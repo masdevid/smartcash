@@ -1,0 +1,89 @@
+# Python specifics
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+.env/
+.venv/
+
+# Model weights and checkpoints
+*.pt
+*.pth
+*.onnx
+*.h5
+weights/
+*.weights
+
+# Logs and databases
+*.log
+*.sqlite
+logs/
+runs/
+
+# Dataset handling
+# Keep source files and annotations, exclude actual images
+data/rupiah/train/images/*
+!data/rupiah/train/images/.gitkeep
+data/rupiah/val/images/*
+!data/rupiah/val/images/.gitkeep
+data/rupiah/test/images/*
+!data/rupiah/test/images/.gitkeep
+data/datasource/*
+
+# Keep labels and source files
+data/rupiah/train/labels/*.txt
+data/rupiah/val/labels/*.txt
+data/rupiah/test/labels/*.txt
+
+# IDEs and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Machine Learning specifics
+*.pkl
+*.joblib
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Exports and temporary files
+exports/
+temp/
+tmp/
+
+# Compiled files
+*.pyc
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# System and temporary files
+.tmp/
+.temp/
+
+# TensorBoard logs
+tensorboard_logs/
+
+# Experiment tracking
+mlruns/
+wandb/
+
+# Security
+.env
+*.env
+
+# Placeholder files to keep directories
+!.gitkeep

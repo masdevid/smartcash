@@ -1,0 +1,43 @@
+# File: config/experiments.yaml
+# Author: Alfrida Sabar
+# Experimental testing configuration
+
+experiments:
+  baseline_vs_proposed:
+    scenarios:
+      - name: 'normal_detection'
+        conditions: 
+          lighting: 'normal'
+          distance: 'medium'
+          orientation: 'horizontal'
+        metrics: ['precision', 'recall', 'f1', 'mAP']
+      
+      - name: 'small_object'
+        conditions:
+          distance: 'far'
+          min_box_size: [32, 32]
+        metrics: ['small_object_ap', 'recall']
+      
+      - name: 'low_light'
+        conditions:
+          lighting: 'low'
+          brightness_range: [0.1, 0.3]
+        metrics: ['precision', 'feature_preservation']
+        
+      - name: 'overlapping'
+        conditions:
+          min_overlap: 0.3
+          stack_count: [2, 3]
+        metrics: ['precision', 'recall']
+        
+  statistical_tests:
+    significance_level: 0.05
+    tests: ['paired_ttest', 'wilcoxon']
+    metrics_to_compare: ['mAP', 'inference_time']
+
+  ablation_studies:
+    components:
+      - name: 'without_fpn'
+      - name: 'without_panet'
+      - name: 'without_compound_scaling'
+    metrics: ['mAP', 'inference_time']

@@ -1,0 +1,31 @@
+# File: config/baseline.yaml
+# Author: Alfrida Sabar
+# Baseline YOLOv5 with CSPDarknet
+
+model:
+  name: 'yolov5_baseline'
+  backbone: 'csp_darknet'
+  img_size: 640
+  nc: 7
+  conf_thres: 0.25
+
+train:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.01
+  early_stop_patience: 5
+
+test_scenarios:
+  position:
+    angles: ['top', 'bottom', 'left', 'right']
+    orientations: ['horizontal', 'vertical', 'diagonal']
+    distances: ['close', 'medium', 'far']
+  
+  lighting:
+    intensities: ['low', 'medium', 'high']
+    sources: ['natural', 'artificial', 'mixed']
+    temperatures: ['cool', 'neutral', 'warm']
+
+metrics:
+  iou_thresholds: [0.5, 0.75, 0.9]
+  map_metrics: ['mAP50', 'mAP75', 'mAP']

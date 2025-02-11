@@ -1,0 +1,44 @@
+# File: config/proposed.yaml
+# Author: Alfrida Sabar
+# Proposed YOLOv5 + EfficientNet-B4
+
+model:
+  name: 'yolov5_efficientnet'
+  backbone: 'efficientnet_b4'
+  backbone_phi: 4
+  img_size: 640
+  nc: 7
+  conf_thres: 0.25
+  fpn:
+    channels: [56, 160, 272, 448]
+    smooth_coef: 0.5
+  panet:
+    depth: 3
+    width: 256
+
+train:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.01
+  early_stop_patience: 5
+  compound_scaling: true
+
+test_scenarios:
+  position:
+    angles: ['top', 'bottom', 'left', 'right']
+    orientations: ['horizontal', 'vertical', 'diagonal']
+    distances: ['close', 'medium', 'far']
+    feature_extraction: ['multi_scale_validation']
+  
+  lighting:
+    intensities: ['low', 'medium', 'high', 'extreme_low']
+    sources: ['natural', 'artificial', 'mixed']
+    temperatures: ['cool', 'neutral', 'warm']
+    feature_preservation: ['low_light_metrics']
+
+metrics:
+  iou_thresholds: [0.5, 0.75, 0.9]
+  map_metrics: ['mAP50', 'mAP75', 'mAP']
+  additional:
+    - 'feature_quality'
+    - 'small_object_ap'

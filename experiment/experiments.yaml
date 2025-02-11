@@ -1,0 +1,77 @@
+# File: config/experiments.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi eksperimen untuk SmartCash Detector
+
+experiments:
+  baseline_vs_proposed:
+    name: "YOLOv5 CSPDarknet vs YOLOv5 EfficientNet-B4"
+    model_config:
+      img_size: 640
+      nc: 7  # jumlah kelas nominal rupiah
+      conf_thres: 0.25
+      backbone_phi: 4  # untuk EfficientNet-B4
+    
+    data_config:
+      train_path: "data/rupiah/train"
+      val_path: "data/rupiah/val"
+      test_path: "data/rupiah/test"
+      batch_size: 16
+      
+    scenarios:
+      - name: "normal_lighting"
+        conditions:
+          lighting: "normal"
+          distance: "medium"
+        metrics_thresholds:
+          mAP: 0.85
+          precision: 0.90
+          recall: 0.85
+          
+      - name: "low_light"
+        conditions:
+          lighting: "low"
+          brightness_range: [0.1, 0.3]
+        metrics_thresholds:
+          mAP: 0.75
+          precision: 0.80
+          recall: 0.75
+          
+      - name: "small_objects"
+        conditions:
+          distance: "far"
+          min_box_size: [32, 32]
+        metrics_thresholds:
+          mAP: 0.70
+          small_object_ap: 0.65
+          
+      - name: "occlusion"
+        conditions:
+          min_overlap: 0.3
+          max_overlap: 0.7
+        metrics_thresholds:
+          mAP: 0.80
+          precision: 0.85
+          
+    metrics:
+      - mAP
+      - precision
+      - recall
+      - f1_score
+      - inference_time
+      - small_object_ap
+
+  ablation_studies:
+    name: "Component Analysis"
+    scenarios:
+      - name: "no_fpn"
+        model_config:
+          use_fpn: false
+          
+      - name: "no_compound_scaling"
+        model_config:
+          use_compound_scaling: false
+          
+      - name: "basic_augmentation"
+        data_config:
+          use_mosaic: false
+          use_mixup: false

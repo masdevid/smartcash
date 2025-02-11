@@ -1,0 +1,27 @@
+# File: config/default.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi default dengan label yang diperbarui
+
+model:
+  img_size: 640
+  nc: 7
+  backbone_phi: 4
+  anchors: [[10,13], [16,30], [33,23],
+            [30,61], [62,45], [59,119],
+            [116,90], [156,198], [373,326]]
+  conf_thres: 0.25
+
+data:
+  data_dir: 'data/rupiah'
+  train_path: 'data/rupiah/train'
+  val_path: 'data/rupiah/val'
+  test_path: 'data/rupiah/test'
+  class_names: ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
+  aug_factor: 2
+
+train:
+  epochs: 100
+  batch_size: 16
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  early_stop_patience: 5

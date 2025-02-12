@@ -8,13 +8,15 @@ SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal 
 
 ### 🤝 Kontribusi dan Alur Kerja
 Sebelum mulai berkontribusi, harap baca dengan seksama:
-- [Panduan Komprehensif Alur Kerja Git](docs/Panduan Alur Kerja Git.md)
+- 
+- 
+- [Panduan Alur Kerja Git](docs/WORKFLOW.md)
   - Cara clone repository
   - Membuat cabang develop dan fitur
   - Praktik commit terbaik
   - Etika kontribusi
 
-- [Panduan Pesan Commit](docs/Panduan Commit Message (GitHook).md)
+- [Pedoman Pesan Commit](docs/COMMIT_GUIDELINES.md)
   - Format pesan commit yang benar
   - Jenis commit
   - Praktik penulisan pesan commit
@@ -61,7 +63,7 @@ smartcash-detector/
 1. Clone repository:
 ```bash
 git clone https://github.com/[username]/smartcash-detector.git
-cd smartcash-detector
+cd smartcash
 ```
 
 2. Buat virtual environment:

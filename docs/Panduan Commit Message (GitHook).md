@@ -8,6 +8,10 @@
   ```bash
   pip install flake8 mypy pytest
   ```
+  atau
+  ```bash
+  pip install -r dev_requirements.txt
+  ```
 
 ### Instalasi
 1. Salin skrip `pre-commit` ke `.git/hooks/pre-commit`

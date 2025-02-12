@@ -1,93 +1,108 @@
-# SmartCash Detector: Optimasi Deteksi Nominal Mata Uang dengan YOLOv5 dan EfficientNet-B4
+# SmartCash Detector: Deteksi Nominal Mata Uang Rupiah
 
-## 🎯 Tujuan Penelitian
+## 🎯 Tujuan Proyek
 
-Proyek SmartCash Detector bertujuan mengembangkan sistem deteksi mata uang Rupiah yang akurat dan andal menggunakan teknologi deteksi objek YOLOv5. Fokus utama penelitian adalah mengoptimalkan algoritma YOLOv5 DarkNet dengan arsitektur backbone EfficientNet-B4 untuk meningkatkan performa deteksi, terutama pada kondisi spesifik.
+SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal mata uang Rupiah menggunakan teknologi deteksi objek berbasis deep learning.
 
-## 🔬 Fitur Utama
+## 🛠 Struktur Proyek
 
-- 🤖 Integrasi YOLOv5 dengan EfficientNet-B4
-- 📷 Deteksi nominal mata uang Rupiah
-- 🌈 Robust terhadap variasi pencahayaan
-- 🔍 Optimasi deteksi objek kecil
-- 📊 Evaluasi komprehensif dengan berbagai skenario
+```
+smartcash-detector/
+│
+├── src/                   # Kode sumber utama
+│   ├── main.py            # Titik masuk aplikasi
+│   ├── interfaces/        # Antarmuka pengguna
+│   ├── models/            # Definisi model deteksi
+│   ├── data/              # Manajemen dataset
+│   ├── evaluation/        # Modul evaluasi model
+│   └── utils/             # Utilitas pendukung
+│
+├── data/                  # Direktori data
+│   └── rupiah/            # Dataset mata uang Rupiah
+│       ├── train/
+│       ├── val/
+│       └── test/
+│
+├── weights/               # Model yang dilatih
+├── runs/                  # Hasil eksperimen
+├── logs/                  # Log sistem
+│
+├── requirements.txt       # Dependensi utama
+├── dev-requirements.txt   # Dependensi pengembangan
+└── README.md              # Dokumentasi proyek
+```
 
-## 🛠 Persyaratan Sistem
+## 🚀 Persiapan Awal
 
-### Perangkat Keras
-- GPU CUDA dengan memori minimal 8GB
-- CPU Intel/AMD dengan dukunng AVX2
-- RAM minimal 16GB
-
-### Perangkat Lunak
+### Prasyarat
 - Python 3.8+
-- PyTorch 1.10+
-- CUDA 11.3+
-- Albumentations
-- EfficientNet-PyTorch
+- GPU CUDA (disarankan, tetapi tidak wajib)
+- Minimal 16GB RAM
 
-## 🚀 Instalasi
+### Instalasi
 
+1. Clone repository:
 ```bash
-# Clone repository
-git clone https://github.com/alfridasabar/smartcash-detector.git
+git clone https://github.com/[username]/smartcash-detector.git
 cd smartcash-detector
+```
 
-# Buat virtual environment
+2. Buat virtual environment:
+```bash
 python -m venv venv
 source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate   # Windows
+```
 
-# Install dependencies
+3. Instal dependensi:
+```bash
 pip install -r requirements.txt
 ```
 
-## 📋 Penggunaan Dasar
+## 🖥️ Menjalankan Aplikasi
 
-### Persiapan Dataset
-```bash
-python src/data/prepare.py
-```
-
-### Training Model
+Cukup jalankan:
 ```bash
 python src/main.py
-# Pilih menu Training Model
 ```
 
-### Evaluasi
-```bash
-python src/main.py
-# Pilih menu Evaluasi & Pengujian
-```
+### Menu Utama
+
+1. **Manajemen Data**
+   - Persiapan dataset
+   - Augmentasi data
+   - Verifikasi dataset
+   - Statistik dataset
+
+2. **Operasi Model**
+   - Training model
+   - Tuning hyperparameter
+   - Melihat status model
+
+3. **Pengujian & Evaluasi**
+   - Jalankan skenario pengujian
+   - Evaluasi performa model
+   - Analisis error
+
+4. **Ekspor Model**
+   - Konversi model ke format berbeda
 
 ## 🧪 Skenario Pengujian
 
-1. **Pencahayaan Normal**
-   - Deteksi mata uang dalam kondisi cahaya standar
+- Deteksi dalam pencahayaan normal
+- Deteksi dalam pencahayaan rendah
+- Deteksi objek kecil
+- Deteksi dengan oklusi parsial
 
-2. **Pencahayaan Rendah**
-   - Uji kemampuan deteksi dalam kondisi cahaya minim
+## 📊 Metrik Evaluasi
 
-3. **Deteksi Objek Kecil**
-   - Fokus pada akurasi deteksi nominal berukuran kecil
-
-4. **Oklusi Parsial**
-   - Simulasi deteksi mata uang yang terhalang sebagian
-
-## 📈 Metrik Evaluasi
-
-- mAP (Mean Average Precision)
+- Mean Average Precision (mAP)
 - Precision
 - Recall
 - Waktu Inferensi
-- Performa Deteksi Objek Kecil
 
 ## 🤝 Kontribusi
 
-Kami mendorong kontribusi dari komunitas! Silakan buka _issue_ atau kirim _pull request_.
-
-### Panduan Kontribusi
 1. Fork repository
 2. Buat branch fitur (`git checkout -b fitur/AturDeteksi`)
 3. Commit perubahan (`git commit -m 'Tambah fitur deteksi lanjutan'`)
@@ -98,16 +113,7 @@ Kami mendorong kontribusi dari komunitas! Silakan buka _issue_ atau kirim _pull 
 
 Proyek ini dilisensikan di bawah MIT License.
 
-## 📞 Kontak
-
-**Alfrida Sabar**
-- Email: alfrida.sabar@gmail.com
-- LinkedIn: [Profil LinkedIn](https://www.linkedin.com/in/@username/)
-- ResearchGate: [Profil ResearchGate](https://www.researchgate.net/profile/@username)
-
 ## 🏆 Sitasi
-
-Jika penelitian ini membantu Anda, pertimbangkan untuk mensitasi:
 
 ```
 Sabar, A. (2025). Optimasi Deteksi Nominal Mata Uang dengan YOLOv5 dan EfficientNet-B4. (Unpublished)

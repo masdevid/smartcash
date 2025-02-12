@@ -1,4 +1,4 @@
-# SmartCash Detector: Deteksi Nominal Mata Uang Rupiah
+# SmartCash Detector: Deteksi Nominal Mata Uang Rupiah (WORK IN PROGRESS)
 
 ## 🎯 Tujuan Proyek
 
@@ -60,7 +60,7 @@ smartcash-detector/
 
 1. Clone repository:
 ```bash
-git clone https://github.com/[username]/smartcash.git
+git clone https://github.com/masdevid/smartcash.git
 cd smartcash
 ```
 
@@ -116,14 +116,14 @@ python main.py
 
 - Mean Average Precision (mAP)
 - Precision
-- Recall
+- Recall 
 - Waktu Inferensi
 
 ## 🤝 Kontribusi
 
-1. Baca panduan alur kerja Git
+1. Baca panduan [panduan Alur Kerja Git](docs/WORKFLOW.md)
 2. Buat branch fitur (`git checkout -b fitur/AturDeteksi`)
-3. Commit perubahan sesuai panduan
+3. Commit perubahan sesuai [Pedoman Pesan Commit](docs/COMMIT_GUIDELINES.md)
 4. Push ke branch
 5. Buka Pull Request
 

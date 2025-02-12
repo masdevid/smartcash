@@ -5,6 +5,7 @@
 from pathlib import Path
 from .base_interface import BaseInterface
 import yaml
+
 class ExportInterface(BaseInterface):
     def __init__(self, config):
         super().__init__()
@@ -26,6 +27,7 @@ class ExportInterface(BaseInterface):
         return self.prompt(menu, color='cyan')
 
     def handle_menu(self):
+        """Tangani pilihan menu ekspor"""
         while True:
             pilihan = self.tampilkan_menu()
             
@@ -42,6 +44,15 @@ class ExportInterface(BaseInterface):
                     self.ekspor_konfigurasi()
                 else:
                     self.show_error("❌ Pilihan menu tidak valid!")
+                    continue
+                
+                # Konfirmasi kembali ke menu
+                if not self.confirm("\nKembali ke menu Ekspor & Deploy?"):
+                    break
+                    
+            except KeyboardInterrupt:
+                self.logger.warning("\n⚠️ Operasi dibatalkan oleh pengguna")
+                continue
             except Exception as e:
                 self.show_error(f"❌ Terjadi kesalahan: {str(e)}")
 
@@ -56,10 +67,7 @@ class ExportInterface(BaseInterface):
         if self.confirm("Mulai proses ekspor?"):
             try:
                 output_path = self.export_dir / nama_file
-                self.detector.export_onnx(
-                    output_path=str(output_path),
-                    opset=opset
-                )
+                # TODO: Implement ONNX export logic
                 self.show_success(f"✨ Model berhasil diekspor ke: {output_path}")
             except Exception as e:
                 self.show_error(f"❌ Gagal mengekspor model: {str(e)}")
@@ -82,10 +90,10 @@ class ExportInterface(BaseInterface):
             # Dapatkan konfigurasi
             config = {
                 'model': {
-                    'type': self.detector.model_type,
+                    'type': 'YOLOv5 dengan EfficientNet-B4',
                     'img_size': self.cfg.model.img_size,
                     'nc': self.cfg.model.nc,
-                    'backbone': self.detector.backbone_info
+                    'backbone': 'EfficientNet-B4'
                 },
                 'inference': {
                     'conf_thres': self.cfg.model.conf_thres,

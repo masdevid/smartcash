@@ -1,433 +1,233 @@
+# File: src/interfaces/data_management_interface.py
+# Author: Alfrida Sabar
+# Deskripsi: Antarmuka untuk manajemen dataset dengan pendekatan context-driven
+
+
+
 # File: src/interfaces/data_interface.py
 # Author: Alfrida Sabar
-# Deskripsi: Antarmuka modular untuk manajemen data SmartCash Detector
+# Deskripsi: Antarmuka untuk manajemen dataset dengan pendekatan context-driven
 
 from pathlib import Path
 from typing import Dict, Optional
-from termcolor import colored
-import cv2
+
 from .base_interface import BaseInterface
-from handlers.dataset_handlers import (
-    DatasetCopyHandler,
-    DatasetCleanHandler,
-    DatasetVerifyHandler
-)
-from handlers.augmentation_handlers import AugmentationHandler
+from interfaces.data_manager import DataManager
+from config.manager import ConfigManager
 
 class DataInterface(BaseInterface):
-    def __init__(self, config):
+    """Antarmuka untuk operasi manajemen dataset"""
+    def __init__(self, config: ConfigManager):
         super().__init__()
         self.cfg = config
+        self.data_manager = DataManager(config)
         
-        # Define directory structure
-        self.project_root = Path(__file__).parent.parent.parent
-        self.data_dir = self.project_root / "data"
-        self.rupiah_dir = self.data_dir / "rupiah"
-        
-        # Initialize handlers
-        self._init_handlers()
-
-    def _init_handlers(self):
-        """Initialize operation handlers"""
-        self.copy_handler = DatasetCopyHandler(self.rupiah_dir)
-        self.clean_handler = DatasetCleanHandler(self.rupiah_dir)
-        self.verify_handler = DatasetVerifyHandler(self.rupiah_dir)
-        self.aug_handler = AugmentationHandler(self.rupiah_dir)
-
-    def tampilkan_menu(self):
+    def tampilkan_menu(self) -> str:
+        """Tampilkan menu manajemen dataset"""
         menu = """
-📁 Menu Manajemen Data:
+📦 Menu Manajemen Dataset:
 
 1. Persiapan Dataset
-2. Terapkan Augmentasi
-3. Verifikasi Dataset
-4. Statistik Dataset
-5. Salin Dataset Eksternal 📥
-6. Bersihkan Dataset 🗑️
+   └─ Buat struktur direktori dan konfigurasi
+2. Verifikasi Dataset
+   └─ Periksa integritas dan konsistensi data
+3. Informasi Dataset
+   └─ Tampilkan statistik dan detail dataset
+4. Pembersihan Dataset
+   └─ Hapus data korup atau tidak valid
+5. Augmentasi Data
+   └─ Perluas dan variasikan dataset
 
 0. Kembali ke Menu Utama
 """
         return self.prompt(menu, color='cyan')
 
     def handle_menu(self):
+        """Tangani pilihan menu manajemen dataset"""
         while True:
-            pilihan = self.tampilkan_menu()
-            
             try:
-                if pilihan == '0':
-                    break
-                elif pilihan == '1':
-                    self.persiapkan_dataset()
-                elif pilihan == '2':
-                    self.terapkan_augmentasi()
-                elif pilihan == '3':
-                    self.verifikasi_dataset()
-                elif pilihan == '4':
-                    self.tampilkan_statistik()
-                elif pilihan == '5':
-                    self.salin_dataset_eksternal()
-                elif pilihan == '6':
-                    self.bersihkan_dataset()
-                else:
+                pilihan = self.tampilkan_menu()
+                
+                menu_actions = {
+                    '0': lambda: True,
+                    '1': self._handle_preparation,
+                    '2': self._handle_verification,
+                    '3': self._handle_dataset_info,
+                    '4': self._handle_cleaning,
+                    '5': self._handle_augmentation
+                }
+                
+                # Eksekusi aksi atau minta ulang
+                action = menu_actions.get(pilihan)
+                if action is None:
                     self.show_error("❌ Pilihan menu tidak valid!")
+                    continue
+                
+                # Jalankan aksi
+                should_exit = action()
+                if should_exit:
+                    break
+                
+                # Konfirmasi kembali ke menu
+                if not self.confirm("\nKembali ke menu Manajemen Dataset?"):
+                    break
+                    
+            except KeyboardInterrupt:
+                self.logger.warning("\n⚠️ Operasi dibatalkan oleh pengguna")
             except Exception as e:
                 self.show_error(f"❌ Terjadi kesalahan: {str(e)}")
 
-    def persiapkan_dataset(self):
-        """Proses persiapan dataset"""
-        self.logger.info("\n🔄 Persiapan Dataset")
+    def _handle_preparation(self):
+        """Tangani persiapan dataset"""
+        self.logger.info("\n🔧 Mempersiapkan Dataset...")
         
-        # Verifikasi dataset jika sudah ada
-        if self.rupiah_dir.exists():
-            stats = self.verify_handler.verify_dataset()
-            self._display_verification_results(stats)
-            
-            if not self.confirm("\nDataset sudah ada. Ingin mempersiapkan ulang?"):
-                return
-        
-        # Buat struktur direktori
-        try:
-            self.copy_handler._create_dest_structure()
-            self.copy_handler._create_config()
-            self.show_success("✨ Persiapan dataset selesai!")
-        except Exception as e:
-            self.show_error(f"❌ Gagal mempersiapkan dataset: {str(e)}")
-
-    def terapkan_augmentasi(self):
-        """Proses augmentasi data"""
-        # Get augmentation descriptions
-        aug_types = self.aug_handler.get_augmentation_descriptions()
-        
-        # Display augmentation info
-        self.logger.info("\n🎨 Konfigurasi Augmentasi Data:\n")
-        self._display_augmentation_info()
-        
-        # Get user choice
-        for i, (key, info) in enumerate(aug_types.items(), 1):
-            print(colored(f"\n{i}. {info['name']}", 'yellow'))
-            print(f"   {info['description']}")
-            for feature in info['features']:
-                print(f"   • {feature}")
-            print(f"   Cocok untuk: {info['use_case']}")
-        
-        choice = self.prompt("\nPilih jenis augmentasi", default="3")
-        mode = list(aug_types.keys())[int(choice)-1]
-        
-        # Get augmentation parameters if needed
-        params = None
-        if mode == 'currency':
-            params = self._get_currency_augmentation_params()
-        
-        # Get multiplication factor
-        aug_info = self.aug_handler.get_augmentation_info()
-        self._display_augmentation_factor_info(aug_info)
-        factor = int(self.prompt("Faktor penggandaan", 
-                               default=str(aug_info['recommended_factor'])))
-        
-        # Apply augmentation
-        if self.confirm("\nMulai proses augmentasi?"):
-            try:
-                stats = self.aug_handler.apply_augmentation(mode, factor, params)
-                self._display_augmentation_results(stats)
-            except Exception as e:
-                self.show_error(f"❌ Gagal melakukan augmentasi: {str(e)}")
-
-    def verifikasi_dataset(self):
-        """Verifikasi integritas dataset"""
-        self.logger.info("\n🔍 Memulai verifikasi dataset...")
-        
-        try:
-            stats = self.verify_handler.verify_dataset()
-            self._display_verification_results(stats)
-        except Exception as e:
-            self.show_error(f"❌ Gagal memverifikasi dataset: {str(e)}")
-
-    def tampilkan_statistik(self):
-        """Tampilkan statistik dataset"""
-        self.logger.info("\n📊 Menganalisis dataset...")
-        
-        try:
-            # Get verification stats
-            verify_stats = self.verify_handler.verify_dataset()
-            
-            # Get augmentation stats
-            aug_stats = self.aug_handler.get_augmentation_info()
-            
-            self._display_dataset_statistics(verify_stats, aug_stats)
-        except Exception as e:
-            self.show_error(f"❌ Gagal mengambil statistik: {str(e)}")
-
-    def salin_dataset_eksternal(self):
-        """Proses penyalinan dataset dari sumber eksternal"""
-        self.logger.info("\n📥 Salin Dataset Eksternal")
-        
-        # Get source location
-        source_dir = self._get_source_location()
-        if not source_dir:
-            return
-            
-        # Validate and copy
-        if self.confirm("\nMulai penyalinan dataset?"):
-            try:
-                stats = self.copy_handler.copy_dataset(source_dir)
-                self._display_copy_results(stats)
-            except Exception as e:
-                self.show_error(f"❌ Gagal menyalin dataset: {str(e)}")
-
-    def bersihkan_dataset(self):
-        """Proses pembersihan dataset"""
-        self.logger.info("\n🗑️ Pembersihan Dataset")
-        
-        # Get cleaning mode
-        mode = self._get_cleaning_mode()
-        if not mode:
-            return
-            
-        # Confirm and clean
-        if self.confirm("Anda yakin ingin melanjutkan?"):
-            try:
-                stats = self.clean_handler.clean_dataset(mode)
-                self._display_cleaning_results(stats)
-            except Exception as e:
-                self.show_error(f"❌ Gagal membersihkan dataset: {str(e)}")
-
-    # Helper methods for displaying information
-    def _display_verification_results(self, stats: Dict):
-        """Display dataset verification results"""
-        self.logger.info("\n📊 Hasil Verifikasi:")
-        for split, info in stats.items():
-            print(colored(f"\n{split.upper()}:", 'cyan'))
-            print(f"  • Total Gambar: {info['images']}")
-            print(f"  • Total Label: {info['labels']}")
-            print(f"  • File Rusak: {info['corrupt']}")
-            print(f"  • Label Invalid: {info['invalid']}")
-            print(f"  • Gambar Original: {info['original']}")
-            print(f"  • Gambar Augmentasi: {info['augmented']}")
-
-    def _display_augmentation_info(self):
-        """Display general augmentation information"""
-        self.logger.info("📝 Tujuan Augmentasi:")
-        self.logger.info("- Meningkatkan variasi data training")
-        self.logger.info("- Mencegah overfitting")
-        self.logger.info("- Meningkatkan ketahanan model terhadap variasi kondisi nyata\n")
-
-    def _display_augmentation_factor_info(self, aug_info: Dict):
-        """Display multiplication factor guidance"""
-        self.logger.info("\n📊 Panduan Faktor Penggandaan:")
-        self.logger.info("1-2x  : Penambahan minimal, untuk dataset besar (>1000 gambar)")
-        self.logger.info("3-4x  : Penambahan moderat, untuk dataset sedang (500-1000 gambar)")
-        self.logger.info("5-8x  : Penambahan besar, untuk dataset kecil (<500 gambar)")
-        self.logger.info(f"\nℹ️  Jumlah gambar saat ini: {aug_info['original']}")
-        self.logger.info(f"💡 Rekomendasi faktor: {aug_info['recommended_factor']}x")
-
-    def _display_augmentation_results(self, stats: Dict):
-        """Display augmentation results"""
-        self.show_success(
-            f"✨ Augmentasi selesai!\n"
-            f"   • Gambar diproses: {stats['processed']}\n"
-            f"   • Augmentasi dibuat: {stats['augmented']}\n"
-            f"   • Error: {stats['errors']}"
-        )
-
-    def _display_copy_results(self, stats: Dict):
-        """Display dataset copy results"""
-        self.show_success(
-            f"✨ Dataset berhasil disalin!\n"
-            f"   • File disalin: {stats['copied']}\n"
-            f"   • File dilewati: {stats['skipped']}\n"
-            f"   • Error: {stats['errors']}"
-        )
-
-    def _display_cleaning_results(self, stats: Dict):
-        """Display dataset cleaning results"""
-        self.show_success(
-            f"✨ Pembersihan selesai!\n"
-            f"   • File dihapus: {stats['removed']}\n"
-            f"   • Error: {stats['errors']}"
-        )
-
-    def _display_dataset_statistics(self, verify_stats: Dict, aug_stats: Dict):
-        """Display comprehensive dataset statistics"""
-        self.logger.info("\n📈 Statistik Dataset:")
-        
-        # Overall stats
-        total_images = sum(s['images'] for s in verify_stats.values())
-        total_original = sum(s['original'] for s in verify_stats.values())
-        total_augmented = sum(s['augmented'] for s in verify_stats.values())
-        
-        print(colored("\nRingkasan:", 'cyan'))
-        print(f"  • Total Gambar: {total_images}")
-        print(f"  • Gambar Original: {total_original}")
-        print(f"  • Gambar Augmentasi: {total_augmented}")
-        
-        # Per-split stats
-        for split, stats in verify_stats.items():
-            print(colored(f"\n{split.upper()}:", 'cyan'))
-            print(f"  • Gambar: {stats['images']}")
-            print(f"  • Original: {stats['original']}")
-            print(f"  • Augmentasi: {stats['augmented']}")
-            print(f"  • File Rusak: {stats['corrupt']}")
-            
-        # Augmentation recommendation
-        print(colored("\nRekomendasi Augmentasi:", 'cyan'))
-        print(f"  • Faktor yang disarankan: {aug_stats['recommended_factor']}x")
-
-    # Helper methods for user input
-    def _get_source_location(self) -> Optional[Path]:
-        """Get and validate source dataset location"""
-        self.logger.info("\nPilih lokasi sumber dataset:")
-        print(colored("1. Dari direktori proyek saat ini", 'yellow'))
-        print(colored("2. Dari direktori data", 'yellow'))
-        print(colored("3. Dari lokasi eksternal", 'yellow'))
-
-        choice = self.prompt("Pilih lokasi sumber", default="1")
-        
-        # Determine base directory
-        if choice == "1":
-            base_dir = self.project_root
-            self.logger.info(f"📂 Direktori proyek: {base_dir}")
-        elif choice == "2":
-            base_dir = self.data_dir
-            self.logger.info(f"📂 Direktori data: {base_dir}")
+        # Validasi dan persiapan direktori
+        if (self.data_manager.validate_directory(self.data_manager.data_dir) and 
+            self.data_manager.prepare_dataset()):
+            self.show_success("✅ Persiapan dataset berhasil!")
         else:
-            base_dir = Path(self.prompt("Masukkan path lengkap direktori sumber"))
-            if not base_dir.exists():
-                self.show_error("❌ Direktori tidak ditemukan!")
-                return None
+            self.show_error("❌ Gagal mempersiapkan dataset")
+        return False
 
-        # Get subdirectory
-        subdir = self.prompt("Nama subdirektori sumber (e.g., rupiah_baru)")
-        source_dir = base_dir / subdir
+    def _handle_verification(self):
+        """Tangani verifikasi dataset"""
+        self.logger.info("\n🔍 Memverifikasi Dataset...")
         
-        if not source_dir.exists():
-            self.show_error("❌ Subdirektori sumber tidak ditemukan!")
-            return None
+        is_verified = self.data_manager.verify_dataset(plot=True)
+        
+        if is_verified:
+            self.show_success("✅ Dataset valid dan siap digunakan!")
+        else:
+            self.show_error("❌ Ditemukan masalah dalam dataset")
+        return False
+
+    def _handle_dataset_info(self):
+        """Tampilkan informasi dan statistik dataset"""
+        self.logger.info("\n📊 Informasi Dataset:")
+        
+        try:
+            # Tampilkan informasi dataset
+            self.data_manager.print_dataset_info()
             
-        return source_dir
+            # Analisis komprehensif
+            analysis = self.data_manager.analyze_dataset()
+            
+            # Generate rekomendasi
+            recs = analysis.get('augmentation_recommendations', {})
+            if recs.get('general'):
+                print("\n💡 Rekomendasi:")
+                for rec in recs['general']:
+                    print(f"  • {rec.get('description', 'Rekomendasi umum')}")
+                    for action in rec.get('actions', []):
+                        print(f"    - {action}")
+        except Exception as e:
+            self.logger.error(f"Gagal mendapatkan analisis: {str(e)}")
+        return False
 
-    def _get_cleaning_mode(self) -> Optional[str]:
-        """Get dataset cleaning mode from user"""
-        self.logger.info("\nPilih operasi pembersihan:")
-        print(colored("1. Bersihkan semua data", 'red'))
-        print(colored("2. Bersihkan hanya data augmentasi", 'yellow'))
-        print(colored("3. Bersihkan data training saja", 'yellow'))
-        print(colored("4. Bersihkan file rusak", 'yellow'))
-
-        choice = self.prompt("Pilih operasi", default="2")
+    def _handle_cleaning(self):
+        """Tangani pembersihan dataset"""
+        self.logger.info("\n🧹 Membersihkan Dataset...")
         
-        # Map choice to mode
-        mode_map = {
-            "1": "all",
-            "2": "augmented",
-            "3": "training",
-            "4": "corrupt"
+        modes = {
+            '1': 'all',
+            '2': 'augmented',
+            '3': 'training',
+            '4': 'corrupt'
         }
         
-        if choice not in mode_map:
+        print("\nPilih Mode Pembersihan:")
+        print("1. Hapus Semua Data")
+        print("2. Hapus Data Augmentasi")
+        print("3. Hapus Data Training")
+        print("4. Hapus Data Korup")
+        print("0. Batal")
+        
+        mode_choice = self.prompt("Pilih mode", default='0')
+        
+        # Keluar jika dibatalkan
+        if mode_choice == '0':
+            return False
+        
+        # Validasi pilihan
+        if mode_choice not in modes:
             self.show_error("❌ Pilihan tidak valid!")
-            return None
+            return False
+        
+        # Konfirmasi pembersihan
+        if not self.confirm(f"Yakin hapus data '{modes[mode_choice]}'?"):
+            return False
+        
+        # Jalankan pembersihan
+        try:
+            stats = self.data_manager.clean_dataset(modes[mode_choice])
             
-        # Show warning for destructive operations
-        if choice == "1":
-            self.logger.warning("\n⚠️ PERINGATAN: SEMUA DATA akan dihapus!")
-        else:
-            self.logger.warning("\n⚠️ PERINGATAN: Data yang dihapus tidak dapat dikembalikan!")
-            
-        return mode_map[choice]
+            print(f"  • Total file dihapus: {stats.get('removed', 0)}")
+            if stats.get('errors', 0) > 0:
+                self.show_error(f"⚠️ Terjadi {stats['errors']} kesalahan")
+            else:
+                self.show_success("✅ Pembersihan dataset berhasil!")
+        except Exception as e:
+            self.show_error(f"❌ Gagal membersihkan dataset: {str(e)}")
+        
+        return False
 
-    def _get_currency_augmentation_params(self) -> Dict:
-        """Get parameters for currency-specific augmentation"""
-        print(colored("\nParameter Augmentasi Mata Uang:", 'cyan'))
-        print("1. Variasi Pencahayaan (simulasi kondisi pencahayaan berbeda)")
-        print("2. Variasi Sudut (simulasi posisi kamera berbeda)")
-        print("3. Variasi Kondisi (simulasi uang lusuh/terlipat)")
-        print("4. Semua variasi di atas")
+    def _handle_augmentation(self):
+        """Tangani augmentasi dataset"""
+        self.logger.info("\n🔄 Memulai Augmentasi Dataset...")
         
-        choice = self.prompt("Pilih parameter (1-4)", default="4")
+        augmentation_handler = self.data_manager.handlers['augmentation']
         
-        return {
-            'lighting': choice in ['1', '4'],
-            'geometric': choice in ['2', '4'],
-            'condition': choice in ['3', '4']
+        # Dapatkan rekomendasi faktor
+        recommended_factor = augmentation_handler.get_recommended_factor()
+        
+        # Tampilkan deskripsi augmentasi
+        descriptions = augmentation_handler.get_augmentation_descriptions()
+        
+        print("\nTipe Augmentasi Tersedia:")
+        for key, desc in descriptions.items():
+            print(f"\n{desc['name']}:")
+            print(f"  Deskripsi: {desc['description']}")
+            print("  Fitur:")
+            for feature in desc.get('features', []):
+                print(f"    • {feature}")
+        
+        # Pilih faktor dan mode
+        factor = int(self.prompt("Faktor augmentasi", default=str(recommended_factor)))
+        
+        modes_options = {
+            '1': ['lighting'],
+            '2': ['geometric'],
+            '3': ['condition'],
+            '4': ['lighting', 'geometric', 'condition']
         }
-
-    def _validate_dataset_structure(self, path: Path) -> bool:
-        """Validate dataset directory structure"""
-        required_structure = {
-            'train': ['images', 'labels'],
-            'val': ['images', 'labels'],
-            'test': ['images', 'labels']
-        }
         
-        missing = []
-        for split, subdirs in required_structure.items():
-            for subdir in subdirs:
-                if not (path / split / subdir).exists():
-                    missing.append(f"{split}/{subdir}")
+        print("\nPilih Mode Augmentasi:")
+        print("1. Pencahayaan")
+        print("2. Geometrik")
+        print("3. Kondisi")
+        print("4. Semua Mode")
         
-        if missing:
-            self.logger.warning("⚠️ Struktur direktori tidak lengkap!")
-            self.logger.warning("Direktori yang tidak ditemukan:")
-            for dir_path in missing:
-                print(colored(f"  • {dir_path}", 'yellow'))
+        mode_choice = self.prompt("Pilih mode", default='4')
+        
+        # Validasi pilihan
+        if mode_choice not in modes_options:
+            self.show_error("❌ Pilihan tidak valid!")
             return False
+        
+        # Jalankan augmentasi
+        try:
+            stats = self.data_manager.augment_dataset(
+                factor=factor, 
+                modes=modes_options[mode_choice]
+            )
             
-        return True
-
-    def _validate_image_sizes(self, path: Path) -> bool:
-        """Validate image dimensions and formats"""
-        min_size = self.cfg.data.min_size
-        max_size = self.cfg.data.max_size
-        invalid = []
+            print(f"  • Total diproses: {stats.get('processed', 0)}")
+            print(f"  • Data ditambahkan: {stats.get('augmented', 0)}")
+            if stats.get('errors', 0) > 0:
+                self.show_error(f"⚠️ Terjadi {stats['errors']} kesalahan")
+            else:
+                self.show_success("✅ Augmentasi dataset berhasil!")
+        except Exception as e:
+            self.show_error(f"❌ Gagal melakukan augmentasi: {str(e)}")
         
-        for img_path in path.rglob('*.jpg'):
-            try:
-                img = cv2.imread(str(img_path))
-                if img is None:
-                    invalid.append((img_path, "Tidak dapat dibaca"))
-                    continue
-                    
-                h, w = img.shape[:2]
-                if h < min_size[0] or w < min_size[1]:
-                    invalid.append((img_path, f"Terlalu kecil ({w}x{h})"))
-                elif h > max_size[0] or w > max_size[1]:
-                    invalid.append((img_path, f"Terlalu besar ({w}x{h})"))
-            except Exception as e:
-                invalid.append((img_path, f"Error: {str(e)}"))
-        
-        if invalid:
-            self.logger.warning("\n⚠️ Ditemukan gambar yang tidak valid:")
-            for path, reason in invalid:
-                print(colored(f"  • {path.name}: {reason}", 'yellow'))
-            return False
-            
-        return True
-
-    def _validate_labels(self, path: Path) -> bool:
-        """Validate label format and content"""
-        invalid = []
-        
-        for label_path in path.rglob('*.txt'):
-            try:
-                with open(label_path) as f:
-                    for i, line in enumerate(f, 1):
-                        try:
-                            values = list(map(float, line.strip().split()))
-                            if len(values) != 5:
-                                invalid.append((label_path, f"Baris {i}: Format tidak valid"))
-                            elif not (0 <= values[0] <= 6):
-                                invalid.append((label_path, f"Baris {i}: Kelas tidak valid"))
-                            elif not all(0 <= v <= 1 for v in values[1:]):
-                                invalid.append((label_path, f"Baris {i}: Koordinat tidak valid"))
-                        except ValueError:
-                            invalid.append((label_path, f"Baris {i}: Tidak dapat diparse"))
-            except Exception as e:
-                invalid.append((label_path, f"Error: {str(e)}"))
-        
-        if invalid:
-            self.logger.warning("\n⚠️ Ditemukan label yang tidak valid:")
-            for path, reason in invalid:
-                print(colored(f"  • {path.name}: {reason}", 'yellow'))
-            return False
-            
-        return True
+        return False

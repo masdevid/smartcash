@@ -27,6 +27,7 @@ class EvaluationInterface(BaseInterface):
         return self.prompt(menu, color='cyan')
 
     def handle_menu(self):
+        """Tangani pilihan menu evaluasi"""
         while True:
             pilihan = self.tampilkan_menu()
             
@@ -43,6 +44,15 @@ class EvaluationInterface(BaseInterface):
                     self.bandingkan_model()
                 else:
                     self.show_error("❌ Pilihan menu tidak valid!")
+                    continue
+                
+                # Konfirmasi kembali ke menu
+                if not self.confirm("\nKembali ke menu Evaluasi & Pengujian?"):
+                    break
+                    
+            except KeyboardInterrupt:
+                self.logger.warning("\n⚠️ Operasi dibatalkan oleh pengguna")
+                continue
             except Exception as e:
                 self.show_error(f"❌ Terjadi kesalahan: {str(e)}")
 
@@ -58,11 +68,8 @@ class EvaluationInterface(BaseInterface):
         threshold = float(self.prompt("Confidence threshold", default="0.25"))
         
         try:
-            hasil = self.evaluator.evaluate_scenario(
-                scenario=skenario,
-                conf_thresh=threshold
-            )
-            self.tampilkan_hasil_evaluasi(hasil)
+            # TODO: Implement scenario evaluation
+            self.logger.info("Menjalankan skenario pengujian...")
         except Exception as e:
             self.show_error(f"❌ Gagal menjalankan skenario: {str(e)}")
 
@@ -71,12 +78,8 @@ class EvaluationInterface(BaseInterface):
         self.logger.info("📊 Memulai evaluasi performa...")
         
         try:
-            metrics = self.evaluator.evaluate_all()
-            
-            self.logger.info("\n📈 Hasil Evaluasi:")
-            for metrik, nilai in metrics.items():
-                warna = 'green' if nilai > 0.8 else 'yellow' if nilai > 0.6 else 'red'
-                print(colored(f"- {metrik}: {nilai:.4f}", warna))
+            # TODO: Implement performance evaluation
+            self.logger.info("Mengevaluasi performa model...")
         except Exception as e:
             self.show_error(f"❌ Gagal mengevaluasi performa: {str(e)}")
 
@@ -84,20 +87,16 @@ class EvaluationInterface(BaseInterface):
         """Analisis kesalahan deteksi"""
         self.logger.info("🔍 Menganalisis kesalahan deteksi...")
         try:
-            errors = self.evaluator.analyze_errors()
-            
-            self.logger.info("\n❌ Analisis Error:")
-            self.logger.info("1. False Positives:")
-            for kelas, jumlah in errors['fp'].items():
-                self.logger.info(f"  • Rp{kelas}: {jumlah}")
-                
-            self.logger.info("\n2. False Negatives:")
-            for kelas, jumlah in errors['fn'].items():
-                self.logger.info(f"  • Rp{kelas}: {jumlah}")
+            # TODO: Implement error analysis
+            self.logger.info("Menganalisis kesalahan deteksi...")
         except Exception as e:
             self.show_error(f"❌ Gagal menganalisis error: {str(e)}")
 
     def bandingkan_model(self):
         """Bandingkan performa antar model"""
         self.logger.info("🔄 Perbandingan Model...")
-        # Implementasi perbandingan model
+        try:
+            # TODO: Implement model comparison
+            self.logger.info("Membandingkan model...")
+        except Exception as e:
+            self.show_error(f"❌ Gagal membandingkan model: {str(e)}")

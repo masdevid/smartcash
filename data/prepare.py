@@ -97,20 +97,35 @@ class DatasetPrep:
         """Verifikasi integritas dataset"""
         print(colored('🔍 Memverifikasi dataset...', 'cyan'))
         
+        stats = {'total': 0, 'missing_labels': 0, 'missing_images': 0}
+        
         for split in ['train', 'val', 'test']:
             img_dir = self.data_dir / split / 'images'
             label_dir = self.data_dir / split / 'labels'
             
-            n_images = len(list(img_dir.glob('*.jpg')))
-            n_labels = len(list(label_dir.glob('*.txt')))
+            # Ensure directories exist
+            img_dir.mkdir(parents=True, exist_ok=True)
+            label_dir.mkdir(parents=True, exist_ok=True)
             
-            # Hitung file augmentasi
-            n_aug_images = len([f for f in img_dir.glob('*.jpg') if '_aug' in f.stem])
-            n_aug_labels = len([f for f in label_dir.glob('*.txt') if '_aug' in f.stem])
+            # Get file lists
+            img_files = set(f.stem for f in img_dir.glob('*.jpg'))
+            label_files = set(f.stem for f in label_dir.glob('*.txt'))
             
-            print(colored(f'📊 {split}:', 'yellow'), 
-                  colored(f'{n_images} images ({n_aug_images} augmented),', 'cyan'),
-                  colored(f'{n_labels} labels ({n_aug_labels} augmented)', 'cyan'))
+            # Find mismatches
+            missing_labels = img_files - label_files
+            missing_images = label_files - img_files
             
-            if n_images != n_labels:
-                print(colored(f'⚠️ Peringatan: Jumlah image dan label tidak sama di {split}', 'red'))
+            stats['total'] += len(img_files)
+            stats['missing_labels'] += len(missing_labels)
+            stats['missing_images'] += len(missing_images)
+            
+            print(colored(f'\n📊 {split}:', 'yellow'))
+            print(colored(f'  Images: {len(img_files)}', 'cyan'))
+            print(colored(f'  Labels: {len(label_files)}', 'cyan'))
+            
+            if missing_labels:
+                print(colored(f'  ⚠️ {len(missing_labels)} images missing labels', 'red'))
+            if missing_images:
+                print(colored(f'  ⚠️ {len(missing_images)} labels missing images', 'red'))
+        
+        return stats

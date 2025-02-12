@@ -19,7 +19,6 @@ class ModelContext:
     training_status: Dict = None
     last_evaluation: Dict = None
     is_modified: bool = False
-
 class ModelOperationHandler:
     """Handler untuk operasi-operasi model"""
     def __init__(self, config: ConfigManager, data_path: Path):
@@ -63,11 +62,7 @@ class ModelInterface(BaseInterface):
         self.model = None
 
     def tampilkan_menu(self) -> str:
-        """Tampilkan menu utama dengan status konteks"""
-        # Tampilkan status model jika ada
-        if self.context.model_type:
-            self._display_model_status()
-
+        """Tampilkan menu utama dengan status model"""
         menu = """
 🤖 Menu Operasi Model:
 
@@ -102,6 +97,12 @@ class ModelInterface(BaseInterface):
                     self._handle_export()
                 else:
                     self.show_error("❌ Pilihan menu tidak valid!")
+                    continue
+                
+                # Konfirmasi kembali ke menu
+                if not self.confirm("\nKembali ke menu Model Operations?"):
+                    break
+                    
             except KeyboardInterrupt:
                 self.logger.warning("\n⚠️ Operasi dibatalkan oleh pengguna")
                 continue

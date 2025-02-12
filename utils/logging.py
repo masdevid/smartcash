@@ -7,13 +7,6 @@ import logging
 import sys
 
 class ColoredLogger:
-    EMOJIS = {
-        'INFO': '📚',
-        'WARNING': '⚠️',
-        'ERROR': '❌',
-        'DEBUG': '🔍',
-        'METRIC': '📊'
-    }
     
     COLORS = {
         'INFO': 'cyan',
@@ -32,10 +25,9 @@ class ColoredLogger:
         self.logger.addHandler(handler)
 
     def _log(self, level, msg, *args, **kwargs):
-        emoji = self.EMOJIS.get(level, '')
         color = self.COLORS.get(level, 'white')
         
-        formatted_msg = f"{emoji} {msg}"
+        formatted_msg = f"{level}: {msg}"
         if kwargs.get('metrics'):
             metrics = kwargs['metrics']
             metrics_str = ', '.join(f"{k}: {colored(v, 'yellow')}" 

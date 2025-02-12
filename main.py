@@ -81,7 +81,7 @@ class SmartCashApp:
 
     def run(self):
         """Jalankan aplikasi"""
-        self.logger.info('🎯 Selamat datang di SmartCash Detector!')
+        print(colored('🎯 Selamat datang di SmartCash Detector!', 'cyan'))
         
         while True:
             try:

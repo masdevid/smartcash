@@ -2,7 +2,7 @@
 
 ## 🎯 Tujuan Proyek
 
-SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal mata uang Rupiah menggunakan teknologi deteksi objek berbasis deep learning.
+SmartCash adalah solusi canggih untuk deteksi dan identifikasi nominal mata uang Rupiah menggunakan teknologi deteksi objek berbasis deep learning.
 
 ## 📚 Panduan Penting Sebelum Memulai
 
@@ -41,7 +41,6 @@ smartcash/             # Kode sumber utama
 ├── docs/              # Dokumentasi proyek
 ├── config/            # Konfigurasi aplikasi
 │
-├── main.py            # Aplikasi utama
 ├── requirements.txt       # Dependensi utama
 ├── dev-requirements.txt   # Dependensi pengembangan
 └── README.md              # Dokumentasi proyek

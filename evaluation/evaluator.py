@@ -25,8 +25,7 @@ class DetectorEvaluator:
             'foreign': RupiahDataset(test_dir / 'foreign')
         }
         
-        self.class_names = ['1000', '2000', '5000', '10000', '20000', 
-                           '50000', '100000']
+        self.class_names =  ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
 
     def calculate_iou(self, box1, box2):
         """Menghitung Intersection over Union antara dua bounding box"""

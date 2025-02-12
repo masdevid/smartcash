@@ -76,7 +76,7 @@ class RupiahDataset(Dataset):
                         if len(values) == 5:  # Format YOLO: class, x, y, w, h
                             # Konversi indeks kelas
                             old_cls = int(values[0])
-                            old_label = ['1000', '2000', '5000', '10000', '20000', '50000', '100000'][old_cls]
+                            old_label = ['100k', '10k', '1k', '20k', '2k', '50k', '5k'][old_cls]
                             new_label = self.label_config.convert_label(old_label)
                             new_cls = self.label_config.get_label_idx(new_label)
                             

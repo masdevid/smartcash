@@ -8,7 +8,7 @@ import cv2
 from tqdm import tqdm
 from typing import Dict, List, Optional, Tuple
 from utils.logging import ColoredLogger
-
+import yaml
 class BaseHandler:
     def __init__(self, data_dir: Path):
         self.data_dir = Path(data_dir)
@@ -22,6 +22,23 @@ class BaseHandler:
                 for split in splits]
 
 class DatasetCopyHandler(BaseHandler):
+    def _create_config(self):
+        """Buat konfigurasi dataset"""
+        config = {
+            'path': str(self.data_dir),
+            'train': str(self.data_dir / 'train'),
+            'val': str(self.data_dir / 'val'),
+            'test': str(self.data_dir / 'test'),
+            'nc': 7,  # jumlah kelas
+            'names':  ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
+        }
+
+        # Simpan konfigurasi
+        config_path = self.data_dir / 'rupiah.yaml'
+        with open(config_path, 'w') as f:
+            yaml.safe_dump(config, f, sort_keys=False)
+
+        self.logger.info("✨ Konfigurasi dataset berhasil dibuat")
     def copy_dataset(self, source_dir: Path) -> Dict:
         """Copy dataset from source to destination"""
         stats = {'copied': 0, 'skipped': 0, 'errors': 0}

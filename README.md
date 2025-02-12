@@ -8,8 +8,6 @@ SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal 
 
 ### 🤝 Kontribusi dan Alur Kerja
 Sebelum mulai berkontribusi, harap baca dengan seksama:
-- 
-- 
 - [Panduan Alur Kerja Git](docs/WORKFLOW.md)
   - Cara clone repository
   - Membuat cabang develop dan fitur
@@ -62,7 +60,7 @@ smartcash-detector/
 
 1. Clone repository:
 ```bash
-git clone https://github.com/[username]/smartcash-detector.git
+git clone https://github.com/[username]/smartcash.git
 cd smartcash
 ```
 

@@ -2,7 +2,22 @@
 
 ## 🎯 Tujuan Proyek
 
-SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal mata uang Rupiah menggunakan teknologi deteksi objek berbasis deep learning (YOLOv5 dan EfficientNet-B4).
+SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal mata uang Rupiah menggunakan teknologi deteksi objek berbasis deep learning.
+
+## 📚 Panduan Penting Sebelum Memulai
+
+### 🤝 Kontribusi dan Alur Kerja
+Sebelum mulai berkontribusi, harap baca dengan seksama:
+- [Panduan Komprehensif Alur Kerja Git](WORKFLOW.md)
+  - Cara clone repository
+  - Membuat cabang develop dan fitur
+  - Praktik commit terbaik
+  - Etika kontribusi
+
+- [Panduan Pesan Commit](COMMIT_GUIDELINES.md)
+  - Format pesan commit yang benar
+  - Jenis commit
+  - Praktik penulisan pesan commit
 
 ## 🛠 Struktur Proyek
 
@@ -38,6 +53,7 @@ smartcash-detector/
 - Python 3.8+
 - GPU CUDA (disarankan, tetapi tidak wajib)
 - Minimal 16GB RAM
+- Git terinstal
 
 ### Instalasi
 
@@ -103,10 +119,10 @@ python src/main.py
 
 ## 🤝 Kontribusi
 
-1. Fork repository
+1. Baca panduan alur kerja Git
 2. Buat branch fitur (`git checkout -b fitur/AturDeteksi`)
-3. Commit perubahan (`git commit -m 'Tambah fitur deteksi lanjutan'`)
-4. Push ke branch (`git push origin fitur/AturDeteksi`)
+3. Commit perubahan sesuai panduan
+4. Push ke branch
 5. Buka Pull Request
 
 ## 📜 Lisensi

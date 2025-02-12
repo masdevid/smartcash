@@ -12,7 +12,7 @@ class BaseHandler:
     """Base handler for data management operations"""
     def __init__(self, config):
         self.cfg = config
-        self.logger = ColoredLogger('DataManager')
+        self.logger = ColoredLogger('BaseHandler')
         
         # Define directory structure
         self.project_root = Path(__file__).parent.parent.parent.parent

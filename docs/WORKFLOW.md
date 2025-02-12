@@ -16,7 +16,7 @@ git clone https://github.com/masdevid/smartcash.git
 # Clone menggunakan SSH (disarankan)
 git clone https://github.com/masdevid/smartcash.git
 # Masuk ke direktori proyek
-cd smartcash-detector
+cd smartcash
 ```
 
 ### Konfigurasi Remote Repository

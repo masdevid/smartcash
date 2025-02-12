@@ -22,26 +22,26 @@ Sebelum mulai berkontribusi, harap baca dengan seksama:
 ## 🛠 Struktur Proyek
 
 ```
-smartcash-detector/
-│
-├── src/                   # Kode sumber utama
-│   ├── main.py            # Titik masuk aplikasi
-│   ├── interfaces/        # Antarmuka pengguna
-│   ├── models/            # Definisi model deteksi
-│   ├── data/              # Manajemen dataset
-│   ├── evaluation/        # Modul evaluasi model
-│   └── utils/             # Utilitas pendukung
-│
-├── data/                  # Direktori data
+smartcash/             # Kode sumber utama
+│                
+├── main.py            # Titik masuk aplikasi
+├── interfaces/        # Antarmuka pengguna
+│   └──  handlers/          # Penanganan antarmuka dataset
+├── models/            # Definisi model deteksi
+├── data/              # Manajemen dataset
 │   └── rupiah/            # Dataset mata uang Rupiah
 │       ├── train/
 │       ├── val/
 │       └── test/
+├── evaluation/        # Modul evaluasi model
+├── training/          # Modul pelatihan model
+├── utils/             # Utilitas pendukung
+├── runs/              # Hasil eksperimen
+├── weights/           # Model yang dilatih
+├── docs/              # Dokumentasi proyek
+├── config/            # Konfigurasi aplikasi
 │
-├── weights/               # Model yang dilatih
-├── runs/                  # Hasil eksperimen
-├── logs/                  # Log sistem
-│
+├── main.py            # Aplikasi utama
 ├── requirements.txt       # Dependensi utama
 ├── dev-requirements.txt   # Dependensi pengembangan
 └── README.md              # Dokumentasi proyek

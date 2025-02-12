@@ -8,13 +8,13 @@ SmartCash Detector adalah solusi canggih untuk deteksi dan identifikasi nominal 
 
 ### 🤝 Kontribusi dan Alur Kerja
 Sebelum mulai berkontribusi, harap baca dengan seksama:
-- [Panduan Komprehensif Alur Kerja Git](WORKFLOW.md)
+- [Panduan Komprehensif Alur Kerja Git](docs/Panduan Alur Kerja Git.md)
   - Cara clone repository
   - Membuat cabang develop dan fitur
   - Praktik commit terbaik
   - Etika kontribusi
 
-- [Panduan Pesan Commit](COMMIT_GUIDELINES.md)
+- [Panduan Pesan Commit](docs/Panduan Commit Message (GitHook).md)
   - Format pesan commit yang benar
   - Jenis commit
   - Praktik penulisan pesan commit
@@ -51,6 +51,7 @@ smartcash-detector/
 
 ### Prasyarat
 - Python 3.8+
+- Conda terinstal
 - GPU CUDA (disarankan, tetapi tidak wajib)
 - Minimal 16GB RAM
 - Git terinstal
@@ -66,12 +67,13 @@ cd smartcash-detector
 2. Buat virtual environment:
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# venv\Scripts\activate   # Windows
+source venv/bin/activate  # Linux/Mac  
+# venv\Scripts\activate   # Windows 
 ```
 
 3. Instal dependensi:
 ```bash
+pip install -r dev_requirements.txt
 pip install -r requirements.txt
 ```
 
@@ -79,7 +81,7 @@ pip install -r requirements.txt
 
 Cukup jalankan:
 ```bash
-python src/main.py
+python main.py
 ```
 
 ### Menu Utama

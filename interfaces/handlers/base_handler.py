@@ -15,7 +15,7 @@ class BaseHandler:
         self.logger = ColoredLogger('BaseHandler')
         
         # Define directory structure
-        self.project_root = Path(__file__).parent.parent.parent.parent
+        self.project_root = Path(__file__).parent.parent.parent
         self.data_dir = self.project_root / "data"
         self.rupiah_dir = self.data_dir / "rupiah"
         

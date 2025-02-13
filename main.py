@@ -88,11 +88,8 @@ class SmartCashApp:
                 choice = self.tampilkan_menu()
                 
                 if choice == '0':
-                    if self._konfirmasi_keluar():
-                        self.logger.info('👋 Terima kasih telah menggunakan SmartCash Detector!')
-                        break
-                    continue
-                
+                    self.logger.info('👋 Terima kasih telah menggunakan SmartCash Detector!')
+                    break
                 # Tangani menu utama
                 if choice == '1':
                     self.interfaces['data'].handle_menu()

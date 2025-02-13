@@ -1,4 +1,4 @@
-# SmartCash Detector: Deteksi Nominal Mata Uang Rupiah (WORK IN PROGRESS)
+# SmartCash: Deteksi Nominal Mata Uang Rupiah (WORK IN PROGRESS)
 
 ## 🎯 Tujuan Proyek
 

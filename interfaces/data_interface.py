@@ -79,8 +79,6 @@ class DataInterface(BaseInterface):
 
     def _handle_preparation(self):
         """Tangani persiapan dataset"""
-        self.logger.info("\n🔧 Mempersiapkan Dataset...")
-        
         # Validasi dan persiapan direktori
         if (self.data_manager.validate_directory(self.data_manager.data_dir) and 
             self.data_manager.prepare_dataset()):

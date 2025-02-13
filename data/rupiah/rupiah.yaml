@@ -1,16 +1,13 @@
-# Dataset configuration for Rupiah Banknote Detection
-
-# Train and validation paths
-train: data/rupiah/train/images
-val: data/rupiah/val/images
-test: data/rupiah/test/images
-
-# Number of classes
+path: /Users/masdevid/Projects/MQL Market/smartcash/src/data/rupiah
+train: /Users/masdevid/Projects/MQL Market/smartcash/src/data/rupiah/train
+val: /Users/masdevid/Projects/MQL Market/smartcash/src/data/rupiah/val
+test: /Users/masdevid/Projects/MQL Market/smartcash/src/data/rupiah/test
 nc: 7
-
-# Class names
- ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
-
-# Optional: Additional dataset information
-description: 'SmartCash Rupiah Banknote Detection Dataset'
-version: '1.0'
+names:
+- 100k
+- 10k
+- 1k
+- 20k
+- 2k
+- 50k
+- 5k

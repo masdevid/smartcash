@@ -1,12 +1,16 @@
 # File: configs/base_config.yaml
 # Author: Alfrida Sabar
-# Deskripsi: Konfigurasi dasar untuk eksperimen deteksi nilai mata uang
+# Deskripsi: Konfigurasi komprehensif untuk sistem deteksi mata uang SmartCash
 
+# Konfigurasi Dataset
 dataset:
+  name: "Rupiah Currency Detection"
+  version: "1.0"
   workspace: "detection-twl6q"
   project: "rupiah_emisi-baru"
-  version: 3
-  classes: 
+  
+  # Konfigurasi kelas mata uang
+  classes:
     - "100k"
     - "10k"
     - "1k"
@@ -14,69 +18,152 @@ dataset:
     - "2k"
     - "50k"
     - "5k"
-  train_path: "../train/images"
-  valid_path: "../valid/images"
-  test_path: "../test/images"
 
+  # Paths untuk dataset
+  paths:
+    train: "data/train"
+    validation: "data/valid"
+    test: "data/test"
+    
+  # Statistik dataset
+  stats:
+    total_samples: 2740
+    train_split: 0.7
+    validation_split: 0.15
+    test_split: 0.15
+
+# Konfigurasi Model
 model:
-  # YOLOv5 configs
-  img_size: [640, 640]
-  conf_thres: 0.25
-  iou_thres: 0.45
-  max_det: 1000
-  device: '' # auto-detect
+  # Arsitektur deteksi
+  architecture:
+    backbone: "efficientnet_b4"
+    neck: "fpn_pan"
+    head: "yolov5"
   
-  # Hardware utilization
-  workers: 8
-  batch_size: 16
-  memory_limit: 0.6  # 60% resource usage
+  # Konfigurasi input
+  input:
+    image_size: [640, 640]  # Ukuran standar input
+    channels: 3             # RGB
+  
+  # Hyperparameters backbone
+  backbone:
+    pretrained: true
+    trainable_layers: 3
+    freeze_bn: true
+  
+  # Anchor boxes per skala deteksi
+  anchors:
+    p3: [[10, 13], [16, 30], [33, 23]]     # Small objects
+    p4: [[30, 61], [62, 45], [59, 119]]    # Medium objects
+    p5: [[116, 90], [156, 198], [373, 326]]  # Large objects
+  
+  # Detection head
+  head:
+    num_classes: 7
+    confidence_threshold: 0.25
+    iou_threshold: 0.45
+    max_detections: 100
 
+# Konfigurasi Training
 training:
+  # Parameter dasar training
   epochs: 100
-  warmup_epochs: 3
-  momentum: 0.937
-  weight_decay: 0.0005
+  batch_size: 16
+  learning_rate:
+    initial: 0.01
+    min: 0.0001
+    max: 0.1
   
-  # Learning rate settings
-  lr0: 0.01  # initial learning rate
-  lrf: 0.01  # final learning rate
+  # Optimizer
+  optimizer:
+    name: "AdamW"
+    weight_decay: 0.0005
   
-  # Augmentation params
-  hsv_h: 0.015  # hue augmentation
-  hsv_s: 0.7    # saturation augmentation
-  hsv_v: 0.4    # value augmentation
-  degrees: 0.0   # rotation augmentation
-  translate: 0.1 # translation augmentation
-  scale: 0.5    # scale augmentation
-  shear: 0.0    # shear augmentation
-  perspective: 0.0  # perspective augmentation
-  flipud: 0.0    # vertical flip probability
-  fliplr: 0.5    # horizontal flip probability
-  mosaic: 1.0    # mosaic probability
-  mixup: 0.0     # mixup probability
+  # Learning Rate Scheduler
+  lr_scheduler:
+    name: "OneCycleLR"
+    max_lr: 0.01
+    epochs: 100
+    cycle_momentum: true
+  
+  # Callbacks
+  early_stopping:
+    monitor: "val_loss"
+    patience: 10
+    min_delta: 0.001
+  
+  # Checkpoint
+  checkpoint:
+    save_top_k: 3
+    save_last: true
+    monitor: "val_loss"
+  
+  # Augmentasi Data
+  augmentation:
+    horizontal_flip: 0.5
+    vertical_flip: 0.0
+    rotation_range: 20
+    width_shift_range: 0.1
+    height_shift_range: 0.1
+    brightness_range: [0.8, 1.2]
+    zoom_range: [0.9, 1.1]
+  
+  # Regulasi & Normalisasi
+  mixup_alpha: 0.2
+  label_smoothing: 0.1
 
+# Konfigurasi Evaluasi
 evaluation:
-  save_visualizations: True
-  save_path: "results/visualizations"
-  metrics: ["accuracy", "precision", "recall", "f1", "mAP", "inference_time"]
+  # Metrik yang akan dilacak
+  metrics:
+    - accuracy
+    - precision
+    - recall
+    - f1_score
+    - map
+    - inference_time
   
-experiment_scenarios:
-  - name: "scenario_1"
-    description: "YOLOv5 Default (CSPDarknet) - Variasi Posisi"
-    backbone: "csp"
-    conditions: "position"
+  # Skenario Pengujian
+  scenarios:
+    - name: "baseline_position"
+      backbone: "csp"
+      condition: "position_variation"
     
-  - name: "scenario_2"
-    description: "YOLOv5 Default (CSPDarknet) - Variasi Pencahayaan"
-    backbone: "csp" 
-    conditions: "lighting"
+    - name: "baseline_lighting"
+      backbone: "csp"
+      condition: "lighting_variation"
     
-  - name: "scenario_3"
-    description: "YOLOv5 + EfficientNet-B4 - Variasi Posisi"
-    backbone: "efficientnet"
-    conditions: "position"
+    - name: "efficient_position"
+      backbone: "efficientnet"
+      condition: "position_variation"
     
-  - name: "scenario_4"
-    description: "YOLOv5 + EfficientNet-B4 - Variasi Pencahayaan"
-    backbone: "efficientnet"
-    conditions: "lighting"
+    - name: "efficient_lighting"
+      backbone: "efficientnet"
+      condition: "lighting_variation"
+  
+  # Visualisasi Hasil
+  visualizations:
+    save_predictions: true
+    save_confusion_matrix: true
+    save_roc_curve: true
+
+# Konfigurasi Hardware
+hardware:
+  device: "cuda"  # atau "cpu"
+  precision: 16   # Mixed precision training
+  num_workers: 8
+  memory_limit: 0.6  # 60% resource usage
+  
+# Logging & Monitoring
+logging:
+  level: "INFO"
+  dir: "logs"
+  save_interval: 10
+  track_system_metrics: true
+
+# Konfigurasi Eksperimen
+experiment:
+  name: "SmartCash_Currency_Detection"
+  description: "YOLOv5 with EfficientNet-B4 for Rupiah Banknote Detection"
+  version: "1.0.0"
+  random_seed: 42

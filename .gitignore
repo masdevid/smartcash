@@ -102,3 +102,16 @@ MANIFEST
 # Temporary files
 tmp/
 temp/
+
+# Preprocessing Cache
+.cache/preprocessing/
+.cache/checkpoint_metadata.json
+
+# Specific Project Directories
+experiments/
+
+# Config Files
+*.yaml
+
+# Model Metadata
+*.index

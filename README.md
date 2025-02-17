@@ -70,16 +70,6 @@ Setelah menjalankan notebook, Anda dapat melihat hasil eksperimen berupa:
 
 Semua hasil akan disimpan di folder `results/` untuk analisis lebih lanjut.
 
-## 📚 Dokumentasi
-Dokumentasi lengkap tentang project SmartCash tersedia di folder `docs/`, mencakup:
-- Penjelasan detil arsitektur sistem
-- Deskripsi dataset dan struktur anotasi
-- Algoritma dan teknik yang digunakan
-- Hasil eksperimen dan analisis mendalam
-- Potensi pengembangan dan aplikasi lebih lanjut
-
-Silakan eksplorasi folder `docs/` untuk pemahaman yang lebih komprehensif tentang project ini.
-
 ## 📜 Lisensi
 Proyek ini dilisensikan di bawah MIT License.
 

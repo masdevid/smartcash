@@ -1,26 +1,28 @@
 # File: models/trainers/yolo_trainer.py
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi trainer untuk YOLOv5 dengan CSPDarknet backbone
+# Deskripsi: Base trainer untuk YOLOv5 yang mendukung berbagai backbone
 
 import torch
-from typing import Dict, Optional, Tuple
+import torch.nn as nn
+from typing import Dict, Optional, Tuple, List
 import numpy as np
+from tqdm.auto import tqdm
 
 from .base_trainer import BaseTrainer
 from utils.logger import SmartCashLogger
 
-class YOLOv5Trainer(BaseTrainer):
-    """Trainer untuk YOLOv5 dengan CSPDarknet backbone"""
+class YOLOv5BaseTrainer(BaseTrainer):
+    """Base trainer untuk YOLOv5 dengan komponen umum"""
     
     def __init__(
         self,
-        model: torch.nn.Module,
+        model: nn.Module,
         config: Dict,
         logger: Optional[SmartCashLogger] = None
     ):
         super().__init__(model, config, logger)
         
-        # Setup loss weights
+        # Loss weights
         self.loss_weights = {
             'box': self.config['training'].get('box_loss_weight', 0.05),
             'obj': self.config['training'].get('obj_loss_weight', 1.0),
@@ -28,44 +30,14 @@ class YOLOv5Trainer(BaseTrainer):
         }
         
         # Setup optimizer dan scheduler
-        self.optimizer = self.configure_optimizers()
-        
-    def configure_optimizers(self) -> Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler._LRScheduler]:
-        """Setup optimizer dan learning rate scheduler"""
-        # Setup optimizer
-        optimizer = torch.optim.SGD(
-            self.model.parameters(),
-            lr=self.config['training']['lr0'],
-            momentum=self.config['training']['momentum'],
-            weight_decay=self.config['training']['weight_decay']
-        )
-        
-        # Setup scheduler
-        lrf = self.config['training']['lrf']  # final learning rate
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(
-            optimizer,
-            max_lr=self.config['training']['lr0'],
-            total_steps=self.config['training']['epochs'],
-            pct_start=self.config['training'].get('warmup_epochs', 3) / 
-                      self.config['training']['epochs'],
-            final_div_factor=1/lrf
-        )
-        
-        return optimizer, scheduler
+        self.optimizer, self.scheduler = self.configure_optimizers()
         
     def train_step(
         self,
         batch: Tuple[torch.Tensor, torch.Tensor],
         batch_idx: int
     ) -> Dict[str, torch.Tensor]:
-        """
-        Training step untuk YOLOv5
-        Args:
-            batch: Tuple (images, targets)
-            batch_idx: Index batch
-        Returns:
-            Dict metrics
-        """
+        """Common training step untuk semua YOLOv5 variants"""
         images, targets = batch
         images = images.to(self.device)
         targets = targets.to(self.device)
@@ -80,8 +52,19 @@ class YOLOv5Trainer(BaseTrainer):
         # Backward pass
         self.optimizer.zero_grad()
         total_loss.backward()
+        
+        # Gradient clipping
+        torch.nn.utils.clip_grad_norm_(
+            self.model.parameters(),
+            max_norm=self.config['training'].get('max_grad_norm', 10.0)
+        )
+        
         self.optimizer.step()
         
+        # Update learning rate
+        if self.scheduler is not None:
+            self.scheduler.step()
+            
         metrics = {
             'loss': total_loss,
             **losses
@@ -89,58 +72,36 @@ class YOLOv5Trainer(BaseTrainer):
         
         return metrics
         
-    def validation_step(
+    def _compute_losses(
         self,
-        batch: Tuple[torch.Tensor, torch.Tensor],
-        batch_idx: int
+        predictions: torch.Tensor,
+        targets: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
-        """
-        Validation step untuk YOLOv5
-        Args:
-            batch: Tuple (images, targets)
-            batch_idx: Index batch
-        Returns:
-            Dict metrics
-        """
-        images, targets = batch
-        images = images.to(self.device)
-        targets = targets.to(self.device)
+        """Abstract method untuk loss calculation"""
+        raise NotImplementedError
         
-        # Forward pass
-        with torch.no_grad():
-            predictions = self.model(images)
-            
-        # Calculate losses dan metrics
-        losses = self._compute_losses(predictions, targets)
-        metrics = self._compute_metrics(predictions, targets)
-        
-        return {
-            'val_loss': sum(losses.values()),
-            **{f'val_{k}': v for k, v in losses.items()},
-            **{f'val_{k}': v for k, v in metrics.items()}
-        }
-        
+class YOLOv5CSPTrainer(YOLOv5BaseTrainer):
+    """Trainer untuk YOLOv5 dengan CSPDarknet backbone"""
+    
     def _compute_losses(
         self,
         predictions: torch.Tensor,
         targets: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
         """
-        Hitung losses YOLOv5
-        Args:
-            predictions: Output model
-            targets: Ground truth
-        Returns:
-            Dict losses
+        CSPDarknet specific loss calculation
+        - Single feature map output
+        - Standard YOLO anchor boxes
         """
-        # Box loss (CIoU)
-        box_loss = self._compute_box_loss(predictions, targets)
+        # Unpack predictions
+        pred_box = predictions[..., :4]  # x,y,w,h
+        pred_conf = predictions[..., 4]  # objectness
+        pred_cls = predictions[..., 5:]  # class probabilities
         
-        # Objectness loss (BCE)
-        obj_loss = self._compute_obj_loss(predictions, targets)
-        
-        # Classification loss (BCE)
-        cls_loss = self._compute_cls_loss(predictions, targets)
+        # Calculate losses menggunakan format CSPDarknet
+        box_loss = self._box_loss(pred_box, targets[..., :4])
+        obj_loss = self._objectness_loss(pred_conf, targets[..., 4])
+        cls_loss = self._classification_loss(pred_cls, targets[..., 5])
         
         return {
             'box_loss': box_loss * self.loss_weights['box'],
@@ -148,64 +109,96 @@ class YOLOv5Trainer(BaseTrainer):
             'cls_loss': cls_loss * self.loss_weights['cls']
         }
         
-    def _compute_metrics(
+class YOLOv5EfficientTrainer(YOLOv5BaseTrainer):
+    """Trainer untuk YOLOv5 dengan EfficientNet backbone"""
+    
+    def __init__(
         self,
-        predictions: torch.Tensor,
+        model: nn.Module,
+        config: Dict,
+        logger: Optional[SmartCashLogger] = None
+    ):
+        super().__init__(model, config, logger)
+        
+        # Anchor boxes per scale
+        self.anchors = self._generate_anchors()
+        
+    def _generate_anchors(self) -> List[torch.Tensor]:
+        """Generate anchor boxes untuk setiap skala deteksi"""
+        base_anchors = torch.tensor(self.config['model'].get('anchors', [
+            [[10, 13], [16, 30], [33, 23]],     # P3 anchors
+            [[30, 61], [62, 45], [59, 119]],    # P4 anchors
+            [[116, 90], [156, 198], [373, 326]]  # P5 anchors
+        ]))
+        return [anchors.float().to(self.device) for anchors in base_anchors]
+        
+    def _compute_losses(
+        self,
+        predictions: List[torch.Tensor],  # List dari P3, P4, P5 predictions
         targets: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
         """
-        Hitung metrics evaluasi
-        Args:
-            predictions: Output model
-            targets: Ground truth
-        Returns:
-            Dict metrics
+        EfficientNet specific loss calculation
+        - Multi-scale feature maps
+        - Scale-specific anchor boxes
         """
-        # Compute precision, recall, mAP
-        metrics = {}
+        scale_losses = []
         
-        # Precision & Recall per class
-        for cls in range(self.config['model']['nc']):
-            prec, rec = self._compute_precision_recall(
-                predictions,
-                targets,
-                cls
-            )
-            metrics[f'precision_cls_{cls}'] = prec
-            metrics[f'recall_cls_{cls}'] = rec
+        # Calculate loss untuk setiap skala
+        for scale_idx, (pred, anchors) in enumerate(zip(predictions, self.anchors)):
+            scale_losses.append(self._compute_scale_losses(
+                predictions=pred,
+                targets=targets,
+                anchors=anchors,
+                scale_idx=scale_idx
+            ))
             
-        # Mean metrics
-        metrics.update({
-            'mAP50': self._compute_map(predictions, targets, iou_thresh=0.5),
-            'mAP50_95': self._compute_map(
-                predictions,
-                targets,
-                iou_threshs=np.arange(0.5, 1.0, 0.05)
-            )
-        })
+        # Combine losses dari semua skala
+        combined_losses = {}
+        for key in ['box_loss', 'obj_loss', 'cls_loss']:
+            combined_losses[key] = sum(loss[key] for loss in scale_losses)
+            
+        return combined_losses
         
-        return metrics
-        
-    def _compute_box_loss(
+    def _compute_scale_losses(
         self,
         predictions: torch.Tensor,
-        targets: torch.Tensor
-    ) -> torch.Tensor:
-        """Calculate Complete IoU loss untuk bounding boxes"""
-        pass  # TODO: Implementasi CIoU loss
+        targets: torch.Tensor,
+        anchors: torch.Tensor,
+        scale_idx: int
+    ) -> Dict[str, torch.Tensor]:
+        """Compute losses untuk satu skala deteksi"""
+        # Unpack predictions
+        pred_box = predictions[..., :4]
+        pred_conf = predictions[..., 4]
+        pred_cls = predictions[..., 5:]
         
-    def _compute_obj_loss(
-        self,
-        predictions: torch.Tensor,
-        targets: torch.Tensor
-    ) -> torch.Tensor:
-        """Calculate objectness loss (BCE)"""
-        pass  # TODO: Implementasi objectness loss
+        # Match predictions dengan targets untuk skala ini
+        matches, match_indices = self._match_predictions(
+            pred_box,
+            targets,
+            anchors,
+            scale_idx
+        )
         
-    def _compute_cls_loss(
-        self,
-        predictions: torch.Tensor,
-        targets: torch.Tensor
-    ) -> torch.Tensor:
-        """Calculate classification loss (BCE)"""
-        pass  # TODO: Implementasi classification loss
+        # Calculate losses
+        box_loss = self._box_loss(
+            pred_box[matches],
+            targets[match_indices][..., :4]
+        )
+        
+        obj_loss = self._objectness_loss(
+            pred_conf,
+            matches
+        )
+        
+        cls_loss = self._classification_loss(
+            pred_cls[matches],
+            targets[match_indices][..., 4]
+        )
+        
+        return {
+            'box_loss': box_loss * self.loss_weights['box'],
+            'obj_loss': obj_loss * self.loss_weights['obj'],
+            'cls_loss': cls_loss * self.loss_weights['cls']
+        }

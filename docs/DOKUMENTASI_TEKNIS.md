@@ -1,222 +1,167 @@
-# 📚 Dokumentasi Teknis SmartCash
+# 📚 Dokumentasi Teknis SmartCash (Updated)
 
 ## 📋 Overview
 
-SmartCash adalah sistem deteksi nilai mata uang yang menggunakan YOLOv5 yang dioptimasi dengan EfficientNet-B4 sebagai backbone. Project ini bertujuan untuk meningkatkan akurasi deteksi nilai mata uang Rupiah dengan mempertimbangkan berbagai kondisi pengambilan gambar.
+SmartCash adalah sistem deteksi nilai mata uang yang mengintegrasikan YOLOv5 dengan EfficientNet-B4 sebagai backbone melalui timm library. Sistem ini dirancang untuk meningkatkan akurasi deteksi nilai mata uang Rupiah dengan mempertimbangkan berbagai kondisi pengambilan gambar.
 
-## 🎯 Tujuan Penelitian
+## 🔄 Flow Sistem
 
-1. Implementasi algoritma YOLOv5 untuk deteksi nilai mata uang Rupiah
-2. Evaluasi akurasi YOLOv5 dalam deteksi nilai mata uang Rupiah
-3. Implementasi pendekatan kombinasi YOLOv5 dan EfficientNet-B4
-4. Evaluasi akurasi pendekatan kombinasi tersebut
-5. Optimasi dan analisis peningkatan performa
+### 1. Input Processing
+- **Input Format**: Gambar RGB dengan preprocessing:
+  - Resize ke 640x640 piksel
+  - Normalisasi nilai piksel (0-1)
+  - Augmentasi data (saat training)
 
-## 📁 Struktur Project
+### 2. EfficientNet-B4 Backbone
+- **Implementasi**: Menggunakan timm library
+  - `features_only=True` untuk mendapatkan intermediate features
+  - `out_indices=(2,3,4)` untuk P3, P4, P5 stages
+- **Feature Extraction**:
+  - P3: Stage 2 features
+  - P4: Stage 3 features
+  - P5: Stage 4 features
+- **Training Control**:
+  - Configurable layer freezing
+  - Transfer learning dari pretrained weights
 
-```
-smartcash/
-├── configs/                  # Konfigurasi eksperimen
-├── data/                    # Dataset storage
-├── handlers/                # Data & model handlers
-├── models/                  # Model implementations
-│   ├── backbones/          # Model backbones
-│   └── trainers/           # Training implementations
-├── utils/                  # Utility modules
-├── notebooks/              # Jupyter notebooks
-└── README.md
-```
+### 3. Feature Processing Neck
+- **Feature Pyramid Network (FPN)**:
+  - Lateral connections untuk channel adaptation
+  - Top-down pathway untuk semantic enhancement
+  - Multi-scale feature fusion
+- **Path Aggregation Network (PAN)**:
+  - Bottom-up path augmentation
+  - Enhanced feature propagation
+  - Adaptive feature pooling
 
-## 📦 Modul-Modul Utama
+### 4. Detection Head
+- **Multi-scale Detection**:
+  - Dedicated head untuk setiap skala (P3, P4, P5)
+  - Format output: [batch, anchors, height, width, 5+classes]
+- **Output Components**:
+  - Bounding box coordinates (x, y, w, h)
+  - Objectness score
+  - Class probabilities (7 denominasi Rupiah)
 
-### 1. Configs
-Berisi konfigurasi untuk eksperimen dan parameter model.
+## 🛠️ Komponen Utama
 
-- **base_config.yaml**: Konfigurasi dasar yang mencakup:
-  - Dataset settings
-  - Model parameters
-  - Training configuration
-  - Hardware utilization
-  - Experiment scenarios
-
-### 2. Handlers
-
-#### Data Handlers
-- **data_handler.py**: Pengelolaan dataset lokal
-  - Verifikasi struktur dan integritas
-  - Statistik dataset
-  - Setup folder structure
-
-- **roboflow_handler.py**: Integrasi dengan Roboflow
-  - Download dan setup dataset
-  - Konversi ke format YOLOv5
-  - Dataset versioning
-
-- **dataset_cleanup.py**: Pembersihan dataset
-  - Penghapusan file augmentasi
-  - Validasi integritas
-  - Backup management
-
-#### Model Handlers
-- **model_handler.py**: Pengelolaan model
-  - Training pipeline
-  - Experiment tracking
-  - Model persistence
-
-- **evaluation_handler.py**: Evaluasi model
-  - Metric calculation
-  - Result visualization
-  - Scenario comparison
-
-### 3. Models
-
-#### Backbones
-- **efficient_adapter.py**: Integrasi EfficientNet-B4
-  - Feature map adaptation
-  - Channel dimension mapping
-  - Custom layers
-
-#### Trainers
-- **base_trainer.py**: Abstract trainer class
-  - Training loop management
-  - Callback support
-  - Metric tracking
-
-- **yolo_trainer.py**: YOLOv5 trainer
-  - Loss calculations
-  - Optimization strategy
-  - Validation steps
-
-- **efficient_trainer.py**: EfficientNet-YOLOv5 trainer
-  - Backbone integration
-  - Feature adaptation
-  - Custom learning rates
-
-### 4. Utils
-- **logger.py**: Custom logging
-  - Emoji contextual logs
-  - Colored output
-  - Progress tracking
-
-- **metrics.py**: Metric calculations
-  - Accuracy, Precision, Recall
-  - mAP calculation
-  - Loss tracking
-
-- **preprocessing.py**: Data preprocessing
-  - Image resizing
-  - Augmentation
-  - Normalization
-
-- **visualization.py**: Result visualization
-  - Training plots
-  - Evaluation metrics
-  - Comparison charts
-
-## 🔄 Workflow
-
-```mermaid
-graph TD
-    A[Dataset] --> B[Preprocessing]
-    B --> C{Training Split}
-    C -->|70%| D[Training Set]
-    C -->|15%| E[Validation Set]
-    C -->|15%| F[Test Set]
-    
-    D --> G[Model Training]
-    E --> G
-    G --> H[Model Evaluation]
-    F --> H
-    
-    subgraph Training Pipeline
-    I[YOLOv5] --> J[EfficientNet-B4]
-    J --> K[Feature Adaptation]
-    K --> L[Detection Head]
-    end
-    
-    H --> M[Performance Metrics]
-    M --> N[Visualization]
+### EfficientNetAdapter
+```python
+class EfficientNetAdapter(nn.Module):
+    def __init__(self, pretrained=True, trainable_layers=3):
+        # Inisialisasi backbone dengan timm
+        self.efficientnet = timm.create_model(
+            'efficientnet_b4',
+            pretrained=pretrained,
+            features_only=True,
+            out_indices=(2, 3, 4)
+        )
 ```
 
-## 📊 Skenario Evaluasi
+### PreprocessingHandler
+```python
+class PreprocessingCache:
+    """Cache system untuk hasil preprocessing"""
+    def __init__(self, cache_dir: str, max_size_gb: float = 1.0):
+        # Konfigurasi cache
+        self.cache_dir = Path(cache_dir)
+        self.max_size_bytes = int(max_size_gb * 1024 * 1024 * 1024)
+        
+class ImagePreprocessor:
+    """Preprocessor untuk dataset uang kertas"""
+    def __init__(
+        self,
+        config_path: str,
+        cache_size_gb: float = 1.0
+    ):
+        # Setup komponen
+        self.cache = PreprocessingCache(max_size_gb=cache_size_gb)
+        self.coord_normalizer = CoordinateNormalizer()
+        self.augmentor = self._setup_augmentations()
 
-1. **Baseline (YOLOv5 + CSPDarknet)**
+class CoordinateNormalizer:
+    """Normalizer untuk koordinat label"""
+    def normalize_polygon(
+        self,
+        points: List[Tuple[float, float]],
+        image_size: Tuple[int, int]
+    ) -> List[float]:
+        # Normalisasi koordinat ke range [0,1]
+        pass
+```
+
+### FeatureProcessingNeck
+```python
+class FeatureProcessingNeck(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        self.fpn = FeaturePyramidNetwork(in_channels, out_channels)
+        self.pan = PathAggregationNetwork(out_channels)
+```
+
+### DetectionHead
+```python
+class DetectionHead(nn.Module):
+    def __init__(self, in_channels, num_classes=7):
+        # Detection layers untuk mata uang
+        self.conv = nn.Sequential(...)
+```
+
+## 📊 Training Pipeline
+
+### Data Management & Preprocessing
+
+#### Pipeline Preprocessing
+1. **Input Data**
+   - Dataset split: 70% training, 15% validation, 15% testing
+   - Format gambar: JPG/JPEG
+   - Format label: TXT (YOLO format & polygon coordinates)
+
+2. **Cache System**
+   - Persistent disk cache untuk hasil preprocessing
+   - Cache key berdasarkan hash file + parameter
+   - LRU cleanup policy dengan configurable max size
+   - Tracking cache stats (hit rate, size, file count)
+
+3. **Coordinate Normalization**
+   - Normalisasi koordinat polygon ke range [0,1]
+   - Backward compatibility dengan format YOLO bbox
+   - Validasi dan sanitasi koordinat
+
+4. **Image Processing**
+   - Resize ke 640x640 pixels
+   - Normalisasi pixel values (mean/std)
+   - Augmentasi data:
+     - Rotasi dan flipping
+     - Variasi pencahayaan
+     - Scaling dan cropping
+
+5. **Validasi Output**
+   - Verifikasi integritas gambar
+   - Validasi format label
+   - Statistik preprocessing detail
+   - Auto-revalidation
+
+### Optimization
+- Transfer learning dari pretrained EfficientNet-B4
+- Progressive layer unfreezing
+- Learning rate scheduling dengan warmup
+
+### Monitoring
+- Logging dengan contextual emojis
+- Debug information untuk feature shapes
+- Progress tracking dengan tqdm
+
+## 🔍 Evaluasi
+
+### Skenario Pengujian
+1. **Baseline**: YOLOv5 dengan CSPDarknet
+   - Variasi posisi
+   - Variasi pencahayaan
+2. **Optimized**: YOLOv5 dengan EfficientNet-B4
    - Variasi posisi
    - Variasi pencahayaan
 
-2. **Optimized (YOLOv5 + EfficientNet-B4)**
-   - Variasi posisi
-   - Variasi pencahayaan
-
-## 🛠️ Implementasi Utama
-
-### EfficientNet Adapter
-
-```mermaid
-graph LR
-    A[EfficientNet Features] --> B[Channel Adaptation]
-    B --> C[Spatial Adaptation]
-    C --> D[Feature Fusion]
-    D --> E[YOLOv5 Neck]
-```
-
-1. **Channel Adaptation**
-   - 1x1 convolution untuk menyesuaikan dimensi channel
-   - Batch normalization
-   - Activation function (SiLU)
-
-2. **Spatial Adaptation**
-   - 3x3 convolution untuk menyesuaikan receptive field
-   - Feature pyramid integration
-   - Skip connections
-
-### Training Pipeline
-
-```mermaid
-graph TD
-    A[Input Image] --> B[Backbone]
-    B --> C[Feature Extraction]
-    C --> D[Adapter Layer]
-    D --> E[Detection Head]
-    E --> F[Predictions]
-    
-    subgraph Loss Calculation
-    F --> G[Box Loss]
-    F --> H[Object Loss]
-    F --> I[Class Loss]
-    end
-    
-    G --> J[Total Loss]
-    H --> J
-    I --> J
-    J --> K[Backpropagation]
-```
-
-## 📝 Konfigurasi Eksperimen
-
-Konfigurasi eksperimen diatur melalui `base_config.yaml`:
-
-```yaml
-dataset:
-  workspace: "detection-twl6q"
-  project: "rupiah_emisi-baru"
-  version: 3
-  
-model:
-  img_size: [640, 640]
-  conf_thres: 0.25
-  iou_thres: 0.45
-  
-training:
-  epochs: 100
-  batch_size: 16
-  warmup_epochs: 3
-  lr0: 0.01
-```
-
-## 🔍 Evaluasi Performa
-
-Metrik evaluasi mencakup:
+### Metrik Evaluasi
 - Accuracy
 - Precision
 - Recall
@@ -224,31 +169,54 @@ Metrik evaluasi mencakup:
 - mAP
 - Inference Time
 
-## 📈 Visualisasi Hasil
+## 💾 Cache Management
 
-Visualisasi hasil mencakup:
-1. Training metrics plot
-2. Confusion matrix
-3. Precision-Recall curves
-4. Inference time comparison
-5. Per-class performance analysis
+### Struktur Cache
+```
+.cache/preprocessing/
+├── cache_index.json    # Metadata & tracking
+└── [hash].pkl         # Cached preprocessing results
+```
+
+### Cache Metrics
+- Hit Rate: Persentase cache hits vs total requests
+- Cache Size: Total ukuran data yang di-cache
+- File Count: Jumlah file dalam cache system
+
+### Cleanup Policy
+1. **Size-based**:
+   - Trigger ketika melebihi max_size_gb
+   - Hapus file terlama (LRU)
+   - Update index setelah cleanup
+
+2. **Manual**:
+   - Method clear_cache() untuk reset
+   - Recreate cache structure
+   - Reset statistics
 
 ## 🚀 Deployment
 
-Model dapat di-deploy melalui:
-1. Jupyter Notebook untuk eksperimen
-2. Python script untuk batch processing
-3. API endpoint untuk real-time inference
+### Requirements
+```text
+torch>=1.7.0
+timm>=0.6.12
+numpy>=1.19.0
+opencv-python>=4.5.0
+albumentations>=1.0.0
+```
 
-## 📋 Dependencies
+### Hardware Requirements
+- GPU dengan minimal 6GB VRAM
+- CPU dengan 8+ cores untuk preprocessing
+- 16GB+ RAM untuk batch processing
 
-Requirement utama:
-- PyTorch
-- OpenCV
-- Albumentations
-- Roboflow
-- NumPy
-- Matplotlib
-- Seaborn
-- tqdm
-- PyYAML
+### Resource Management
+- Memory limit: 60% dari available resources
+- Multi-processing untuk data loading
+- Batch size optimization
+
+## 📝 Notes
+- Backbone menggunakan timm untuk better compatibility
+- Channel dimensions diambil otomatis dari EfficientNet
+- Debug mode tersedia untuk detailed feature analysis
+- Resource usage dibatasi untuk stabilitas sistem

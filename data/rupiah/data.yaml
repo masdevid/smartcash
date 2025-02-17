@@ -1,0 +1,13 @@
+train: ../train/images
+val: ../valid/images
+test: ../test/images
+
+nc: 7
+names: ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
+
+roboflow:
+  workspace: detection-twl6q
+  project: rupiah_emisi-baru
+  version: 3
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/detection-twl6q/rupiah_emisi-baru/dataset/3

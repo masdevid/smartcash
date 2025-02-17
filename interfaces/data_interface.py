@@ -82,7 +82,7 @@ class DataInterface(BaseInterface):
         # Validasi dan persiapan direktori
         if (self.data_manager.validate_directory(self.data_manager.data_dir) and 
             self.data_manager.prepare_dataset()):
-            self.show_success("✅ Persiapan dataset berhasil!")
+            self.show_success("✅ Persiapan dataset selesai!")
         else:
             self.show_error("❌ Gagal mempersiapkan dataset")
         return False

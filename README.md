@@ -70,6 +70,45 @@ Setelah menjalankan notebook, Anda dapat melihat hasil eksperimen berupa:
 
 Semua hasil akan disimpan di folder `results/` untuk analisis lebih lanjut.
 
+## 🧪 Pengujian Proyek SmartCash
+
+### 📋 Struktur Pengujian
+
+Direktori pengujian ini berisi serangkaian tes unit dan integrasi untuk proyek SmartCash:
+
+- `test_data_handlers.py`: Pengujian untuk handler data
+- `test_models.py`: Pengujian komponen model
+- `test_evaluation.py`: Pengujian proses evaluasi
+- `conftest.py`: Konfigurasi global pytest
+
+### 🚀 Menjalankan Pengujian
+
+#### Perintah Dasar
+```bash
+# Jalankan semua pengujian
+pytest
+
+# Jalankan pengujian spesifik
+pytest tests/test_data_handlers.py
+
+# Jalankan tes lambat
+pytest --runslow
+
+# Tampilkan informasi tambahan
+pytest -v
+```
+
+##### 🔍 Marker Pengujian
+
+- `@pytest.mark.slow`: Tes yang membutuhkan waktu lama
+- `@pytest.mark.integration`: Tes integrasi
+
+#### 💡 Tips
+- Pastikan Anda berada di root project saat menjalankan pengujian
+- Gunakan virtual environment untuk menghindari konflik dependencies
+- Periksa keluaran pytest untuk detail kesalahan
+
+
 ## 📜 Lisensi
 Proyek ini dilisensikan di bawah MIT License.
 

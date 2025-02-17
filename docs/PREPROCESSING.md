@@ -1,0 +1,10 @@
+- **Tujuan Preprocessing**: Mempersiapkan data agar model lebih baik dalam training dan testing.
+- **Dataset Gambar Uang Kertas Rupiah**:
+  - Diproses untuk memudahkan pengenalan dan pembersihan data.
+  - Menghasilkan nilai akurasi yang lebih baik.
+- **Tahapan Preprocessing**:
+  - **Resize**: Mengubah ukuran gambar menjadi 640x640 piksel untuk standarisasi input sesuai format YOLOv5 dan EfficientNet-B4.
+  - **Normalisasi**: Mengubah nilai piksel gambar (0-255) ke skala 0-1 untuk membantu model memproses data lebih stabil dan efisien.
+  - **Augmentasi Data**: Menambah variasi gambar dengan teknik rotasi, flipping, dan penyesuaian kecerahan/kontras.
+  - **Pembagian Dataset**: Membagi data menjadi data latih (80%) dan data uji (20%) untuk evaluasi model.
+- **Hasil**: Gambar uang kertas rupiah siap digunakan untuk melatih model, meningkatkan akurasi deteksi di berbagai kondisi.

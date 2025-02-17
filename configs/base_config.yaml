@@ -1,0 +1,82 @@
+# File: configs/base_config.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi dasar untuk eksperimen deteksi nilai mata uang
+
+dataset:
+  workspace: "detection-twl6q"
+  project: "rupiah_emisi-baru"
+  version: 3
+  classes: 
+    - "100k"
+    - "10k"
+    - "1k"
+    - "20k"
+    - "2k"
+    - "50k"
+    - "5k"
+  train_path: "../train/images"
+  valid_path: "../valid/images"
+  test_path: "../test/images"
+
+model:
+  # YOLOv5 configs
+  img_size: [640, 640]
+  conf_thres: 0.25
+  iou_thres: 0.45
+  max_det: 1000
+  device: '' # auto-detect
+  
+  # Hardware utilization
+  workers: 8
+  batch_size: 16
+  memory_limit: 0.6  # 60% resource usage
+
+training:
+  epochs: 100
+  warmup_epochs: 3
+  momentum: 0.937
+  weight_decay: 0.0005
+  
+  # Learning rate settings
+  lr0: 0.01  # initial learning rate
+  lrf: 0.01  # final learning rate
+  
+  # Augmentation params
+  hsv_h: 0.015  # hue augmentation
+  hsv_s: 0.7    # saturation augmentation
+  hsv_v: 0.4    # value augmentation
+  degrees: 0.0   # rotation augmentation
+  translate: 0.1 # translation augmentation
+  scale: 0.5    # scale augmentation
+  shear: 0.0    # shear augmentation
+  perspective: 0.0  # perspective augmentation
+  flipud: 0.0    # vertical flip probability
+  fliplr: 0.5    # horizontal flip probability
+  mosaic: 1.0    # mosaic probability
+  mixup: 0.0     # mixup probability
+
+evaluation:
+  save_visualizations: True
+  save_path: "results/visualizations"
+  metrics: ["accuracy", "precision", "recall", "f1", "mAP", "inference_time"]
+  
+experiment_scenarios:
+  - name: "scenario_1"
+    description: "YOLOv5 Default (CSPDarknet) - Variasi Posisi"
+    backbone: "csp"
+    conditions: "position"
+    
+  - name: "scenario_2"
+    description: "YOLOv5 Default (CSPDarknet) - Variasi Pencahayaan"
+    backbone: "csp" 
+    conditions: "lighting"
+    
+  - name: "scenario_3"
+    description: "YOLOv5 + EfficientNet-B4 - Variasi Posisi"
+    backbone: "efficientnet"
+    conditions: "position"
+    
+  - name: "scenario_4"
+    description: "YOLOv5 + EfficientNet-B4 - Variasi Pencahayaan"
+    backbone: "efficientnet"
+    conditions: "lighting"

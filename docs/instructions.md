@@ -37,7 +37,7 @@ Berikan draft notebook dengan memperhatikan hal-hal berikut:
 5. Buat notebook yang fleksibel dan modular
 6. Tambahkan petunjuk penggunaan di setiap sel
 
-Harap perhatikan struktur proyek dan dokumentasi yang telah kita buat sebelumnya. Gunakan bahasa Indonesia untuk komentar, dokumentasi, dan pesan logging.
+Harap perhatikan struktur proyek dan dokumentasi yang telah kita buat sebelumnya. Gunakan bahasa Indonesia untuk komentar, dokumentasi, dan pesan logging. 
 
 
 Kita akan mengembangkan notebook untuk training model YOLOv5 dengan EfficientNet-B4 pada proyek SmartCash (deteksi mata uang Rupiah).

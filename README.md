@@ -1,4 +1,5 @@
-# 🔍 SmartCash: Deteksi Nilai Mata Uang Rupiah
+# 🔍 SmartCash (Work in Progress)
+## Deteksi Nilai Mata Uang Rupiah
 
 SmartCash adalah sistem deteksi nilai mata uang Rupiah yang menggunakan YOLOv5 dengan EfficientNet-B4 sebagai backbone. Sistem ini dioptimasi untuk akurasi tinggi dalam berbagai kondisi pengambilan gambar.
 
@@ -78,7 +79,6 @@ smartcash/
 ## 🤝 Kontribusi
 Kami menyambut kontribusi! Lihat [CONTRIBUTING.md](docs/dev/CONTRIBUTING.md) untuk panduan.
 
-## 📜 Lisensi
 ## 📜 Lisensi / License
 
 This project is licensed under the [Creative Commons Attribution 4.0 International License](https://creativecommons.org/licenses/by/4.0/).

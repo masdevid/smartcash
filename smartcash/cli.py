@@ -14,22 +14,14 @@ from dotenv import load_dotenv
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.handlers.dataset_cleanup import DatasetCleanupHandler
-
+from smartcash.utils.configuration_manager import ConfigurationManager
 # Initialize logger
 logger = SmartCashLogger("smartcash-menu")
 
-# Global configuration
-config: Dict = {
-    'data_source': None,
-    'detection_mode': None,
-    'backbone': None,
-    'training': {
-        'batch_size': 32,
-        'learning_rate': 0.001,
-        'epochs': 100,
-        'early_stopping_patience': 10
-    }
-}
+        
+config_path = Path(__file__).parent.parent / 'configs' / 'base_config.yaml'
+configuration_manager = ConfigurationManager(config_path)
+config = configuration_manager.current_config
 
 class MenuItem:
     def __init__(self, title: str, action: Callable, description: str = "", category: str = ""):
@@ -245,28 +237,6 @@ def view_logs():
     input("\nTekan Enter untuk kembali ke menu...")
     return True
 
-def load_config() -> Dict[str, Any]:
-    """Load configuration from latest file."""
-    try:
-        config_dir = Path('configs')
-        if not config_dir.exists():
-            return {}
-            
-        config_files = sorted(config_dir.glob('train_config_*.yaml'))
-        if not config_files:
-            return {}
-            
-        # Get latest config
-        latest_config = config_files[-1]
-        with open(latest_config, 'r') as f:
-            config = yaml.safe_load(f)
-            
-        return config
-        
-    except Exception as e:
-        logger.error(f"Error loading config: {str(e)}")
-        return {}
-
 def run_command(cmd: List[str]) -> None:
     """Run a command and wait for user input before continuing."""
     try:
@@ -447,6 +417,7 @@ def get_user_input(stdscr, prompt: str, timeout: int = 100) -> str:
 
 def show_config_status(stdscr, config: Dict[str, Any], start_y: int = 2, start_x: int = 50):
     """Show current configuration status."""
+    config = configuration_manager.current_config
     # Show main configuration
     y = start_y
     stdscr.addstr(y, start_x, "Status Konfigurasi:")
@@ -703,9 +674,9 @@ def show_submenu(stdscr: Optional[curses.window], menu: Menu) -> bool:
 def start_training(stdscr, config_path: Path) -> bool:
     """Mulai proses training model."""
     if not all([
-        config['data_source'],
-        config['detection_mode'],
-        config['backbone']
+        configuration_manager.current_config.get('data_source'),
+        configuration_manager.current_config.get('detection_mode'),
+        configuration_manager.current_config.get('backbone')
     ]):
         show_error(stdscr, "❌ Silakan lengkapi semua konfigurasi terlebih dahulu")
         return True
@@ -755,19 +726,6 @@ def start_training(stdscr, config_path: Path) -> bool:
         print(f"\n❌ Error: {str(e)}")
         input("\nTekan Enter untuk kembali ke menu...")
         return True
-
-def save_config():
-    """Save current configuration to file."""
-    config_dir = Path('configs')
-    config_dir.mkdir(exist_ok=True)
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    config_file = config_dir / f"train_config_{timestamp}.yaml"
-    
-    with open(config_file, 'w') as f:
-        yaml.dump(config, f)
-    
-    logger.info(f"Konfigurasi disimpan di: {config_file}")
 
 def show_error(stdscr, message: str, timeout_ms: int = 2000):
     """Show error message with red color."""
@@ -853,10 +811,14 @@ def show_system_status(stdscr):
 
 def set_config(key: str, value: str, **kwargs) -> bool:
     """Set configuration value and return to previous menu."""
-    global config
-    config[key] = value
+    global configuration_manager
+    
+    # Update config with primary key and optional additional kwargs
+    configuration_manager.update(key, value)
     if kwargs:
-        config.update(kwargs)
+        for k, v in kwargs.items():
+            configuration_manager.update(k, v)
+    configuration_manager.save()
     return True
 
 def show_data_source_menu(stdscr):
@@ -1046,9 +1008,7 @@ def main(stdscr):
     
     # Enable keypad
     stdscr.keypad(True)
-    
-    # Load config path
-    config_path = Path(__file__).parent.parent / 'configs' / 'base_config.yaml'
+        
     if not config_path.exists():
         show_error(stdscr, f"❌ File konfigurasi tidak ditemukan: {config_path}")
         return

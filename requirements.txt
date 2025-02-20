@@ -62,7 +62,7 @@ nest_asyncio @ file:///home/conda/feedstock_root/build_artifacts/nest-asyncio_17
 networkx==3.4.2
 nodeenv==1.9.1
 numba==0.61.0
-numpy==2.1.3
+numpy==2.1.1
 omegaconf==2.3.0
 onnx==1.17.0
 opencv-python==4.11.0.86
@@ -80,9 +80,9 @@ pre-commit==3.3.2
 prompt_toolkit @ file:///home/conda/feedstock_root/build_artifacts/prompt-toolkit_1737453357274/work
 protobuf==5.29.3
 psutil @ file:///private/var/folders/k1/30mswbxs7r1g6zwn8y4fyt500000gp/T/abs_10oa1k8l11/croot/psutil_1736367646006/work
-psutil>=5.9.0
 ptyprocess @ file:///home/conda/feedstock_root/build_artifacts/ptyprocess_1733302279685/work/dist/ptyprocess-0.7.0-py2.py3-none-any.whl#sha256=92c32ff62b5fd8cf325bec5ab90d7be3d2a8ca8c8a3813ff487a8d2002630d1f
 pure_eval @ file:///home/conda/feedstock_root/build_artifacts/pure_eval_1733569405015/work
+py-cpuinfo==9.0.0
 pycodestyle==2.10.0
 pydantic==2.10.6
 pydantic_core==2.27.2
@@ -128,7 +128,8 @@ traitlets @ file:///home/conda/feedstock_root/build_artifacts/traitlets_17333673
 types-PyYAML==6.0.12.9
 typing_extensions @ file:///home/conda/feedstock_root/build_artifacts/typing_extensions_1733188668063/work
 tzdata==2025.1
-ultralytics==8.0.0
+ultralytics==8.3.77
+ultralytics-thop==2.0.14
 urllib3==2.3.0
 virtualenv==20.29.2
 wcwidth @ file:///home/conda/feedstock_root/build_artifacts/wcwidth_1733231326287/work

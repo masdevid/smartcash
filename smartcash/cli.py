@@ -637,7 +637,7 @@ def evaluate_research(stdscr):
         show_error(stdscr, f"Gagal menjalankan skenario penelitian: {str(e)}")
         return True
 
-def show_training_menu(stdscr):
+def show_training_menu(stdscr, config_path: Path):
     """Show training configuration menu."""
     menu_items = [
         MenuItem(
@@ -666,7 +666,7 @@ def show_training_menu(stdscr):
         ),
         MenuItem(
             title="Mulai Pelatihan",
-            action=lambda: start_training(stdscr),
+            action=lambda: start_training(stdscr, config_path),
             description="Mulai proses pelatihan model",
             category="Aksi"
         ),
@@ -700,25 +700,61 @@ def show_submenu(stdscr: Optional[curses.window], menu: Menu) -> bool:
         if result is None:  # No action taken
             continue
 
-def start_training(stdscr) -> bool:
-    """Start model training."""
+def start_training(stdscr, config_path: Path) -> bool:
+    """Mulai proses training model."""
     if not all([
         config['data_source'],
         config['detection_mode'],
         config['backbone']
     ]):
-        show_error(stdscr, "Silakan lengkapi semua konfigurasi terlebih dahulu")
+        show_error(stdscr, "❌ Silakan lengkapi semua konfigurasi terlebih dahulu")
         return True
         
-    # Save configuration
-    save_config()
-    
-    # Start training process
-    logger.info("Memulai proses pelatihan...")
-    logger.info(f"Konfigurasi: {config}")
-    
-    # TODO: Implement actual training
-    return False
+    try:
+        # Initialize training pipeline
+        from smartcash.handlers.training_pipeline import TrainingPipeline
+        # Update config dengan nilai yang diperlukan
+        config['config_path'] = str(config_path)
+        config['data_dir'] = str(Path(config_path).parent.parent / 'data')
+        
+        # Load base config untuk mendapatkan default values
+        with open(config_path, 'r') as f:
+            base_config = yaml.safe_load(f)
+            
+        # Update model config
+        if 'model' not in config:
+            config['model'] = base_config.get('model', {})
+        if 'backbone' not in config:
+            config['backbone'] = config['model'].get('backbone', 'cspdarknet')  # config_path dari parameter cli
+        pipeline = TrainingPipeline(config=config)
+        
+        # Start training in curses window
+        curses.endwin()  # Temporarily exit curses mode
+        
+        print("\n=== 🚀 Memulai Training ===")
+        print(f"• Mode Deteksi: {config['detection_mode']}")
+        print(f"• Backbone: {config['backbone']}")
+        print(f"• Sumber Data: {config['data_source']}")
+        print(f"• Batch Size: {config['training']['batch_size']}")
+        print(f"• Learning Rate: {config['training']['learning_rate']}")
+        print(f"• Epochs: {config['training']['epochs']}\n")
+        
+        # Run training
+        results = pipeline.train()
+        
+        print("\n=== ✨ Training Selesai ===")
+        print(f"• Output Dir: {results['train_dir']}")
+        print("\nMetrics Terbaik:")
+        for metric, value in results['best_metrics'].items():
+            print(f"• {metric}: {value:.4f}")
+            
+        input("\nTekan Enter untuk kembali ke menu...")
+        return True
+        
+    except Exception as e:
+        print(f"\n❌ Error: {str(e)}")
+        input("\nTekan Enter untuk kembali ke menu...")
+        return True
 
 def save_config():
     """Save current configuration to file."""
@@ -878,14 +914,14 @@ def show_backbone_menu(stdscr):
     menu_items = [
         MenuItem(
             title="CSPDarknet",
-            action=lambda: set_config('backbone', 'cspdarknet'),
+            action=lambda: update_backbone('cspdarknet'),
             description="Backbone standar YOLOv5",
             category="Arsitektur"
         ),
         MenuItem(
             title="EfficientNet-B4",
-            action=lambda: set_config('backbone', 'efficientnet'),
-            description="Backbone EfficientNet-B4",
+            action=lambda: update_backbone('efficientnet'),
+            description="Backbone EfficientNet-B4 dengan scaling compound",
             category="Arsitektur"
         ),
         MenuItem(
@@ -897,6 +933,18 @@ def show_backbone_menu(stdscr):
     
     menu = Menu("Pilih Arsitektur Model", menu_items)
     return show_submenu(stdscr, menu)
+    
+def update_backbone(backbone_type: str) -> bool:
+    """Update backbone dalam konfigurasi global"""
+    global config
+    
+    # Update konfigurasi backbone
+    config['backbone'] = backbone_type
+    
+    # Log pemilihan backbone
+    logger.info(f"🔧 Backbone dipilih: {backbone_type}")
+    
+    return True
 
 def show_training_params_menu(stdscr):
     """Show training parameters menu."""
@@ -999,21 +1047,23 @@ def main(stdscr):
     # Enable keypad
     stdscr.keypad(True)
     
-    # Check system requirements
-    if not check_system_requirements():
+    # Load config path
+    config_path = Path(__file__).parent.parent / 'configs' / 'base_config.yaml'
+    if not config_path.exists():
+        show_error(stdscr, f"❌ File konfigurasi tidak ditemukan: {config_path}")
         return
     
     # Main menu items
     menu_items = [
         MenuItem(
             title="Pelatihan Model",
-            action=lambda: show_training_menu(stdscr),
+            action=lambda: show_training_menu(stdscr, config_path),
             description="Konfigurasi dan mulai pelatihan model",
             category="Model"
         ),
         MenuItem(
             title="Evaluasi Model",
-            action=lambda: show_evaluation_menu(stdscr),
+            action=lambda: show_evaluation_menu(stdscr, config_path),
             description="Evaluasi performa model",
             category="Model"
         ),
@@ -1026,7 +1076,8 @@ def main(stdscr):
     ]
     
     menu = Menu("SmartCash - Sistem Deteksi Uang Kertas", menu_items)
-    
+
+    # Menu loop
     while True:
         try:
             stdscr.clear()

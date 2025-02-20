@@ -3,10 +3,13 @@
 # Deskripsi: Handler untuk model training dan evaluasi
 
 import os
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Union
 import yaml
 import time
+import torch
+from pathlib import Path
 from smartcash.utils.logger import SmartCashLogger
+from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.models.baseline import BaselineModel
 
 class ModelHandler:
@@ -18,17 +21,94 @@ class ModelHandler:
         num_classes: int,
         logger: Optional[SmartCashLogger] = None
     ):
+        self.config_path = Path(config_path)  # Store config path
         self.logger = logger or SmartCashLogger(__name__)
+        
+        # Load configuration
         self.config = self._load_config(config_path)
+        
         self.num_classes = num_classes
         self.results = {}
         
     def _load_config(self, config_path: str) -> Dict:
         """Load experiment configuration"""
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        return config
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+            
+            # Validate critical configurations
+            if not config:
+                raise ValueError("Konfigurasi kosong atau tidak valid")
+            
+            return config
+        except Exception as e:
+            self.logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
+            raise
+    
+    def get_model(self) -> Union[YOLOv5Model, BaselineModel]:
+        """
+        Inisialisasi model dengan dukungan backbone fleksibel
         
+        Returns:
+            Model yang siap untuk training
+        """
+        try:
+            # Prioritaskan backbone dari konfigurasi
+            backbone_type = (
+                self.config.get('backbone') or  # Backbone dari config global
+                self.config.get('model', {}).get('backbone', 'cspdarknet')  # Fallback ke default
+            )
+            
+            # Parameter tambahan
+            pretrained = self.config.get('model', {}).get('pretrained', True)
+            layers = self.config.get('layers', ['banknote'])
+            num_classes = len(self.config.get('dataset', {}).get('classes', [7]))
+            
+            # Log detail inisialisasi
+            self.logger.info(
+                f"🚀 Mempersiapkan model dengan:\n"
+                f"   • Backbone: {backbone_type}\n"
+                f"   • Pretrained: {pretrained}\n"
+                f"   • Jumlah Layer: {len(layers)}\n"
+                f"   • Jumlah Kelas: {num_classes}"
+            )
+            
+            # Inisialisasi model dengan backbone yang dipilih
+            if backbone_type == 'efficientnet':
+                model = YOLOv5Model(
+                    num_classes=num_classes,
+                    backbone_type='efficientnet',
+                    pretrained=pretrained,
+                    detection_layers=layers,  # Gunakan detection_layers
+                    logger=self.logger
+                )
+            elif backbone_type == 'cspdarknet':
+                model = YOLOv5Model(
+                    num_classes=num_classes,
+                    backbone_type='cspdarknet',
+                    pretrained=pretrained,
+                    detection_layers=layers,  # Gunakan detection_layers
+                    logger=self.logger
+                )
+            else:
+                # Fallback untuk backbone khusus/eksperimental
+                model = BaselineModel(
+                    num_classes=num_classes,
+                    backbone=backbone_type,
+                    pretrained=pretrained
+                )
+            
+            # Pindahkan ke GPU jika tersedia
+            if torch.cuda.is_available():
+                model = model.cuda()
+                self.logger.info("💻 Model dialihkan ke GPU")
+            
+            return model
+            
+        except Exception as e:
+            self.logger.error(f"❌ Gagal mempersiapkan model: {str(e)}")
+            raise
+            
     def run_experiment(
         self,
         scenario: Dict,
@@ -44,17 +124,7 @@ class ModelHandler:
         
         try:
             # Initialize model sesuai skenario
-            if scenario['backbone'] == 'csp':
-                model = BaselineModel(
-                    config_path=self.config,
-                    num_classes=self.num_classes,
-                    logger=self.logger
-                )
-            else:
-                # TODO: Implementasi untuk EfficientNet backbone
-                raise NotImplementedError(
-                    "EfficientNet backbone belum diimplementasi"
-                )
+            model = self.get_model()
             
             # Build & train model
             start_time = time.time()
@@ -93,7 +163,7 @@ class ModelHandler:
             self.logger.error(
                 f"Eksperimen {scenario['name']} gagal: {str(e)}"
             )
-            raise e
+            raise
     
     def run_all_experiments(
         self,

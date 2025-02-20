@@ -110,7 +110,9 @@ temp/
 
 # Specific Project Directories
 experiments/
-!models/experiments
+!models/experiments/*
+
+pretrained/
 
 # Config Files
 *.yaml

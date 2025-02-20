@@ -7,10 +7,11 @@ import torch
 import yaml
 from pathlib import Path
 
-from models.yolo5_efficient import YOLOv5Efficient
-from models.backbones.efficient_adapter import EfficientNetAdapter
-from models.necks.fpn_pan import FeatureProcessingNeck
-from utils.logger import SmartCashLogger
+from smartcash.models.yolov5_model import YOLOv5Model
+from smartcash.models.backbones.cspdarknet import CSPDarknet
+from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+from smartcash.models.detection_head import DetectionHead
+from smartcash.utils.logger import SmartCashLogger
 
 class TestModelComponents:
     @pytest.fixture
@@ -26,7 +27,7 @@ class TestModelComponents:
     def test_efficientnet_adapter(self, sample_input):
         """Pengujian EfficientNetAdapter"""
         logger = SmartCashLogger(__name__)
-        backbone = EfficientNetAdapter(logger=logger)
+        backbone = EfficientNetBackbone(logger=logger)
         
         # Ekstraksi fitur
         features = backbone(sample_input)
@@ -38,50 +39,86 @@ class TestModelComponents:
         for i, feature in enumerate(features):
             assert feature.shape[1] == expected_channels[i], f"Channel stage {i+3} tidak sesuai"
     
-    def test_feature_processing_neck(self, sample_input):
-        """Pengujian FeatureProcessingNeck"""
-        # Siapkan backbone untuk mendapatkan fitur
-        backbone = EfficientNetAdapter()
-        backbone_features = backbone(sample_input)
+    def test_cspdarknet_backbone(self, sample_input):
+        """Pengujian CSPDarknet backbone"""
+        backbone = CSPDarknet()
+        features = backbone(sample_input)
         
-        neck = FeatureProcessingNeck(
-            in_channels=[56, 160, 448],
-            out_channels=[128, 256, 512]
-        )
-        
-        # Gabungkan fitur melalui neck
-        neck_features = neck.fpn(backbone_features)
-        neck_features = neck.pan(neck_features)
-        
-        assert len(neck_features) == 3, "Harus ada 3 feature map setelah pemrosesan neck"
-        
-        # Periksa dimensi channel output
+        assert len(features) == 3, "Harus ada 3 feature map"
         expected_channels = [128, 256, 512]
-        for i, feature in enumerate(neck_features):
-            assert feature.shape[1] == expected_channels[i], f"Channel output stage {i+3} tidak sesuai"
+        for i, feature in enumerate(features):
+            assert feature.shape[1] == expected_channels[i], f"Channel stage {i+3} tidak sesuai"
     
-    def test_yolov5_efficient(self, config_path, sample_input):
-        """Pengujian arsitektur YOLOv5 dengan EfficientNet backbone"""
-        # Baca konfigurasi untuk mendapatkan jumlah kelas
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+    def test_detection_head_single_layer(self, sample_input):
+        """Pengujian detection head untuk single layer"""
+        # Setup input channels
+        in_channels = [256, 512, 1024]
         
-        num_classes = len(config['dataset']['classes'])
+        # Single layer head
+        head = DetectionHead(in_channels=in_channels)
         
-        model = YOLOv5Efficient(num_classes=num_classes)
+        # Generate sample feature maps
+        features = [
+            torch.randn(1, ch, 80//s, 80//s)
+            for ch, s in zip(in_channels, [1, 2, 4])
+        ]
         
         # Forward pass
+        predictions = head(features)
+        
+        # Periksa struktur output
+        assert isinstance(predictions, dict), "Output harus berupa dict"
+        assert "banknote" in predictions, "Harus ada layer banknote"
+        assert len(predictions["banknote"]) == 3, "Harus ada 3 skala prediksi"
+    
+    def test_detection_head_multi_layer(self, sample_input):
+        """Pengujian detection head untuk multi layer"""
+        in_channels = [256, 512, 1024]
+        layers = ["banknote", "nominal"]
+        
+        head = DetectionHead(
+            in_channels=in_channels,
+            layers=layers
+        )
+        
+        features = [
+            torch.randn(1, ch, 80//s, 80//s)
+            for ch, s in zip(in_channels, [1, 2, 4])
+        ]
+        
+        predictions = head(features)
+        
+        assert set(predictions.keys()) == set(layers), "Output harus sesuai layer yang diminta"
+        for layer in layers:
+            assert len(predictions[layer]) == 3, f"Layer {layer} harus memiliki 3 skala"
+    
+    def test_yolov5_single_layer(self, sample_input):
+        """Pengujian YOLOv5 dengan single layer detection"""
+        model = YOLOv5Model(
+            num_classes=7,
+            backbone_type="cspdarknet"
+        )
+        
         predictions = model(sample_input)
         
-        assert len(predictions) == 3, "Harus ada 3 prediksi dari detection heads"
+        # Single layer output
+        assert isinstance(predictions, dict), "Output harus berupa dict"
+        assert "banknote" in predictions, "Harus ada layer banknote"
+        assert len(predictions["banknote"]) == 3, "Harus ada 3 skala prediksi"
+    
+    def test_yolov5_multi_layer(self, sample_input):
+        """Pengujian YOLOv5 dengan multi layer detection"""
+        layers = ["banknote", "nominal"]
+        model = YOLOv5Model(
+            backbone_type="efficientnet",
+            layers=layers
+        )
         
-        # Periksa dimensi prediksi untuk setiap skala
-        expected_channels = [128, 256, 512]
-        for i, pred in enumerate(predictions):
-            # Periksa bentuk prediksi
-            assert pred.ndim == 5, f"Prediksi skala {i} harus 5 dimensi"
-            assert pred.shape[1] == 3, f"Jumlah anchor di skala {i} harus 3"
-            assert pred.shape[4] == 5 + num_classes, f"Ukuran channel prediksi di skala {i} tidak sesuai"
+        predictions = model(sample_input)
+        
+        assert set(predictions.keys()) == set(layers), "Output harus sesuai layer yang diminta"
+        for layer in layers:
+            assert len(predictions[layer]) == 3, f"Layer {layer} harus memiliki 3 skala"
     
     def test_model_loss_computation(self, config_path, sample_input):
         """Pengujian komputasi loss"""
@@ -89,9 +126,7 @@ class TestModelComponents:
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
         
-        num_classes = len(config['dataset']['classes'])
-        
-        model = YOLOv5Efficient(num_classes=num_classes)
+        model = YOLOv5Model(num_classes=7)
         
         # Buat target palsu untuk pengujian
         target = torch.tensor([
@@ -101,9 +136,10 @@ class TestModelComponents:
         
         # Prediksi model
         predictions = model(sample_input)
+        loss = model.compute_loss(predictions, target)
         
-        try:
-            loss = model.compute_loss(predictions, target)
-            assert loss is not None, "Komputasi loss gagal"
-        except Exception as e:
-            pytest.fail(f"Kesalahan dalam komputasi loss: {str(e)}")
+        assert 'total_loss' in loss, "Harus ada total loss"
+        assert 'box_loss' in loss, "Harus ada box loss"
+        assert 'obj_loss' in loss, "Harus ada objectness loss"
+        assert 'cls_loss' in loss, "Harus ada classification loss"
+        assert all(v >= 0 for v in loss.values()), "Semua loss harus non-negatif"

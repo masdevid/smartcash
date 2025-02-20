@@ -1,169 +1,97 @@
-# File: configs/base_config.yaml
-# Author: Alfrida Sabar
-# Deskripsi: Konfigurasi komprehensif untuk sistem deteksi mata uang SmartCash
-
-# Konfigurasi Dataset
-dataset:
-  name: "Rupiah Currency Detection"
-  version: "1.0"
-  workspace: "detection-twl6q"
-  project: "rupiah_emisi-baru"
-  
-  # Konfigurasi kelas mata uang
+data:
   classes:
-    - "100k"
-    - "10k"
-    - "1k"
-    - "20k"
-    - "2k"
-    - "50k"
-    - "5k"
-
-  # Paths untuk dataset
-  paths:
-    train: "data/train"
-    validation: "data/valid"
-    test: "data/test"
-    
-  # Statistik dataset
-  stats:
-    total_samples: 2740
-    train_split: 0.7
-    validation_split: 0.15
-    test_split: 0.15
-
-# Konfigurasi Model
-model:
-  # Arsitektur deteksi
-  architecture:
-    backbone: "efficientnet_b4"
-    neck: "fpn_pan"
-    head: "yolov5"
-  
-  # Konfigurasi input
-  input:
-    image_size: [640, 640]  # Ukuran standar input
-    channels: 3             # RGB
-  
-  # Hyperparameters backbone
-  backbone:
-    pretrained: true
-    trainable_layers: 3
-    freeze_bn: true
-  
-  # Anchor boxes per skala deteksi
-  anchors:
-    p3: [[10, 13], [16, 30], [33, 23]]     # Small objects
-    p4: [[30, 61], [62, 45], [59, 119]]    # Medium objects
-    p5: [[116, 90], [156, 198], [373, 326]]  # Large objects
-  
-  # Detection head
-  head:
-    num_classes: 7
-    confidence_threshold: 0.25
-    iou_threshold: 0.45
-    max_detections: 100
-
-# Konfigurasi Training
-training:
-  # Parameter dasar training
-  epochs: 100
-  batch_size: 16
-  learning_rate:
-    initial: 0.01
-    min: 0.0001
-    max: 0.1
-  
-  # Optimizer
-  optimizer:
-    name: "AdamW"
-    weight_decay: 0.0005
-  
-  # Learning Rate Scheduler
-  lr_scheduler:
-    name: "OneCycleLR"
-    max_lr: 0.01
-    epochs: 100
-    cycle_momentum: true
-  
-  # Callbacks
-  early_stopping:
-    monitor: "val_loss"
-    patience: 10
-    min_delta: 0.001
-  
-  # Checkpoint
-  checkpoint:
-    save_top_k: 3
-    save_last: true
-    monitor: "val_loss"
-  
-  # Augmentasi Data
-  augmentation:
-    horizontal_flip: 0.5
-    vertical_flip: 0.0
-    rotation_range: 20
-    width_shift_range: 0.1
-    height_shift_range: 0.1
-    brightness_range: [0.8, 1.2]
-    zoom_range: [0.9, 1.1]
-  
-  # Regulasi & Normalisasi
-  mixup_alpha: 0.2
-  label_smoothing: 0.1
-
-# Konfigurasi Evaluasi
+  - '1000'
+  - '2000'
+  - '5000'
+  - '10000'
+  - '20000'
+  - '50000'
+  - '100000'
+  local:
+    test: data/test
+    train: data/train
+    val: data/val
+  roboflow:
+    api_key: your_roboflow_api_key
+    project: rupiah_emisi-baru
+    version: 3
+    workspace: detection-twl6q
+  source: local
+dataset:
+  classes:
+  - 100k
+  - 10k
+  - 1k
+  - 20k
+  - 2k
+  - 50k
+  - 5k
+  project: rupiah_emisi-baru
+  test_path: ../test/images
+  train_path: ../train/images
+  valid_path: ../valid/images
+  version: 3
+  workspace: detection-twl6q
 evaluation:
-  # Metrik yang akan dilacak
   metrics:
-    - accuracy
-    - precision
-    - recall
-    - f1_score
-    - map
-    - inference_time
-  
-  # Skenario Pengujian
-  scenarios:
-    - name: "baseline_position"
-      backbone: "csp"
-      condition: "position_variation"
-    
-    - name: "baseline_lighting"
-      backbone: "csp"
-      condition: "lighting_variation"
-    
-    - name: "efficient_position"
-      backbone: "efficientnet"
-      condition: "position_variation"
-    
-    - name: "efficient_lighting"
-      backbone: "efficientnet"
-      condition: "lighting_variation"
-  
-  # Visualisasi Hasil
-  visualizations:
-    save_predictions: true
-    save_confusion_matrix: true
-    save_roc_curve: true
-
-# Konfigurasi Hardware
-hardware:
-  device: "cuda"  # atau "cpu"
-  precision: 16   # Mixed precision training
-  num_workers: 8
-  memory_limit: 0.6  # 60% resource usage
-  
-# Logging & Monitoring
-logging:
-  level: "INFO"
-  dir: "logs"
-  save_interval: 10
-  track_system_metrics: true
-
-# Konfigurasi Eksperimen
-experiment:
-  name: "SmartCash_Currency_Detection"
-  description: "YOLOv5 with EfficientNet-B4 for Rupiah Banknote Detection"
-  version: "1.0.0"
-  random_seed: 42
+  - accuracy
+  - precision
+  - recall
+  - f1
+  - mAP
+  - inference_time
+  save_path: results/visualizations
+  save_visualizations: true
+experiment_scenarios:
+- backbone: cspdarknet
+  conditions: position
+  description: YOLOv5 Default (CSPDarknet) - Variasi Posisi
+  name: scenario_1
+- backbone: cspdarknet
+  conditions: lighting
+  description: YOLOv5 Default (CSPDarknet) - Variasi Pencahayaan
+  name: scenario_2
+- backbone: efficientnet
+  conditions: position
+  description: YOLOv5 + EfficientNet-B4 - Variasi Posisi
+  name: scenario_3
+- backbone: efficientnet
+  conditions: lighting
+  description: YOLOv5 + EfficientNet-B4 - Variasi Pencahayaan
+  name: scenario_4
+model:
+  backbone: cspdarknet
+  batch_size: 16
+  conf_thres: 0.25
+  device: ''
+  img_size:
+  - 640
+  - 640
+  iou_thres: 0.45
+  max_det: 1000
+  memory_limit: 0.6
+  num_classes: 7
+  pretrained: true
+  workers: 8
+training:
+  batch_size: 16
+  degrees: 0.0
+  epochs: 100
+  fliplr: 0.5
+  flipud: 0.0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  image_size: 640
+  learning_rate: 0.01
+  lr0: 0.01
+  lrf: 0.01
+  mixup: 0.0
+  momentum: 0.937
+  mosaic: 1.0
+  perspective: 0.0
+  scale: 0.5
+  shear: 0.0
+  translate: 0.1
+  warmup_epochs: 3
+  weight_decay: 0.0005

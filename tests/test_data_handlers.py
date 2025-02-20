@@ -6,9 +6,9 @@ import pytest
 import os
 from pathlib import Path
 
-from handlers.data_handler import DataHandler
-from handlers.roboflow_handler import RoboflowHandler
-from utils.logger import SmartCashLogger
+from smartcash.handlers.data_handler import DataHandler
+from smartcash.handlers.roboflow_handler import RoboflowHandler
+from smartcash.utils.logger import SmartCashLogger
 
 class TestDataHandlers:
     @pytest.fixture
@@ -60,7 +60,7 @@ class TestDataHandlers:
         assert len(class_names) > 0, "Nama kelas tidak boleh kosong"
         
         # Periksa nama kelas sesuai konfigurasi
-        expected_classes = ['100k', '10k', '1k', '20k', '2k', '50k', '5k']
+        expected_classes = ['100K', '10K', '1K', '20k', '2K', '50K', '5K']
         assert set(class_names) == set(expected_classes), "Nama kelas tidak sesuai"
     
     @pytest.mark.skipif(

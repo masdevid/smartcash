@@ -1,5 +1,13 @@
 # 📑 SmartCash - Overview & Petunjuk Penggunaan
 
+## 🔍 Daftar Isi
+- [Overview Project](#overview-project)
+- [Petunjuk Penggunaan](#petunjuk-penggunaan)
+- [Dokumentasi](#dokumentasi)
+- [Struktur Project](#struktur-project)
+- [Lisensi](#lisensi)
+- [Sitasi](#sitasi)
+
 ## 🔍 Overview Project
 SmartCash adalah sistem deteksi nilai mata uang Rupiah menggunakan algoritma YOLOv5 yang dioptimasi dengan arsitektur EfficientNet-B4 sebagai backbone. Tujuan project ini adalah meningkatkan akurasi deteksi nilai mata uang Rupiah dengan mempertimbangkan berbagai kondisi pengambilan gambar.
 
@@ -17,106 +25,75 @@ SmartCash adalah sistem deteksi nilai mata uang Rupiah menggunakan algoritma YOL
    - Cari ekstensi "Markdown Preview Mermaid Support" dan install
    - Restart VSCode agar ekstensi aktif
 
-2. Aktivasi conda environment
-   - Buka terminal (Ctrl+`)
-   - Jalankan perintah berikut untuk membuat & mengaktifkan conda env:
+3. Aktivasi conda environment
+   ```bash
+   conda create -n smartcash python=3.9
+   conda activate smartcash
+   pip install -r requirements.txt
+   ```
+
+4. Persiapkan dataset
+   - Download dataset dari Roboflow atau gunakan dataset lokal
+   - Struktur folder data:
      ```
-     conda create -n smartcash python=3.9
-     conda activate smartcash
+     data/
+     ├── train/
+     │   ├── images/
+     │   └── labels/
+     ├── valid/
+     │   ├── images/
+     │   └── labels/
+     └── test/
+         ├── images/
+         └── labels/
      ```
-   - Install semua dependencies:
-     ```
-     pip install -r requirements.txt
-     ```
 
-3. Persiapkan dataset
-   - Jika menggunakan dataset lokal:
-     - Download dataset dari Roboflow
-     - Ekstrak dataset ke folder `data/` dengan struktur berikut:
-       ```
-       data/
-       ├── train/
-       │   ├── images/
-       │   └── labels/
-       ├── valid/
-       │   ├── images/
-       │   └── labels/
-       └── test/
-           ├── images/
-           └── labels/
-       ```
-   - Jika menggunakan Roboflow API:
-     - Dapatkan API key dari akun Roboflow Anda
-     - Buat file `.env` berdasarkan `.env.example`
-     - Set nilai `ROBOFLOW_API_KEY` dengan API key Anda
+Untuk petunjuk lengkap penggunaan aplikasi, silakan lihat:
+- [📱 Panduan Pengguna](docs/PANDUAN_PENGGUNA.md)
 
-### Menjalankan Eksperimen
-1. Buka notebook `notebooks/smartcash_experiment.ipynb`
-2. Jalankan setiap cell secara berurutan
-3. Notebook akan secara otomatis:
-   - Membaca konfigurasi dari `configs/base_config.yaml`
-   - Menginisialisasi model sesuai skenario eksperimen
-   - Memuat dataset (lokal atau via API)
-   - Melakukan training & evaluasi model
-   - Memvisualisasikan hasil eksperimen
+## 📚 Dokumentasi
+Dokumentasi lengkap tentang project SmartCash tersedia di folder [`docs/`](./docs/):
 
-## 📊 Hasil Eksperimen
-Setelah menjalankan notebook, Anda dapat melihat hasil eksperimen berupa:
-- Grafik metrics pelatihan
-- Confusion matrix
-- Precision-Recall curve
-- Perbandingan inference time
-- Analisis performa per kelas
+### 📖 Panduan
+- [📱 Panduan Pengguna](./docs/PANDUAN_PENGGUNA.md) - Petunjuk lengkap penggunaan aplikasi
+- [📊 Panduan Anotasi Dataset](./docs/PANDUAN_ANOTASI.md) - Cara membuat & mengelola dataset
+- [🔧 Panduan Preprocessing](./docs/PREPROCESSING.md) - Langkah-langkah preprocessing data
 
-Semua hasil akan disimpan di folder `results/` untuk analisis lebih lanjut.
+### 🏗️ Dokumentasi Teknis
+- [🔍 Overview Project](./docs/SUMMARY.md) - Ringkasan & tujuan project
+- [⚙️ Arsitektur Sistem](./docs/DOKUMENTASI_TEKNIS.md) - Detil implementasi sistem
+- [🔄 Alur Kerja Git](./docs/GIT_WORKFLOW.md) - Panduan kolaborasi & version control
 
-## 🧪 Pengujian Proyek SmartCash
+### 🧪 Eksperimen & Evaluasi
+- [📈 Roboflow Integration](./docs/ROBOFLOW.md) - Konfigurasi & penggunaan Roboflow
+- [🔬 YOLOv5 + EfficientNet](./docs/YOLOv5_EfficientNetB4_Backbone.md) - Detil arsitektur model
 
-### 📋 Struktur Pengujian
-
-Direktori pengujian ini berisi serangkaian tes unit dan integrasi untuk proyek SmartCash:
-
-- `test_data_handlers.py`: Pengujian untuk handler data
-- `test_models.py`: Pengujian komponen model
-- `test_evaluation.py`: Pengujian proses evaluasi
-- `conftest.py`: Konfigurasi global pytest
-
-### 🚀 Menjalankan Pengujian
-
-#### Perintah Dasar
-```bash
-# Jalankan semua pengujian
-pytest
-
-# Jalankan pengujian spesifik
-pytest tests/test_data_handlers.py
-
-# Jalankan tes lambat
-pytest --runslow
-
-# Tampilkan informasi tambahan
-pytest -v
+## 🏗️ Struktur Project
 ```
-
-##### 🔍 Marker Pengujian
-
-- `@pytest.mark.slow`: Tes yang membutuhkan waktu lama
-- `@pytest.mark.integration`: Tes integrasi
-
-#### 💡 Tips
-- Pastikan Anda berada di root project saat menjalankan pengujian
-- Gunakan virtual environment untuk menghindari konflik dependencies
-- Periksa keluaran pytest untuk detail kesalahan
-
+SmartCash/
+├── configs/           # Konfigurasi eksperimen
+├── data/             # Dataset (train/valid/test)
+├── docs/             # Dokumentasi lengkap
+├── handlers/         # Modul penanganan data
+├── models/           # Implementasi model
+├── notebooks/        # Jupyter notebooks
+├── tests/           # Unit & integration tests
+├── utils/           # Utilitas & helpers
+├── .env.example     # Template environment vars
+├── README.md        # Dokumentasi utama
+└── requirements.txt # Dependencies
+```
 
 ## 📜 Lisensi
-Proyek ini dilisensikan di bawah MIT License.
+Project ini dilisensikan di bawah MIT License - lihat file [LICENSE](LICENSE) untuk detil.
 
-## 🏆 Sitasi
-Jika Anda menggunakan SmartCash dalam penelitian Anda, harap sitasi repository ini:
+## 📚 Sitasi
+Jika Anda menggunakan SmartCash dalam penelitian Anda, silakan sitasi:
 
-```
-Sabar, A. (2025). Optimasi Deteksi Nominal Mata Uang dengan YOLOv5 dan EfficientNet-B4. (Unpublished)
-```
-
-Terima kasih telah menggunakan SmartCash! 🙏 Semoga bermanfaat untuk penelitian Anda. Jika Anda menemukan bug atau ingin request fitur baru, silakan buat Issue di repository ini. Happy detecting! 🪙💰
+```bibtex
+@software{smartcash2025,
+  author = {Your Name},
+  title = {SmartCash: Indonesian Banknote Detection with YOLOv5 & EfficientNet-B4},
+  year = {2025},
+  url = {https://github.com/yourusername/smartcash}
+}

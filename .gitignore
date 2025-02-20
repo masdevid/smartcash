@@ -120,3 +120,4 @@ pretrained/
 # Model Metadata
 *.index
 backup/
+*.pt

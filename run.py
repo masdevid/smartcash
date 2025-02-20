@@ -1,12 +1,15 @@
-#!/usr/bin/env python3
+# File: run.py
+# Author: Alfrida Sabar
+# Deskripsi: Legacy entry point script dengan warning penggunaan
 
-import sys
-import curses
-from smartcash.cli import main
+import warnings
+from smartcash.__main__ import main
 
 if __name__ == '__main__':
-    try:
-        curses.wrapper(main)
-    except KeyboardInterrupt:
-        print("\nKeluar dari SmartCash...")
-        sys.exit(0)
+    warnings.warn(
+        "run.py akan dihapus di versi mendatang. "
+        "Gunakan 'python -m smartcash' sebagai gantinya.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    main()

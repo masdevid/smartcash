@@ -61,7 +61,7 @@ experiment_scenarios:
   name: scenario_4
 model:
   backbone: cspdarknet
-  batch_size: 16
+  batch_size: 32
   conf_thres: 0.25
   device: ''
   img_size:

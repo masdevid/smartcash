@@ -117,3 +117,4 @@ experiments/
 
 # Model Metadata
 *.index
+backup/

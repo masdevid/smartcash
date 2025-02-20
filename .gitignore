@@ -121,3 +121,4 @@ pretrained/
 *.index
 backup/
 *.pt
+.windsurfrules

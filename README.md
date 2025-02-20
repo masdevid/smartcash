@@ -22,6 +22,10 @@ pip install -r requirements.txt
 ### 3. Jalankan Aplikasi
 ```bash
 python run.py
+
+atau
+
+python -m smartcash
 ```
 
 ## 📚 Dokumentasi

@@ -85,7 +85,7 @@ Project ini dilisensikan di bawah MIT License - lihat [LICENSE](LICENSE).
 ```bibtex
 @software{smartcash2025,
   title={SmartCash: Indonesian Banknote Detection with YOLOv5 & EfficientNet-B4},
-  author={Your Name},
+  author={Alfrida Sabar},
   year={2025},
-  url={https://github.com/yourusername/smartcash}
+  url={https://github.com/masdevid/smartcash}
 }

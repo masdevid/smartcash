@@ -34,6 +34,7 @@ coverage.xml
 data/
 */data/
 dataset/
+!docs/dataset
 weights/
 *.pt
 *.pth
@@ -109,6 +110,7 @@ temp/
 
 # Specific Project Directories
 experiments/
+!models/experiments
 
 # Config Files
 *.yaml

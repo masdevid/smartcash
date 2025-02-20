@@ -1,99 +1,91 @@
-# 📑 SmartCash - Overview & Petunjuk Penggunaan
+# 🔍 SmartCash: Deteksi Nilai Mata Uang Rupiah
 
-## 🔍 Daftar Isi
-- [Overview Project](#overview-project)
-- [Petunjuk Penggunaan](#petunjuk-penggunaan)
-- [Dokumentasi](#dokumentasi)
-- [Struktur Project](#struktur-project)
-- [Lisensi](#lisensi)
-- [Sitasi](#sitasi)
+SmartCash adalah sistem deteksi nilai mata uang Rupiah yang menggunakan YOLOv5 dengan EfficientNet-B4 sebagai backbone. Sistem ini dioptimasi untuk akurasi tinggi dalam berbagai kondisi pengambilan gambar.
 
-## 🔍 Overview Project
-SmartCash adalah sistem deteksi nilai mata uang Rupiah menggunakan algoritma YOLOv5 yang dioptimasi dengan arsitektur EfficientNet-B4 sebagai backbone. Tujuan project ini adalah meningkatkan akurasi deteksi nilai mata uang Rupiah dengan mempertimbangkan berbagai kondisi pengambilan gambar.
+## 📋 Quick Start
 
-## 🚀 Petunjuk Penggunaan
+### 1. Setup Environment
+```bash
+# Create and activate environment
+conda create -n smartcash python=3.9
+conda activate smartcash
 
-### Persiapan Environment
-1. Install ekstensi VSCode untuk Jupyter Notebook
-   - Buka VSCode, klik menu Extensions (Ctrl+Shift+X)
-   - Cari ekstensi "Jupyter" dan install
-   - Restart VSCode agar ekstensi aktif
+# Install dependencies
+pip install -r requirements.txt
+```
 
-2. Install ekstensi "Markdown Preview Mermaid Support"
-   - Ekstensi ini dibutuhkan untuk preview diagram Mermaid di README
-   - Buka VSCode, klik menu Extensions (Ctrl+Shift+X)
-   - Cari ekstensi "Markdown Preview Mermaid Support" dan install
-   - Restart VSCode agar ekstensi aktif
+### 2. Persiapkan Dataset
+- [Panduan Dataset](docs/dataset/README.md) - Persiapan & preprocessing dataset
+- [Roboflow Integration](docs/dataset/ROBOFLOW.md) - Penggunaan dataset Roboflow
 
-3. Aktivasi conda environment
-   ```bash
-   conda create -n smartcash python=3.9
-   conda activate smartcash
-   pip install -r requirements.txt
-   ```
-
-4. Persiapkan dataset
-   - Download dataset dari Roboflow atau gunakan dataset lokal
-   - Struktur folder data:
-     ```
-     data/
-     ├── train/
-     │   ├── images/
-     │   └── labels/
-     ├── valid/
-     │   ├── images/
-     │   └── labels/
-     └── test/
-         ├── images/
-         └── labels/
-     ```
-
-Untuk petunjuk lengkap penggunaan aplikasi, silakan lihat:
-- [📱 Panduan Pengguna](docs/PANDUAN_PENGGUNA.md)
+### 3. Jalankan Aplikasi
+```bash
+python run.py
+```
 
 ## 📚 Dokumentasi
-Dokumentasi lengkap tentang project SmartCash tersedia di folder [`docs/`](./docs/):
 
-### 📖 Panduan
-- [📱 Panduan Pengguna](./docs/PANDUAN_PENGGUNA.md) - Petunjuk lengkap penggunaan aplikasi
-- [📊 Panduan Anotasi Dataset](./docs/PANDUAN_ANOTASI.md) - Cara membuat & mengelola dataset
-- [🔧 Panduan Preprocessing](./docs/PREPROCESSING.md) - Langkah-langkah preprocessing data
+### 🎯 Panduan Pengguna
+- [Instalasi & Setup](docs/user_guide/INSTALASI.md) - Persiapan environment
+- [CLI Interface](docs/user_guide/CLI.md) - Penggunaan antarmuka CLI
+- [Training Guide](docs/user_guide/TRAINING.md) - Pelatihan model
+- [Evaluation Guide](docs/user_guide/EVALUATION.md) - Evaluasi model
+- [Troubleshooting](docs/user_guide/TROUBLESHOOTING.md) - Solusi masalah umum
 
-### 🏗️ Dokumentasi Teknis
-- [🔍 Overview Project](./docs/SUMMARY.md) - Ringkasan & tujuan project
-- [⚙️ Arsitektur Sistem](./docs/DOKUMENTASI_TEKNIS.md) - Detil implementasi sistem
-- [🔄 Alur Kerja Git](./docs/GIT_WORKFLOW.md) - Panduan kolaborasi & version control
+### 💻 Dokumentasi Teknis
+- [Arsitektur](docs/technical/ARSITEKTUR.md) - Desain sistem & komponen
+- [Model](docs/technical/MODEL.md) - Implementasi YOLOv5 + EfficientNet
+- [Dataset](docs/technical/DATASET.md) - Format & preprocessing data
+- [Evaluasi](docs/technical/EVALUASI.md) - Metrik & metodologi evaluasi
+- [API](docs/technical/API.md) - Dokumentasi API & integrasi
 
-### 🧪 Eksperimen & Evaluasi
-- [📈 Roboflow Integration](./docs/ROBOFLOW.md) - Konfigurasi & penggunaan Roboflow
-- [🔬 YOLOv5 + EfficientNet](./docs/YOLOv5_EfficientNetB4_Backbone.md) - Detil arsitektur model
+### 🛠️ Development
+- [Contribution Guide](docs/dev/CONTRIBUTING.md) - Panduan kontribusi
+- [Git Workflow](docs/dev/GIT_WORKFLOW.md) - Manajemen kode & versioning
+- [Testing](docs/dev/TESTING.md) - Unit & integration testing
+- [Code Style](docs/dev/CODE_STYLE.md) - Konvensi & best practices
 
 ## 🏗️ Struktur Project
+
 ```
-SmartCash/
-├── configs/           # Konfigurasi eksperimen
-├── data/             # Dataset (train/valid/test)
-├── docs/             # Dokumentasi lengkap
-├── handlers/         # Modul penanganan data
-├── models/           # Implementasi model
-├── notebooks/        # Jupyter notebooks
-├── tests/           # Unit & integration tests
-├── utils/           # Utilitas & helpers
-├── .env.example     # Template environment vars
-├── README.md        # Dokumentasi utama
-└── requirements.txt # Dependencies
+smartcash/
+├── configs/                 # Konfigurasi
+│   ├── base_config.yaml    # Konfigurasi dasar
+│   └── experiment/         # Konfigurasi eksperimen
+├── data/                   # Dataset
+│   ├── raw/               # Data mentah
+│   └── processed/         # Data terproses
+├── docs/                   # Dokumentasi
+│   ├── dataset/           # Dokumentasi dataset
+│   ├── dev/               # Dokumentasi developer
+│   ├── technical/         # Dokumentasi teknis
+│   └── user_guide/        # Panduan pengguna
+├── notebooks/              # Jupyter notebooks
+│   ├── 01_prepare_dataset.ipynb
+│   ├── 02_train_model.ipynb
+│   └── 03_evaluate_model.ipynb
+├── smartcash/             # Source code
+│   ├── handlers/          # Data & model handlers
+│   ├── models/           # Model implementations
+│   └── utils/            # Utility functions
+├── tests/                 # Unit & integration tests
+├── .env.example          # Environment template
+├── LICENSE               # MIT License
+├── README.md            # This file
+└── requirements.txt     # Python dependencies
 ```
+
+## 🤝 Kontribusi
+Kami menyambut kontribusi! Lihat [CONTRIBUTING.md](docs/dev/CONTRIBUTING.md) untuk panduan.
 
 ## 📜 Lisensi
-Project ini dilisensikan di bawah MIT License - lihat file [LICENSE](LICENSE) untuk detil.
+Project ini dilisensikan di bawah MIT License - lihat [LICENSE](LICENSE).
 
 ## 📚 Sitasi
-Jika Anda menggunakan SmartCash dalam penelitian Anda, silakan sitasi:
-
 ```bibtex
 @software{smartcash2025,
-  author = {Your Name},
-  title = {SmartCash: Indonesian Banknote Detection with YOLOv5 & EfficientNet-B4},
-  year = {2025},
-  url = {https://github.com/yourusername/smartcash}
+  title={SmartCash: Indonesian Banknote Detection with YOLOv5 & EfficientNet-B4},
+  author={Your Name},
+  year={2025},
+  url={https://github.com/yourusername/smartcash}
 }

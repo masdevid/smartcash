@@ -170,17 +170,23 @@ class TrainingParamsMenu(BaseMenu):
             
             # Update parameter in config
             try:
-                # Gunakan key parameter yang benar - perbaikan typo "mode" dengan "model"
-                if param_id == 'batch_size' and 'model' in self.config_manager.current_config:
-                    model_config = self.config_manager.current_config['model']
-                    # Update model.batch_size juga jika ada dan diminta untuk mengubah batch_size training
-                    old_model_bs = model_config.get('batch_size')
-                    if old_model_bs is not None:
-                        self.config_manager.update('model.batch_size', typed_value)
-                        self.logger.info(f"📝 Juga mengupdate model.batch_size ke {typed_value}")
-                
-                # Update parameter training
-                self.config_manager.update(f'training.{param_id}', typed_value)
+                # Kasus khusus untuk batch_size yang perlu diupdate di dua tempat
+                if param_id == 'batch_size':
+                    # Update training.batch_size
+                    self.config_manager.update(f'training.{param_id}', typed_value)
+                    
+                    # Juga update model.batch_size jika ada
+                    if 'model' in self.config_manager.current_config:
+                        # Gunakan cara yang lebih aman - baca model config, update batch_size, lalu tulis kembali
+                        model_config = self.config_manager.current_config.get('model', {}).copy()
+                        model_config['batch_size'] = typed_value
+                        self.config_manager.update('model', model_config)
+                        
+                        if self.logger:
+                            self.logger.info(f"📝 Juga mengupdate model.batch_size ke {typed_value}")
+                else:
+                    # Parameter normal - hanya update di training
+                    self.config_manager.update(f'training.{param_id}', typed_value)
                 
                 # Save config
                 self.config_manager.save()
@@ -188,14 +194,14 @@ class TrainingParamsMenu(BaseMenu):
                 
             except Exception as e:
                 self.display.show_error(f"Gagal mengupdate: {str(e)}")
-                self.logger.error(f"❌ Error update parameter: {str(e)}")
+                if self.logger:
+                    self.logger.error(f"❌ Error update parameter: {str(e)}")
                 
             return True
             
         except Exception as e:
             self.display.show_error(f"Gagal mengatur parameter: {str(e)}")
-            return True
-            
+            return True 
     def _reset_parameters(self) -> bool:
         """Reset semua parameter ke nilai default."""
         try:

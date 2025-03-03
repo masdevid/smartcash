@@ -339,6 +339,14 @@ class ConfigurationManager:
         # Update konfigurasi
         keys = key.split('.')
         
+        # Kasus khusus: jika mengupdate seluruh 'model', pastikan batch_size tetap ada
+        if key == 'model' and isinstance(value, dict):
+            # Pastikan batch_size tetap ada jika sebelumnya ada
+            existing_batch_size = self.current_config.get('model', {}).get('batch_size')
+            if existing_batch_size is not None and 'batch_size' not in value:
+                self.logger.warning(f"⚠️ Mempertahankan model.batch_size={existing_batch_size}")
+                value['batch_size'] = existing_batch_size
+        
         # Cek struktur untuk memastikan path ada
         config = self.current_config
         for i, k in enumerate(keys[:-1]):
@@ -378,7 +386,7 @@ class ConfigurationManager:
             self.logger.warning(f"⚠️ Kunci 'mode.batch_size' ditemukan, kemungkinan typo. Seharusnya 'model.batch_size'")
             key = 'model.batch_size'  # Koreksi ke kunci yang benar
         
-        # Skip validasi jika nilai None atau key tidak dalam validator
+        # Skip validasi jika nilai None
         if value is None:
             return
             
@@ -400,6 +408,9 @@ class ConfigurationManager:
             if expected_type and not isinstance(value, expected_type):
                 # Log tipe aktual untuk debugging
                 actual_type = type(value).__name__
+                self.logger.error(f"❌ Tipe tidak valid untuk {key}: {actual_type}, diharapkan {expected_type.__name__}")
+                self.logger.error(f"❌ Nilai: {value}")
+                
                 raise ValidationError(
                     f"Tipe tidak valid untuk {key}: {actual_type}. "
                     f"Tipe yang diharapkan: {expected_type.__name__}"
@@ -420,7 +431,6 @@ class ConfigurationManager:
                     f"Nilai terlalu besar untuk {key}: {value}. "
                     f"Maximum: {max_val}"
                 )
-    
     def _validate_config(self, config: Dict[str, Any]) -> None:
         """
         Validasi seluruh konfigurasi.

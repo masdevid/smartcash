@@ -69,6 +69,7 @@ class BackboneMenu(BaseMenu):
         
         super().__init__("Pilih Arsitektur Model", items)
         
+        
     def _set_backbone(self, backbone: str) -> bool:
         """
         Set arsitektur backbone model.
@@ -110,7 +111,18 @@ class BackboneMenu(BaseMenu):
             
             # Update konfigurasi model dengan error handling yang lebih baik
             try:
-                self.config_manager.update('model', model_config[backbone])
+                # Ambil konfigurasi model yang sudah ada
+                existing_model_config = self.config_manager.current_config.get('model', {})
+                
+                # Gabungkan dengan konfigurasi backbone baru (TANPA menimpa nilai yang sudah ada)
+                updated_model_config = {**existing_model_config, **model_config[backbone]}
+                
+                # Log untuk debug
+                if 'batch_size' in existing_model_config:
+                    self.app.logger.info(f"🔍 Mempertahankan model.batch_size={existing_model_config.get('batch_size')}")
+                
+                # Update konfigurasi model
+                self.config_manager.update('model', updated_model_config)
             except Exception as model_error:
                 self.display.show_error(f"Gagal mengatur konfigurasi model: {str(model_error)}")
                 return True
@@ -130,7 +142,7 @@ class BackboneMenu(BaseMenu):
         except Exception as e:
             self.display.show_error(f"Gagal mengatur arsitektur: {str(e)}")
             return True
-            
+
     def draw(self, stdscr, start_y: int) -> None:
         """Override draw untuk menambahkan info kompatibilitas."""
         super().draw(stdscr, start_y)

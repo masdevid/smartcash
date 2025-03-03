@@ -103,7 +103,7 @@ class ConfigurationManager:
         base_config_path: str, 
         config_dir: Optional[str] = None,
         max_config_age_days: int = 30,
-        max_config_files: int = 10,
+        max_config_files: int = 1,  # ⚠️ Diubah dari 10 menjadi 1
         logger: Optional[SmartCashLogger] = None
     ):
         """
@@ -113,7 +113,7 @@ class ConfigurationManager:
             base_config_path: Path ke file konfigurasi dasar
             config_dir: Direktori konfigurasi (default: folder yang sama dengan base_config)
             max_config_age_days: Usia maksimal file konfigurasi sebelum dibersihkan
-            max_config_files: Jumlah maksimal file konfigurasi yang disimpan
+            max_config_files: Jumlah maksimal file konfigurasi yang disimpan (default: 1)
             logger: Logger kustom (opsional)
         """
         self.logger = logger or SmartCashLogger(__name__)
@@ -175,13 +175,14 @@ class ConfigurationManager:
             self.logger.warning(f"⚠️ Validasi konfigurasi gagal: {str(ve)}")
             # Tidak raise exception, hanya log warning
         
-        # Lakukan pembersihan saat inisialisasi
+        # Lakukan pembersihan saat inisialisasi untuk menghapus file lama
         try:
             self._cleanup_old_configs()
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal membersihkan konfigurasi lama: {str(e)}")
         
         self.logger.info(f"🔧 Konfigurasi dimuat dari {self.base_config_path}")
+
         
     def _load_base_config(self) -> Dict[str, Any]:
         """
@@ -266,50 +267,52 @@ class ConfigurationManager:
     
     def _cleanup_old_configs(self) -> None:
         """
-        Bersihkan file konfigurasi lama dengan logging detail.
+        Bersihkan file konfigurasi lama, hanya mempertahankan 1 file terbaru.
         """
         try:
             # Temukan semua file konfigurasi
+            config_files = []
+            for pattern in ['train_config_*.yaml', 'train_config_*.yml']:
+                config_files.extend(list(self.config_dir.glob(pattern)))
+            
+            if not config_files:
+                self.logger.info("🔍 Tidak ditemukan file konfigurasi untuk dibersihkan")
+                return
+                
+            # Sort berdasarkan waktu modifikasi (terbaru ke terlama)
             config_files = sorted(
-                self.config_dir.glob('train_config_*.yaml'),
+                config_files,
                 key=lambda x: x.stat().st_mtime,
                 reverse=True
             )
             
-            if not config_files:
-                return
-                
             self.logger.info(f"🧹 Membersihkan konfigurasi lama, ditemukan {len(config_files)} file")
             
-            # Calculate cutoff date
-            now = datetime.now()
-            cutoff_date = now - self.max_config_age
-            
-            # Batasi jumlah file yang disimpan
+            # Pertahankan hanya 1 file terbaru dan hapus sisanya
             files_to_keep = config_files[:self.max_config_files]
-            files_to_remove = []
+            files_to_remove = config_files[self.max_config_files:]
             
-            # Tambahkan file yang terlalu tua
-            for file in config_files:
-                mod_time = datetime.fromtimestamp(file.stat().st_mtime)
-                if mod_time < cutoff_date and file not in files_to_keep:
-                    files_to_remove.append(file)
-            
-            # Hapus file yang berlebihan
+            # Hapus file konfigurasi lama
+            successfully_removed = 0
             for file in files_to_remove:
                 try:
-                    file.unlink()
-                    self.logger.info(f"🗑️ Menghapus konfigurasi lama: {file.name}")
+                    if file.exists() and os.access(file.parent, os.W_OK):
+                        file.unlink()
+                        self.logger.info(f"🗑️ Menghapus konfigurasi lama: {file.name}")
+                        successfully_removed += 1
+                    else:
+                        self.logger.warning(f"⚠️ Tidak dapat menghapus {file.name}: file tidak ada atau tidak memiliki akses")
                 except Exception as remove_error:
                     self.logger.warning(f"⚠️ Gagal menghapus {file.name}: {remove_error}")
             
-            if files_to_remove:
-                self.logger.success(f"✅ Berhasil membersihkan {len(files_to_remove)} file konfigurasi lama")
+            if successfully_removed > 0:
+                self.logger.success(f"✅ Berhasil membersihkan {successfully_removed} file konfigurasi lama")
             
         except Exception as e:
             self.logger.error(f"❌ Gagal membersihkan konfigurasi: {str(e)}")
+            # Tidak raise exception agar aplikasi tetap berjalan
 
-    # Metode untuk update nilai tidak berubah, tapi akan ditingkatkan error handlingnya
+        
     def update(self, key: str, value: Any) -> None:
         """
         Perbarui konfigurasi dengan perbaikan penanganan error struktur.
@@ -321,11 +324,7 @@ class ConfigurationManager:
         Raises:
             ValidationError: Jika nilai tidak valid
         """
-        # Koreksi kunci jika diperlukan
-        if key == 'mode.batch_size':
-            self.logger.warning(f"⚠️ Kunci 'mode.batch_size' ditemukan, kemungkinan typo. Dikoreksi ke 'model.batch_size'")
-            key = 'model.batch_size'
-            
+       
         # Validasi nilai
         try:
             self._validate_value(key, value)
@@ -372,7 +371,7 @@ class ConfigurationManager:
         
     def _validate_value(self, key: str, value: Any) -> None:
         """
-        Validasi nilai konfigurasi dengan perbaikan untuk error kunci mode.batch_size.
+        Validasi nilai konfigurasi
         
         Args:
             key: Kunci konfigurasi
@@ -381,10 +380,6 @@ class ConfigurationManager:
         Raises:
             ValidationError: Jika nilai tidak valid
         """
-        # Perbaikan untuk typo pada kunci 'mode.batch_size'
-        if key == 'mode.batch_size':
-            self.logger.warning(f"⚠️ Kunci 'mode.batch_size' ditemukan, kemungkinan typo. Seharusnya 'model.batch_size'")
-            key = 'model.batch_size'  # Koreksi ke kunci yang benar
         
         # Skip validasi jika nilai None
         if value is None:
@@ -475,7 +470,7 @@ class ConfigurationManager:
     # Metode untuk menyimpan konfigurasi yang menjadi sumber error
     def save(self, config: Optional[Dict[str, Any]] = None) -> Path:
         """
-        Simpan konfigurasi saat ini dengan error handling yang lebih baik.
+        Simpan konfigurasi saat ini dan bersihkan file lama.
         
         Args:
             config: Konfigurasi kustom untuk disimpan (opsional)
@@ -486,12 +481,6 @@ class ConfigurationManager:
         Raises:
             ConfigError: Jika gagal menyimpan konfigurasi
         """
-        # Bersihkan file konfigurasi sebelum menyimpan
-        try:
-            self._cleanup_old_configs()
-        except Exception as e:
-            self.logger.warning(f"⚠️ Gagal membersihkan konfigurasi lama: {str(e)}")
-        
         config = config or self.current_config
         
         try:
@@ -523,6 +512,9 @@ class ConfigurationManager:
                 raise write_error
                 
             self.logger.success(f"💾 Konfigurasi disimpan ke {config_file}")
+            
+            # Bersihkan file konfigurasi lama setelah menyimpan file baru
+            self._cleanup_old_configs()
             
             return config_file
             

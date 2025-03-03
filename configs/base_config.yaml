@@ -1,3 +1,7 @@
+# File: configs/base_config.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi dasar yang sudah diperbaiki dengan jalur yang konsisten
+
 data:
   classes:
   - '001'
@@ -20,7 +24,7 @@ data:
   local:
     test: data/test
     train: data/train
-    val: data/val
+    valid: data/valid  # Diubah dari 'val' ke 'valid' untuk konsistensi
   roboflow:
     api_key: your_roboflow_api_key
     project: rupiah_emisi-baru
@@ -49,7 +53,7 @@ dataset:
   project: rupiah_emisi-baru
   test_path: ../test/images
   train_path: ../train/images
-  valid_path: ../valid/images
+  valid_path: ../valid/images  # Memastikan konsistensi dengan struktur 'valid'
   version: 3
   workspace: detection-twl6q
 evaluation:

@@ -401,13 +401,23 @@ class SmartCashApp:
     def _cleanup(self) -> None:
         """Cleanup resources sebelum exit."""
         try:
-            # Save config changes
+            # Save config changes dan membersihkan file lama
             if hasattr(self, 'config_manager'):
                 try:
+                    # Simpan konfigurasi saat ini (sudah termasuk cleanup)
                     self.config_manager.save()
+                    self.logger.info("✅ Konfigurasi disimpan dan dibersihkan")
                 except Exception as save_error:
                     self.debug_helper.log_error("cleanup_save", save_error)
                     self.logger.warning(f"⚠️ Gagal menyimpan konfigurasi saat cleanup: {str(save_error)}")
+                    
+                    # Jika save gagal, coba lakukan cleanup terpisah
+                    try:
+                        self.config_manager._cleanup_old_configs()
+                        self.logger.info("✅ Pembersihan file konfigurasi berhasil")
+                    except Exception as cleanup_error:
+                        self.debug_helper.log_error("cleanup_configs", cleanup_error)
+                        self.logger.warning(f"⚠️ Gagal membersihkan konfigurasi lama: {str(cleanup_error)}")
             
             # Reset terminal state
             if hasattr(self, 'stdscr'):

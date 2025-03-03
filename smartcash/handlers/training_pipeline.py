@@ -9,6 +9,7 @@ from smartcash.handlers.model_handler import ModelHandler
 from smartcash.handlers.data_handler import DataHandler
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.utils.model_checkpoint import ModelCheckpoint
+from smartcash.utils.path_validator import PathValidator
 from smartcash.utils.metrics import MetricsCalculator
 from smartcash.exceptions.base import (
     TrainingError, DataError, ResourceError, ValidationError
@@ -78,9 +79,64 @@ class TrainingPipeline:
             ]:
                 path.mkdir(exist_ok=True)
                 
+            # Validasi struktur data dan otomatis perbaiki jika perlu
+            self._validate_data_structure()
+                
         except Exception as e:
             self.logger.error(f"❌ Gagal menyiapkan direktori: {str(e)}")
             raise
+    def _validate_data_structure(self):
+        """Validasi struktur data dan perbaiki jika perlu."""
+        # Inisialisasi validator jalur
+        validator = PathValidator(logger=self.logger)
+        
+        # Dapatkan direktori data
+        data_dir = Path(self.config.get('data_dir', 'data'))
+        
+        # Validasi struktur dataset
+        self.logger.info(f"🔍 Memvalidasi struktur dataset di {data_dir}...")
+        results = validator.validate_data_structure(data_dir)
+        
+        # Log hasil validasi
+        for split, valid in results.items():
+            status = "✅ Valid" if valid else "❌ Tidak valid"
+            self.logger.info(f"   {split}: {status}")
+        
+        # Jika ada split yang tidak valid, coba perbaiki secara otomatis
+        if not all(results.values()):
+            self.logger.warning("⚠️ Ditemukan masalah pada struktur dataset, mencoba perbaiki otomatis...")
+            
+            # Coba perbaiki data_local dulu untuk mendukung 'val' dan 'valid'
+            if 'data' in self.config and 'local' in self.config['data']:
+                # Koreksi 'val' vs 'valid'
+                data_local = self.config['data']['local']
+                if 'val' in data_local and 'valid' not in data_local:
+                    data_local['valid'] = data_local['val']
+                    self.logger.info(f"🔄 Menambahkan 'valid' ke config (sama dengan 'val')")
+                elif 'valid' in data_local and 'val' not in data_local:
+                    data_local['val'] = data_local['valid']
+                    self.logger.info(f"🔄 Menambahkan 'val' ke config (sama dengan 'valid')")
+            
+            # Coba perbaiki jalur yang tidak valid
+            for split, valid in results.items():
+                if not valid:
+                    # Coba cari jalur alternatif
+                    path, found = validator.find_or_fix_path(data_dir, split, auto_fix=True)
+                    if found:
+                        self.logger.success(f"✅ Berhasil memperbaiki jalur untuk {split}: {path}")
+                    else:
+                        self.logger.error(f"❌ Tidak dapat menemukan alternatif untuk {split}")
+            
+            # Validasi ulang setelah perbaikan
+            updated_results = validator.validate_data_structure(data_dir)
+            if not all(updated_results.values()):
+                invalid_splits = [s for s, v in updated_results.items() if not v]
+                raise DataError(
+                    f"Direktori dataset masih tidak valid setelah perbaikan otomatis: {invalid_splits}. "
+                    "Pastikan struktur direktori data/{split}/images dan data/{split}/labels ada."
+                )
+            else:
+                self.logger.success("✨ Berhasil memperbaiki struktur dataset!")
 
     def _initialize_handlers(self):
         """Inisialisasi model dan data handlers."""

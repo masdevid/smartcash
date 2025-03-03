@@ -215,7 +215,21 @@ class DataHandler:
         num_workers = num_workers or self.config['model']['workers']
         
         # Get path
-        val_path = Path(self.config['data']['local']['val'])
+        # Perbaikan: Menggunakan 'valid' sebagai kunci dan fallback ke 'val' jika tidak ditemukan
+        valid_key = 'valid' if 'valid' in self.config['data']['local'] else 'val'
+        val_path = Path(self.config['data']['local'][valid_key])
+        
+        # Logging untuk debugging
+        self.logger.info(f"📂 Menggunakan jalur validasi: {val_path}")
+        
+        # Periksa keberadaan direktori
+        if not (val_path / 'images').exists():
+            self.logger.warning(f"⚠️ Direktori validasi tidak ditemukan: {val_path / 'images'}")
+            # Coba alternatif jalur
+            alt_path = val_path.parent / ('valid' if valid_key == 'val' else 'val')
+            if (alt_path / 'images').exists():
+                self.logger.info(f"🔍 Menemukan jalur alternatif: {alt_path}")
+                val_path = alt_path
         
         # Create dataset
         val_dataset = MultilayerDataset(

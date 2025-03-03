@@ -5,7 +5,7 @@
 import curses
 import psutil
 import torch
-from typing import Dict, Optional, Any, Tuple, Callable
+from typing import Dict, Optional, Any, Tuple, Callable, List
 from pathlib import Path
 
 class DisplayManager:
@@ -14,8 +14,10 @@ class DisplayManager:
     def __init__(self, stdscr: curses.window):
         self.stdscr = stdscr
         self.error_log = []  # Simpan riwayat error untuk referensi
+        self.log_buffer = []  # Buffer untuk menyimpan pesan log
+        self.max_log_lines = 5  # Jumlah maksimum baris log yang ditampilkan
         self.setup_colors()
-        
+
     def setup_colors(self) -> None:
         """Setup pasangan warna untuk interface."""
         if not curses.has_colors():
@@ -31,12 +33,50 @@ class DisplayManager:
         curses.init_pair(4, curses.COLOR_CYAN, -1)    # Info/Title
         curses.init_pair(5, curses.COLOR_MAGENTA, -1) # Special
         curses.init_pair(6, curses.COLOR_BLUE, -1)    # Navigation
+    def _add_to_log_buffer(self, message: str, color: int) -> None:
+        """
+        Tambahkan pesan ke buffer log.
         
+        Args:
+            message: Pesan untuk ditambahkan
+            color: Warna pesan
+        """
+        self.log_buffer.append((message, color))
+        # Batasi jumlah pesan dalam buffer
+        if len(self.log_buffer) > self.max_log_lines:
+            self.log_buffer.pop(0)
+    def _draw_log_area(self) -> None:
+        """Gambar area log di bagian bawah layar."""
+        height, width = self.stdscr.getmaxyx()
         
+        # Hapus area log terlebih dahulu
+        log_start_y = height - self.max_log_lines - 2
+        for y in range(log_start_y, height):
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+        
+        # Gambar border untuk area log
+        self.stdscr.attron(curses.color_pair(6))  # Blue
+        self.stdscr.addstr(log_start_y, 0, "─" * (width - 1))
+        self.stdscr.addstr(log_start_y, 0, "┌ Log Area ┐")
+        self.stdscr.attroff(curses.color_pair(6))
+        
+        # Tampilkan pesan log dari buffer
+        for i, (message, color) in enumerate(self.log_buffer):
+            y = log_start_y + i + 1
+            if y < height:
+                # Truncate message if too long
+                if len(message) > width - 4:
+                    message = message[:width-7] + "..."
+                self.stdscr.attron(curses.color_pair(color))
+                self.stdscr.addstr(y, 2, message)
+                self.stdscr.attroff(curses.color_pair(color))
+        
+        self.stdscr.refresh()        
+    
     def show_error(
         self, 
         message: str, 
-        timeout_ms: int = 3000,  # Increased timeout for better readability
+        timeout_ms: int = 0,  # 0 berarti tunggu key press
         show_help: bool = True   # Show helpful suggestion
     ) -> Optional[int]:
         """
@@ -44,7 +84,7 @@ class DisplayManager:
         
         Args:
             message: Pesan error untuk ditampilkan
-            timeout_ms: Timeout dalam milidetik
+            timeout_ms: Timeout dalam milidetik (0 untuk tunggu key press)
             show_help: Tampilkan saran bantuan
             
         Returns:
@@ -54,95 +94,70 @@ class DisplayManager:
         self.error_log.append(message)
         if len(self.error_log) > 10:  # Keep only last 10 errors
             self.error_log.pop(0)
-            
-        try:
-            height, width = self.stdscr.getmaxyx()
-            y = height - 2
-            x = 2
-            
-            # Clear line
-            self.stdscr.addstr(y, 0, " " * (width - 1))
-            
-            # Show error
-            self.stdscr.attron(curses.color_pair(1))
-            error_msg = f"❌ ERROR: {message}"
-            
-            # Truncate if too long
-            if len(error_msg) > width - 4:
-                error_msg = error_msg[:width-7] + "..."
-                
-            self.stdscr.addstr(y, x, error_msg)
-            self.stdscr.attroff(curses.color_pair(1))
-            
-            # Show help if requested
-            if show_help:
-                help_y = height - 1
-                self.stdscr.addstr(help_y, 0, " " * (width - 1))
-                self.stdscr.attron(curses.color_pair(3))
-                self.stdscr.addstr(help_y, x, "💡 Tekan key untuk menutup pesan atau tunggu untuk lanjut")
-                self.stdscr.attroff(curses.color_pair(3))
-                
-            self.stdscr.refresh()
-            
-            # Wait for timeout or key press
+        
+        # Tambahkan ke buffer log
+        error_msg = f"❌ ERROR: {message}"
+        self._add_to_log_buffer(error_msg, 1)  # Red color
+        
+        # Tampilkan area log
+        self._draw_log_area()
+        
+        # Jika timeout_ms > 0, tunggu timeout atau key press
+        if timeout_ms > 0:
             self.stdscr.timeout(timeout_ms)
             key = self.stdscr.getch()
             self.stdscr.timeout(-1)
-            
-            # Clear message
-            self.stdscr.addstr(y, 0, " " * (width - 1))
-            if show_help:
-                self.stdscr.addstr(help_y, 0, " " * (width - 1))
-            self.stdscr.refresh()
-            
             return key if key != -1 else None
-            
-        except Exception as e:
-            # Fallback if display fails
-            try:
-                self.stdscr.addstr(0, 0, f"Display Error: {str(e)}")
+        else:
+            # Jika show_help, tampilkan pesan bantuan
+            if show_help:
+                height, width = self.stdscr.getmaxyx()
+                help_y = height - 1
+                self.stdscr.attron(curses.color_pair(3))
+                self.stdscr.addstr(help_y, 0, " " * (width - 1))
+                help_msg = "💡 Tekan key untuk melanjutkan..."
+                self.stdscr.addstr(help_y, (width - len(help_msg)) // 2, help_msg)
+                self.stdscr.attroff(curses.color_pair(3))
                 self.stdscr.refresh()
-            except:
-                pass  # Give up if even this fails
-            return None
+                
+                # Tunggu key press
+                key = self.stdscr.getch()
+                
+                # Hapus pesan bantuan
+                self.stdscr.addstr(help_y, 0, " " * (width - 1))
+                self.stdscr.refresh()
+                
+                return key
+        
+        return None
 
     def show_success(
         self, 
         message: str, 
-        timeout_ms: int = 1500
+        timeout_ms: int = 0
     ) -> None:
         """Tampilkan pesan sukses dengan warna hijau."""
-        try:
-            height, width = self.stdscr.getmaxyx()
-            y = height - 2
-            x = 2
-            
-            self.stdscr.addstr(y, 0, " " * (width - 1))
-            self.stdscr.attron(curses.color_pair(2))
-            
-            # Truncate if too long
-            success_msg = f"✅ {message}"
-            if len(success_msg) > width - 4:
-                success_msg = success_msg[:width-7] + "..."
-                
-            self.stdscr.addstr(y, x, success_msg)
-            self.stdscr.attroff(curses.color_pair(2))
-            self.stdscr.refresh()
-            
+        # Tambahkan ke buffer log
+        success_msg = f"✅ {message}"
+        self._add_to_log_buffer(success_msg, 2)  # Green color
+        
+        # Tampilkan area log
+        self._draw_log_area()
+        
+        # Jika timeout_ms > 0, tunggu timeout
+        if timeout_ms > 0:
             curses.napms(timeout_ms)
-            self.stdscr.addstr(y, 0, " " * (width - 1))
-            self.stdscr.refresh()
             
-        except Exception as e:
-            # Silent fail for success messages
-            pass
-
-    def show_config_status(self, config: Dict[str, Any], start_y: int = 2, start_x: int = 50) -> None:
+    def show_config_status(self, config: Dict[str, Any]) -> None:
         """Tampilkan status konfigurasi saat ini dengan error handling yang lebih baik."""
         try:
             if not config:
                 return
-                
+            
+            height, width = self.stdscr.getmaxyx()    
+            start_y = 2
+            start_x = width - 30  # Posisi x untuk status konfigurasi (30 kolom dari kanan)
+            
             self.stdscr.addstr(start_y, start_x, "Status Konfigurasi:")
             y = start_y + 2
             
@@ -288,10 +303,16 @@ class DisplayManager:
         """
         height, width = self.stdscr.getmaxyx()
         
+        # Pastikan y dan x valid dan di dalam batas layar
         if y is None:
             y = height - 3
+        else:
+            y = max(0, min(y, height - 1))
+            
         if x is None:
             x = 2
+        else:
+            x = max(0, min(x, width - 1))
             
         # Simpan mode kursor saat ini dan aktifkan echo
         try:
@@ -305,16 +326,18 @@ class DisplayManager:
         # Clear input area and show prompt
         try:
             self.stdscr.addstr(y, 0, " " * (width - 1))
-            self.stdscr.addstr(y, x, prompt)
+            if x + len(prompt) < width:
+                self.stdscr.addstr(y, x, prompt)
             
             # Show default value if provided
             if default:
-                self.stdscr.addstr(y, x + len(prompt), f"[{default}] ")
+                if x + len(prompt) + len(f"[{default}] ") < width:
+                    self.stdscr.addstr(y, x + len(prompt), f"[{default}] ")
                 
             self.stdscr.refresh()
         except curses.error as e:
             # Handle drawing errors
-            self.show_error(f"Error saat menampilkan prompt: {str(e)}")
+            self._add_to_log_buffer(f"Error saat menampilkan prompt: {str(e)}", 1)
             curses.curs_set(old_cursor)
             curses.noecho()
             self.stdscr.timeout(-1)
@@ -325,6 +348,9 @@ class DisplayManager:
         cursor_x = len(prompt) + x
         if default:
             cursor_x += len(f"[{default}] ")
+        
+        # Pastikan cursor_x tetap dalam batas layar
+        cursor_x = min(cursor_x, width - 1)
         
         while True:
             try:
@@ -338,15 +364,20 @@ class DisplayManager:
                         
                     # Validate if validator provided
                     if validator and not validator(input_buffer):
-                        self.show_error("Input tidak valid")
+                        self._add_to_log_buffer("Input tidak valid", 1)
                         continue
                     break
                 elif ch == ord('\b') or ch == curses.KEY_BACKSPACE or ch == 127:  # Backspace
                     if input_buffer:
                         input_buffer = input_buffer[:-1]
-                        cursor_x -= 1
-                        self.stdscr.addch(y, cursor_x, ' ')
-                        self.stdscr.move(y, cursor_x)
+                        if cursor_x > 0:
+                            cursor_x -= 1
+                            try:
+                                self.stdscr.addch(y, cursor_x, ' ')
+                                self.stdscr.move(y, cursor_x)
+                            except curses.error:
+                                # Handle edge case
+                                pass
                 elif ch == 3:  # Ctrl+C
                     raise KeyboardInterrupt
                 elif ch == 27:  # Escape
@@ -355,20 +386,21 @@ class DisplayManager:
                     self.stdscr.timeout(-1)
                     return None
                 elif 32 <= ch <= 126:  # Printable characters
-                    input_buffer += chr(ch)
-                    try:
-                        self.stdscr.addch(y, cursor_x, ch)
-                        cursor_x += 1
-                    except curses.error:
-                        # Handle edge case where cursor is at screen edge
-                        input_buffer = input_buffer[:-1]  # Remove last char
+                    if cursor_x < width - 1:  # Pastikan cursor tidak melewati batas
+                        input_buffer += chr(ch)
+                        try:
+                            self.stdscr.addch(y, cursor_x, ch)
+                            cursor_x += 1
+                        except curses.error:
+                            # Tetap tambahkan ke buffer tapi jangan tampilkan
+                            pass
                     
                 self.stdscr.refresh()
                 
             except curses.error:
                 continue
             except Exception as e:
-                self.show_error(f"Error saat input: {str(e)}")
+                self._add_to_log_buffer(f"Error saat input: {str(e)}", 1)
                 curses.curs_set(old_cursor)
                 curses.noecho()
                 self.stdscr.timeout(-1)
@@ -400,23 +432,33 @@ class DisplayManager:
             total: Nilai total progress
             width: Lebar progress bar
         """
-        height, term_width = self.stdscr.getmaxyx()
-        y = height - 4
-        x = 2
-        
-        # Calculate progress
-        progress = min(1.0, current / total)
-        filled = int(width * progress)
-        
-        # Create progress bar
-        bar = "█" * filled + "░" * (width - filled)
-        percent = int(progress * 100)
-        
-        # Clear line and show progress
-        self.stdscr.addstr(y, 0, " " * (term_width - 1))
-        self.stdscr.addstr(y, x, f"{message} [{bar}] {percent}%")
-        self.stdscr.refresh()
-        
+        try:
+            height, term_width = self.stdscr.getmaxyx()
+            
+            # Calculate progress
+            progress = min(1.0, current / total)
+            filled = int(width * progress)
+            
+            # Create progress bar
+            bar = "█" * filled + "░" * (width - filled)
+            percent = int(progress * 100)
+            
+            # Format pesan
+            progress_msg = f"{message} [{bar}] {percent}%"
+            
+            # Tambahkan ke buffer log
+            self._add_to_log_buffer(progress_msg, 6)  # Blue
+            
+            # Tampilkan area log
+            self._draw_log_area()
+            
+        except curses.error:
+            # Ignore curses errors
+            pass
+        except Exception as e:
+            # Log error tapi jangan crash
+            self.error_log.append(f"Error progress bar: {str(e)}")
+    
     def clear_message_area(self) -> None:
         """Bersihkan area pesan di bagian bawah layar."""
         height, width = self.stdscr.getmaxyx()
@@ -442,8 +484,11 @@ class DisplayManager:
             Key dari opsi yang dipilih atau None jika dibatalkan
         """
         height, width = self.stdscr.getmaxyx()
-        dialog_height = 6
-        dialog_width = max(40, len(message) + 4)
+        
+        # Calculate dialog dimensions
+        message_lines = message.split('\n')
+        dialog_height = len(message_lines) + 6  # Title + message + options + padding
+        dialog_width = max(40, max(len(line) for line in message_lines) + 4, len(title) + 4)
         
         # Calculate dialog position
         dialog_y = (height - dialog_height) // 2
@@ -476,14 +521,15 @@ class DisplayManager:
         title_x = dialog_x + (dialog_width - len(title)) // 2
         self.stdscr.addstr(dialog_y, title_x, f" {title} ")
         
-        # Draw message
-        msg_x = dialog_x + (dialog_width - len(message)) // 2
-        self.stdscr.addstr(dialog_y + 2, msg_x, message)
+        # Draw message (multi-line support)
+        for i, line in enumerate(message_lines):
+            msg_x = dialog_x + (dialog_width - len(line)) // 2
+            self.stdscr.addstr(dialog_y + 2 + i, msg_x, line)
         
         # Draw options
         options_text = " | ".join([f"{key}: {label}" for key, label in options.items()])
         options_x = dialog_x + (dialog_width - len(options_text)) // 2
-        self.stdscr.addstr(dialog_y + 4, options_x, options_text)
+        self.stdscr.addstr(dialog_y + dialog_height - 2, options_x, options_text)
         self.stdscr.attroff(curses.color_pair(4))
         
         # Get user input
@@ -503,7 +549,6 @@ class DisplayManager:
         self.stdscr.refresh()
         
         return result
-
     def show_help(self, title: str, content: Dict[str, str]) -> None:
         """
         Tampilkan layar bantuan dengan scrolling.
@@ -647,42 +692,18 @@ class DisplayManager:
             self.show_info("Tidak ada error yang tercatat")
             return
             
-        height, width = self.stdscr.getmaxyx()
+        # Format error history sebagai list baris
+        error_lines = [f"[{i+1}] {err}" for i, err in enumerate(self.error_log)]
         
-        # Buat dialog box
-        box_height = min(len(self.error_log) + 4, height - 4)
-        box_width = width - 10
-        box_y = (height - box_height) // 2
-        box_x = 5
-        
-        # Buat dialog border
-        win = curses.newwin(box_height, box_width, box_y, box_x)
-        win.box()
-        
-        # Judul dialog
-        win.attron(curses.color_pair(1))
-        win.addstr(0, 2, " Riwayat Error ")
-        win.attroff(curses.color_pair(1))
-        
-        # Tampilkan error
-        for i, error in enumerate(self.error_log[-box_height+4:]):
-            if i < box_height - 4:  # Pastikan masih dalam window
-                # Potong pesan jika terlalu panjang
-                if len(error) > box_width - 4:
-                    error = error[:box_width-7] + "..."
-                win.addstr(i + 1, 2, error)
-                
-        # Footer
-        win.attron(curses.color_pair(3))
-        win.addstr(box_height-1, 2, " Tekan key untuk menutup ")
-        win.attroff(curses.color_pair(3))
-        
-        win.refresh()
-        
-        # Tunggu keypress
-        win.getch()
-        
-    def show_info(self, message: str, title: str = "Informasi", timeout_ms: int = 0) -> None:
+        # Gunakan terminal mode untuk menampilkan
+        self.show_terminal("Riwayat Error", error_lines)
+
+    def show_info(
+        self, 
+        message: str, 
+        title: str = "Informasi", 
+        timeout_ms: int = 0
+    ) -> None:
         """
         Tampilkan pesan informasi dalam box.
         
@@ -744,8 +765,129 @@ class DisplayManager:
         except Exception as e:
             # Fallback to simple error display
             try:
-                self.stdscr.addstr(0, 0, f"Display error: {str(e)}")
-                self.stdscr.refresh()
+                self._add_to_log_buffer(f"Display error: {str(e)}", 1)
+                self._draw_log_area()
                 curses.napms(1000)
             except:
                 pass
+    def show_terminal(
+        self,
+        title: str,
+        lines: List[str],
+        wait_for_key: bool = True
+    ) -> None:
+        """
+        Tampilkan terminal-like window dengan scrolling dan border.
+        
+        Args:
+            title: Judul terminal
+            lines: List baris teks yang akan ditampilkan
+            wait_for_key: Tunggu keypress sebelum menutup
+        """
+        try:
+            height, width = self.stdscr.getmaxyx()
+            
+            # Calculate dimensions
+            term_height = height - 6  # Leave space for header and footer
+            term_width = width - 4
+            
+            # Create window
+            term_y = 3
+            term_x = 2
+            
+            # Draw border around terminal area
+            self.stdscr.attron(curses.color_pair(4))
+            for y in range(term_y-1, term_y+term_height+1):
+                if y == term_y-1:  # Top border
+                    self.stdscr.addstr(y, term_x-1, "┌" + "─" * term_width + "┐")
+                elif y == term_y+term_height:  # Bottom border
+                    self.stdscr.addstr(y, term_x-1, "└" + "─" * term_width + "┘")
+                else:  # Side borders
+                    self.stdscr.addstr(y, term_x-1, "│")
+                    self.stdscr.addstr(y, term_x+term_width, "│")
+            
+            # Add title
+            title_x = term_x + (term_width - len(title)) // 2
+            self.stdscr.addstr(term_y-1, title_x, f" {title} ")
+            self.stdscr.attroff(curses.color_pair(4))
+            
+            # Draw the content with scrolling
+            scroll_pos = 0
+            max_scroll = max(0, len(lines) - term_height)
+            
+            while True:
+                # Clear terminal area
+                for y in range(term_height):
+                    self.stdscr.addstr(term_y+y, term_x, " " * term_width)
+                
+                # Draw visible lines
+                for i in range(min(term_height, len(lines) - scroll_pos)):
+                    line = lines[scroll_pos + i]
+                    
+                    # Detect color codes in line
+                    if line.startswith("✅"):
+                        self.stdscr.attron(curses.color_pair(2))
+                    elif line.startswith("❌"):
+                        self.stdscr.attron(curses.color_pair(1))
+                    elif line.startswith("⚠️"):
+                        self.stdscr.attron(curses.color_pair(3))
+                    elif line.startswith("ℹ️") or line.startswith("🔍"):
+                        self.stdscr.attron(curses.color_pair(4))
+                    
+                    # Truncate if needed
+                    if len(line) > term_width:
+                        line = line[:term_width-3] + "..."
+                    
+                    self.stdscr.addstr(term_y+i, term_x, line)
+                    
+                    # Reset colors
+                    for color in range(1, 7):
+                        self.stdscr.attroff(curses.color_pair(color))
+                
+                # Draw scrollbar if needed
+                if len(lines) > term_height:
+                    scrollbar_height = max(1, int(term_height * term_height / len(lines)))
+                    scrollbar_pos = min(
+                        term_height - scrollbar_height,
+                        int(scroll_pos * term_height / len(lines))
+                    )
+                    
+                    for i in range(term_height):
+                        if scrollbar_pos <= i < scrollbar_pos + scrollbar_height:
+                            self.stdscr.addstr(term_y+i, term_x+term_width+1, "█")
+                        else:
+                            self.stdscr.addstr(term_y+i, term_x+term_width+1, "│")
+                
+                # Draw footer
+                footer_y = term_y + term_height + 1
+                self.stdscr.attron(curses.color_pair(6))
+                footer = "↑↓: Scroll | Q: Kembali" if wait_for_key else "Tekan Q untuk kembali"
+                footer_x = term_x + (term_width - len(footer)) // 2
+                self.stdscr.addstr(footer_y, footer_x, footer)
+                self.stdscr.attroff(curses.color_pair(6))
+                
+                self.stdscr.refresh()
+                
+                if not wait_for_key:
+                    break
+                    
+                # Handle input
+                key = self.stdscr.getch()
+                if key in [ord('q'), ord('Q')]:
+                    break
+                elif key == curses.KEY_UP and scroll_pos > 0:
+                    scroll_pos -= 1
+                elif key == curses.KEY_DOWN and scroll_pos < max_scroll:
+                    scroll_pos += 1
+                elif key == curses.KEY_PPAGE:  # Page Up
+                    scroll_pos = max(0, scroll_pos - term_height)
+                elif key == curses.KEY_NPAGE:  # Page Down
+                    scroll_pos = min(max_scroll, scroll_pos + term_height)
+                elif key == curses.KEY_HOME:
+                    scroll_pos = 0
+                elif key == curses.KEY_END:
+                    scroll_pos = max_scroll
+        
+        except Exception as e:
+            self._add_to_log_buffer(f"Error tampilan terminal: {str(e)}", 1)
+            self._draw_log_area()

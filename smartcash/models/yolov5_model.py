@@ -23,11 +23,15 @@ class YOLOv5Model(nn.Module):
         num_classes: int = 7,  # 7 denominasi Rupiah
         backbone_type: str = "cspdarknet",
         pretrained: bool = True,
+        layers: Optional[List[str]] = None,  # Parameter layers, bukan detection_layers
         logger: Optional[SmartCashLogger] = None
     ):
         super().__init__()
         self.logger = logger or SmartCashLogger(__name__)
         self.num_classes = num_classes
+        
+        # Default layers jika None
+        self.active_layers = layers or ['banknote']
         
         # Inisialisasi backbone
         self.backbone = self._create_backbone(backbone_type, pretrained)
@@ -38,13 +42,15 @@ class YOLOv5Model(nn.Module):
         # Detection Head
         self.head = self._build_head(
             in_channels=[256, 512, 1024],  # Channel setelah FPN
-            num_classes=num_classes
+            num_classes=num_classes,
+            layers=self.active_layers  # Gunakan active_layers di sini
         )
         
         self.logger.info(
             f"✨ Model YOLOv5 siap dengan:\n"
             f"   Backbone: {backbone_type}\n"
             f"   Classes: {num_classes}\n"
+            f"   Layers: {self.active_layers}\n"
             f"   Pretrained: {pretrained}"
         )
         
@@ -85,23 +91,33 @@ class YOLOv5Model(nn.Module):
     def _build_head(
         self,
         in_channels: List[int],
-        num_classes: int
-    ) -> nn.ModuleList:
-        """Build detection head untuk setiap skala"""
-        heads = nn.ModuleList()
+        num_classes: int,
+        layers: List[str] = ['banknote']  # Default ke banknote layer saja
+    ) -> nn.ModuleDict:  # Return ModuleDict bukan ModuleList
+        """Build detection head untuk setiap layer dan skala."""
+        heads = nn.ModuleDict()  # Gunakan ModuleDict untuk menyimpan head per layer
         
-        for ch in in_channels:
-            heads.append(
-                nn.Sequential(
-                    self._conv(ch, ch//2, 1),
-                    self._conv(ch//2, ch, 3),
-                    nn.Conv2d(
-                        ch,
-                        3 * (5 + num_classes),  # 3 anchor, 5 bbox params, num_classes
-                        1
+        # Buat head untuk setiap layer
+        for layer_name in layers:
+            # Buat ModuleList untuk skala P3, P4, P5 per layer
+            layer_heads = nn.ModuleList()
+            
+            # Tambahkan head untuk setiap skala (P3, P4, P5)
+            for ch in in_channels:
+                layer_heads.append(
+                    nn.Sequential(
+                        self._conv(ch, ch//2, 1),
+                        self._conv(ch//2, ch, 3),
+                        nn.Conv2d(
+                            ch,
+                            3 * (5 + num_classes),  # 3 anchor, 5 bbox params, num_classes
+                            1
+                        )
                     )
                 )
-            )
+            
+            # Tambahkan head layer ke heads
+            heads[layer_name] = layer_heads
             
         return heads
         
@@ -126,7 +142,7 @@ class YOLOv5Model(nn.Module):
             nn.SiLU(inplace=True)
         )
         
-    def forward(self, x: torch.Tensor) -> List[torch.Tensor]:
+    def forward(self, x: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
         """
         Forward pass model
         
@@ -134,7 +150,12 @@ class YOLOv5Model(nn.Module):
             x: Input tensor [B, 3, H, W]
             
         Returns:
-            List prediksi untuk setiap skala [P3, P4, P5]
+            Dict berisi prediksi untuk setiap layer dan skala
+            Format: {
+                'banknote': [pred_s, pred_m, pred_l],
+                'nominal': [pred_s, pred_m, pred_l],
+                ...
+            }
         """
         # Backbone features
         features = self.backbone(x)
@@ -144,18 +165,27 @@ class YOLOv5Model(nn.Module):
         for feat, fpn in zip(features, self.fpn):
             fpn_features.append(fpn(feat))
             
-        # Detection head untuk setiap skala
-        predictions = []
-        for feat, head in zip(fpn_features, self.head):
-            # Deteksi dan reshape ke format YOLO
-            pred = head(feat)
-            bs, _, h, w = pred.shape
+        # Dict untuk menyimpan hasil prediksi per layer
+        predictions = {}
+        
+        # Deteksi untuk setiap layer
+        for layer_name, layer_heads in self.head.items():
+            layer_preds = []
             
-            # [B, anchors*(5+classes), H, W] -> [B, anchors, H, W, 5+classes]
-            pred = pred.view(bs, 3, 5 + self.num_classes, h, w)
-            pred = pred.permute(0, 1, 3, 4, 2)
+            # Prediksi untuk setiap skala pada layer ini
+            for feat, head in zip(fpn_features, layer_heads):
+                # Deteksi dan reshape ke format YOLO
+                bs, _, h, w = feat.shape
+                pred = head(feat)
+                
+                # [B, anchors*(5+classes), H, W] -> [B, anchors, H, W, 5+classes]
+                pred = pred.view(bs, 3, 5 + self.num_classes, h, w)
+                pred = pred.permute(0, 1, 3, 4, 2)
+                
+                layer_preds.append(pred)
             
-            predictions.append(pred)
+            # Simpan prediksi layer
+            predictions[layer_name] = layer_preds
             
         return predictions
         

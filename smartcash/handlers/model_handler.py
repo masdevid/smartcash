@@ -51,7 +51,7 @@ class ModelHandler:
         """
         Inisialisasi model dengan dukungan backbone fleksibel
         
-        Returns:o
+        Returns:
             Model yang siap untuk training
         """
         try:
@@ -65,13 +65,13 @@ class ModelHandler:
             num_classes = len(self.config.get('dataset', {}).get('classes', [7]))
             
             # Log detail inisialisasi
-            # self.logger.info(
-            #     f"🚀 Mempersiapkan model dengan:\n"
-            #     f"   • Backbone: {backbone_type}\n"
-            #     f"   • Pretrained: {pretrained}\n"
-            #     f"   • Jumlah Layer: {len(layers)}\n"
-            #     f"   • Jumlah Kelas: {num_classes}"
-            # )
+            self.logger.info(
+                f"🚀 Mempersiapkan model dengan:\n"
+                f"   • Backbone: {backbone_type}\n"
+                f"   • Pretrained: {pretrained}\n"
+                f"   • Jumlah Layer: {len(layers)}\n"
+                f"   • Jumlah Kelas: {num_classes}"
+            )
             
             # Inisialisasi model dengan backbone yang dipilih
             if backbone_type == 'efficientnet':
@@ -79,7 +79,7 @@ class ModelHandler:
                     num_classes=num_classes,
                     backbone_type='efficientnet',
                     pretrained=pretrained,
-                    detection_layers=layers,  # Gunakan detection_layers
+                    layers=layers,  # Menggunakan layers, bukan detection_layers
                     logger=self.logger
                 )
             elif backbone_type == 'cspdarknet':
@@ -87,7 +87,7 @@ class ModelHandler:
                     num_classes=num_classes,
                     backbone_type='cspdarknet',
                     pretrained=pretrained,
-                    detection_layers=layers,  # Gunakan detection_layers
+                    layers=layers,  # Menggunakan layers, bukan detection_layers
                     logger=self.logger
                 )
             else:

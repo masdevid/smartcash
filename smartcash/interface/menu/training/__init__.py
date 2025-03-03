@@ -1,4 +1,4 @@
-# File: smartcash/interface/menu/training.py
+# File: smartcash/interface/menu/__init__.py
 # Author: Alfrida Sabar
 # Deskripsi: Menu utama pelatihan model dengan integrasi submenu
 
@@ -7,6 +7,7 @@ from smartcash.interface.menu.training.detection_mode import DetectionModeMenu
 from smartcash.interface.menu.training.backbone import BackboneMenu
 from smartcash.interface.menu.training.parameters import TrainingParamsMenu
 from smartcash.handlers.training_pipeline import TrainingPipeline
+from pathlib import Path
 
 
 class TrainingMenu(BaseMenu):
@@ -205,27 +206,53 @@ class TrainingMenu(BaseMenu):
     def start_training(self) -> bool:
         """Mulai proses pelatihan model."""
         try:
-            # Konfirmasi mulai training
-            if not self.display.show_dialog(
-                "Konfirmasi",
-                "Apakah Anda yakin ingin memulai pelatihan?",
-                {"y": "Ya", "n": "Tidak"}
-            ):
+            # Validasi konfigurasi
+            if not self._validate_training_config():
                 return True
-            
-            # Setup training pipeline
+
+            # Konfirmasi mulai training
+            # if not self.display.show_dialog(
+            #     "Konfirmasi",
+            #     "Apakah Anda yakin ingin memulai pelatihan?",
+            #     {"y": "Ya", "n": "Tidak"}
+            # ):
+            #     return True
+                
+            # Setup training pipeline dengan path yang benar
             config = self.config_manager.current_config
-            pipeline = TrainingPipeline(config=config)
+            
+            # Pastikan path dataset dan output ada
+            data_dir = Path('data')
+            if not data_dir.exists():
+                self.display.show_error("❌ Direktori data tidak ditemukan")
+                return True
+                
+            # Set path dataset berdasarkan sumber data
+            if config['data_source'] == 'local':
+                config.update({
+                    'train_data_path': str(data_dir / 'train'),
+                    'val_data_path': str(data_dir / 'valid'),
+                    'test_data_path': str(data_dir / 'test')
+                })
+            elif config['data_source'] == 'roboflow':
+                # Akan dihandle oleh RoboflowHandler
+                pass
+            
+            # Set path output
+            output_dir = Path('runs/train')
+            output_dir.mkdir(parents=True, exist_ok=True)
+            config['output_dir'] = str(output_dir)
             
             # Clear screen dan tampilkan status training
             self.app.stdscr.clear()
             self.display.show_success("🚀 Memulai pelatihan model...")
             self.app.stdscr.refresh()
             
-            # Run training
-            results = pipeline.train(
-                progress_callback=self.display.show_progress
-            )
+            # Run training dengan config yang sudah divalidasi
+            pipeline = TrainingPipeline(config=config)
+            results = pipeline.train(display_manager=self.display)
+            if results == {}:
+                return True
             
             # Show completion dialog
             self.display.show_dialog(
@@ -242,4 +269,29 @@ class TrainingMenu(BaseMenu):
             
         except Exception as e:
             self.display.show_error(f"Gagal memulai pelatihan: {str(e)}")
-            return True
+            return False
+
+    def _validate_training_config(self) -> bool:
+        """Validasi konfigurasi sebelum training."""
+        config = self.config_manager.current_config
+        
+        # Required configs
+        required = {
+            'data_source': 'Sumber data',
+            'detection_mode': 'Mode deteksi',
+            'backbone': 'Arsitektur backbone',
+            'training.batch_size': 'Ukuran batch',
+            'training.learning_rate': 'Learning rate',
+            'training.epochs': 'Jumlah epoch'
+        }
+        
+        # Check each required config
+        for key, label in required.items():
+            value = config
+            for k in key.split('.'):
+                value = value.get(k)
+                if value is None:
+                    self.display.show_error(f"❌ {label} belum dikonfigurasi")
+                    return False
+        
+        return True

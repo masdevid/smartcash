@@ -5,7 +5,7 @@
 import curses
 import psutil
 import torch
-from typing import Dict, Optional, Any, Tuple
+from typing import Dict, Optional, Any, Tuple, Callable
 from pathlib import Path
 
 class DisplayManager:
@@ -13,6 +13,7 @@ class DisplayManager:
     
     def __init__(self, stdscr: curses.window):
         self.stdscr = stdscr
+        self.error_log = []  # Simpan riwayat error untuk referensi
         self.setup_colors()
         
     def setup_colors(self) -> None:
@@ -31,67 +32,113 @@ class DisplayManager:
         curses.init_pair(5, curses.COLOR_MAGENTA, -1) # Special
         curses.init_pair(6, curses.COLOR_BLUE, -1)    # Navigation
         
+        
     def show_error(
         self, 
         message: str, 
-        timeout_ms: int = 2000
+        timeout_ms: int = 3000,  # Increased timeout for better readability
+        show_help: bool = True   # Show helpful suggestion
     ) -> Optional[int]:
         """
-        Tampilkan pesan error dengan warna merah.
+        Tampilkan pesan error dengan warna merah dan logging error.
         
         Args:
             message: Pesan error untuk ditampilkan
             timeout_ms: Timeout dalam milidetik
+            show_help: Tampilkan saran bantuan
             
         Returns:
             Key yang ditekan atau None jika timeout
         """
-        height, width = self.stdscr.getmaxyx()
-        y = height - 2
-        x = 2
-        
-        # Clear line
-        self.stdscr.addstr(y, 0, " " * (width - 1))
-        
-        # Show error
-        self.stdscr.attron(curses.color_pair(1))
-        self.stdscr.addstr(y, x, f"❌ {message}")
-        self.stdscr.attroff(curses.color_pair(1))
-        self.stdscr.refresh()
-        
-        # Wait for timeout or key press
-        self.stdscr.timeout(timeout_ms)
-        key = self.stdscr.getch()
-        self.stdscr.timeout(-1)
-        
-        # Clear message
-        self.stdscr.addstr(y, 0, " " * (width - 1))
-        self.stdscr.refresh()
-        
-        return key if key != -1 else None
-        
+        # Log error for history
+        self.error_log.append(message)
+        if len(self.error_log) > 10:  # Keep only last 10 errors
+            self.error_log.pop(0)
+            
+        try:
+            height, width = self.stdscr.getmaxyx()
+            y = height - 2
+            x = 2
+            
+            # Clear line
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+            
+            # Show error
+            self.stdscr.attron(curses.color_pair(1))
+            error_msg = f"❌ ERROR: {message}"
+            
+            # Truncate if too long
+            if len(error_msg) > width - 4:
+                error_msg = error_msg[:width-7] + "..."
+                
+            self.stdscr.addstr(y, x, error_msg)
+            self.stdscr.attroff(curses.color_pair(1))
+            
+            # Show help if requested
+            if show_help:
+                help_y = height - 1
+                self.stdscr.addstr(help_y, 0, " " * (width - 1))
+                self.stdscr.attron(curses.color_pair(3))
+                self.stdscr.addstr(help_y, x, "💡 Tekan key untuk menutup pesan atau tunggu untuk lanjut")
+                self.stdscr.attroff(curses.color_pair(3))
+                
+            self.stdscr.refresh()
+            
+            # Wait for timeout or key press
+            self.stdscr.timeout(timeout_ms)
+            key = self.stdscr.getch()
+            self.stdscr.timeout(-1)
+            
+            # Clear message
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+            if show_help:
+                self.stdscr.addstr(help_y, 0, " " * (width - 1))
+            self.stdscr.refresh()
+            
+            return key if key != -1 else None
+            
+        except Exception as e:
+            # Fallback if display fails
+            try:
+                self.stdscr.addstr(0, 0, f"Display Error: {str(e)}")
+                self.stdscr.refresh()
+            except:
+                pass  # Give up if even this fails
+            return None
+
     def show_success(
         self, 
         message: str, 
         timeout_ms: int = 1500
     ) -> None:
         """Tampilkan pesan sukses dengan warna hijau."""
-        height, width = self.stdscr.getmaxyx()
-        y = height - 2
-        x = 2
-        
-        self.stdscr.addstr(y, 0, " " * (width - 1))
-        self.stdscr.attron(curses.color_pair(2))
-        self.stdscr.addstr(y, x, f"✅ {message}")
-        self.stdscr.attroff(curses.color_pair(2))
-        self.stdscr.refresh()
-        
-        curses.napms(timeout_ms)
-        self.stdscr.addstr(y, 0, " " * (width - 1))
-        self.stdscr.refresh()
-        
+        try:
+            height, width = self.stdscr.getmaxyx()
+            y = height - 2
+            x = 2
+            
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+            self.stdscr.attron(curses.color_pair(2))
+            
+            # Truncate if too long
+            success_msg = f"✅ {message}"
+            if len(success_msg) > width - 4:
+                success_msg = success_msg[:width-7] + "..."
+                
+            self.stdscr.addstr(y, x, success_msg)
+            self.stdscr.attroff(curses.color_pair(2))
+            self.stdscr.refresh()
+            
+            curses.napms(timeout_ms)
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+            self.stdscr.refresh()
+            
+        except Exception as e:
+            # Silent fail for success messages
+            pass
+
     def show_config_status(self, config: Dict[str, Any], start_y: int = 2, start_x: int = 50) -> None:
-        """Tampilkan status konfigurasi saat ini."""
+        """Tampilkan status konfigurasi saat ini dengan error handling yang lebih baik."""
         try:
             if not config:
                 return
@@ -137,8 +184,31 @@ class DisplayManager:
             # Ignore curses errors - usually due to window resize
             pass
         except Exception as e:
-            self.logger.error(f"Error showing config status: {str(e)}")
+            # Log error but don't crash
+            self.error_log.append(f"Error menampilkan status konfigurasi: {str(e)}")
     
+    def _show_config_value(self, y: int, x: int, value: Any) -> None:
+        """Tampilkan nilai konfigurasi dengan warna yang sesuai dan handling error yang lebih baik."""
+        try:
+            # Ensure value is string
+            value_str = str(value) if value is not None else 'Belum dipilih'
+            
+            if value_str == 'Belum dipilih':
+                self.stdscr.attron(curses.color_pair(1))
+            else:
+                self.stdscr.attron(curses.color_pair(2))
+                
+            self.stdscr.addstr(y, x, value_str)
+            self.stdscr.attroff(curses.color_pair(1))
+            self.stdscr.attroff(curses.color_pair(2))
+            
+        except curses.error:
+            # Ignore curses errors (likely window resize)
+            pass
+        except Exception as e:
+            # Silent fail - just don't display the value
+            pass
+
     def show_system_status(self) -> None:
         """Tampilkan status sistem di header."""
         height, width = self.stdscr.getmaxyx()
@@ -193,35 +263,17 @@ class DisplayManager:
         self.stdscr.addstr(y, help_x, help_text)
         self.stdscr.attroff(curses.color_pair(6))
             
-    def _show_config_value(self, y: int, x: int, value: str) -> None:
-        """Tampilkan nilai konfigurasi dengan warna yang sesuai."""
-        try:
-            # Ensure value is string
-            value_str = str(value) if value is not None else 'Belum dipilih'
-            
-            if value_str == 'Belum dipilih':
-                self.stdscr.attron(curses.color_pair(1))
-            else:
-                self.stdscr.attron(curses.color_pair(2))
-                
-            self.stdscr.addstr(y, x, value_str)
-            self.stdscr.attroff(curses.color_pair(1))
-            self.stdscr.attroff(curses.color_pair(2))
-            
-        except Exception as e:
-            self.logger.error(f"Error showing config value: {str(e)}")
-            # Don't re-raise - just log and continue
-        
     def get_user_input(
         self, 
         prompt: str, 
         y: Optional[int] = None, 
         x: Optional[int] = None,
         timeout: int = 100,
-        validator: Optional[callable] = None
+        validator: Optional[Callable] = None,
+        default: Optional[str] = None
     ) -> Optional[str]:
         """
-        Dapatkan input dari user dengan timeout dan validasi.
+        Dapatkan input dari user dengan error handling yang ditingkatkan.
         
         Args:
             prompt: Prompt untuk ditampilkan
@@ -229,6 +281,7 @@ class DisplayManager:
             x: Posisi x (opsional)
             timeout: Timeout dalam milidetik
             validator: Fungsi validasi input (opsional)
+            default: Nilai default jika input kosong
             
         Returns:
             String input dari user atau None jika dibatalkan
@@ -240,17 +293,38 @@ class DisplayManager:
         if x is None:
             x = 2
             
-        curses.echo()
+        # Simpan mode kursor saat ini dan aktifkan echo
+        try:
+            old_cursor = curses.curs_set(1)
+            curses.echo()
+        except:
+            old_cursor = 0
+            
         self.stdscr.timeout(timeout)
         
         # Clear input area and show prompt
-        self.stdscr.addstr(y, 0, " " * (width - 1))
-        self.stdscr.addstr(y, x, prompt)
-        self.stdscr.refresh()
+        try:
+            self.stdscr.addstr(y, 0, " " * (width - 1))
+            self.stdscr.addstr(y, x, prompt)
+            
+            # Show default value if provided
+            if default:
+                self.stdscr.addstr(y, x + len(prompt), f"[{default}] ")
+                
+            self.stdscr.refresh()
+        except curses.error as e:
+            # Handle drawing errors
+            self.show_error(f"Error saat menampilkan prompt: {str(e)}")
+            curses.curs_set(old_cursor)
+            curses.noecho()
+            self.stdscr.timeout(-1)
+            return None
         
         # Initialize input buffer
         input_buffer = ""
         cursor_x = len(prompt) + x
+        if default:
+            cursor_x += len(f"[{default}] ")
         
         while True:
             try:
@@ -258,11 +332,16 @@ class DisplayManager:
                 if ch == -1:  # No input within timeout
                     continue
                 elif ch in [ord('\n'), ord('\r')]:  # Enter
+                    # If input is empty and default exists, use default
+                    if not input_buffer and default:
+                        input_buffer = default
+                        
+                    # Validate if validator provided
                     if validator and not validator(input_buffer):
                         self.show_error("Input tidak valid")
                         continue
                     break
-                elif ch == ord('\b') or ch == curses.KEY_BACKSPACE:  # Backspace
+                elif ch == ord('\b') or ch == curses.KEY_BACKSPACE or ch == 127:  # Backspace
                     if input_buffer:
                         input_buffer = input_buffer[:-1]
                         cursor_x -= 1
@@ -271,21 +350,40 @@ class DisplayManager:
                 elif ch == 3:  # Ctrl+C
                     raise KeyboardInterrupt
                 elif ch == 27:  # Escape
+                    curses.curs_set(old_cursor)
+                    curses.noecho()
+                    self.stdscr.timeout(-1)
                     return None
                 elif 32 <= ch <= 126:  # Printable characters
                     input_buffer += chr(ch)
-                    self.stdscr.addch(y, cursor_x, ch)
-                    cursor_x += 1
+                    try:
+                        self.stdscr.addch(y, cursor_x, ch)
+                        cursor_x += 1
+                    except curses.error:
+                        # Handle edge case where cursor is at screen edge
+                        input_buffer = input_buffer[:-1]  # Remove last char
                     
                 self.stdscr.refresh()
                 
             except curses.error:
                 continue
+            except Exception as e:
+                self.show_error(f"Error saat input: {str(e)}")
+                curses.curs_set(old_cursor)
+                curses.noecho()
+                self.stdscr.timeout(-1)
+                return None
                 
+        # Restore terminal state
+        try:
+            curses.curs_set(old_cursor)
+        except:
+            pass
+            
         curses.noecho()
         self.stdscr.timeout(-1)
         return input_buffer.strip()
-        
+
     def show_progress(
         self, 
         message: str,
@@ -540,3 +638,114 @@ class DisplayManager:
         # Wait for any key
         self.stdscr.refresh()
         self.stdscr.getch()
+
+    def show_error_history(self) -> None:
+        """
+        Tampilkan riwayat error untuk debugging.
+        """
+        if not self.error_log:
+            self.show_info("Tidak ada error yang tercatat")
+            return
+            
+        height, width = self.stdscr.getmaxyx()
+        
+        # Buat dialog box
+        box_height = min(len(self.error_log) + 4, height - 4)
+        box_width = width - 10
+        box_y = (height - box_height) // 2
+        box_x = 5
+        
+        # Buat dialog border
+        win = curses.newwin(box_height, box_width, box_y, box_x)
+        win.box()
+        
+        # Judul dialog
+        win.attron(curses.color_pair(1))
+        win.addstr(0, 2, " Riwayat Error ")
+        win.attroff(curses.color_pair(1))
+        
+        # Tampilkan error
+        for i, error in enumerate(self.error_log[-box_height+4:]):
+            if i < box_height - 4:  # Pastikan masih dalam window
+                # Potong pesan jika terlalu panjang
+                if len(error) > box_width - 4:
+                    error = error[:box_width-7] + "..."
+                win.addstr(i + 1, 2, error)
+                
+        # Footer
+        win.attron(curses.color_pair(3))
+        win.addstr(box_height-1, 2, " Tekan key untuk menutup ")
+        win.attroff(curses.color_pair(3))
+        
+        win.refresh()
+        
+        # Tunggu keypress
+        win.getch()
+        
+    def show_info(self, message: str, title: str = "Informasi", timeout_ms: int = 0) -> None:
+        """
+        Tampilkan pesan informasi dalam box.
+        
+        Args:
+            message: Pesan informasi
+            title: Judul box
+            timeout_ms: Timeout dalam milidetik (0 untuk tunggu keypress)
+        """
+        try:
+            height, width = self.stdscr.getmaxyx()
+            
+            # Calculate box dimensions
+            msg_lines = message.split('\n')
+            box_height = min(len(msg_lines) + 4, height - 4)
+            box_width = min(max(len(line) for line in msg_lines) + 6, width - 4)
+            box_width = max(box_width, len(title) + 6)  # Pastikan judul muat
+            
+            # Calculate position
+            box_y = (height - box_height) // 2
+            box_x = (width - box_width) // 2
+            
+            # Create window for box
+            win = curses.newwin(box_height, box_width, box_y, box_x)
+            win.box()
+            
+            # Add title
+            win.attron(curses.color_pair(4))
+            title_x = (box_width - len(title) - 2) // 2
+            win.addstr(0, title_x, f" {title} ")
+            win.attroff(curses.color_pair(4))
+            
+            # Add message lines
+            for i, line in enumerate(msg_lines[:box_height-4]):
+                # Truncate if needed
+                if len(line) > box_width - 4:
+                    line = line[:box_width-7] + "..."
+                win.addstr(i + 1, 2, line)
+                
+            # Add footer
+            win.attron(curses.color_pair(6))
+            footer = " Tekan key untuk menutup " if timeout_ms == 0 else " Tunggu... "
+            footer_x = (box_width - len(footer)) // 2
+            win.addstr(box_height-1, footer_x, footer)
+            win.attroff(curses.color_pair(6))
+            
+            win.refresh()
+            
+            # Wait for keypress or timeout
+            if timeout_ms > 0:
+                win.timeout(timeout_ms)
+                win.getch()  # Ignore result
+            else:
+                win.timeout(-1)
+                win.getch()
+                
+        except curses.error:
+            # Handle window size errors silently
+            pass
+        except Exception as e:
+            # Fallback to simple error display
+            try:
+                self.stdscr.addstr(0, 0, f"Display error: {str(e)}")
+                self.stdscr.refresh()
+                curses.napms(1000)
+            except:
+                pass

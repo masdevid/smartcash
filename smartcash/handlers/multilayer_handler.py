@@ -1,4 +1,4 @@
-# File: handlers/multilayer_handler.py
+# File: smartcash/handlers/multilayer_handler.py
 # Author: Alfrida Sabar
 # Deskripsi: Handler untuk mengelola dataset dengan multiple layer anotasi
 
@@ -26,18 +26,18 @@ class MultilayerHandler:
         self.config = config
         self.logger = logger or SmartCashLogger(__name__)
         
-        # Initialize layer-specific configurations
+        # Initialize layer-specific configurations berdasarkan nama kelas yang aktual
         self.layers = {
             'banknote': {
-                'classes': ['1K', '2K', '5K', '10K', '20K', '50K', '100K'],
+                'classes': ['001', '002', '005', '010', '020', '050', '100'],
                 'weight': 1.0
             },
             'nominal': {
-                'classes': ['nom_1K', 'nom_2K', 'nom_5K', 'nom_10K', 'nom_20K', 'nom_50K', 'nom_100K'],
+                'classes': ['l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100'],
                 'weight': 0.8
             },
             'security': {
-                'classes': ['security', 'thread', 'microtext', 'watermark'],
+                'classes': ['l3_sign', 'l3_text', 'l3_thread'],
                 'weight': 0.6
             }
         }

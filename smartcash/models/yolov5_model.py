@@ -23,14 +23,11 @@ class YOLOv5Model(nn.Module):
         num_classes: int = 7,  # 7 denominasi Rupiah
         backbone_type: str = "cspdarknet",
         pretrained: bool = True,
-        detection_layers: Optional[List[str]] = None,
         logger: Optional[SmartCashLogger] = None
     ):
         super().__init__()
         self.logger = logger or SmartCashLogger(__name__)
         self.num_classes = num_classes
-        # Default layers jika tidak dispesifikasi
-        self.detection_layers = detection_layers or ['banknote']
         
         # Inisialisasi backbone
         self.backbone = self._create_backbone(backbone_type, pretrained)
@@ -45,11 +42,10 @@ class YOLOv5Model(nn.Module):
         )
         
         self.logger.info(
-            f"🚀 Inisialisasi YOLOv5Model:\n"
-            f"   • Backbone: {backbone_type}\n"
-            f"   • Jumlah Kelas: {num_classes}\n"
-            f"   • Layer Deteksi: {self.detection_layers}\n"
-            f"   • Pretrained: {pretrained}"
+            f"✨ Model YOLOv5 siap dengan:\n"
+            f"   Backbone: {backbone_type}\n"
+            f"   Classes: {num_classes}\n"
+            f"   Pretrained: {pretrained}"
         )
         
     def _create_backbone(

@@ -9,18 +9,18 @@ import torch.nn as nn
 class DetectionHead(nn.Module):
     """Detection head yang bisa menangani single atau multi layer"""
     
-    # Konfigurasi layer yang didukung
+    # Konfigurasi layer yang didukung dengan nama kelas aktual
     LAYER_CONFIG = {
         'banknote': {
-            'num_classes': 7,  # 7 denominasi
+            'num_classes': 7,  # 7 denominasi ('001', '002', '005', '010', '020', '050', '100')
             'description': 'Deteksi uang kertas utuh'
         },
         'nominal': {
-            'num_classes': 7,  # 7 area nominal
+            'num_classes': 7,  # 7 area nominal ('l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100')
             'description': 'Deteksi area nominal'
         },
         'security': {
-            'num_classes': 4,  # 4 fitur keamanan
+            'num_classes': 3,  # 3 fitur keamanan ('l3_sign', 'l3_text', 'l3_thread')
             'description': 'Deteksi fitur keamanan'
         }
     }

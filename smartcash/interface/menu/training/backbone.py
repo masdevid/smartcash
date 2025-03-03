@@ -1,9 +1,11 @@
 # File: smartcash/interface/menu/training/backbone.py
 # Author: Alfrida Sabar
-# Deskripsi: Menu pemilihan arsitektur backbone model
+# Deskripsi: Menu pemilihan arsitektur backbone model dengan perbaikan error handling
 
 from smartcash.interface.menu.base import BaseMenu, MenuItem
 import curses
+from typing import Dict, Any
+from pathlib import Path
 
 class BackboneMenu(BaseMenu):
     """Menu pemilihan arsitektur backbone."""
@@ -13,6 +15,9 @@ class BackboneMenu(BaseMenu):
             'name': 'CSPDarknet',
             'description': (
                 "Backbone standar YOLOv5\n"
+                "• Kecepatan inferensi tinggi\n"
+                "• Ukuran model lebih kecil\n"
+                "• Parameter lebih sedikit"
             ),
             'compatible_modes': ['single', 'multi']
         },
@@ -20,6 +25,9 @@ class BackboneMenu(BaseMenu):
             'name': 'EfficientNet-B4',
             'description': (
                 "Backbone EfficientNet-B4\n"
+                "• Akurasi lebih tinggi\n"
+                "• Compound scaling untuk feature extraction\n"
+                "• Performa lebih baik pada detail kecil"
             ),
             'compatible_modes': ['single', 'multi']
         }
@@ -72,10 +80,23 @@ class BackboneMenu(BaseMenu):
             bool: True jika berhasil
         """
         try:
+            # Memastikan backbone valid sebelum melakukan update
+            if backbone not in self.BACKBONE_INFO:
+                self.display.show_error(f"Arsitektur tidak valid: {backbone}")
+                return True
+                
+            # Cek kompatibilitas dengan mode deteksi
+            current_mode = self.config_manager.current_config.get('detection_mode')
+            if current_mode and current_mode not in self.BACKBONE_INFO[backbone]['compatible_modes']:
+                self.display.show_error(
+                    f"Arsitektur {backbone} tidak kompatibel dengan mode {current_mode}"
+                )
+                return True
+                
             # Update backbone di config
             self.config_manager.update('backbone', backbone)
             
-            # Update model config sesuai backbone
+            # Update model config sesuai backbone dengan channels yang benar
             model_config = {
                 'cspdarknet': {
                     'pretrained': True,
@@ -87,15 +108,23 @@ class BackboneMenu(BaseMenu):
                 }
             }
             
-            self.config_manager.update('model', model_config[backbone])
+            # Update konfigurasi model dengan error handling yang lebih baik
+            try:
+                self.config_manager.update('model', model_config[backbone])
+            except Exception as model_error:
+                self.display.show_error(f"Gagal mengatur konfigurasi model: {str(model_error)}")
+                return True
             
-            # Save changes
-            self.config_manager.save()
-            
-            # Show feedback
-            self.display.show_success(
-                f"Arsitektur diatur ke: {self.BACKBONE_INFO[backbone]['name']}"
-            )
+            # Save changes with error handling
+            try:
+                self.config_manager.save()
+                # Show feedback
+                self.display.show_success(
+                    f"Arsitektur diatur ke: {self.BACKBONE_INFO[backbone]['name']}"
+                )
+            except Exception as save_error:
+                self.display.show_error(f"Gagal menyimpan konfigurasi: {str(save_error)}")
+                
             return True
             
         except Exception as e:

@@ -4,6 +4,7 @@
 
 import os
 from typing import Dict, Optional, List, Union
+from roboflow.core.version import process
 import yaml
 import time
 import torch
@@ -17,6 +18,7 @@ class ModelHandler:
     
     def __init__(
         self,
+        config: Dict,
         config_path: str,
         num_classes: int,
         logger: Optional[SmartCashLogger] = None
@@ -25,7 +27,7 @@ class ModelHandler:
         self.logger = logger or SmartCashLogger(__name__)
         
         # Load configuration
-        self.config = self._load_config(config_path)
+        self.config = config or self._load_config(config_path)
         
         self.num_classes = num_classes
         self.results = {}
@@ -49,29 +51,27 @@ class ModelHandler:
         """
         Inisialisasi model dengan dukungan backbone fleksibel
         
-        Returns:
+        Returns:o
             Model yang siap untuk training
         """
         try:
             # Prioritaskan backbone dari konfigurasi
             backbone_type = (
-                self.config.get('backbone') or  # Backbone dari config global
-                self.config.get('model', {}).get('backbone', 'cspdarknet')  # Fallback ke default
+                self.config.get('backbone') or 'cspdarknet'
             )
-            
             # Parameter tambahan
             pretrained = self.config.get('model', {}).get('pretrained', True)
             layers = self.config.get('layers', ['banknote'])
             num_classes = len(self.config.get('dataset', {}).get('classes', [7]))
             
             # Log detail inisialisasi
-            self.logger.info(
-                f"🚀 Mempersiapkan model dengan:\n"
-                f"   • Backbone: {backbone_type}\n"
-                f"   • Pretrained: {pretrained}\n"
-                f"   • Jumlah Layer: {len(layers)}\n"
-                f"   • Jumlah Kelas: {num_classes}"
-            )
+            # self.logger.info(
+            #     f"🚀 Mempersiapkan model dengan:\n"
+            #     f"   • Backbone: {backbone_type}\n"
+            #     f"   • Pretrained: {pretrained}\n"
+            #     f"   • Jumlah Layer: {len(layers)}\n"
+            #     f"   • Jumlah Kelas: {num_classes}"
+            # )
             
             # Inisialisasi model dengan backbone yang dipilih
             if backbone_type == 'efficientnet':

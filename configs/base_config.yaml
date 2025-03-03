@@ -1,12 +1,22 @@
 data:
   classes:
-  - '1000'
-  - '2000'
-  - '5000'
-  - '10000'
-  - '20000'
-  - '50000'
-  - '100000'
+  - '001'
+  - '002'
+  - '005'
+  - '010'
+  - '020'
+  - '050'
+  - '100'
+  - 'l2_001'
+  - 'l2_002'
+  - 'l2_005'
+  - 'l2_010'
+  - 'l2_020'
+  - 'l2_050'
+  - 'l2_100'
+  - 'l3_sign'
+  - 'l3_text'
+  - 'l3_thread'
   local:
     test: data/test
     train: data/train
@@ -19,13 +29,23 @@ data:
   source: local
 dataset:
   classes:
-  - 100k
-  - 10k
-  - 1k
-  - 20k
-  - 2k
-  - 50k
-  - 5k
+  - '001'
+  - '002'
+  - '005'
+  - '010'
+  - '020'
+  - '050'
+  - '100'
+  - 'l2_001'
+  - 'l2_002'
+  - 'l2_005'
+  - 'l2_010'
+  - 'l2_020'
+  - 'l2_050'
+  - 'l2_100'
+  - 'l3_sign'
+  - 'l3_text'
+  - 'l3_thread'
   project: rupiah_emisi-baru
   test_path: ../test/images
   train_path: ../train/images
@@ -61,7 +81,7 @@ experiment_scenarios:
   name: scenario_4
 model:
   backbone: cspdarknet
-  batch_size: 32
+  batch_size: 16
   conf_thres: 0.25
   device: ''
   img_size:
@@ -70,7 +90,7 @@ model:
   iou_thres: 0.45
   max_det: 1000
   memory_limit: 0.6
-  num_classes: 7
+  num_classes: 17  # Total class (7 banknote + 7 nominal + 3 security)
   pretrained: true
   workers: 8
 training:

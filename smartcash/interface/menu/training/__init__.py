@@ -1,6 +1,6 @@
-# File: smartcash/interface/menu/__init__.py
+# File: smartcash/interface/menu/training/__init__.py
 # Author: Alfrida Sabar
-# Deskripsi: Menu utama pelatihan model dengan integrasi submenu
+# Deskripsi: Menu utama pelatihan model dengan integrasi submenu dan tampilan log yang lebih baik
 
 from smartcash.interface.menu.base import BaseMenu, MenuItem
 from smartcash.interface.menu.training.detection_mode import DetectionModeMenu
@@ -8,7 +8,7 @@ from smartcash.interface.menu.training.backbone import BackboneMenu
 from smartcash.interface.menu.training.parameters import TrainingParamsMenu
 from smartcash.handlers.training_pipeline import TrainingPipeline
 from pathlib import Path
-
+import curses
 
 class TrainingMenu(BaseMenu):
     """Menu utama pelatihan model."""
@@ -131,6 +131,12 @@ class TrainingMenu(BaseMenu):
     def _set_data_source(self, source: str) -> bool:
         """Set sumber data dan update menu."""
         try:
+            # Memastikan backbone valid sebelum melakukan update
+            if source not in ['local', 'roboflow']:
+                self.display.show_error(f"Sumber data tidak valid: {source}")
+                return True
+                
+            # Update backbone di config
             self.config_manager.update('data_source', source)
             
             # Additional config for Roboflow
@@ -204,20 +210,12 @@ class TrainingMenu(BaseMenu):
                 return True
     
     def start_training(self) -> bool:
-        """Mulai proses pelatihan model."""
+        """Mulai proses pelatihan model dengan tampilan log yang lebih baik."""
         try:
             # Validasi konfigurasi
             if not self._validate_training_config():
                 return True
 
-            # Konfirmasi mulai training
-            # if not self.display.show_dialog(
-            #     "Konfirmasi",
-            #     "Apakah Anda yakin ingin memulai pelatihan?",
-            #     {"y": "Ya", "n": "Tidak"}
-            # ):
-            #     return True
-                
             # Setup training pipeline dengan path yang benar
             config = self.config_manager.current_config
             
@@ -234,25 +232,52 @@ class TrainingMenu(BaseMenu):
                     'val_data_path': str(data_dir / 'valid'),
                     'test_data_path': str(data_dir / 'test')
                 })
-            elif config['data_source'] == 'roboflow':
-                # Akan dihandle oleh RoboflowHandler
-                pass
             
             # Set path output
             output_dir = Path('runs/train')
             output_dir.mkdir(parents=True, exist_ok=True)
             config['output_dir'] = str(output_dir)
-            
-            # Clear screen dan tampilkan status training
+
+            # Reset tampilan dan siapkan area log
             self.app.stdscr.clear()
+            height, width = self.app.stdscr.getmaxyx()
+            
+            # Area untuk judul 
+            title = "🚀 Pelatihan SmartCash"
+            self.app.stdscr.attron(curses.color_pair(2))
+            self.app.stdscr.addstr(0, (width - len(title)) // 2, title)
+            self.app.stdscr.attroff(curses.color_pair(2))
+            
+            # Tampilkan status awal
             self.display.show_success("🚀 Memulai pelatihan model...")
+            
+            # Area status
+            status_y = 1
+            self.app.stdscr.addstr(status_y, 0, "=" * width)
+            
+            # Buat subwindow untuk menampilkan log
+            log_y = status_y + 1
+            log_height = height - log_y - 2  # Reserve space for progress bar
+            log_win = curses.newwin(log_height, width, log_y, 0)
+            log_win.scrollok(True)
+            
+            # Progress area
+            progress_y = height - 2
+            self.app.stdscr.addstr(progress_y - 1, 0, "=" * width)
+            
+            # Initial refresh
             self.app.stdscr.refresh()
+            log_win.refresh()
             
             # Run training dengan config yang sudah divalidasi
             pipeline = TrainingPipeline(config=config)
             results = pipeline.train(display_manager=self.display)
-            if results == {}:
+            
+            if not results:
                 return True
+            
+            # Kembalikan ke tampilan normal
+            self.app.stdscr.clear()
             
             # Show completion dialog
             self.display.show_dialog(
@@ -269,7 +294,7 @@ class TrainingMenu(BaseMenu):
             
         except Exception as e:
             self.display.show_error(f"Gagal memulai pelatihan: {str(e)}")
-            return False
+            return True
 
     def _validate_training_config(self) -> bool:
         """Validasi konfigurasi sebelum training."""

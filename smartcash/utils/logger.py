@@ -1,11 +1,15 @@
 # File: smartcash/utils/logger.py
 # Author: Alfrida Sabar
 # Deskripsi: Custom logger dengan emoji dan warna yang mewarisi logging.Logger
+# dengan perbaikan untuk menampilkan log di file tanpa menampilkan di konsol
 
 import logging
 import sys
+import os
 from typing import Optional
 from termcolor import colored
+from datetime import datetime
+from pathlib import Path
 
 class SmartCashLogger(logging.Logger):
     """Custom logger untuk SmartCash project dengan emoji dan colored output."""
@@ -27,7 +31,10 @@ class SmartCashLogger(logging.Logger):
     def __init__(
         self, 
         name: str,
-        level: int = logging.INFO
+        level: int = logging.INFO,
+        log_to_file: bool = True,
+        log_to_console: bool = True,
+        log_dir: str = "logs"
     ):
         """
         Inisialisasi logger.
@@ -35,23 +42,51 @@ class SmartCashLogger(logging.Logger):
         Args:
             name: Nama logger
             level: Level logging (default: INFO)
+            log_to_file: Flag untuk mengaktifkan logging ke file
+            log_to_console: Flag untuk mengaktifkan logging ke konsol
+            log_dir: Direktori untuk menyimpan file log
         """
         # Inisialisasi logger dasar
         super().__init__(name, level)
         
-        # Setup console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(level)
+        # Buat direktori log jika belum ada
+        self.log_dir = Path(log_dir)
+        if log_to_file:
+            self.log_dir.mkdir(exist_ok=True, parents=True)
         
-        # Setup formatter
-        console_formatter = logging.Formatter(
-            '%(asctime)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        console_handler.setFormatter(console_formatter)
-        
-        # Tambahkan handler
-        self.addHandler(console_handler)
+        # Setup console handler jika diperlukan
+        if log_to_console:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(level)
+            
+            # Setup formatter
+            console_formatter = logging.Formatter(
+                '%(asctime)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            console_handler.setFormatter(console_formatter)
+            
+            # Tambahkan handler
+            self.addHandler(console_handler)
+            
+        # Setup file handler jika diperlukan
+        if log_to_file:
+            # Buat nama file dengan timestamp
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_file = self.log_dir / f"smartcash_{today}.log"
+            
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setLevel(level)
+            
+            # Setup formatter dengan lebih detail untuk file
+            file_formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            file_handler.setFormatter(file_formatter)
+            
+            # Tambahkan handler
+            self.addHandler(file_handler)
     
     def _format_message(
         self, 
@@ -153,12 +188,19 @@ class SmartCashLogger(logging.Logger):
             highlight_values=True, *args, **kwargs
         )
 
-def get_logger(name: str) -> SmartCashLogger:
+# Fungsi bantuan untuk mendapatkan logger dengan konfigurasi standar
+def get_logger(
+    name: str, 
+    log_to_console: bool = True, 
+    log_to_file: bool = True
+) -> SmartCashLogger:
     """
     Get atau buat instance SmartCashLogger.
     
     Args:
         name: Nama logger yang diinginkan
+        log_to_console: Flag untuk mengaktifkan logging ke konsol
+        log_to_file: Flag untuk mengaktifkan logging ke file
         
     Returns:
         Instance SmartCashLogger
@@ -167,5 +209,16 @@ def get_logger(name: str) -> SmartCashLogger:
     if not logging.getLoggerClass() == SmartCashLogger:
         logging.setLoggerClass(SmartCashLogger)
     
-    # Get atau buat logger
-    return logging.getLogger(name)
+    # Get atau buat logger dengan konfigurasi standar
+    logger = logging.getLogger(name)
+    
+    # Pastikan logger adalah SmartCashLogger dan memiliki handlers yang sesuai
+    if isinstance(logger, SmartCashLogger) and not logger.handlers:
+        # Reinisialisasi logger dengan parameter yang diberikan
+        logger = SmartCashLogger(
+            name=name,
+            log_to_console=log_to_console,
+            log_to_file=log_to_file
+        )
+    
+    return logger

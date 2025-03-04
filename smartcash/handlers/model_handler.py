@@ -1,10 +1,9 @@
 # File: handlers/model_handler.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk model training dan evaluasi
+# Deskripsi: Handler untuk model training dan evaluasi dengan perbaikan untuk ModuleDict.active_layers
 
 import os
 from typing import Dict, Optional, List, Union
-from roboflow.core.version import process
 import yaml
 import time
 import torch
@@ -59,41 +58,43 @@ class ModelHandler:
             backbone_type = (
                 self.config.get('backbone') or 'cspdarknet'
             )
+            
+            # Pastikan detection_layers diambil dari config
+            detection_layers = self.config.get('layers', ['banknote'])
+            
             # Parameter tambahan
             pretrained = self.config.get('model', {}).get('pretrained', True)
-            layers = self.config.get('layers', ['banknote'])
-            num_classes = len(self.config.get('dataset', {}).get('classes', [7]))
             
             # Log detail inisialisasi
             self.logger.info(
                 f"🚀 Mempersiapkan model dengan:\n"
                 f"   • Backbone: {backbone_type}\n"
                 f"   • Pretrained: {pretrained}\n"
-                f"   • Jumlah Layer: {len(layers)}\n"
-                f"   • Jumlah Kelas: {num_classes}"
+                f"   • Jumlah Layer: {len(detection_layers)}\n"
+                f"   • Jumlah Kelas: {self.num_classes}"
             )
             
             # Inisialisasi model dengan backbone yang dipilih
             if backbone_type == 'efficientnet':
                 model = YOLOv5Model(
-                    num_classes=num_classes,
+                    num_classes=self.num_classes,
                     backbone_type='efficientnet',
                     pretrained=pretrained,
-                    layers=layers,  # Menggunakan layers, bukan detection_layers
+                    detection_layers=detection_layers,  # Gunakan detection_layers, bukan layers
                     logger=self.logger
                 )
             elif backbone_type == 'cspdarknet':
                 model = YOLOv5Model(
-                    num_classes=num_classes,
+                    num_classes=self.num_classes,
                     backbone_type='cspdarknet',
                     pretrained=pretrained,
-                    layers=layers,  # Menggunakan layers, bukan detection_layers
+                    detection_layers=detection_layers,  # Gunakan detection_layers, bukan layers
                     logger=self.logger
                 )
             else:
                 # Fallback untuk backbone khusus/eksperimental
                 model = BaselineModel(
-                    num_classes=num_classes,
+                    num_classes=self.num_classes,
                     backbone=backbone_type,
                     pretrained=pretrained
                 )

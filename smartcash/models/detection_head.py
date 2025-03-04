@@ -1,6 +1,6 @@
 # File: models/detection_head.py 
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi detection head dengan opsi multi-layer
+# Deskripsi: Implementasi detection head dengan opsi multi-layer (FIX)
 
 from typing import Dict, List, Optional
 import torch
@@ -34,16 +34,16 @@ class DetectionHead(nn.Module):
         super().__init__()
         
         # Jika layers tidak dispesifikasi, gunakan banknote saja
-        self.active_layers = layers or ['banknote']
+        self.layers = layers or ['banknote']
         
         # Validasi layer yang diminta
-        for layer in self.active_layers:
+        for layer in self.layers:
             if layer not in self.LAYER_CONFIG:
                 raise ValueError(f"Layer {layer} tidak didukung")
         
         # Buat head untuk setiap kombinasi layer dan skala
         self.heads = nn.ModuleDict()
-        for layer in self.active_layers:
+        for layer in self.layers:
             heads_per_scale = nn.ModuleList()
             num_classes = self.LAYER_CONFIG[layer]['num_classes']
             

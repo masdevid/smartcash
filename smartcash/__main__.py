@@ -1,8 +1,6 @@
-#!/usr/bin/env python3
-
 # File: smartcash/__main__.py
 # Author: Alfrida Sabar
-# Deskripsi: Entry point untuk aplikasi SmartCash dengan dukungan CLI yang lebih baik dan penanganan error yang ditingkatkan
+# Deskripsi: Entry point dengan perbaikan handling error import curses
 
 import os
 import sys
@@ -16,6 +14,12 @@ from smartcash.exceptions.handler import ErrorHandler
 from smartcash.exceptions.base import ConfigError, ValidationError
 from smartcash.utils.debug_helper import DebugHelper
 
+# Cek ketersediaan curses sebelum import
+try:
+    import curses
+    CURSES_AVAILABLE = True
+except ImportError:
+    CURSES_AVAILABLE = False
 
 # Setup logger
 logger = SmartCashLogger("smartcash")
@@ -200,6 +204,12 @@ def check_dependencies() -> None:
         logger.info(f"🔍 Timm terdeteksi: {timm.__version__}")
     except ImportError:
         logger.warning("⚠️ Timm tidak terinstal, backbone EfficientNet tidak dapat digunakan")
+        
+    # Cek curses
+    if not CURSES_AVAILABLE:
+        logger.warning("⚠️ Package 'curses' tidak tersedia, mode TUI tidak akan digunakan")
+        if sys.platform == 'win32':
+            logger.info("💡 Tip: Pada Windows, install dengan 'pip install windows-curses'")
 
 def show_version() -> None:
     """Tampilkan informasi versi SmartCash."""
@@ -361,17 +371,20 @@ def run_tui_mode(config_path: Path) -> None:
         config_path: Path ke file konfigurasi
     """
     try:
-        import curses
+        if not CURSES_AVAILABLE:
+            logger.error("❌ Package 'curses' tidak tersedia, mode TUI tidak dapat dijalankan")
+            logger.info("💡 Gunakan mode CLI sebagai alternatif. Contoh: python -m smartcash --train")
+            sys.exit(1)
+            
+        # Import hanya jika curses tersedia
         from smartcash.interface.app import SmartCashApp
         
         app = SmartCashApp(config_path)
         curses.wrapper(app.run)
+        
     except KeyboardInterrupt:
         print("\nKeluar dari SmartCash...")
         sys.exit(0)
-    except ImportError:
-        logger.error("❌ Package 'curses' tidak tersedia, mode TUI tidak dapat dijalankan")
-        sys.exit(1)
     except Exception as e:
         error_handler.handle(e)
         sys.exit(1)

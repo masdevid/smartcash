@@ -1,10 +1,10 @@
-# File: utils/early_stopping.py
+# File: smartcash/utils/early_stopping.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk early stopping dengan support multiple metrics
+# Deskripsi: Handler untuk early stopping dengan perbaikan untuk masalah pickle
 
 import numpy as np
-from typing import Dict, Optional
-from smartcash.utils.logger import SmartCashLogger
+from typing import Dict, Optional, Union, Callable
+import logging
 
 class EarlyStopping:
     """
@@ -18,13 +18,23 @@ class EarlyStopping:
         min_delta: float = 0.0,
         patience: int = 5,
         mode: str = 'min',
-        logger: Optional[SmartCashLogger] = None
+        logger: Optional = None
     ):
         self.monitor = monitor
         self.min_delta = min_delta
         self.patience = patience
         self.mode = mode
-        self.logger = logger or SmartCashLogger(__name__)
+        
+        # Gunakan callable untuk logging alih-alih menyimpan objek logger
+        if logger:
+            self._log_info = lambda msg: logger.info(msg)
+            self._log_success = lambda msg: logger.success(msg)
+            self._log_warning = lambda msg: logger.warning(msg)
+        else:
+            # Fallback ke print jika tidak ada logger
+            self._log_info = lambda msg: print(f"ℹ️ {msg}")
+            self._log_success = lambda msg: print(f"✅ {msg}")
+            self._log_warning = lambda msg: print(f"⚠️ {msg}")
         
         self.best_score = np.inf if mode == 'min' else -np.inf
         self.counter = 0
@@ -46,7 +56,7 @@ class EarlyStopping:
             bool: True jika training harus dihentikan
         """
         if self.monitor not in metrics:
-            self.logger.warning(
+            self._log_warning(
                 f"⚠️ Metrik {self.monitor} tidak ditemukan di {metrics.keys()}"
             )
             return False
@@ -68,7 +78,7 @@ class EarlyStopping:
         self.best_score = current
         self.counter = 0
         
-        self.logger.success(
+        self._log_success(
             f"✨ {self.monitor} membaik: {current:.4f} "
             f"(+{diff:.4f})"
         )
@@ -79,13 +89,13 @@ class EarlyStopping:
         
         if self.counter >= self.patience:
             self.early_stop = True
-            self.logger.warning(
+            self._log_warning(
                 f"⚠️ Early stopping setelah {self.counter} epoch "
                 f"tanpa improvement di {self.monitor}"
             )
         else:
             remaining = self.patience - self.counter
-            self.logger.info(
+            self._log_info(
                 f"📉 Tidak ada improvement. "
                 f"Akan early stop dalam {remaining} epoch"
             )

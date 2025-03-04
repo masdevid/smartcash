@@ -1,0 +1,207 @@
+# ================= [TRAINING] =================
+# Cell 9: Training Pipeline
+# Import pustaka tambahan untuk visualisasi
+import time
+from datetime import datetime
+from tqdm.auto import tqdm
+import matplotlib.pyplot as plt
+from tensorboard.backend.event_processing import event_accumulator
+
+class TrainingPipeline:
+    """Pipeline training SmartCash"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.logger = SmartCashLogger("training_pipeline")
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Inisialisasi model dan data manager
+        self.model_manager = ModelManager(config)
+        self.data_manager = DataManager(config)
+        
+        # Setup direktori output
+        self.output_dir = Path(config.get('output_dir', 'runs/train'))
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Setup TensorBoard
+        self.log_dir = self.output_dir / 'logs'
+        self.log_dir.mkdir(exist_ok=True)
+        
+        from torch.utils.tensorboard import SummaryWriter
+        self.writer = SummaryWriter(log_dir=str(self.log_dir))
+        
+        # Setup metrik untuk tracking
+        self.metrics_history = {
+            'train_loss': [],
+            'val_loss': [],
+            'epochs': []
+        }
+        
+    def train(self, model=None, dataloaders=None):
+        """Training dengan Early Stopping dan Checkpoint Saving"""
+        # Setup model dan dataloaders jika belum ada
+        model = model or self.model_manager.create_model()
+        dataloaders = dataloaders or self.data_manager.get_dataloaders()
+        
+        # Setup optimizer
+        optimizer = self.model_manager.get_optimizer(model)
+        
+        # Setup early stopping
+        early_stopping = EarlyStopping(
+            patience=self.config.get('training', {}).get('early_stopping_patience', 5),
+            mode='min'
+        )
+        
+        # Hyperparameters
+        epochs = self.config.get('training', {}).get('epochs', 30)
+        
+        self.logger.info(f"🚀 Memulai training untuk {epochs} epochs")
+        self.logger.info(f"🖥️ Device: {self.device}")
+        
+        start_time = time.time()
+        best_val_loss = float('inf')
+        
+        # Training loop
+        for epoch in range(epochs):
+            epoch_start = time.time()
+            
+            # Training phase
+            model.train()
+            train_loss = 0.0
+            
+            train_progress = tqdm(dataloaders['train'], desc=f"Epoch {epoch+1}/{epochs} [Train]")
+            
+            for batch_idx, (images, targets) in enumerate(train_progress):
+                # Move to device
+                images = images.to(self.device)
+                if isinstance(targets, torch.Tensor):
+                    targets = targets.to(self.device)
+                
+                # Forward pass
+                predictions = model(images)
+                
+                # Compute loss
+                loss_dict = model.compute_loss(predictions, targets)
+                loss = loss_dict['total_loss']
+                
+                # Backward and optimize
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                
+                # Update metrics
+                train_loss += loss.item()
+                train_progress.set_postfix({'loss': loss.item()})
+            
+            # Calculate average training loss
+            avg_train_loss = train_loss / len(dataloaders['train'])
+            
+            # Validation phase
+            model.eval()
+            val_loss = 0.0
+            
+            val_progress = tqdm(dataloaders['val'], desc=f"Epoch {epoch+1}/{epochs} [Val]")
+            
+            with torch.no_grad():
+                for batch_idx, (images, targets) in enumerate(val_progress):
+                    # Move to device
+                    images = images.to(self.device)
+                    if isinstance(targets, torch.Tensor):
+                        targets = targets.to(self.device)
+                    
+                    # Forward pass
+                    predictions = model(images)
+                    
+                    # Compute loss
+                    loss_dict = model.compute_loss(predictions, targets)
+                    loss = loss_dict['total_loss']
+                    
+                    # Update metrics
+                    val_loss += loss.item()
+                    val_progress.set_postfix({'loss': loss.item()})
+            
+            # Calculate average validation loss
+            avg_val_loss = val_loss / len(dataloaders['val'])
+            
+            # Log metrics
+            self.writer.add_scalar('Loss/train', avg_train_loss, epoch)
+            self.writer.add_scalar('Loss/val', avg_val_loss, epoch)
+            
+            # Track metrics history
+            self.metrics_history['train_loss'].append(avg_train_loss)
+            self.metrics_history['val_loss'].append(avg_val_loss)
+            self.metrics_history['epochs'].append(epoch)
+            
+            # Calculate epoch time
+            epoch_time = time.time() - epoch_start
+            
+            # Log epoch results
+            self.logger.info(
+                f"⏱️ Epoch [{epoch+1}/{epochs}] - "
+                f"Train Loss: {avg_train_loss:.4f}, "
+                f"Val Loss: {avg_val_loss:.4f}, "
+                f"Time: {epoch_time:.2f}s"
+            )
+            
+            # Check if this is the best model so far
+            is_best = avg_val_loss < best_val_loss
+            if is_best:
+                best_val_loss = avg_val_loss
+                self.logger.success(f"🏆 Validasi loss terbaik: {best_val_loss:.4f}")
+            
+            # Save checkpoint
+            checkpoint_paths = self.model_manager.save_checkpoint(
+                model=model,
+                epoch=epoch,
+                loss=avg_val_loss,
+                is_best=is_best
+            )
+            
+            # Early stopping check
+            if early_stopping(avg_val_loss):
+                self.logger.warning(f"⚠️ Early stopping setelah epoch {epoch+1}")
+                break
+        
+        # Training selesai
+        training_time = time.time() - start_time
+        hours, remainder = divmod(training_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        
+        self.logger.success(
+            f"✅ Training selesai dalam "
+            f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+        )
+        
+        # Simpan kurva loss
+        self._plot_training_curves()
+        
+        # Tutup TensorBoard writer
+        self.writer.close()
+        
+        return {
+            'model': model,
+            'best_val_loss': best_val_loss,
+            'training_time': training_time,
+            'epochs_completed': len(self.metrics_history['epochs']),
+            'metrics_history': self.metrics_history
+        }
+        
+    def _plot_training_curves(self):
+        """Plot kurva loss training dan validasi"""
+        plt.figure(figsize=(10, 6))
+        plt.plot(self.metrics_history['epochs'], self.metrics_history['train_loss'], label='Training Loss', marker='o')
+        plt.plot(self.metrics_history['epochs'], self.metrics_history['val_loss'], label='Validation Loss', marker='o')
+        plt.title('Kurva Loss Training dan Validasi')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        
+        # Simpan plot
+        plot_path = self.output_dir / 'loss_curve.png'
+        plt.savefig(plot_path)
+        plt.close()
+        
+        self.logger.info(f"📊 Kurva loss disimpan di {plot_path}")
+        
+        return plot_path

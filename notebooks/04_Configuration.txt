@@ -1,0 +1,71 @@
+# ================= [KONFIGURASI] =================
+# Cell 4: Buat Konfigurasi
+def buat_konfigurasi_dasar():
+    """Buat file konfigurasi dasar dengan dua backbone"""
+    config = {
+        "data": {
+            "classes": [
+                "001", "002", "005", "010", "020", "050", "100",
+                "l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100",
+                "l3_sign", "l3_text", "l3_thread"
+            ],
+            "local": {
+                "test": "data/test",
+                "train": "data/train",
+                "valid": "data/valid"
+            },
+            "roboflow": {
+                "api_key": "",  # Akan diisi oleh input pengguna
+                "project": "rupiah-emisi-2022",
+                "version": "3",
+                "workspace": "smartcash-wo2us"
+            },
+            "source": "roboflow"  # Default: gunakan roboflow
+        },
+        "dataset": {
+            "classes": [
+                "001", "002", "005", "010", "020", "050", "100",
+                "l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100",
+                "l3_sign", "l3_text", "l3_thread"
+            ],
+            "test_path": "data/test/images",
+            "train_path": "data/train/images",
+            "valid_path": "data/valid/images"
+        },
+        "model": {
+            "backbone": "efficientnet",  # Default: EfficientNet
+            "batch_size": 16,
+            "conf_thres": 0.25,
+            "img_size": [640, 640],
+            "iou_thres": 0.45,
+            "memory_limit": 0.6,
+            "num_classes": 17,
+            "pretrained": True,
+            "workers": 4  # Sesuaikan dengan yang tersedia
+        },
+        "training": {
+            "batch_size": 16,
+            "epochs": 30,  # Default: 30 epochs
+            "early_stopping_patience": 5,
+            "learning_rate": 0.001,
+            "warmup_epochs": 3,
+            "weight_decay": 0.0005
+        },
+        "evaluation": {
+            "metrics": ["accuracy", "precision", "recall", "f1", "mAP", "inference_time"],
+            "save_visualizations": True
+        },
+        "output_dir": "runs/train",
+        "detection_mode": "single",  # Default: single layer
+        "layers": ["banknote"]  # Default: hanya deteksi banknote
+    }
+    
+    # Simpan konfigurasi
+    with open('configs/base_config.yaml', 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    
+    print("✅ Konfigurasi dasar berhasil dibuat di configs/base_config.yaml")
+    return config
+
+# Buat konfigurasi dasar
+config = buat_konfigurasi_dasar()

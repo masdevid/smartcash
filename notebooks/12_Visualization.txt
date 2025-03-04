@@ -1,0 +1,143 @@
+# ================= [VISUALISASI] =================
+# Cell 13: Visualisasi dan Pembahasan Hasil
+def visualize_results(results_path='runs/train/research_results/research_results.csv'):
+    """Visualisasi hasil penelitian"""
+    try:
+        import pandas as pd
+        results_df = pd.read_csv(results_path)
+        
+        # Jika tidak ada hasil, tampilkan pesan
+        if len(results_df) == 0:
+            print("❌ Tidak ada hasil yang ditemukan. Jalankan eksperimen terlebih dahulu.")
+            return
+        
+        # Tampilkan DataFrame hasil
+        print("📊 Hasil Penelitian:")
+        display(results_df)
+        
+        # Visualisasi perbandingan backbone
+        plt.figure(figsize=(14, 8))
+        
+        # Kelompokkan berdasarkan backbone
+        efficientnet_df = results_df[results_df['backbone'] == 'efficientnet']
+        cspdarknet_df = results_df[results_df['backbone'] == 'cspdarknet']
+        
+        # Metrik yang akan divisualisasikan
+        metrics_to_plot = ['accuracy', 'precision', 'recall', 'f1', 'mAP']
+        
+        # Siapkan X tick positions
+        x = np.arange(len(metrics_to_plot))
+        width = 0.35
+        
+        # Plot bars
+        rects1 = plt.bar(
+            x - width/2, 
+            [efficientnet_df[m].mean() for m in metrics_to_plot],
+            width,
+            label='EfficientNet-B4',
+            color='#1f77b4'
+        )
+        
+        rects2 = plt.bar(
+            x + width/2, 
+            [cspdarknet_df[m].mean() for m in metrics_to_plot],
+            width,
+            label='CSPDarknet',
+            color='#ff7f0e'
+        )
+        
+        # Tambahkan label
+        plt.xlabel('Metrik')
+        plt.ylabel('Nilai')
+        plt.title('Perbandingan Metrik Antar Backbone')
+        plt.xticks(x, metrics_to_plot)
+        plt.ylim(0, 1.1)
+        plt.legend()
+        plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        # Add values on top of bars
+        def autolabel(rects):
+            for rect in rects:
+                height = rect.get_height()
+                plt.annotate(f'{height:.3f}',
+                            xy=(rect.get_x() + rect.get_width()/2, height),
+                            xytext=(0, 3),
+                            textcoords="offset points",
+                            ha='center', va='bottom',
+                            fontweight='bold')
+        
+        autolabel(rects1)
+        autolabel(rects2)
+        
+        plt.tight_layout()
+        plt.show()
+        
+        # Plot waktu inferensi
+        plt.figure(figsize=(10, 6))
+        
+        sns.barplot(
+            x='scenario',
+            y='inference_time',
+            hue='backbone',
+            data=results_df,
+            palette=['#1f77b4', '#ff7f0e']
+        )
+        
+        plt.title('Perbandingan Waktu Inferensi Antar Skenario')
+        plt.ylabel('Waktu Inferensi (s)')
+        plt.xticks(rotation=45)
+        plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        plt.show()
+        
+        # Tampilkan peningkatan performa EfficientNet vs CSPDarknet
+        eff_acc = efficientnet_df['accuracy'].mean()
+        csp_acc = cspdarknet_df['accuracy'].mean()
+        acc_improvement = ((eff_acc - csp_acc) / csp_acc) * 100
+        
+        eff_f1 = efficientnet_df['f1'].mean()
+        csp_f1 = cspdarknet_df['f1'].mean()
+        f1_improvement = ((eff_f1 - csp_f1) / csp_f1) * 100
+        
+        eff_map = efficientnet_df['mAP'].mean()
+        csp_map = cspdarknet_df['mAP'].mean()
+        map_improvement = ((eff_map - csp_map) / csp_map) * 100
+        
+        eff_time = efficientnet_df['inference_time'].mean()
+        csp_time = cspdarknet_df['inference_time'].mean()
+        time_diff = ((eff_time - csp_time) / csp_time) * 100
+        
+        print("\n📈 Analisis Peningkatan Performa:")
+        print(f"Akurasi: {'⬆️' if acc_improvement > 0 else '⬇️'} {abs(acc_improvement):.2f}%")
+        print(f"F1-Score: {'⬆️' if f1_improvement > 0 else '⬇️'} {abs(f1_improvement):.2f}%")
+        print(f"mAP: {'⬆️' if map_improvement > 0 else '⬇️'} {abs(map_improvement):.2f}%")
+        print(f"Waktu Inferensi: {'⬆️' if time_diff > 0 else '⬇️'} {abs(time_diff):.2f}% ({'lebih lambat' if time_diff > 0 else 'lebih cepat'})")
+        
+        # Kesimpulan
+        print("\n🔍 Kesimpulan:")
+        if eff_map > csp_map:
+            print("✅ EfficientNet-B4 memberikan performa deteksi yang lebih baik dibandingkan CSPDarknet.")
+        else:
+            print("✅ CSPDarknet memberikan performa deteksi yang lebih baik dibandingkan EfficientNet-B4.")
+            
+        if eff_time < csp_time:
+            print("✅ EfficientNet-B4 memiliki waktu inferensi yang lebih cepat daripada CSPDarknet.")
+        else:
+            print("✅ CSPDarknet memiliki waktu inferensi yang lebih cepat daripada EfficientNet-B4.")
+            
+    except Exception as e:
+        print(f"❌ Terjadi kesalahan saat memvisualisasikan hasil: {str(e)}")
+
+# Button untuk visualisasi hasil
+visualize_button = widgets.Button(
+    description='Visualisasi Hasil',
+    button_style='info',
+    icon='chart-line'
+)
+
+def on_visualize_button_clicked(b):
+    """Callback untuk visualisasi hasil"""
+    visualize_results()
+
+visualize_button.on_click(on_visualize_button_clicked)
+display(visualize_button)

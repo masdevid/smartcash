@@ -109,8 +109,7 @@ temp/
 .cache/checkpoint_metadata.json
 
 # Specific Project Directories
-experiments/
-!models/experiments/*
+
 
 pretrained/
 

@@ -1,0 +1,214 @@
+# ================= [EVALUATION] =================
+# Cell 10: Evaluasi Model
+from smartcash.smartcash.utils.metrics import MetricsCalculator
+from sklearn.metrics import confusion_matrix, classification_report
+import seaborn as sns
+
+class ModelEvaluator:
+    """Evaluator untuk model SmartCash"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.logger = SmartCashLogger("model_evaluator")
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Inisialisasi metrik
+        self.metrics_calculator = MetricsCalculator()
+        
+        # Setup direktori output
+        self.output_dir = Path(config.get('output_dir', 'runs/train'))
+        self.results_dir = self.output_dir / 'results'
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+        
+    def evaluate(self, model, dataloader):
+        """Evaluasi model pada dataloader"""
+        model.eval()
+        self.metrics_calculator.reset()
+        
+        # Tracking untuk confusion matrix
+        all_predictions = []
+        all_targets = []
+        
+        # Tracking untuk waktu inferensi
+        inference_times = []
+        
+        self.logger.info(f"🔍 Evaluasi model...")
+        
+        with torch.no_grad():
+            for batch_idx, (images, targets) in enumerate(tqdm(dataloader, desc="Evaluasi")):
+                # Move to device
+                images = images.to(self.device)
+                if isinstance(targets, torch.Tensor):
+                    targets = targets.to(self.device)
+                
+                # Measure inference time
+                start_time = time.time()
+                predictions = model(images)
+                inference_time = time.time() - start_time
+                
+                # Record inference time per image
+                inference_times.append(inference_time / images.size(0))
+                
+                # Update metrics
+                #self.metrics_calculator.update(predictions, targets)
+                
+                # Store predictions and targets for confusion matrix
+                if isinstance(predictions, dict):
+                    # Multi-layer: ambil layer pertama saja (banknote)
+                    layer_name = list(predictions.keys())[0]
+                    layer_preds = predictions[layer_name][0]
+                    pred_classes = layer_preds.max(dim=-1)[1].cpu().numpy()
+                else:
+                    # Single layer
+                    pred_classes = torch.argmax(predictions, dim=1).cpu().numpy()
+                
+                if isinstance(targets, torch.Tensor):
+                    target_classes = targets.cpu().numpy()
+                else:
+                    # Jika target adalah dictionary, ambil layer yang sama
+                    target_classes = targets[layer_name].cpu().numpy() if layer_name in targets else []
+                
+                all_predictions.extend(pred_classes)
+                all_targets.extend(target_classes)
+        
+        # Calculate average inference time
+        avg_inference_time = np.mean(inference_times)
+        
+        # Calculate metrics
+        metrics = {}  #self.metrics_calculator.compute()
+        metrics['inference_time'] = avg_inference_time
+        
+        # Hitung confusion matrix
+        try:
+            cm = confusion_matrix(all_targets, all_predictions)
+            metrics['confusion_matrix'] = cm
+        except Exception as e:
+            self.logger.warning(f"⚠️ Tidak dapat membuat confusion matrix: {str(e)}")
+        
+        # Hitung accuracy, precision, recall, f1-score
+        try:
+            report = classification_report(
+                all_targets, all_predictions, 
+                output_dict=True,
+                zero_division=0
+            )
+            
+            metrics['accuracy'] = report.get('accuracy', 0)
+            metrics['precision'] = np.mean([v['precision'] for k, v in report.items() 
+                                           if isinstance(v, dict)])
+            metrics['recall'] = np.mean([v['recall'] for k, v in report.items() 
+                                        if isinstance(v, dict)])
+            metrics['f1'] = np.mean([v['f1-score'] for k, v in report.items() 
+                                    if isinstance(v, dict)])
+            metrics['classification_report'] = report
+        except Exception as e:
+            self.logger.warning(f"⚠️ Tidak dapat membuat classification report: {str(e)}")
+            # Set default values
+            metrics['accuracy'] = 0
+            metrics['precision'] = 0
+            metrics['recall'] = 0
+            metrics['f1'] = 0
+        
+        # Tambahkan mAP (mean Average Precision) - simplified
+        metrics['mAP'] = (metrics['precision'] + metrics['recall']) / 2
+        
+        return metrics
+    
+    def plot_confusion_matrix(self, confusion_matrix, class_names=None):
+        """Plot confusion matrix"""
+        if class_names is None:
+            # Default ke 7 kelas mata uang
+            class_names = ['1k', '2k', '5k', '10k', '20k', '50k', '100k']
+        
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            confusion_matrix,
+            annot=True,
+            fmt='d',
+            cmap='Blues',
+            xticklabels=class_names,
+            yticklabels=class_names
+        )
+        plt.title('Confusion Matrix')
+        plt.ylabel('Label Sebenarnya')
+        plt.xlabel('Label Prediksi')
+        
+        # Simpan plot
+        plot_path = self.results_dir / 'confusion_matrix.png'
+        plt.savefig(plot_path)
+        plt.close()
+        
+        self.logger.info(f"📊 Confusion matrix disimpan di {plot_path}")
+        return plot_path
+    
+    def plot_metrics(self, metrics_dict):
+        """Plot metrik evaluasi"""
+        # Filter metric yang akan diplot
+        plot_metrics = {
+            'accuracy': metrics_dict.get('accuracy', 0),
+            'precision': metrics_dict.get('precision', 0),
+            'recall': metrics_dict.get('recall', 0),
+            'f1': metrics_dict.get('f1', 0),
+            'mAP': metrics_dict.get('mAP', 0)
+        }
+        
+        plt.figure(figsize=(10, 6))
+        bars = plt.bar(
+            plot_metrics.keys(),
+            plot_metrics.values(),
+            color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd']
+        )
+        
+        # Tambahkan label
+        for bar in bars:
+            height = bar.get_height()
+            plt.text(
+                bar.get_x() + bar.get_width()/2.,
+                height,
+                f'{height:.3f}',
+                ha='center',
+                va='bottom',
+                fontweight='bold'
+            )
+        
+        plt.title('Metrik Evaluasi Model')
+        plt.ylabel('Nilai')
+        plt.ylim(0, 1.1)
+        plt.grid(True, axis='y', linestyle='--', alpha=0.7)
+        
+        # Simpan plot
+        plot_path = self.results_dir / 'metrics.png'
+        plt.savefig(plot_path)
+        plt.close()
+        
+        self.logger.info(f"📊 Metrik evaluasi disimpan di {plot_path}")
+        return plot_path
+    
+    def load_best_model(self, model_manager, backbone_type=None):
+        """Load model terbaik dari checkpoint"""
+        backbone = backbone_type or self.config.get('model', {}).get('backbone', 'efficientnet')
+        
+        # Buat model baru dengan arsitektur yang sama
+        model = model_manager.create_model(backbone)
+        
+        # Cari checkpoint terbaik
+        checkpoint_dir = Path(self.config.get('output_dir', 'runs/train')) / 'weights'
+        checkpoint_files = list(checkpoint_dir.glob(f"*_best.pth"))
+        
+        if not checkpoint_files:
+            self.logger.warning(f"⚠️ Tidak ditemukan checkpoint terbaik di {checkpoint_dir}")
+            return model
+        
+        # Ambil checkpoint terbaru
+        checkpoint_path = max(checkpoint_files, key=lambda x: x.stat().st_mtime)
+        self.logger.info(f"📂 Memuat model terbaik dari {checkpoint_path}")
+        
+        try:
+            # Load checkpoint
+            checkpoint = torch.load(checkpoint_path, map_location=self.device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            self.logger.success(f"✅ Berhasil memuat model dari epoch {checkpoint.get('epoch', 'unknown')}")
+            return model
+        except Exception as e:
+            self.logger.error(f"❌ Gagal memuat checkpoint: {str(e)}")
+            return model

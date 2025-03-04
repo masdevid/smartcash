@@ -1,235 +1,24 @@
-# Cell: Download Dataset Dengan Roboflow API
-# Fungsi download yang disederhanakan menggunakan Roboflow API dan bersih-bersih otomatis
-
+# Cell 6: Download Dataset Menggunakan API Roboflow (Versi Ringkas)
 import os
 import yaml
-import shutil
-from pathlib import Path
-from tqdm.notebook import tqdm
 import ipywidgets as widgets
 from IPython.display import display
 
-def download_dataset_with_roboflow_api(config):
-    """
-    Download dataset dari Roboflow menggunakan API resmi
-    
-    Args:
-        config: Konfigurasi dengan kredensial Roboflow
-        
-    Returns:
-        Path ke direktori dataset yang diunduh atau None jika gagal
-    """
-    if config['data']['source'] != 'roboflow':
-        print("⚠️ Konfigurasi data_source bukan 'roboflow', mengabaikan...")
-        return None
-    
-    # Ambil kredensial dan info dari config
-    workspace = config['data']['roboflow'].get('workspace', 'smartcash-wo2us')
-    project = config['data']['roboflow'].get('project', 'rupiah-emisi-2022')
-    version = config['data']['roboflow'].get('version', '3')
-    api_key = config['data']['roboflow'].get('api_key') or os.environ.get("ROBOFLOW_API_KEY")
-    
-    if not api_key:
-        print("❌ Roboflow API key tidak ditemukan. Mohon isi API key di konfigurasi.")
-        return None
-    
-    print(f"🔄 Menyiapkan download dari Roboflow...")
-    print(f"   • Workspace: {workspace}")
-    print(f"   • Project: {project}")
-    print(f"   • Version: {version}")
-    
-    # Cek direktori lokal
-    data_dir = Path('data')
-    
-    # Cek apakah data sudah ada
-    train_images_dir = data_dir / 'train' / 'images'
-    valid_images_dir = data_dir / 'valid' / 'images'
-    test_images_dir = data_dir / 'test' / 'images'
-    
-    if train_images_dir.exists() and valid_images_dir.exists() and test_images_dir.exists():
-        # Hitung jumlah file dalam setiap direktori
-        train_count = len(list(train_images_dir.glob('*.*')))
-        valid_count = len(list(valid_images_dir.glob('*.*')))
-        test_count = len(list(test_images_dir.glob('*.*')))
-        
-        total_files = train_count + valid_count + test_count
-        
-        if total_files > 0:
-            print(f"✅ Dataset sudah tersedia di direktori data lokal dengan {total_files} file.")
-            print(f"   Train: {train_count}, Valid: {valid_count}, Test: {test_count} gambar")
-            return None
-    
-    # Jika sampai sini, berarti data belum ada atau tidak lengkap
-    
-    # Download dataset menggunakan Roboflow API
-    try:
-        from roboflow import Roboflow
-        
-        print(f"🔌 Menghubungkan ke Roboflow API...")
-        rf = Roboflow(api_key=api_key)
-        
-        try:
-            workspace_obj = rf.workspace(workspace)
-            project_obj = workspace_obj.project(project)
-            version_obj = project_obj.version(version)
-        except Exception as e:
-            print(f"❌ Gagal mengakses project: {str(e)}")
-            print(f"   Pastikan workspace, project, dan version sudah benar.")
-            return None
-        
-        print(f"📥 Mengunduh dataset melalui API Roboflow...")
-        dataset = version_obj.download("yolov5")
-        
-        # Validasi hasil download
-        dataset_location = Path(dataset.location)
-        if not dataset_location.exists():
-            print(f"❌ Direktori dataset tidak ditemukan setelah download")
-            return None
-            
-        # Validasi ukuran dataset
-        dataset_size = sum(f.stat().st_size for f in dataset_location.glob('**/*') if f.is_file())
-        if dataset_size < 10000:  # Kurang dari 10KB
-            print(f"❌ Dataset yang diunduh terlalu kecil: {dataset_size} bytes")
-            return None
-            
-        # Validasi isi dataset
-        train_images = list((dataset_location / 'train' / 'images').glob('*.*'))
-        if not train_images:
-            print(f"❌ Tidak ada gambar training yang ditemukan dalam dataset")
-            return None
-            
-        print(f"✅ Dataset berhasil diunduh ke {dataset_location}")
-        print(f"   Ukuran: {dataset_size/1024/1024:.2f} MB")
-        
-        # Pindahkan ke lokasi data yang sesuai
-        transfer_dataset_to_data_dir(dataset_location, data_dir)
-        
-        return data_dir
-        
-    except Exception as e:
-        print(f"❌ Gagal mengunduh dataset: {str(e)}")
-        return None
-
-def transfer_dataset_to_data_dir(source_dir, target_dir):
-    """
-    Pindahkan dataset dari lokasi sementara ke direktori data
-    
-    Args:
-        source_dir: Direktori sumber (hasil download)
-        target_dir: Direktori tujuan (data/)
-    
-    Returns:
-        bool: True jika berhasil, False jika gagal
-    """
-    source_path = Path(source_dir)
-    target_path = Path(target_dir)
-    
-    # Validasi direktori sumber
-    if not source_path.exists():
-        print(f"❌ Direktori sumber {source_path} tidak ditemukan")
-        return False
-        
-    # Validasi struktur dataset
-    valid_structure = True
-    for split in ['train', 'valid', 'test']:
-        if not (source_path / split / 'images').exists():
-            print(f"⚠️ Direktori {split}/images tidak ditemukan di sumber")
-            valid_structure = False
-    
-    if not valid_structure:
-        print("❌ Struktur dataset tidak valid, membatalkan pemindahan")
-        return False
-    
-    print(f"🔄 Memindahkan dataset dari {source_path} ke {target_path}...")
-    
-    try:
-        # Pastikan direktori tujuan ada
-        for split in ['train', 'valid', 'test']:
-            (target_path / split / 'images').mkdir(parents=True, exist_ok=True)
-            (target_path / split / 'labels').mkdir(parents=True, exist_ok=True)
-        
-        # Counter untuk file yang dipindahkan
-        files_moved = 0
-        
-        # Untuk setiap split dataset
-        for split in ['train', 'valid', 'test']:
-            split_source = source_path / split
-            
-            if not split_source.exists():
-                print(f"⚠️ Direktori {split} tidak ditemukan di {source_path}")
-                continue
-                
-            print(f"\n✨ Memproses {split}...")
-            
-            # Pindahkan gambar
-            images_source = split_source / 'images'
-            images_target = target_path / split / 'images'
-            
-            if images_source.exists():
-                image_files = list(images_source.glob('*.*'))
-                
-                for img_file in tqdm(image_files, desc=f"Gambar {split}"):
-                    target_file = images_target / img_file.name
-                    if not target_file.exists():
-                        shutil.copy2(img_file, target_file)
-                        files_moved += 1
-            
-            # Pindahkan label
-            labels_source = split_source / 'labels'
-            labels_target = target_path / split / 'labels'
-            
-            if labels_source.exists():
-                label_files = list(labels_source.glob('*.*'))
-                
-                for lbl_file in tqdm(label_files, desc=f"Label {split}"):
-                    target_file = labels_target / lbl_file.name
-                    if not target_file.exists():
-                        shutil.copy2(lbl_file, target_file)
-                        files_moved += 1
-        
-        # Verifikasi pemindahan
-        if files_moved == 0:
-            print("⚠️ Tidak ada file yang dipindahkan, mungkin dataset kosong")
-            return False
-        
-        # Bersihkan direktori sumber setelah pemindahan selesai
-        try:
-            print(f"🧹 Membersihkan direktori sumber {source_path}...")
-            shutil.rmtree(source_path)
-            print(f"✅ Pembersihan selesai")
-        except Exception as e:
-            print(f"⚠️ Tidak dapat membersihkan direktori sumber: {str(e)}")
-        
-        print(f"\n✅ Total {files_moved} file dipindahkan ke {target_path}")
-        
-        # Update konfigurasi untuk menggunakan data lokal
-        try:
-            config_path = 'configs/experiment_config.yaml'
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config = yaml.safe_load(f)
-                
-                # Ubah sumber data ke lokal
-                config['data']['source'] = 'local'
-                
-                with open(config_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
-                
-                print("✅ Konfigurasi diperbarui: data_source = local")
-        except Exception as e:
-            print(f"⚠️ Gagal update konfigurasi: {str(e)}")
-        
-        return True
-    
-    except Exception as e:
-        print(f"❌ Gagal memindahkan dataset: {str(e)}")
-        return False
+# Import RoboflowDownloader dari modul utils
+from smartcash.smartcash.utils.roboflow_downloader import download_dataset_from_roboflow
 
 # Tombol download dataset
 download_button = widgets.Button(
     description='Download Dataset',
     button_style='info',
     icon='download'
+)
+
+# Tambahkan checkbox untuk force download
+force_download_checkbox = widgets.Checkbox(
+    value=False,
+    description='Paksa download ulang',
+    disabled=False
 )
 
 def on_download_button_clicked(b):
@@ -256,85 +45,25 @@ def on_download_button_clicked(b):
             download_button.description = "Download Dataset"
             return
             
-        # Cek dataset yang ada
-        data_dir = Path('data')
-        train_images_dir = data_dir / 'train' / 'images'
-        valid_images_dir = data_dir / 'valid' / 'images'
-        test_images_dir = data_dir / 'test' / 'images'
+        # Jalankan proses download menggunakan fungsi dari modul
+        force = force_download_checkbox.value
+        results = download_dataset_from_roboflow(config, force=force)
         
-        dataset_exists = False
-        
-        if train_images_dir.exists() and valid_images_dir.exists() and test_images_dir.exists():
-            # Hitung jumlah file dalam setiap direktori
-            train_count = len(list(train_images_dir.glob('*.*')))
-            valid_count = len(list(valid_images_dir.glob('*.*')))
-            test_count = len(list(test_images_dir.glob('*.*')))
-            
-            total_files = train_count + valid_count + test_count
-            
-            if total_files > 0:
-                dataset_exists = True
-                print(f"🔍 Dataset yang ada: {total_files} file total")
-                print(f"   Train: {train_count}, Valid: {valid_count}, Test: {test_count} gambar")
-                
-                # Tanyakan konfirmasi untuk menghapus data yang ada
-                user_response = input("⚠️ Dataset sudah ada. Hapus dan download ulang? [y/n]: ")
-                if user_response.lower() != 'y':
-                    print("❌ Download dibatalkan oleh pengguna.")
-                    download_button.disabled = False
-                    download_button.description = "Download Dataset"
-                    return
-                
-                # Bersihkan data yang ada
-                print("🧹 Membersihkan dataset yang ada...")
-                for split in ['train', 'valid', 'test']:
-                    for subdir in ['images', 'labels']:
-                        dir_path = data_dir / split / subdir
-                        if dir_path.exists():
-                            # Hapus semua file dalam direktori
-                            for file in dir_path.glob('*.*'):
-                                try:
-                                    file.unlink()
-                                except Exception as e:
-                                    print(f"⚠️ Gagal menghapus {file}: {str(e)}")
-                
-                print("✅ Pembersihan selesai.")
-        
-        # Jalankan proses download
-        print("📥 Mengunduh dataset baru...")
-        dataset_location = download_dataset_with_roboflow_api(config)
-        
-        if dataset_location:
-            print(f"\n✅ Dataset siap di: {dataset_location}")
-            
-            # Tampilkan informasi tentang jumlah data
-            total_images = 0
-            for split in ['train', 'valid', 'test']:
-                images_dir = dataset_location / split / 'images'
-                if images_dir.exists():
-                    img_count = len(list(images_dir.glob('*.*')))
-                    total_images += img_count
-                    print(f"📊 {split.capitalize()}: {img_count} gambar")
-            
-            print(f"📦 Total gambar: {total_images}")
-            
-            # Cek file zip yang mungkin tersisa dan bersihkan
-            for zip_file in Path('.').glob('*.zip'):
-                print(f"🧹 Membersihkan file zip: {zip_file}")
-                try:
-                    zip_file.unlink()
-                except Exception as e:
-                    print(f"⚠️ Gagal menghapus file zip {zip_file}: {str(e)}")
+        if results['success']:
+            # Tampilkan statistik akhir jika sukses
+            stats = results['stats'].get('final', results['stats'].get('existing', {}))
             
             # Update tombol untuk menunjukkan selesai
             download_button.button_style = "success"
             download_button.description = "Download Selesai"
             download_button.icon = "check"
         else:
-            print("\n⚠️ Gagal mengunduh dataset")
+            print("\n⚠️ Proses download tidak berhasil diselesaikan")
             # Reset tombol
             download_button.disabled = False
             download_button.description = "Download Dataset"
+            download_button.button_style = "danger"
+            
     except Exception as e:
         print(f"❌ Error saat proses download: {str(e)}")
         # Reset tombol
@@ -343,4 +72,8 @@ def on_download_button_clicked(b):
         download_button.button_style = "danger"
 
 download_button.on_click(on_download_button_clicked)
-display(download_button)
+
+# Tampilkan widgets dalam layout vertical
+display(widgets.VBox([force_download_checkbox, download_button]))
+
+print("💡 Tip: Centang 'Paksa download ulang' jika ingin mengunduh dataset baru meskipun sudah ada yang tersedia.")

@@ -246,9 +246,7 @@ def on_save_config_button_clicked(b):
     
     with open('configs/experiment_config.yaml', 'r') as f:
         config = yaml.safe_load(f)
-
-def on_reload_config_button_clicked(b):
-    """Callback untuk memuat ulang konfigurasi dari file"""
+def reload_config():
     loaded_config = load_config()
     if loaded_config:
         update_ui_from_config(loaded_config)
@@ -258,10 +256,14 @@ def on_reload_config_button_clicked(b):
         config = loaded_config
     else:
         print("⚠️ Tidak dapat memuat konfigurasi dari file")
+def on_reload_config_button_clicked(b):
+    """Callback untuk memuat ulang konfigurasi dari file"""
+    reload_config()
+    
 
 save_config_button.on_click(on_save_config_button_clicked)
 reload_config_button.on_click(on_reload_config_button_clicked)
-
+reload_config()
 # Display buttons side by side in a HBox
 button_box = widgets.HBox([save_config_button, reload_config_button])
 display(button_box)

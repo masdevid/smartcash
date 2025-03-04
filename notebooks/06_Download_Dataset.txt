@@ -1,11 +1,13 @@
-# Cell 6: Download Dataset Menggunakan API Roboflow (Versi Ringkas)
+# Cell: Download Dataset Menggunakan API Roboflow (Versi Ringkas)
 import os
 import yaml
+import shutil
+from pathlib import Path
 import ipywidgets as widgets
 from IPython.display import display
 
 # Import RoboflowDownloader dari modul utils
-from smartcash.smartcash.utils.roboflow_downloader import download_dataset_from_roboflow
+from smartcash.smartcash.utils.roboflow_downloader import download_dataset_from_roboflow, RoboflowDownloader
 
 # Tombol download dataset
 download_button = widgets.Button(
@@ -19,6 +21,13 @@ force_download_checkbox = widgets.Checkbox(
     value=False,
     description='Paksa download ulang',
     disabled=False
+)
+
+# Tombol untuk membersihkan file sementara
+cleanup_button = widgets.Button(
+    description='Bersihkan File Sementara',
+    button_style='warning',
+    icon='trash'
 )
 
 def on_download_button_clicked(b):
@@ -70,10 +79,82 @@ def on_download_button_clicked(b):
         download_button.disabled = False
         download_button.description = "Download Dataset"
         download_button.button_style = "danger"
+    finally:
+        # Re-enable tombol setelah selesai
+        download_button.disabled = False
 
+def on_cleanup_button_clicked(b):
+    """Callback untuk membersihkan file sementara"""
+    cleanup_button.disabled = True
+    cleanup_button.description = "Sedang Membersihkan..."
+    
+    try:
+        # Bersihkan file zip
+        print("🧹 Mencari dan membersihkan file zip...")
+        zip_found = False
+        for zip_file in Path('.').glob('*.zip'):
+            zip_found = True
+            print(f"  → Menghapus file zip: {zip_file}")
+            try:
+                zip_file.unlink()
+            except Exception as e:
+                print(f"⚠️ Gagal menghapus file zip {zip_file}: {str(e)}")
+        
+        if not zip_found:
+            print("✅ Tidak ditemukan file zip.")
+        
+        # Bersihkan direktori sementara hasil ekstraksi
+        print("🧹 Mencari direktori hasil ekstraksi...")
+        temp_found = False
+        temp_dirs = [d for d in Path('.').glob('*') 
+                    if d.is_dir() and (
+                        d.name.startswith('rupiah') or 
+                        d.name.endswith('-yolov5') or
+                        d.name.endswith('_sample')
+                    )]
+        
+        for temp_dir in temp_dirs:
+            temp_found = True
+            print(f"  → Menghapus direktori sementara: {temp_dir}")
+            try:
+                shutil.rmtree(temp_dir)
+            except Exception as e:
+                print(f"⚠️ Gagal menghapus direktori {temp_dir}: {str(e)}")
+        
+        if not temp_found:
+            print("✅ Tidak ditemukan direktori sementara.")
+            
+        # Buat instance RoboflowDownloader untuk membersihkan cache
+        try:
+            config_path = 'configs/experiment_config.yaml'
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    downloader = RoboflowDownloader(config)
+                    downloader.clean_temp_files()
+            else:
+                print("ℹ️ File konfigurasi tidak ditemukan untuk pembersihan tambahan")
+        except Exception as e:
+            print(f"⚠️ Gagal melakukan pembersihan tambahan: {str(e)}")
+        
+        print("✨ Pembersihan selesai!")
+        
+    except Exception as e:
+        print(f"❌ Error saat membersihkan: {str(e)}")
+    finally:
+        # Reset tombol
+        cleanup_button.disabled = False
+        cleanup_button.description = "Bersihkan File Sementara"
+
+# Set event handlers
 download_button.on_click(on_download_button_clicked)
+cleanup_button.on_click(on_cleanup_button_clicked)
 
 # Tampilkan widgets dalam layout vertical
-display(widgets.VBox([force_download_checkbox, download_button]))
+display(widgets.VBox([
+    force_download_checkbox, 
+    widgets.HBox([download_button, cleanup_button])
+]))
 
 print("💡 Tip: Centang 'Paksa download ulang' jika ingin mengunduh dataset baru meskipun sudah ada yang tersedia.")
+print("🧹 Tip: Gunakan tombol 'Bersihkan File Sementara' untuk menghapus file zip dan direktori hasil ekstraksi yang tidak diperlukan.")

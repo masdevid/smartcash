@@ -1,15 +1,39 @@
 # Cell 5: Konfigurasi Parameter Utama
 # Widget input untuk konfigurasi
 from ipywidgets import widgets
-from IPython.display import display
+from IPython.display import display, HTML
 from google.colab import userdata
+import os
 
-# API Key
-api_key_input = widgets.Text(
-    value=userdata.get('ROBOFLOW_API_KEY'), 
-    description='Roboflow API Key:',
-    layout=widgets.Layout(width='500px'),
-    style={'description_width': 'initial'}
+# Cek apakah API key sudah tersedia di secret
+api_key_exists = userdata.get('ROBOFLOW_API_KEY') is not None
+
+# Tampilkan status dan tips untuk API key
+api_key_status = widgets.HTML(
+    value=f"""
+    <div style="padding: 10px; border-radius: 5px; margin-bottom: 10px; font-family: monospace;">
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <span style="font-weight: bold; margin-right: 10px;">Roboflow API Key:</span>
+            <span style="background-color: {'#d4edda' if api_key_exists else '#f8d7da'}; 
+                   color: {'#155724' if api_key_exists else '#721c24'}; 
+                   padding: 2px 8px; border-radius: 3px;">
+                {'✅ Terdeteksi' if api_key_exists else '❌ Tidak ditemukan'}
+            </span>
+        </div>
+        <div style="font-size: 0.9em; color: #6c757d;">
+            <strong>Tips:</strong> Simpan API key di Google Colab Secret dengan nama <code>ROBOFLOW_API_KEY</code><br>
+            <ol>
+                <li>Klik ikon 🔑 di sidebar sebelah kiri</li>
+                <li>Klik "+ Add new secret"</li>
+                <li>Masukkan <code>ROBOFLOW_API_KEY</code> sebagai nama</li>
+                <li>Masukkan API key dari akun Roboflow Anda</li>
+                <li>Klik "Save"</li>
+                <li>Restart runtime untuk menerapkan perubahan</li>
+            </ol>
+        </div>
+    </div>
+    """,
+    layout=widgets.Layout(width='100%')
 )
 
 # Backbone Selection
@@ -81,8 +105,9 @@ project_input = widgets.Text(
     style={'description_width': 'initial'}
 )
 
+# Version sebagai IntSlider
 version_input = widgets.IntSlider(
-    value=1,
+    value=3,
     min=1,
     max=100,
     step=1,
@@ -92,10 +117,10 @@ version_input = widgets.IntSlider(
 
 # Group displays for better layout
 params_box = widgets.VBox([
+    api_key_status,
     widgets.HBox([backbone_dropdown, data_source_radio]),
     widgets.HBox([batch_size_slider, epochs_slider]),
     widgets.HBox([lr_dropdown, detection_mode_radio]),
-    api_key_input,
     workspace_input,
     project_input,
     version_input
@@ -161,11 +186,6 @@ def update_ui_from_config(config):
     if detection_mode and detection_mode in ['single', 'multi']:
         detection_mode_radio.value = detection_mode
     
-    # Update API key
-    api_key = config.get('data', {}).get('roboflow', {}).get('api_key')
-    if api_key:
-        api_key_input.value = api_key
-    
     # Update workspace
     workspace = config.get('data', {}).get('roboflow', {}).get('workspace')
     if workspace:
@@ -176,9 +196,15 @@ def update_ui_from_config(config):
     if project:
         project_input.value = project
     
-    # Update version
+    # Pastikan version diubah menjadi integer
     version = config.get('data', {}).get('roboflow', {}).get('version')
-    if version and isinstance(version, int):
+    if version is not None:
+        # Konversi ke integer jika string
+        if isinstance(version, str):
+            try:
+                version = int(version)
+            except ValueError:
+                version = 3  # Default value jika konversi gagal
         version_input.value = version
     
     print("✅ Konfigurasi berhasil dimuat ke antarmuka")
@@ -207,10 +233,13 @@ def on_save_config_button_clicked(b):
     config.setdefault('training', {})
 
     """Callback untuk menyimpan konfigurasi"""
-    config['data']['roboflow']['api_key'] = api_key_input.value
+    # Ambil API key dari Google Colab secret
+    api_key = userdata.get('ROBOFLOW_API_KEY', '')
+    config['data']['roboflow']['api_key'] = api_key
+    
     config['data']['roboflow']['workspace'] = workspace_input.value
     config['data']['roboflow']['project'] = project_input.value
-    config['data']['roboflow']['version'] = version_input.value
+    config['data']['roboflow']['version'] = int(version_input.value)
     config['model']['backbone'] = backbone_dropdown.value
     config['model']['batch_size'] = batch_size_slider.value
     config['training']['batch_size'] = batch_size_slider.value
@@ -230,8 +259,8 @@ def on_save_config_button_clicked(b):
         yaml.dump(config, f, default_flow_style=False)
     
     # Set environment variable untuk Roboflow API
-    if api_key_input.value:
-        os.environ["ROBOFLOW_API_KEY"] = api_key_input.value
+    if api_key:
+        os.environ["ROBOFLOW_API_KEY"] = api_key
     
     print(f"✅ Konfigurasi berhasil disimpan di configs/experiment_config.yaml")
     print(f"📄 Mode deteksi: {detection_mode_radio.value}")
@@ -243,9 +272,11 @@ def on_save_config_button_clicked(b):
     print(f"🏢 Workspace: {workspace_input.value}")
     print(f"📂 Project: {project_input.value}")
     print(f"🔢 Version: {version_input.value}")
+    print(f"🔑 API Key: {'✅ Terdeteksi' if api_key else '❌ Tidak ditemukan'}")
     
     with open('configs/experiment_config.yaml', 'r') as f:
         config = yaml.safe_load(f)
+
 def reload_config():
     loaded_config = load_config()
     if loaded_config:
@@ -256,6 +287,7 @@ def reload_config():
         config = loaded_config
     else:
         print("⚠️ Tidak dapat memuat konfigurasi dari file")
+
 def on_reload_config_button_clicked(b):
     """Callback untuk memuat ulang konfigurasi dari file"""
     reload_config()

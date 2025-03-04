@@ -1,0 +1,355 @@
+# ================= [DATA HANDLING] =================
+# Cell 7: Setup Data Pipeline dengan Preprocessing dan Augmentasi
+import ipywidgets as widgets
+from IPython.display import display, HTML, clear_output
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+from pathlib import Path
+
+# Import modul yang diperlukan
+from smartcash.handlers.data_handler import DataHandler
+from smartcash.utils.dataset_augmentation_utils import DatasetProcessor
+from smartcash.handlers.advanced_data_manager import AdvancedDataManager
+from smartcash.utils.logger import SmartCashLogger
+
+# Set logger
+logger = SmartCashLogger("data_pipeline")
+
+# Fungsi untuk memuat config
+def load_experiment_config():
+    """Muat konfigurasi eksperimen dari file"""
+    config_path = 'configs/experiment_config.yaml'
+    try:
+        with open(config_path, 'r') as f:
+            import yaml
+            return yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
+        # Gunakan file config dasar jika eksperimen config tidak tersedia
+        try:
+            with open('configs/base_config.yaml', 'r') as f:
+                import yaml
+                return yaml.safe_load(f)
+        except:
+            return {}
+
+# Inisialisasi data manager dengan config
+config = load_experiment_config()
+data_manager = AdvancedDataManager(config, logger)
+
+# Setup tampilan tabs untuk navigasi
+tabs = widgets.Tab()
+tab_data_info = widgets.VBox()
+tab_augmentation = widgets.VBox()
+tab_split_dataset = widgets.VBox()
+
+tabs.children = [tab_data_info, tab_augmentation, tab_split_dataset]
+tabs.set_title(0, "Informasi Dataset")
+tabs.set_title(1, "Augmentasi Data")
+tabs.set_title(2, "Split Dataset")
+
+# ===== TAB 1: INFORMASI DATASET =====
+def get_dataset_info():
+    """Ambil dan tampilkan informasi dataset"""
+    stats_df = data_manager.get_dataset_stats()
+    
+    # Tampilkan statistik dalam bentuk tabel
+    display(HTML("<h3>📊 Statistik Dataset</h3>"))
+    display(stats_df.style.format({'images': '{:,}', 'labels': '{:,}', 
+                                  'augmented': '{:,}', 'original': '{:,}'})
+                     .highlight_max(axis=0, color='lightgreen', subset=['images', 'labels']))
+    
+    # Plot distribusi data
+    plt.figure(figsize=(10, 5))
+    splits = stats_df['Split'][:-1]  # Exclude Total row
+    
+    # Siapkan data untuk plotting
+    original = stats_df['original'][:-1].values
+    augmented = stats_df['augmented'][:-1].values
+    
+    # Create stacked bar
+    bar_width = 0.6
+    plt.bar(splits, original, bar_width, label='Original', color='#1f77b4')
+    plt.bar(splits, augmented, bar_width, bottom=original, label='Augmented', color='#ff7f0e')
+    
+    # Add total labels on top
+    for i, split in enumerate(splits):
+        total = original[i] + augmented[i]
+        plt.text(i, total + 5, f'Total: {total}', ha='center', va='bottom', fontweight='bold')
+    
+    plt.title('Distribusi Dataset per Split')
+    plt.ylabel('Jumlah Gambar')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+# Tombol refresh informasi dataset
+refresh_info_button = widgets.Button(
+    description='Refresh Info Dataset',
+    button_style='info',
+    icon='sync'
+)
+
+refresh_info_button.on_click(lambda b: get_dataset_info())
+
+# Tambahkan elemen ke tab
+tab_data_info.children = [
+    widgets.HTML("<h2>ℹ️ Informasi Dataset</h2>"),
+    widgets.HTML("<p>Pada bagian ini Anda dapat melihat statistik dan distribusi dataset.</p>"),
+    refresh_info_button,
+    widgets.Output()
+]
+
+# ===== TAB 2: AUGMENTASI DATA =====
+# Widget untuk mengontrol augmentasi
+augmentation_type = widgets.RadioButtons(
+    options=[
+        ('Posisi (rotasi, perspektif, flip)', 'position'),
+        ('Pencahayaan (kontras, bayangan, saturasi)', 'lighting'),
+        ('Kombinasi (posisi dan pencahayaan)', 'combined')
+    ],
+    value='combined',
+    description='Tipe Augmentasi:',
+    style={'description_width': 'initial'},
+    layout={'width': 'max-content'}
+)
+
+split_selection = widgets.SelectMultiple(
+    options=[('Train', 'train'), ('Validation', 'valid'), ('Test', 'test')],
+    value=['train'],
+    description='Dataset Split:',
+    style={'description_width': 'initial'},
+    layout={'width': '300px'}
+)
+
+num_workers_slider = widgets.IntSlider(
+    value=4,
+    min=1,
+    max=8,
+    step=1,
+    description='Jumlah Workers:',
+    style={'description_width': 'initial'}
+)
+
+augment_button = widgets.Button(
+    description='Augmentasi Data',
+    button_style='primary',
+    icon='plus'
+)
+
+clean_button = widgets.Button(
+    description='Bersihkan Augmentasi',
+    button_style='danger',
+    icon='trash-alt'
+)
+
+augmentation_output = widgets.Output()
+
+def on_augment_button_clicked(b):
+    """Callback untuk augmentasi data"""
+    with augmentation_output:
+        clear_output()
+        
+        splits = split_selection.value
+        aug_type = augmentation_type.value
+        num_workers = num_workers_slider.value
+        
+        if not splits:
+            print("⚠️ Pilih setidaknya satu split dataset!")
+            return
+            
+        print(f"🔄 Memulai augmentasi untuk {', '.join(splits)} dengan tipe {aug_type}...")
+        
+        all_stats = {}
+        for split in splits:
+            stats = data_manager.augment_data(
+                split=split,
+                augmentation_type=aug_type,
+                num_workers=num_workers
+            )
+            all_stats[split] = stats
+            
+        print("\n✅ Augmentasi selesai!")
+        
+        # Tampilkan statistik dalam bentuk tabel
+        stats_data = []
+        for split, stat in all_stats.items():
+            stats_data.append({
+                'Split': split.capitalize(),
+                'Original': stat['processed'],
+                'Augmented': stat['augmented'],
+                'Errors': stat['errors']
+            })
+            
+        if stats_data:
+            display(pd.DataFrame(stats_data))
+            
+        # Refresh statistik dataset
+        get_dataset_info()
+
+def on_clean_button_clicked(b):
+    """Callback untuk membersihkan hasil augmentasi"""
+    with augmentation_output:
+        clear_output()
+        
+        splits = split_selection.value
+        
+        if not splits:
+            print("⚠️ Pilih setidaknya satu split dataset!")
+            return
+            
+        print(f"🧹 Membersihkan hasil augmentasi untuk {', '.join(splits)}...")
+        
+        stats = data_manager.clean_augmented_data(splits=splits)
+        
+        print(f"\n✅ Pembersihan selesai!")
+        print(f"📊 Statistik:")
+        print(f"   • Gambar dihapus: {stats['removed_images']}")
+        print(f"   • Label dihapus: {stats['removed_labels']}")
+        
+        # Refresh statistik dataset
+        get_dataset_info()
+
+augment_button.on_click(on_augment_button_clicked)
+clean_button.on_click(on_clean_button_clicked)
+
+augmentation_controls = widgets.VBox([
+    widgets.HTML("<h3>🔄 Pengaturan Augmentasi</h3>"),
+    augmentation_type,
+    widgets.HBox([split_selection, num_workers_slider]),
+    widgets.HBox([augment_button, clean_button]),
+    augmentation_output
+])
+
+tab_augmentation.children = [
+    widgets.HTML("<h2>🔀 Augmentasi Data</h2>"),
+    widgets.HTML("<p>Augmentasi data membantu meningkatkan variasi dataset dan membantu model belajar lebih baik.</p>"),
+    augmentation_controls
+]
+
+# ===== TAB 3: SPLIT DATASET =====
+# Widget untuk mengontrol split
+train_ratio_slider = widgets.FloatSlider(
+    value=0.7,
+    min=0.5,
+    max=0.9,
+    step=0.05,
+    description='Ratio Train:',
+    style={'description_width': 'initial'}
+)
+
+valid_ratio_slider = widgets.FloatSlider(
+    value=0.15,
+    min=0.05,
+    max=0.3,
+    step=0.05,
+    description='Ratio Valid:',
+    style={'description_width': 'initial'}
+)
+
+test_ratio_slider = widgets.FloatSlider(
+    value=0.15,
+    min=0.05,
+    max=0.3,
+    step=0.05,
+    description='Ratio Test:',
+    style={'description_width': 'initial'}
+)
+
+total_ratio_text = widgets.HTML(
+    value="<b>Total Ratio: 1.0</b> ✅",
+)
+
+def update_total_ratio(*args):
+    """Update tampilan total ratio"""
+    total = train_ratio_slider.value + valid_ratio_slider.value + test_ratio_slider.value
+    
+    if abs(total - 1.0) < 0.001:  # Mendekati 1.0
+        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ✅"
+        split_button.disabled = False
+    else:
+        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ❌ (harus 1.0)"
+        split_button.disabled = True
+
+train_ratio_slider.observe(update_total_ratio, names='value')
+valid_ratio_slider.observe(update_total_ratio, names='value')
+test_ratio_slider.observe(update_total_ratio, names='value')
+
+split_button = widgets.Button(
+    description='Split Dataset',
+    button_style='primary',
+    icon='random'
+)
+
+split_status_output = widgets.Output()
+
+def on_split_button_clicked(b):
+    """Callback untuk split dataset"""
+    with split_status_output:
+        clear_output()
+        
+        train_ratio = train_ratio_slider.value
+        valid_ratio = valid_ratio_slider.value
+        test_ratio = test_ratio_slider.value
+        
+        print(f"🔄 Memulai split dataset dengan rasio: Train={train_ratio:.2f}, Valid={valid_ratio:.2f}, Test={test_ratio:.2f}...")
+        
+        # Periksa keberadaan direktori all_data
+        if not os.path.exists('data/all_data/images'):
+            print("❌ Direktori 'data/all_data/images' tidak ditemukan!")
+            print("📝 Pastikan Anda memiliki data lengkap di direktori 'data/all_data'.")
+            print("💡 Tip: Salin dataset hasil download ke direktori ini jika belum ada.")
+            return
+            
+        # Jalankan split dataset
+        try:
+            stats = data_manager.split_dataset(
+                train_ratio=train_ratio,
+                valid_ratio=valid_ratio,
+                test_ratio=test_ratio
+            )
+            
+            print("\n✅ Split dataset selesai!")
+            print(f"📊 Statistik split:")
+            print(f"   • Train: {stats['train']} file")
+            print(f"   • Valid: {stats['valid']} file")
+            print(f"   • Test: {stats['test']} file")
+            
+            # Refresh statistik dataset
+            get_dataset_info()
+            
+        except Exception as e:
+            print(f"❌ Gagal melakukan split dataset: {str(e)}")
+
+split_button.on_click(on_split_button_clicked)
+
+# Tambahkan elemen ke tab
+tab_split_dataset.children = [
+    widgets.HTML("<h2>📊 Split Dataset</h2>"),
+    widgets.HTML("<p>Atur rasio split dataset untuk training, validasi, dan testing.</p>"),
+    widgets.HTML("<div style='background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>"
+                "<b>📋 Petunjuk:</b><br>"
+                "1. Pastikan data lengkap ada di direktori <code>data/all_data</code><br>"
+                "2. Atur rasio untuk masing-masing split (total harus 1.0)<br>"
+                "3. Klik tombol 'Split Dataset' untuk memulai proses"
+                "</div>"),
+    train_ratio_slider,
+    valid_ratio_slider,
+    test_ratio_slider,
+    total_ratio_text,
+    split_button,
+    split_status_output
+]
+
+# ===== FUNGSI UTILITAS UNTUK DATALOADER =====
+def get_train_val_test_dataloaders(batch_size=None):
+    """Dapatkan dataloader untuk training, validation, dan testing"""
+    return data_manager.get_dataloaders(batch_size=batch_size)
+
+# Tampilkan tabs
+display(tabs)
+
+# Tampilkan statistik dataset awal
+get_dataset_info()

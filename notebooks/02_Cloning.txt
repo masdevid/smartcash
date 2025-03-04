@@ -14,7 +14,7 @@ if not os.path.exists('yolov5'):
     !git clone https://github.com/ultralytics/yolov5.git
     # Install dependensi YOLOv5
     !pip install -r yolov5/requirements.txt
-    
+
 # Tambahkan direktori ke path
 if 'smartcash' not in sys.path:
     sys.path.append('smartcash')

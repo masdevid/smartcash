@@ -5,8 +5,10 @@ import os
 import requests
 import yaml
 import time
+import shutil
 from tqdm.notebook import tqdm
 from pathlib import Path
+from smartcash.smartcash.utils.roboflow_downloader import RoboflowDownloader
 
 def download_dataset_with_progress(config):
     """
@@ -14,7 +16,7 @@ def download_dataset_with_progress(config):
     
     Args:
         config: Konfigurasi dengan kredensial Roboflow
-        
+    
     Returns:
         Path ke file zip yang diunduh
     """
@@ -37,169 +39,83 @@ def download_dataset_with_progress(config):
     print(f"   • Project: {project}")
     print(f"   • Version: {version}")
     
-    # Konstruksi URL download langsung (format YOLOv5 PyTorch)
-    base_url = "https://app.roboflow.com/ds/api/export"
-    export_format = "yolov5"  # Format YOLOv5 PyTorch
-    
-    download_url = f"{base_url}/{project}?key={api_key}&format={export_format}&version={version}"
+    # Inisialisasi downloader
+    downloader = RoboflowDownloader(
+        api_key=api_key,
+        workspace=workspace,
+        project=project,
+        version=version,
+        output_dir='dataset_downloads'
+    )
     
     # Cek direktori lokal
     data_dir = Path('data')
     
-    # Cek apakah data sudah ada
+    # Jika dataset sudah ada, lakukan cleanup
     if data_dir.exists() and any((data_dir / 'train' / 'images').glob('*')):
-        print("✅ Dataset sudah tersedia di direktori data lokal.")
-        return None
+        print("⚠️ Dataset sudah ada. Membersihkan versi lama...")
+        cleanup_existing_dataset(data_dir)
     
-    # Siapkan direktori untuk menyimpan file zip
-    output_dir = Path('dataset_downloads')
-    output_dir.mkdir(exist_ok=True)
-    
-    # Nama file zip output
-    zip_filename = f"{project}_v{version}_yolov5.zip"
-    zip_path = output_dir / zip_filename
-    
-    print(f"📥 Memulai download dataset ke {zip_path}...")
+    print(f"📥 Memulai download dataset...")
     
     try:
-        # Stream download dengan progress bar
         start_time = time.time()
         
-        # Lakukan HEAD request untuk mendapatkan ukuran file
-        response_head = requests.head(download_url)
-        total_size_in_bytes = int(response_head.headers.get('content-length', 0))
-        
-        if total_size_in_bytes < 1000:  # Jika file terlalu kecil
-            print(f"⚠️ File yang akan diunduh terlalu kecil ({total_size_in_bytes} bytes)")
-            print("   Mencoba langsung mengunduh dataset melalui API Roboflow...")
-            
-            # Gunakan Roboflow API sebagai fallback
-            try:
-                from roboflow import Roboflow
-                
-                rf = Roboflow(api_key=api_key)
-                workspace_obj = rf.workspace(workspace)
-                project_obj = workspace_obj.project(project)
-                version_obj = project_obj.version(version)
-                
-                print(f"📥 Mengunduh dataset melalui API Roboflow...")
-                dataset = version_obj.download("yolov5")
-                
-                print(f"✅ Dataset berhasil diunduh ke {dataset.location}")
-                return dataset.location
-            except Exception as api_error:
-                print(f"❌ Gagal mengunduh melalui API: {str(api_error)}")
-                raise
-        
-        # Download dengan progress bar
-        response = requests.get(download_url, stream=True)
-        
-        # Periksa apakah respons berhasil
-        if response.status_code != 200:
-            print(f"❌ Error saat download: HTTP {response.status_code}")
-            if response.status_code == 403:
-                print("⚠️ Error 403 Forbidden: Periksa API key Anda")
-            elif response.status_code == 404:
-                print("⚠️ Error 404 Not Found: Periksa project dan version")
-            return None
-        
-        # Cek apakah respons adalah HTML (error page) bukan file zip
-        content_type = response.headers.get('content-type', '')
-        if 'text/html' in content_type:
-            print(f"⚠️ Respons berupa HTML, bukan file zip (content-type: {content_type})")
-            print("   Mencoba fallback ke API Roboflow...")
-            
-            # Simpan respons HTML untuk debugging
-            with open(output_dir / "error_response.html", "wb") as f:
-                f.write(response.content)
-            
-            # Fallback ke API Roboflow
-            from roboflow import Roboflow
-            
-            rf = Roboflow(api_key=api_key)
-            workspace_obj = rf.workspace(workspace)
-            project_obj = workspace_obj.project(project)
-            version_obj = project_obj.version(version)
-            
-            print(f"📥 Mengunduh dataset melalui API Roboflow...")
-            dataset = version_obj.download("yolov5")
-            
-            print(f"✅ Dataset berhasil diunduh ke {dataset.location}")
-            return dataset.location
-            
-        # Jika respons valid, lanjutkan download dengan progress bar
-        progress_bar = tqdm(total=total_size_in_bytes, unit='iB', unit_scale=True)
-        
-        with open(zip_path, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if chunk:
-                    progress_bar.update(len(chunk))
-                    f.write(chunk)
-        
-        progress_bar.close()
-        
-        # Verifikasi ukuran file
-        actual_size = os.path.getsize(zip_path)
-        if actual_size < 10000:  # Jika file terlalu kecil (kurang dari 10KB)
-            print(f"⚠️ File zip yang diunduh terlalu kecil: {actual_size} bytes")
-            print("   Mencoba dengan metode API Roboflow...")
-            
-            # Fallback ke API Roboflow
-            from roboflow import Roboflow
-            
-            rf = Roboflow(api_key=api_key)
-            workspace_obj = rf.workspace(workspace)
-            project_obj = workspace_obj.project(project)
-            version_obj = project_obj.version(version)
-            
-            print(f"📥 Mengunduh dataset melalui API Roboflow...")
-            dataset = version_obj.download("yolov5")
-            
-            print(f"✅ Dataset berhasil diunduh ke {dataset.location}")
-            return dataset.location
+        # Download dataset
+        dataset_path = downloader.download(format='yolov5')
         
         elapsed_time = time.time() - start_time
         print(f"✅ Download selesai dalam {elapsed_time:.1f} detik")
-        print(f"📁 Dataset tersimpan di: {zip_path}")
+        print(f"📁 Dataset tersimpan di: {dataset_path}")
         
-        # Ekstrak file zip
-        import zipfile
-        extract_dir = output_dir / f"{project}_v{version}"
-        
-        print(f"📦 Mengekstrak file zip ke {extract_dir}...")
-        
-        try:
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                # Tampilkan daftar file dalam zip
-                file_list = zip_ref.namelist()
-                print(f"   File dalam zip: {len(file_list)} file")
-                
-                # Ekstrak semua file
-                zip_ref.extractall(extract_dir)
-                
-                print(f"✅ Ekstraksi selesai")
-                return str(extract_dir)
-        except zipfile.BadZipFile:
-            print(f"❌ File zip tidak valid. Mungkin download tidak lengkap atau error.")
-            
-            # Fallback ke API Roboflow
-            print("   Mencoba dengan API Roboflow...")
-            from roboflow import Roboflow
-            
-            rf = Roboflow(api_key=api_key)
-            workspace_obj = rf.workspace(workspace)
-            project_obj = workspace_obj.project(project)
-            version_obj = project_obj.version(version)
-            
-            print(f"📥 Mengunduh dataset melalui API Roboflow...")
-            dataset = version_obj.download("yolov5")
-            
-            print(f"✅ Dataset berhasil diunduh ke {dataset.location}")
-            return dataset.location
-        
+        return str(dataset_path)
+    
     except Exception as e:
         print(f"❌ Error saat download dataset: {str(e)}")
         return None
+
+def cleanup_existing_dataset(data_dir: Path):
+    """
+    Membersihkan dataset yang ada dengan membuat backup dan menghapus file lama
+    
+    Args:
+        data_dir: Path ke direktori data
+    """
+    backup_dir = data_dir.parent / 'data_backups'
+    timestamp = time.strftime('%Y%m%d_%H%M%S')
+    current_backup = backup_dir / timestamp
+    
+    try:
+        # Buat direktori backup jika belum ada
+        backup_dir.mkdir(exist_ok=True)
+        current_backup.mkdir()
+        
+        print(f"🔄 Membuat backup dataset ke {current_backup}")
+        
+        # Backup semua file
+        for split in ['train', 'valid', 'test']:
+            for file_type in ['images', 'labels']:
+                src = data_dir / split / file_type
+                if src.exists():
+                    dst = current_backup / split / file_type
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(src, dst)
+        
+        print(f"🧹 Membersihkan direktori data...")
+        
+        # Hapus file lama
+        for split in ['train', 'valid', 'test']:
+            for file_type in ['images', 'labels']:
+                target_dir = data_dir / split / file_type
+                if target_dir.exists():
+                    shutil.rmtree(target_dir)
+                    target_dir.mkdir()
+        
+        print(f"✅ Cleanup selesai. Backup tersimpan di {current_backup}")
+        
+    except Exception as e:
+        print(f"❌ Error saat cleanup dataset: {str(e)}")
+        raise
 
 # Tombol download dataset
 download_button = widgets.Button(
@@ -237,7 +153,6 @@ def display_extract_button(dataset_location):
     def on_extract_clicked(b):
         from pathlib import Path
         import shutil
-        import glob
         from tqdm.notebook import tqdm
         
         src_path = Path(dataset_location)
@@ -295,19 +210,41 @@ def display_extract_button(dataset_location):
         # Cek hasil
         print(f"\n✅ Total {total_copied} file disalin ke {dst_path}")
         
-        # Update konfigurasi
+        # Update konfigurasi hanya jika file disalin
+        if total_copied > 0:
+            try:
+                with open('configs/experiment_config.yaml', 'r') as f:
+                    config = yaml.safe_load(f)
+                
+                config['data']['source'] = 'local'
+                
+                with open('configs/experiment_config.yaml', 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                
+                print("✅ Konfigurasi diperbarui: data_source = local")
+            except Exception as e:
+                print(f"⚠️ Gagal update konfigurasi: {str(e)}")
+        else:
+            print("⚠️ Tidak ada file yang disalin, konfigurasi tidak diperbarui")
+        
+        # Bersihkan file yang diunduh
         try:
-            with open('configs/experiment_config.yaml', 'r') as f:
-                config = yaml.safe_load(f)
-            
-            config['data']['source'] = 'local'
-            
-            with open('configs/experiment_config.yaml', 'w') as f:
-                yaml.dump(config, f, default_flow_style=False)
-            
-            print("✅ Konfigurasi diperbarui: data_source = local")
+            print(f"🧹 Membersihkan file sementara di {src_path}...")
+            if src_path.exists():
+                shutil.rmtree(src_path)
+            print("✅ File sementara berhasil dibersihkan")
         except Exception as e:
-            print(f"⚠️ Gagal update konfigurasi: {str(e)}")
+            print(f"⚠️ Gagal membersihkan file sementara: {str(e)}")
+        
+        # Bersihkan file zip
+        zip_path = src_path.with_suffix('.zip')
+        try:
+            if zip_path.exists():
+                print(f"🧹 Membersihkan file zip {zip_path}...")
+                zip_path.unlink()
+                print("✅ File zip berhasil dibersihkan")
+        except Exception as e:
+            print(f"⚠️ Gagal membersihkan file zip: {str(e)}")
     
     extract_button.on_click(on_extract_clicked)
     display(extract_button)

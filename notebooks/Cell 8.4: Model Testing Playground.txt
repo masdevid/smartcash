@@ -1,0 +1,175 @@
+# ================= [MODEL PLAYGROUND] =================
+# Cell untuk mencoba model secara interaktif
+
+# Widget untuk memilih backbone
+backbone_selector = widgets.Dropdown(
+    options=[
+        ('EfficientNet-B4', 'efficientnet'),
+        ('CSPDarknet (YOLOv5)', 'cspdarknet')
+    ],
+    value='efficientnet',
+    description='Backbone:',
+    style={'description_width': 'initial'}
+)
+
+# Widget untuk memilih mode deteksi
+detection_mode_selector = widgets.Dropdown(
+    options=[
+        ('Single Layer (Banknote)', 'single'),
+        ('Multi Layer (+ Nominal & Security)', 'multi')
+    ],
+    value='single',
+    description='Mode Deteksi:',
+    style={'description_width': 'initial'}
+)
+
+# Widget untuk mengontrol opsi lain
+pretrained_checkbox = widgets.Checkbox(
+    value=True,
+    description='Gunakan Pretrained Weights',
+    style={'description_width': 'initial'}
+)
+
+# Tombol untuk mencoba model
+test_model_button = widgets.Button(
+    description='Buat & Test Model',
+    button_style='success',
+    icon='play'
+)
+
+# Output area
+model_test_output = widgets.Output()
+
+def on_test_model_button_clicked(b):
+    """Callback untuk mencoba model"""
+    # Update tombol ke status loading
+    test_model_button.description = "Memproses..."
+    test_model_button.disabled = True
+    
+    with model_test_output:
+        clear_output()
+        
+        # Update konfigurasi berdasarkan pilihan
+        config['model']['backbone'] = backbone_selector.value
+        config['detection_mode'] = detection_mode_selector.value
+        
+        if detection_mode_selector.value == 'multi':
+            config['layers'] = ['banknote', 'nominal', 'security']
+        else:
+            config['layers'] = ['banknote']
+        
+        config['model']['pretrained'] = pretrained_checkbox.value
+        
+        try:
+            # Buat model manager baru dengan konfigurasi yang diperbarui
+            test_manager = ModelManager(config, logger)
+            
+            # Ukur waktu pembuatan model
+            start_time = torch.cuda.Event(enable_timing=True)
+            end_time = torch.cuda.Event(enable_timing=True)
+            
+            start_time.record()
+            model = test_manager.create_model()
+            end_time.record()
+            
+            torch.cuda.synchronize()
+            model_creation_time = start_time.elapsed_time(end_time)
+            
+            logger.success(f"✅ Model berhasil dibuat dalam {model_creation_time:.2f}ms")
+            
+            # Buat input dummy untuk test
+            batch_size = 1
+            input_dummy = torch.randn(batch_size, 3, 640, 640, device=device)
+            
+            # Ukur waktu inferensi
+            model.eval()
+            with torch.no_grad():
+                # Warming up
+                for _ in range(5):
+                    _ = model(input_dummy)
+                
+                # Ukur waktu
+                start_time = torch.cuda.Event(enable_timing=True)
+                end_time = torch.cuda.Event(enable_timing=True)
+                
+                start_time.record()
+                output = model(input_dummy)
+                end_time.record()
+                
+                torch.cuda.synchronize()
+                inference_time = start_time.elapsed_time(end_time)
+                
+                logger.success(f"✅ Inferensi selesai dalam {inference_time:.2f}ms")
+                
+                # Tampilkan info output
+                if isinstance(output, dict):
+                    logger.info("📊 Output Model (Multi-layer):")
+                    for layer_name, layer_outputs in output.items():
+                        logger.info(f"  Layer '{layer_name}':")
+                        for i, out in enumerate(layer_outputs):
+                            logger.info(f"    P{i+3}: shape={tuple(out.shape)}")
+                else:
+                    logger.info(f"📊 Output Model: shape={tuple(output.shape)}")
+                
+                # Tampilkan ringkasan visual
+                print("\n📈 Ringkasan Performance Model:")
+                print(f"  • Backbone: {backbone_selector.value}")
+                print(f"  • Mode Deteksi: {detection_mode_selector.value}")
+                print(f"  • Pretrained: {'Ya' if pretrained_checkbox.value else 'Tidak'}")
+                print(f"  • Waktu Pembuatan Model: {model_creation_time:.2f}ms")
+                print(f"  • Waktu Inferensi: {inference_time:.2f}ms")
+                print(f"  • FPS Estimasi: {1000/inference_time:.1f}")
+                
+                # Plot barchart waktu
+                plt.figure(figsize=(10, 4))
+                bars = plt.bar(
+                    ['Pembuatan Model', 'Inferensi'], 
+                    [model_creation_time, inference_time],
+                    color=['#3498db', '#2ecc71']
+                )
+                
+                # Tambahkan nilai di atas bar
+                for bar in bars:
+                    height = bar.get_height()
+                    plt.text(
+                        bar.get_x() + bar.get_width()/2.,
+                        height + 0.1,
+                        f'{height:.1f}ms',
+                        ha='center', 
+                        va='bottom',
+                        fontweight='bold'
+                    )
+                
+                plt.title('Perbandingan Waktu (ms)')
+                plt.ylabel('Waktu (ms)')
+                plt.yscale('log')
+                plt.grid(True, linestyle='--', alpha=0.7)
+                plt.tight_layout()
+                plt.show()
+                
+                # Bersihkan memori
+                del model, input_dummy, output
+                torch.cuda.empty_cache()
+                    
+        except Exception as e:
+            logger.error(f"❌ Terjadi kesalahan: {str(e)}")
+            import traceback
+            traceback.print_exc()
+        
+        # Reset tombol
+        test_model_button.description = "Buat & Test Model"
+        test_model_button.disabled = False
+
+# Setup callback
+test_model_button.on_click(on_test_model_button_clicked)
+
+# Tampilkan UI
+display(widgets.VBox([
+    widgets.HTML("<h2>🧪 Model Testing Playground</h2>"),
+    widgets.HTML("<p>Coba berbagai konfigurasi model dan lihat performanya.</p>"),
+    backbone_selector,
+    detection_mode_selector,
+    pretrained_checkbox,
+    test_model_button,
+    model_test_output
+]))

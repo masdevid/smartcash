@@ -54,8 +54,9 @@ class SmartCashLogger:
     def __init__(
         self, 
         name: str,
-        log_to_colab: bool = True,
+        level: int = logging.INFO,
         log_to_file: bool = True,
+        log_to_console: bool = True,
         log_dir: str = "logs"
     ):
         """
@@ -209,22 +210,40 @@ class SmartCashLogger:
 # Fungsi bantuan untuk mendapatkan logger dengan konfigurasi standar
 def get_logger(
     name: str, 
-    log_to_colab: bool = True, 
-    log_to_file: bool = True
+    log_to_console: bool = True, 
+    log_to_file: bool = True,
+    log_to_colab: bool = False
 ) -> SmartCashLogger:
     """
     Get atau buat instance SmartCashLogger.
     
     Args:
         name: Nama logger yang diinginkan
-        log_to_colab: Flag untuk mengaktifkan logging ke Colab display
+        log_to_console: Flag untuk mengaktifkan logging ke konsol
         log_to_file: Flag untuk mengaktifkan logging ke file
+        log_to_colab: Flag khusus untuk Google Colab (sama dengan log_to_console)
         
     Returns:
         Instance SmartCashLogger
     """
-    return SmartCashLogger(
-        name=name,
-        log_to_colab=log_to_colab,
-        log_to_file=log_to_file
-    )
+    # Register SmartCashLogger sebagai logger class
+    if not logging.getLoggerClass() == SmartCashLogger:
+        logging.setLoggerClass(SmartCashLogger)
+    
+    # Get atau buat logger dengan konfigurasi standar
+    logger = logging.getLogger(name)
+    
+    # Gunakan log_to_colab sebagai alias untuk log_to_console jika diberikan
+    if log_to_colab:
+        log_to_console = True
+    
+    # Pastikan logger adalah SmartCashLogger dan memiliki handlers yang sesuai
+    if isinstance(logger, SmartCashLogger) and not logger.handlers:
+        # Reinisialisasi logger dengan parameter yang diberikan
+        logger = SmartCashLogger(
+            name=name,
+            log_to_console=log_to_console,
+            log_to_file=log_to_file
+        )
+    
+    return logger

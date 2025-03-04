@@ -1,0 +1,95 @@
+# ================= [MODEL UTILITIES] =================
+# Cell 8.1: Import Modul-modul untuk Model
+
+import os
+import torch
+import yaml
+import gc
+from pathlib import Path
+from datetime import datetime
+from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
+from tqdm.auto import tqdm
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Pastikan path smartcash di PYTHONPATH
+import sys
+if not os.getcwd() in sys.path:
+    sys.path.append(os.getcwd())
+
+# Import modul-modul esensial dengan path yang disesuaikan
+# Pastikan menggunakan path baru (tanpa smartcash.smartcash)
+from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.models.backbones.cspdarknet import CSPDarknet
+from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+from smartcash.models.yolov5_model import YOLOv5Model
+from smartcash.handlers.data_handler import DataHandler
+from smartcash.utils.early_stopping import EarlyStopping
+from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+
+# Coba import torch utility jika tersedia
+try:
+    import torch.utils.benchmark as benchmark
+except ImportError:
+    benchmark = None
+
+# Setup logger untuk Colab
+logger = get_logger("data_pipeline", log_to_console=True, log_to_file=True)
+
+# Periksa ketersediaan GPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+logger.info(f"🖥️ Menggunakan device: {device}")
+
+if torch.cuda.is_available():
+    gpu_name = torch.cuda.get_device_name(0)
+    memory_allocated = torch.cuda.memory_allocated(0) / (1024**2)
+    memory_cached = torch.cuda.memory_reserved(0) / (1024**2)
+    logger.info(f"📊 GPU: {gpu_name}")
+    logger.info(f"💾 Memory yang digunakan: {memory_allocated:.2f} MB")
+    logger.info(f"💾 Memory yang dicadangkan: {memory_cached:.2f} MB")
+    
+    # Set untuk menggunakan cuDNN auto-tuner jika tersedia
+    if hasattr(torch.backends, 'cudnn'):
+        torch.backends.cudnn.benchmark = True
+        logger.info("🚀 cuDNN benchmark diaktifkan untuk performa optimal")
+else:
+    logger.info("⚠️ GPU tidak tersedia, menggunakan CPU")
+
+# Fungsi untuk memuat config
+def load_experiment_config():
+    """Muat konfigurasi eksperimen dari file"""
+    config_path = 'configs/experiment_config.yaml'
+    try:
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+            if config:
+                return config
+    except Exception as e:
+        logger.error(f"Gagal memuat konfigurasi eksperimen: {str(e)}")
+        
+    # Gunakan file config dasar jika eksperimen config tidak tersedia
+    try:
+        with open('configs/base_config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+            if config:
+                logger.info("ℹ️ Menggunakan konfigurasi dasar")
+                return config
+    except Exception as e:
+        logger.error(f"Gagal memuat konfigurasi dasar: {str(e)}")
+    
+    # Jika semua gagal, kembalikan config default
+    logger.warning("⚠️ Tidak ada konfigurasi yang dapat dimuat, menggunakan default")
+    return {
+        'model': {
+            'backbone': 'efficientnet',
+            'batch_size': 8,
+            'img_size': [640, 640],
+            'num_classes': 7
+        },
+        'layers': ['banknote']
+    }
+
+# Muat konfigurasi
+config = load_experiment_config()
+logger.info("✅ Model imports berhasil dimuat")

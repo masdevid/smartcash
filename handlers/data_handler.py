@@ -1,30 +1,19 @@
 # File: smartcash/handlers/data_handler.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk pemrosesan dataset dengan validasi dan normalisasi koordinat bounding box
+# Deskripsi: Handler untuk pemrosesan dataset dengan kompatibilitas Google Colab
 
 import os
 import torch
 import cv2
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Callable
+from typing import Dict, List, Optional, Tuple, Callable, Union
 from pathlib import Path
 from torch.utils.data import Dataset, DataLoader
 import albumentations as A
-from tqdm.auto import tqdm
+from tqdm.notebook import tqdm
 import logging
 
-# Fungsi logging global untuk menghindari lambda
-def default_log_info(msg):
-    print(f"ℹ️ {msg}")
-
-def default_log_warning(msg):
-    print(f"⚠️ {msg}")
-
-def default_log_error(msg):
-    print(f"❌ {msg}")
-
-def default_log_success(msg):
-    print(f"✅ {msg}")
+from smartcash.utils.logger import SmartCashLogger, get_logger
 
 class MultilayerDataset(Dataset):
     """Dataset untuk deteksi multi-layer uang kertas Rupiah."""
@@ -34,7 +23,8 @@ class MultilayerDataset(Dataset):
         data_path: str,
         img_size: Tuple[int, int] = (640, 640),
         mode: str = 'train',
-        transform = None
+        transform = None,
+        logger: Optional[SmartCashLogger] = None
     ):
         """
         Initialize dataset.
@@ -44,11 +34,15 @@ class MultilayerDataset(Dataset):
             img_size: Ukuran gambar yang diinginkan
             mode: Mode dataset ('train', 'val', 'test')
             transform: Custom transformations
+            logger: Logger untuk output
         """
         self.data_path = Path(data_path)
         self.img_size = img_size
         self.mode = mode
         self.transform = transform
+        
+        # Setup logger
+        self.logger = logger or get_logger("multilayer_dataset", log_to_file=False)
         
         # Layer configuration berdasarkan struktur class yang aktual
         self.layer_config = {
@@ -71,15 +65,20 @@ class MultilayerDataset(Dataset):
         self.labels_dir = self.data_path / 'labels'
         
         if not self.images_dir.exists():
-            raise FileNotFoundError(f"Images directory not found: {self.images_dir}")
-        if not self.labels_dir.exists():
-            raise FileNotFoundError(f"Labels directory not found: {self.labels_dir}")
+            self.logger.warning(f"Directory images tidak ditemukan: {self.images_dir}")
+            # Buat direktori jika tidak ada
+            self.images_dir.mkdir(parents=True, exist_ok=True)
             
-        self.image_files = sorted(list(self.images_dir.glob('*.jpg')))
+        if not self.labels_dir.exists():
+            self.logger.warning(f"Directory labels tidak ditemukan: {self.labels_dir}")
+            # Buat direktori jika tidak ada
+            self.labels_dir.mkdir(parents=True, exist_ok=True)
+            
+        self.image_files = self._find_image_files()
         
         # Validate
         if len(self.image_files) == 0:
-            default_log_warning(f"⚠️ No images found in {self.images_dir}")
+            self.logger.warning(f"Tidak ada gambar ditemukan di {self.images_dir}")
             
         # Setup transformations
         self.default_transform = A.Compose([
@@ -96,8 +95,17 @@ class MultilayerDataset(Dataset):
                 A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
             ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
             
-        default_log_info(f"📚 Loaded {len(self.image_files)} images for {mode} dataset")
+        self.logger.info(f"Loaded {len(self.image_files)} images for {mode} dataset")
         
+    def _find_image_files(self) -> List[Path]:
+        """Temukan semua file gambar dengan berbagai ekstensi"""
+        image_files = []
+        
+        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
+            image_files.extend(list(self.images_dir.glob(ext)))
+            
+        return sorted(image_files)
+    
     def __len__(self) -> int:
         return len(self.image_files)
     
@@ -131,13 +139,26 @@ class MultilayerDataset(Dataset):
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get item from dataset dengan validasi koordinat bounding box."""
         try:
+            # Handle kasus dataset kosong
+            if len(self.image_files) == 0:
+                # Return dummy data
+                dummy_img = torch.zeros((3, self.img_size[1], self.img_size[0]))
+                dummy_targets = torch.zeros((17, 5))  # 17 kelas, 5 nilai (x,y,w,h,conf)
+                return dummy_img, dummy_targets
+                
             img_path = self.image_files[idx]
             label_path = self.labels_dir / f"{img_path.stem}.txt"
             
             # Load image
             img = cv2.imread(str(img_path))
             if img is None:
-                raise IOError(f"Tidak dapat membaca gambar: {img_path}")
+                # Skip image yang tidak bisa dibaca
+                self.logger.warning(f"Tidak dapat membaca gambar: {img_path}")
+                # Return dummy data
+                dummy_img = torch.zeros((3, self.img_size[1], self.img_size[0]))
+                dummy_targets = torch.zeros((17, 5))
+                return dummy_img, dummy_targets
+                
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             
             # Load labels
@@ -145,14 +166,13 @@ class MultilayerDataset(Dataset):
             class_labels = []
             
             if label_path.exists():
-                with open(label_path, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) >= 5:  # class_id, x, y, w, h
-                            # PERBAIKAN: Pastikan class_id adalah integer
-                            # dan koordinat bounding box adalah float
-                            try:
-                                class_id = int(float(parts[0]))  # Konversi ke int dengan aman
+                try:
+                    with open(label_path, 'r') as f:
+                        for line in f:
+                            parts = line.strip().split()
+                            if len(parts) >= 5:  # class_id, x, y, w, h
+                                # Pastikan class_id adalah integer
+                                class_id = int(float(parts[0]))
                                 
                                 # Baca koordinat dan lakukan normalisasi
                                 coords = list(map(float, parts[1:5]))
@@ -160,9 +180,8 @@ class MultilayerDataset(Dataset):
                                 
                                 bboxes.append(normalized_coords)
                                 class_labels.append(class_id)
-                            except (ValueError, IndexError) as e:
-                                default_log_error(f"⚠️ Baris label tidak valid pada {label_path}: {line.strip()} - {str(e)}")
-                                continue
+                except Exception as e:
+                    self.logger.warning(f"Error membaca label {label_path}: {str(e)}")
             
             # Apply transformations
             if self.transform:
@@ -170,7 +189,7 @@ class MultilayerDataset(Dataset):
             else:
                 transformed = self.default_transform(image=img, bboxes=bboxes, class_labels=class_labels)
                 
-            # PERBAIKAN: Validasi hasil transformasi
+            # Validasi hasil transformasi
             validated_bboxes = []
             validated_class_labels = []
             
@@ -183,7 +202,7 @@ class MultilayerDataset(Dataset):
                     validated_bboxes.append(bbox)
                     validated_class_labels.append(cls_id)
                 except ValueError as e:
-                    default_log_warning(f"⚠️ Mengabaikan bbox tidak valid: {bbox} - {str(e)}")
+                    self.logger.warning(f"Mengabaikan bbox tidak valid: {bbox}")
                     continue
                 
             # Update hasil transformasi
@@ -197,7 +216,7 @@ class MultilayerDataset(Dataset):
             # Convert to tensor format
             img_tensor = torch.from_numpy(img).permute(2, 0, 1).float()
             
-            # PERBAIKAN: Pastikan semua class_labels adalah integer
+            # Pastikan semua class_labels adalah integer
             class_labels = [int(cl) for cl in class_labels]
             
             # Prepare multi-layer targets
@@ -205,7 +224,7 @@ class MultilayerDataset(Dataset):
             targets = torch.zeros((total_classes, 5))  # [class_id, x, y, w, h]
             
             for i, (bbox, cls_id) in enumerate(zip(bboxes, class_labels)):
-                # PERBAIKAN: Pastikan cls_id dalam range yang valid dan integer
+                # Pastikan cls_id dalam range yang valid dan integer
                 if 0 <= cls_id < total_classes:
                     x_center, y_center, width, height = bbox
                     targets[cls_id, 0] = x_center
@@ -213,13 +232,11 @@ class MultilayerDataset(Dataset):
                     targets[cls_id, 2] = width
                     targets[cls_id, 3] = height
                     targets[cls_id, 4] = 1.0  # Confidence
-                else:
-                    default_log_warning(f"⚠️ Class ID {cls_id} di luar jangkauan (0-{total_classes-1}) pada {img_path}")
                 
             return img_tensor, targets
             
         except Exception as e:
-            default_log_error(f"❌ Error loading item {idx}: {str(e)}")
+            self.logger.error(f"Error loading item {idx}: {str(e)}")
             # Return a zero image and empty target as fallback
             img_tensor = torch.zeros((3, self.img_size[1], self.img_size[0]))
             total_classes = sum(len(layer['classes']) for layer in self.layer_config.values())
@@ -227,13 +244,13 @@ class MultilayerDataset(Dataset):
             return img_tensor, targets
 
 class DataHandler:
-    """Handler untuk data training dan evaluasi."""
+    """Handler untuk data training dan evaluasi yang kompatibel dengan Google Colab."""
     
     def __init__(
         self,
         config: Optional[Dict] = None,
         data_dir: Optional[str] = None,
-        logger: Optional[Callable] = None
+        logger: Optional[SmartCashLogger] = None
     ):
         """
         Inisialisasi data handler.
@@ -245,12 +262,7 @@ class DataHandler:
         """
         self.config = config or {}
         self.data_dir = data_dir or self.config.get('data_dir', 'data')
-        
-        # Setup logger functions
-        self.log_info = logger.info if logger else default_log_info
-        self.log_error = logger.error if logger else default_log_error
-        self.log_success = logger.success if logger else default_log_success
-        self.log_warning = logger.warning if logger else default_log_warning
+        self.logger = logger or get_logger("data_handler")
         
         # Setup image size
         self.img_size = self.config.get('model', {}).get('img_size', [640, 640])
@@ -281,19 +293,21 @@ class DataHandler:
             self.test_path = self.config.get('test_data_path', os.path.join(self.data_dir, 'test'))
         
         # Log jalur dataset
-        self.log_info(f"📂 Dataset paths:")
-        self.log_info(f"   Train: {self.train_path}")
-        self.log_info(f"   Val: {self.val_path}")
-        self.log_info(f"   Test: {self.test_path}")
+        self.logger.info(f"Dataset paths:")
+        self.logger.info(f"   Train: {self.train_path}")
+        self.logger.info(f"   Val: {self.val_path}")
+        self.logger.info(f"   Test: {self.test_path}")
+        
+        # Pastikan direktori dataset ada
+        self._ensure_dataset_dirs()
     
-    def setup_dataset_structure(self) -> None:
-        """Siapkan struktur direktori dataset."""
+    def _ensure_dataset_dirs(self) -> None:
+        """Pastikan direktori dataset ada."""
         for path in [self.train_path, self.val_path, self.test_path]:
             # Buat direktori images dan labels
             for subdir in ['images', 'labels']:
                 dir_path = os.path.join(path, subdir)
                 os.makedirs(dir_path, exist_ok=True)
-                self.log_info(f"✅ Direktori dibuat: {dir_path}")
     
     def get_train_loader(
         self,
@@ -313,13 +327,14 @@ class DataHandler:
             DataLoader untuk training
         """
         dataset_path = dataset_path or self.train_path
-        self.log_info(f"🔄 Mempersiapkan training dataloader dari {dataset_path}")
+        self.logger.info(f"Mempersiapkan training dataloader dari {dataset_path}")
         
         # Buat dataset
         dataset = MultilayerDataset(
             data_path=dataset_path,
             img_size=tuple(self.img_size),
-            mode='train'
+            mode='train',
+            logger=self.logger
         )
         
         # Buat dan kembalikan dataloader
@@ -350,13 +365,14 @@ class DataHandler:
             DataLoader untuk validasi
         """
         dataset_path = dataset_path or self.val_path
-        self.log_info(f"🔄 Mempersiapkan validation dataloader dari {dataset_path}")
+        self.logger.info(f"Mempersiapkan validation dataloader dari {dataset_path}")
         
         # Buat dataset
         dataset = MultilayerDataset(
             data_path=dataset_path,
             img_size=tuple(self.img_size),
-            mode='val'
+            mode='val',
+            logger=self.logger
         )
         
         # Buat dan kembalikan dataloader
@@ -387,13 +403,14 @@ class DataHandler:
             DataLoader untuk testing
         """
         dataset_path = dataset_path or self.test_path
-        self.log_info(f"🔄 Mempersiapkan test dataloader dari {dataset_path}")
+        self.logger.info(f"Mempersiapkan test dataloader dari {dataset_path}")
         
         # Buat dataset
         dataset = MultilayerDataset(
             data_path=dataset_path,
             img_size=tuple(self.img_size),
-            mode='test'
+            mode='test',
+            logger=self.logger
         )
         
         # Buat dan kembalikan dataloader
@@ -431,6 +448,13 @@ class DataHandler:
         Returns:
             Tuple (img_tensor, targets_tensor)
         """
+        # Filter out None values (failed loads)
+        batch = [b for b in batch if b is not None and isinstance(b, tuple) and len(b) == 2]
+        
+        # Return empty batch if no valid samples
+        if len(batch) == 0:
+            return torch.zeros((0, 3, self.img_size[0], self.img_size[1])), torch.zeros((0, 17, 5))
+        
         imgs, targets = zip(*batch)
         
         # Batch images - sudah dalam format tensor dari dataset.__getitem__
@@ -441,3 +465,22 @@ class DataHandler:
             targets = torch.stack(targets)
         
         return imgs, targets
+    
+    def get_dataset_sizes(self) -> Dict[str, int]:
+        """
+        Dapatkan ukuran dataset untuk setiap split.
+        
+        Returns:
+            Dict ukuran dataset
+        """
+        sizes = {}
+        
+        for split, path in [('train', self.train_path), ('val', self.val_path), ('test', self.test_path)]:
+            image_dir = Path(path) / 'images'
+            if image_dir.exists():
+                image_files = list(image_dir.glob('*.jpg')) + list(image_dir.glob('*.jpeg')) + list(image_dir.glob('*.png'))
+                sizes[split] = len(image_files)
+            else:
+                sizes[split] = 0
+                
+        return sizes

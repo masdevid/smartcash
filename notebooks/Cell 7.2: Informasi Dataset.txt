@@ -1,0 +1,111 @@
+# Cell 7.2: Tab Informasi Dataset
+
+# Fungsi untuk menampilkan statistik dataset
+def get_dataset_info():
+    """Ambil dan tampilkan informasi dataset"""
+    # Tampilkan statistik dalam bentuk tabel
+    stats = dataset_processor.get_dataset_stats()
+    
+    # Konversi ke DataFrame
+    df_data = []
+    for split, split_stats in stats.items():
+        row = {'Split': split.capitalize()}
+        row.update(split_stats)
+        df_data.append(row)
+            
+    stats_df = pd.DataFrame(df_data)
+    
+    # Tambahkan total
+    total_row = {'Split': 'Total'}
+    for col in stats_df.columns:
+        if col != 'Split':
+            total_row[col] = stats_df[col].sum()
+    
+    stats_df = pd.concat([stats_df, pd.DataFrame([total_row])], ignore_index=True)
+    
+    # Tampilkan statistik dalam bentuk tabel
+    display(HTML("<h3>📊 Statistik Dataset</h3>"))
+    display(stats_df.style.format({
+        'images': '{:,}', 
+        'labels': '{:,}', 
+        'augmented': '{:,}', 
+        'original': '{:,}'
+    }).highlight_max(axis=0, color='lightgreen', subset=['images', 'labels']))
+    
+    # Plot distribusi data jika ada data
+    if not stats_df.empty and len(stats_df) > 1:  # Minimal ada satu split + total
+        plt.figure(figsize=(10, 5))
+        
+        # Exclude Total row
+        plot_df = stats_df[stats_df['Split'] != 'Total']
+        splits = plot_df['Split']
+        
+        # Siapkan data untuk plotting
+        if 'original' in plot_df.columns and 'augmented' in plot_df.columns:
+            original = plot_df['original'].fillna(0).values
+            augmented = plot_df['augmented'].fillna(0).values
+            
+            # Create stacked bar
+            bar_width = 0.6
+            plt.bar(splits, original, bar_width, label='Original', color='#1f77b4')
+            plt.bar(splits, augmented, bar_width, bottom=original, label='Augmented', color='#ff7f0e')
+            
+            # Add total labels on top
+            for i, split in enumerate(splits):
+                total = original[i] + augmented[i]
+                plt.text(i, total + 5, f'Total: {int(total)}', ha='center', va='bottom', fontweight='bold')
+        else:
+            # Fallback jika kolom tidak tersedia
+            images = plot_df['images'].fillna(0).values
+            plt.bar(splits, images, color='#1f77b4')
+            
+            # Add labels on top
+            for i, (split, count) in enumerate(zip(splits, images)):
+                plt.text(i, count + 5, f'Total: {int(count)}', ha='center', va='bottom', fontweight='bold')
+        
+        plt.title('Distribusi Dataset per Split')
+        plt.ylabel('Jumlah Gambar')
+        plt.legend()
+        plt.tight_layout()
+        plt.show()
+    else:
+        display(HTML("<p><i>Tidak cukup data untuk visualisasi.</i></p>"))
+    
+    # Tambahkan informasi ketersediaan dataloaders
+    sizes = data_handler.get_dataset_sizes()
+    display(HTML("<h4>🔄 Ketersediaan DataLoader</h4>"))
+    for split, count in sizes.items():
+        status = "✅ Tersedia" if count > 0 else "❌ Tidak tersedia"
+        display(HTML(f"<p><b>{split.capitalize()}</b>: {count} gambar - {status}</p>"))
+
+# Setup tab informasi dataset
+info_tab = widgets.Tab()
+info_output = widgets.Output()
+
+# Tombol refresh informasi dataset
+refresh_info_button = widgets.Button(
+    description='Refresh Info Dataset',
+    button_style='info',
+    icon='sync'
+)
+
+def on_refresh_info_clicked(b):
+    with info_output:
+        clear_output()
+        get_dataset_info()
+
+refresh_info_button.on_click(on_refresh_info_clicked)
+
+# Tampilkan tab
+tab_content = widgets.VBox([
+    widgets.HTML("<h2>ℹ️ Informasi Dataset</h2>"),
+    widgets.HTML("<p>Pada bagian ini Anda dapat melihat statistik dan distribusi dataset.</p>"),
+    refresh_info_button,
+    info_output
+])
+
+display(tab_content)
+
+# Tampilkan statistik dataset awal
+with info_output:
+    get_dataset_info()

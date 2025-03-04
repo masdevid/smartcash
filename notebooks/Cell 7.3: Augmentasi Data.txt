@@ -1,0 +1,161 @@
+# Cell 7.3: Tab Augmentasi Data
+
+# ===== AUGMENTASI DATA =====
+# Widget untuk mengontrol augmentasi
+augmentation_type = widgets.RadioButtons(
+    options=[
+        ('Posisi (rotasi, perspektif, flip)', 'position'),
+        ('Pencahayaan (kontras, bayangan, saturasi)', 'lighting'),
+        ('Kombinasi (posisi dan pencahayaan)', 'combined')
+    ],
+    value='combined',
+    description='Tipe Augmentasi:',
+    style={'description_width': 'initial'},
+    layout={'width': 'max-content'}
+)
+
+split_selection = widgets.SelectMultiple(
+    options=[('Train', 'train'), ('Validation', 'valid'), ('Test', 'test')],
+    value=['train'],
+    description='Dataset Split:',
+    style={'description_width': 'initial'},
+    layout={'width': '300px'}
+)
+
+num_workers_slider = widgets.IntSlider(
+    value=2,  # Nilai default lebih kecil untuk Colab
+    min=1,
+    max=4,   # Nilai maksimum lebih kecil untuk Colab
+    step=1,
+    description='Jumlah Workers:',
+    style={'description_width': 'initial'}
+)
+
+augment_button = widgets.Button(
+    description='Augmentasi Data',
+    button_style='primary',
+    icon='plus'
+)
+
+clean_button = widgets.Button(
+    description='Bersihkan Augmentasi',
+    button_style='danger',
+    icon='trash-alt'
+)
+
+augmentation_output = widgets.Output()
+
+def on_augment_button_clicked(b):
+    """Callback untuk augmentasi data"""
+    # Disable tombol selama proses
+    augment_button.disabled = True
+    augment_button.description = "Memproses..."
+    
+    with augmentation_output:
+        clear_output()
+        
+        splits = split_selection.value
+        aug_type = augmentation_type.value
+        num_workers = num_workers_slider.value
+        
+        if not splits:
+            print("⚠️ Pilih setidaknya satu split dataset!")
+            augment_button.disabled = False
+            augment_button.description = "Augmentasi Data"
+            return
+            
+        logger.info(f"Memulai augmentasi untuk {', '.join(splits)} dengan tipe {aug_type}...")
+        
+        all_stats = {}
+        for split in splits:
+            stats = dataset_processor.augment_dataset(
+                split=split,
+                augmentation_type=aug_type,
+                num_workers=num_workers
+            )
+            all_stats[split] = stats
+            
+        logger.success("Augmentasi selesai!")
+        
+        # Tampilkan statistik dalam bentuk tabel
+        stats_data = []
+        for split, stat in all_stats.items():
+            stats_data.append({
+                'Split': split.capitalize(),
+                'Original': stat['processed'],
+                'Augmented': stat['augmented'],
+                'Errors': stat['errors']
+            })
+            
+        if stats_data:
+            display(pd.DataFrame(stats_data))
+            
+        # Refresh statistik dataset
+        get_dataset_info()
+        
+        # Force garbage collection
+        gc.collect()
+        
+    # Re-enable tombol
+    augment_button.disabled = False
+    augment_button.description = "Augmentasi Data"
+
+def on_clean_button_clicked(b):
+    """Callback untuk membersihkan hasil augmentasi"""
+    # Disable tombol selama proses
+    clean_button.disabled = True
+    clean_button.description = "Membersihkan..."
+    
+    with augmentation_output:
+        clear_output()
+        
+        splits = split_selection.value
+        
+        if not splits:
+            print("⚠️ Pilih setidaknya satu split dataset!")
+            clean_button.disabled = False
+            clean_button.description = "Bersihkan Augmentasi"
+            return
+            
+        logger.info(f"Membersihkan hasil augmentasi untuk {', '.join(splits)}...")
+        
+        stats = dataset_processor.clean_augmented_data(splits=splits)
+        
+        logger.success("Pembersihan selesai!")
+        logger.info(f"Statistik:")
+        logger.info(f"• Gambar dihapus: {stats['removed_images']}")
+        logger.info(f"• Label dihapus: {stats['removed_labels']}")
+        
+        # Refresh statistik dataset
+        get_dataset_info()
+        
+        # Force garbage collection
+        gc.collect()
+        
+    # Re-enable tombol
+    clean_button.disabled = False
+    clean_button.description = "Bersihkan Augmentasi"
+
+augment_button.on_click(on_augment_button_clicked)
+clean_button.on_click(on_clean_button_clicked)
+
+# Buat tab augmentasi
+tab_aug_content = widgets.VBox([
+    widgets.HTML("<h2>🔀 Augmentasi Data</h2>"),
+    widgets.HTML("<p>Augmentasi data membantu meningkatkan variasi dataset dan membantu model belajar lebih baik.</p>"),
+    widgets.HTML("<div style='background-color: #FFF5E4; color:#FFA725; padding: 10px; border-radius: 5px; margin-bottom: 10px;'>"
+                "<b>⚠️ Catatan Khusus untuk Google Colab:</b><br>"
+                "- Augmentasi dapat memakan waktu & memori lebih banyak dalam lingkungan Colab<br>"
+                "- Gunakan worker dengan jumlah <b>1-2</b> untuk performa optimal<br>"
+                "- Batasi augmentasi pada split kecil (Testing) terlebih dahulu sebelum memproses dataset besar"
+                "</div>"),
+    widgets.VBox([
+        widgets.HTML("<h3>🔄 Pengaturan Augmentasi</h3>"),
+        augmentation_type,
+        widgets.HBox([split_selection, num_workers_slider]),
+        widgets.HBox([augment_button, clean_button]),
+        augmentation_output
+    ])
+])
+
+display(tab_aug_content)

@@ -1,0 +1,228 @@
+# Cell 7.4: Tab Split Dataset
+
+# ===== SPLIT DATASET =====
+# Widget untuk mengontrol split
+train_ratio_slider = widgets.FloatSlider(
+    value=0.7,
+    min=0.5,
+    max=0.9,
+    step=0.05,
+    description='Ratio Train:',
+    style={'description_width': 'initial'}
+)
+
+valid_ratio_slider = widgets.FloatSlider(
+    value=0.15,
+    min=0.05,
+    max=0.3,
+    step=0.05,
+    description='Ratio Valid:',
+    style={'description_width': 'initial'}
+)
+
+test_ratio_slider = widgets.FloatSlider(
+    value=0.15,
+    min=0.05,
+    max=0.3,
+    step=0.05,
+    description='Ratio Test:',
+    style={'description_width': 'initial'}
+)
+
+total_ratio_text = widgets.HTML(
+    value="<b>Total Ratio: 1.0</b> ✅",
+)
+
+def update_total_ratio(*args):
+    """Update tampilan total ratio"""
+    total = train_ratio_slider.value + valid_ratio_slider.value + test_ratio_slider.value
+    
+    if abs(total - 1.0) < 0.001:  # Mendekati 1.0
+        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ✅"
+        split_button.disabled = False
+    else:
+        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ❌ (harus 1.0)"
+        split_button.disabled = True
+
+train_ratio_slider.observe(update_total_ratio, names='value')
+valid_ratio_slider.observe(update_total_ratio, names='value')
+test_ratio_slider.observe(update_total_ratio, names='value')
+
+split_button = widgets.Button(
+    description='Split Dataset',
+    button_style='primary',
+    icon='random'
+)
+
+split_status_output = widgets.Output()
+
+def on_split_button_clicked(b):
+    """Callback untuk split dataset"""
+    # Disable tombol selama proses
+    split_button.disabled = True
+    split_button.description = "Memproses..."
+    
+    with split_status_output:
+        clear_output()
+        
+        train_ratio = train_ratio_slider.value
+        valid_ratio = valid_ratio_slider.value
+        test_ratio = test_ratio_slider.value
+        
+        logger.info(f"Memulai split dataset dengan rasio: Train={train_ratio:.2f}, Valid={valid_ratio:.2f}, Test={test_ratio:.2f}...")
+        
+        # Periksa keberadaan direktori all_data dan buat jika belum ada
+        all_data_dir = Path('data/all_data')
+        all_data_images = all_data_dir / 'images'
+        all_data_labels = all_data_dir / 'labels'
+        
+        if not all_data_images.exists():
+            all_data_images.mkdir(parents=True, exist_ok=True)
+            logger.warning(f"Direktori 'data/all_data/images' dibuat karena belum ada!")
+            
+        if not all_data_labels.exists():
+            all_data_labels.mkdir(parents=True, exist_ok=True)
+            
+        # Periksa apakah ada file di direktori
+        image_files = list(all_data_images.glob('*.jpg')) + list(all_data_images.glob('*.jpeg')) + list(all_data_images.glob('*.png'))
+        
+        if not image_files:
+            logger.error(f"Tidak ada gambar dalam direktori {all_data_images}!")
+            logger.info(f"💡 Tip: Salin dataset hasil download ke direktori ini jika belum ada.")
+            
+            # Option to copy from Roboflow download
+            display(HTML("<p><strong>Tidak ada gambar di direktori data/all_data/images.</strong></p>"))
+            display(HTML("<p>Apakah Anda ingin menyalin data dari hasil download Roboflow?</p>"))
+            
+            # Tombol untuk menyalin dari train, valid, test ke all_data
+            copy_button = widgets.Button(
+                description='Salin Data dari Hasil Download',
+                button_style='warning',
+                icon='copy'
+            )
+            
+            def on_copy_button_clicked(b):
+                copy_button.disabled = True
+                copy_button.description = "Menyalin..."
+                
+                try:
+                    # Buat direktori all_data jika belum ada
+                    os.makedirs('data/all_data/images', exist_ok=True)
+                    os.makedirs('data/all_data/labels', exist_ok=True)
+                    
+                    # Salin data dari train, valid, test ke all_data
+                    total_copied = 0
+                    
+                    for split in ['train', 'valid', 'test']:
+                        split_images = Path(f'data/{split}/images')
+                        split_labels = Path(f'data/{split}/labels')
+                        
+                        if split_images.exists():
+                            # Hitung file yang akan disalin
+                            image_files = list(split_images.glob('*.jpg')) + \
+                                         list(split_images.glob('*.jpeg')) + \
+                                         list(split_images.glob('*.png'))
+                            
+                            logger.info(f"Menyalin {len(image_files)} gambar dari {split}...")
+                            
+                            # Salin gambar dan label
+                            for img_file in image_files:
+                                # Skip file yang sudah ada augmentasi
+                                if 'aug_' in img_file.name:
+                                    continue
+                                    
+                                # Salin gambar
+                                dest_img = Path(f'data/all_data/images/{img_file.name}')
+                                if not dest_img.exists():
+                                    import shutil
+                                    shutil.copy2(img_file, dest_img)
+                                    
+                                    # Salin label jika ada
+                                    label_file = split_labels / f"{img_file.stem}.txt"
+                                    if label_file.exists():
+                                        dest_label = Path(f'data/all_data/labels/{img_file.stem}.txt')
+                                        if not dest_label.exists():
+                                            shutil.copy2(label_file, dest_label)
+                                    
+                                    total_copied += 1
+                    
+                    logger.success(f"Berhasil menyalin {total_copied} gambar ke direktori all_data!")
+                    
+                    # Refresh count
+                    image_files = list(all_data_images.glob('*.jpg')) + \
+                                 list(all_data_images.glob('*.jpeg')) + \
+                                 list(all_data_images.glob('*.png'))
+                    
+                    if image_files:
+                        logger.info(f"Sekarang ada {len(image_files)} gambar di direktori all_data!")
+                    else:
+                        logger.warning("Masih tidak ada gambar di direktori all_data!")
+                        
+                except Exception as e:
+                    logger.error(f"Gagal menyalin data: {str(e)}")
+                
+                finally:
+                    copy_button.disabled = False
+                    copy_button.description = "Salin Data dari Hasil Download"
+            
+            copy_button.on_click(on_copy_button_clicked)
+            display(copy_button)
+            
+            # Re-enable tombol
+            split_button.disabled = False
+            split_button.description = "Split Dataset"
+            return
+            
+        # Jalankan split dataset
+        try:
+            # Jalankan split dengan dataset_processor bukan data_manager
+            stats = dataset_processor.split_dataset(
+                train_ratio=train_ratio,
+                valid_ratio=valid_ratio,
+                test_ratio=test_ratio
+            )
+            
+            logger.success("Split dataset selesai!")
+            logger.info(f"Statistik split:")
+            logger.info(f"• Train: {stats['train']} file")
+            logger.info(f"• Valid: {stats['valid']} file")
+            logger.info(f"• Test: {stats['test']} file")
+            
+            # Refresh statistik dataset
+            get_dataset_info()
+            
+            # Force garbage collection
+            gc.collect()
+            
+        except Exception as e:
+            logger.error(f"Gagal melakukan split dataset: {str(e)}")
+    
+    # Re-enable tombol
+    split_button.disabled = False
+    split_button.description = "Split Dataset"
+
+split_button.on_click(on_split_button_clicked)
+
+# Tampilkan tab split dataset
+tab_split_content = widgets.VBox([
+    widgets.HTML("<h2>📊 Split Dataset</h2>"),
+    widgets.HTML("<p>Atur rasio split dataset untuk training, validasi, dan testing.</p>"),
+    widgets.HTML("<div style='background-color: #FFF5E4; color:#FFA725;padding: 10px; border-radius: 5px; margin-bottom: 10px;'>"
+                "<b>📋 Petunjuk:</b><br>"
+                "1. Pastikan data lengkap ada di direktori <code>data/all_data</code><br>"
+                "2. Atur rasio untuk masing-masing split (total harus 1.0)<br>"
+                "3. Klik tombol 'Split Dataset' untuk memulai proses"
+                "</div>"),
+    widgets.VBox([
+        train_ratio_slider,
+        valid_ratio_slider,
+        test_ratio_slider,
+        total_ratio_text,
+    ]),
+    widgets.VBox([
+        split_button,
+        split_status_output
+    ])
+])
+
+display(tab_split_content)

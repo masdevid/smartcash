@@ -1,15 +1,16 @@
-# File: handlers/evaluation_handler.py
+# File: smartcash/handlers/evaluation_handler.py
 # Author: Alfrida Sabar
 # Deskripsi: Handler untuk evaluasi model dengan pendekatan modular
 
 import os
+import yaml
 from typing import Dict, Optional, Any
 from pathlib import Path
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.handlers.base_evaluation_handler import BaseEvaluationHandler
 from smartcash.handlers.research_scenario_handler import ResearchScenarioHandler
-from smartcash.cli.configuration_manager import ConfigurationManager
+
 
 class EvaluationHandler:
     """
@@ -24,6 +25,7 @@ class EvaluationHandler:
     def __init__(
         self, 
         config: Optional[Dict[str, Any]] = None,
+        config_path: str = 'configs/base_config.yaml',
         logger: Optional[SmartCashLogger] = None
     ):
         """
@@ -31,23 +33,18 @@ class EvaluationHandler:
         
         Args:
             config: Konfigurasi kustom (opsional)
+            config_path: Path ke file konfigurasi (opsional)
             logger: Logger kustom (opsional)
         """
         # Setup logger
         self.logger = logger or SmartCashLogger(__name__)
         
-        # Gunakan ConfigurationManager untuk mengelola konfigurasi
-        self.config_manager = ConfigurationManager(
-            base_config_path='configs/base_config.yaml'
-        )
+        # Load konfigurasi dasar
+        self.config = self._load_config(config_path)
         
-        # Update konfigurasi jika ada
+        # Update dengan konfigurasi kustom jika ada
         if config:
-            for key, value in config.items():
-                self.config_manager.update(key, value)
-        
-        # Ambil konfigurasi yang sudah diproses
-        self.config = self.config_manager.current_config
+            self._update_config_dict(self.config, config)
         
         # Inisialisasi handler evaluasi
         try:
@@ -84,7 +81,7 @@ class EvaluationHandler:
             # Update konfigurasi dengan argumen tambahan
             if kwargs:
                 for key, value in kwargs.items():
-                    self.config_manager.update(key, value)
+                    self._set_nested_value(self.config, key, value)
             
             # Pilih evaluator berdasarkan tipe
             if eval_type == 'regular':
@@ -178,3 +175,68 @@ class EvaluationHandler:
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal menemukan checkpoints: {str(e)}")
             return {}
+    
+    def _load_config(self, config_path: str) -> Dict:
+        """
+        Load konfigurasi dari file YAML.
+        
+        Args:
+            config_path: Path ke file konfigurasi
+            
+        Returns:
+            Dict konfigurasi
+        """
+        try:
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+                return config or {}
+        except Exception as e:
+            self.logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
+            # Return empty dict if loading fails
+            return {}
+    
+    def _update_config_dict(self, target: Dict, updates: Dict) -> None:
+        """
+        Update konfigurasi secara rekursif.
+        
+        Args:
+            target: Konfigurasi target
+            updates: Pembaruan yang akan diaplikasikan
+        """
+        for key, value in updates.items():
+            if isinstance(value, dict) and key in target and isinstance(target[key], dict):
+                # Rekursif untuk nested dict
+                self._update_config_dict(target[key], value)
+            else:
+                # Update nilai langsung
+                target[key] = value
+    
+    def _set_nested_value(self, config: Dict, key_path: str, value: Any) -> None:
+        """
+        Set nilai dalam konfigurasi berdasarkan path.
+        
+        Args:
+            config: Konfigurasi yang akan diupdate
+            key_path: Path key (misalnya 'model.backbone')
+            value: Nilai yang akan diset
+        """
+        keys = key_path.split('.')
+        current = config
+        
+        # Traverse hingga key terakhir
+        for key in keys[:-1]:
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+        
+        # Set nilai
+        current[keys[-1]] = value
+    
+    def get_config(self) -> Dict:
+        """
+        Dapatkan konfigurasi saat ini.
+        
+        Returns:
+            Dictionary konfigurasi
+        """
+        return self.config

@@ -56,7 +56,7 @@ class RoboflowDownloader:
         Returns:
             URL download
         """
-        base_url = "https://app.roboflow.com/ds/api/export"
+        base_url = "https://api.roboflow.com/ds/api/export"
         return (
             f"{base_url}/{self.project}?"
             f"key={self.api_key}&"

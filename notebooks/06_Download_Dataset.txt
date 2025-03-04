@@ -72,7 +72,58 @@ def download_dataset_with_progress(config):
     
     except Exception as e:
         print(f"❌ Error saat download dataset: {str(e)}")
+        
+        # Restore from backup if available
+        if data_dir.exists():
+            restore_from_backup(data_dir)
+        
+        # Cleanup temporary files
+        if 'dataset_path' in locals() and dataset_path.exists():
+            try:
+                shutil.rmtree(dataset_path)
+            except Exception as e:
+                print(f"⚠️ Gagal membersihkan file sementara: {str(e)}")
+        
         return None
+
+def restore_from_backup(data_dir: Path):
+    """
+    Restore dataset from latest backup
+    
+    Args:
+        data_dir: Path to data directory
+    """
+    backup_dir = data_dir.parent / 'data_backups'
+    
+    if not backup_dir.exists():
+        print("⚠️ Tidak ada backup yang ditemukan")
+        return False
+    
+    # Get latest backup
+    backups = sorted(backup_dir.iterdir(), key=os.path.getmtime, reverse=True)
+    
+    if not backups:
+        print("⚠️ Tidak ada backup yang tersedia")
+        return False
+    
+    latest_backup = backups[0]
+    print(f"🔄 Memulihkan dari backup terakhir: {latest_backup}")
+    
+    try:
+        # Restore all files
+        for split in ['train', 'valid', 'test']:
+            for file_type in ['images', 'labels']:
+                src = latest_backup / split / file_type
+                if src.exists():
+                    dst = data_dir / split / file_type
+                    dst.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(src, dst)
+        
+        print(f"✅ Dataset berhasil dipulihkan dari {latest_backup}")
+        return True
+    except Exception as e:
+        print(f"❌ Gagal memulihkan dataset: {str(e)}")
+        return False
 
 def cleanup_existing_dataset(data_dir: Path):
     """
@@ -86,7 +137,11 @@ def cleanup_existing_dataset(data_dir: Path):
     current_backup = backup_dir / timestamp
     
     try:
-        # Buat direktori backup jika belum ada
+        # Delete previous backup if exists
+        if backup_dir.exists():
+            shutil.rmtree(backup_dir)
+        
+        # Buat direktori backup
         backup_dir.mkdir(exist_ok=True)
         current_backup.mkdir()
         

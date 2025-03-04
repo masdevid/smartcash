@@ -14,7 +14,7 @@ if not os.path.exists('yolov5'):
     !git clone https://github.com/ultralytics/yolov5.git
     # Install dependensi YOLOv5
     !pip install -r yolov5/requirements.txt
-
+    
 # Tambahkan direktori ke path
 if 'smartcash' not in sys.path:
     sys.path.append('smartcash')
@@ -22,3 +22,34 @@ if 'yolov5' not in sys.path:
     sys.path.append('yolov5')
 
 print("✅ Repository berhasil disiapkan!")
+
+# Print all sys.path entries
+print("📂 Current sys.path:")
+for path in sys.path:
+    print(f"- {path}")
+
+# Add button to re-clone smartcash repo
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+
+reclone_button = widgets.Button(
+    description='🔄 Re-clone SmartCash',
+    disabled=False,
+    button_style='warning',
+    tooltip='Click to re-clone the SmartCash repository',
+    icon='refresh'
+)
+
+output = widgets.Output()
+
+def on_reclone_click(b):
+    with output:
+        clear_output()
+        print("🗑️ Removing existing SmartCash folder...")
+        !rm -rf smartcash
+        print("📥 Re-cloning SmartCash...")
+        !git clone https://github.com/masdevid/smartcash.git
+        print("✅ SmartCash repository re-cloned successfully!")
+
+reclone_button.on_click(on_reclone_click)
+display(reclone_button, output)

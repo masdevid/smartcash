@@ -109,7 +109,7 @@ class TrainingPipeline:
         try:
             # Coba dengan SmartCashLogger jika tersedia
             if hasattr(self.logger, 'log'):
-                self.logger.log(log_level, message)
+                self.logger.log(log_level, 'info', message)
             # Fallback ke logging standar
             elif hasattr(self.logger, log_level):
                 getattr(self.logger, log_level)(message)

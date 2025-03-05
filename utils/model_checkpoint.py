@@ -4,6 +4,7 @@
 
 import os
 import torch
+import yaml
 from typing import Optional, Dict, Any, Callable
 from datetime import datetime
 from pathlib import Path

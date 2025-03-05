@@ -11,6 +11,7 @@ from pathlib import Path
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.models.baseline import BaselineModel
+from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
 
 class ModelHandler:
     """Handler untuk training dan evaluasi model"""
@@ -65,7 +66,7 @@ class ModelHandler:
             # Parameter tambahan
             pretrained = self.config.get('model', {}).get('pretrained', True)
             
-            # Log detail inisialisasi
+            # Log konfirmasi backbone yang dipilih
             self.logger.info(
                 f"🚀 Mempersiapkan model dengan:\n"
                 f"   • Backbone: {backbone_type}\n"
@@ -108,7 +109,7 @@ class ModelHandler:
             
         except Exception as e:
             self.logger.error(f"❌ Gagal mempersiapkan model: {str(e)}")
-            raise
+            raise e
             
     def run_experiment(
         self,
@@ -185,3 +186,159 @@ class ModelHandler:
             all_results[scenario['name']] = results
             
         return all_results
+        
+    def get_optimizer(self, model, lr=None):
+        """Dapatkan optimizer untuk model"""
+        learning_rate = lr or self.config.get('training', {}).get('learning_rate', 0.001)
+        weight_decay = self.config.get('training', {}).get('weight_decay', 0.0005)
+        
+        self.logger.info(f"🔧 Membuat optimizer dengan learning rate {learning_rate}")
+        
+        # Pilih optimizer berdasarkan konfigurasi
+        optimizer_type = self.config.get('training', {}).get('optimizer', 'adam').lower()
+        
+        if optimizer_type == 'adam':
+            return torch.optim.Adam(
+                model.parameters(),
+                lr=learning_rate,
+                weight_decay=weight_decay
+            )
+        elif optimizer_type == 'adamw':
+            return torch.optim.AdamW(
+                model.parameters(),
+                lr=learning_rate,
+                weight_decay=weight_decay
+            )
+        elif optimizer_type == 'sgd':
+            momentum = self.config.get('training', {}).get('momentum', 0.9)
+            return torch.optim.SGD(
+                model.parameters(),
+                lr=learning_rate,
+                momentum=momentum,
+                weight_decay=weight_decay
+            )
+        else:
+            self.logger.warning(f"⚠️ Tipe optimizer '{optimizer_type}' tidak dikenal, menggunakan Adam")
+            return torch.optim.Adam(
+                model.parameters(),
+                lr=learning_rate,
+                weight_decay=weight_decay
+            )
+    
+    def get_scheduler(self, optimizer):
+        """Dapatkan learning rate scheduler berdasarkan konfigurasi"""
+        scheduler_type = self.config.get('training', {}).get('scheduler', 'plateau').lower()
+        
+        if scheduler_type == 'plateau':
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode='min',
+                factor=0.5,
+                patience=5,
+                verbose=True
+            )
+        elif scheduler_type == 'step':
+            step_size = self.config.get('training', {}).get('lr_step_size', 10)
+            gamma = self.config.get('training', {}).get('lr_gamma', 0.1)
+            return torch.optim.lr_scheduler.StepLR(
+                optimizer,
+                step_size=step_size,
+                gamma=gamma
+            )
+        elif scheduler_type == 'cosine':
+            epochs = self.config.get('training', {}).get('epochs', 30)
+            return torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer,
+                T_max=epochs
+            )
+        else:
+            self.logger.warning(f"⚠️ Tipe scheduler '{scheduler_type}' tidak dikenal, menggunakan ReduceLROnPlateau")
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer,
+                mode='min',
+                factor=0.5,
+                patience=5,
+                verbose=True
+            )
+    
+    def save_checkpoint(self, model, epoch, loss, is_best=False):
+        """Simpan checkpoint model"""
+        checkpoint_dir = Path(self.config.get('output_dir', 'runs/train')) / 'weights'
+        
+        try:
+            # Pastikan direktori ada
+            os.makedirs(checkpoint_dir, exist_ok=True)
+            
+            # Simpan model menggunakan StatelessCheckpointSaver
+            return StatelessCheckpointSaver.save_checkpoint(
+                model=model,
+                config=self.config,
+                epoch=epoch,
+                loss=loss,
+                checkpoint_dir=str(checkpoint_dir),
+                is_best=is_best,
+                log_fn=self.logger.info
+            )
+        except Exception as e:
+            self.logger.error(f"❌ Gagal menyimpan checkpoint: {str(e)}")
+            self.logger.error(f"📋 Detail: {str(e)}")
+            return None
+    
+    def load_model(self, checkpoint_path=None):
+        """Muat model dari checkpoint dengan dukungan fleksibilitas layer"""
+        # Ambil direktori checkpoint
+        checkpoint_dir = Path(self.config.get('output_dir', 'runs/train')) / 'weights'
+        
+        # Jika tidak ada path yang diberikan, cari checkpoint terbaik
+        if checkpoint_path is None:
+            best_checkpoints = list(checkpoint_dir.glob("*_best.pth"))
+            if best_checkpoints:
+                checkpoint_path = str(max(best_checkpoints, key=os.path.getmtime))
+                self.logger.info(f"📂 Menggunakan checkpoint terbaik: {checkpoint_path}")
+            else:
+                latest_checkpoints = list(checkpoint_dir.glob("*_latest.pth"))
+                if latest_checkpoints:
+                    checkpoint_path = str(max(latest_checkpoints, key=os.path.getmtime))
+                    self.logger.info(f"📂 Menggunakan checkpoint terakhir: {checkpoint_path}")
+                else:
+                    self.logger.warning("⚠️ Tidak ada checkpoint yang ditemukan")
+                    return self.get_model()
+                  
+        try:
+            # Muat checkpoint terlebih dahulu untuk mendapatkan informasi konfigurasi
+            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+            checkpoint_config = checkpoint.get('config', {})
+            
+            # Dapatkan informasi backbone dan layer dari checkpoint
+            backbone_type = checkpoint_config.get('model', {}).get('backbone', self.config.get('model', {}).get('backbone', 'efficientnet'))
+            checkpoint_layers = checkpoint_config.get('layers', self.config.get('layers', ['banknote']))
+            
+            # Perbarui detection_layers pada instance jika diperlukan
+            current_layers = self.config.get('layers', ['banknote'])
+            if set(checkpoint_layers) != set(current_layers):
+                self.logger.warning(f"⚠️ Layer pada checkpoint ({checkpoint_layers}) berbeda dengan konfigurasi saat ini ({current_layers})")
+                self.logger.info(f"ℹ️ Menggunakan layer dari checkpoint: {checkpoint_layers}")
+                
+                # Update config dengan layer dari checkpoint
+                self.config['layers'] = checkpoint_layers
+            
+            # Buat model baru dengan konfigurasi yang sama dengan checkpoint
+            model = self.get_model()
+            
+            # Muat state_dict
+            model.load_state_dict(checkpoint['model_state_dict'])
+            
+            self.logger.success(f"✅ Model berhasil dimuat dari {checkpoint_path}")
+            self.logger.info(f"📊 Epoch: {checkpoint.get('epoch', 'unknown')}")
+            self.logger.info(f"📉 Loss: {checkpoint.get('loss', 'unknown')}")
+            self.logger.info(f"🔍 Backbone: {backbone_type}")
+            self.logger.info(f"📋 Layers: {checkpoint_layers}")
+            
+            return model
+        except Exception as e:
+            self.logger.error(f"❌ Gagal memuat model: {str(e)}")
+            self.logger.error(f"📋 Detail: {str(e)}")
+            
+            # Fallback ke model baru
+            self.logger.warning("⚠️ Kembali ke model baru dengan konfigurasi default")
+            return self.get_model()

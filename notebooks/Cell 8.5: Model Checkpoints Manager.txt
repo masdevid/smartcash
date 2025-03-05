@@ -1,172 +1,11 @@
-# ================= [MODEL CHECKPOINTS] =================
-# Cell untuk mengelola checkpoint model
+# ================= [CHECKPOINT VIEWER] =================
+# Cell untuk melihat dan mengelola checkpoint model
 
 from datetime import datetime
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 
-class CheckpointsManager:
-    """Kelas untuk mengelola checkpoint model"""
-    
-    def __init__(self, checkpoints_dir='runs/train/weights', logger=None):
-        self.checkpoints_dir = Path(checkpoints_dir)
-        self.logger = logger or SmartCashLogger("checkpoints_manager")
-        
-        # Pastikan direktori checkpoint ada
-        self.checkpoints_dir.mkdir(parents=True, exist_ok=True)
-    
-    def list_checkpoints(self):
-        """Temukan semua checkpoint yang tersedia"""
-        # Kategori checkpoint
-        checkpoint_categories = {
-            'best': list(self.checkpoints_dir.glob('*_best.pth')),
-            'latest': list(self.checkpoints_dir.glob('*_latest.pth')),
-            'epoch': list(self.checkpoints_dir.glob('*_epoch_*.pth'))
-        }
-        
-        # Sort berdasarkan waktu modifikasi (terbaru dulu)
-        for category, files in checkpoint_categories.items():
-            checkpoint_categories[category] = sorted(
-                files, 
-                key=lambda x: x.stat().st_mtime,
-                reverse=True
-            )
-        
-        return checkpoint_categories
-    
-    def get_checkpoint_info(self, checkpoint_path):
-        """Dapatkan informasi dari checkpoint"""
-        try:
-            # Load checkpoint tanpa memuat model weights
-            checkpoint = torch.load(checkpoint_path, map_location='cpu')
-            
-            # Ekstrak informasi
-            info = {
-                'filename': checkpoint_path.name,
-                'path': str(checkpoint_path),
-                'size': f"{checkpoint_path.stat().st_size / (1024*1024):.2f} MB",
-                'modified': datetime.fromtimestamp(checkpoint_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
-                'epoch': checkpoint.get('epoch', 'unknown'),
-                'loss': checkpoint.get('loss', 'unknown'),
-                'config': checkpoint.get('config', {})
-            }
-            
-            # Ekstrak informasi backbone dan mode
-            config = checkpoint.get('config', {})
-            info['backbone'] = config.get('model', {}).get('backbone', 'unknown')
-            info['detection_mode'] = config.get('detection_mode', 'unknown')
-            info['layers'] = config.get('layers', ['unknown'])
-            
-            return info
-            
-        except Exception as e:
-            self.logger.error(f"❌ Gagal mendapatkan informasi checkpoint {checkpoint_path.name}: {str(e)}")
-            return {
-                'filename': checkpoint_path.name,
-                'path': str(checkpoint_path),
-                'error': str(e)
-            }
-    
-    def display_checkpoints(self):
-        """Tampilkan daftar checkpoint dalam format yang mudah dibaca"""
-        checkpoints = self.list_checkpoints()
-        
-        if sum(len(files) for files in checkpoints.values()) == 0:
-            print("⚠️ Tidak ada checkpoint yang ditemukan")
-            return
-        
-        # Tampilkan informasi untuk setiap kategori
-        for category, files in checkpoints.items():
-            if files:
-                if category == 'best':
-                    print(f"🏆 Checkpoint Terbaik:")
-                elif category == 'latest':
-                    print(f"🔄 Checkpoint Terakhir:")
-                else:
-                    print(f"📋 Checkpoint per Epoch:")
-                
-                # Tampilkan informasi untuk setiap file
-                for i, file in enumerate(files):
-                    info = self.get_checkpoint_info(file)
-                    
-                    if i < 5:  # Batasi tampilan hingga 5 file per kategori
-                        print(f"  • {info['filename']}")
-                        print(f"    - Epoch: {info['epoch']}")
-                        print(f"    - Loss: {info.get('loss', 'unknown')}")
-                        print(f"    - Backbone: {info.get('backbone', 'unknown')}")
-                        print(f"    - Mode: {info.get('detection_mode', 'unknown')}")
-                        print(f"    - Ukuran: {info['size']}")
-                        print(f"    - Waktu: {info['modified']}")
-                        print()
-                
-                # Tampilkan jumlah total jika ada lebih dari 5
-                if len(files) > 5:
-                    print(f"  ... dan {len(files) - 5} file lainnya\n")
-    
-    def delete_checkpoint(self, checkpoint_path):
-        """Hapus checkpoint"""
-        try:
-            Path(checkpoint_path).unlink()
-            self.logger.success(f"✅ Checkpoint {os.path.basename(checkpoint_path)} berhasil dihapus")
-            return True
-        except Exception as e:
-            self.logger.error(f"❌ Gagal menghapus checkpoint: {str(e)}")
-            return False
-    
-    def cleanup_checkpoints(self, keep_best=True, keep_latest=True, max_epochs=5):
-        """Bersihkan checkpoint lama"""
-        checkpoints = self.list_checkpoints()
-        deleted_count = 0
-        
-        # Pertahankan checkpoint terbaik jika diminta
-        if keep_best and checkpoints['best']:
-            best_to_keep = checkpoints['best'][0]  # Pertahankan yang terbaru
-            for cp in checkpoints['best'][1:]:  # Hapus sisanya
-                self.delete_checkpoint(cp)
-                deleted_count += 1
-        
-        # Pertahankan checkpoint terakhir jika diminta
-        if keep_latest and checkpoints['latest']:
-            latest_to_keep = checkpoints['latest'][0]  # Pertahankan yang terbaru
-            for cp in checkpoints['latest'][1:]:  # Hapus sisanya
-                self.delete_checkpoint(cp)
-                deleted_count += 1
-        
-        # Batasi jumlah checkpoint epoch
-        if len(checkpoints['epoch']) > max_epochs:
-            # Pertahankan checkpoint epoch terbaru
-            for cp in checkpoints['epoch'][max_epochs:]:
-                self.delete_checkpoint(cp)
-                deleted_count += 1
-                
-        self.logger.success(f"✅ Berhasil menghapus {deleted_count} checkpoint lama")
-        return deleted_count
-        
-    def copy_to_drive(self, checkpoint_path, drive_dir):
-        """Salin checkpoint ke Google Drive"""
-        try:
-            # Cek apakah drive_dir ada
-            if not os.path.exists(drive_dir):
-                os.makedirs(drive_dir, exist_ok=True)
-                
-            # Salin file
-            import shutil
-            dest_path = os.path.join(drive_dir, os.path.basename(checkpoint_path))
-            shutil.copy2(checkpoint_path, dest_path)
-            
-            self.logger.success(f"✅ Checkpoint berhasil disalin ke {dest_path}")
-            return dest_path
-        except Exception as e:
-            self.logger.error(f"❌ Gagal menyalin checkpoint ke Drive: {str(e)}")
-            return None
-
-# Inisialisasi checkpoints manager
-checkpoints_manager = CheckpointsManager(
-    checkpoints_dir=str(Path(config.get('output_dir', 'runs/train')) / 'weights'),
-    logger=logger
-)
-
-# Buat UI untuk mengelola checkpoint
+# Tombol untuk melihat checkpoint
 list_checkpoints_button = widgets.Button(
     description='Lihat Checkpoints',
     button_style='info',
@@ -214,7 +53,7 @@ checkpoints_output = widgets.Output()
 def on_list_checkpoints_button_clicked(b):
     with checkpoints_output:
         clear_output()
-        checkpoints_manager.display_checkpoints()
+        checkpoint_manager.display_checkpoints()
 
 def on_cleanup_checkpoints_button_clicked(b):
     with checkpoints_output:
@@ -224,7 +63,7 @@ def on_cleanup_checkpoints_button_clicked(b):
         print("🧹 Membersihkan checkpoint lama...")
         
         # Jalankan cleanup
-        deleted = checkpoints_manager.cleanup_checkpoints(
+        deleted = checkpoint_manager.cleanup_checkpoints(
             keep_best=True,
             keep_latest=True,
             max_epochs=5
@@ -235,10 +74,52 @@ def on_cleanup_checkpoints_button_clicked(b):
         
         # Tampilkan daftar yang tersisa
         print("\nDaftar checkpoint yang tersisa:")
-        checkpoints_manager.display_checkpoints()
+        checkpoint_manager.display_checkpoints()
 
 list_checkpoints_button.on_click(on_list_checkpoints_button_clicked)
 cleanup_checkpoints_button.on_click(on_cleanup_checkpoints_button_clicked)
+
+# Tambahkan fungsionalitas untuk menyalin ke Drive jika berjalan di Colab
+if drive_mounted or mount_drive_button:
+    copy_to_drive_button = widgets.Button(
+        description='Salin ke Drive',
+        button_style='primary',
+        icon='cloud-upload'
+    )
+    
+    drive_path_input = widgets.Text(
+        value='/content/drive/MyDrive/SmartCash/weights',
+        description='Path di Drive:',
+        style={'description_width': 'initial'},
+        layout={'width': '400px'}
+    )
+    
+    def on_copy_to_drive_button_clicked(b):
+        with checkpoints_output:
+            clear_output()
+            
+            if not drive_mounted and mount_drive_button:
+                print("⚠️ Google Drive belum terpasang. Silakan klik tombol 'Mount Google Drive' terlebih dahulu.")
+                return
+                
+            # Dapatkan checkpoint terbaik
+            best_checkpoint = checkpoint_manager.find_best_checkpoint()
+            if not best_checkpoint:
+                print("⚠️ Tidak ada checkpoint yang ditemukan untuk disalin.")
+                return
+                
+            # Salin ke Drive
+            result_path = checkpoint_manager.copy_to_drive(
+                checkpoint_path=best_checkpoint,
+                drive_dir=drive_path_input.value
+            )
+            
+            if result_path:
+                print(f"✅ Checkpoint berhasil disalin ke {result_path}")
+            else:
+                print("❌ Gagal menyalin checkpoint ke Drive.")
+    
+    copy_to_drive_button.on_click(on_copy_to_drive_button_clicked)
 
 # Tampilkan UI
 ui_components = [
@@ -248,13 +129,17 @@ ui_components = [
 ]
 
 if mount_drive_button:
-    ui_components.append(mount_drive_button)
+    ui_components.append(widgets.HTML("<h3>🔄 Google Drive Integration</h3>"))
+    ui_components.append(widgets.VBox([
+        mount_drive_button,
+        widgets.HBox([drive_path_input, copy_to_drive_button]) if 'copy_to_drive_button' in locals() else None
+    ]))
     ui_components.append(widgets.HTML("<p><i>Mount Google Drive untuk menyimpan checkpoint secara permanen</i></p>"))
 
 ui_components.append(checkpoints_output)
 
-display(widgets.VBox(ui_components))
+display(widgets.VBox([comp for comp in ui_components if comp is not None]))
 
 # Tampilkan daftar checkpoint awal
 with checkpoints_output:
-    checkpoints_manager.display_checkpoints()
+    checkpoint_manager.display_checkpoints()

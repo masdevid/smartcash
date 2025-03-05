@@ -56,7 +56,11 @@ try:
     from smartcash.models.yolov5_model import YOLOv5Model
     from smartcash.handlers.data_handler import DataHandler
     from smartcash.utils.early_stopping import EarlyStopping
+    
+    # Import modul-modul yang sudah dipisahkan
     from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+    from smartcash.utils.model_visualizer import ModelVisualizer
+    from smartcash.utils.checkpoint_manager import CheckpointManager
     
     logger.success("Modul model berhasil diimpor")
 except Exception as e:
@@ -124,4 +128,28 @@ def load_experiment_config():
 
 # Muat konfigurasi
 config = load_experiment_config()
-logger.success("Model imports berhasil dimuat")
+
+# Inisialisasi model handler untuk penggunaan di sel berikutnya
+from smartcash.handlers.model_handler import ModelHandler
+try:
+    # Coba inisialisasi ModelHandler
+    model_handler = ModelHandler(
+        config=config, 
+        config_path='configs/base_config.yaml',
+        num_classes=config.get('model', {}).get('num_classes', 7)
+    )
+    logger.success("ModelHandler berhasil diinisialisasi")
+except Exception as e:
+    logger.error(f"Gagal inisialisasi ModelHandler: {str(e)}")
+    
+# Inisialisasi checkpoint manager
+try:
+    checkpoint_manager = CheckpointManager(
+        checkpoints_dir=str(Path(config.get('output_dir', 'runs/train')) / 'weights'),
+        logger=logger
+    )
+    logger.success("CheckpointManager berhasil diinisialisasi")
+except Exception as e:
+    logger.error(f"Gagal inisialisasi CheckpointManager: {str(e)}")
+
+logger.success("Model imports dan setup berhasil dimuat")

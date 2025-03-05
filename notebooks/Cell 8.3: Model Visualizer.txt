@@ -1,116 +1,9 @@
-class ModelVisualizer:
-    """Kelas untuk memvisualisasikan arsitektur dan parameter model"""
-    
-    def __init__(self, model, logger=None):
-        self.model = model
-        self.logger = logger or SmartCashLogger("model_visualizer")
-    
-    def print_model_summary(self):
-        """Tampilkan ringkasan model"""
-        try:
-            from torchsummary import summary
-            
-            if isinstance(self.model, torch.nn.Module):
-                # Dapatkan dimensi input dari konfigurasi
-                input_shape = (3, 640, 640)  # Default
-                
-                # Print summary
-                self.logger.info(f"📊 Ringkasan model untuk input {input_shape}:")
-                summary(self.model, input_shape, device=next(self.model.parameters()).device.type)
-                return True
-            else:
-                self.logger.error("❌ Model bukan instance dari torch.nn.Module")
-                return False
-                
-        except ImportError:
-            self.logger.warning("⚠️ torchsummary tidak ditemukan, instalasi diperlukan")
-            return False
-        except Exception as e:
-            self.logger.error(f"❌ Gagal menampilkan ringkasan model: {str(e)}")
-            return False
-    
-    def visualize_backbone(self):
-        """Visualisasikan backbone model"""
-        try:
-            if hasattr(self.model, 'backbone'):
-                backbone_type = self.model.backbone.__class__.__name__
-                
-                # Dapatkan channels dan shapes
-                if hasattr(self.model.backbone, 'get_output_channels'):
-                    channels = self.model.backbone.get_output_channels()
-                else:
-                    channels = ["Unknown"]
-                
-                if hasattr(self.model.backbone, 'get_output_shapes'):
-                    shapes = self.model.backbone.get_output_shapes()
-                else:
-                    shapes = ["Unknown"]
-                
-                # Tampilkan informasi backbone
-                print(f"🔍 Backbone: {backbone_type}")
-                print(f"📊 Output channels: {channels}")
-                print(f"🖼️ Output shapes: {shapes}")
-                
-                # Plot visualisasi sederhana
-                if isinstance(channels, list) and all(isinstance(x, int) for x in channels):
-                    plt.figure(figsize=(10, 5))
-                    plt.bar(range(len(channels)), channels, color='skyblue')
-                    plt.xlabel('Feature Levels')
-                    plt.ylabel('Channels')
-                    plt.title(f'Output Channels dari {backbone_type}')
-                    plt.xticks(range(len(channels)), [f'P{i+3}' for i in range(len(channels))])
-                    for i, v in enumerate(channels):
-                        plt.text(i, v + 5, str(v), ha='center')
-                    plt.tight_layout()
-                    plt.show()
-                
-                return True
-            else:
-                self.logger.warning("⚠️ Model tidak memiliki atribut backbone")
-                return False
-        except Exception as e:
-            self.logger.error(f"❌ Gagal memvisualisasikan backbone: {str(e)}")
-            return False
-    
-    def count_parameters(self):
-        """Hitung dan tampilkan jumlah parameter model"""
-        try:
-            total_params = sum(p.numel() for p in self.model.parameters())
-            trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-            non_trainable_params = total_params - trainable_params
-            
-            # Tampilkan dalam format yang mudah dibaca
-            params_data = {
-                'Total': total_params,
-                'Trainable': trainable_params,
-                'Non-trainable': non_trainable_params
-            }
-            
-            # Print sebagai tabel
-            print(f"📊 Parameter Model:")
-            for name, count in params_data.items():
-                print(f"  • {name}: {count:,} ({count/1000000:.2f}M)")
-            
-            # Plot sebagai pie chart
-            plt.figure(figsize=(8, 5))
-            plt.pie(
-                [trainable_params, non_trainable_params],
-                labels=['Trainable', 'Non-trainable'],
-                autopct='%1.1f%%',
-                colors=['#5DA5DA', '#FAA43A'],
-                startangle=90
-            )
-            plt.title('Distribusi Parameter Model')
-            plt.tight_layout()
-            plt.show()
-            
-            return params_data
-        except Exception as e:
-            self.logger.error(f"❌ Gagal menghitung parameter: {str(e)}")
-            return None
+# ================= [MODEL VISUALIZATION] =================
+# Cell untuk visualisasi model
 
-# Inisialisasi model manager
-model_manager = ModelManager(config, logger)
+from smartcash.utils.model_visualizer import ModelVisualizer
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
 # Buat tombol untuk demonstrasi visualisasi model
 create_model_button = widgets.Button(
@@ -128,7 +21,7 @@ def on_create_model_button_clicked(b):
         
         try:
             # Buat model
-            model = model_manager.create_model()
+            model = model_handler.get_model()
             
             # Visualisasikan model
             visualizer = ModelVisualizer(model, logger)
@@ -139,6 +32,10 @@ def on_create_model_button_clicked(b):
             # Visualisasikan backbone
             visualizer.visualize_backbone()
             
+            # Visualisasikan output layer jika tersedia
+            print("\n🔍 Visualisasi Output Layer:")
+            visualizer.visualize_layer_outputs()
+            
             # Coba tampilkan summary jika torchsummary tersedia
             try:
                 import torchsummary
@@ -148,15 +45,57 @@ def on_create_model_button_clicked(b):
                 print("\n⚠️ Untuk melihat detail struktur model, install torchsummary:")
                 print("!pip install torchsummary")
             
+            # Bersihkan model
+            del model
+            torch.cuda.empty_cache()
+            
         except Exception as e:
             logger.error(f"❌ Gagal membuat atau memvisualisasikan model: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
 create_model_button.on_click(on_create_model_button_clicked)
+
+# Tambahkan dropdown untuk memilih backbone dan mode
+backbone_select = widgets.Dropdown(
+    options=[
+        ('EfficientNet-B4', 'efficientnet'),
+        ('CSPDarknet', 'cspdarknet')
+    ],
+    value='efficientnet',
+    description='Backbone:',
+    style={'description_width': 'initial'}
+)
+
+mode_select = widgets.Dropdown(
+    options=[
+        ('Single Layer', 'single'),
+        ('Multiple Layers', 'multi')
+    ],
+    value='single',
+    description='Mode:',
+    style={'description_width': 'initial'}
+)
+
+# Visualisasi modul
+viz_module_select = widgets.RadioButtons(
+    options=[
+        ('Full Model', 'full'),
+        ('Backbone Only', 'backbone'),
+        ('Parameters', 'parameters')
+    ],
+    value='full',
+    description='Visualisasi:',
+    style={'description_width': 'initial'},
+    layout={'width': 'max-content'}
+)
 
 # Tampilkan UI
 display(widgets.VBox([
     widgets.HTML("<h2>🔍 Visualisasi Model</h2>"),
-    widgets.HTML("<p>Klik tombol di bawah untuk membuat model dan melihat visualisasinya.</p>"),
+    widgets.HTML("<p>Visualisasi struktur dan parameter model berdasarkan konfigurasi.</p>"),
+    widgets.HBox([backbone_select, mode_select]),
+    viz_module_select,
     create_model_button,
     visualization_output
 ]))

@@ -61,15 +61,20 @@ def on_test_model_button_clicked(b):
         config['model']['pretrained'] = pretrained_checkbox.value
         
         try:
-            # Buat model manager baru dengan konfigurasi yang diperbarui
-            test_manager = ModelManager(config, logger)
+            # Gunakan ModelHandler untuk membuat model
+            test_manager = ModelHandler(
+                config=config, 
+                config_path="configs/base_config.yaml",
+                num_classes=config.get('model', {}).get('num_classes', 7),
+                logger=logger
+            )
             
             # Ukur waktu pembuatan model
             start_time = torch.cuda.Event(enable_timing=True)
             end_time = torch.cuda.Event(enable_timing=True)
             
             start_time.record()
-            model = test_manager.create_model()
+            model = test_manager.get_model()
             end_time.record()
             
             torch.cuda.synchronize()
@@ -100,6 +105,10 @@ def on_test_model_button_clicked(b):
                 inference_time = start_time.elapsed_time(end_time)
                 
                 logger.success(f"✅ Inferensi selesai dalam {inference_time:.2f}ms")
+                
+                # Gunakan ModelVisualizer untuk menampilkan informasi model
+                visualizer = ModelVisualizer(model, logger)
+                visualizer.count_parameters()
                 
                 # Tampilkan info output
                 if isinstance(output, dict):
@@ -146,6 +155,10 @@ def on_test_model_button_clicked(b):
                 plt.grid(True, linestyle='--', alpha=0.7)
                 plt.tight_layout()
                 plt.show()
+                
+                # Tampilkan visualisasi backbone setelah performance
+                print("\n🧠 Visualisasi Arsitektur Backbone:")
+                visualizer.visualize_backbone()
                 
                 # Bersihkan memori
                 del model, input_dummy, output

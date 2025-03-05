@@ -1,3 +1,5 @@
+# 8.2: Model Manager
+
 class ModelManager:
     """Pengelola model SmartCash dengan dukungan backbone berbeda dan fleksibilitas layer"""
     

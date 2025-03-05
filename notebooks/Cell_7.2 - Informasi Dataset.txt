@@ -1,4 +1,4 @@
-# Cell 7.2: Tab Informasi Dataset
+# Cell 7.2: Informasi Dataset
 
 # Fungsi untuk menampilkan statistik dataset
 def get_dataset_info():

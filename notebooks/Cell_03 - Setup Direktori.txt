@@ -1,4 +1,5 @@
 # Cell 3: Setup Direktori dengan Google Drive Integration
+
 from google.colab import drive
 import os
 from pathlib import Path

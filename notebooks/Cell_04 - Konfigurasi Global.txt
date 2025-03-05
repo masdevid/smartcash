@@ -1,0 +1,90 @@
+# Cell 4: Konfigurasi Global - Pengaturan parameter dan variabel global untuk sistem SmartCash
+
+def create_base_config():
+    """Create base configuration for the project"""
+    config = {
+        "data": {
+            "classes": [
+                "001", "002", "005", "010", "020", "050", "100",
+                "l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100",
+                "l3_sign", "l3_text", "l3_thread"
+            ],
+            "local": {
+                "test": f"{BASE_DIR}/data/test",
+                "train": f"{BASE_DIR}/data/train",
+                "valid": f"{BASE_DIR}/data/valid"
+            },
+            "roboflow": {
+                "api_key": "",  # Will be filled by user input
+                "project": "rupiah-emisi-2022",
+                "version": "3",
+                "workspace": "smartcash-wo2us"
+            },
+            "source": "roboflow"
+        },
+        "model": {
+            "backbone": "efficientnet",
+            "batch_size": 16,
+            "conf_thres": 0.25,
+            "img_size": [640, 640],
+            "iou_thres": 0.45,
+            "memory_limit": 0.6,
+            "num_classes": 17,
+            "pretrained": True,
+            "workers": 4 if not IN_COLAB else 2  # Reduce workers in Colab
+        },
+        "training": {
+            "batch_size": 16,
+            "epochs": 30,
+            "early_stopping_patience": 5,
+            "learning_rate": 0.001,
+            "warmup_epochs": 3,
+            "weight_decay": 0.0005,
+            "optimizer": "adam"
+        },
+        "evaluation": {
+            "metrics": ["accuracy", "precision", "recall", "f1", "mAP", "inference_time"],
+            "save_visualizations": True
+        },
+        "output_dir": f"{BASE_DIR}/runs/train",
+        "detection_mode": "single",
+        "layers": ["banknote"]
+    }
+    
+    # Save configuration
+    config_path = f"{BASE_DIR}/configs/base_config.yaml"
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    
+    logger.info("✅ Konfigurasi dasar berhasil dibuat")
+    return config
+
+def load_config():
+    """Load configuration from file"""
+    try:
+        with open(f"{BASE_DIR}/configs/experiment_config.yaml", 'r') as f:
+            config = yaml.safe_load(f)
+            if config:
+                logger.info("✅ Konfigurasi eksperimen berhasil dimuat")
+                return config
+    except FileNotFoundError:
+        try:
+            with open(f"{BASE_DIR}/configs/base_config.yaml", 'r') as f:
+                config = yaml.safe_load(f)
+                if config:
+                    logger.info("✅ Konfigurasi dasar berhasil dimuat")
+                    return config
+        except FileNotFoundError:
+            logger.warning("⚠️ File konfigurasi tidak ditemukan")
+    return None
+
+# Create or load configuration
+config = load_config()
+if not config:
+    config = create_base_config()
+
+# Save config for other cells
+with open('config.pkl', 'wb') as f:
+    pickle.dump(config, f)
+
+logger.success("✨ Konfigurasi global berhasil diinisialisasi")

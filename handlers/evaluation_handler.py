@@ -8,18 +8,18 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 
 from smartcash.utils.logger import SmartCashLogger
-from smartcash.handlers.base_evaluation_handler import BaseEvaluationHandler
+from smartcash.handlers.evaluator import Evaluator
 from smartcash.handlers.research_scenario_handler import ResearchScenarioHandler
 
 
 class EvaluationHandler:
     """
-    Handler utama untuk evaluasi model dengan dukungan berbagai skenario.
+    Main handler for model evaluation with support for various scenarios.
     
-    Fitur:
-    - Evaluasi model reguler
-    - Evaluasi skenario penelitian
-    - Manajemen konfigurasi fleksibel
+    Features:
+    - Regular model evaluation
+    - Research scenario evaluation
+    - Flexible configuration management
     """
     
     def __init__(
@@ -29,26 +29,26 @@ class EvaluationHandler:
         logger: Optional[SmartCashLogger] = None
     ):
         """
-        Inisialisasi EvaluationHandler.
+        Initialize EvaluationHandler.
         
         Args:
-            config: Konfigurasi kustom (opsional)
-            config_path: Path ke file konfigurasi (opsional)
-            logger: Logger kustom (opsional)
+            config: Custom configuration (optional)
+            config_path: Path to config file (optional)
+            logger: Custom logger (optional)
         """
         # Setup logger
         self.logger = logger or SmartCashLogger(__name__)
         
-        # Load konfigurasi dasar
+        # Load base configuration
         self.config = self._load_config(config_path)
         
-        # Update dengan konfigurasi kustom jika ada
+        # Update with custom config if provided
         if config:
             self._update_config_dict(self.config, config)
         
-        # Inisialisasi handler evaluasi
+        # Initialize evaluators
         try:
-            self.base_evaluator = BaseEvaluationHandler(
+            self.base_evaluator = Evaluator(
                 config=self.config, 
                 logger=self.logger
             )
@@ -59,62 +59,62 @@ class EvaluationHandler:
             )
             
         except Exception as e:
-            self.logger.error(f"❌ Gagal menginisialisasi evaluator: {str(e)}")
+            self.logger.error(f"❌ Failed to initialize evaluators: {str(e)}")
             raise
     
     def evaluate(
         self, 
-        eval_type: str = 'regular', 
+        eval_type: str = 'regular',
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Evaluasi model berdasarkan tipe evaluasi.
+        Evaluate model based on evaluation type.
         
         Args:
-            eval_type: Tipe evaluasi ('regular' atau 'research')
-            **kwargs: Argumen tambahan untuk kustomisasi evaluasi
+            eval_type: Type of evaluation ('regular' or 'research')
+            **kwargs: Additional arguments for customizing evaluation
         
         Returns:
-            Dict berisi hasil evaluasi
+            Dict containing evaluation results
         """
         try:
-            # Update konfigurasi dengan argumen tambahan
+            # Update configuration with additional arguments
             if kwargs:
                 for key, value in kwargs.items():
                     self._set_nested_value(self.config, key, value)
             
-            # Pilih evaluator berdasarkan tipe
+            # Choose evaluator based on type
             if eval_type == 'regular':
-                return self._evaluate_regular()
+                return self._evaluate_regular(**kwargs)
             elif eval_type == 'research':
                 return self._evaluate_research()
             else:
-                raise ValueError(f"Tipe evaluasi tidak valid: {eval_type}")
+                raise ValueError(f"Invalid evaluation type: {eval_type}")
         
         except Exception as e:
-            self.logger.error(f"❌ Evaluasi gagal: {str(e)}")
+            self.logger.error(f"❌ Evaluation failed: {str(e)}")
             raise
     
-    def _evaluate_regular(self) -> Dict:
+    def _evaluate_regular(self, **kwargs) -> Dict:
         """
-        Evaluasi model regular dengan checkpoint terbaru.
+        Regular model evaluation with latest checkpoint.
         
         Returns:
-            Dict berisi hasil evaluasi
+            Dict containing evaluation results
         """
-        self.logger.info("🔍 Memulai evaluasi reguler...")
+        self.logger.info("🔍 Starting regular evaluation...")
         
-        # Cari checkpoint model terbaru
+        # Find latest model checkpoint
         checkpoints_dir = Path(self.config.get('checkpoints_dir', 'checkpoints'))
         
-        # Pola pencarian checkpoint
+        # Checkpoint search patterns
         checkpoint_patterns = [
-            '*_best.pth',    # Checkpoint terbaik
-            '*_latest.pth',  # Checkpoint terakhir
-            '*_epoch_*.pth'  # Checkpoint epoch tertentu
+            '*_best.pth',    # Best checkpoint
+            '*_latest.pth',  # Latest checkpoint
+            '*_epoch_*.pth'  # Specific epoch checkpoint
         ]
         
-        # Cari checkpoint yang valid
+        # Find valid checkpoint
         latest_checkpoint = None
         for pattern in checkpoint_patterns:
             matches = list(checkpoints_dir.glob(pattern))
@@ -123,27 +123,32 @@ class EvaluationHandler:
                 break
         
         if not latest_checkpoint:
-            raise FileNotFoundError("❌ Tidak ada checkpoint model yang ditemukan")
+            raise FileNotFoundError("❌ No model checkpoint found")
         
-        # Path dataset testing
+        # Get test dataset path
         test_data_path = self.config.get('test_data_path', 'data/test')
         
-        # Lakukan evaluasi
+        # Run evaluation
         return self.base_evaluator.evaluate_model(
             model_path=str(latest_checkpoint),
-            dataset_path=test_data_path
+            dataset_path=test_data_path,
+            **kwargs
         )
     
     def _evaluate_research(self) -> Dict:
         """
-        Evaluasi model untuk skenario penelitian.
+        Research scenario evaluation.
         
         Returns:
-            Dict berisi hasil evaluasi penelitian
+            Dict containing research evaluation results
         """
-        self.logger.info("🔬 Memulai evaluasi skenario penelitian...")
+        self.logger.info("🔬 Starting research scenario evaluation...")
         
-        return self.research_evaluator.run_all_scenarios()
+        results = {
+            'research_results': self.research_evaluator.run_all_scenarios()
+        }
+        
+        return results
     
     def list_checkpoints(self) -> Dict[str, Path]:
         """
@@ -177,60 +182,28 @@ class EvaluationHandler:
             return {}
     
     def _load_config(self, config_path: str) -> Dict:
-        """
-        Load konfigurasi dari file YAML.
-        
-        Args:
-            config_path: Path ke file konfigurasi
-            
-        Returns:
-            Dict konfigurasi
-        """
+        """Load configuration from file."""
         try:
             with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                return config or {}
+                return yaml.safe_load(f)
         except Exception as e:
-            self.logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
-            # Return empty dict if loading fails
-            return {}
+            self.logger.error(f"❌ Failed to load config: {str(e)}")
+            raise
     
-    def _update_config_dict(self, target: Dict, updates: Dict) -> None:
-        """
-        Update konfigurasi secara rekursif.
-        
-        Args:
-            target: Konfigurasi target
-            updates: Pembaruan yang akan diaplikasikan
-        """
-        for key, value in updates.items():
-            if isinstance(value, dict) and key in target and isinstance(target[key], dict):
-                # Rekursif untuk nested dict
-                self._update_config_dict(target[key], value)
+    def _update_config_dict(self, base: Dict, update: Dict) -> None:
+        """Update configuration dictionary recursively."""
+        for key, value in update.items():
+            if isinstance(value, dict) and key in base:
+                self._update_config_dict(base[key], value)
             else:
-                # Update nilai langsung
-                target[key] = value
+                base[key] = value
     
-    def _set_nested_value(self, config: Dict, key_path: str, value: Any) -> None:
-        """
-        Set nilai dalam konfigurasi berdasarkan path.
-        
-        Args:
-            config: Konfigurasi yang akan diupdate
-            key_path: Path key (misalnya 'model.backbone')
-            value: Nilai yang akan diset
-        """
-        keys = key_path.split('.')
-        current = config
-        
-        # Traverse hingga key terakhir
-        for key in keys[:-1]:
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-        
-        # Set nilai
-        current[keys[-1]] = value
+    def _set_nested_value(self, d: Dict, key: str, value: Any) -> None:
+        """Set value in nested dictionary using dot notation."""
+        keys = key.split('.')
+        for k in keys[:-1]:
+            d = d.setdefault(k, {})
+        d[keys[-1]] = value
     
     def get_config(self) -> Dict:
         """

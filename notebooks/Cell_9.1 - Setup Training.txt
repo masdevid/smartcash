@@ -1,4 +1,3 @@
-# ================= [TRAINING SETUP] =================
 # Cell 9.1: Import dan Setup Training
 
 from smartcash.utils.training_pipeline import TrainingPipeline

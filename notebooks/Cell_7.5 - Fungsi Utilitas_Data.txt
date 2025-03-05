@@ -1,6 +1,5 @@
 # Cell 7.5: Fungsi Utilitas Data
 
-# ===== FUNGSI UTILITAS UNTUK DATALOADER =====
 def get_dataloaders(batch_size=None):
     """
     Dapatkan dataloader untuk training, validation, dan testing

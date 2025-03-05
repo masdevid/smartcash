@@ -1,0 +1,80 @@
+# Cell 7.1: Inisialisasi dan Import Data Handling - Setup awal untuk pengolahan dan manajemen dataset
+
+import ipywidgets as widgets
+from IPython.display import display, HTML, clear_output
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import os
+import gc
+import sys
+from pathlib import Path
+import torch
+import pickle
+
+# Tambahkan path ke PYTHONPATH jika belum ada
+if os.getcwd() not in sys.path:
+    sys.path.append(os.getcwd())
+
+# Import modul yang diperlukan
+from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.handlers.data_manager import DataManager
+
+# Set logger yang kompatibel dengan Colab
+logger = get_logger("data_pipeline", log_to_colab=True, log_to_file=True)
+
+# Load global config
+with open('config.pkl', 'rb') as f:
+    config = pickle.load(f)
+
+# Initialize data manager
+data_manager = DataManager(
+    config=config,
+    logger=logger
+)
+
+# Get class names and dataset info
+class_names = data_manager.get_class_names()
+logger.info(f"Loaded {len(class_names)} classes: {class_names}")
+
+# Get dataset statistics
+stats = data_manager.get_dataset_stats()
+logger.info("\nDataset statistics:")
+for split, split_stats in stats.items():
+    logger.info(f"{split.capitalize()}:")
+    for key, value in split_stats.items():
+        logger.info(f"  {key}: {value}")
+
+# Create data loaders with memory-optimized settings
+train_loader = data_manager.get_dataloader(
+    data_path=config['data']['local']['train'],
+    batch_size=config['model']['batch_size'],
+    mode='train',
+    num_workers=config['model']['workers']
+)
+
+val_loader = data_loader = data_manager.get_dataloader(
+    data_path=config['data']['local']['valid'],
+    batch_size=config['model']['batch_size'],
+    mode='val',
+    num_workers=config['model']['workers']
+)
+
+test_loader = data_manager.get_dataloader(
+    data_path=config['data']['local']['test'],
+    batch_size=config['model']['batch_size'],
+    mode='test',
+    num_workers=1  # Reduce workers for testing
+)
+
+# Save data loaders for other cells
+dataloaders = {
+    'train': train_loader,
+    'val': val_loader,
+    'test': test_loader
+}
+
+with open('dataloaders.pkl', 'wb') as f:
+    pickle.dump(dataloaders, f)
+
+logger.success("✨ Data handling initialization completed!")

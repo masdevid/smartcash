@@ -1,5 +1,4 @@
-# ================= [MODEL PLAYGROUND] =================
-# Cell untuk mencoba model secara interaktif
+# Cell 8.4: Model Playground - Untuk mencoba model secara interaktif
 
 # Widget untuk memilih backbone
 backbone_selector = widgets.Dropdown(

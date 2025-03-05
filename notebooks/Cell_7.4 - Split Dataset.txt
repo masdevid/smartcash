@@ -1,6 +1,5 @@
-# Cell 7.4: Tab Split Dataset
+# Cell 7.4: Split Dataset
 
-# ===== SPLIT DATASET =====
 # Widget untuk mengontrol split
 train_ratio_slider = widgets.FloatSlider(
     value=0.7,

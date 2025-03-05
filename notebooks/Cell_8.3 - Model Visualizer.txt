@@ -1,5 +1,4 @@
-# ================= [MODEL VISUALIZATION] =================
-# Cell untuk visualisasi model
+# Cell 8.3: Model Visualization - Untuk visualisasi model
 
 from smartcash.utils.model_visualizer import ModelVisualizer
 import ipywidgets as widgets

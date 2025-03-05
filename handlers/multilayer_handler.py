@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.models.yolov5_model import YOLOv5Model
-from smartcash.handlers.data_handler import DataHandler
+from smartcash.handlers.data_manager import DataManager
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.utils.model_checkpoint import ModelCheckpoint
 
@@ -48,8 +48,11 @@ class MultilayerHandler:
         # Initialize model
         self.model = self._create_model()
         
-        # Initialize data handler
-        self.data_handler = DataHandler(config=config, logger=logger)
+        # Initialize data manager
+        self.data_manager = DataManager(
+            config_path=config.get('config_path', 'config.yaml'),
+            logger=self.logger
+        )
         
     def _create_model(self) -> YOLOv5Model:
         """Create and initialize the YOLOv5 model for multilayer detection."""
@@ -70,10 +73,10 @@ class MultilayerHandler:
         """Train the multilayer detection model."""
         try:
             # Create data loaders
-            train_loader = self.data_handler.get_train_loader(
+            train_loader = self.data_manager.get_train_loader(
                 batch_size=self.config['training']['batch_size']
             )
-            val_loader = self.data_handler.get_val_loader(
+            val_loader = self.data_manager.get_val_loader(
                 batch_size=self.config['training']['batch_size']
             )
             

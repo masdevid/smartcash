@@ -1,4 +1,3 @@
-# ================= [MODEL UTILITIES] =================
 # Cell 8.1: Import Modul-modul untuk Model
 
 import os
@@ -14,6 +13,7 @@ from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 import traceback
+import pickle
 
 # Pastikan path smartcash di PYTHONPATH
 import sys
@@ -54,7 +54,7 @@ try:
     from smartcash.models.backbones.cspdarknet import CSPDarknet
     from smartcash.models.backbones.efficientnet import EfficientNetBackbone
     from smartcash.models.yolov5_model import YOLOv5Model
-    from smartcash.handlers.data_handler import DataHandler
+    from smartcash.handlers.data_manager import DataManager
     from smartcash.utils.early_stopping import EarlyStopping
     
     # Import modul-modul yang sudah dipisahkan
@@ -149,3 +149,87 @@ except Exception as e:
     logger.error(f"Gagal inisialisasi CheckpointHandler: {str(e)}")
 
 logger.success("Model imports dan setup berhasil dimuat")
+
+# ================= [MODEL CREATION] =================
+# Cell 8.1: Model Creation and Setup
+
+# Load global config and dataloaders
+with open('config.pkl', 'rb') as f:
+    config = pickle.load(f)
+    
+with open('dataloaders.pkl', 'rb') as f:
+    dataloaders = pickle.load(f)
+
+# Import model modules
+from smartcash.models.backbones.cspdarknet import CSPDarknet
+from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+from smartcash.models.yolov5_model import YOLOv5Model
+from smartcash.handlers.model_handler import ModelHandler
+from smartcash.utils.early_stopping import EarlyStopping
+from smartcash.utils.model_visualizer import ModelVisualizer
+from smartcash.handlers.checkpoint_handler import CheckpointHandler
+
+# Initialize model handler
+model_handler = ModelHandler(
+    config=config,
+    logger=logger
+)
+
+# Create model
+model = model_handler.create_model(
+    backbone_type=config['model']['backbone']
+)
+
+# Initialize checkpoint handler
+checkpoint_handler = CheckpointHandler(
+    output_dir=config['output_dir'],
+    logger=logger
+)
+
+# Initialize early stopping
+early_stopping = EarlyStopping(
+    patience=config['training']['early_stopping_patience'],
+    logger=logger
+)
+
+# Initialize model visualizer
+model_visualizer = ModelVisualizer(
+    output_dir=config['output_dir'],
+    logger=logger
+)
+
+# Setup optimizer and scheduler
+optimizer = model_handler.get_optimizer(model)
+scheduler = model_handler.get_scheduler(optimizer)
+
+# Save model components for other cells
+model_components = {
+    'model': model,
+    'optimizer': optimizer,
+    'scheduler': scheduler,
+    'early_stopping': early_stopping,
+    'checkpoint_handler': checkpoint_handler,
+    'model_visualizer': model_visualizer
+}
+
+with open('model_components.pkl', 'wb') as f:
+    pickle.dump(model_components, f)
+
+# Display model summary
+logger.info("\nModel Summary:")
+logger.info(f"Backbone: {config['model']['backbone']}")
+logger.info(f"Number of classes: {config['model']['num_classes']}")
+logger.info(f"Image size: {config['model']['img_size']}")
+logger.info(f"Detection layers: {config['layers']}")
+
+# Log GPU status if available
+if torch.cuda.is_available():
+    gpu_name = torch.cuda.get_device_name(0)
+    memory_allocated = torch.cuda.memory_allocated(0) / (1024**2)
+    memory_cached = torch.cuda.memory_reserved(0) / (1024**2)
+    logger.info(f"\nGPU Status:")
+    logger.info(f"GPU: {gpu_name}")
+    logger.info(f"Memory allocated: {memory_allocated:.2f} MB")
+    logger.info(f"Memory cached: {memory_cached:.2f} MB")
+
+logger.success("✨ Model creation and setup completed!")

@@ -14,6 +14,7 @@ import shutil
 import requests
 
 from smartcash.utils.logger import SmartCashLogger
+from smartcash.handlers.data_manager import DataManager
 
 class RoboflowHandler:
     """Handler untuk mengelola dataset dari Roboflow API"""
@@ -415,14 +416,14 @@ class RoboflowHandler:
         train_path, _, _ = self._ensure_dataset_available()
         dataset_path = dataset_path or train_path
         
-        # Gunakan DataHandler untuk membuat loader
-        from smartcash.handlers.data_handler import DataHandler
-        data_handler = DataHandler(
-            config=self.config,
-            data_dir=str(self.data_dir)
-        )
+        # Gunakan DataManager untuk membuat loader
+        data_manager = DataManager(config_path=self.config)
         
-        return data_handler.get_train_loader(batch_size, num_workers, dataset_path)
+        return data_manager.get_dataloader(
+            data_path=dataset_path,
+            batch_size=batch_size,
+            mode='train'
+        )
 
     def get_val_loader(self, batch_size: int = 32, num_workers: int = 4, dataset_path: Optional[str] = None) -> DataLoader:
         """
@@ -440,14 +441,14 @@ class RoboflowHandler:
         _, val_path, _ = self._ensure_dataset_available()
         dataset_path = dataset_path or val_path
         
-        # Gunakan DataHandler untuk membuat loader
-        from smartcash.handlers.data_handler import DataHandler
-        data_handler = DataHandler(
-            config=self.config,
-            data_dir=str(self.data_dir)
-        )
+        # Gunakan DataManager untuk membuat loader
+        data_manager = DataManager(config_path=self.config)
         
-        return data_handler.get_val_loader(batch_size, num_workers, dataset_path)
+        return data_manager.get_dataloader(
+            data_path=dataset_path,
+            batch_size=batch_size,
+            mode='val'
+        )
 
     def get_test_loader(self, batch_size: int = 32, num_workers: int = 4, dataset_path: Optional[str] = None) -> DataLoader:
         """
@@ -465,14 +466,14 @@ class RoboflowHandler:
         _, _, test_path = self._ensure_dataset_available()
         dataset_path = dataset_path or test_path
         
-        # Gunakan DataHandler untuk membuat loader
-        from smartcash.handlers.data_handler import DataHandler
-        data_handler = DataHandler(
-            config=self.config,
-            data_dir=str(self.data_dir)
-        )
+        # Gunakan DataManager untuk membuat loader
+        data_manager = DataManager(config_path=self.config)
         
-        return data_handler.get_test_loader(batch_size, num_workers, dataset_path)
+        return data_manager.get_dataloader(
+            data_path=dataset_path,
+            batch_size=batch_size,
+            mode='test'
+        )
 
     def _ensure_dataset_available(self) -> Tuple[str, str, str]:
         """

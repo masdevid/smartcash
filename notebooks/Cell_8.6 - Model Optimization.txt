@@ -1,5 +1,4 @@
-# ================= [MEMORY OPTIMIZATION] =================
-# Cell untuk optimasi memori khusus Google Colab
+# Cell 8.6: Memory Optimization - Untuk optimasi memori khusus Google Colab
 
 from smartcash.utils.memory_optimizer import MemoryOptimizer
 import matplotlib.pyplot as plt

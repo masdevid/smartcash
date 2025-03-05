@@ -1,5 +1,5 @@
-# ================= [SKENARIO PENELITIAN] =================
 # Cell 11: Skenario Penelitian
+
 class ResearchScenarioRunner:
     """Runner untuk menjalankan skenario penelitian"""
     

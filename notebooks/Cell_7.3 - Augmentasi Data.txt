@@ -1,6 +1,5 @@
-# Cell 7.3: Tab Augmentasi Data
+# Cell 7.3: Augmentasi Data
 
-# ===== AUGMENTASI DATA =====
 # Widget untuk mengontrol augmentasi
 augmentation_type = widgets.RadioButtons(
     options=[

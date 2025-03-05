@@ -1,4 +1,3 @@
-# ================= [EVALUATION] =================
 # Cell 10: Evaluasi Model
 from smartcash.smartcash.utils.metrics import MetricsCalculator
 from sklearn.metrics import confusion_matrix, classification_report

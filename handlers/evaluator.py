@@ -1,11 +1,19 @@
-"""Base evaluation handler for model evaluation."""
+"""Base evaluator class for model evaluation."""
 
 import os
 import torch
 import numpy as np
+from pathlib import Path
 from typing import Dict, Optional, List, Union
 from tqdm.auto import tqdm
-from sklearn.metrics import precision_recall_fscore_support, confusion_matrix, accuracy_score
+from sklearn.metrics import (
+    precision_recall_fscore_support,
+    confusion_matrix,
+    accuracy_score,
+    roc_curve,
+    precision_recall_curve,
+    auc
+)
 import time
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -14,10 +22,9 @@ from smartcash.utils.logger import SmartCashLogger
 from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.handlers.data_manager import DataManager
 from smartcash.utils.metrics import MetricsCalculator
-from smartcash.handlers.evaluator import Evaluator
 
-class BaseEvaluationHandler(Evaluator):
-    """Base handler for model evaluation."""
+class Evaluator:
+    """Base evaluator class that implements common evaluation functionality."""
     
     def __init__(
         self,
@@ -25,21 +32,26 @@ class BaseEvaluationHandler(Evaluator):
         logger: Optional[SmartCashLogger] = None
     ):
         """
-        Initialize base evaluation handler.
+        Initialize evaluator.
         
         Args:
             config: Configuration dictionary
             logger: Optional logger instance
         """
-        super().__init__(config=config, logger=logger)
+        self.config = config
+        self.logger = logger or SmartCashLogger("evaluator")
         
         # Initialize data manager
         self.data_manager = DataManager(
             config_path=config.get('config_path', 'config.yaml'),
             logger=self.logger
         )
+        
+        # Initialize metrics calculator
         self.metrics_calculator = MetricsCalculator()
-        self.output_dir = Path("outputs/evaluation")
+        
+        # Setup output directories
+        self.output_dir = Path(config.get('output_dir', 'outputs/evaluation'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.plot_dir = self.output_dir / "plots"
         self.plot_dir.mkdir(exist_ok=True)
@@ -49,16 +61,18 @@ class BaseEvaluationHandler(Evaluator):
         model_path: str,
         dataset_path: str,
         batch_size: int = 32,
-        num_workers: int = 4
+        num_workers: int = 4,
+        device: str = None
     ) -> Dict:
         """
-        Evaluate a single model on a dataset.
+        Evaluate a model on a dataset.
         
         Args:
             model_path: Path to model checkpoint
             dataset_path: Path to evaluation dataset
             batch_size: Batch size for evaluation
             num_workers: Number of workers for data loading
+            device: Device to run evaluation on ('cuda' or 'cpu')
             
         Returns:
             Dictionary containing evaluation metrics
@@ -67,7 +81,7 @@ class BaseEvaluationHandler(Evaluator):
         
         # Load model
         model = self._load_model(model_path)
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         model = model.to(device)
         model.eval()
         
@@ -107,20 +121,48 @@ class BaseEvaluationHandler(Evaluator):
         metrics = self.metrics_calculator.compute()
         metrics['inference_time'] = np.mean(inference_times)
         
-        # Plot confusion matrix
-        confusion_mat = confusion_matrix(true_labels, np.argmax(pred_scores, axis=1))
-        self.plot_confusion_matrix(confusion_mat, list(range(self.config['model']['num_classes'])))
-        
-        # Plot ROC curves
-        self.plot_roc_curves(true_labels, pred_scores, list(range(self.config['model']['num_classes'])))
-        
-        # Plot precision-recall curves
-        self.plot_pr_curves(true_labels, pred_scores, list(range(self.config['model']['num_classes'])))
+        # Generate evaluation plots
+        if self.config.get('evaluation', {}).get('generate_plots', True):
+            self._generate_evaluation_plots(true_labels, pred_scores)
         
         # Log results
         self._log_results(metrics)
         
         return metrics
+    
+    def evaluate_multiple_runs(
+        self,
+        model_path: str,
+        dataset_path: str,
+        num_runs: int = 3,
+        **kwargs
+    ) -> Dict:
+        """
+        Evaluate a model multiple times and average the results.
+        
+        Args:
+            model_path: Path to model checkpoint
+            dataset_path: Path to evaluation dataset
+            num_runs: Number of evaluation runs
+            **kwargs: Additional arguments passed to evaluate_model
+            
+        Returns:
+            Dictionary containing averaged evaluation metrics
+        """
+        metrics_list = []
+        
+        for run in range(num_runs):
+            self.logger.info(f"Run {run + 1}/{num_runs}")
+            metrics = self.evaluate_model(model_path, dataset_path, **kwargs)
+            metrics_list.append(metrics)
+        
+        # Calculate average metrics
+        avg_metrics = {}
+        for key in metrics_list[0].keys():
+            if isinstance(metrics_list[0][key], (int, float)):
+                avg_metrics[key] = np.mean([m[key] for m in metrics_list])
+        
+        return avg_metrics
     
     def _load_model(self, model_path: str) -> torch.nn.Module:
         """
@@ -163,6 +205,158 @@ class BaseEvaluationHandler(Evaluator):
             self.logger.error(f"Failed to load model: {str(e)}")
             raise
     
+    def _generate_evaluation_plots(
+        self,
+        true_labels: np.ndarray,
+        pred_scores: np.ndarray
+    ) -> None:
+        """
+        Generate evaluation plots (confusion matrix, ROC curves, PR curves).
+        
+        Args:
+            true_labels: True class labels
+            pred_scores: Predicted class scores
+        """
+        # Get class names
+        num_classes = self.config['model']['num_classes']
+        class_names = list(range(num_classes))
+        
+        # Plot confusion matrix
+        confusion_mat = confusion_matrix(true_labels, np.argmax(pred_scores, axis=1))
+        self._plot_confusion_matrix(confusion_mat, class_names)
+        
+        # Plot ROC curves
+        self._plot_roc_curves(true_labels, pred_scores, class_names)
+        
+        # Plot precision-recall curves
+        self._plot_pr_curves(true_labels, pred_scores, class_names)
+    
+    def _plot_confusion_matrix(
+        self,
+        confusion_matrix: np.ndarray,
+        class_names: List[str],
+        normalize: bool = True
+    ) -> str:
+        """
+        Plot confusion matrix.
+        
+        Args:
+            confusion_matrix: Confusion matrix array
+            class_names: List of class names
+            normalize: Whether to normalize values
+            
+        Returns:
+            Path to saved plot
+        """
+        if normalize:
+            confusion_matrix = confusion_matrix.astype(float) / confusion_matrix.sum(axis=1)[:, np.newaxis]
+            fmt = '.2%'
+        else:
+            fmt = 'd'
+        
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(
+            confusion_matrix,
+            annot=True,
+            fmt=fmt,
+            cmap='Blues',
+            xticklabels=class_names,
+            yticklabels=class_names,
+            square=True,
+            cbar_kws={'shrink': .8}
+        )
+        plt.title('Confusion Matrix', size=16)
+        plt.ylabel('True Label', size=14)
+        plt.xlabel('Predicted Label', size=14)
+        plt.xticks(rotation=45)
+        plt.yticks(rotation=0)
+        
+        plot_path = self.plot_dir / 'confusion_matrix.png'
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(plot_path)
+    
+    def _plot_roc_curves(
+        self,
+        true_labels: np.ndarray,
+        pred_scores: np.ndarray,
+        class_names: List[str]
+    ) -> str:
+        """
+        Plot ROC curves for each class.
+        
+        Args:
+            true_labels: True class labels
+            pred_scores: Predicted class scores
+            class_names: List of class names
+            
+        Returns:
+            Path to saved plot
+        """
+        plt.figure(figsize=(10, 8))
+        
+        for i, class_name in enumerate(class_names):
+            fpr, tpr, _ = roc_curve((true_labels == i).astype(int), pred_scores[:, i])
+            roc_auc = auc(fpr, tpr)
+            plt.plot(fpr, tpr, lw=2, label=f'{class_name} (AUC = {roc_auc:.2f})')
+        
+        plt.plot([0, 1], [0, 1], 'k--', lw=2)
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.0])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC Curves', size=16)
+        plt.legend(loc='lower right')
+        plt.grid(True)
+        
+        plot_path = self.plot_dir / 'roc_curves.png'
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(plot_path)
+    
+    def _plot_pr_curves(
+        self,
+        true_labels: np.ndarray,
+        pred_scores: np.ndarray,
+        class_names: List[str]
+    ) -> str:
+        """
+        Plot precision-recall curves for each class.
+        
+        Args:
+            true_labels: True class labels
+            pred_scores: Predicted class scores
+            class_names: List of class names
+            
+        Returns:
+            Path to saved plot
+        """
+        plt.figure(figsize=(10, 8))
+        
+        for i, class_name in enumerate(class_names):
+            precision, recall, _ = precision_recall_curve(
+                (true_labels == i).astype(int),
+                pred_scores[:, i]
+            )
+            pr_auc = auc(recall, precision)
+            plt.plot(recall, precision, lw=2, label=f'{class_name} (AUC = {pr_auc:.2f})')
+        
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.0])
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.title('Precision-Recall Curves', size=16)
+        plt.legend(loc='lower left')
+        plt.grid(True)
+        
+        plot_path = self.plot_dir / 'pr_curves.png'
+        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        return str(plot_path)
+    
     def _log_results(self, metrics: Dict) -> None:
         """
         Log evaluation results.
@@ -178,133 +372,4 @@ class BaseEvaluationHandler(Evaluator):
             f"  F1-Score: {metrics['f1']:.4f}\n"
             f"  mAP: {metrics['mAP']:.4f}\n"
             f"  Waktu Inferensi: {metrics['inference_time']*1000:.2f}ms"
-        )
-
-    def plot_confusion_matrix(
-        self,
-        confusion_matrix: np.ndarray,
-        class_names: List[str],
-        title: str = "Confusion Matrix",
-        normalize: bool = True
-    ) -> str:
-        """Plot confusion matrix and save to file.
-        
-        Args:
-            confusion_matrix: Confusion matrix array
-            class_names: List of class names
-            title: Plot title
-            normalize: Whether to normalize values
-            
-        Returns:
-            Path to saved plot
-        """
-        if normalize:
-            confusion_matrix = confusion_matrix.astype(float) / confusion_matrix.sum(axis=1)[:, np.newaxis]
-            fmt = ".2%"
-        else:
-            fmt = "d"
-        
-        plt.figure(figsize=(10, 8))
-        sns.heatmap(
-            confusion_matrix,
-            annot=True,
-            fmt=fmt,
-            cmap="Blues",
-            xticklabels=class_names,
-            yticklabels=class_names,
-            square=True,
-            cbar_kws={"shrink": .8}
-        )
-        plt.title(title, size=16)
-        plt.ylabel("True Label", size=14)
-        plt.xlabel("Predicted Label", size=14)
-        plt.xticks(rotation=45)
-        plt.yticks(rotation=0)
-        
-        # Save plot
-        plot_path = self.plot_dir / "confusion_matrix.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-        
-        return str(plot_path)
-        
-    def plot_roc_curves(
-        self,
-        true_labels: Union[List[int], np.ndarray],
-        pred_scores: Union[List[float], np.ndarray],
-        class_names: List[str],
-        title: str = "ROC Curves"
-    ) -> str:
-        """Plot ROC curves for each class.
-        
-        Args:
-            true_labels: True class labels
-            pred_scores: Predicted class scores
-            class_names: List of class names
-            title: Plot title
-            
-        Returns:
-            Path to saved plot
-        """
-        plt.figure(figsize=(10, 8))
-        
-        for i, class_name in enumerate(class_names):
-            fpr, tpr, _ = roc_curve((true_labels == i).astype(int), pred_scores[:, i])
-            roc_auc = auc(fpr, tpr)
-            plt.plot(fpr, tpr, lw=2, label=f"{class_name} (AUC = {roc_auc:.2f})")
-            
-        plt.plot([0, 1], [0, 1], "k--", lw=2)
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.0])
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title(title, size=16)
-        plt.legend(loc="lower right")
-        plt.grid(True)
-        
-        # Save plot
-        plot_path = self.plot_dir / "roc_curves.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-        
-        return str(plot_path)
-        
-    def plot_pr_curves(
-        self,
-        true_labels: Union[List[int], np.ndarray],
-        pred_scores: Union[List[float], np.ndarray],
-        class_names: List[str],
-        title: str = "Precision-Recall Curves"
-    ) -> str:
-        """Plot precision-recall curves for each class.
-        
-        Args:
-            true_labels: True class labels
-            pred_scores: Predicted class scores
-            class_names: List of class names
-            title: Plot title
-            
-        Returns:
-            Path to saved plot
-        """
-        plt.figure(figsize=(10, 8))
-        
-        for i, class_name in enumerate(class_names):
-            precision, recall, _ = precision_recall_curve((true_labels == i).astype(int), pred_scores[:, i])
-            pr_auc = auc(recall, precision)
-            plt.plot(recall, precision, lw=2, label=f"{class_name} (AUC = {pr_auc:.2f})")
-            
-        plt.xlim([0.0, 1.0])
-        plt.ylim([0.0, 1.0])
-        plt.xlabel("Recall")
-        plt.ylabel("Precision")
-        plt.title(title, size=16)
-        plt.legend(loc="lower left")
-        plt.grid(True)
-        
-        # Save plot
-        plot_path = self.plot_dir / "pr_curves.png"
-        plt.savefig(plot_path, dpi=300, bbox_inches="tight")
-        plt.close()
-        
-        return str(plot_path)
+        ) 

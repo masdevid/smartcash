@@ -147,7 +147,8 @@ class SmartCashLogger(logging.Logger):
         
         # Log ke file melalui parent Logger
         if self.log_to_file:
-            log_method = getattr(super(), level, super().info)
+            level_str = str(level) if isinstance(level, int) else level
+            log_method = getattr(super(), level_str, super().info)
             log_method(plain_msg)
         
         # Tampilkan di Colab jika diaktifkan

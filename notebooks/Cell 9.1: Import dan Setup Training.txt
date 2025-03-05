@@ -1,0 +1,70 @@
+# ================= [TRAINING SETUP] =================
+# Cell 9.1: Import dan Setup Training
+
+from smartcash.utils.training_pipeline import TrainingPipeline
+from smartcash.utils.early_stopping import EarlyStopping
+from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+from smartcash.utils.memory_optimizer import MemoryOptimizer
+import torch
+import gc
+import os
+import time
+from pathlib import Path
+from torch.utils.tensorboard import SummaryWriter
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display, HTML, clear_output
+
+# Check if we're running in Colab
+try:
+    from google.colab import drive
+    is_colab = True
+    logger.log('info', "🌐 Berjalan di Google Colab. Optimasi untuk Colab diaktifkan.")
+except ImportError:
+    is_colab = False
+    logger.log('info', "💻 Berjalan di lingkungan lokal.")
+
+# Setup direktori untuk training
+output_dir = Path(config.get('output_dir', 'runs/train'))
+output_dir.mkdir(parents=True, exist_ok=True)
+
+checkpoint_dir = output_dir / 'weights'
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+# Inisialisasi memory optimizer
+memory_optimizer = MemoryOptimizer(logger=logger)
+
+# Cek status GPU
+memory_optimizer.check_gpu_status()
+
+# Inisialisasi training pipeline
+training_pipeline = TrainingPipeline(
+    config=config,
+    model_manager=model_handler,
+    data_manager=None,  # Akan diisi nanti
+    logger=logger
+)
+
+# Tombol untuk mount Google Drive (hanya di Colab)
+if is_colab:
+    # Widget untuk Mount Google Drive
+    drive_status = widgets.HTML(value="<b>Status Drive:</b> Belum terpasang")
+    mount_button = widgets.Button(
+        description='Mount Google Drive',
+        button_style='info',
+        icon='hdd'
+    )
+    
+    def on_mount_drive_clicked(b):
+        try:
+            drive.mount('/content/drive')
+            drive_status.value = "<b>Status Drive:</b> <span style='color:green'>✅ Terpasang</span>"
+            logger.log('success', "✅ Google Drive berhasil terpasang di /content/drive")
+        except Exception as e:
+            drive_status.value = f"<b>Status Drive:</b> <span style='color:red'>❌ Gagal terpasang: {str(e)}</span>"
+            logger.log('error', f"❌ Gagal memasang Google Drive: {str(e)}")
+    
+    mount_button.on_click(on_mount_drive_clicked)
+    display(widgets.VBox([drive_status, mount_button]))
+
+logger.log('info', "🔄 Setup training pipeline selesai")

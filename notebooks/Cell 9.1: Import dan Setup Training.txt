@@ -19,10 +19,10 @@ from IPython.display import display, HTML, clear_output
 try:
     from google.colab import drive
     is_colab = True
-    logger.log('info', "🌐 Berjalan di Google Colab. Optimasi untuk Colab diaktifkan.")
+    logger.log('info', 'Colab environment detected', "🌐 Berjalan di Google Colab. Optimasi untuk Colab diaktifkan.")
 except ImportError:
     is_colab = False
-    logger.log('info', "💻 Berjalan di lingkungan lokal.")
+    logger.log('info', 'Local environment detected', "💻 Berjalan di lingkungan lokal.")
 
 # Setup direktori untuk training
 output_dir = Path(config.get('output_dir', 'runs/train'))
@@ -67,4 +67,4 @@ if is_colab:
     mount_button.on_click(on_mount_drive_clicked)
     display(widgets.VBox([drive_status, mount_button]))
 
-logger.log('info', "🔄 Setup training pipeline selesai")
+logger.log('info', 'Training pipeline setup complete', "🔄 Setup training pipeline selesai")

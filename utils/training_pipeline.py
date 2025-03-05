@@ -2,22 +2,28 @@
 # Author: Alfrida Sabar
 # Deskripsi: Pipeline training yang dioptimalkan untuk Google Colab dengan dukungan checkpointing dan visualisasi
 
-import torch
+import os
 import time
 import gc
-import os
-from datetime import datetime
+import logging
 from pathlib import Path
-from tqdm.notebook import tqdm
-import matplotlib.pyplot as plt
+
+import torch
 import numpy as np
-from IPython.display import display, clear_output
+import matplotlib.pyplot as plt
+from tqdm.notebook import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
 from smartcash.utils.memory_optimizer import MemoryOptimizer
+
+# Tambahkan import untuk mengatasi masalah TensorBoard
+try:
+    import tensorflow as tf
+except ImportError:
+    tf = None
 
 class TrainingPipeline:
     """Pipeline training SmartCash dengan optimasi untuk Google Colab"""
@@ -30,7 +36,20 @@ class TrainingPipeline:
         logger=None
     ):
         self.config = config
-        self.logger = logger or SmartCashLogger("training_pipeline")
+        
+        # Setup logger dengan mode yang lebih aman
+        if logger is None:
+            # Buat logger kustom jika tidak disediakan
+            logger = logging.getLogger('training_pipeline')
+            logger.setLevel(logging.INFO)
+            if not logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                handler.setFormatter(formatter)
+                logger.addHandler(handler)
+        
+        self.logger = SmartCashLogger("training_pipeline") if isinstance(logger, SmartCashLogger) else logger
+        
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Menyimpan referensi ke manager
@@ -41,10 +60,17 @@ class TrainingPipeline:
         self.output_dir = Path(config.get('output_dir', 'runs/train'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Setup TensorBoard
+        # Setup TensorBoard dengan penanganan error
         self.log_dir = self.output_dir / 'logs'
         self.log_dir.mkdir(exist_ok=True)
-        self.writer = SummaryWriter(log_dir=str(self.log_dir))
+        
+        # Gunakan SummaryWriter dengan penanganan error
+        try:
+            self.writer = SummaryWriter(log_dir=str(self.log_dir))
+        except Exception as e:
+            # Fallback ke logging biasa jika TensorBoard gagal
+            self.logger.warning(f"❌ Gagal menginisialisasi TensorBoard: {str(e)}")
+            self.writer = None
         
         # Setup metrik untuk tracking
         self.metrics_history = {
@@ -61,7 +87,49 @@ class TrainingPipeline:
         self.current_epoch = 0
         self.best_val_loss = float('inf')
         self.training_start_time = None
+    
+    def _safe_log(self, log_level, message):
+        """
+        Logging yang aman dengan berbagai metode
         
+        Args:
+            log_level: Level logging (info, warning, error, etc)
+            message: Pesan yang akan di-log
+        """
+        try:
+            # Coba dengan SmartCashLogger jika tersedia
+            if hasattr(self.logger, 'log'):
+                self.logger.log(log_level, 'info', message)
+            # Fallback ke logging standar
+            elif hasattr(self.logger, log_level):
+                getattr(self.logger, log_level)(message)
+            else:
+                # Fallback paling akhir
+                logging.log(
+                    getattr(logging, log_level.upper(), logging.INFO), 
+                    message
+                )
+        except Exception as e:
+            # Logging terakhir dengan print jika semua cara gagal
+            print(f"Logging error: {e}. Original message: {message}")
+    
+    def _log_metrics(self, epoch, avg_train_loss, avg_val_loss):
+        """
+        Log metrik dengan aman, termasuk ke TensorBoard jika tersedia
+        """
+        # Log ke console
+        self._safe_log('info', 
+            f"⏱️ Epoch [{epoch+1}] - Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}"
+        )
+        
+        # Log ke TensorBoard jika tersedia
+        if self.writer:
+            try:
+                self.writer.add_scalar('Loss/train', avg_train_loss, epoch)
+                self.writer.add_scalar('Loss/val', avg_val_loss, epoch)
+            except Exception as e:
+                self._safe_log('warning', f"Gagal menulis ke TensorBoard: {str(e)}")
+    
     def train(
         self, 
         model=None, 

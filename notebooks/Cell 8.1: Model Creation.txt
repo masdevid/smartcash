@@ -58,7 +58,6 @@ try:
     from smartcash.utils.early_stopping import EarlyStopping
     
     # Import modul-modul yang sudah dipisahkan
-    from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
     from smartcash.utils.model_visualizer import ModelVisualizer
     from smartcash.handlers.checkpoint_handler import CheckpointHandler
     
@@ -144,7 +143,7 @@ except Exception as e:
     
 # Inisialisasi CheckpointHandler
 try:
-    checkpoint_handler = CheckpointHandler(config=config, logger=logger)
+    checkpoint_handler = CheckpointHandler(logger=logger)
     logger.success("CheckpointHandler berhasil diinisialisasi")
 except Exception as e:
     logger.error(f"Gagal inisialisasi CheckpointHandler: {str(e)}")

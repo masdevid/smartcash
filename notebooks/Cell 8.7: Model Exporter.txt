@@ -31,13 +31,9 @@ if 'logger' not in globals():
 # Inisialisasi model exporter menggunakan kelas dari modul utils
 model_exporter = ModelExporter(model_manager, logger)
 
-# Pastikan checkpoint_manager tersedia
-if 'checkpoint_manager' not in globals():
-    from smartcash.utils.checkpoint_manager import CheckpointManager
-    checkpoint_manager = CheckpointManager(
-        checkpoints_dir=str(Path(config.get('output_dir', 'runs/train')) / 'weights'),
-        logger=logger
-    )
+# Inisialisasi CheckpointHandler
+from smartcash.handlers.checkpoint_handler import CheckpointHandler
+checkpoint_handler = CheckpointHandler(logger=logger)
 
 # UI untuk ekspor model
 export_format_selector = widgets.Dropdown(
@@ -83,7 +79,7 @@ def on_export_button_clicked(b):
         clear_output()
         
         # Ambil checkpoint terbaik
-        checkpoints = checkpoint_manager.list_checkpoints()
+        checkpoints = checkpoint_handler.list_checkpoints()
         best_checkpoint = None
         
         if checkpoints['best']:

@@ -1,4 +1,4 @@
-# Cell 8.5: Model Checkpoint - Untuk melihat dan mengelola checkpoint model
+# Cell 8.4: Model Checkpoint - Untuk melihat dan mengelola checkpoint model
 
 from datetime import datetime
 import ipywidgets as widgets

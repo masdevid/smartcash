@@ -1,4 +1,4 @@
-# Cell 8.7: Model Exporter - Untuk mengekspor model dalam format yang dapat digunakan di produksi
+# Cell 8.6: Model Exporter - Untuk mengekspor model dalam format yang dapat digunakan di produksi
 
 from smartcash.utils.model_exporter import ModelExporter
 import torch
@@ -16,6 +16,7 @@ if 'model_manager' not in globals():
     else:
         # Jika tidak tersedia, buat instance baru
         from smartcash.handlers.model_handler import ModelHandler
+
         model_manager = ModelHandler(
             config=config, 
             config_path='configs/base_config.yaml',

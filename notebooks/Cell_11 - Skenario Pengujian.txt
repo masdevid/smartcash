@@ -9,7 +9,7 @@ class ResearchScenarioRunner:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Setup managers
-        self.model_manager = ModelManager(config)
+        self.model_manager = ModelHandler(config)
         self.data_manager = DataManager(config)
         self.evaluator = ModelEvaluator(config)
         

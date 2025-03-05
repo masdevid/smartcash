@@ -16,7 +16,6 @@ from torch.utils.tensorboard import SummaryWriter
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.early_stopping import EarlyStopping
-from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
 from smartcash.utils.memory_optimizer import MemoryOptimizer
 
 class TrainingPipeline:
@@ -25,7 +24,7 @@ class TrainingPipeline:
     def __init__(
         self, 
         config, 
-        model_manager=None, 
+        model_handler=None, 
         data_manager=None, 
         logger=None
     ):
@@ -34,7 +33,7 @@ class TrainingPipeline:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Menyimpan referensi ke manager
-        self.model_manager = model_manager
+        self.model_manager = model_handler
         self.data_manager = data_manager
         
         # Setup direktori output
@@ -84,7 +83,7 @@ class TrainingPipeline:
             Dictionary berisi hasil training
         """
         # Setup model dan dataloaders jika belum ada
-        model = model or self.model_manager.get_model()
+        model = model or self.model_manager.create_model()
         dataloaders = dataloaders or self.data_manager.get_dataloaders()
         
         # Setup optimizer
@@ -118,7 +117,7 @@ class TrainingPipeline:
         self.current_epoch = start_epoch
         
         # Implementasi mixed precision untuk efisiensi memori
-        scaler = torch.cuda.amp.GradScaler() if torch.cuda.is_available() else None
+        scaler = torch.amp.GradScaler('cuda') if torch.cuda.is_available() else None
         
         # Training loop
         try:

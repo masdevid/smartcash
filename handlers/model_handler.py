@@ -1,9 +1,9 @@
 # File: handlers/model_handler.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk model training dan evaluasi dengan perbaikan untuk ModuleDict.active_layers
+# Deskripsi: Handler terkonsolidasi untuk model training, evaluasi, dan manajemen dengan dukungan multi-backbone
 
 import os
-from typing import Dict, Optional, List, Union
+from typing import Dict, Optional, List, Union, Any
 import yaml
 import time
 import torch
@@ -14,181 +14,118 @@ from smartcash.models.baseline import BaselineModel
 from smartcash.handlers.checkpoint_handler import CheckpointHandler
 
 class ModelHandler:
-    """Handler untuk training dan evaluasi model"""
+    """Handler terkonsolidasi untuk model training, evaluasi, dan manajemen dengan dukungan multi-backbone"""
     
     def __init__(
         self,
         config: Dict,
-        config_path: str,
-        num_classes: int,
+        config_path: str = "configs/base_config.yaml",
+        num_classes: int = 7,
         logger: Optional[SmartCashLogger] = None
     ):
-        self.config_path = Path(config_path)  # Store config path
+        """
+        Inisialisasi model handler.
+        
+        Args:
+            config: Konfigurasi model dan training
+            config_path: Path ke file konfigurasi (opsional)
+            num_classes: Jumlah kelas (jika None, akan diambil dari config)
+            logger: Custom logger (opsional)
+        """
+        self.config = config  
+        self.config_path = Path(config_path) if config_path else None
         self.logger = logger or SmartCashLogger(__name__)
+        self.num_classes = num_classes or config.get('model', {}).get('num_classes', 7)
         
-        # Load configuration
-        self.config = config or self._load_config(config_path)
+        # Setup checkpoint handler
+        self.checkpoint_handler = CheckpointHandler(
+            checkpoints_dir=config.get('output_dir', 'runs/train') + '/weights',
+            logger=self.logger
+        )
         
-        self.num_classes = num_classes
+        # Track results eksperimen
         self.results = {}
-        
-    def _load_config(self, config_path: str) -> Dict:
-        """Load experiment configuration"""
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-            
-            # Validate critical configurations
-            if not config:
-                raise ValueError("Konfigurasi kosong atau tidak valid")
-            
-            return config
-        except Exception as e:
-            self.logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
-            raise
     
-    def get_model(self) -> Union[YOLOv5Model, BaselineModel]:
+    def create_model(self, backbone_type: Optional[str] = None) -> Union[YOLOv5Model, BaselineModel]:
         """
-        Inisialisasi model dengan dukungan backbone fleksibel
+        Membuat model dengan backbone dan konfigurasi yang ditentukan.
         
+        Args:
+            backbone_type: Tipe backbone ('efficientnet', 'cspdarknet', dll)
+            
         Returns:
-            Model yang siap untuk training
+            Model yang siap digunakan
         """
+        # Prioritaskan backbone yang diberikan, atau gunakan dari config
+        backbone_type = backbone_type or self.config.get('model', {}).get('backbone', 'cspdarknet')
+        
+        # Parameter lain dari config
+        pretrained = self.config.get('model', {}).get('pretrained', True)
+        detection_layers = self.config.get('layers', ['banknote'])
+        
+        # Log informasi model
+        self.logger.info(
+            f"🔄 Membuat model dengan backbone: {backbone_type}\n"
+            f"   • Pretrained: {pretrained}\n"
+            f"   • Detection layers: {detection_layers}\n"
+            f"   • Num classes: {self.num_classes}"
+        )
+        
+        # Buat model sesuai tipe backbone
         try:
-            # Prioritaskan backbone dari konfigurasi
-            backbone_type = (
-                self.config.get('backbone') or 'cspdarknet'
-            )
-            
-            # Pastikan detection_layers diambil dari config
-            detection_layers = self.config.get('layers', ['banknote'])
-            
-            # Parameter tambahan
-            pretrained = self.config.get('model', {}).get('pretrained', True)
-            
-            # Log konfirmasi backbone yang dipilih
-            self.logger.info(
-                f"🚀 Mempersiapkan model dengan:\n"
-                f"   • Backbone: {backbone_type}\n"
-                f"   • Pretrained: {pretrained}\n"
-                f"   • Jumlah Layer: {len(detection_layers)}\n"
-                f"   • Jumlah Kelas: {self.num_classes}"
-            )
-            
-            # Inisialisasi model dengan backbone yang dipilih
-            if backbone_type == 'efficientnet':
-                model = YOLOv5Model(
+            if backbone_type in ['efficientnet', 'cspdarknet']:
+                return YOLOv5Model(
                     num_classes=self.num_classes,
-                    backbone_type='efficientnet',
+                    backbone_type=backbone_type,
                     pretrained=pretrained,
-                    detection_layers=detection_layers,  # Gunakan detection_layers, bukan layers
-                    logger=self.logger
-                )
-            elif backbone_type == 'cspdarknet':
-                model = YOLOv5Model(
-                    num_classes=self.num_classes,
-                    backbone_type='cspdarknet',
-                    pretrained=pretrained,
-                    detection_layers=detection_layers,  # Gunakan detection_layers, bukan layers
+                    detection_layers=detection_layers,
                     logger=self.logger
                 )
             else:
-                # Fallback untuk backbone khusus/eksperimental
-                model = BaselineModel(
+                # Fallback untuk backbone lain
+                return BaselineModel(
                     num_classes=self.num_classes,
                     backbone=backbone_type,
                     pretrained=pretrained
                 )
-            
-            # Pindahkan ke GPU jika tersedia
-            if torch.cuda.is_available():
-                model = model.cuda()
-                self.logger.info("💻 Model dialihkan ke GPU")
-            
+                
+            self.logger.success(f"✅ Model berhasil dibuat dengan backbone {backbone_type}")
             return model
             
         except Exception as e:
-            self.logger.error(f"❌ Gagal mempersiapkan model: {str(e)}")
+            self.logger.error(f"❌ Gagal membuat model: {str(e)}")
             raise e
-            
-    def run_experiment(
-        self,
-        scenario: Dict,
-        train_path: str,
-        val_path: str,
-        test_path: str
-    ) -> Dict:
-        """Jalankan eksperimen untuk satu skenario"""
-        self.logger.start(
-            f"Memulai eksperimen: {scenario['name']}\n"
-            f"Deskripsi: {scenario['description']}"
-        )
-        
-        try:
-            # Initialize model sesuai skenario
-            model = self.get_model()
-            
-            # Build & train model
-            start_time = time.time()
-            
-            model.build()
-            train_results = model.train(
-                train_path=train_path,
-                val_path=val_path,
-                epochs=self.config['training']['epochs']
-            )
-            
-            # Evaluasi
-            eval_results = model.evaluate(
-                test_path=test_path,
-                save_visualizations=self.config['evaluation']['save_visualizations']
-            )
-            
-            # Hitung inference time
-            inference_time = (time.time() - start_time) / len(os.listdir(test_path))
-            eval_results['inference_time'] = inference_time
-            
-            # Simpan hasil
-            self.results[scenario['name']] = {
-                'training': train_results,
-                'evaluation': eval_results
-            }
-            
-            self.logger.success(
-                f"Eksperimen {scenario['name']} selesai!\n"
-                f"Inference time: {inference_time:.4f} s/img"
-            )
-            
-            return eval_results
-            
-        except Exception as e:
-            self.logger.error(
-                f"Eksperimen {scenario['name']} gagal: {str(e)}"
-            )
-            raise
     
-    def run_all_experiments(
-        self,
-        train_path: str,
-        val_path: str,
-        test_path: str
-    ) -> Dict:
-        """Jalankan semua skenario eksperimen"""
-        all_results = {}
+    def get_model(self, backbone_type: Optional[str] = None) -> Union[YOLOv5Model, BaselineModel]:
+        """
+        Alias untuk create_model untuk kompatibilitas dengan kode lama
         
-        for scenario in self.config['experiment_scenarios']:
-            results = self.run_experiment(
-                scenario=scenario,
-                train_path=train_path,
-                val_path=val_path,
-                test_path=test_path
-            )
-            all_results[scenario['name']] = results
+        Args:
+            backbone_type: Tipe backbone ('efficientnet', 'cspdarknet', dll)
             
-        return all_results
+        Returns:
+            Model yang siap digunakan
+        """
+        return self.create_model(backbone_type)
+            
+    def get_optimizer(
+        self, 
+        model: torch.nn.Module, 
+        lr: Optional[float] = None,
+        clip_grad_norm: Optional[float] = None
+    ) -> torch.optim.Optimizer:
+        """
+        Membuat optimizer untuk model.
         
-    def get_optimizer(self, model, lr=None):
-        """Dapatkan optimizer untuk model"""
+        Args:
+            model: Model yang akan dioptimasi
+            lr: Learning rate (jika None, akan diambil dari config)
+            clip_grad_norm: Nilai maksimum untuk gradient clipping (opsional)
+            
+        Returns:
+            Optimizer yang sesuai dengan konfigurasi
+        """
+        # Ambil parameter dari config
         learning_rate = lr or self.config.get('training', {}).get('learning_rate', 0.001)
         weight_decay = self.config.get('training', {}).get('weight_decay', 0.0005)
         
@@ -198,20 +135,20 @@ class ModelHandler:
         optimizer_type = self.config.get('training', {}).get('optimizer', 'adam').lower()
         
         if optimizer_type == 'adam':
-            return torch.optim.Adam(
+            optimizer = torch.optim.Adam(
                 model.parameters(),
                 lr=learning_rate,
                 weight_decay=weight_decay
             )
         elif optimizer_type == 'adamw':
-            return torch.optim.AdamW(
+            optimizer = torch.optim.AdamW(
                 model.parameters(),
                 lr=learning_rate,
                 weight_decay=weight_decay
             )
         elif optimizer_type == 'sgd':
             momentum = self.config.get('training', {}).get('momentum', 0.9)
-            return torch.optim.SGD(
+            optimizer = torch.optim.SGD(
                 model.parameters(),
                 lr=learning_rate,
                 momentum=momentum,
@@ -219,14 +156,39 @@ class ModelHandler:
             )
         else:
             self.logger.warning(f"⚠️ Tipe optimizer '{optimizer_type}' tidak dikenal, menggunakan Adam")
-            return torch.optim.Adam(
+            optimizer = torch.optim.Adam(
                 model.parameters(),
                 lr=learning_rate,
                 weight_decay=weight_decay
             )
+            
+        # Tambahkan gradient clipping jika diminta
+        if clip_grad_norm is not None:
+            for group in optimizer.param_groups:
+                group.setdefault('max_grad_norm', clip_grad_norm)
+            
+            # Wrap step method dengan gradient clipping
+            original_step = optimizer.step
+            
+            def step_with_clip(*args, **kwargs):
+                torch.nn.utils.clip_grad_norm_(model.parameters(), clip_grad_norm)
+                return original_step(*args, **kwargs)
+                
+            optimizer.step = step_with_clip
+            self.logger.info(f"🔒 Gradient clipping diaktifkan dengan max_norm={clip_grad_norm}")
+            
+        return optimizer
     
-    def get_scheduler(self, optimizer):
-        """Dapatkan learning rate scheduler berdasarkan konfigurasi"""
+    def get_scheduler(self, optimizer: torch.optim.Optimizer) -> Any:
+        """
+        Membuat learning rate scheduler berdasarkan konfigurasi.
+        
+        Args:
+            optimizer: Optimizer yang akan dijadwalkan
+            
+        Returns:
+            Learning rate scheduler
+        """
         scheduler_type = self.config.get('training', {}).get('scheduler', 'plateau').lower()
         
         if scheduler_type == 'plateau':
@@ -261,84 +223,285 @@ class ModelHandler:
                 verbose=True
             )
     
-    def save_checkpoint(self, model, epoch, loss, is_best=False):
-        """Simpan checkpoint model"""
-        checkpoint_dir = Path(self.config.get('output_dir', 'runs/train')) / 'weights'
+    def save_checkpoint(
+        self, 
+        model: torch.nn.Module, 
+        epoch: int, 
+        loss: float, 
+        is_best: bool = False
+    ) -> Dict[str, str]:
+        """
+        Simpan model checkpoint.
         
-        try:
-            # Pastikan direktori ada
-            os.makedirs(checkpoint_dir, exist_ok=True)
+        Args:
+            model: Model yang akan disimpan
+            epoch: Epoch saat ini
+            loss: Loss terakhir
+            is_best: Flag untuk menandai checkpoint terbaik
             
-            # Simpan model menggunakan CheckpointHandler
-            return CheckpointHandler.save_checkpoint(
-                model=model,
-                config=self.config,
-                epoch=epoch,
-                loss=loss,
-                checkpoint_dir=str(checkpoint_dir),
-                is_best=is_best,
-                log_fn=self.logger.info
-            )
-        except Exception as e:
-            self.logger.error(f"❌ Gagal menyimpan checkpoint: {str(e)}")
-            self.logger.error(f"📋 Detail: {str(e)}")
-            return None
+        Returns:
+            Dict berisi path checkpoint yang disimpan
+        """
+        return self.checkpoint_handler.save_checkpoint(
+            model=model,
+            config=self.config,
+            epoch=epoch,
+            metrics={'loss': loss},
+            is_best=is_best
+        )
     
-    def load_model(self, checkpoint_path=None):
-        """Muat model dari checkpoint dengan dukungan fleksibilitas layer"""
-        # Ambil direktori checkpoint
-        checkpoint_dir = Path(self.config.get('output_dir', 'runs/train')) / 'weights'
+    def load_model(self, checkpoint_path: Optional[str] = None) -> torch.nn.Module:
+        """
+        Muat model dari checkpoint.
         
-        # Jika tidak ada path yang diberikan, cari checkpoint terbaik
+        Args:
+            checkpoint_path: Path ke checkpoint (jika None, akan mencari checkpoint terbaik)
+            
+        Returns:
+            Model yang dimuat dari checkpoint
+        """
+        # Cari checkpoint terbaik jika tidak ada path yang diberikan
         if checkpoint_path is None:
-            best_checkpoints = list(checkpoint_dir.glob("*_best.pth"))
-            if best_checkpoints:
-                checkpoint_path = str(max(best_checkpoints, key=os.path.getmtime))
-                self.logger.info(f"📂 Menggunakan checkpoint terbaik: {checkpoint_path}")
-            else:
-                latest_checkpoints = list(checkpoint_dir.glob("*_latest.pth"))
-                if latest_checkpoints:
-                    checkpoint_path = str(max(latest_checkpoints, key=os.path.getmtime))
-                    self.logger.info(f"📂 Menggunakan checkpoint terakhir: {checkpoint_path}")
-                else:
-                    self.logger.warning("⚠️ Tidak ada checkpoint yang ditemukan")
-                    return self.get_model()
-                  
+            checkpoint_path = self.checkpoint_handler.find_best_checkpoint()
+            if checkpoint_path is None:
+                self.logger.warning("⚠️ Tidak ada checkpoint yang ditemukan, membuat model baru")
+                return self.create_model()
+                
         try:
-            # Muat checkpoint terlebih dahulu untuk mendapatkan informasi konfigurasi
-            checkpoint = torch.load(checkpoint_path, map_location='cpu')
+            # Muat checkpoint
+            checkpoint = self.checkpoint_handler.load_checkpoint(checkpoint_path)
             checkpoint_config = checkpoint.get('config', {})
             
-            # Dapatkan informasi backbone dan layer dari checkpoint
-            backbone_type = checkpoint_config.get('model', {}).get('backbone', self.config.get('model', {}).get('backbone', 'efficientnet'))
-            checkpoint_layers = checkpoint_config.get('layers', self.config.get('layers', ['banknote']))
-            
-            # Perbarui detection_layers pada instance jika diperlukan
-            current_layers = self.config.get('layers', ['banknote'])
-            if set(checkpoint_layers) != set(current_layers):
-                self.logger.warning(f"⚠️ Layer pada checkpoint ({checkpoint_layers}) berbeda dengan konfigurasi saat ini ({current_layers})")
-                self.logger.info(f"ℹ️ Menggunakan layer dari checkpoint: {checkpoint_layers}")
-                
-                # Update config dengan layer dari checkpoint
-                self.config['layers'] = checkpoint_layers
+            # Dapatkan informasi backbone dari checkpoint
+            backbone = checkpoint_config.get('model', {}).get('backbone', self.config.get('model', {}).get('backbone', 'efficientnet'))
             
             # Buat model baru dengan konfigurasi yang sama dengan checkpoint
-            model = self.get_model()
+            model = self.create_model(backbone_type=backbone)
             
             # Muat state_dict
             model.load_state_dict(checkpoint['model_state_dict'])
             
-            self.logger.success(f"✅ Model berhasil dimuat dari {checkpoint_path}")
-            self.logger.info(f"📊 Epoch: {checkpoint.get('epoch', 'unknown')}")
-            self.logger.info(f"📉 Loss: {checkpoint.get('loss', 'unknown')}")
-            self.logger.info(f"🔍 Backbone: {backbone_type}")
-            self.logger.info(f"📋 Layers: {checkpoint_layers}")
+            # Log informasi
+            self.logger.success(
+                f"✅ Model berhasil dimuat dari checkpoint:\n"
+                f"   • Path: {checkpoint_path}\n"
+                f"   • Epoch: {checkpoint.get('epoch', 'unknown')}\n"
+                f"   • Loss: {checkpoint.get('metrics', {}).get('loss', 'unknown')}\n"
+                f"   • Backbone: {backbone}"
+            )
             
             return model
+            
         except Exception as e:
             self.logger.error(f"❌ Gagal memuat model: {str(e)}")
-            self.logger.error(f"📋 Detail: {str(e)}")
+            raise e
             
-            # Fallback ke model baru
-            self.logger.warning("⚠️ Kembali ke model baru dengan konfigurasi default")
-            return self.get_model()
+    def run_experiment(
+        self,
+        scenario: Dict,
+        train_loader: torch.utils.data.DataLoader,
+        val_loader: torch.utils.data.DataLoader,
+        test_loader: torch.utils.data.DataLoader
+    ) -> Dict:
+        """
+        Jalankan eksperimen berdasarkan skenario.
+        
+        Args:
+            scenario: Konfigurasi skenario eksperimen
+            train_loader: DataLoader untuk training
+            val_loader: DataLoader untuk validasi
+            test_loader: DataLoader untuk testing
+            
+        Returns:
+            Dict berisi hasil eksperimen
+        """
+        self.logger.info(f"🧪 Memulai eksperimen: {scenario['name']}")
+        self.logger.info(f"📝 Deskripsi: {scenario['description']}")
+        
+        # Simpan konfigurasi awal
+        original_config = self.config.copy()
+        
+        try:
+            # Update konfigurasi sesuai skenario
+            if 'backbone' in scenario:
+                self.config['model']['backbone'] = scenario['backbone']
+                
+            # Buat model sesuai skenario
+            model = self.create_model()
+            
+            # Pindahkan ke GPU jika tersedia
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            model = model.to(device)
+            
+            # Setup optimizer dan scheduler
+            optimizer = self.get_optimizer(model)
+            scheduler = self.get_scheduler(optimizer)
+            
+            # Training loop
+            start_time = time.time()
+            epochs = self.config.get('training', {}).get('epochs', 30)
+            
+            for epoch in range(epochs):
+                # Training
+                model.train()
+                train_loss = self._train_epoch(model, optimizer, train_loader, device)
+                
+                # Validation
+                model.eval()
+                val_loss = self._validate_epoch(model, val_loader, device)
+                
+                # Update scheduler
+                if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                    scheduler.step(val_loss)
+                else:
+                    scheduler.step()
+                    
+                # Log progress
+                self.logger.info(
+                    f"Epoch [{epoch+1}/{epochs}] - "
+                    f"Train Loss: {train_loss:.4f}, "
+                    f"Val Loss: {val_loss:.4f}"
+                )
+                
+            # Evaluasi final
+            model.eval()
+            metrics = self._evaluate_model(model, test_loader, device)
+            
+            # Tambahkan waktu eksperimen
+            total_time = time.time() - start_time
+            metrics['training_time'] = total_time
+            
+            # Simpan hasil
+            self.results[scenario['name']] = {
+                'metrics': metrics,
+                'config': self.config.copy()
+            }
+            
+            # Log hasil
+            self.logger.success(
+                f"✅ Eksperimen selesai: {scenario['name']}\n"
+                f"📊 Hasil:\n"
+                f"   • Accuracy: {metrics.get('accuracy', 0):.4f}\n"
+                f"   • mAP: {metrics.get('mAP', 0):.4f}\n"
+                f"   • Inference time: {metrics.get('inference_time', 0)*1000:.2f}ms\n"
+                f"   • Training time: {total_time:.2f}s"
+            )
+            
+            return metrics
+            
+        except Exception as e:
+            self.logger.error(f"❌ Eksperimen gagal: {str(e)}")
+            raise e
+            
+        finally:
+            # Restore konfigurasi asli
+            self.config = original_config
+            
+    def _train_epoch(
+        self, 
+        model: torch.nn.Module, 
+        optimizer: torch.optim.Optimizer,
+        train_loader: torch.utils.data.DataLoader,
+        device: torch.device
+    ) -> float:
+        """
+        Jalankan satu epoch training.
+        
+        Args:
+            model: Model yang akan dilatih
+            optimizer: Optimizer yang digunakan
+            train_loader: DataLoader untuk training
+            device: Device untuk komputasi
+            
+        Returns:
+            Rata-rata loss untuk epoch ini
+        """
+        total_loss = 0
+        
+        for batch_idx, (images, targets) in enumerate(train_loader):
+            # Move to device
+            images = images.to(device)
+            if isinstance(targets, torch.Tensor):
+                targets = targets.to(device)
+                
+            # Forward pass
+            predictions = model(images)
+            loss_dict = model.compute_loss(predictions, targets)
+            loss = loss_dict['total_loss']
+            
+            # Backward and optimize
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+            
+            # Update metrics
+            total_loss += loss.item()
+            
+        return total_loss / len(train_loader)
+    
+    def _validate_epoch(
+        self, 
+        model: torch.nn.Module, 
+        val_loader: torch.utils.data.DataLoader,
+        device: torch.device
+    ) -> float:
+        """
+        Jalankan satu epoch validasi.
+        
+        Args:
+            model: Model yang akan divalidasi
+            val_loader: DataLoader untuk validasi
+            device: Device untuk komputasi
+            
+        Returns:
+            Rata-rata validation loss
+        """
+        total_loss = 0
+        
+        with torch.no_grad():
+            for batch_idx, (images, targets) in enumerate(val_loader):
+                # Move to device
+                images = images.to(device)
+                if isinstance(targets, torch.Tensor):
+                    targets = targets.to(device)
+                    
+                # Forward pass
+                predictions = model(images)
+                loss_dict = model.compute_loss(predictions, targets)
+                loss = loss_dict['total_loss']
+                
+                # Update metrics
+                total_loss += loss.item()
+                
+        return total_loss / len(val_loader)
+    
+    def _evaluate_model(
+        self, 
+        model: torch.nn.Module, 
+        test_loader: torch.utils.data.DataLoader,
+        device: torch.device
+    ) -> Dict:
+        """
+        Evaluasi model pada test set.
+        
+        Args:
+            model: Model yang akan dievaluasi
+            test_loader: DataLoader untuk testing
+            device: Device untuk komputasi
+            
+        Returns:
+            Dict berisi metrik evaluasi
+        """
+        metrics = {
+            'accuracy': 0,
+            'precision': 0,
+            'recall': 0,
+            'f1': 0,
+            'mAP': 0,
+            'inference_time': 0
+        }
+        
+        # Implementasi evaluasi model disini
+        # ...
+        
+        return metrics

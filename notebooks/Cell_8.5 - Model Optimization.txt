@@ -1,4 +1,4 @@
-# Cell 8.6: Memory Optimization - Untuk optimasi memori khusus Google Colab
+# Cell 8.5: Memory Optimization - Untuk optimasi memori khusus Google Colab
 
 from smartcash.utils.memory_optimizer import MemoryOptimizer
 import matplotlib.pyplot as plt
@@ -82,7 +82,7 @@ def on_optimize_button_clicked(b):
             
             # Coba gunakan model_handler untuk membuat model baru
             print("🔄 Membuat model untuk pengujian batch size...")
-            model = model_handler.get_model()
+            model = model_handler.create_model()
             
             # Jalankan optimasi
             print("🔄 Mencari batch size optimal...")

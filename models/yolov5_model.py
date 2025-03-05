@@ -1,6 +1,6 @@
 # File: models/yolov5_model.py
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi model YOLOv5 yang bisa menggunakan CSPDarknet atau EfficientNet sebagai backbone (FIX)
+# Deskripsi: Perbaikan model YOLOv5 untuk bekerja dengan EfficientNet backbone
 
 import torch
 import torch.nn as nn
@@ -36,21 +36,25 @@ class YOLOv5Model(nn.Module):
         # Inisialisasi backbone
         self.backbone = self._create_backbone(backbone_type, pretrained)
         
+        # Get output channels dari backbone
+        self.backbone_channels = self.backbone.get_output_channels()
+        
         # Feature Pyramid Network
-        self.fpn = self._build_fpn(self.backbone.get_output_channels())
+        self.fpn = self._build_fpn(self.backbone_channels)
         
         # Detection Head - ModuleDict untuk mendukung multiple layers
         self.heads = nn.ModuleDict()
         for layer in self.detection_layers:
             # Buat head untuk setiap layer deteksi
             self.heads[layer] = self._build_head(
-                in_channels=[256, 512, 1024],  # Channel setelah FPN
+                in_channels=[128, 256, 512],  # Channel setelah FPN, sekarang sudah disesuaikan
                 num_classes=num_classes // len(self.detection_layers)  # Classes per layer
             )
         
         self.logger.info(
             f"✨ Model YOLOv5 siap dengan:\n"
             f"   Backbone: {backbone_type}\n"
+            f"   Channels: {self.backbone_channels}\n"
             f"   Classes: {num_classes}\n"
             f"   Detection Layers: {self.detection_layers}\n"
             f"   Pretrained: {pretrained}"

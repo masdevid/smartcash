@@ -1,4 +1,4 @@
-# Cell 8.3: Model Visualization - Untuk visualisasi model
+# Cell 8.2: Model Visualization - Untuk visualisasi model
 
 from smartcash.utils.model_visualizer import ModelVisualizer
 import ipywidgets as widgets
@@ -20,7 +20,7 @@ def on_create_model_button_clicked(b):
         
         try:
             # Buat model
-            model = model_handler.get_model()
+            model = model_handler.create_model()
             
             # Visualisasikan model
             visualizer = ModelVisualizer(model, logger)

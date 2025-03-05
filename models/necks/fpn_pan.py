@@ -1,6 +1,6 @@
 # File: models/necks/fpn_pan.py
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi Feature Pyramid Network dan Path Aggregation Network 
+# Deskripsi: Optimasi Feature Pyramid Network dan Path Aggregation Network 
 # untuk memproses fitur dari EfficientNet-B4 backbone
 
 import torch
@@ -16,8 +16,8 @@ class FeatureProcessingNeck(nn.Module):
     
     def __init__(
         self,
-        in_channels: List[int],  # Channel dari EfficientNet stages [56, 160, 448]
-        out_channels: List[int],  # Channel output untuk YOLOv5 [128, 256, 512]
+        in_channels: List[int],  # Channel dari backbone stages
+        out_channels: List[int] = [128, 256, 512],  # Target output channels untuk YOLOv5
         logger: Optional[SmartCashLogger] = None
     ):
         super().__init__()
@@ -34,6 +34,24 @@ class FeatureProcessingNeck(nn.Module):
             in_channels=out_channels,
             out_channels=out_channels
         )
+        
+    def forward(self, features: List[torch.Tensor]) -> List[torch.Tensor]:
+        """
+        Forward pass FPN-PAN
+        
+        Args:
+            features: List fitur dari backbone [P3, P4, P5]
+            
+        Returns:
+            List fitur yang telah diproses
+        """
+        # FPN pass
+        fpn_features = self.fpn(features)
+        
+        # PAN pass
+        pan_features = self.pan(fpn_features)
+        
+        return pan_features
         
 class FeaturePyramidNetwork(nn.Module):
     """

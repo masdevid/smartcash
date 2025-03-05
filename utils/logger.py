@@ -147,6 +147,8 @@ class SmartCashLogger(logging.Logger):
         
         # Log ke file melalui parent Logger
         if self.log_to_file:
+            if isinstance(level, int):
+                level = logging.getLevelName(level).lower()  # Convert integer to string level name
             log_method = getattr(super(), level, super().info)
             log_method(plain_msg)
         

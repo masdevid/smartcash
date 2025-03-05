@@ -4,6 +4,10 @@
 from datetime import datetime
 import ipywidgets as widgets
 from IPython.display import display, clear_output
+from smartcash.handlers.checkpoint_handler import CheckpointHandler
+
+# Inisialisasi CheckpointHandler
+checkpoint_handler = CheckpointHandler()
 
 # Tombol untuk melihat checkpoint
 list_checkpoints_button = widgets.Button(
@@ -22,27 +26,23 @@ cleanup_checkpoints_button = widgets.Button(
 try:
     from google.colab import drive
     drive_mounted = False
-    
     mount_drive_button = widgets.Button(
         description='Mount Google Drive',
-        button_style='primary',
-        icon='hdd'
+        button_style='success',
+        icon='folder'
     )
     
     def on_mount_drive_button_clicked(b):
         global drive_mounted
-        try:
-            drive.mount('/content/drive')
-            drive_mounted = True
-            mount_drive_button.description = "Drive Terpasang ✓"
-            mount_drive_button.button_style = "success"
-            mount_drive_button.disabled = True
-            logger.success("✅ Google Drive berhasil terpasang di /content/drive")
-        except Exception as e:
-            logger.error(f"❌ Gagal memasang Google Drive: {str(e)}")
-    
+        drive.mount('/content/drive')
+        drive_mounted = True
+        mount_drive_button.disabled = True
+        mount_drive_button.description = 'Google Drive Terpasang'
+        mount_drive_button.button_style = ''
+        mount_drive_button.icon = 'check'
+        
     mount_drive_button.on_click(on_mount_drive_button_clicked)
-    
+
 except ImportError:
     mount_drive_button = None
     drive_mounted = False
@@ -53,7 +53,7 @@ checkpoints_output = widgets.Output()
 def on_list_checkpoints_button_clicked(b):
     with checkpoints_output:
         clear_output()
-        checkpoint_manager.display_checkpoints()
+        checkpoint_handler.display_checkpoints()
 
 def on_cleanup_checkpoints_button_clicked(b):
     with checkpoints_output:
@@ -63,23 +63,20 @@ def on_cleanup_checkpoints_button_clicked(b):
         print("🧹 Membersihkan checkpoint lama...")
         
         # Jalankan cleanup
-        deleted = checkpoint_manager.cleanup_checkpoints(
+        deleted = checkpoint_handler.cleanup_checkpoints(
             keep_best=True,
             keep_latest=True,
             max_epochs=5
         )
         
         # Tampilkan hasil
-        print(f"✅ Berhasil menghapus {deleted} checkpoint lama")
-        
-        # Tampilkan daftar yang tersisa
-        print("\nDaftar checkpoint yang tersisa:")
-        checkpoint_manager.display_checkpoints()
+        if deleted:
+            print(f"🚮 {len(deleted)} checkpoint dihapus:")
+            for d in deleted:
+                print(f"- {d}")
+        else:
+            print("✅ Tidak ada checkpoint yang dihapus.")
 
-list_checkpoints_button.on_click(on_list_checkpoints_button_clicked)
-cleanup_checkpoints_button.on_click(on_cleanup_checkpoints_button_clicked)
-
-# Tambahkan fungsionalitas untuk menyalin ke Drive jika berjalan di Colab
 if drive_mounted or mount_drive_button:
     copy_to_drive_button = widgets.Button(
         description='Salin ke Drive',
@@ -103,21 +100,15 @@ if drive_mounted or mount_drive_button:
                 return
                 
             # Dapatkan checkpoint terbaik
-            best_checkpoint = checkpoint_manager.find_best_checkpoint()
+            best_checkpoint = checkpoint_handler.find_best_checkpoint()
             if not best_checkpoint:
-                print("⚠️ Tidak ada checkpoint yang ditemukan untuk disalin.")
+                print("⚠️ Tidak ada checkpoint yang ditemukan.")
                 return
-                
-            # Salin ke Drive
-            result_path = checkpoint_manager.copy_to_drive(
-                checkpoint_path=best_checkpoint,
-                drive_dir=drive_path_input.value
-            )
             
-            if result_path:
-                print(f"✅ Checkpoint berhasil disalin ke {result_path}")
-            else:
-                print("❌ Gagal menyalin checkpoint ke Drive.")
+            # Salin ke Google Drive
+            print(f"📤 Menyalin checkpoint terbaik ke Google Drive...")
+            checkpoint_handler.copy_to_drive(best_checkpoint, drive_path_input.value)
+            print("✅ Berhasil menyalin checkpoint ke Google Drive.")
     
     copy_to_drive_button.on_click(on_copy_to_drive_button_clicked)
 
@@ -142,4 +133,4 @@ display(widgets.VBox([comp for comp in ui_components if comp is not None]))
 
 # Tampilkan daftar checkpoint awal
 with checkpoints_output:
-    checkpoint_manager.display_checkpoints()
+    checkpoint_handler.display_checkpoints()

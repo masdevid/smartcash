@@ -8,6 +8,7 @@ from smartcash.handlers.research_scenario_handler import ResearchScenarioHandler
 from smartcash.handlers.multilayer_handler import MultilayerHandler
 from smartcash.handlers.roboflow_handler import RoboflowHandler
 from smartcash.handlers.data_augmentation_handler import DataAugmentationHandler
+from smartcash.handlers.checkpoint_handler import CheckpointHandler
 
 __all__ = [
     'DataHandler',
@@ -17,5 +18,6 @@ __all__ = [
     'ResearchScenarioHandler',
     'MultilayerHandler',
     'RoboflowHandler',
-    'DataAugmentationHandler'
+    'DataAugmentationHandler',
+    'CheckpointHandler'
 ]

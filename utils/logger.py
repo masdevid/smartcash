@@ -131,29 +131,28 @@ class SmartCashLogger(logging.Logger):
     
     def log(
         self,
-        level,
-        msg,
-        emoji_key="info",
-        color=None,
-        highlight_values=False
+        level: str,
+        emoji_key: str,
+        msg: str,
+        color: Optional[str] = None,
+        highlight_values: bool = False
     ):
-        """Helper method for logging with emojis and colors."""
-        if isinstance(level, str):
-            level = getattr(logging, level.upper(), logging.INFO)  # Convert str to logging level
-
+        """Helper method untuk logging dengan format."""
         plain_msg, html_msg = self._format_message(
             emoji_key, msg, color, highlight_values
         )
-
-        # Log to file
+        
+        # Waktu untuk timestamp
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        
+        # Log ke file melalui parent Logger
         if self.log_to_file:
-            super().log(level, plain_msg)
-
-        # Log to Colab (if enabled)
+            log_method = getattr(super(), level, super().info)
+            log_method(plain_msg)
+        
+        # Tampilkan di Colab jika diaktifkan
         if self.log_to_colab:
-            from IPython.display import display, HTML
-            display(HTML(f"<div>{html_msg}</div>"))
-
+            display(HTML(f"<div>[{timestamp}] {html_msg}</div>"))
     
     def start(self, msg: str):
         """Log start event dengan rocket emoji."""

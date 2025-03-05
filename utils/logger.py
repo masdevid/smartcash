@@ -18,7 +18,7 @@ def colored_text(text, color=None, weight="normal"):
         return f'<span style="color:{color}; font-weight:{weight}">{text}</span>'
     return text
 
-class SmartCashLogger:
+class SmartCashLogger(logging.Logger):
     """Logger yang kompatibel dengan Google Colab dengan dukungan emoji dan warna"""
     
     # Emoji untuk konteks log yang berbeda
@@ -64,12 +64,15 @@ class SmartCashLogger:
         
         Args:
             name: Nama logger
-            log_to_colab: Flag untuk mengaktifkan logging ke Colab display
+            level: Level logging
             log_to_file: Flag untuk mengaktifkan logging ke file
+            log_to_console: Flag untuk mengaktifkan logging ke Colab display
             log_dir: Direktori untuk menyimpan file log
         """
-        self.name = name
-        self.log_to_colab = log_to_colab
+        # Inisialisasi parent class Logger
+        super().__init__(name, level)
+        
+        self.log_to_colab = log_to_console  # Log ke Colab sama dengan log ke console
         self.log_to_file = log_to_file
         
         # Buat direktori log jika belum ada
@@ -77,17 +80,13 @@ class SmartCashLogger:
         if log_to_file:
             self.log_dir.mkdir(exist_ok=True, parents=True)
             
-            # Setup file logger
-            self.file_logger = logging.getLogger(name)
-            self.file_logger.setLevel(logging.INFO)
-            
             # Set file handler dengan rotasi harian
             today = datetime.now().strftime("%Y-%m-%d")
             log_file = self.log_dir / f"smartcash_{today}.log"
             
             # Cek handler yang sudah ada dan hapus jika perlu
-            for handler in self.file_logger.handlers[:]:
-                self.file_logger.removeHandler(handler)
+            for handler in self.handlers[:]:
+                self.removeHandler(handler)
                 
             file_handler = logging.FileHandler(log_file, encoding='utf-8')
             formatter = logging.Formatter(
@@ -95,7 +94,8 @@ class SmartCashLogger:
                 datefmt='%Y-%m-%d %H:%M:%S'
             )
             file_handler.setFormatter(formatter)
-            self.file_logger.addHandler(file_handler)
+            self.addHandler(file_handler)
+            self.setLevel(level)
     
     def _format_message(
         self, 
@@ -145,18 +145,10 @@ class SmartCashLogger:
         # Waktu untuk timestamp
         timestamp = datetime.now().strftime("%H:%M:%S")
         
-        # Log ke file jika diaktifkan
+        # Log ke file melalui parent Logger
         if self.log_to_file:
-            if level == 'info':
-                self.file_logger.info(plain_msg)
-            elif level == 'warning':
-                self.file_logger.warning(plain_msg)
-            elif level == 'error':
-                self.file_logger.error(plain_msg)
-            elif level == 'critical':
-                self.file_logger.critical(plain_msg)
-            else:
-                self.file_logger.info(plain_msg)
+            log_method = getattr(super(), level, super().info)
+            log_method(plain_msg)
         
         # Tampilkan di Colab jika diaktifkan
         if self.log_to_colab:
@@ -212,7 +204,8 @@ def get_logger(
     name: str, 
     log_to_console: bool = True, 
     log_to_file: bool = True,
-    log_to_colab: bool = False
+    log_to_colab: bool = False,
+    level: int = logging.INFO
 ) -> SmartCashLogger:
     """
     Get atau buat instance SmartCashLogger.
@@ -222,13 +215,13 @@ def get_logger(
         log_to_console: Flag untuk mengaktifkan logging ke konsol
         log_to_file: Flag untuk mengaktifkan logging ke file
         log_to_colab: Flag khusus untuk Google Colab (sama dengan log_to_console)
+        level: Level logging (default: INFO)
         
     Returns:
         Instance SmartCashLogger
     """
     # Register SmartCashLogger sebagai logger class
-    if not logging.getLoggerClass() == SmartCashLogger:
-        logging.setLoggerClass(SmartCashLogger)
+    logging.setLoggerClass(SmartCashLogger)
     
     # Get atau buat logger dengan konfigurasi standar
     logger = logging.getLogger(name)
@@ -237,13 +230,28 @@ def get_logger(
     if log_to_colab:
         log_to_console = True
     
-    # Pastikan logger adalah SmartCashLogger dan memiliki handlers yang sesuai
-    if isinstance(logger, SmartCashLogger) and not logger.handlers:
-        # Reinisialisasi logger dengan parameter yang diberikan
-        logger = SmartCashLogger(
-            name=name,
-            log_to_console=log_to_console,
-            log_to_file=log_to_file
-        )
+    # Reinisialisasi logger jika belum memiliki handlers
+    if not logger.handlers:
+        # Buat handler file
+        if log_to_file:
+            log_dir = Path("logs")
+            log_dir.mkdir(exist_ok=True, parents=True)
+            today = datetime.now().strftime("%Y-%m-%d")
+            log_file = log_dir / f"smartcash_{today}.log"
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            formatter = logging.Formatter(
+                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+        
+        # Set level
+        logger.setLevel(level)
+        
+        # Set properti khusus SmartCashLogger
+        if isinstance(logger, SmartCashLogger):
+            logger.log_to_colab = log_to_console
+            logger.log_to_file = log_to_file
     
     return logger

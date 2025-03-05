@@ -5,6 +5,7 @@ import os
 import torch
 import yaml
 import gc
+import logging
 from pathlib import Path
 from datetime import datetime
 from IPython.display import display, HTML, clear_output
@@ -12,21 +13,55 @@ import ipywidgets as widgets
 from tqdm.auto import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
+import traceback
 
 # Pastikan path smartcash di PYTHONPATH
 import sys
 if not os.getcwd() in sys.path:
     sys.path.append(os.getcwd())
 
-# Import modul-modul esensial dengan path yang disesuaikan
-# Pastikan menggunakan path baru (tanpa smartcash.smartcash)
-from smartcash.utils.logger import get_logger, SmartCashLogger
-from smartcash.models.backbones.cspdarknet import CSPDarknet
-from smartcash.models.backbones.efficientnet import EfficientNetBackbone
-from smartcash.models.yolov5_model import YOLOv5Model
-from smartcash.handlers.data_handler import DataHandler
-from smartcash.utils.early_stopping import EarlyStopping
-from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+# Pastikan direktori untuk logger ada
+os.makedirs("logs", exist_ok=True)
+
+# Setup dasar logging tanpa SmartCashLogger
+try:
+    # Coba impor logger yang sudah diperbaiki
+    from smartcash.utils.logger import get_logger, SmartCashLogger
+    
+    # Buat logger
+    logger = get_logger("model_manager", log_to_console=True, log_to_file=True, log_to_colab=True)
+    
+    logger.info("✅ Logger berhasil diinisialisasi")
+except Exception as e:
+    # Fallback ke logger standard
+    print(f"⚠️ Gagal mengimpor SmartCashLogger: {str(e)}")
+    print("⚠️ Menggunakan logger standard...")
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(f"logs/smartcash_{datetime.now().strftime('%Y-%m-%d')}.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    from smartcash.utils.simple_logger import SimpleLogger
+    logger = SimpleLogger("model_manager")
+    logger.info("Logger fallback diaktifkan")
+
+# Import modul-modul model
+try:
+    from smartcash.models.backbones.cspdarknet import CSPDarknet
+    from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+    from smartcash.models.yolov5_model import YOLOv5Model
+    from smartcash.handlers.data_handler import DataHandler
+    from smartcash.utils.early_stopping import EarlyStopping
+    from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+    
+    logger.success("Modul model berhasil diimpor")
+except Exception as e:
+    logger.error(f"Gagal mengimpor modul-modul model: {str(e)}")
+    traceback.print_exc()
 
 # Coba import torch utility jika tersedia
 try:
@@ -34,27 +69,24 @@ try:
 except ImportError:
     benchmark = None
 
-# Setup logger untuk Colab
-logger = get_logger("data_pipeline", log_to_console=True, log_to_file=True)
-
 # Periksa ketersediaan GPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-logger.info(f"🖥️ Menggunakan device: {device}")
+logger.info(f"Menggunakan device: {device}")
 
 if torch.cuda.is_available():
     gpu_name = torch.cuda.get_device_name(0)
     memory_allocated = torch.cuda.memory_allocated(0) / (1024**2)
     memory_cached = torch.cuda.memory_reserved(0) / (1024**2)
-    logger.info(f"📊 GPU: {gpu_name}")
-    logger.info(f"💾 Memory yang digunakan: {memory_allocated:.2f} MB")
-    logger.info(f"💾 Memory yang dicadangkan: {memory_cached:.2f} MB")
+    logger.info(f"GPU: {gpu_name}")
+    logger.info(f"Memory yang digunakan: {memory_allocated:.2f} MB")
+    logger.info(f"Memory yang dicadangkan: {memory_cached:.2f} MB")
     
     # Set untuk menggunakan cuDNN auto-tuner jika tersedia
     if hasattr(torch.backends, 'cudnn'):
         torch.backends.cudnn.benchmark = True
-        logger.info("🚀 cuDNN benchmark diaktifkan untuk performa optimal")
+        logger.info("cuDNN benchmark diaktifkan untuk performa optimal")
 else:
-    logger.info("⚠️ GPU tidak tersedia, menggunakan CPU")
+    logger.warning("GPU tidak tersedia, menggunakan CPU")
 
 # Fungsi untuk memuat config
 def load_experiment_config():
@@ -73,13 +105,13 @@ def load_experiment_config():
         with open('configs/base_config.yaml', 'r') as f:
             config = yaml.safe_load(f)
             if config:
-                logger.info("ℹ️ Menggunakan konfigurasi dasar")
+                logger.info("Menggunakan konfigurasi dasar")
                 return config
     except Exception as e:
         logger.error(f"Gagal memuat konfigurasi dasar: {str(e)}")
     
     # Jika semua gagal, kembalikan config default
-    logger.warning("⚠️ Tidak ada konfigurasi yang dapat dimuat, menggunakan default")
+    logger.warning("Tidak ada konfigurasi yang dapat dimuat, menggunakan default")
     return {
         'model': {
             'backbone': 'efficientnet',
@@ -92,4 +124,4 @@ def load_experiment_config():
 
 # Muat konfigurasi
 config = load_experiment_config()
-logger.info("✅ Model imports berhasil dimuat")
+logger.success("Model imports berhasil dimuat")

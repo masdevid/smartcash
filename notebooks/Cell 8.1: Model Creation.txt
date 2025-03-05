@@ -60,7 +60,7 @@ try:
     # Import modul-modul yang sudah dipisahkan
     from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
     from smartcash.utils.model_visualizer import ModelVisualizer
-    from smartcash.utils.checkpoint_manager import CheckpointManager
+    from smartcash.handlers.checkpoint_handler import CheckpointHandler
     
     logger.success("Modul model berhasil diimpor")
 except Exception as e:
@@ -142,14 +142,11 @@ try:
 except Exception as e:
     logger.error(f"Gagal inisialisasi ModelHandler: {str(e)}")
     
-# Inisialisasi checkpoint manager
+# Inisialisasi CheckpointHandler
 try:
-    checkpoint_manager = CheckpointManager(
-        checkpoints_dir=str(Path(config.get('output_dir', 'runs/train')) / 'weights'),
-        logger=logger
-    )
-    logger.success("CheckpointManager berhasil diinisialisasi")
+    checkpoint_handler = CheckpointHandler(config=config, logger=logger)
+    logger.success("CheckpointHandler berhasil diinisialisasi")
 except Exception as e:
-    logger.error(f"Gagal inisialisasi CheckpointManager: {str(e)}")
+    logger.error(f"Gagal inisialisasi CheckpointHandler: {str(e)}")
 
 logger.success("Model imports dan setup berhasil dimuat")

@@ -243,6 +243,27 @@ class CheckpointHandler:
             self.logger.error(f"❌ Gagal mencari checkpoint terbaik: {str(e)}")
             return None
     
+    def display_checkpoints(self):
+        """
+        Tampilkan daftar checkpoint yang tersedia dalam format yang mudah dibaca.
+        """
+        checkpoints = {
+            'best': list(self.checkpoints_dir.glob('*_best.pth')),
+            'latest': list(self.checkpoints_dir.glob('*_latest.pth')),
+            'epoch': list(self.checkpoints_dir.glob('*_epoch_*.pth'))
+        }
+        
+        # Sort berdasarkan waktu modifikasi (terbaru dulu)
+        for category, files in checkpoints.items():
+            checkpoints[category] = sorted(files, key=lambda x: x.stat().st_mtime, reverse=True)
+        
+        # Tampilkan hasil
+        for category, files in checkpoints.items():
+            print(f"📦 {category.capitalize()} Checkpoints:")
+            for f in files:
+                print(f"- {f.name} (last modified: {datetime.fromtimestamp(f.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S')})")
+            print()
+    
     def delete_old_checkpoints(
         self, 
         max_checkpoints: int = 10, 

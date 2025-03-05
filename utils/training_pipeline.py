@@ -7,6 +7,7 @@ import time
 import gc
 import logging
 from pathlib import Path
+from typing import Dict, Optional, Any
 
 import torch
 import numpy as np
@@ -30,11 +31,20 @@ class TrainingPipeline:
     
     def __init__(
         self, 
-        config, 
+        config: Dict[str, Any], 
         model_manager=None, 
         data_manager=None, 
         logger=None
     ):
+        """
+        Inisialisasi pipeline training.
+        
+        Args:
+            config: Konfigurasi training
+            model_manager: Manajer model
+            data_manager: Manajer data
+            logger: Logger kustom
+        """
         self.config = config
         
         # Setup logger dengan mode yang lebih aman
@@ -69,11 +79,11 @@ class TrainingPipeline:
             self.writer = SummaryWriter(log_dir=str(self.log_dir))
         except Exception as e:
             # Fallback ke logging biasa jika TensorBoard gagal
-            self.logger.warning(f"❌ Gagal menginisialisasi TensorBoard: {str(e)}")
+            self._safe_log('warning', f"❌ Gagal menginisialisasi TensorBoard: {str(e)}")
             self.writer = None
         
         # Setup metrik untuk tracking
-        self.metrics_history = {
+        self.metrics_history: Dict[str, List[float]] = {
             'train_loss': [],
             'val_loss': [],
             'epochs': []
@@ -88,7 +98,7 @@ class TrainingPipeline:
         self.best_val_loss = float('inf')
         self.training_start_time = None
     
-    def _safe_log(self, log_level, message):
+    def _safe_log(self, log_level: str, message: str) -> None:
         """
         Logging yang aman dengan berbagai metode
         
@@ -113,9 +123,14 @@ class TrainingPipeline:
             # Logging terakhir dengan print jika semua cara gagal
             print(f"Logging error: {e}. Original message: {message}")
     
-    def _log_metrics(self, epoch, avg_train_loss, avg_val_loss):
+    def _log_metrics(self, epoch: int, avg_train_loss: float, avg_val_loss: float) -> None:
         """
         Log metrik dengan aman, termasuk ke TensorBoard jika tersedia
+        
+        Args:
+            epoch: Nomor epoch saat ini
+            avg_train_loss: Loss rata-rata training
+            avg_val_loss: Loss rata-rata validasi
         """
         # Log ke console
         self._safe_log('info', 
@@ -175,10 +190,10 @@ class TrainingPipeline:
             model.load_state_dict(checkpoint['model_state_dict'])
             start_epoch = checkpoint['epoch'] + 1
             self.best_val_loss = checkpoint.get('loss', float('inf'))
-            self.logger.info(f"📂 Melanjutkan training dari epoch {start_epoch} dengan loss {self.best_val_loss:.4f}")
+            self._safe_log('info', f"📂 Melanjutkan training dari epoch {start_epoch} dengan loss {self.best_val_loss:.4f}")
         
-        self.logger.info(f"🚀 Memulai training untuk {epochs} epochs")
-        self.logger.info(f"🖥️ Device: {self.device}")
+        self._safe_log('info', f"🚀 Memulai training untuk {epochs} epochs")
+        self._safe_log('info', f"🖥️ Device: {self.device}")
         
         # Mulai timer
         self.training_start_time = time.time()
@@ -279,8 +294,7 @@ class TrainingPipeline:
                     scheduler.step()
                 
                 # Log metrics
-                self.writer.add_scalar('Loss/train', avg_train_loss, epoch)
-                self.writer.add_scalar('Loss/val', avg_val_loss, epoch)
+                self._log_metrics(epoch, avg_train_loss, avg_val_loss)
                 
                 # Track metrics history
                 self.metrics_history['train_loss'].append(avg_train_loss)
@@ -291,7 +305,7 @@ class TrainingPipeline:
                 epoch_time = time.time() - epoch_start
                 
                 # Log epoch results
-                self.logger.info(
+                self._safe_log('info', 
                     f"⏱️ Epoch [{epoch+1}/{epochs}] - "
                     f"Train Loss: {avg_train_loss:.4f}, "
                     f"Val Loss: {avg_val_loss:.4f}, "
@@ -302,7 +316,7 @@ class TrainingPipeline:
                 is_best = avg_val_loss < self.best_val_loss
                 if is_best:
                     self.best_val_loss = avg_val_loss
-                    self.logger.success(f"🏆 Validasi loss terbaik: {self.best_val_loss:.4f}")
+                    self._safe_log('info', f"🏆 Validasi loss terbaik: {self.best_val_loss:.4f}")
                 
                 # Save checkpoint berdasarkan interval atau jika best
                 if epoch % save_every == 0 or is_best or epoch == epochs - 1:
@@ -315,7 +329,7 @@ class TrainingPipeline:
                 
                 # Early stopping check
                 if early_stopping(avg_val_loss):
-                    self.logger.warning(f"⚠️ Early stopping setelah epoch {epoch+1}")
+                    self._safe_log('warning', f"⚠️ Early stopping setelah epoch {epoch+1}")
                     break
                     
                 # Plot progress setelah setiap epoch
@@ -332,7 +346,7 @@ class TrainingPipeline:
             hours, remainder = divmod(training_time, 3600)
             minutes, seconds = divmod(remainder, 60)
             
-            self.logger.success(
+            self._safe_log('info', 
                 f"✅ Training selesai dalam "
                 f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
             )
@@ -340,8 +354,12 @@ class TrainingPipeline:
             # Final plot
             self._plot_training_curves()
             
+            # Tutup TensorBoard writer
+            if self.writer:
+                self.writer.close()
+            
         except KeyboardInterrupt:
-            self.logger.warning("⚠️ Training dihentikan oleh pengguna")
+            self._safe_log('warning', "⚠️ Training dihentikan oleh pengguna")
             # Simpan checkpoint terakhir jika dihentikan
             self.model_manager.save_checkpoint(
                 model=model,
@@ -350,13 +368,11 @@ class TrainingPipeline:
                 is_best=False
             )
         except Exception as e:
-            self.logger.error(f"❌ Error selama training: {str(e)}")
+            self._safe_log('error', f"❌ Error selama training: {str(e)}")
             import traceback
             traceback.print_exc()
         finally:
             self.is_training = False
-            # Tutup TensorBoard writer
-            self.writer.close()
         
         return {
             'model': model,
@@ -365,7 +381,6 @@ class TrainingPipeline:
             'epochs_completed': len(self.metrics_history['epochs']),
             'metrics_history': self.metrics_history
         }
-    
     def _plot_progress(self):
         """Plot kurva loss untuk monitoring selama training"""
         if len(self.metrics_history['epochs']) > 1:

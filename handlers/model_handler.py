@@ -11,7 +11,7 @@ from pathlib import Path
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.models.baseline import BaselineModel
-from smartcash.utils.model_checkpoint import StatelessCheckpointSaver
+from smartcash.handlers.checkpoint_handler import CheckpointHandler
 
 class ModelHandler:
     """Handler untuk training dan evaluasi model"""
@@ -269,8 +269,8 @@ class ModelHandler:
             # Pastikan direktori ada
             os.makedirs(checkpoint_dir, exist_ok=True)
             
-            # Simpan model menggunakan StatelessCheckpointSaver
-            return StatelessCheckpointSaver.save_checkpoint(
+            # Simpan model menggunakan CheckpointHandler
+            return CheckpointHandler.save_checkpoint(
                 model=model,
                 config=self.config,
                 epoch=epoch,

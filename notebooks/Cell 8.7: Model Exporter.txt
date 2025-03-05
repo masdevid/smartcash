@@ -8,8 +8,36 @@ from IPython.display import display, clear_output
 import os
 from datetime import datetime
 
+# Memastikan model_manager dan logger tersedia
+# Gunakan model_manager yang sudah diinisialisasi sebelumnya
+if 'model_manager' not in globals():
+    # Jika belum ada, coba gunakan model_handler dari cell sebelumnya jika tersedia
+    if 'model_handler' in globals():
+        model_manager = model_handler
+    else:
+        # Jika tidak tersedia, buat instance baru
+        from smartcash.handlers.model_handler import ModelHandler
+        model_manager = ModelHandler(
+            config=config, 
+            config_path='configs/base_config.yaml',
+            num_classes=config.get('model', {}).get('num_classes', 7)
+        )
+
+# Pastikan logger tersedia
+if 'logger' not in globals():
+    from smartcash.utils.logger import get_logger
+    logger = get_logger("model_exporter", log_to_console=True, log_to_file=True, log_to_colab=True)
+
 # Inisialisasi model exporter menggunakan kelas dari modul utils
 model_exporter = ModelExporter(model_manager, logger)
+
+# Pastikan checkpoint_manager tersedia
+if 'checkpoint_manager' not in globals():
+    from smartcash.utils.checkpoint_manager import CheckpointManager
+    checkpoint_manager = CheckpointManager(
+        checkpoints_dir=str(Path(config.get('output_dir', 'runs/train')) / 'weights'),
+        logger=logger
+    )
 
 # UI untuk ekspor model
 export_format_selector = widgets.Dropdown(

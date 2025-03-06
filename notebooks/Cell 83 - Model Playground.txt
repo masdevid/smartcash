@@ -1,4 +1,4 @@
-# Cell 8.3: Model Playground (refactored) - Untuk mencoba model secara interaktif
+# Cell 83: Model Playground (refactored) - Untuk mencoba model secara interaktif
 
 import torch
 import gc

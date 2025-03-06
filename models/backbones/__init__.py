@@ -1,5 +1,15 @@
-from .efficientnet import EfficientNetBackbone
-from .cspdarknet import CSPDarknet
-from .base import BaseBackbone
+"""
+File: smartcash/models/backbones/__init__.py
+Author: Alfrida Sabar
+Deskripsi: Package initialization untuk backbone models.
+"""
 
-__all__ = ['EfficientNetBackbone', 'CSPDarknet', 'BaseBackbone']
+from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+from smartcash.models.backbones.cspdarknet import CSPDarknet
+from smartcash.models.backbones.base import BaseBackbone
+
+__all__ = [
+    'EfficientNetBackbone',
+    'CSPDarknet',
+    'BaseBackbone'
+]

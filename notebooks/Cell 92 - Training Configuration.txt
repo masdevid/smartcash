@@ -1,4 +1,4 @@
-# Cell 9.2: Training Configuration (refactored)
+# Cell 92: Training Configuration (refactored)
 
 import os
 import pickle

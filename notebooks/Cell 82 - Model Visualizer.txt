@@ -1,4 +1,4 @@
-# Cell 8.2: Model Visualization (refactored)
+# Cell 82: Model Visualization (refactored)
 
 import torch
 import gc

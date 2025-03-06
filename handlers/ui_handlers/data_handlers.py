@@ -9,8 +9,10 @@ import torch
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import ipywidgets as widgets  # Added for widget references
 from IPython.display import display, clear_output, HTML
 from typing import Dict, Any, Optional
+
 
 def on_refresh_info_clicked(ui_components, data_manager, logger):
     """

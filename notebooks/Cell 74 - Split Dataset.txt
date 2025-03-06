@@ -1,4 +1,4 @@
-# Cell 7.4: Split Dataset (refactored)
+# Cell 74: Split Dataset (refactored)
 
 import pickle
 from IPython.display import display, HTML

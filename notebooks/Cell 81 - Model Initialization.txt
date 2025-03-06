@@ -1,4 +1,4 @@
-# Cell 8.1: Model initialization (refactored)
+# Cell 81: Model initialization (refactored)
 
 import os
 import torch

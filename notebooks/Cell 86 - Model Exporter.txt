@@ -1,4 +1,4 @@
-# Cell 8.6: Model Exporter (refactored)
+# Cell 86: Model Exporter (refactored)
 
 import torch
 import os

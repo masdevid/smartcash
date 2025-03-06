@@ -1,6 +1,6 @@
 # File: smartcash/__main__.py
 # Author: Alfrida Sabar
-# Deskripsi: Entry point dengan perbaikan handling error import curses
+# Deskripsi: Entry point dengan perbaikan handling error
 
 import os
 import sys
@@ -14,12 +14,13 @@ from smartcash.exceptions.handler import ErrorHandler
 from smartcash.exceptions.base import ConfigError, ValidationError
 from smartcash.utils.debug_helper import DebugHelper
 
-# Cek ketersediaan curses sebelum import
-try:
-    import curses
-    CURSES_AVAILABLE = True
-except ImportError:
-    CURSES_AVAILABLE = False
+# Import handlers
+from smartcash.handlers.training_pipeline import TrainingPipeline
+from smartcash.handlers.detection_handler import DetectionHandler
+from smartcash.handlers.evaluation_handler import EvaluationHandler
+from smartcash.handlers.data_manager import DataManager
+from smartcash.handlers.model_handler import ModelHandler
+from smartcash.utils.visualization import ResultVisualizer
 
 # Setup logger
 logger = SmartCashLogger("smartcash")
@@ -33,8 +34,8 @@ def parse_args() -> argparse.Namespace:
         epilog=(
             "Contoh penggunaan:\n"
             "  python -m smartcash --train --backbone efficientnet --data-source local\n"
-            "  python -m smartcash --eval --weights models/best.pt\n"
-            "  python -m smartcash --detect --source images/test.jpg\n"
+            "  python -m smartcash --eval --weights models/best.pt --scenario research\n"
+            "  python -m smartcash --detect --source images/test.jpg --conf-thres 0.4\n"
         )
     )
     
@@ -61,11 +62,6 @@ def parse_args() -> argparse.Namespace:
         '--detect', '-d',
         action='store_true',
         help='Jalankan mode deteksi via CLI'
-    )
-    mode_group.add_argument(
-        '--interactive', '-i',
-        action='store_true',
-        help='Jalankan mode interaktif dengan antarmuka TUI'
     )
     
     # Training arguments
@@ -100,6 +96,39 @@ def parse_args() -> argparse.Namespace:
         type=float,
         help='Learning rate untuk training'
     )
+    train_group.add_argument(
+        '--seed',
+        type=int,
+        help='Random seed untuk reproducibility'
+    )
+    train_group.add_argument(
+        '--resume',
+        type=str,
+        help='Path ke checkpoint untuk melanjutkan training'
+    )
+    train_group.add_argument(
+        '--pretrained',
+        action='store_true',
+        help='Gunakan pre-trained weights untuk backbone'
+    )
+    train_group.add_argument(
+        '--augment',
+        choices=['none', 'basic', 'advanced'],
+        default='basic',
+        help='Level augmentasi data (default: basic)'
+    )
+    train_group.add_argument(
+        '--early-stopping',
+        type=int,
+        metavar='PATIENCE',
+        help='Aktifkan early stopping dengan patience tertentu'
+    )
+    train_group.add_argument(
+        '--save-every',
+        type=int,
+        default=1,
+        help='Interval epoch untuk menyimpan checkpoint (default: 1)'
+    )
     
     # Evaluation arguments
     eval_group = parser.add_argument_group('Evaluation arguments')
@@ -118,6 +147,23 @@ def parse_args() -> argparse.Namespace:
         choices=['regular', 'research', 'all'],
         default='regular',
         help='Skenario evaluasi (regular, research, atau all)'
+    )
+    eval_group.add_argument(
+        '--batch-eval',
+        action='store_true',
+        help='Evaluasi dalam batch untuk dataset besar'
+    )
+    eval_group.add_argument(
+        '--save-predictions',
+        action='store_true',
+        help='Simpan hasil prediksi untuk analisis'
+    )
+    eval_group.add_argument(
+        '--metrics',
+        nargs='+',
+        choices=['accuracy', 'precision', 'recall', 'f1', 'mAP', 'confusion'],
+        default=['all'],
+        help='Metrik evaluasi yang akan dihitung'
     )
     
     # Detection arguments
@@ -139,6 +185,32 @@ def parse_args() -> argparse.Namespace:
         default='output',
         help='Direktori output untuk hasil deteksi (default: output)'
     )
+    detect_group.add_argument(
+        '--save-txt',
+        action='store_true',
+        help='Simpan hasil deteksi dalam format teks'
+    )
+    detect_group.add_argument(
+        '--save-conf',
+        action='store_true',
+        help='Simpan nilai confidence bersama hasil deteksi'
+    )
+    detect_group.add_argument(
+        '--hide-labels',
+        action='store_true',
+        help='Sembunyikan label pada visualisasi'
+    )
+    detect_group.add_argument(
+        '--hide-conf',
+        action='store_true',
+        help='Sembunyikan confidence pada visualisasi'
+    )
+    detect_group.add_argument(
+        '--line-thickness',
+        type=int,
+        default=3,
+        help='Ketebalan garis bounding box (default: 3)'
+    )
     
     # General arguments
     general_group = parser.add_argument_group('General arguments')
@@ -157,6 +229,21 @@ def parse_args() -> argparse.Namespace:
         '--version',
         action='store_true',
         help='Tampilkan versi SmartCash dan keluar'
+    )
+    general_group.add_argument(
+        '--debug',
+        action='store_true',
+        help='Aktifkan mode debug'
+    )
+    general_group.add_argument(
+        '--profile',
+        action='store_true',
+        help='Aktifkan profiling untuk analisis performa'
+    )
+    general_group.add_argument(
+        '--no-color',
+        action='store_true',
+        help='Nonaktifkan output berwarna'
     )
     
     return parser.parse_args()
@@ -183,6 +270,55 @@ def validate_config_path(config_path: str) -> Path:
     
     return path
 
+def validate_config(config: Dict) -> None:
+    """
+    Validasi konfigurasi dengan pengecekan yang lebih ketat.
+    
+    Args:
+        config: Dictionary konfigurasi
+        
+    Raises:
+        ValidationError: Jika konfigurasi tidak valid
+    """
+    # Validasi backbone
+    backbone = config.get('backbone')
+    if backbone not in ['cspdarknet', 'efficientnet']:
+        raise ValidationError(f"Backbone tidak valid: {backbone}")
+        
+    # Validasi detection mode
+    detection_mode = config.get('detection_mode')
+    if detection_mode not in ['single', 'multi']:
+        raise ValidationError(f"Mode deteksi tidak valid: {detection_mode}")
+        
+    # Validasi data source
+    data_source = config.get('data_source')
+    if data_source not in ['local', 'roboflow']:
+        raise ValidationError(f"Sumber data tidak valid: {data_source}")
+        
+    # Validasi training params
+    training = config.get('training', {})
+    if not isinstance(training.get('batch_size', 16), int):
+        raise ValidationError("Batch size harus berupa integer")
+    if not isinstance(training.get('epochs', 30), int):
+        raise ValidationError("Epochs harus berupa integer")
+    if not isinstance(training.get('learning_rate', 0.001), float):
+        raise ValidationError("Learning rate harus berupa float")
+        
+    # Validasi model params
+    model = config.get('model', {})
+    if not isinstance(model.get('img_size', [640, 640]), list):
+        raise ValidationError("Image size harus berupa list [width, height]")
+        
+    # Validasi output paths
+    output_dir = config.get('output_dir', 'results')
+    if not isinstance(output_dir, str):
+        raise ValidationError("Output directory harus berupa string")
+        
+    # Validasi device
+    device = config.get('device', 'cuda')
+    if device not in ['cpu', 'cuda'] and not device.startswith('cuda:'):
+        raise ValidationError(f"Device tidak valid: {device}")
+
 def check_dependencies() -> None:
     """Verifikasi dependencies yang diperlukan tersedia."""
     try:
@@ -205,11 +341,11 @@ def check_dependencies() -> None:
     except ImportError:
         logger.warning("⚠️ Timm tidak terinstal, backbone EfficientNet tidak dapat digunakan")
         
-    # Cek curses
-    if not CURSES_AVAILABLE:
-        logger.warning("⚠️ Package 'curses' tidak tersedia, mode TUI tidak akan digunakan")
-        if sys.platform == 'win32':
-            logger.info("💡 Tip: Pada Windows, install dengan 'pip install windows-curses'")
+    try:
+        import cv2
+        logger.info(f"🔍 OpenCV terdeteksi: {cv2.__version__}")
+    except ImportError:
+        logger.warning("⚠️ OpenCV tidak terinstal, visualisasi akan terbatas")
 
 def show_version() -> None:
     """Tampilkan informasi versi SmartCash."""
@@ -239,6 +375,12 @@ def setup_environment(args: argparse.Namespace) -> None:
         elif args.device == 'cpu':
             os.environ["CUDA_VISIBLE_DEVICES"] = ""
             logger.info("🖥️ Menggunakan CPU secara paksa")
+            
+    # Set CUDA flags untuk optimasi
+    if torch.cuda.is_available():
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.deterministic = False
+        logger.info("🚀 CUDA optimizations diaktifkan")
     
     # Set logging level berdasarkan verbosity
     if args.verbose >= 2:
@@ -247,6 +389,15 @@ def setup_environment(args: argparse.Namespace) -> None:
     elif args.verbose == 1:
         logger.setLevel("INFO")
         logger.info("🔊 Level log: INFO")
+        
+    # Set random seed untuk reproducibility
+    if 'seed' in args:
+        seed = args.seed
+        torch.manual_seed(seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed_all(seed)
+        np.random.seed(seed)
+        logger.info(f"🎲 Random seed: {seed}")
 
 def run_cli_mode(args: argparse.Namespace, config_manager: ConfigurationManager) -> None:
     """
@@ -275,11 +426,20 @@ def run_cli_mode(args: argparse.Namespace, config_manager: ConfigurationManager)
             # Save updated config
             config_manager.save()
             
+            # Initialize handlers
+            data_manager = DataManager(config=config_manager.current_config)
+            model_handler = ModelHandler(config=config_manager.current_config)
+            
             # Start training
-            from smartcash.handlers.training_pipeline import TrainingPipeline
             logger.info("🚀 Memulai training...")
             
-            pipeline = TrainingPipeline(config=config_manager.current_config)
+            pipeline = TrainingPipeline(
+                config=config_manager.current_config,
+                model_handler=model_handler,
+                data_manager=data_manager,
+                logger=logger
+            )
+            
             results = pipeline.train()
             
             logger.success(
@@ -296,11 +456,10 @@ def run_cli_mode(args: argparse.Namespace, config_manager: ConfigurationManager)
                 logger.error("❌ --weights diperlukan untuk mode evaluasi reguler")
                 sys.exit(1)
                 
-            # Start evaluation
-            from smartcash.handlers.evaluation_handler import EvaluationHandler
-            logger.info(f"📊 Memulai evaluasi (skenario: {args.scenario})...")
-            
+            # Initialize evaluator
             evaluator = EvaluationHandler(config=config_manager.current_config)
+            
+            logger.info(f"📊 Memulai evaluasi (skenario: {args.scenario})...")
             
             if args.scenario == 'research':
                 results = evaluator.evaluate(eval_type='research')
@@ -336,11 +495,14 @@ def run_cli_mode(args: argparse.Namespace, config_manager: ConfigurationManager)
                 logger.error("❌ --source diperlukan untuk mode deteksi")
                 sys.exit(1)
                 
-            # Start detection
-            from smartcash.handlers.detection_handler import DetectionHandler
+            # Initialize detector
+            detector = DetectionHandler(
+                config=config_manager.current_config,
+                weights_path=args.weights
+            )
+            
             logger.info("🔍 Memulai deteksi...")
             
-            detector = DetectionHandler(config=config_manager.current_config)
             results = detector.detect(
                 source=args.source,
                 conf_thres=args.conf_thres,
@@ -356,35 +518,6 @@ def run_cli_mode(args: argparse.Namespace, config_manager: ConfigurationManager)
         elif args.version:
             show_version()
             
-        elif args.interactive:
-            run_tui_mode(config_manager.base_config_path)
-            
-    except Exception as e:
-        error_handler.handle(e)
-        sys.exit(1)
-
-def run_tui_mode(config_path: Path) -> None:
-    """
-    Run SmartCash in TUI mode.
-    
-    Args:
-        config_path: Path ke file konfigurasi
-    """
-    try:
-        if not CURSES_AVAILABLE:
-            logger.error("❌ Package 'curses' tidak tersedia, mode TUI tidak dapat dijalankan")
-            logger.info("💡 Gunakan mode CLI sebagai alternatif. Contoh: python -m smartcash --train")
-            sys.exit(1)
-            
-        # Import hanya jika curses tersedia
-        from smartcash.interface.app import SmartCashApp
-        
-        app = SmartCashApp(config_path)
-        curses.wrapper(app.run)
-        
-    except KeyboardInterrupt:
-        print("\nKeluar dari SmartCash...")
-        sys.exit(0)
     except Exception as e:
         error_handler.handle(e)
         sys.exit(1)
@@ -421,11 +554,8 @@ def main() -> None:
             logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
             sys.exit(1)
         
-        # Determine run mode
-        if any([args.train, args.eval, args.detect, args.version]):
-            run_cli_mode(args, config_manager)
-        else:
-            run_tui_mode(config_path)
+        # Run CLI mode
+        run_cli_mode(args, config_manager)
             
     except KeyboardInterrupt:
         logger.info("\n👋 Program dihentikan oleh pengguna")

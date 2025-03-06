@@ -12,6 +12,7 @@ import numpy as np
 from IPython.display import display, clear_output
 import traceback
 
+
 def on_test_model_button_clicked(ui_components, model_handler, config, logger, device=None):
     """
     Handler untuk tombol test model.

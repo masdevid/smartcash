@@ -10,10 +10,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import os  # Added for handling paths
+import ipywidgets as widgets  # Added for widget references
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
 from contextlib import contextmanager
 from typing import Dict, Any, Optional, List, Callable, Union
+
 
 @contextmanager
 def memory_manager():

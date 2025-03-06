@@ -5,7 +5,7 @@ Deskripsi: Package initialization untuk UI handlers.
 """
 
 # Data handling handlers
-from .data_handlers import (
+from smartcash.handlers.ui_handlers.data_handlers import (
     on_refresh_info_clicked,
     get_dataset_info,
     on_split_button_clicked,
@@ -17,7 +17,7 @@ from .data_handlers import (
 )
 
 # Dataset handlers
-from .dataset_handlers import (
+from smartcash.handlers.ui_handlers.dataset_handlers import (
     on_download_button_clicked,
     on_cleanup_button_clicked,
     on_check_status_button_clicked,
@@ -28,7 +28,7 @@ from .dataset_handlers import (
 )
 
 # Directory management handlers
-from .directory_handlers import (
+from smartcash.handlers.ui_handlers.directory_handlers import (
     is_colab,
     setup_google_drive,
     create_directory_structure,
@@ -40,7 +40,7 @@ from .directory_handlers import (
 )
 
 # Augmentation handlers
-from .augmentation_handlers import (
+from smartcash.handlers.ui_handlers.augmentation_handlers import (
     on_augment_button_clicked,
     on_clean_button_clicked,
     refresh_dataset_stats,
@@ -48,7 +48,7 @@ from .augmentation_handlers import (
 )
 
 # Configuration handlers
-from .config_handlers import (
+from smartcash.handlers.ui_handlers.config_handlers import (
     update_config_from_ui,
     save_config_to_file,
     update_layer_info,
@@ -62,7 +62,7 @@ from .config_handlers import (
 )
 
 # Model handlers
-from .model_handlers import (
+from smartcash.handlers.ui_handlers.model_handlers import (
     setup_gpu,
     on_initialize_model_clicked,
     on_visualize_model_clicked,
@@ -85,13 +85,13 @@ from .model_handlers import (
 )
 
 # Model playground handlers
-from .model_playground_handlers import (
+from smartcash.handlers.ui_handlers.model_playground_handlers import (
     on_test_model_button_clicked,
     setup_model_playground_handlers
 )
 
 # Evaluation handlers
-from .evaluation_handlers import (
+from smartcash.handlers.ui_handlers.evaluation_handlers import (
     init_ui,
     evaluate_model,
     evaluate_multiple_runs,
@@ -101,7 +101,7 @@ from .evaluation_handlers import (
 )
 
 # Research handlers
-from .research_handlers import (
+from smartcash.handlers.ui_handlers.research_handlers import (
     run_research_evaluation,
     visualize_research_results,
     on_run_button_clicked,
@@ -110,7 +110,7 @@ from .research_handlers import (
 )
 
 # Training handlers
-from .training_handlers import (
+from smartcash.handlers.ui_handlers.training_handlers import (
     # Training execution handlers
     TrainingMetricsTracker,
     metrics_callback,
@@ -139,7 +139,7 @@ from .training_handlers import (
 )
 
 # Repository handlers (for completeness)
-from .repository_handlers import (
+from smartcash.handlers.ui_handlers.repository_handlers import (
     setup_repository_handlers,
     on_clone_button_clicked,
     on_custom_repo_checkbox_changed

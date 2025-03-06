@@ -7,8 +7,9 @@ Deskripsi: Handler untuk UI komponen augmentasi data, menangani proses augmentas
 import gc
 import time
 import pandas as pd
+import torch  # Added for CUDA checks
 from IPython.display import display, clear_output, HTML
-import torch
+import ipywidgets as widgets  # Added for widget references
 
 def on_augment_button_clicked(ui_components, aug_manager, data_manager, logger):
     """

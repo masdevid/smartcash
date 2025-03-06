@@ -1,4 +1,4 @@
-# Cell 8.5: Memory Optimization (refactored)
+# Cell 85: Memory Optimization (refactored)
 
 import torch
 import gc

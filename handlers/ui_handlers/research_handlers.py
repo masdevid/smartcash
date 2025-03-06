@@ -10,8 +10,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import ipywidgets as widgets  # Added missing import
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
+
 
 def run_research_evaluation(ui_components, research_handler, logger):
     """

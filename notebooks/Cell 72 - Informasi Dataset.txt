@@ -1,4 +1,4 @@
-# Cell 7.2: Informasi Dataset (refactored)
+# Cell 72: Informasi Dataset (refactored)
 
 import pickle
 from IPython.display import display, HTML

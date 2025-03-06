@@ -10,6 +10,9 @@ import pickle
 from datetime import datetime
 from pathlib import Path
 from IPython.display import display, clear_output, HTML
+import ipywidgets as widgets  # Added for widget references
+import sys  # Added for system operations
+
 
 def update_config_from_ui(ui_components, config):
     """

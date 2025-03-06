@@ -8,6 +8,9 @@ import os
 import pickle
 from pathlib import Path
 from IPython.display import display, clear_output, HTML
+import ipywidgets as widgets  # Added for widget references
+import sys  # Added for system path manipulation
+
 
 def is_colab():
     """

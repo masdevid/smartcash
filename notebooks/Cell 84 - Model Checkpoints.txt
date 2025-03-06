@@ -1,0 +1,152 @@
+# Cell 8.4: Model Checkpoint - Untuk melihat dan mengelola checkpoint model
+
+import os
+import torch
+import pickle
+from datetime import datetime
+import ipywidgets as widgets
+from IPython.display import display, clear_output
+import matplotlib.pyplot as plt
+import pandas as pd
+from pathlib import Path
+
+# Import checkpoint handler dan logger
+try:
+    from smartcash.handlers.checkpoint_handler import CheckpointHandler
+    from smartcash.utils.logger import get_logger
+except ImportError as e:
+    print(f"⚠️ Error importing modules: {str(e)}")
+    raise
+
+# Setup logger
+logger = get_logger("checkpoint_manager", log_to_console=True)
+
+# Inisialisasi CheckpointHandler
+try:
+    # Load config if available, otherwise use default
+    if 'config' in globals():
+        checkpoint_dir = config.get('output_dir', 'runs/train') + '/weights'
+    else:
+        with open('config.pkl', 'rb') as f:
+            config = pickle.load(f)
+        checkpoint_dir = config.get('output_dir', 'runs/train') + '/weights'
+        
+    checkpoint_handler = CheckpointHandler(
+        output_dir=checkpoint_dir,
+        logger=logger
+    )
+except Exception as e:
+    print(f"⚠️ Error initializing CheckpointHandler: {str(e)}")
+    # Fallback to default
+    checkpoint_handler = CheckpointHandler(logger=logger)
+
+# Tombol untuk manajemen checkpoint
+list_checkpoints_button = widgets.Button(
+    description='Lihat Checkpoints',
+    button_style='info',
+    icon='list'
+)
+
+cleanup_checkpoints_button = widgets.Button(
+    description='Bersihkan Checkpoints',
+    button_style='warning',
+    icon='trash'
+)
+
+compare_button = widgets.Button(
+    description='Bandingkan Checkpoints',
+    button_style='primary',
+    icon='exchange'
+)
+
+# Tambahkan opsi untuk mounting Google Drive
+try:
+    from google.colab import drive
+    drive_mounted = False
+    mount_drive_button = widgets.Button(
+        description='Mount Google Drive',
+        button_style='success',
+        icon='folder'
+    )
+    
+    def on_mount_drive_button_clicked(b):
+        global drive_mounted
+        drive.mount('/content/drive')
+        drive_mounted = True
+        mount_drive_button.disabled = True
+        mount_drive_button.description = 'Google Drive Terpasang'
+        mount_drive_button.button_style = ''
+        mount_drive_button.icon = 'check'
+        
+    mount_drive_button.on_click(on_mount_drive_button_clicked)
+
+except ImportError:
+    mount_drive_button = None
+    drive_mounted = False
+    logger.info("ℹ️ Tidak berjalan di Google Colab, opsi Google Drive tidak tersedia")
+
+checkpoints_output = widgets.Output()
+
+def on_list_checkpoints_button_clicked(b):
+    with checkpoints_output:
+        clear_output()
+        checkpoint_handler.display_checkpoints()
+        
+        # Tambahkan visualisasi
+        checkpoints = checkpoint_handler.list_checkpoints()
+        
+        # Count checkpoints by type
+        counts = {
+            'Best': len(checkpoints.get('best', [])),
+            'Latest': len(checkpoints.get('latest', [])),
+            'Epoch': len(checkpoints.get('epoch', [])),
+            'Emergency': len(checkpoints.get('emergency', []))
+        }
+        
+        # Plot chart if there are any checkpoints
+        if sum(counts.values()) > 0:
+            plt.figure(figsize=(10, 4))
+            plt.subplot(1, 2, 1)
+            bars = plt.bar(
+                counts.keys(),
+                counts.values(),
+                color=['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
+            )
+            
+            # Add values above bars
+            for bar in bars:
+                height = bar.get_height()
+                if height > 0:
+                    plt.text(
+                        bar.get_x() + bar.get_width()/2., 
+                        height + 0.05,
+                        f'{int(height)}',
+                        ha='center', 
+                        va='bottom'
+                    )
+                    
+            plt.title('Jumlah Checkpoint per Tipe')
+            plt.ylabel('Jumlah File')
+            plt.grid(True, linestyle='--', alpha=0.7)
+            
+            # Create second subplot - size on disk
+            plt.subplot(1, 2, 2)
+            
+            # Calculate size of checkpoints by type
+            sizes = {}
+            for checkpoint_type, checkpoint_list in checkpoints.items():
+                total_size = sum([ckpt.stat().st_size for ckpt in checkpoint_list]) / (1024 * 1024) # MB
+                sizes[checkpoint_type] = total_size
+                
+            if sum(sizes.values()) > 0:
+                plt.pie(
+                    list(sizes.values()),
+                    labels=list(sizes.keys()),
+                    autopct='%1.1f%%',
+                    colors=['#3498db', '#2ecc71', '#e74c3c', '#f39c12']
+                )
+                plt.title(f'Ukuran Disk ({sum(sizes.values()):.1f} MB)')
+                plt.axis('equal')
+            
+            plt.tight_layout()
+            plt.show()

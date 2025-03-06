@@ -28,12 +28,12 @@ if 'logger' not in globals():
     from smartcash.utils.logger import get_logger
     logger = get_logger("model_exporter", log_to_console=True, log_to_file=True, log_to_colab=True)
 
-# Inisialisasi model exporter menggunakan kelas dari modul utils
-model_exporter = ModelExporter(model_manager, logger)
-
 # Inisialisasi CheckpointHandler
 from smartcash.handlers.checkpoint_handler import CheckpointHandler
 checkpoint_handler = CheckpointHandler(logger=logger)
+
+# Inisialisasi model exporter menggunakan kelas dari modul utils
+model_exporter = ModelExporter(model_manager, checkpoint_handler, logger)
 
 # UI untuk ekspor model
 export_format_selector = widgets.Dropdown(
@@ -53,6 +53,17 @@ optimize_checkbox = widgets.Checkbox(
     style={'description_width': 'initial'}
 )
 
+# Opsi ONNX
+onnx_opset_selector = widgets.IntSlider(
+    value=12,
+    min=10,
+    max=14,
+    step=1,
+    description='ONNX Opset Version:',
+    disabled=True,
+    style={'description_width': 'initial'}
+)
+
 # Opsi salin ke Drive
 copy_to_drive_checkbox = widgets.Checkbox(
     value=True,
@@ -69,6 +80,17 @@ export_button = widgets.Button(
 
 export_output = widgets.Output()
 
+# Function untuk update UI berdasarkan format yang dipilih
+def on_format_change(change):
+    if change['new'] == 'onnx':
+        onnx_opset_selector.disabled = False
+        optimize_checkbox.disabled = True
+    else:
+        onnx_opset_selector.disabled = True
+        optimize_checkbox.disabled = False
+
+export_format_selector.observe(on_format_change, names='value')
+
 def on_export_button_clicked(b):
     """Handler untuk tombol ekspor"""
     # Update tombol
@@ -78,64 +100,47 @@ def on_export_button_clicked(b):
     with export_output:
         clear_output()
         
-        # Ambil checkpoint terbaik
-        checkpoints = checkpoint_handler.list_checkpoints()
-        best_checkpoint = None
-        
-        if checkpoints['best']:
-            best_checkpoint = checkpoints['best'][0]
-            print(f"🏆 Menggunakan checkpoint terbaik: {best_checkpoint.name}")
-        else:
-            print("⚠️ Tidak ada checkpoint terbaik, mencari checkpoint lain...")
-            
-            if checkpoints['latest']:
-                best_checkpoint = checkpoints['latest'][0]
-                print(f"🔄 Menggunakan checkpoint terakhir: {best_checkpoint.name}")
-            elif checkpoints['epoch']:
-                best_checkpoint = checkpoints['epoch'][0]
-                print(f"🕒 Menggunakan checkpoint epoch: {best_checkpoint.name}")
+        try:
+            # Jalankan ekspor berdasarkan format yang dipilih
+            if export_format_selector.value == 'torchscript':
+                export_path = model_exporter.export_to_torchscript(
+                    optimize=optimize_checkbox.value
+                )
+            elif export_format_selector.value == 'onnx':
+                export_path = model_exporter.export_to_onnx(
+                    opset_version=onnx_opset_selector.value
+                )
             else:
-                print("❌ Tidak ada checkpoint yang tersedia")
-                export_button.description = "Ekspor Model"
-                export_button.disabled = False
+                print(f"❌ Format ekspor tidak valid: {export_format_selector.value}")
                 return
+            
+            # Cek hasil ekspor
+            if export_path:
+                export_file = Path(export_path)
+                file_size = export_file.stat().st_size / (1024 * 1024)  # size in MB
+                
+                print(f"\n✅ Model berhasil diekspor:")
+                print(f"📁 Path: {export_path}")
+                print(f"📊 Ukuran: {file_size:.2f} MB")
+                print(f"🔄 Format: {export_format_selector.value}")
+                print(f"🕒 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                
+                # Salin ke Drive jika diminta
+                if copy_to_drive_checkbox.value and os.path.exists("/content/drive"):
+                    drive_path = model_exporter.copy_to_drive(export_path)
+                    if drive_path:
+                        print(f"\n✅ Model berhasil disalin ke Google Drive:")
+                        print(f"📁 Path: {drive_path}")
+            else:
+                print("❌ Ekspor model gagal")
+                
+        except Exception as e:
+            print(f"❌ Error saat mengekspor model: {str(e)}")
         
-        # Jalankan ekspor berdasarkan format yang dipilih
-        if export_format_selector.value == 'torchscript':
-            result = model_exporter.export_to_torchscript(
-                checkpoint_path=best_checkpoint,
-                optimize=optimize_checkbox.value
-            )
-        elif export_format_selector.value == 'onnx':
-            result = model_exporter.export_to_onnx(
-                checkpoint_path=best_checkpoint
-            )
-        else:
-            print(f"❌ Format ekspor tidak valid: {export_format_selector.value}")
+        finally:
+            # Reset tombol
             export_button.description = "Ekspor Model"
             export_button.disabled = False
-            return
-        
-        # Cek hasil ekspor
-        if result:
-            print(f"\n✅ Model berhasil diekspor:")
-            print(f"📁 Path: {result['path']}")
-            print(f"📊 Ukuran: {result['size']}")
-            print(f"🔄 Format: {result['format']}")
-            print(f"🕒 Timestamp: {result['timestamp']}")
-            
-            # Salin ke Drive jika diminta
-            if copy_to_drive_checkbox.value and os.path.exists("/content/drive"):
-                drive_path = model_exporter.copy_to_drive(result['path'])
-                if drive_path:
-                    print(f"\n✅ Model berhasil disalin ke Google Drive:")
-                    print(f"📁 Path: {drive_path}")
-        else:
-            print("❌ Ekspor model gagal")
-    
-    # Reset tombol
-    export_button.description = "Ekspor Model"
-    export_button.disabled = False
 
 export_button.on_click(on_export_button_clicked)
 
@@ -144,7 +149,8 @@ display(widgets.VBox([
     widgets.HTML("<h2>📦 Ekspor Model</h2>"),
     widgets.HTML("<p>Ekspor model checkpoint terbaik ke format yang dapat digunakan di produksi.</p>"),
     export_format_selector,
-    widgets.HBox([optimize_checkbox, copy_to_drive_checkbox]),
+    widgets.HBox([optimize_checkbox, onnx_opset_selector]),
+    copy_to_drive_checkbox,
     export_button,
     export_output
 ]))

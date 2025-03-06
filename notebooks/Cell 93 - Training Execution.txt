@@ -1,0 +1,857 @@
+# Cell 9.3: Training Execution - Menjalankan training model dengan visualisasi real-time
+
+import torch
+import gc
+import numpy as np
+import ipywidgets as widgets
+from IPython.display import display, clear_output, HTML
+import pickle
+import os
+import time
+from contextlib import contextmanager
+import threading
+from datetime import datetime, timedelta
+import yaml
+
+# Context manager untuk manajemen memori
+@contextmanager
+def memory_manager():
+    """Context manager untuk optimasi penggunaan memori."""
+    try:
+        yield
+    finally:
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+# ===== 1. LOAD COMPONENTS =====
+# Pastikan komponen training tersedia
+try:
+    with open('training_components.pkl', 'rb') as f:
+        components = pickle.load(f)
+    
+    pipeline = components.get('pipeline')
+    model_handler = components.get('model_handler')
+    checkpoint_handler = components.get('checkpoint_handler')
+    experiment_tracker = components.get('experiment_tracker')
+    dataloaders = components.get('dataloaders')
+    
+    with open('config.pkl', 'rb') as f:
+        config = pickle.load(f)
+    
+    # Import visualizer untuk visualisasi metrics
+    try:
+        from smartcash.utils.model_visualizer import ModelVisualizer
+        visualizer = ModelVisualizer()
+        has_model_visualizer = True
+    except ImportError:
+        has_model_visualizer = False
+    
+    try:
+        from smartcash.utils.visualization import plot_training_metrics
+        has_plot_training = True
+    except ImportError:
+        has_plot_training = False
+        
+    from smartcash.utils.logger import get_logger
+    logger = get_logger("training_execution", log_to_console=True, log_to_file=True, log_to_colab=True)
+    logger.success("✅ Komponen training berhasil dimuat")
+    
+except Exception as e:
+    print(f"⚠️ Komponen training belum diinisialisasi: {str(e)}")
+    print("ℹ️ Jalankan Cell 9.1 terlebih dahulu untuk menginisialisasi pipeline")
+    components = None
+    pipeline = None
+    model_handler = None
+    checkpoint_handler = None
+    experiment_tracker = None
+    dataloaders = None
+    config = {}
+    logger = None
+    has_model_visualizer = False
+    has_plot_training = False
+
+# ===== 2. TRACKING METRICS =====
+# Variabel untuk menyimpan metrics selama training
+training_metrics = {
+    'train_loss': [],
+    'val_loss': [],
+    'lr': [],
+    'epochs': [],
+    'best_epoch': 0,
+    'best_val_loss': float('inf'),
+    'is_training': False,
+    'start_time': None,
+    'last_update': None,
+    'gpu_memory_history': []  # Tambahan untuk tracking GPU memory
+}
+
+# Fungsi untuk mencatat metrics dari callbacks pipeline
+def metrics_callback(epoch, metrics):
+    """Callback untuk mencatat metrics dari pipeline training."""
+    with memory_manager():
+        # Cek apakah epoch sudah ada di training_metrics (untuk mencegah duplikasi)
+        if epoch in training_metrics['epochs']:
+            idx = training_metrics['epochs'].index(epoch)
+            # Update nilai yang ada
+            training_metrics['train_loss'][idx] = metrics.get('train_loss', training_metrics['train_loss'][idx])
+            training_metrics['val_loss'][idx] = metrics.get('val_loss', training_metrics['val_loss'][idx])
+            if 'lr' in metrics and training_metrics['lr'] and len(training_metrics['lr']) > idx:
+                training_metrics['lr'][idx] = metrics.get('lr', training_metrics['lr'][idx])
+        else:
+            # Tambah epoch baru
+            training_metrics['epochs'].append(epoch)
+            training_metrics['train_loss'].append(metrics.get('train_loss', 0))
+            training_metrics['val_loss'].append(metrics.get('val_loss', 0))
+            training_metrics['lr'].append(metrics.get('lr', 0))
+        
+        # Update best metrics
+        if metrics.get('val_loss', float('inf')) < training_metrics['best_val_loss']:
+            training_metrics['best_val_loss'] = metrics.get('val_loss', float('inf'))
+            training_metrics['best_epoch'] = epoch
+        
+        # Catat GPU memory jika tersedia
+        if torch.cuda.is_available():
+            training_metrics['gpu_memory_history'].append({
+                'epoch': epoch,
+                'allocated': torch.cuda.memory_allocated() / (1024**2),
+                'reserved': torch.cuda.memory_reserved() / (1024**2)
+            })
+        
+        training_metrics['last_update'] = time.time()
+        
+        # Update visualisasi secara real-time
+        update_plot()
+        update_metrics_table()
+        update_status()
+
+# ===== 3. SETUP TRAINING CONTROLS =====
+# Tombol kontrol training
+start_training_button = widgets.Button(
+    description='Mulai Training',
+    button_style='success',
+    icon='play',
+    tooltip='Mulai proses training model'
+)
+
+stop_training_button = widgets.Button(
+    description='Hentikan Training',
+    button_style='danger',
+    icon='stop',
+    disabled=True,
+    tooltip='Hentikan proses training'
+)
+
+# Tambahkan opsi resume dari checkpoint
+resume_checkbox = widgets.Checkbox(
+    value=False,
+    description='Resume dari checkpoint terbaik',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='50%')
+)
+
+# Opsi batch size override
+batch_size_dropdown = widgets.Dropdown(
+    options=[8, 16, 32, 64],
+    value=config.get('training', {}).get('batch_size', 16),
+    description='Batch Size:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='30%')
+)
+
+# Opsi Google Drive backup
+try:
+    from google.colab import drive
+    drive_backup_checkbox = widgets.Checkbox(
+        value=True,
+        description='Backup checkpoint ke Google Drive',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%')
+    )
+    is_colab = True
+except ImportError:
+    drive_backup_checkbox = widgets.Checkbox(
+        value=False,
+        description='Backup checkpoint ke Google Drive (tidak tersedia)',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%'),
+        disabled=True
+    )
+    is_colab = False
+
+# Output untuk visualisasi dan log
+training_output = widgets.Output()
+
+# Setup plot tabs
+live_plot_tab = widgets.Output()
+metrics_tab = widgets.Output()
+status_tab = widgets.Output()
+
+tabs = widgets.Tab([live_plot_tab, metrics_tab, status_tab])
+tabs.set_title(0, 'Live Plot')
+tabs.set_title(1, 'Metrics')
+tabs.set_title(2, 'Status')
+
+# Status tracking
+status_text = widgets.HTML(
+    value="<p><b>Status:</b> Idle</p><p><b>Epoch:</b> 0/?</p><p><b>Best Val Loss:</b> -</p>"
+)
+
+progress_bar = widgets.IntProgress(
+    value=0,
+    min=0,
+    max=100,
+    step=1,
+    description='Progress:',
+    bar_style='info',
+    orientation='horizontal'
+)
+
+# ===== 4. EVENT HANDLERS =====
+def on_start_button_clicked(b):
+    """Handler untuk tombol Start Training."""
+    with memory_manager():
+        with training_output:
+            clear_output(wait=True)
+            start_training_button.disabled = True
+            stop_training_button.disabled = False
+            resume_checkbox.disabled = True
+            batch_size_dropdown.disabled = True
+            
+            # Override batch size jika diperlukan
+            if batch_size_dropdown.value != config.get('training', {}).get('batch_size', 16):
+                config['training']['batch_size'] = batch_size_dropdown.value
+                logger.info(f"🔄 Menggunakan batch size: {batch_size_dropdown.value}")
+                
+                # Perbarui dataloader jika perlu
+                if hasattr(model_handler, 'update_dataloaders'):
+                    dataloaders = model_handler.update_dataloaders(batch_size=batch_size_dropdown.value)
+            
+            # Jalankan training di thread terpisah
+            training_thread = threading.Thread(
+                target=run_training,
+                args=(resume_checkbox.value,)
+            )
+            training_thread.daemon = True
+            training_thread.start()
+
+def on_stop_button_clicked(b):
+    """Handler untuk tombol Stop Training."""
+    with training_output:
+        if training_metrics['is_training']:
+            logger.warning("⚠️ Menghentikan training...")
+            # Set flag untuk menghentikan training
+            training_metrics['is_training'] = False
+            
+            # Disable tombol stop dan enable tombol start
+            stop_training_button.disabled = True
+            
+            # Callback untuk pipeline stop jika ada
+            if hasattr(pipeline, 'stop_training'):
+                pipeline.stop_training()
+
+# Connect event handlers
+start_training_button.on_click(on_start_button_clicked)
+stop_training_button.on_click(on_stop_button_clicked)
+
+# ===== 5. VISUALIZATION FUNCTIONS =====
+def update_plot():
+    """Update plot dengan data metrics terbaru."""
+    with live_plot_tab:
+        clear_output(wait=True)
+        
+        if not training_metrics['train_loss']:
+            print("📊 Belum ada data training untuk divisualisasikan")
+            return
+        
+        try:
+            # Siapkan data metrics
+            metrics_data = {
+                'train_loss': training_metrics['train_loss'],
+                'val_loss': training_metrics['val_loss'],
+                'learning_rates': training_metrics['lr'] if training_metrics['lr'] else []
+            }
+            
+            # Coba gunakan ModelVisualizer terlebih dahulu
+            if has_model_visualizer:
+                # Gunakan visualize_training_progress jika tersedia
+                if hasattr(visualizer, 'visualize_training_progress'):
+                    visualizer.visualize_training_progress(
+                        metrics=metrics_data,
+                        current_epoch=training_metrics['epochs'][-1] if training_metrics['epochs'] else 0,
+                        best_epoch=training_metrics['best_epoch'],
+                        best_val_loss=training_metrics['best_val_loss']
+                    )
+                else:
+                    # Fallback ke visualize_metrics jika ada
+                    if hasattr(visualizer, 'visualize_metrics'):
+                        visualizer.visualize_metrics(metrics_data)
+                    else:
+                        # Fallback ke plot_training_metrics
+                        if has_plot_training:
+                            plot_training_metrics(metrics_data)
+                        else:
+                            _fallback_plot(metrics_data)
+            else:
+                # Gunakan plot_training_metrics jika tersedia
+                if has_plot_training:
+                    plot_training_metrics(metrics_data)
+                else:
+                    # Fallback ke visualisasi built-in
+                    _fallback_plot(metrics_data)
+            
+            # Tambahkan tabel ringkasan
+            if len(training_metrics['epochs']) > 0:
+                _display_metrics_summary()
+                
+        except Exception as e:
+            print(f"❌ Error saat update plot: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
+            # Fallback ke visualisasi minimal jika semua gagal
+            _minimal_plot()
+
+def _fallback_plot(metrics_data):
+    """Plot fallback untuk visualisasi training metrics."""
+    import matplotlib.pyplot as plt
+    
+    # Setup figure dengan dua subplot
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+    
+    # Plot training & validation loss
+    epochs = training_metrics['epochs']
+    train_loss = training_metrics['train_loss']
+    val_loss = training_metrics['val_loss']
+    
+    ax1.plot(epochs, train_loss, 'bo-', label='Training Loss')
+    ax1.plot(epochs, val_loss, 'ro-', label='Validation Loss')
+    
+    # Highlight best epoch
+    best_epoch = training_metrics['best_epoch']
+    if best_epoch in epochs:
+        idx = epochs.index(best_epoch)
+        best_loss = val_loss[idx]
+        
+        ax1.scatter([best_epoch], [best_loss], c='gold', s=150, zorder=5, 
+                  label=f'Best Model (Val Loss: {best_loss:.4f})')
+    
+    ax1.set_title('Training & Validation Loss')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.grid(True, linestyle='--', alpha=0.7)
+    ax1.legend()
+    
+    # Plot learning rate
+    if training_metrics['lr']:
+        ax2.plot(epochs, training_metrics['lr'], 'go-', label='Learning Rate')
+        ax2.set_title('Learning Rate Schedule')
+        ax2.set_xlabel('Epoch')
+        ax2.set_ylabel('Learning Rate')
+        ax2.grid(True, linestyle='--', alpha=0.7)
+        ax2.set_yscale('log')
+        ax2.legend()
+        
+    plt.tight_layout()
+    plt.show()
+
+def _minimal_plot():
+    """Plot minimal saat semua visualisasi gagal."""
+    import matplotlib.pyplot as plt
+    
+    plt.figure(figsize=(10, 6))
+    plt.plot(training_metrics['epochs'], training_metrics['train_loss'], 'b-', label='Train Loss')
+    plt.plot(training_metrics['epochs'], training_metrics['val_loss'], 'r-', label='Val Loss')
+    plt.title('Training Progress')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+def _display_metrics_summary():
+    """Tampilkan ringkasan metrics dalam bentuk tabel."""
+    try:
+        import pandas as pd
+        
+        # Ambil 5 epoch terakhir saja
+        last_n = min(5, len(training_metrics['epochs']))
+        
+        metrics_data = {
+            'Epoch': training_metrics['epochs'][-last_n:],
+            'Train Loss': training_metrics['train_loss'][-last_n:],
+            'Val Loss': training_metrics['val_loss'][-last_n:]
+        }
+        
+        if training_metrics['lr'] and len(training_metrics['lr']) >= last_n:
+            metrics_data['Learning Rate'] = training_metrics['lr'][-last_n:]
+            
+        metrics_df = pd.DataFrame(metrics_data)
+        
+        # Highlight row dengan best val loss
+        def highlight_best(row):
+            is_best = row['Epoch'] == training_metrics['best_epoch']
+            return ['background-color: #d4f7e7' if is_best else '' for _ in row]
+        
+        # Display styled dataframe
+        display(metrics_df.style.apply(highlight_best, axis=1).format({
+            'Train Loss': '{:.4f}',
+            'Val Loss': '{:.4f}',
+            'Learning Rate': '{:.6f}'
+        }))
+    except ImportError:
+        # Fallback tanpa pandas
+        print("\n📋 Epoch terakhir:")
+        for i in range(max(0, len(training_metrics['epochs'])-5), len(training_metrics['epochs'])):
+            epoch = training_metrics['epochs'][i]
+            train = training_metrics['train_loss'][i]
+            val = training_metrics['val_loss'][i]
+            
+            best_marker = " 🌟" if epoch == training_metrics['best_epoch'] else ""
+            print(f"Epoch {epoch}: Train={train:.4f}, Val={val:.4f}{best_marker}")
+
+def update_metrics_table():
+    """Update metrics table untuk tampilan yang lebih detil."""
+    with metrics_tab:
+        clear_output(wait=True)
+        
+        if not training_metrics['epochs']:
+            print("📊 Belum ada data training untuk ditampilkan")
+            return
+        
+        try:
+            # Gunakan visualizer untuk tabel metrics jika tersedia
+            if has_model_visualizer and hasattr(visualizer, 'display_metrics_table'):
+                visualizer.display_metrics_table(
+                    epochs=training_metrics['epochs'],
+                    train_loss=training_metrics['train_loss'],
+                    val_loss=training_metrics['val_loss'],
+                    learning_rates=training_metrics['lr'],
+                    best_epoch=training_metrics['best_epoch']
+                )
+            else:
+                # Fallback ke tampilan metrics table sederhana
+                _display_detailed_metrics_table()
+                
+            # Tampilkan GPU metrics jika tersedia (selalu ditampilkan terlepas dari visualizer)
+            if training_metrics['gpu_memory_history'] and torch.cuda.is_available():
+                _display_gpu_metrics()
+                
+        except Exception as e:
+            print(f"❌ Error saat update metrics table: {str(e)}")
+            # Minimal fallback
+            _display_minimal_metrics()
+
+def _display_detailed_metrics_table():
+    """Tampilkan tabel metrics detail dengan format yang bagus."""
+    try:
+        import pandas as pd
+        
+        # Prepare metrics data
+        metrics_data = {
+            'Epoch': training_metrics['epochs'],
+            'Train Loss': training_metrics['train_loss'],
+            'Val Loss': training_metrics['val_loss']
+        }
+        
+        if training_metrics['lr']:
+            metrics_data['Learning Rate'] = training_metrics['lr']
+        
+        # Create DataFrame
+        metrics_df = pd.DataFrame(metrics_data)
+        
+        # Calculate improvement from previous epoch
+        if len(metrics_df) > 1:
+            metrics_df['Train Diff'] = metrics_df['Train Loss'].diff() * -1
+            metrics_df['Val Diff'] = metrics_df['Val Loss'].diff() * -1
+            
+            # Mark best epoch
+            metrics_df['Best'] = [epoch == training_metrics['best_epoch'] for epoch in metrics_df['Epoch']]
+        
+        # Display styled table
+        styled_df = metrics_df.style.format({
+            'Train Loss': '{:.4f}',
+            'Val Loss': '{:.4f}',
+            'Train Diff': '{:+.4f}',
+            'Val Diff': '{:+.4f}',
+            'Learning Rate': '{:.6f}'
+        })
+        
+        # Add color highlighting
+        if 'Train Diff' in metrics_df.columns:
+            styled_df = styled_df.background_gradient(
+                subset=['Train Diff', 'Val Diff'], 
+                cmap='RdYlGn',
+                vmin=-0.05,
+                vmax=0.05
+            )
+        
+        # Highlight best epoch
+        def highlight_best(row):
+            if 'Best' in row and row['Best']:
+                return ['background-color: #d4f7e7'] * len(row)
+            return [''] * len(row)
+        
+        styled_df = styled_df.apply(highlight_best, axis=1)
+        
+        # Hide the Best column if it exists
+        if 'Best' in metrics_df.columns:
+            styled_df = styled_df.hide(columns=['Best'])
+        
+        display(styled_df)
+        
+        # Show summary statistics
+        print("\n📊 Statistik Ringkasan:")
+        summary = {
+            'Minimum': [
+                min(training_metrics['train_loss']),
+                min(training_metrics['val_loss'])
+            ],
+            'Maximum': [
+                max(training_metrics['train_loss']),
+                max(training_metrics['val_loss'])
+            ],
+            'Mean': [
+                sum(training_metrics['train_loss']) / len(training_metrics['train_loss']),
+                sum(training_metrics['val_loss']) / len(training_metrics['val_loss'])
+            ],
+            'Last': [
+                training_metrics['train_loss'][-1],
+                training_metrics['val_loss'][-1]
+            ],
+            'Best': [
+                '-',
+                min(training_metrics['val_loss'])
+            ]
+        }
+        
+        summary_df = pd.DataFrame(summary, index=['Train Loss', 'Val Loss'])
+        display(summary_df.style.format('{:.4f}'))
+    except Exception as e:
+        print(f"⚠️ Error saat menampilkan tabel metrics: {str(e)}")
+        _display_minimal_metrics()
+
+def _display_gpu_metrics():
+    """Tampilkan statistik penggunaan GPU memory."""
+    try:
+        import pandas as pd
+        print("\n🔥 GPU Memory Usage:")
+        
+        # Ambil 5 entri terakhir untuk ditampilkan
+        recent_history = training_metrics['gpu_memory_history'][-5:]
+        
+        gpu_data = {
+            'Epoch': [item['epoch'] for item in recent_history],
+            'Allocated (MB)': [item['allocated'] for item in recent_history],
+            'Reserved (MB)': [item['reserved'] for item in recent_history]
+        }
+        
+        gpu_df = pd.DataFrame(gpu_data)
+        
+        display(gpu_df.style.format({
+            'Allocated (MB)': '{:.1f}',
+            'Reserved (MB)': '{:.1f}'
+        }))
+        
+        # Tambahkan info memory saat ini
+        current_allocated = torch.cuda.memory_allocated() / (1024**2)
+        current_reserved = torch.cuda.memory_reserved() / (1024**2)
+        total_memory = torch.cuda.get_device_properties(0).total_memory / (1024**2)
+        
+        print(f"\nMemory saat ini: {current_allocated:.1f}MB / {total_memory:.1f}MB ({(current_allocated/total_memory)*100:.1f}%)")
+    except Exception as e:
+        print(f"⚠️ Error saat menampilkan GPU metrics: {str(e)}")
+
+def _display_minimal_metrics():
+    """Tampilkan statistik minimal ketika semua tampilan gagal."""
+    print("📋 Training metrics:")
+    print(f"• Epochs: {len(training_metrics['epochs'])}")
+    print(f"• Best epoch: {training_metrics['best_epoch']} (Val loss: {training_metrics['best_val_loss']:.4f})")
+    
+    if training_metrics['epochs']:
+        print(f"• Latest epoch: {training_metrics['epochs'][-1]}")
+        print(f"• Latest train loss: {training_metrics['train_loss'][-1]:.4f}")
+        print(f"• Latest val loss: {training_metrics['val_loss'][-1]:.4f}")
+
+def update_status():
+    """Update status training UI."""
+    with status_tab:
+        clear_output(wait=True)
+        
+        # Check if training is active
+        if training_metrics['is_training']:
+            # Get current stats
+            current_epoch = training_metrics['epochs'][-1] if training_metrics['epochs'] else 0
+            total_epochs = config.get('training', {}).get('epochs', 30)
+            progress_percent = (current_epoch / total_epochs) * 100 if total_epochs > 0 else 0
+            
+            # Update progress bar
+            progress_bar.value = int(progress_percent)
+            
+            # Calculate timing information
+            elapsed = time.time() - training_metrics['start_time'] if training_metrics['start_time'] else 0
+            epoch_time = elapsed / max(1, current_epoch)  # Avoid division by zero
+            remaining_epochs = total_epochs - current_epoch
+            eta = remaining_epochs * epoch_time if remaining_epochs > 0 else 0
+            
+            elapsed_str = str(timedelta(seconds=int(elapsed)))
+            eta_str = str(timedelta(seconds=int(eta)))
+            
+            # Update status text
+            status_text.value = (
+                f"<p><b>Status:</b> <span style='color:green'>Training</span></p>"
+                f"<p><b>Epoch:</b> {current_epoch}/{total_epochs} (<b>{progress_percent:.1f}%</b>)</p>"
+                f"<p><b>Best Val Loss:</b> <span style='color:blue'>{training_metrics['best_val_loss']:.4f}</span> (Epoch {training_metrics['best_epoch']})</p>"
+                f"<p><b>Waktu berjalan:</b> {elapsed_str}</p>"
+                f"<p><b>Estimasi selesai:</b> {eta_str}</p>"
+            )
+            
+            # GPU stats if available
+            if torch.cuda.is_available():
+                gpu_memory_allocated = torch.cuda.memory_allocated() / (1024**2)
+                gpu_memory_reserved = torch.cuda.memory_reserved() / (1024**2)
+                
+                status_text.value += (
+                    f"<p><b>GPU Memory:</b> {gpu_memory_allocated:.1f}MB (allocated) / "
+                    f"{gpu_memory_reserved:.1f}MB (reserved)</p>"
+                )
+            
+            # Display checkpoints information if available
+            if checkpoint_handler:
+                print("\n📦 Checkpoint Training:")
+                _display_checkpoint_info()
+                
+        else:
+            # Update status for non-training state
+            status_text.value = (
+                f"<p><b>Status:</b> <span style='color:gray'>Idle</span></p>"
+            )
+            
+            if training_metrics['best_val_loss'] < float('inf'):
+                status_text.value += (
+                    f"<p><b>Best Val Loss:</b> <span style='color:blue'>{training_metrics['best_val_loss']:.4f}</span> (Epoch {training_metrics['best_epoch']})</p>"
+                )
+            
+            # Show available checkpoints if any
+            if checkpoint_handler:
+                print("\n📦 Checkpoint tersedia:")
+                _display_checkpoint_info()
+                
+        # Display training tips
+        if not training_metrics['is_training']:
+            print("\n💡 Tips Training:")
+            print("• Gunakan batch size yang lebih kecil jika mengalami out-of-memory")
+            print("• Opsi 'Resume dari checkpoint' untuk melanjutkan training yang terhenti")
+            print("• Jalankan notebook di environment dengan GPU untuk performa lebih baik")
+
+def _display_checkpoint_info():
+    """Tampilkan informasi checkpoint."""
+    try:
+        checkpoints = checkpoint_handler.list_checkpoints()
+        for category, paths in checkpoints.items():
+            if paths:  # Jika ada checkpoint dalam kategori ini
+                path = paths[0]  # Ambil yang pertama (terbaru)
+                size_mb = path.stat().st_size / (1024*1024)
+                print(f"• {category.capitalize()}: {path.name} ({size_mb:.1f} MB)")
+    except Exception as e:
+        print(f"⚠️ Tidak dapat menampilkan info checkpoint: {str(e)}")
+
+# ===== 6. TRAINING FUNCTION =====
+def run_training(resume_from_checkpoint=False):
+    """
+    Jalankan proses training model.
+    
+    Args:
+        resume_from_checkpoint: Jika True, lanjutkan training dari checkpoint terbaik
+    """
+    global training_metrics
+    
+    if not pipeline or not dataloaders:
+        print("❌ Pipeline training belum diinisialisasi")
+        return False
+    
+    # Reset status training
+    training_metrics['is_training'] = True
+    training_metrics['start_time'] = time.time()
+    
+    # Jika tidak melanjutkan training, reset metrics history
+    if not resume_from_checkpoint:
+        training_metrics = {
+            'train_loss': [],
+            'val_loss': [],
+            'lr': [],
+            'epochs': [],
+            'best_epoch': 0,
+            'best_val_loss': float('inf'),
+            'is_training': True,
+            'start_time': time.time(),
+            'last_update': None,
+            'gpu_memory_history': []
+        }
+    
+    try:
+        # Dapatkan parameter training dari config
+        epochs = config.get('training', {}).get('epochs', 30)
+        batch_size = config.get('training', {}).get('batch_size', 16)
+        save_every = config.get('training', {}).get('save_every', 5)
+        
+        checkpoint_path = None
+        if resume_from_checkpoint:
+            # Cari checkpoint terbaik
+            if checkpoint_handler:
+                checkpoint_path = checkpoint_handler.find_best_checkpoint()
+                if not checkpoint_path:
+                    logger.warning("⚠️ Tidak menemukan checkpoint terbaik, mencari yang terakhir...")
+                    checkpoint_path = checkpoint_handler.find_latest_checkpoint()
+                
+                if checkpoint_path:
+                    logger.info(f"📂 Melanjutkan training dari checkpoint: {checkpoint_path}")
+                else:
+                    logger.warning("⚠️ Tidak menemukan checkpoint, memulai training dari awal")
+            else:
+                logger.warning("⚠️ Checkpoint handler tidak tersedia")
+        
+        # Register callback untuk metrics jika pipeline mendukungnya
+        if hasattr(pipeline, 'register_callback'):
+            pipeline.register_callback('epoch_end', metrics_callback)
+        
+        # Jalankan training lewat pipeline
+        results = pipeline.train(
+            dataloaders=dataloaders,
+            resume_from_checkpoint=checkpoint_path,
+            save_every=save_every,
+            epochs=epochs
+        )
+        
+        # Reset status
+        training_metrics['is_training'] = False
+        
+        # Backup checkpoint ke Drive jika diminta
+        if is_colab and drive_backup_checkbox.value and checkpoint_handler:
+            _backup_to_drive()
+        
+        # Update UI controls
+        start_training_button.disabled = False
+        stop_training_button.disabled = True
+        resume_checkbox.disabled = False
+        batch_size_dropdown.disabled = False
+        
+        # Update visualisasi terakhir
+        update_plot()
+        update_metrics_table()
+        update_status()
+        
+        logger.success("✅ Training selesai!")
+        return True
+        
+    except KeyboardInterrupt:
+        logger.warning("⚠️ Training dihentikan oleh pengguna.")
+        training_metrics['is_training'] = False
+        
+        # Update UI controls
+        start_training_button.disabled = False
+        stop_training_button.disabled = True
+        resume_checkbox.disabled = False
+        batch_size_dropdown.disabled = False
+        
+        update_status()
+        return False
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat training: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        training_metrics['is_training'] = False
+        
+        # Update UI controls
+        start_training_button.disabled = False
+        stop_training_button.disabled = True
+        resume_checkbox.disabled = False
+        batch_size_dropdown.disabled = False
+        
+        update_status()
+        return False
+
+def _backup_to_drive():
+    """Backup checkpoints to Google Drive."""
+    try:
+        from google.colab import drive
+        if not os.path.exists('/content/drive'):
+            drive.mount('/content/drive')
+            
+        # Buat direktori backup
+        backup_dir = '/content/drive/MyDrive/SmartCash/checkpoints'
+        os.makedirs(backup_dir, exist_ok=True)
+        
+        # Salin checkpoint terbaik
+        if hasattr(checkpoint_handler, 'copy_to_drive'):
+            # Gunakan metode built-in jika tersedia
+            copied_paths = checkpoint_handler.copy_to_drive(backup_dir, best_only=True)
+            logger.success(f"✅ Checkpoint disalin ke Google Drive: {backup_dir}")
+        else:
+            # Fallback manual backup
+            import shutil
+            checkpoints = checkpoint_handler.list_checkpoints()
+            
+            copied_count = 0
+            # Salin best checkpoint jika ada
+            if checkpoints.get('best'):
+                best_checkpoint = checkpoints['best'][0]
+                dest_path = os.path.join(backup_dir, best_checkpoint.name)
+                shutil.copy2(best_checkpoint, dest_path)
+                copied_count += 1
+                logger.info(f"🔄 Checkpoint terbaik disalin ke Drive: {best_checkpoint.name}")
+            
+            # Salin latest checkpoint jika ada dan berbeda dari best
+            if checkpoints.get('latest'):
+                latest_checkpoint = checkpoints['latest'][0]
+                # Cek apakah best dan latest berbeda
+                if not checkpoints.get('best') or latest_checkpoint.name != checkpoints['best'][0].name:
+                    dest_path = os.path.join(backup_dir, latest_checkpoint.name)
+                    shutil.copy2(latest_checkpoint, dest_path)
+                    copied_count += 1
+                    logger.info(f"🔄 Checkpoint terakhir disalin ke Drive: {latest_checkpoint.name}")
+            
+            logger.success(f"✅ {copied_count} checkpoint berhasil disalin ke Google Drive")
+            
+    except Exception as e:
+        logger.warning(f"⚠️ Error saat backup ke Google Drive: {str(e)}")
+        try:
+            # Coba otomatis mount drive jika belum di-mount
+            if not os.path.exists('/content/drive'):
+                from google.colab import drive
+                drive.mount('/content/drive')
+                logger.info("🔄 Google Drive berhasil di-mount, coba backup lagi")
+                _backup_to_drive()  # Coba lagi setelah mount
+        except:
+            logger.error("❌ Gagal melakukan backup ke Google Drive")
+
+# Inisialisasi tabs
+update_plot()
+update_metrics_table()
+update_status()
+
+# ===== 7. DISPLAY TRAINING UI =====
+# Tampilkan UI training
+display(widgets.VBox([
+    widgets.HTML("<h2>🚀 Training Model</h2>"),
+    widgets.HTML("<p>Jalankan proses training model dengan konfigurasi yang telah ditetapkan.</p>"),
+    
+    # Controls
+    widgets.VBox([
+        widgets.HTML("<h3>⚙️ Kontrol Training</h3>"),
+        widgets.HBox([resume_checkbox, drive_backup_checkbox]),
+        widgets.HBox([batch_size_dropdown]),
+        widgets.HBox([start_training_button, stop_training_button]),
+        progress_bar,
+        status_text
+    ]),
+    
+    # Output area
+    training_output,
+    
+    # Tabs for visualization
+    widgets.HTML("<h3>📊 Visualisasi Training</h3>"),
+    tabs
+]))

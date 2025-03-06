@@ -1,334 +1,478 @@
-# File: utils/experiment_tracker.py
+# File: smartcash/utils/experiment_tracker.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk tracking dan logging eksperimen
-# dengan dukungan visualisasi dan komparasi hasil
+# Deskripsi: Utilitas untuk melacak dan menyimpan eksperimen training
 
+import os
 import json
-from pathlib import Path
-from typing import Dict, List, Optional
+import yaml
+import time
+import torch
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
+from pathlib import Path
 from datetime import datetime
+from typing import Dict, List, Optional, Any, Union
 
 from smartcash.utils.logger import SmartCashLogger
 
 class ExperimentTracker:
     """
-    Tracker untuk eksperimen dengan dukungan:
-    - Logging metrik dan parameter
-    - Visualisasi hasil
-    - Komparasi antar eksperimen
-    - Export hasil
+    Melacak dan menyimpan informasi eksperimen training untuk analisis performa.
+    Mendukung visualisasi hasil dan perbandingan antara eksperimen.
     """
     
     def __init__(
         self,
         experiment_name: str,
-        output_dir: str = "experiments",
+        output_dir: str = "runs/train/experiments",
         logger: Optional[SmartCashLogger] = None
     ):
+        """
+        Inisialisasi experiment tracker.
+        
+        Args:
+            experiment_name: Nama unik untuk eksperimen
+            output_dir: Direktori untuk menyimpan data eksperimen
+            logger: Logger kustom
+        """
         self.experiment_name = experiment_name
         self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
         self.logger = logger or SmartCashLogger(__name__)
         
-        # Buat direktori eksperimen
-        self.experiment_dir = self.output_dir / experiment_name
-        self.experiment_dir.mkdir(parents=True, exist_ok=True)
+        # Setup experiment directory
+        self.experiment_dir = self.output_dir / self.experiment_name
+        self.experiment_dir.mkdir(exist_ok=True)
         
-        # Setup tracking
-        self.current_run = None
-        self.metrics_history = []
-        self.run_metadata = {}
+        # Setup metrics tracking
+        self.metrics = {
+            'train_loss': [],
+            'val_loss': [],
+            'lr': [],
+            'epochs': [],
+            'timestamp': []
+        }
         
-        self.logger.info(
-            f"🔬 Experiment tracker diinisialisasi:\n"
-            f"   Nama: {experiment_name}\n"
-            f"   Output: {self.experiment_dir}"
-        )
+        self.config = {}
+        self.best_metrics = {}
+        self.start_time = None
+        self.end_time = None
         
-    def start_run(
-        self,
-        run_name: Optional[str] = None,
-        config: Optional[Dict] = None
-    ) -> None:
+        self.logger.info(f"🧪 Experiment tracker diinisialisasi: {experiment_name}")
+    
+    def start_experiment(self, config: Dict[str, Any]) -> None:
         """
-        Mulai run eksperimen baru
+        Memulai eksperimen baru dengan konfigurasi tertentu.
+        
         Args:
-            run_name: Nama run (opsional)
             config: Konfigurasi eksperimen
         """
-        # Generate run name jika tidak dispesifikasi
-        if run_name is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            run_name = f"run_{timestamp}"
-            
-        self.current_run = run_name
+        self.start_time = time.time()
+        self.config = config
         
-        # Setup direktori untuk run ini
-        run_dir = self.experiment_dir / run_name
-        run_dir.mkdir(exist_ok=True)
-        
-        # Save config
-        if config:
-            with open(run_dir / 'config.json', 'w') as f:
-                json.dump(config, f, indent=2)
-                
-        # Initialize tracking untuk run ini
-        self.metrics_history = []
-        self.run_metadata = {
-            'start_time': datetime.now().isoformat(),
-            'status': 'running',
-            'config': config
+        # Reset metrics
+        self.metrics = {
+            'train_loss': [],
+            'val_loss': [],
+            'lr': [],
+            'epochs': [],
+            'timestamp': []
         }
         
-        self.logger.info(
-            f"🏃 Memulai run: {run_name}\n"
-            f"   Config: {config if config else 'default'}"
-        )
-        
+        # Simpan konfigurasi
+        config_path = self.experiment_dir / 'config.yaml'
+        with open(config_path, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False)
+            
+        self.logger.info(f"🚀 Eksperimen {self.experiment_name} dimulai")
+    
     def log_metrics(
         self,
-        metrics: Dict[str, float],
-        step: Optional[int] = None
+        epoch: int,
+        train_loss: float,
+        val_loss: float,
+        lr: Optional[float] = None,
+        additional_metrics: Optional[Dict[str, float]] = None
     ) -> None:
         """
-        Log metrik evaluasi
+        Mencatat metrik untuk satu epoch.
+        
         Args:
-            metrics: Dict metrik
-            step: Step/epoch saat ini
+            epoch: Nomor epoch
+            train_loss: Training loss
+            val_loss: Validation loss
+            lr: Learning rate
+            additional_metrics: Metrik tambahan (opsional)
         """
-        if self.current_run is None:
-            raise ValueError("Tidak ada run yang aktif")
+        self.metrics['epochs'].append(epoch)
+        self.metrics['train_loss'].append(train_loss)
+        self.metrics['val_loss'].append(val_loss)
+        
+        if lr is not None:
+            self.metrics['lr'].append(lr)
             
-        # Add step info
-        metrics_entry = {
-            'step': step or len(self.metrics_history),
-            'timestamp': datetime.now().isoformat(),
-            **metrics
+        self.metrics['timestamp'].append(time.time())
+        
+        # Track metrik tambahan
+        if additional_metrics:
+            for key, value in additional_metrics.items():
+                if key not in self.metrics:
+                    self.metrics[key] = []
+                self.metrics[key].append(value)
+        
+        # Update best metrics
+        if not self.best_metrics or val_loss < self.best_metrics.get('val_loss', float('inf')):
+            self.best_metrics = {
+                'epoch': epoch,
+                'val_loss': val_loss,
+                'train_loss': train_loss,
+                'lr': lr
+            }
+            
+            if additional_metrics:
+                self.best_metrics.update(additional_metrics)
+        
+        # Auto-save setiap epoch
+        self.save_metrics()
+        
+        # Log information
+        self.logger.info(
+            f"📈 Epoch {epoch}: train_loss={train_loss:.4f}, val_loss={val_loss:.4f}, "
+            f"lr={lr:.6f}" if lr is not None else ""
+        )
+    
+    def end_experiment(self, final_metrics: Optional[Dict[str, float]] = None) -> None:
+        """
+        Mengakhiri eksperimen dan menyimpan hasil akhir.
+        
+        Args:
+            final_metrics: Metrik akhir eksperimen (opsional)
+        """
+        self.end_time = time.time()
+        duration = self.end_time - self.start_time
+        
+        # Simpan hasil akhir
+        results = {
+            'experiment_name': self.experiment_name,
+            'duration': duration,
+            'start_time': datetime.fromtimestamp(self.start_time).isoformat(),
+            'end_time': datetime.fromtimestamp(self.end_time).isoformat(),
+            'best_metrics': self.best_metrics
         }
         
-        self.metrics_history.append(metrics_entry)
-        
-        # Save metrics
-        run_dir = self.experiment_dir / self.current_run
-        with open(run_dir / 'metrics.json', 'w') as f:
-            json.dump(self.metrics_history, f, indent=2)
+        if final_metrics:
+            results['final_metrics'] = final_metrics
             
-        # Log ke console
-        metrics_str = ", ".join([
-            f"{k}: {v:.4f}" for k, v in metrics.items()
-        ])
-        self.logger.metric(
-            f"📊 Step {metrics_entry['step']}: {metrics_str}"
-        )
-        
-    def end_run(
-        self,
-        status: str = 'completed'
-    ) -> None:
-        """
-        Akhiri run eksperimen saat ini
-        Args:
-            status: Status akhir run
-        """
-        if self.current_run is None:
-            return
-            
-        # Update metadata
-        self.run_metadata.update({
-            'end_time': datetime.now().isoformat(),
-            'status': status,
-            'n_steps': len(self.metrics_history)
-        })
-        
-        # Save metadata
-        run_dir = self.experiment_dir / self.current_run
-        with open(run_dir / 'metadata.json', 'w') as f:
-            json.dump(self.run_metadata, f, indent=2)
+        # Simpan hasil ke file
+        results_path = self.experiment_dir / 'results.json'
+        with open(results_path, 'w') as f:
+            json.dump(results, f, indent=2)
             
         self.logger.success(
-            f"✨ Run {self.current_run} selesai\n"
-            f"   Status: {status}\n"
-            f"   Steps: {self.run_metadata['n_steps']}"
+            f"✅ Eksperimen {self.experiment_name} selesai dalam {duration/60:.1f} menit\n"
+            f"   Best val_loss: {self.best_metrics.get('val_loss', 'N/A'):.4f} "
+            f"(Epoch {self.best_metrics.get('epoch', 'N/A')})"
         )
         
-        self.current_run = None
-        
-    def plot_metrics(
-        self,
-        metrics: Optional[List[str]] = None,
-        save: bool = True,
-        show: bool = True
-    ) -> None:
+        # Generate laporan
+        self.generate_report()
+    
+    def save_metrics(self) -> str:
         """
-        Plot metrik dari run saat ini
+        Simpan metrik saat ini ke file.
+        
+        Returns:
+            Path file metrik tersimpan
+        """
+        metrics_path = self.experiment_dir / 'metrics.json'
+        
+        with open(metrics_path, 'w') as f:
+            json.dump(self.metrics, f, indent=2)
+            
+        return str(metrics_path)
+    
+    def load_metrics(self) -> Dict[str, List]:
+        """
+        Muat metrik dari file.
+        
+        Returns:
+            Metrik eksperimen
+        """
+        metrics_path = self.experiment_dir / 'metrics.json'
+        
+        if metrics_path.exists():
+            with open(metrics_path, 'r') as f:
+                metrics = json.load(f)
+                
+            self.metrics = metrics
+            
+            # Calculate best metrics
+            if self.metrics['val_loss']:
+                best_idx = self.metrics['val_loss'].index(min(self.metrics['val_loss']))
+                self.best_metrics = {
+                    'epoch': self.metrics['epochs'][best_idx],
+                    'val_loss': self.metrics['val_loss'][best_idx],
+                    'train_loss': self.metrics['train_loss'][best_idx]
+                }
+                
+                if 'lr' in self.metrics and best_idx < len(self.metrics['lr']):
+                    self.best_metrics['lr'] = self.metrics['lr'][best_idx]
+                    
+        return self.metrics
+    
+    def plot_metrics(self, save_to_file: bool = True) -> Optional[plt.Figure]:
+        """
+        Plot metrik training dan validation loss.
+        
         Args:
-            metrics: List metrik yang akan diplot
-            save: Simpan plot ke file
-            show: Tampilkan plot
+            save_to_file: Jika True, simpan plot ke file
+            
+        Returns:
+            Plot figure atau None jika tidak ada metrik
         """
-        if not self.metrics_history:
+        if not self.metrics['epochs']:
             self.logger.warning("⚠️ Tidak ada metrik untuk diplot")
-            return
+            return None
             
-        # Convert ke DataFrame
-        df = pd.DataFrame(self.metrics_history)
+        # Ukuran figure tergantung apakah ada learning rate
+        has_lr = 'lr' in self.metrics and len(self.metrics['lr']) > 0
         
-        if metrics is None:
-            # Plot semua metrik kecuali step dan timestamp
-            metrics = [col for col in df.columns 
-                      if col not in ['step', 'timestamp']]
-            
-        # Setup plot
-        n_metrics = len(metrics)
-        fig, axes = plt.subplots(
-            n_metrics, 1,
-            figsize=(10, 4*n_metrics),
-            squeeze=False
-        )
+        if has_lr:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5))
+        else:
+            fig, ax1 = plt.subplots(1, 1, figsize=(8, 5))
         
-        # Plot setiap metrik
-        for i, metric in enumerate(metrics):
-            ax = axes[i, 0]
+        # Plot loss
+        ax1.plot(self.metrics['epochs'], self.metrics['train_loss'], 'b-', label='Training Loss')
+        ax1.plot(self.metrics['epochs'], self.metrics['val_loss'], 'r-', label='Validation Loss')
+        
+        # Highlight best epoch
+        if self.best_metrics:
+            best_epoch = self.best_metrics['epoch']
+            best_val_loss = self.best_metrics['val_loss']
             
-            df.plot(
-                x='step',
-                y=metric,
-                ax=ax,
-                legend=True,
-                marker='o'
+            ax1.scatter([best_epoch], [best_val_loss], c='gold', s=100, zorder=5, edgecolor='k')
+            ax1.annotate(
+                f'Best: {best_val_loss:.4f}',
+                (best_epoch, best_val_loss),
+                xytext=(10, -20),
+                textcoords='offset points',
+                arrowprops=dict(arrowstyle="->", color='black')
             )
-            
-            ax.set_title(f'Evolution of {metric}')
-            ax.grid(True)
-            
+        
+        ax1.set_title(f"Eksperimen: {self.experiment_name}")
+        ax1.set_xlabel('Epoch')
+        ax1.set_ylabel('Loss')
+        ax1.grid(True, linestyle='--', alpha=0.7)
+        ax1.legend()
+        
+        # Plot learning rate jika tersedia
+        if has_lr:
+            ax2.plot(self.metrics['epochs'], self.metrics['lr'], 'g-', label='Learning Rate')
+            ax2.set_title('Learning Rate Schedule')
+            ax2.set_xlabel('Epoch')
+            ax2.set_ylabel('Learning Rate')
+            ax2.set_yscale('log')
+            ax2.grid(True, linestyle='--', alpha=0.7)
+            ax2.legend()
+        
         plt.tight_layout()
         
-        # Save plot
-        if save and self.current_run:
-            run_dir = self.experiment_dir / self.current_run
-            plt.savefig(run_dir / 'metrics.png')
-            self.logger.info("💾 Plot metrik disimpan")
-            
-        if show:
-            plt.show()
-            
-    def compare_runs(
-        self,
-        metric: str,
-        runs: Optional[List[str]] = None,
-        save: bool = True,
-        show: bool = True
-    ) -> None:
+        # Simpan plot jika diminta
+        if save_to_file:
+            plot_path = self.experiment_dir / 'training_plot.png'
+            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            self.logger.info(f"📊 Plot metrik tersimpan: {plot_path}")
+        
+        return fig
+    
+    def generate_report(self) -> str:
         """
-        Bandingkan metrik antar runs
+        Generate laporan eksperimen.
+        
+        Returns:
+            Path file laporan
+        """
+        report_path = self.experiment_dir / 'report.md'
+        
+        # Hitung durasi eksperimen
+        duration = self.end_time - self.start_time if self.end_time else 0
+        hours, remainder = divmod(duration, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        duration_str = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+        
+        # Generate plot
+        self.plot_metrics(save_to_file=True)
+        
+        # Buat report
+        with open(report_path, 'w') as f:
+            f.write(f"# Laporan Eksperimen: {self.experiment_name}\n\n")
+            
+            # Informasi dasar
+            f.write("## Informasi Eksperimen\n\n")
+            f.write(f"- **Nama Eksperimen**: {self.experiment_name}\n")
+            
+            start_time_str = datetime.fromtimestamp(self.start_time).strftime("%Y-%m-%d %H:%M:%S") if self.start_time else "N/A"
+            end_time_str = datetime.fromtimestamp(self.end_time).strftime("%Y-%m-%d %H:%M:%S") if self.end_time else "N/A"
+            
+            f.write(f"- **Waktu Mulai**: {start_time_str}\n")
+            f.write(f"- **Waktu Selesai**: {end_time_str}\n")
+            f.write(f"- **Durasi**: {duration_str}\n\n")
+            
+            # Konfigurasi
+            f.write("## Konfigurasi\n\n")
+            f.write("```yaml\n")
+            yaml.dump(self.config, f, default_flow_style=False)
+            f.write("```\n\n")
+            
+            # Best metrics
+            f.write("## Hasil Terbaik\n\n")
+            if self.best_metrics:
+                f.write(f"- **Epoch**: {self.best_metrics.get('epoch', 'N/A')}\n")
+                f.write(f"- **Validation Loss**: {self.best_metrics.get('val_loss', 'N/A'):.4f}\n")
+                f.write(f"- **Training Loss**: {self.best_metrics.get('train_loss', 'N/A'):.4f}\n")
+                
+                for key, value in self.best_metrics.items():
+                    if key not in ['epoch', 'val_loss', 'train_loss', 'lr']:
+                        f.write(f"- **{key}**: {value}\n")
+                
+                f.write("\n")
+            else:
+                f.write("Tidak ada metrik tersedia.\n\n")
+            
+            # Plot
+            f.write("## Visualisasi\n\n")
+            f.write("![Training Metrics](training_plot.png)\n\n")
+            
+            # Metrics table
+            f.write("## Tabel Metrik\n\n")
+            if self.metrics['epochs']:
+                f.write("| Epoch | Train Loss | Val Loss | Learning Rate |\n")
+                f.write("|-------|------------|----------|---------------|\n")
+                
+                for i, epoch in enumerate(self.metrics['epochs']):
+                    lr_value = self.metrics['lr'][i] if 'lr' in self.metrics and i < len(self.metrics['lr']) else '-'
+                    f.write(f"| {epoch} | {self.metrics['train_loss'][i]:.4f} | {self.metrics['val_loss'][i]:.4f} | {lr_value} |\n")
+            else:
+                f.write("Tidak ada metrik tersedia.\n")
+                
+        self.logger.info(f"📝 Laporan eksperimen tersimpan: {report_path}")
+        return str(report_path)
+    
+    @classmethod
+    def list_experiments(cls, output_dir: str = "runs/train/experiments") -> List[str]:
+        """
+        Daftar semua eksperimen yang tersedia.
+        
         Args:
-            metric: Metrik yang akan dibandingkan
-            runs: List run yang akan dibandingkan
-            save: Simpan plot ke file
-            show: Tampilkan plot
+            output_dir: Direktori eksperimen
+            
+        Returns:
+            List nama eksperimen
         """
-        if runs is None:
-            # Compare semua run yang ada
-            runs = [d.name for d in self.experiment_dir.iterdir() 
-                   if d.is_dir()]
-            
-        # Collect data dari setiap run
-        data = []
-        for run in runs:
-            run_dir = self.experiment_dir / run
-            metrics_file = run_dir / 'metrics.json'
-            
-            if metrics_file.exists():
-                with open(metrics_file, 'r') as f:
-                    run_metrics = json.load(f)
-                    
-                df = pd.DataFrame(run_metrics)
-                if metric in df.columns:
-                    df['run'] = run
-                    data.append(df)
-                    
-        if not data:
-            self.logger.warning(
-                f"⚠️ Tidak ada data untuk metrik {metric}"
-            )
-            return
-            
-        # Combine data
-        df = pd.concat(data, ignore_index=True)
+        output_path = Path(output_dir)
         
-        # Plot
-        plt.figure(figsize=(12, 6))
-        sns.lineplot(
-            data=df,
-            x='step',
-            y=metric,
-            hue='run',
-            marker='o'
-        )
-        
-        plt.title(f'Comparison of {metric} across runs')
-        plt.grid(True)
-        
-        # Save plot
-        if save:
-            plt.savefig(self.experiment_dir / f'comparison_{metric}.png')
-            self.logger.info("💾 Plot perbandingan disimpan")
+        if not output_path.exists():
+            return []
             
-        if show:
-            plt.show()
-            
-    def export_results(
-        self,
-        format: str = 'csv'
-    ) -> None:
+        # Filter direktori saja
+        experiments = [
+            d.name for d in output_path.iterdir() 
+            if d.is_dir() and (d / 'config.yaml').exists()
+        ]
+        
+        return sorted(experiments)
+    
+    @classmethod
+    def compare_experiments(
+        cls,
+        experiment_names: List[str],
+        output_dir: str = "runs/train/experiments",
+        save_to_file: bool = True
+    ) -> Optional[plt.Figure]:
         """
-        Export hasil eksperimen
+        Bandingkan beberapa eksperimen.
+        
         Args:
-            format: Format export ('csv' atau 'json')
+            experiment_names: List nama eksperimen
+            output_dir: Direktori eksperimen
+            save_to_file: Jika True, simpan hasil ke file
+            
+        Returns:
+            Plot figure atau None jika tidak ada eksperimen
         """
-        # Collect results dari semua run
-        results = []
+        if not experiment_names:
+            print("⚠️ Tidak ada eksperimen untuk dibandingkan")
+            return None
+            
+        output_path = Path(output_dir)
         
-        for run_dir in self.experiment_dir.iterdir():
-            if not run_dir.is_dir():
+        # Siapkan figure
+        fig, ax = plt.subplots(figsize=(10, 6))
+        
+        # Track best metrics untuk setiap eksperimen
+        best_metrics = {}
+        
+        # Plot setiap eksperimen
+        for exp_name in experiment_names:
+            exp_dir = output_path / exp_name
+            metrics_path = exp_dir / 'metrics.json'
+            
+            if not metrics_path.exists():
+                print(f"⚠️ Metrik tidak ditemukan untuk {exp_name}")
                 continue
                 
-            run_results = {'run_name': run_dir.name}
-            
-            # Load metadata
-            metadata_file = run_dir / 'metadata.json'
-            if metadata_file.exists():
-                with open(metadata_file, 'r') as f:
-                    metadata = json.load(f)
-                    run_results.update(metadata)
-                    
-            # Load final metrics
-            metrics_file = run_dir / 'metrics.json'
-            if metrics_file.exists():
-                with open(metrics_file, 'r') as f:
-                    metrics = json.load(f)
-                    if metrics:
-                        # Ambil metrik terakhir
-                        final_metrics = metrics[-1]
-                        run_results['final_metrics'] = final_metrics
-                        
-            results.append(run_results)
-            
-        if not results:
-            self.logger.warning("⚠️ Tidak ada hasil untuk diexport")
-            return
-            
-        # Export
-        output_path = self.experiment_dir / f'results.{format}'
-        
-        if format == 'csv':
-            pd.DataFrame(results).to_csv(output_path, index=False)
-        else:
-            with open(output_path, 'w') as f:
-                json.dump(results, f, indent=2)
+            with open(metrics_path, 'r') as f:
+                metrics = json.load(f)
                 
-        self.logger.success(
-            f"📤 Hasil eksperimen diexport ke {output_path}"
-        )
+            if not metrics.get('epochs'):
+                print(f"⚠️ Tidak ada metrik epoch untuk {exp_name}")
+                continue
+                
+            # Plot validation loss
+            ax.plot(metrics['epochs'], metrics['val_loss'], marker='o', markersize=3, 
+                   label=f"{exp_name}")
+            
+            # Track best metrics
+            if metrics['val_loss']:
+                best_idx = metrics['val_loss'].index(min(metrics['val_loss']))
+                best_metrics[exp_name] = {
+                    'epoch': metrics['epochs'][best_idx],
+                    'val_loss': metrics['val_loss'][best_idx]
+                }
+        
+        ax.set_title("Perbandingan Validation Loss")
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Validation Loss')
+        ax.grid(True, linestyle='--', alpha=0.7)
+        ax.legend()
+        
+        plt.tight_layout()
+        
+        # Simpan plot jika diminta
+        if save_to_file:
+            comparison_path = output_path / 'comparison.png'
+            plt.savefig(comparison_path, dpi=300, bbox_inches='tight')
+            print(f"📊 Plot perbandingan tersimpan: {comparison_path}")
+            
+        # Generate tabel perbandingan
+        print("\n📋 Tabel Perbandingan:")
+        
+        # Prepare comparison table
+        if best_metrics:
+            comparison_data = {
+                'Experiment': list(best_metrics.keys()),
+                'Best Epoch': [m['epoch'] for m in best_metrics.values()],
+                'Best Val Loss': [m['val_loss'] for m in best_metrics.values()]
+            }
+            
+            try:
+                import pandas as pd
+                df = pd.DataFrame(comparison_data)
+                df = df.sort_values('Best Val Loss')
+                print(df.to_string(index=False))
+            except ImportError:
+                for exp_name, metrics in best_metrics.items():
+                    print(f"• {exp_name}: Epoch {metrics['epoch']}, Val Loss {metrics['val_loss']:.4f}")
+        
+        return fig

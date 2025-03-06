@@ -1,7 +1,7 @@
-# File: utils/preprocessing.py
+# File: smartcash/utils/preprocessing.py
 # Author: Alfrida Sabar
-# Deskripsi: Modul preprocessing untuk dataset uang kertas Rupiah, 
-# menangani resize, normalisasi, dan augmentasi data
+# Deskripsi: Modul preprocessing yang diperbarui untuk dataset uang kertas Rupiah, 
+# menggunakan enhanced cache dan layer config manager
 
 import os
 import cv2
@@ -16,10 +16,11 @@ import yaml
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.coordinate_normalizer import CoordinateNormalizer
-from smartcash.utils.preprocessing_cache import PreprocessingCache
+from smartcash.utils.enhanced_cache import EnhancedCache  # Menggunakan enhanced cache
+from smartcash.utils.layer_config_manager import get_layer_config  # Menggunakan layer config manager
 
 class ImagePreprocessor:
-    """Preprocessor untuk dataset gambar uang kertas Rupiah"""
+    """Preprocessor untuk dataset gambar uang kertas Rupiah dengan komponen yang diperbarui"""
     
     def __init__(
         self,
@@ -27,6 +28,14 @@ class ImagePreprocessor:
         logger: Optional[SmartCashLogger] = None,
         cache_size_gb: float = 1.0
     ):
+        """
+        Inisialisasi image preprocessor.
+        
+        Args:
+            config_path: Path ke file konfigurasi
+            logger: Custom logger
+            cache_size_gb: Ukuran cache dalam GB
+        """
         self.logger = logger or SmartCashLogger(__name__)
         self.config = self._load_config(config_path)
         self.target_size = tuple(self.config['model']['img_size'])
@@ -34,10 +43,17 @@ class ImagePreprocessor:
         # Setup komponen
         self.augmentor = self._setup_augmentations()
         self.coord_normalizer = CoordinateNormalizer(logger=self.logger)
-        self.cache = PreprocessingCache(
+        
+        # Gunakan EnhancedCache dengan fitur yang lebih baik
+        self.cache = EnhancedCache(
+            cache_dir=".cache/preprocessing",
             max_size_gb=cache_size_gb,
             logger=self.logger
         )
+        
+        # Dapatkan konfigurasi layer dari layer config manager
+        self.layer_config = get_layer_config()
+        self.active_layers = self.config.get('layers', ['banknote'])
         
         # Hitung jumlah worker berdasarkan CPU dan memory limit
         self.n_workers = self._calculate_workers()
@@ -50,7 +66,7 @@ class ImagePreprocessor:
     def _calculate_workers(self) -> int:
         """Hitung jumlah optimal worker berdasarkan resource limit"""
         cpu_count = mp.cpu_count()
-        memory_limit = self.config['model']['memory_limit']
+        memory_limit = self.config['model'].get('memory_limit', 0.6)
         suggested_workers = max(1, int(cpu_count * memory_limit))
         
         self.logger.info(
@@ -61,7 +77,7 @@ class ImagePreprocessor:
         return suggested_workers
     
     def _setup_augmentations(self) -> A.Compose:
-        """Setup pipeline augmentasi data"""
+        """Setup pipeline augmentasi data berdasarkan konfigurasi"""
         aug_config = self.config['training']
         
         return A.Compose([
@@ -70,18 +86,18 @@ class ImagePreprocessor:
                 scale=(0.8, 1.0),
                 p=1.0
             ),
-            A.HorizontalFlip(p=aug_config['fliplr']),
-            A.VerticalFlip(p=aug_config['flipud']),
+            A.HorizontalFlip(p=aug_config.get('fliplr', 0.5)),
+            A.VerticalFlip(p=aug_config.get('flipud', 0.0)),
             A.HueSaturationValue(
-                hue_shift_limit=aug_config['hsv_h'],
-                sat_shift_limit=aug_config['hsv_s'],
-                val_shift_limit=aug_config['hsv_v'],
+                hue_shift_limit=aug_config.get('hsv_h', 0.015),
+                sat_shift_limit=aug_config.get('hsv_s', 0.7),
+                val_shift_limit=aug_config.get('hsv_v', 0.4),
                 p=0.5
             ),
             A.ShiftScaleRotate(
-                shift_limit=aug_config['translate'],
-                scale_limit=aug_config['scale'],
-                rotate_limit=aug_config['degrees'],
+                shift_limit=aug_config.get('translate', 0.1),
+                scale_limit=aug_config.get('scale', 0.5),
+                rotate_limit=aug_config.get('degrees', 45),
                 p=0.5
             ),
             A.Normalize(
@@ -89,7 +105,11 @@ class ImagePreprocessor:
                 std=[0.229, 0.224, 0.225],
                 p=1.0
             )
-        ])
+        ], bbox_params=A.BboxParams(
+            format='yolo',
+            label_fields=['class_labels'],
+            min_visibility=0.3
+        ))
     
     def process_image_and_label(
         self,
@@ -99,7 +119,7 @@ class ImagePreprocessor:
         augment: bool = True
     ) -> Tuple[np.ndarray, Optional[str]]:
         """
-        Preprocess gambar dan labelnya dengan support caching
+        Preprocess gambar dan labelnya dengan enhanced cache
         Args:
             image_path: Path ke file gambar
             label_path: Path ke file label (optional)
@@ -109,7 +129,7 @@ class ImagePreprocessor:
             Tuple (gambar yang sudah dipreprocess, path label yang dinormalisasi)
         """
         try:
-            # Check cache
+            # Gunakan enhanced cache untuk get/put
             cache_params = {
                 'target_size': self.target_size,
                 'augment': augment,
@@ -160,7 +180,7 @@ class ImagePreprocessor:
                     cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                 )
             
-            # Cache hasil
+            # Simpan ke enhanced cache
             result = {
                 'image': image,
                 'label_path': normalized_label_path
@@ -180,7 +200,7 @@ class ImagePreprocessor:
         augment: bool = True
     ) -> None:
         """
-        Preprocess seluruh dataset
+        Preprocess seluruh dataset dengan enhanced cache
         Args:
             input_dir: Direktori dataset mentah
             output_dir: Direktori output
@@ -227,14 +247,14 @@ class ImagePreprocessor:
                     desc="💫 Processing"
                 ))
                 
-            # Log cache stats
+            # Log cache stats dari enhanced cache
             stats = self.cache.get_stats()
             self.logger.success(
                 f"✨ Preprocessing selesai!\n"
                 f"📊 Cache stats:\n"
-                f"   Hit rate: {stats['hit_rate']:.1f}%\n"
-                f"   Cache size: {stats['cache_size']:.1f} MB\n"
-                f"   Files cached: {stats['num_files']}\n"
+                f"   Hit rate: {stats['hit_ratio']:.1f}%\n"
+                f"   Cache size: {stats['cache_size_mb']:.1f} MB\n"
+                f"   Files cached: {stats['file_count']}\n"
                 f"💾 Output: {output_dir}"
             )
             
@@ -243,28 +263,10 @@ class ImagePreprocessor:
             raise e
             
     def clear_cache(self) -> None:
-        """Bersihkan cache preprocessing"""
+        """Bersihkan enhanced cache"""
         try:
-            cache_dir = Path(self.cache.cache_dir)
-            if cache_dir.exists():
-                # Hapus semua file cache
-                for cache_file in cache_dir.glob("*.pkl"):
-                    cache_file.unlink()
-                    
-                # Hapus index
-                index_path = cache_dir / "cache_index.json"
-                if index_path.exists():
-                    index_path.unlink()
-                    
-                # Reset cache
-                self.cache = PreprocessingCache(
-                    cache_dir=str(cache_dir),
-                    max_size_gb=self.cache.max_size_bytes / 1024 / 1024 / 1024,
-                    logger=self.logger
-                )
-                
-                self.logger.success("🧹 Cache berhasil dibersihkan")
-                
+            self.cache.clear()
+            self.logger.success("🧹 Cache berhasil dibersihkan")
         except Exception as e:
             self.logger.error(f"❌ Gagal membersihkan cache: {str(e)}")
             raise e
@@ -288,7 +290,8 @@ class ImagePreprocessor:
                 'total_images': 0,
                 'total_labels': 0,
                 'invalid_images': 0,
-                'invalid_labels': 0
+                'invalid_labels': 0,
+                'layer_stats': {layer: 0 for layer in self.active_layers}
             }
             
             # Check gambar
@@ -298,7 +301,7 @@ class ImagePreprocessor:
                     stats['total_images'] += 1
                     try:
                         img = cv2.imread(str(img_path))
-                        if img is None or img.shape[:2] != self.target_size:
+                        if img is None or img.shape[:2] != self.target_size[::-1]:
                             stats['invalid_images'] += 1
                             self.logger.warning(
                                 f"⚠️ Invalid image: {img_path.name}"
@@ -309,6 +312,12 @@ class ImagePreprocessor:
             # Check label
             label_dir = output_dir / 'labels'
             if label_dir.exists():
+                # Get class-to-layer mapping
+                class_to_layer = {}
+                for layer, layer_config in self.layer_config.get_layer_config().items():
+                    for cls_id in layer_config['class_ids']:
+                        class_to_layer[cls_id] = layer
+                
                 for label_path in label_dir.glob("*.txt"):
                     stats['total_labels'] += 1
                     try:
@@ -319,18 +328,37 @@ class ImagePreprocessor:
                                 self.logger.warning(
                                     f"⚠️ Empty label: {label_path.name}"
                                 )
+                                continue
+                                
+                            # Count per layer
+                            for line in lines:
+                                parts = line.strip().split()
+                                if len(parts) >= 5:
+                                    try:
+                                        cls_id = int(float(parts[0]))
+                                        if cls_id in class_to_layer:
+                                            layer = class_to_layer[cls_id]
+                                            if layer in stats['layer_stats']:
+                                                stats['layer_stats'][layer] += 1
+                                    except:
+                                        pass
                     except:
                         stats['invalid_labels'] += 1
                         
             # Log hasil
             self.logger.success(
-                f"✨ Validasi selesai:\n"
+                f"✅ Validasi selesai:\n"
                 f"📊 Statistik:\n"
                 f"   Total images: {stats['total_images']}\n"
                 f"   Invalid images: {stats['invalid_images']}\n"
                 f"   Total labels: {stats['total_labels']}\n"
                 f"   Invalid labels: {stats['invalid_labels']}"
             )
+            
+            # Log statistik per layer
+            for layer, count in stats['layer_stats'].items():
+                if count > 0:
+                    self.logger.info(f"📊 Layer '{layer}': {count} anotasi")
             
             return stats
             

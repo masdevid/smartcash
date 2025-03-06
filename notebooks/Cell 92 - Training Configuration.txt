@@ -1,0 +1,513 @@
+# Cell 9.2: Training Configuration - Konfigurasi parameter training dan manajemen eksperimen
+
+import ipywidgets as widgets
+from IPython.display import display, clear_output, HTML
+import matplotlib.pyplot as plt
+import seaborn as sns
+import torch
+import gc
+import numpy as np
+import pickle
+import os
+from datetime import datetime
+import yaml
+from pathlib import Path
+
+# Pastikan komponen tersedia
+try:
+    with open('training_components.pkl', 'rb') as f:
+        components = pickle.load(f)
+        
+    pipeline = components.get('pipeline')
+    model_handler = components.get('model_handler')
+    checkpoint_handler = components.get('checkpoint_handler')
+    experiment_tracker = components.get('experiment_tracker')
+    dataloaders = components.get('dataloaders')
+    
+    # Memuat konfigurasi
+    with open('config.pkl', 'rb') as f:
+        config = pickle.load(f)
+        
+    from smartcash.utils.logger import get_logger
+    logger = get_logger("training_config", log_to_console=True, log_to_file=True, log_to_colab=True)
+except Exception as e:
+    print(f"⚠️ Komponen training belum diinisialisasi: {str(e)}")
+    print("ℹ️ Jalankan Cell 9.1 terlebih dahulu untuk menginisialisasi pipeline")
+    components = None
+    pipeline = None
+    model_handler = None
+    checkpoint_handler = None
+    experiment_tracker = None
+    dataloaders = None
+    config = {}
+    
+    # Fallback ke logger standard
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    logger = logging.getLogger("training_config")
+
+# ===== 1. TRAINING PARAMETERS UI =====
+# Header dengan styling
+header = widgets.HTML(
+    value='<h2 style="color: #3498db; margin-bottom: 15px;">⚙️ Konfigurasi Training</h2>' +
+          '<p style="color: #555; margin-bottom: 20px;">Sesuaikan parameter training model sebelum mulai proses training.</p>'
+)
+
+# Hyperparameter epochs dengan tooltip informatif
+epochs_slider = widgets.IntSlider(
+    value=config.get('training', {}).get('epochs', 30),
+    min=1,
+    max=100,
+    step=1,
+    description='Epochs:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='50%'),
+    tooltip='Jumlah iterasi training pada seluruh dataset'
+)
+
+# Batch size dengan slider dinamis berdasarkan ketersediaan GPU
+max_batch = 32 if torch.cuda.is_available() else 16
+batch_size_slider = widgets.IntSlider(
+    value=min(config.get('training', {}).get('batch_size', 16), max_batch),
+    min=1,
+    max=max_batch,
+    step=1,
+    description='Batch Size:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='50%'),
+    tooltip='Jumlah sampel yang diproses dalam satu iterasi'
+)
+
+# Learning rate dengan lebih banyak pilihan
+lr_dropdown = widgets.Dropdown(
+    options=[
+        ('0.001 (default)', 0.001),
+        ('0.01 (lebih cepat)', 0.01),
+        ('0.0001 (lebih stabil)', 0.0001),
+        ('0.00001 (fine-tuning)', 0.00001),
+        ('0.002 (warmup)', 0.002)
+    ],
+    value=config.get('training', {}).get('learning_rate', 0.001),
+    description='Learning Rate:',
+    style={'description_width': 'initial'},
+    tooltip='Kecepatan pembelajaran model: nilai kecil=pembelajaran lambat tapi stabil'
+)
+
+# Optimizer dengan opsi tambahan
+optimizer_dropdown = widgets.Dropdown(
+    options=[
+        ('Adam (default)', 'adam'),
+        ('AdamW (lebih robust)', 'adamw'),
+        ('SGD (klasik)', 'sgd'),
+        ('RMSprop (adaptive)', 'rmsprop')
+    ],
+    value=config.get('training', {}).get('optimizer', 'adam'),
+    description='Optimizer:',
+    style={'description_width': 'initial'},
+    tooltip='Algoritma optimasi yang digunakan untuk memperbarui bobot model'
+)
+
+# Scheduler dengan opsi tambahan
+scheduler_dropdown = widgets.Dropdown(
+    options=[
+        ('ReduceLROnPlateau (default)', 'plateau'),
+        ('StepLR (interval tetap)', 'step'),
+        ('CosineAnnealing (smooth)', 'cosine'),
+        ('OneCycleLR (warmup+annealing)', 'onecycle')
+    ],
+    value=config.get('training', {}).get('scheduler', 'plateau'),
+    description='Scheduler:',
+    style={'description_width': 'initial'},
+    tooltip='Pengaturan perubahan learning rate selama training'
+)
+
+# Early stopping patience dengan keterangan
+early_stopping_slider = widgets.IntSlider(
+    value=config.get('training', {}).get('early_stopping_patience', 5),
+    min=1,
+    max=20,
+    step=1,
+    description='Early Stopping:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='50%'),
+    tooltip='Jumlah epoch tanpa peningkatan sebelum training dihentikan'
+)
+
+# Weight decay untuk regularisasi
+weight_decay_dropdown = widgets.Dropdown(
+    options=[
+        ('0.0005 (default)', 0.0005),
+        ('0.001 (lebih kuat)', 0.001),
+        ('0.0001 (lebih lemah)', 0.0001),
+        ('0 (tanpa regularisasi)', 0)
+    ],
+    value=config.get('training', {}).get('weight_decay', 0.0005),
+    description='Weight Decay:',
+    style={'description_width': 'initial'},
+    tooltip='Parameter regularisasi untuk mencegah overfitting'
+)
+
+# Strategi checkpoint
+save_every_slider = widgets.IntSlider(
+    value=config.get('training', {}).get('save_every', 5),
+    min=1,
+    max=10,
+    step=1,
+    description='Save Every:',
+    style={'description_width': 'initial'},
+    tooltip='Simpan checkpoint setiap X epoch',
+    layout=widgets.Layout(width='50%')
+)
+
+# Layer selection (multiselect)
+available_layers = ['banknote', 'nominal', 'security']
+active_layers = config.get('layers', ['banknote'])
+
+layer_selection = widgets.SelectMultiple(
+    options=available_layers,
+    value=active_layers,
+    description='Layers Aktif:',
+    style={'description_width': 'initial'},
+    tooltip='Layer deteksi yang akan diaktifkan',
+    layout=widgets.Layout(width='50%', height='80px')
+)
+
+# ===== 2. EXPERIMENT TRACKING UI =====
+# Experiment name input dengan generator otomatis
+default_name = f"{config.get('model', {}).get('backbone', 'efficientnet')}_{datetime.now().strftime('%Y%m%d_%H%M')}"
+experiment_name_input = widgets.Text(
+    value=default_name,
+    placeholder='Nama eksperimen training',
+    description='Nama Eksperimen:',
+    style={'description_width': 'initial'},
+    layout=widgets.Layout(width='70%'),
+    tooltip='Nama unik untuk mengidentifikasi eksperimen ini'
+)
+
+# Generate random name button
+generate_name_button = widgets.Button(
+    description='Generate Nama',
+    button_style='info',
+    icon='random',
+    tooltip='Generate nama eksperimen acak'
+)
+
+def on_generate_name_button_clicked(b):
+    """Generate nama eksperimen acak."""
+    import random
+    adjectives = ['Cepat', 'Akurat', 'Kuat', 'Cerdas', 'Adaptif', 'Efisien', 'Optimal']
+    nouns = ['Deteksi', 'Training', 'Model', 'Network', 'Percobaan', 'Iterasi']
+    suffix = datetime.now().strftime('%m%d_%H%M')
+    
+    new_name = f"{random.choice(adjectives)}_{random.choice(nouns)}_{suffix}"
+    experiment_name_input.value = new_name
+
+generate_name_button.on_click(on_generate_name_button_clicked)
+
+# ===== 3. SAVE CONFIGURATION UI =====
+save_config_button = widgets.Button(
+    description='Simpan Konfigurasi',
+    button_style='primary',
+    icon='save',
+    tooltip='Simpan konfigurasi training ke file'
+)
+
+# Output area dengan styling
+config_output = widgets.Output(
+    layout=widgets.Layout(
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0',
+        max_height='200px',
+        overflow='auto'
+    )
+)
+
+def update_config_from_ui():
+    """Update konfigurasi dari UI widgets."""
+    # Update konfigurasi training
+    if 'training' not in config:
+        config['training'] = {}
+        
+    config['training']['epochs'] = epochs_slider.value
+    config['training']['batch_size'] = batch_size_slider.value
+    config['training']['learning_rate'] = lr_dropdown.value
+    config['training']['optimizer'] = optimizer_dropdown.value
+    config['training']['scheduler'] = scheduler_dropdown.value
+    config['training']['early_stopping_patience'] = early_stopping_slider.value
+    config['training']['weight_decay'] = weight_decay_dropdown.value
+    config['training']['save_every'] = save_every_slider.value
+    
+    # Update active layers
+    config['layers'] = list(layer_selection.value)
+    
+    # Update model batch size
+    if 'model' not in config:
+        config['model'] = {}
+    config['model']['batch_size'] = batch_size_slider.value
+    
+    return config
+
+def save_training_config():
+    """Simpan konfigurasi training ke file."""
+    try:
+        # Update konfigurasi dari UI
+        updated_config = update_config_from_ui()
+        
+        # Simpan ke file yaml
+        training_config_path = 'configs/training_config.yaml'
+        os.makedirs('configs', exist_ok=True)
+        
+        with open(training_config_path, 'w') as f:
+            yaml.dump(updated_config, f, default_flow_style=False)
+            
+        # Simpan juga ke pickle untuk digunakan di cell lain
+        with open('config.pkl', 'wb') as f:
+            pickle.dump(updated_config, f)
+            
+        # Update experiment tracker name jika tersedia
+        if experiment_tracker:
+            experiment_tracker.experiment_name = experiment_name_input.value
+            
+        return True, training_config_path
+    except Exception as e:
+        return False, str(e)
+
+def on_save_config_button_clicked(b):
+    with config_output:
+        clear_output()
+        
+        print("💾 Menyimpan konfigurasi training...")
+        success, message = save_training_config()
+        
+        if success:
+            print(f"✅ Konfigurasi training berhasil disimpan ke {message}")
+            
+            # Tampilkan informasi konfigurasi training
+            print("\n📋 Parameter Training:")
+            print(f"• Epochs: {epochs_slider.value}")
+            print(f"• Batch Size: {batch_size_slider.value}")
+            print(f"• Learning Rate: {lr_dropdown.value}")
+            print(f"• Optimizer: {optimizer_dropdown.value}")
+            print(f"• Scheduler: {scheduler_dropdown.value}")
+            print(f"• Early Stopping Patience: {early_stopping_slider.value}")
+            print(f"• Weight Decay: {weight_decay_dropdown.value}")
+            print(f"• Save Checkpoint Every: {save_every_slider.value} epoch")
+            print(f"• Layers Aktif: {', '.join(layer_selection.value)}")
+            print(f"• Nama Eksperimen: {experiment_name_input.value}")
+            
+            if experiment_tracker:
+                print(f"\n🧪 Experiment tracker diupdate: {experiment_name_input.value}")
+                
+            # Perbarui dataloaders jika batch size berubah
+            if dataloaders and 'original_batch_size' in globals() and globals()['original_batch_size'] != batch_size_slider.value:
+                print(f"\n⚠️ Batch size berubah dari {globals()['original_batch_size']} menjadi {batch_size_slider.value}")
+                print("ℹ️ Jalankan Cell 9.1 kembali untuk memperbarui dataloader")
+        else:
+            print(f"❌ Gagal menyimpan konfigurasi: {message}")
+
+save_config_button.on_click(on_save_config_button_clicked)
+
+# Simpan batch size awal untuk tracking perubahan
+globals()['original_batch_size'] = config.get('training', {}).get('batch_size', 16)
+
+# ===== 4. VISUALIZE LEARNING RATE SCHEDULE =====
+show_lr_schedule_button = widgets.Button(
+    description='Visualisasi LR Schedule',
+    button_style='info',
+    icon='line-chart',
+    tooltip='Tampilkan visualisasi learning rate schedule untuk konfigurasi saat ini'
+)
+
+lr_schedule_output = widgets.Output(
+    layout=widgets.Layout(
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    )
+)
+
+def simulate_lr_schedule(epochs, lr, scheduler_type):
+    """Simulasikan learning rate schedule."""
+    lrs = []
+    dummy_optimizer = torch.optim.SGD([torch.zeros(1, requires_grad=True)], lr=lr)
+    
+    if scheduler_type == 'plateau':
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(dummy_optimizer, mode='min', factor=0.5, patience=5)
+        
+        # Simulasikan validasi loss yang plateau setelah beberapa epoch
+        for epoch in range(epochs):
+            val_loss = max(1.0 - 0.05 * epoch, 0.5)
+            if epoch > epochs // 3:
+                val_loss = 0.5  # Plateau setelah 1/3 total epochs
+            
+            scheduler.step(val_loss)
+            lrs.append(dummy_optimizer.param_groups[0]['lr'])
+    elif scheduler_type == 'step':
+        step_size = epochs // 5  # 5 steps total
+        gamma = 0.5
+        scheduler = torch.optim.lr_scheduler.StepLR(dummy_optimizer, step_size=step_size, gamma=gamma)
+        
+        for epoch in range(epochs):
+            scheduler.step()
+            lrs.append(dummy_optimizer.param_groups[0]['lr'])
+    elif scheduler_type == 'cosine':
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(dummy_optimizer, T_max=epochs)
+        
+        for epoch in range(epochs):
+            scheduler.step()
+            lrs.append(dummy_optimizer.param_groups[0]['lr'])
+    elif scheduler_type == 'onecycle':
+        # OneCycleLR requires max_lr and total_steps
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(
+            dummy_optimizer, 
+            max_lr=lr*10, 
+            total_steps=epochs,
+            pct_start=0.3,  # 30% untuk warmup
+            div_factor=25,   # initial_lr = max_lr/25
+            final_div_factor=10000  # final_lr = initial_lr/final_div_factor
+        )
+        
+        for epoch in range(epochs):
+            scheduler.step()
+            lrs.append(dummy_optimizer.param_groups[0]['lr'])
+    else:
+        # Constant LR (no scheduler)
+        lrs = [lr] * epochs
+    
+    return lrs
+
+def on_show_lr_schedule_button_clicked(b):
+    with lr_schedule_output:
+        clear_output()
+        
+        # Extract parameters
+        epochs = epochs_slider.value
+        lr = lr_dropdown.value
+        scheduler_type = scheduler_dropdown.value
+        
+        print(f"📈 Visualisasi learning rate schedule untuk {epochs} epochs...")
+        print(f"• Learning rate awal: {lr}")
+        print(f"• Tipe scheduler: {scheduler_type}")
+        
+        try:
+            # Simulasikan learning rate schedule
+            lrs = simulate_lr_schedule(epochs, lr, scheduler_type)
+            
+            # Plot learning rate schedule
+            plt.figure(figsize=(12, 6))
+            plt.plot(range(1, epochs + 1), lrs, 'o-', linewidth=2, markersize=4)
+            plt.title(f'Learning Rate Schedule ({scheduler_type})')
+            plt.xlabel('Epoch')
+            plt.ylabel('Learning Rate')
+            plt.yscale('log')
+            plt.grid(True, linestyle='--', alpha=0.7)
+            
+            # Tambahkan keterangan scheduler
+            if scheduler_type == 'plateau':
+                plateau_start = epochs // 3
+                plt.axvline(x=plateau_start, color='r', linestyle='--', alpha=0.5)
+                plt.annotate('Plateau terdeteksi', xy=(plateau_start, lrs[plateau_start-1]), 
+                            xytext=(plateau_start+5, lrs[0]),
+                            arrowprops=dict(facecolor='red', shrink=0.05), color='red')
+            elif scheduler_type == 'step':
+                step_size = epochs // 5
+                for i in range(step_size, epochs, step_size):
+                    if i < epochs:
+                        plt.axvline(x=i, color='r', linestyle='--', alpha=0.5)
+                        plt.text(i+0.5, lrs[i-1]/2, 'Step', rotation=90, color='r')
+            elif scheduler_type == 'onecycle':
+                warmup_end = int(epochs * 0.3)
+                plt.axvline(x=warmup_end, color='g', linestyle='--', alpha=0.5)
+                plt.text(warmup_end+0.5, lrs[warmup_end]/2, 'Warmup End', rotation=90, color='g')
+            
+            plt.tight_layout()
+            plt.show()
+            
+            # Tambahkan tips berdasarkan konfigurasi
+            print("\n💡 Tips:")
+            if scheduler_type == 'plateau':
+                print("• ReduceLROnPlateau akan mengurangi learning rate ketika validasi loss tidak membaik")
+                print("• Tingkatkan 'Early Stopping Patience' untuk memberi kesempatan pada scheduler bekerja")
+            elif scheduler_type == 'onecycle':
+                print("• OneCycleLR memiliki fase warmup dan cooldown untuk mencapai konvergensi yang lebih baik")
+                print("• Cocok untuk training dari awal dengan dataset besar")
+            elif scheduler_type == 'cosine':
+                print("• CosineAnnealing menurunkan learning rate dengan halus, baik untuk fine-tuning")
+                print("• Optimalkan epoch agar cukup untuk pembelajaran model")
+        except Exception as e:
+            print(f"❌ Gagal memvisualisasikan: {str(e)}")
+            import traceback
+            traceback.print_exc()
+
+show_lr_schedule_button.on_click(on_show_lr_schedule_button_clicked)
+
+# ===== 5. BACKBONE CONFIGURATION =====
+backbone_dropdown = widgets.Dropdown(
+    options=[
+        ('EfficientNet-B4 (default)', 'efficientnet'),
+        ('CSPDarknet (YOLOv5)', 'cspdarknet')
+    ],
+    value=config.get('model', {}).get('backbone', 'efficientnet'),
+    description='Backbone:',
+    style={'description_width': 'initial'},
+    tooltip='Model backbone untuk ekstraksi fitur',
+    layout=widgets.Layout(width='50%')
+)
+
+pretrained_checkbox = widgets.Checkbox(
+    value=config.get('model', {}).get('pretrained', True),
+    description='Gunakan pretrained weights',
+    style={'description_width': 'initial'},
+    tooltip='Menggunakan pretrained weights dari ImageNet untuk transfer learning'
+)
+
+# Update backbone config ketika diubah
+def on_backbone_change(change):
+    if change['type'] == 'change' and change['name'] == 'value':
+        if 'model' not in config:
+            config['model'] = {}
+        config['model']['backbone'] = change['new']
+        experiment_name_input.value = f"{change['new']}_{datetime.now().strftime('%Y%m%d_%H%M')}"
+
+backbone_dropdown.observe(on_backbone_change, names='value')
+
+# ===== LAYOUT UI =====
+# Group widget untuk parameter backbone
+backbone_group = widgets.VBox([
+    widgets.HTML("<h3 style='color: #2980b9; margin-top: 15px;'>🔌 Konfigurasi Backbone</h3>"),
+    widgets.HBox([backbone_dropdown, pretrained_checkbox])
+])
+
+# Group widget untuk parameter training
+training_params_group = widgets.VBox([
+    widgets.HTML("<h3 style='color: #2980b9;'>🔄 Parameter Training</h3>"),
+    widgets.HBox([epochs_slider, batch_size_slider]),
+    widgets.HBox([lr_dropdown, optimizer_dropdown]),
+    widgets.HBox([scheduler_dropdown, weight_decay_dropdown]),
+    widgets.HBox([early_stopping_slider, save_every_slider]),
+    widgets.VBox([
+        widgets.HTML("<h4 style='margin-top: 10px;'>🔍 Layers Deteksi</h4>"),
+        layer_selection
+    ])
+])
+
+# Group widget untuk eksperimen
+experiment_group = widgets.VBox([
+    widgets.HTML("<h3 style='color: #2980b9; margin-top: 15px;'>🧪 Konfigurasi Eksperimen</h3>"),
+    widgets.HBox([experiment_name_input, generate_name_button]),
+    widgets.HBox([save_config_button, show_lr_schedule_button])
+])
+
+# Tampilkan UI
+display(widgets.VBox([
+    header,
+    backbone_group,
+    training_params_group,
+    experiment_group,
+    config_output,
+    lr_schedule_output
+]))

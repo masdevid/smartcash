@@ -6,11 +6,116 @@ Deskripsi: Utilitas umum untuk komponen UI dan interaksi dengan user.
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple, Union, Callable
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import os
+from datetime import datetime
+from pathlib import Path
+
+def create_header(title: str, description: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat header dengan styling yang konsisten.
+    
+    Args:
+        title: Judul header
+        description: Deskripsi opsional
+        
+    Returns:
+        Widget HTML yang berisi header
+    """
+    header = f'<h2 style="color: #3498db; margin-bottom: 10px;">{title}</h2>'
+    if description:
+        header += f'<p style="color: #555; margin-bottom: 15px;">{description}</p>'
+    
+    return widgets.HTML(value=header)
+
+def create_section_title(title: str, icon: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat judul section dengan styling yang konsisten.
+    
+    Args:
+        title: Judul section
+        icon: Icon emoji opsional
+        
+    Returns:
+        Widget HTML yang berisi judul section
+    """
+    title_with_icon = f"{icon} {title}" if icon else title
+    return widgets.HTML(f'<h3 style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;">{title_with_icon}</h3>')
+
+def create_info_alert(message: str, 
+                     alert_type: str = 'info',
+                     icon: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat alert informasi dengan styling yang konsisten.
+    
+    Args:
+        message: Pesan alert
+        alert_type: Tipe alert ('info', 'success', 'warning', 'danger')
+        icon: Icon emoji opsional
+        
+    Returns:
+        Widget HTML yang berisi alert
+    """
+    # Tentukan warna dan ikon berdasarkan tipe alert
+    alert_styles = {
+        'info': {'color': '#0c5460', 'bg': '#d1ecf1', 'border': '#bee5eb', 'default_icon': 'ℹ️'},
+        'success': {'color': '#155724', 'bg': '#d4edda', 'border': '#c3e6cb', 'default_icon': '✅'},
+        'warning': {'color': '#856404', 'bg': '#fff3cd', 'border': '#ffeeba', 'default_icon': '⚠️'},
+        'danger': {'color': '#721c24', 'bg': '#f8d7da', 'border': '#f5c6cb', 'default_icon': '❌'}
+    }
+    
+    style = alert_styles.get(alert_type, alert_styles['info'])
+    icon_to_use = icon if icon else style['default_icon']
+    
+    alert_html = f"""
+    <div style="padding: 12px 15px; margin: 10px 0; 
+               background-color: {style['bg']}; 
+               color: {style['color']}; 
+               border-left: 4px solid {style['border']};
+               border-radius: 4px;">
+        <div style="display: flex; align-items: flex-start;">
+            <div style="margin-right: 10px; font-size: 1.2em;">{icon_to_use}</div>
+            <div>{message}</div>
+        </div>
+    </div>
+    """
+    
+    return widgets.HTML(value=alert_html)
+
+def create_status_indicator(status: str, message: str) -> widgets.HTML:
+    """
+    Buat indikator status dengan styling yang konsisten.
+    
+    Args:
+        status: Tipe status ('success', 'warning', 'error', 'info')
+        message: Pesan status
+        
+    Returns:
+        Widget HTML yang berisi indikator status
+    """
+    status_styles = {
+        'success': {'icon': '✅', 'color': 'green'},
+        'warning': {'icon': '⚠️', 'color': 'orange'},
+        'error': {'icon': '❌', 'color': 'red'},
+        'info': {'icon': 'ℹ️', 'color': 'blue'}
+    }
+    
+    style = status_styles.get(status, status_styles['info'])
+    
+    status_html = f"""
+    <div style="margin: 5px 0; padding: 8px 12px; 
+                border-radius: 4px; background-color: #f8f9fa;">
+        <span style="color: {style['color']}; font-weight: bold;"> 
+            {style['icon']} {message}
+        </span>
+    </div>
+    """
+    
+    return widgets.HTML(value=status_html)
 
 def styled_html(content: str, style: Optional[Dict[str, str]] = None) -> widgets.HTML:
     """

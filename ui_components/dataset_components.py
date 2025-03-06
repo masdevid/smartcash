@@ -1,17 +1,27 @@
+"""
+File: smartcash/ui_components/dataset_components.py
+Author: Alfrida Sabar
+Deskripsi: Komponen UI untuk manajemen dataset, termasuk download dan pengelolaan dataset dari Roboflow.
+"""
+
 import ipywidgets as widgets
 from IPython.display import display, HTML
-from pathlib import Path
 
 def create_dataset_ui(drive_path=None, is_colab=False):
-    """Create UI components for dataset management.
+    """
+    Buat komponen UI untuk manajemen dataset.
     
     Args:
-        drive_path: Path to Google Drive if mounted
-        is_colab: Boolean indicating if running in Colab
+        drive_path: Path ke Google Drive jika di-mount
+        is_colab: Boolean yang menunjukkan apakah berjalan di Google Colab
         
     Returns:
-        Dictionary of UI components
+        Dictionary berisi komponen UI
     """
+    # Header dan deskripsi
+    header = widgets.HTML("<h2>📊 Manajemen Dataset</h2>")
+    description = widgets.HTML("<p>Download dan kelola dataset dari Roboflow atau sumber lokal.</p>")
+    
     # Storage options radio buttons
     storage_options = widgets.RadioButtons(
         options=[('Lokal', 'local'), ('Google Drive', 'drive')],
@@ -51,7 +61,7 @@ def create_dataset_ui(drive_path=None, is_colab=False):
     )
     
     # Output area
-    output_area = widgets.Output()
+    output = widgets.Output()
     
     # Create headers and descriptions
     storage_header = widgets.HTML("<h3>🗄️ Konfigurasi Penyimpanan Dataset</h3>")
@@ -69,6 +79,8 @@ def create_dataset_ui(drive_path=None, is_colab=False):
     
     # Assemble UI components
     ui = widgets.VBox([
+        header,
+        description,
         storage_header,
         storage_options,
         download_header,
@@ -76,7 +88,7 @@ def create_dataset_ui(drive_path=None, is_colab=False):
             force_download_checkbox,
             widgets.HBox([download_button, cleanup_button, check_status_button])
         ]),
-        output_area,
+        output,
         tips_text
     ])
     
@@ -88,5 +100,5 @@ def create_dataset_ui(drive_path=None, is_colab=False):
         'download_button': download_button,
         'cleanup_button': cleanup_button,
         'check_status_button': check_status_button,
-        'output_area': output_area
+        'output': output
     }

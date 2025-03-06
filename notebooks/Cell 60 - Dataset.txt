@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-from google.colab import drive
 from IPython.display import display
 import yaml
 
@@ -24,6 +23,7 @@ def is_colab():
 drive_path = None
 if is_colab():
     try:
+        from google.colab import drive
         drive.mount('/content/drive')
         drive_path = '/content/drive/MyDrive/SmartCash'
         # Buat direktori SmartCash di Drive jika belum ada

@@ -1,4 +1,14 @@
-# Cell 7.4: Split Dataset
+# Cell 7.4: Split Dataset (refactored)
+
+import pickle
+from IPython.display import display, HTML
+from pathlib import Path
+
+# Import komponen UI
+from smartcash.ui_components.data_components import create_split_dataset_ui
+
+# Import handler
+from smartcash.handlers.ui_handlers.data_handlers import setup_split_dataset_handlers
 
 # Pastikan objek global tersedia
 try:
@@ -6,105 +16,35 @@ try:
         globals_dict = pickle.load(f)
     
     data_manager = globals_dict['data_manager']
-    aug_manager = globals_dict['aug_manager']
-    config = globals_dict['config']
+    preprocessor = globals_dict['preprocessor']
     logger = globals_dict['logger']
 except Exception as e:
     print(f"❌ Error loading global objects: {str(e)}")
     print("💡 Jalankan Cell 7.1 terlebih dahulu untuk menginisialisasi dataset")
 
-# Import modul tambahan yang diperlukan
-from smartcash.handlers.unified_preprocessing_handler import UnifiedPreprocessingHandler
+# Buat UI untuk split dataset
+split_ui = create_split_dataset_ui()
 
-# Widget untuk mengontrol split
-train_ratio_slider = widgets.FloatSlider(
-    value=0.7,
-    min=0.5,
-    max=0.9,
-    step=0.05,
-    description='Ratio Train:',
-    style={'description_width': 'initial'}
-)
+# Setup handler untuk komponen UI
+setup_split_dataset_handlers(split_ui, data_manager, preprocessor, logger)
 
-valid_ratio_slider = widgets.FloatSlider(
-    value=0.15,
-    min=0.05,
-    max=0.3,
-    step=0.05,
-    description='Ratio Valid:',
-    style={'description_width': 'initial'}
-)
+# Tampilkan UI
+display(split_ui['ui'])
 
-test_ratio_slider = widgets.FloatSlider(
-    value=0.15,
-    min=0.05,
-    max=0.3,
-    step=0.05,
-    description='Ratio Test:',
-    style={'description_width': 'initial'}
-)
+# Periksa keberadaan direktori all_data
+all_data_dir = Path('data/all_data')
+all_data_images = all_data_dir / 'images'
+all_data_labels = all_data_dir / 'labels'
 
-total_ratio_text = widgets.HTML(
-    value="<b>Total Ratio: 1.0</b> ✅",
-)
-
-def update_total_ratio(*args):
-    """Update tampilan total ratio"""
-    total = train_ratio_slider.value + valid_ratio_slider.value + test_ratio_slider.value
-    
-    if abs(total - 1.0) < 0.001:  # Mendekati 1.0
-        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ✅"
-        split_button.disabled = False
-    else:
-        total_ratio_text.value = f"<b>Total Ratio: {total:.2f}</b> ❌ (harus 1.0)"
-        split_button.disabled = True
-
-train_ratio_slider.observe(update_total_ratio, names='value')
-valid_ratio_slider.observe(update_total_ratio, names='value')
-test_ratio_slider.observe(update_total_ratio, names='value')
-
-split_button = widgets.Button(
-    description='Split Dataset',
-    button_style='primary',
-    icon='random'
-)
-
-split_status_output = widgets.Output()
-
-def on_split_button_clicked(b):
-    """Callback untuk split dataset"""
-    # Disable tombol selama proses
-    split_button.disabled = True
-    split_button.description = "Memproses..."
-    
-    with split_status_output:
-        clear_output()
-        
-        train_ratio = train_ratio_slider.value
-        valid_ratio = valid_ratio_slider.value
-        test_ratio = test_ratio_slider.value
-        
-        logger.info(f"🔄 Memulai split dataset dengan rasio: Train={train_ratio:.2f}, Valid={valid_ratio:.2f}, Test={test_ratio:.2f}...")
-        
-        # Periksa keberadaan direktori all_data dan buat jika belum ada
-        all_data_dir = Path('data/all_data')
-        all_data_images = all_data_dir / 'images'
-        all_data_labels = all_data_dir / 'labels'
-        
-        if not all_data_images.exists():
-            all_data_images.mkdir(parents=True, exist_ok=True)
-            logger.warning(f"⚠️ Direktori 'data/all_data/images' dibuat karena belum ada!")
-            
-        if not all_data_labels.exists():
-            all_data_labels.mkdir(parents=True, exist_ok=True)
-            
-        # Periksa apakah ada file di direktori
-        image_files = list(all_data_images.glob('*.jpg')) + list(all_data_images.glob('*.jpeg')) + list(all_data_images.glob('*.png'))
-        
-        if not image_files:
-            logger.error(f"❌ Tidak ada gambar dalam direktori {all_data_images}!")
-            logger.info(f"💡 Tip: Salin dataset hasil download ke direktori ini jika belum ada.")
-            
-            # Option to copy from Roboflow download
-            display(HTML("<p><strong>Tidak ada gambar di direktori data/all_data/images.</strong></p>"))
-            display(HTML("<p>Apakah Anda ingin menyalin data dari hasil download Roboflow?</p>"))
+if not all_data_images.exists() or not all_data_labels.exists():
+    display(HTML("""
+    <div style="padding: 10px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px; margin: 10px 0;">
+        <h4 style="margin-top: 0;">⚠️ Perhatian</h4>
+        <p>Direktori <code>data/all_data</code> tidak ditemukan atau kosong.</p>
+        <p>Untuk split dataset, Anda perlu:</p>
+        <ol>
+            <li>Memastikan data telah diunduh menggunakan Cell 6.0</li>
+            <li>Pindahkan atau salin data ke direktori <code>data/all_data/images</code> dan <code>data/all_data/labels</code></li>
+        </ol>
+    </div>
+    """))

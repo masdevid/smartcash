@@ -1,0 +1,396 @@
+"""
+File: smartcash/utils/ui_utils.py
+Author: Alfrida Sabar
+Deskripsi: Utilitas umum untuk komponen UI dan interaksi dengan user.
+"""
+
+import ipywidgets as widgets
+from IPython.display import display, HTML, clear_output
+from typing import Dict, Any, List, Optional, Tuple, Union
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+
+def styled_html(content: str, style: Optional[Dict[str, str]] = None) -> widgets.HTML:
+    """
+    Buat widget HTML dengan styling yang konsisten.
+    
+    Args:
+        content: Konten HTML
+        style: Optional dictionary berisi CSS styling
+        
+    Returns:
+        Widget HTML yang sudah di-styling
+    """
+    if not style:
+        return widgets.HTML(value=content)
+    
+    # Bentuk string CSS dari dictionary
+    style_str = '; '.join([f"{k}: {v}" for k, v in style.items()])
+    
+    # Wrap konten dengan div yang memiliki styling
+    styled_content = f'<div style="{style_str}">{content}</div>'
+    
+    return widgets.HTML(value=styled_content)
+
+def create_alert(message: str, 
+                alert_type: str = 'info',
+                icon: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat alert box dengan styling yang konsisten.
+    
+    Args:
+        message: Pesan yang akan ditampilkan
+        alert_type: Tipe alert ('info', 'success', 'warning', 'danger')
+        icon: Optional emoji icon
+        
+    Returns:
+        Widget HTML berisi alert yang di-styling
+    """
+    # Set warna dan background berdasarkan tipe alert
+    styles = {
+        'info': {
+            'bg_color': '#e8f4f8',
+            'text_color': '#0c5460',
+            'border_color': '#bee5eb',
+            'default_icon': 'ℹ️'
+        },
+        'success': {
+            'bg_color': '#d4edda',
+            'text_color': '#155724',
+            'border_color': '#c3e6cb',
+            'default_icon': '✅'
+        },
+        'warning': {
+            'bg_color': '#fff3cd',
+            'text_color': '#856404',
+            'border_color': '#ffeeba',
+            'default_icon': '⚠️'
+        },
+        'danger': {
+            'bg_color': '#f8d7da',
+            'text_color': '#721c24',
+            'border_color': '#f5c6cb',
+            'default_icon': '❌'
+        }
+    }
+    
+    # Default ke info jika tipe tidak valid
+    style = styles.get(alert_type, styles['info'])
+    
+    # Gunakan icon yang disediakan atau default
+    icon_str = icon if icon else style['default_icon']
+    
+    alert_html = f"""
+    <div style="padding: 10px; 
+                background-color: {style['bg_color']}; 
+                color: {style['text_color']}; 
+                border-left: 4px solid {style['border_color']}; 
+                border-radius: 5px; 
+                margin: 10px 0;">
+        <div style="display: flex; align-items: flex-start;">
+            <div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>
+            <div>{message}</div>
+        </div>
+    </div>
+    """
+    
+    return widgets.HTML(value=alert_html)
+
+def create_info_box(title: str, 
+                   content: str, 
+                   icon: Optional[str] = None,
+                   collapsed: bool = False) -> widgets.Accordion:
+    """
+    Buat box informasi yang dapat dilipat.
+    
+    Args:
+        title: Judul box
+        content: Konten dalam box (dapat berisi HTML)
+        icon: Optional emoji icon
+        collapsed: True jika box dilipat secara default
+        
+    Returns:
+        Widget Accordion yang berisi konten
+    """
+    # Tambahkan ikon jika disediakan
+    title_with_icon = f"{icon} {title}" if icon else title
+    
+    # Buat konten dalam HTML widget
+    content_widget = widgets.HTML(value=content)
+    
+    # Buat accordion
+    accordion = widgets.Accordion([content_widget])
+    accordion.set_title(0, title_with_icon)
+    
+    # Set status dilipat atau tidak
+    if collapsed:
+        accordion.selected_index = None
+    else:
+        accordion.selected_index = 0
+        
+    return accordion
+
+def create_metric_display(label: str, 
+                         value: Union[int, float, str],
+                         unit: Optional[str] = None,
+                         is_good: Optional[bool] = None) -> widgets.HTML:
+    """
+    Buat tampilan metrik dengan label dan nilai.
+    
+    Args:
+        label: Label metrik
+        value: Nilai metrik
+        unit: Optional unit (e.g., '%', 'MB')
+        is_good: True jika nilai baik, False jika buruk, None jika netral
+        
+    Returns:
+        Widget HTML berisi metrik yang di-styling
+    """
+    # Tentukan warna berdasarkan nilai is_good
+    if is_good is None:
+        color = "#333333"  # Neutral
+    elif is_good:
+        color = "#28a745"  # Green for good
+    else:
+        color = "#dc3545"  # Red for bad
+    
+    # Format nilai
+    if isinstance(value, float):
+        formatted_value = f"{value:.2f}"
+    else:
+        formatted_value = str(value)
+        
+    # Tambahkan unit jika ada
+    if unit:
+        formatted_value = f"{formatted_value} {unit}"
+    
+    # Buat HTML
+    metric_html = f"""
+    <div style="margin: 10px 0; padding: 8px;">
+        <div style="font-size: 0.9em; color: #666;">{label}</div>
+        <div style="font-size: 1.5em; font-weight: bold; color: {color};">{formatted_value}</div>
+    </div>
+    """
+    
+    return widgets.HTML(value=metric_html)
+
+def create_section_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat header untuk section UI.
+    
+    Args:
+        title: Judul section
+        description: Optional deskripsi
+        icon: Optional emoji icon
+        
+    Returns:
+        Widget HTML untuk header section
+    """
+    # Tambahkan ikon jika disediakan
+    title_with_icon = f"{icon} {title}" if icon else title
+    
+    header_html = f'<h3 style="margin-bottom: 10px; color: #3498db;">{title_with_icon}</h3>'
+    
+    if description:
+        header_html += f'<p style="color: #666; margin-bottom: 15px;">{description}</p>'
+    
+    return widgets.HTML(value=header_html)
+
+def create_tab_view(tabs: Dict[str, widgets.Widget]) -> widgets.Tab:
+    """
+    Buat tampilan tab.
+    
+    Args:
+        tabs: Dictionary dengan nama tab sebagai key dan widget sebagai value
+        
+    Returns:
+        Widget Tab yang berisi konten
+    """
+    # Buat tab
+    tab = widgets.Tab(children=list(tabs.values()))
+    
+    # Set judul tab
+    for i, title in enumerate(tabs.keys()):
+        tab.set_title(i, title)
+    
+    return tab
+
+def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBox, Callable]:
+    """
+    Buat indikator loading yang dapat ditampilkan dan disembunyikan.
+    
+    Args:
+        message: Pesan yang ditampilkan
+        
+    Returns:
+        Tuple berisi widget loading dan fungsi untuk menampilkan/menyembunyikan
+    """
+    # Buat spinner
+    spinner = widgets.HTML(
+        value='<i class="fa fa-spinner fa-spin" style="font-size: 20px; color: #3498db;"></i>'
+    )
+    
+    # Buat pesan
+    message_widget = widgets.HTML(value=f'<span style="margin-left: 10px;">{message}</span>')
+    
+    # Buat container
+    loading = widgets.HBox([spinner, message_widget])
+    loading.layout.display = 'none'  # Hide by default
+    
+    # Fungsi untuk toggle loading
+    def toggle_loading(show: bool = True):
+        loading.layout.display = 'flex' if show else 'none'
+    
+    return loading, toggle_loading
+
+def plot_statistics(
+    data: pd.DataFrame, 
+    title: str, 
+    kind: str = 'bar', 
+    figsize: Tuple[int, int] = (10, 6),
+    **kwargs
+) -> None:
+    """
+    Plot statistik dari DataFrame.
+    
+    Args:
+        data: Data yang akan diplot
+        title: Judul plot
+        kind: Tipe plot ('bar', 'line', etc.)
+        figsize: Ukuran figure
+        **kwargs: Parameter tambahan untuk plot
+    """
+    plt.figure(figsize=figsize)
+    
+    data.plot(kind=kind, **kwargs)
+    
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+def plot_confusion_matrix(
+    cm: np.ndarray,
+    classes: List[str],
+    normalize: bool = False,
+    title: str = 'Confusion Matrix',
+    cmap: str = 'Blues'
+) -> None:
+    """
+    Plot confusion matrix.
+    
+    Args:
+        cm: Confusion matrix
+        classes: List nama class
+        normalize: True untuk normalize matrix
+        title: Judul plot
+        cmap: Colormap
+    """
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='.2f' if normalize else 'd',
+               cmap=cmap, xticklabels=classes, yticklabels=classes)
+    plt.title(title)
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.tight_layout()
+    plt.show()
+
+def create_result_table(
+    data: Dict[str, Any],
+    title: str = 'Results',
+    highlight_max: bool = True
+) -> None:
+    """
+    Buat tabel hasil dengan highlighting.
+    
+    Args:
+        data: Dictionary data yang akan ditampilkan
+        title: Judul tabel
+        highlight_max: True untuk highlight nilai maksimum
+    """
+    # Konversi ke DataFrame
+    df = pd.DataFrame(data)
+    
+    # Display judul
+    display(HTML(f"<h3>{title}</h3>"))
+    
+    # Display tabel dengan styling
+    if highlight_max:
+        display(df.style.highlight_max(axis=0, color='lightgreen'))
+    else:
+        display(df)
+
+def create_progress_updater(progress_bar: widgets.IntProgress) -> Callable:
+    """
+    Buat fungsi untuk update progress bar.
+    
+    Args:
+        progress_bar: Widget progress bar
+        
+    Returns:
+        Fungsi untuk update progress
+    """
+    def update_progress(value: int, total: int, message: Optional[str] = None):
+        # Update value
+        progress_bar.max = total
+        progress_bar.value = value
+        
+        # Update description jika ada message
+        if message:
+            progress_bar.description = message
+    
+    return update_progress
+
+def display_file_info(file_path: str, description: Optional[str] = None) -> widgets.HTML:
+    """
+    Tampilkan informasi file dengan styling yang baik.
+    
+    Args:
+        file_path: Path ke file
+        description: Optional deskripsi
+        
+    Returns:
+        Widget HTML dengan informasi file
+    """
+    import os
+    from pathlib import Path
+    
+    # Ambil info file
+    path = Path(file_path)
+    if path.exists():
+        file_size = path.stat().st_size
+        file_time = path.stat().st_mtime
+        
+        # Format ukuran file
+        if file_size < 1024:
+            size_str = f"{file_size} bytes"
+        elif file_size < 1024 * 1024:
+            size_str = f"{file_size/1024:.1f} KB"
+        else:
+            size_str = f"{file_size/(1024*1024):.1f} MB"
+        
+        # Format waktu
+        from datetime import datetime
+        time_str = datetime.fromtimestamp(file_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Buat HTML
+        html = f"""
+        <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin: 10px 0;">
+            <p><strong>📄 File:</strong> {path.name}</p>
+            <p><strong>📁 Path:</strong> {path.parent}</p>
+            <p><strong>📏 Size:</strong> {size_str}</p>
+            <p><strong>🕒 Modified:</strong> {time_str}</p>
+        """
+        
+        if description:
+            html += f"<p><strong>📝 Description:</strong> {description}</p>"
+        
+        html += "</div>"
+        
+        return widgets.HTML(value=html)
+    else:
+        return widgets.HTML(value=f"<p>⚠️ File not found: {file_path}</p>")

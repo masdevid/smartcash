@@ -1,268 +1,58 @@
-# Cell 8.3: Model Playground - Untuk mencoba model secara interaktif
+# Cell 8.3: Model Playground (refactored) - Untuk mencoba model secara interaktif
 
 import torch
 import gc
-import time
 import pickle
-import matplotlib.pyplot as plt
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-import numpy as np
-from pathlib import Path
+from IPython.display import display
 
-# Import the required modules
-try:
-    from smartcash.handlers.model_handler import ModelHandler
-    from smartcash.utils.logger import get_logger
-    from smartcash.utils.model_visualizer import ModelVisualizer
-    from smartcash.utils.layer_config_manager import get_layer_config
-except ImportError as e:
-    print(f"⚠️ Error importing modules: {str(e)}")
-    raise
+# Import UI components dan handlers
+from smartcash.ui_components.model_playground_components import create_model_playground_ui
+from smartcash.handlers.ui_handlers.model_playground_handlers import setup_model_playground_handlers
 
+# ===== 1. LOAD MODEL HANDLER & CONFIG =====
 # Memuat model_handler dan config dari cell sebelumnya jika tersedia, jika tidak, buat baru
-if 'model_handler' not in globals() or 'config' not in globals():
-    try:
-        # Load config
-        with open('config.pkl', 'rb') as f:
-            config = pickle.load(f)
-            
-        # Setup logger
-        logger = get_logger("model_playground", log_to_console=True)
+try:
+    # Load config
+    with open('config.pkl', 'rb') as f:
+        config = pickle.load(f)
         
+    # Setup logger
+    from smartcash.utils.logger import get_logger
+    logger = get_logger("model_playground", log_to_console=True)
+    
+    # Cek apakah model_handler sudah ada
+    if 'model_handler' not in globals():
         # Initialize model handler
+        from smartcash.handlers.model_handler import ModelHandler
         model_handler = ModelHandler(config=config, logger=logger)
         print("✅ Model handler berhasil dibuat")
-    except Exception as e:
-        print(f"❌ Gagal membuat model handler: {str(e)}")
-        raise
+except Exception as e:
+    print(f"❌ Gagal memuat komponen: {str(e)}")
+    # Jika tidak ada komponen yang tersedia, buat placeholder untuk UI demo
+    config = {'model': {'backbone': 'efficientnet'}, 'layers': ['banknote']}
+    model_handler = None
+    logger = None
 
-# Cek device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# ===== 2. BUAT DAN SETUP UI =====
+# Buat UI components
+ui_components = create_model_playground_ui()
 
-# Widget untuk memilih backbone
-backbone_selector = widgets.Dropdown(
-    options=[
-        ('EfficientNet-B4', 'efficientnet'),
-        ('CSPDarknet (YOLOv5)', 'cspdarknet')
-    ],
-    value='efficientnet',
-    description='Backbone:',
-    style={'description_width': 'initial'}
-)
+# Setup handlers jika model_handler tersedia
+if model_handler and logger:
+    setup_model_playground_handlers(
+        ui_components=ui_components,
+        model_handler=model_handler,
+        config=config,
+        logger=logger
+    )
+else:
+    print("⚠️ Model handler tidak tersedia. UI akan ditampilkan tapi fungsi tidak akan berjalan.")
 
-# Widget untuk memilih mode deteksi
-detection_mode_selector = widgets.Dropdown(
-    options=[
-        ('Single Layer (Banknote)', 'single'),
-        ('Multi Layer (+ Nominal & Security)', 'multi')
-    ],
-    value='single',
-    description='Mode Deteksi:',
-    style={'description_width': 'initial'}
-)
-
-# Widget untuk mengontrol opsi lain
-pretrained_checkbox = widgets.Checkbox(
-    value=True,
-    description='Gunakan Pretrained Weights',
-    style={'description_width': 'initial'}
-)
-
-# Tambahan UI untuk pengaturan inferensi
-img_size_slider = widgets.IntSlider(
-    value=640,
-    min=320,
-    max=1280,
-    step=32,
-    description='Ukuran Gambar:',
-    style={'description_width': 'initial'}
-)
-
-# Tombol untuk mencoba model
-test_model_button = widgets.Button(
-    description='Buat & Test Model',
-    button_style='success',
-    icon='play'
-)
-
-# Output area
-model_test_output = widgets.Output()
-
-def on_test_model_button_clicked(b):
-    """Callback untuk mencoba model"""
-    # Update tombol ke status loading
-    test_model_button.description = "Memproses..."
-    test_model_button.disabled = True
-    
-    with model_test_output:
-        clear_output()
-        
-        # Update konfigurasi berdasarkan pilihan
-        config['model']['backbone'] = backbone_selector.value
-        config['model']['img_size'] = [img_size_slider.value, img_size_slider.value]
-        
-        if detection_mode_selector.value == 'multi':
-            config['layers'] = ['banknote', 'nominal', 'security']
-        else:
-            config['layers'] = ['banknote']
-        
-        config['model']['pretrained'] = pretrained_checkbox.value
-        
-        try:
-            # Bersihkan memori sebelum membuat model baru
-            gc.collect()
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
-            
-            # Gunakan ModelHandler untuk membuat model
-            test_manager = ModelHandler(
-                config=config, 
-                logger=logger
-            )
-            
-            # Initializes layer config if needed
-            layer_config = get_layer_config()
-            
-            # Ukur waktu pembuatan model
-            start_time = time.time()
-            model = test_manager.get_model()
-            model_creation_time = (time.time() - start_time) * 1000  # convert to ms
-            
-            # Pindahkan model ke device yang sesuai
-            model = model.to(device)
-            
-            logger.success(f"✅ Model berhasil dibuat dalam {model_creation_time:.2f}ms")
-            
-            # Buat input dummy untuk test
-            batch_size = 1
-            input_dummy = torch.randn(batch_size, 3, img_size_slider.value, img_size_slider.value, device=device)
-            
-            # Ukur waktu inferensi
-            model.eval()
-            with torch.no_grad():
-                # Warming up
-                for _ in range(5):
-                    _ = model(input_dummy)
-                
-                # Ukur waktu
-                inference_times = []
-                for _ in range(10):  # Jalankan 10 kali untuk mendapatkan rata-rata yang stabil
-                    start_time = time.time()
-                    output = model(input_dummy)
-                    inference_times.append((time.time() - start_time) * 1000)  # convert to ms
-                
-                avg_inference_time = np.mean(inference_times)
-                std_inference_time = np.std(inference_times)
-                
-                logger.success(f"✅ Inferensi selesai dalam {avg_inference_time:.2f}ms±{std_inference_time:.2f}ms")
-                
-                # Gunakan ModelVisualizer untuk menampilkan informasi model
-                visualizer = ModelVisualizer(model, logger)
-                param_count, trainable_count = visualizer.count_parameters()
-                
-                # Tampilkan info output
-                if isinstance(output, dict):
-                    logger.info("📊 Output Model (Multi-layer):")
-                    for layer_name, layer_outputs in output.items():
-                        logger.info(f"  Layer '{layer_name}':")
-                        for i, out in enumerate(layer_outputs):
-                            logger.info(f"    P{i+3}: shape={tuple(out.shape)}")
-                else:
-                    for i, out in enumerate(output):
-                        logger.info(f"  P{i+3}: shape={tuple(out.shape)}")
-                
-                # Tampilkan ringkasan visual
-                print("\n📈 Ringkasan Performance Model:")
-                print(f"  • Backbone: {backbone_selector.value}")
-                print(f"  • Mode Deteksi: {detection_mode_selector.value}")
-                print(f"  • Pretrained: {'Ya' if pretrained_checkbox.value else 'Tidak'}")
-                print(f"  • Ukuran Gambar: {img_size_slider.value}x{img_size_slider.value}")
-                print(f"  • Total Parameter: {param_count:,}")
-                print(f"  • Parameter Trainable: {trainable_count:,} ({trainable_count/param_count*100:.1f}%)")
-                print(f"  • Waktu Pembuatan Model: {model_creation_time:.2f}ms")
-                print(f"  • Waktu Inferensi: {avg_inference_time:.2f}ms±{std_inference_time:.2f}ms")
-                print(f"  • FPS Estimasi: {1000/avg_inference_time:.1f}")
-                
-                # Plot barchart waktu
-                plt.figure(figsize=(10, 5))
-                
-                # Plot model creation time
-                plt.subplot(1, 2, 1)
-                bars = plt.bar(
-                    ['Pembuatan Model', 'Inferensi'], 
-                    [model_creation_time, avg_inference_time],
-                    color=['#3498db', '#2ecc71']
-                )
-                
-                # Tambahkan nilai di atas bar
-                for bar in bars:
-                    height = bar.get_height()
-                    plt.text(
-                        bar.get_x() + bar.get_width()/2.,
-                        height + 0.1,
-                        f'{height:.1f}ms',
-                        ha='center', 
-                        va='bottom',
-                        fontweight='bold'
-                    )
-                
-                plt.title('Perbandingan Waktu (ms)')
-                plt.ylabel('Waktu (ms)')
-                plt.yscale('log')
-                plt.grid(True, linestyle='--', alpha=0.7)
-                
-                # Plot parameter distribution
-                plt.subplot(1, 2, 2)
-                module_params = visualizer.get_module_parameters()
-                
-                # Ambil 5 modul dengan parameter terbanyak
-                top_modules = sorted(module_params.items(), key=lambda x: x[1], reverse=True)[:5]
-                labels = [m[0] for m in top_modules]
-                sizes = [m[1] / param_count * 100 for m in top_modules]
-                
-                plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90, 
-                       colors=['#3498db', '#2ecc71', '#9b59b6', '#e74c3c', '#f39c12'])
-                plt.axis('equal')
-                plt.title('Distribusi Parameter')
-                
-                plt.tight_layout()
-                plt.show()
-                
-                # Tampilkan visualisasi backbone setelah performance
-                print("\n🧠 Visualisasi Arsitektur Backbone:")
-                visualizer.visualize_backbone()
-                
-                # Bersihkan memori
-                del model, input_dummy, output
-                gc.collect()
-                torch.cuda.empty_cache() if torch.cuda.is_available() else None
-                    
-        except Exception as e:
-            logger.error(f"❌ Terjadi kesalahan: {str(e)}")
-            import traceback
-            traceback.print_exc()
-        
-        # Reset tombol
-        test_model_button.description = "Buat & Test Model"
-        test_model_button.disabled = False
-
-# Setup callback
-test_model_button.on_click(on_test_model_button_clicked)
-
+# ===== 3. TAMPILKAN UI =====
 # Tampilkan UI
-display(widgets.VBox([
-    widgets.HTML("<h2>🧪 Model Testing Playground</h2>"),
-    widgets.HTML("<p>Coba berbagai konfigurasi model dan lihat performanya.</p>"),
-    widgets.HBox([
-        widgets.VBox([
-            backbone_selector,
-            detection_mode_selector,
-        ]),
-        widgets.VBox([
-            pretrained_checkbox,
-            img_size_slider,
-        ])
-    ]),
-    test_model_button,
-    model_test_output
-]))
+display(ui_components['ui'])
+
+# ===== 4. CLEANUP =====
+# Bersihkan memori yang tidak digunakan
+gc.collect()
+torch.cuda.empty_cache() if torch.cuda.is_available() else None

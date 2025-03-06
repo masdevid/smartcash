@@ -1,6 +1,6 @@
-# Cell 1.2 - Cek Instalasi
+# Cell 12 - Cek Instalasi (refactored)
 
-# ===== 3. SETUP COLAB ENVIRONMENT =====
+# ===== 1. CEK ENVIRONMENT COLAB =====
 def setup_colab_environment():
     """Setup Google Colab environment if running in Colab"""
     try:
@@ -19,8 +19,8 @@ def setup_colab_environment():
         print("ℹ️ Tidak berjalan di Google Colab")
         return False, os.getcwd()
 
-# ===== 4. SETUP LOGGING =====
-def setup_logging():
+# ===== 2. SETUP LOGGING =====
+def setup_logging(IN_COLAB=False):
     """Setup logging configuration"""
     try:
         from smartcash.utils.logger import get_logger, SmartCashLogger
@@ -40,7 +40,7 @@ def setup_logging():
         logger = SimpleLogger("notebook")
     return logger
 
-# ===== 5. SETUP DIRECTORIES =====
+# ===== 3. SETUP DIRECTORIES =====
 def setup_directories(base_dir):
     """Setup necessary directories for the project"""
     dirs = [
@@ -60,7 +60,7 @@ def setup_directories(base_dir):
     
     return base_dir
 
-# ===== 6. INITIALIZE GLOBAL VARIABLES =====
+# ===== 4. INITIALIZE GLOBAL VARIABLES =====
 # Setup Colab environment
 IN_COLAB, BASE_DIR = setup_colab_environment()
 
@@ -68,12 +68,12 @@ IN_COLAB, BASE_DIR = setup_colab_environment()
 BASE_DIR = setup_directories(BASE_DIR)
 
 # Setup logging
-logger = setup_logging()
+logger = setup_logging(IN_COLAB)
 
 # Setup device
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ===== 7. DISPLAY ENVIRONMENT INFO =====
+# ===== 5. DISPLAY ENVIRONMENT INFO =====
 print("\n🔍 Informasi Lingkungan:")
 print(f"📊 PyTorch: {torch.__version__}")
 print(f"🖥️ CUDA tersedia: {torch.cuda.is_available()}")

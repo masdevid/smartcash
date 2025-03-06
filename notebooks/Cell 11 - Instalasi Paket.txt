@@ -1,9 +1,7 @@
-# Cell 1: Instalasi Paket - Konfigurasi awal environment dan instalasi dependensi yang diperlukan
-
-%%capture
-# Cell 1: Setup Global dan Instalasi Paket
+# Cell 11 - Instalasi Paket (refactored)
 
 # ===== 1. INSTALASI PAKET =====
+%%capture
 # Deep Learning & Vision
 !pip install torch>=2.0.0 torchvision>=0.15.0
 !pip install timm>=0.9.0  # Vision Transformers dan model-model modern
@@ -54,3 +52,5 @@ import yaml
 # Memory cleanup after imports
 gc.collect()
 torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
+print("✅ Semua paket berhasil diinstal dan modul diimpor!")

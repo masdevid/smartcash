@@ -1,140 +1,97 @@
-# Cell 8.5: Memory Optimization - Untuk optimasi memori khusus Google Colab
+# Cell 8.5: Memory Optimization (refactored)
 
 import torch
 import gc
-import psutil
-import numpy as np
-import matplotlib.pyplot as plt
-import ipywidgets as widgets
-from IPython.display import display, clear_output
 import pickle
 from pathlib import Path
-import time
-from tqdm.auto import tqdm
 
-# Import modules
-try:
-    from smartcash.utils.memory_optimizer import MemoryOptimizer
-    from smartcash.utils.logger import get_logger
-    from smartcash.utils.enhanced_cache import EnhancedCache
-    from smartcash.handlers.model_handler import ModelHandler
-except ImportError as e:
-    print(f"⚠️ Error importing modules: {str(e)}")
-    raise
+# Import komponen UI dan handler
+from smartcash.ui_components.model_components import create_model_optimization_ui
+from smartcash.handlers.ui_handlers.model_handlers import setup_model_optimization_handlers
 
 # Setup logger
-logger = get_logger("memory_optimizer", log_to_console=True)
+from smartcash.utils.logger import get_logger
+logger = get_logger("memory_optimizer", log_to_console=True, log_to_file=True, log_to_colab=True)
 
-# Memuat model_handler dan config dari cell sebelumnya jika tersedia, jika tidak, buat baru
-if 'model_handler' not in globals() or 'config' not in globals():
+# Memuat config jika tersedia
+try:
+    with open('config.pkl', 'rb') as f:
+        config = pickle.load(f)
+except Exception as e:
+    logger.warning(f"⚠️ Gagal memuat config: {str(e)}")
+    # Gunakan config default
+    config = {
+        'model': {
+            'backbone': 'efficientnet',
+            'num_classes': 17,
+            'img_size': [640, 640]
+        },
+        'layers': ['banknote']
+    }
+
+# Memuat model_handler dari cell sebelumnya jika tersedia, jika tidak, buat baru
+if 'model_handler' not in globals():
     try:
-        # Load config
-        with open('config.pkl', 'rb') as f:
-            config = pickle.load(f)
-            
         # Initialize model handler
+        from smartcash.handlers.model_handler import ModelHandler
         model_handler = ModelHandler(config=config, logger=logger)
-        print("✅ Model handler berhasil dibuat")
+        logger.info("✅ Model handler berhasil dibuat")
     except Exception as e:
-        print(f"❌ Gagal membuat model handler: {str(e)}")
+        logger.error(f"❌ Gagal membuat model handler: {str(e)}")
         raise
 
 # Inisialisasi memory optimizer
-memory_optimizer = MemoryOptimizer(logger=logger)
+try:
+    from smartcash.utils.memory_optimizer import MemoryOptimizer
+    memory_optimizer = MemoryOptimizer(logger=logger)
+except Exception as e:
+    logger.warning(f"⚠️ Error initializing MemoryOptimizer: {str(e)}")
+    # Fallback to basic implementation
+    # Define minimal class for compatibility
+    class SimpleMemoryOptimizer:
+        def __init__(self, logger):
+            self.logger = logger
+            
+        def check_gpu_status(self):
+            if torch.cuda.is_available():
+                self.logger.info(f"GPU: {torch.cuda.get_device_name(0)}")
+                self.logger.info(f"Memory Allocated: {torch.cuda.memory_allocated() / (1024**2):.2f} MB")
+                self.logger.info(f"Memory Reserved: {torch.cuda.memory_reserved() / (1024**2):.2f} MB")
+            else:
+                self.logger.info("GPU not available")
+        
+        def get_optimization_stats(self):
+            if torch.cuda.is_available():
+                return {
+                    'gpu_available': True,
+                    'gpu_name': torch.cuda.get_device_name(0),
+                    'used_memory': torch.cuda.memory_allocated() / (1024**2),
+                    'free_memory': (torch.cuda.get_device_properties(0).total_memory / (1024**2)) - (torch.cuda.memory_allocated() / (1024**2)),
+                    'total_memory': torch.cuda.get_device_properties(0).total_memory / (1024**2)
+                }
+            else:
+                return {'gpu_available': False}
+    
+    memory_optimizer = SimpleMemoryOptimizer(logger)
 
 # Inisialisasi enhanced cache
 try:
+    from smartcash.utils.enhanced_cache import EnhancedCache
     cache = EnhancedCache(
         cache_dir=".cache/smartcash",
         max_size_gb=1.0,
         logger=logger
     )
 except Exception as e:
-    print(f"⚠️ Error initializing EnhancedCache: {str(e)}")
-    # Fallback
+    logger.warning(f"⚠️ Error initializing EnhancedCache: {str(e)}")
+    # Fallback to None
     cache = None
 
-# UI untuk memori management
-check_memory_button = widgets.Button(
-    description='Cek Status Memori',
-    button_style='info',
-    icon='server'
-)
+# Buat UI komponen untuk optimasi model
+ui_components = create_model_optimization_ui()
 
-clear_memory_button = widgets.Button(
-    description='Bersihkan Memori GPU',
-    button_style='warning',
-    icon='trash'
-)
+# Setup handler untuk komponen UI
+setup_model_optimization_handlers(ui_components, memory_optimizer, cache, logger)
 
-optimize_button = widgets.Button(
-    description='Optimasi Batch Size',
-    button_style='success',
-    icon='cogs'
-)
-
-# Tambahan UI untuk manajemen cache
-clear_cache_button = widgets.Button(
-    description='Bersihkan Cache',
-    button_style='danger',
-    icon='trash-alt'
-)
-
-verify_cache_button = widgets.Button(
-    description='Verifikasi Cache',
-    button_style='info',
-    icon='check-circle'
-)
-
-memory_output = widgets.Output()
-
-def on_check_memory_button_clicked(b):
-    with memory_output:
-        clear_output()
-        memory_optimizer.check_gpu_status()
-        
-        # Tambahkan informasi CPU dan RAM
-        cpu_usage = psutil.cpu_percent()
-        ram = psutil.virtual_memory()
-        
-        print(f"\n🖥️ CPU Usage: {cpu_usage}%")
-        print(f"💾 RAM: {ram.used / (1024**3):.2f} GB / {ram.total / (1024**3):.2f} GB ({ram.percent}%)")
-        
-        # Tambahkan visualisasi penggunaan memori jika GPU tersedia
-        stats = memory_optimizer.get_optimization_stats()
-        
-        # Create figure with multiple plots
-        plt.figure(figsize=(15, 5))
-        
-        # Plot 1: GPU Memory (if available)
-        if 'gpu_available' in stats and stats['gpu_available'] and 'total_memory' in stats:
-            plt.subplot(1, 3, 1)
-            
-            # Data untuk pie chart GPU
-            gpu_sizes = [stats['used_memory'], stats['free_memory']]
-            gpu_labels = [f'Terpakai\n{gpu_sizes[0]:.1f} MB', f'Bebas\n{gpu_sizes[1]:.1f} MB']
-            plt.pie(gpu_sizes, labels=gpu_labels, autopct='%1.1f%%', colors=['#ff9999','#66b3ff'])
-            plt.title(f'GPU Memory ({stats["gpu_name"]})')
-        
-        # Plot 2: RAM Usage
-        plt.subplot(1, 3, 2)
-        ram_sizes = [ram.used / (1024**3), (ram.total - ram.used) / (1024**3)]
-        ram_labels = [f'Terpakai\n{ram_sizes[0]:.1f} GB', f'Bebas\n{ram_sizes[1]:.1f} GB']
-        plt.pie(ram_sizes, labels=ram_labels, autopct='%1.1f%%', colors=['#99ff99','#ffcc99'])
-        plt.title('RAM')
-        
-        # Plot 3: Cache Usage (if available)
-        if cache:
-            plt.subplot(1, 3, 3)
-            cache_stats = cache.get_stats()
-            
-            cache_labels = ['Terpakai', 'Tersedia']
-            cache_sizes = [
-                cache_stats['cache_size_mb'],
-                cache_stats['max_size_mb'] - cache_stats['cache_size_mb']
-            ]
-            plt.pie(cache_sizes, labels=cache_labels, autopct='%1.1f%%', colors=['#9b59b6','#3498db'])
-            plt.title(f'Cache ({cache_stats["file_count"]} file)')
-        
-        plt.tight_layout()
-        plt.show()
+# Tampilkan UI
+display(ui_components['ui'])

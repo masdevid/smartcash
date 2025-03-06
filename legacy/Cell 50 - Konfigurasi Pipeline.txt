@@ -1,0 +1,302 @@
+# Cell 5: Konfigurasi Parameter Utama
+
+# Widget input untuk konfigurasi
+from ipywidgets import widgets
+from IPython.display import display, HTML
+from google.colab import userdata
+import os
+
+# Cek apakah API key sudah tersedia di secret
+api_key_exists = userdata.get('ROBOFLOW_API_KEY') is not None
+
+# Tampilkan status dan tips untuk API key
+api_key_status = widgets.HTML(
+    value=f"""
+    <div style="padding: 10px; border-radius: 5px; margin-bottom: 10px; font-family: monospace;">
+        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+            <span style="font-weight: bold; margin-right: 10px;">Roboflow API Key:</span>
+            <span style="background-color: {'#d4edda' if api_key_exists else '#f8d7da'}; 
+                   color: {'#155724' if api_key_exists else '#721c24'}; 
+                   padding: 2px 8px; border-radius: 3px;">
+                {'✅ Terdeteksi' if api_key_exists else '❌ Tidak ditemukan'}
+            </span>
+        </div>
+        <div style="font-size: 0.9em; color: #6c757d;">
+            <strong>Tips:</strong> Simpan API key di Google Colab Secret dengan nama <code>ROBOFLOW_API_KEY</code><br>
+            <ol>
+                <li>Klik ikon 🔑 di sidebar sebelah kiri</li>
+                <li>Klik "+ Add new secret"</li>
+                <li>Masukkan <code>ROBOFLOW_API_KEY</code> sebagai nama</li>
+                <li>Masukkan API key dari akun Roboflow Anda</li>
+                <li>Klik "Save"</li>
+                <li>Restart runtime untuk menerapkan perubahan</li>
+            </ol>
+        </div>
+    </div>
+    """,
+    layout=widgets.Layout(width='100%')
+)
+
+# Backbone Selection
+backbone_dropdown = widgets.Dropdown(
+    options=[('EfficientNet-B4', 'efficientnet'), ('CSPDarknet (Default YOLOv5)', 'cspdarknet')],
+    value='efficientnet',
+    description='Backbone:',
+    style={'description_width': 'initial'}
+)
+
+# Batch Size Selection
+batch_size_slider = widgets.IntSlider(
+    value=16,
+    min=4,
+    max=64,
+    step=4,
+    description='Batch Size:',
+    style={'description_width': 'initial'}
+)
+
+# Epochs Slider
+epochs_slider = widgets.IntSlider(
+    value=30,
+    min=5,
+    max=100,
+    step=5,
+    description='Epochs:',
+    style={'description_width': 'initial'}
+)
+
+# Learning Rate
+lr_dropdown = widgets.Dropdown(
+    options=[('0.001 (Default)', 0.001), ('0.01', 0.01), ('0.0001', 0.0001)],
+    value=0.001,
+    description='Learning Rate:',
+    style={'description_width': 'initial'}
+)
+
+# Data Source
+data_source_radio = widgets.RadioButtons(
+    options=['roboflow', 'local'],
+    value='roboflow',
+    description='Sumber Data:',
+    style={'description_width': 'initial'},
+    layout={'width': 'max-content'}
+)
+
+# Detection Mode
+detection_mode_radio = widgets.RadioButtons(
+    options=['single', 'multi'],
+    value='single',
+    description='Mode Deteksi:',
+    style={'description_width': 'initial'},
+    layout={'width': 'max-content'}
+)
+
+# Roboflow Project Details
+workspace_input = widgets.Text(
+    value="", 
+    description='Roboflow Workspace:',
+    layout=widgets.Layout(width='500px'),
+    style={'description_width': 'initial'}
+)
+
+project_input = widgets.Text(
+    value="", 
+    description='Roboflow Project:',
+    layout=widgets.Layout(width='500px'),
+    style={'description_width': 'initial'}
+)
+
+# Version sebagai IntSlider
+version_input = widgets.IntSlider(
+    value=3,
+    min=1,
+    max=100,
+    step=1,
+    description='Version:',
+    style={'description_width': 'initial'}
+)
+
+# Group displays for better layout
+params_box = widgets.VBox([
+    api_key_status,
+    widgets.HBox([backbone_dropdown, data_source_radio]),
+    widgets.HBox([batch_size_slider, epochs_slider]),
+    widgets.HBox([lr_dropdown, detection_mode_radio]),
+    workspace_input,
+    project_input,
+    version_input
+])
+
+display(params_box)
+
+# Function to load current configuration
+def load_config():
+    """Load current configuration from file"""
+    try:
+        with open('configs/experiment_config.yaml', 'r') as f:
+            loaded_config = yaml.safe_load(f)
+            if loaded_config:
+                return loaded_config
+    except FileNotFoundError:
+        try:
+            with open('configs/base_config.yaml', 'r') as f:
+                loaded_config = yaml.safe_load(f)
+                if loaded_config:
+                    return loaded_config
+        except FileNotFoundError:
+            print("⚠️ Tidak ada file konfigurasi ditemukan.")
+            return None
+    return None
+
+# Function to update UI widgets based on loaded config
+def update_ui_from_config(config):
+    """Update UI widgets dengan nilai dari konfigurasi yang dimuat"""
+    if not config:
+        return
+    
+    # Update backbone dropdown
+    backbone = config.get('model', {}).get('backbone')
+    if backbone and backbone in ['efficientnet', 'cspdarknet']:
+        backbone_dropdown.value = backbone
+    
+    # Update batch size
+    batch_size = config.get('training', {}).get('batch_size')
+    if batch_size and isinstance(batch_size, int):
+        batch_size_slider.value = batch_size
+    
+    # Update epochs
+    epochs = config.get('training', {}).get('epochs')
+    if epochs and isinstance(epochs, int):
+        epochs_slider.value = epochs
+    
+    # Update learning rate
+    lr = config.get('training', {}).get('learning_rate')
+    if lr and isinstance(lr, float):
+        # Find closest learning rate in dropdown options
+        lr_values = [opt[1] for opt in lr_dropdown.options]
+        if lr in lr_values:
+            lr_dropdown.value = lr
+    
+    # Update data source
+    data_source = config.get('data', {}).get('source')
+    if data_source and data_source in ['roboflow', 'local']:
+        data_source_radio.value = data_source
+    
+    # Update detection mode
+    detection_mode = config.get('detection_mode')
+    if detection_mode and detection_mode in ['single', 'multi']:
+        detection_mode_radio.value = detection_mode
+    
+    # Update workspace
+    workspace = config.get('data', {}).get('roboflow', {}).get('workspace')
+    if workspace:
+        workspace_input.value = workspace
+    
+    # Update project
+    project = config.get('data', {}).get('roboflow', {}).get('project')
+    if project:
+        project_input.value = project
+    
+    # Pastikan version diubah menjadi integer
+    version = config.get('data', {}).get('roboflow', {}).get('version')
+    if version is not None:
+        # Konversi ke integer jika string
+        if isinstance(version, str):
+            try:
+                version = int(version)
+            except ValueError:
+                version = 3  # Default value jika konversi gagal
+        version_input.value = version
+    
+    print("✅ Konfigurasi berhasil dimuat ke antarmuka")
+
+# Save Configuration Button
+save_config_button = widgets.Button(
+    description='Simpan Konfigurasi',
+    button_style='primary',
+    icon='save'
+)
+
+# Reload Configuration Button
+reload_config_button = widgets.Button(
+    description='Muat Ulang Konfigurasi',
+    button_style='warning',
+    icon='sync'
+)
+
+def on_save_config_button_clicked(b):
+    
+    global config  # ✅ Declare global before using
+
+    # Ensure config has required keys to prevent KeyError
+    config.setdefault('data', {}).setdefault('roboflow', {})
+    config.setdefault('model', {})
+    config.setdefault('training', {})
+
+    """Callback untuk menyimpan konfigurasi"""
+    # Ambil API key dari Google Colab secret
+    api_key = userdata.get('ROBOFLOW_API_KEY', '')
+    config['data']['roboflow']['api_key'] = api_key
+    
+    config['data']['roboflow']['workspace'] = workspace_input.value
+    config['data']['roboflow']['project'] = project_input.value
+    config['data']['roboflow']['version'] = int(version_input.value)
+    config['model']['backbone'] = backbone_dropdown.value
+    config['model']['batch_size'] = batch_size_slider.value
+    config['training']['batch_size'] = batch_size_slider.value
+    config['training']['epochs'] = epochs_slider.value
+    config['training']['learning_rate'] = lr_dropdown.value
+    config['data']['source'] = data_source_radio.value
+    config['detection_mode'] = detection_mode_radio.value
+    
+    # Set layers berdasarkan mode
+    if detection_mode_radio.value == 'single':
+        config['layers'] = ['banknote']
+    else:
+        config['layers'] = ['banknote', 'nominal', 'security']
+    
+    # Simpan konfigurasi
+    with open('configs/experiment_config.yaml', 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    
+    # Set environment variable untuk Roboflow API
+    if api_key:
+        os.environ["ROBOFLOW_API_KEY"] = api_key
+    
+    print(f"✅ Konfigurasi berhasil disimpan di configs/experiment_config.yaml")
+    print(f"📄 Mode deteksi: {detection_mode_radio.value}")
+    print(f"🖥️ Backbone: {backbone_dropdown.value}")
+    print(f"📦 Batch size: {batch_size_slider.value}")
+    print(f"🔄 Epochs: {epochs_slider.value}")
+    print(f"📊 Learning rate: {lr_dropdown.value}")
+    print(f"📁 Sumber data: {data_source_radio.value}")
+    print(f"🏢 Workspace: {workspace_input.value}")
+    print(f"📂 Project: {project_input.value}")
+    print(f"🔢 Version: {version_input.value}")
+    print(f"🔑 API Key: {'✅ Terdeteksi' if api_key else '❌ Tidak ditemukan'}")
+    
+    with open('configs/experiment_config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+def reload_config():
+    loaded_config = load_config()
+    if loaded_config:
+        update_ui_from_config(loaded_config)
+        
+        # Update global config variable
+        global config
+        config = loaded_config
+    else:
+        print("⚠️ Tidak dapat memuat konfigurasi dari file")
+
+def on_reload_config_button_clicked(b):
+    """Callback untuk memuat ulang konfigurasi dari file"""
+    reload_config()
+    
+
+save_config_button.on_click(on_save_config_button_clicked)
+reload_config_button.on_click(on_reload_config_button_clicked)
+reload_config()
+# Display buttons side by side in a HBox
+button_box = widgets.HBox([save_config_button, reload_config_button])
+display(button_box)

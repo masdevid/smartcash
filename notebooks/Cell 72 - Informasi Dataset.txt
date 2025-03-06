@@ -1,4 +1,16 @@
-# Cell 7.2: Informasi Dataset
+# Cell 7.2: Informasi Dataset (refactored)
+
+import pickle
+from IPython.display import display, HTML
+
+# Import komponen UI
+from smartcash.ui_components.data_components import create_dataset_info_ui
+
+# Import handler
+from smartcash.handlers.ui_handlers.data_handlers import (
+    setup_dataset_info_handlers,
+    get_dataset_info
+)
 
 # Pastikan objek global tersedia
 try:
@@ -6,163 +18,20 @@ try:
         globals_dict = pickle.load(f)
     
     data_manager = globals_dict['data_manager']
-    aug_manager = globals_dict['aug_manager']
-    config = globals_dict['config']
     logger = globals_dict['logger']
 except Exception as e:
     print(f"❌ Error loading global objects: {str(e)}")
     print("💡 Jalankan Cell 7.1 terlebih dahulu untuk menginisialisasi dataset")
 
-# Fungsi untuk menampilkan statistik dataset
-def get_dataset_info():
-    """Ambil dan tampilkan informasi dataset"""
-    try:
-        # Tampilkan statistik dalam bentuk tabel
-        stats = data_manager.get_dataset_stats()
-        
-        # Persiapkan data untuk DataFrame
-        df_data = []
-        layer_stats = {}
-        
-        # Proses statistik untuk tiap split
-        for split, split_stats in stats.items():
-            row = {'Split': split.capitalize()}
-            
-            # Ambil jumlah gambar dan label
-            row['images'] = split_stats.get('image_count', 0)
-            row['labels'] = split_stats.get('label_count', 0)
-            
-            # Dapatkan statistik original vs augmented jika tersedia
-            if 'original' in split_stats and 'augmented' in split_stats:
-                row['original'] = split_stats['original']
-                row['augmented'] = split_stats['augmented']
-            
-            # Ambil statistik layer
-            layer_stats_for_split = split_stats.get('layer_stats', {})
-            for layer, count in layer_stats_for_split.items():
-                if layer not in layer_stats:
-                    layer_stats[layer] = {}
-                layer_stats[layer][split] = count
-            
-            df_data.append(row)
-        
-        # Konversi ke DataFrame
-        stats_df = pd.DataFrame(df_data)
-        
-        # Tambahkan total
-        total_row = {'Split': 'Total'}
-        for col in stats_df.columns:
-            if col != 'Split' and stats_df[col].dtype.kind in 'iuf':  # Integer, unsigned int, atau float
-                total_row[col] = stats_df[col].sum()
-        
-        stats_df = pd.concat([stats_df, pd.DataFrame([total_row])], ignore_index=True)
-        
-        # Tampilkan statistik dalam bentuk tabel
-        display(HTML("<h3>📊 Statistik Dataset</h3>"))
-        display(stats_df.style.format({
-            'images': '{:,}', 
-            'labels': '{:,}', 
-            'augmented': '{:,}', 
-            'original': '{:,}'
-        }).highlight_max(axis=0, color='lightgreen', subset=['images', 'labels']))
-        
-        # Tampilkan statistik per layer jika tersedia
-        if layer_stats:
-            display(HTML("<h3>📊 Distribusi Layer</h3>"))
-            layer_df = pd.DataFrame(layer_stats)
-            display(layer_df)
-            
-            # Visualisasi layer distribution
-            plt.figure(figsize=(10, 5))
-            layer_df.plot(kind='bar', stacked=True, figsize=(10, 5))
-            plt.title('Distribusi Layer per Split Dataset')
-            plt.ylabel('Jumlah Objek')
-            plt.xlabel('Split')
-            plt.legend(title='Layer')
-            plt.tight_layout()
-            plt.show()
-        
-        # Plot distribusi data jika ada data
-        if not stats_df.empty and len(stats_df) > 1:  # Minimal ada satu split + total
-            plt.figure(figsize=(10, 5))
-            
-            # Exclude Total row
-            plot_df = stats_df[stats_df['Split'] != 'Total']
-            splits = plot_df['Split']
-            
-            # Siapkan data untuk plotting
-            if 'original' in plot_df.columns and 'augmented' in plot_df.columns:
-                original = plot_df['original'].fillna(0).values
-                augmented = plot_df['augmented'].fillna(0).values
-                
-                # Create stacked bar
-                bar_width = 0.6
-                plt.bar(splits, original, bar_width, label='Original', color='#1f77b4')
-                plt.bar(splits, augmented, bar_width, bottom=original, label='Augmented', color='#ff7f0e')
-                
-                # Add total labels on top
-                for i, split in enumerate(splits):
-                    total = original[i] + augmented[i]
-                    plt.text(i, total + 5, f'Total: {int(total)}', ha='center', va='bottom', fontweight='bold')
-            else:
-                # Fallback jika kolom tidak tersedia
-                images = plot_df['images'].fillna(0).values
-                plt.bar(splits, images, color='#1f77b4')
-                
-                # Add labels on top
-                for i, (split, count) in enumerate(zip(splits, images)):
-                    plt.text(i, count + 5, f'Total: {int(count)}', ha='center', va='bottom', fontweight='bold')
-            
-            plt.title('Distribusi Dataset per Split')
-            plt.ylabel('Jumlah Gambar')
-            plt.legend()
-            plt.tight_layout()
-            plt.show()
-        else:
-            display(HTML("<p><i>Tidak cukup data untuk visualisasi.</i></p>"))
-        
-        # Tambahkan informasi ketersediaan dataloaders
-        display(HTML("<h4>🔄 Ketersediaan DataLoader</h4>"))
-        for split in ['train', 'valid', 'test']:
-            try:
-                # Dapatkan ukuran dataset
-                size = data_manager.get_dataset_sizes().get(split, 0)
-                status = "✅ Tersedia" if size > 0 else "❌ Tidak tersedia"
-                display(HTML(f"<p><b>{split.capitalize()}</b>: {size} gambar - {status}</p>"))
-            except Exception as e:
-                display(HTML(f"<p><b>{split.capitalize()}</b>: Error - {str(e)}</p>"))
-    except Exception as e:
-        display(HTML(f"<p>❌ Error mendapatkan informasi dataset: {str(e)}</p>"))
-        logger.error(f"Error mendapatkan informasi dataset: {str(e)}")
+# Buat UI untuk informasi dataset
+info_ui = create_dataset_info_ui()
 
-# Setup tab informasi dataset
-info_tab = widgets.Tab()
-info_output = widgets.Output()
+# Setup handler untuk komponen UI
+setup_dataset_info_handlers(info_ui, data_manager, logger)
 
-# Tombol refresh informasi dataset
-refresh_info_button = widgets.Button(
-    description='Refresh Info Dataset',
-    button_style='info',
-    icon='sync'
-)
+# Tampilkan UI
+display(info_ui['ui'])
 
-def on_refresh_info_clicked(b):
-    with info_output:
-        clear_output()
-        get_dataset_info()
-
-refresh_info_button.on_click(on_refresh_info_clicked)
-
-# Tampilkan tab
-tab_content = widgets.VBox([
-    widgets.HTML("<h2>ℹ️ Informasi Dataset</h2>"),
-    widgets.HTML("<p>Pada bagian ini Anda dapat melihat statistik dan distribusi dataset.</p>"),
-    refresh_info_button,
-    info_output
-])
-
-display(tab_content)
-
-# Tampilkan statistik dataset awal
-with info_output:
-    get_dataset_info()
+# Tampilkan informasi dataset awal
+with info_ui['info_output']:
+    get_dataset_info(data_manager, logger)

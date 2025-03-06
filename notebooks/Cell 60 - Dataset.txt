@@ -1,16 +1,18 @@
-# Cell 60: Dataset - Download Dataset (refactored)
-import os
-import yaml
-from pathlib import Path
-from IPython.display import display
-import sys
+# Cell 60: Dataset (refactored) - Download Dataset dengan Google Drive Integration
 
-# Import UI components and handlers
+import os
+from pathlib import Path
+from google.colab import drive
+from IPython.display import display
+import yaml
+
+# Import UI components dan handlers
 from smartcash.ui_components.dataset_components import create_dataset_ui
 from smartcash.handlers.ui_handlers.dataset_handlers import setup_dataset_handlers
-from smartcash.utils.roboflow_downloader import download_dataset_from_roboflow, RoboflowDownloader
+from smartcash.utils.roboflow_downloader import RoboflowDownloader
 
-# Check if running in Google Colab
+# ===== 1. CEK GOOGLE COLAB & MOUNT DRIVE =====
+# Cek apakah kita berada di Google Colab
 def is_colab():
     try:
         import google.colab
@@ -18,28 +20,49 @@ def is_colab():
     except ImportError:
         return False
 
-# Mount Google Drive if in Colab
+# Mount Google Drive jika kita berada di Colab
 drive_path = None
 if is_colab():
     try:
-        from google.colab import drive
         drive.mount('/content/drive')
         drive_path = '/content/drive/MyDrive/SmartCash'
-        # Create SmartCash directory in Drive if it doesn't exist
+        # Buat direktori SmartCash di Drive jika belum ada
         os.makedirs(drive_path, exist_ok=True)
-        print(f"✅ Google Drive mounted at {drive_path}")
+        print(f"✅ Google Drive berhasil di-mount di {drive_path}")
     except Exception as e:
-        print(f"⚠️ Failed to mount Google Drive: {str(e)}")
+        print(f"⚠️ Gagal mount Google Drive: {str(e)}")
         drive_path = None
 else:
-    print("ℹ️ Not running in Google Colab. Using local storage.")
+    print("ℹ️ Tidak terdeteksi di Google Colab. Gunakan penyimpanan lokal.")
 
-# Create and display the dataset UI
-dataset_ui = create_dataset_ui(drive_path=drive_path, is_colab=is_colab())
+# ===== 2. LOAD KONFIGURASI =====
+# Load konfigurasi yang ada atau gunakan default
+config_path = 'configs/experiment_config.yaml'
+config = {}
+
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+else:
+    # Fallback ke konfigurasi dasar
+    base_config_path = 'configs/base_config.yaml'
+    if os.path.exists(base_config_path):
+        with open(base_config_path, 'r') as f:
+            config = yaml.safe_load(f)
+
+# ===== 3. BUAT DAN SETUP UI =====
+# Buat UI components
+ui_components = create_dataset_ui(drive_path=drive_path, is_colab=is_colab())
+
+# Setup handlers
 setup_dataset_handlers(
-    dataset_ui,
-    roboflow_downloader=RoboflowDownloader,
+    ui_components=ui_components,
+    config=config,
+    downloader_class=RoboflowDownloader,
     drive_path=drive_path
 )
 
-display(dataset_ui['ui'])
+# ===== 4. TAMPILKAN UI =====
+# Tampilkan UI dan output
+display(ui_components['ui'])
+display(ui_components['output'])

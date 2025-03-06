@@ -1,86 +1,20 @@
-# Cell 2: Clone Repository SmartCash dan YOLOv5 dengan Tombol Pembaruan
+# Cell 20 - Clone Repository (refactored)
 
 import os
 import sys
 import shutil
 import ipywidgets as widgets
 from IPython.display import display
-from IPython import get_ipython
 
-# Fungsi untuk mengunduh repository
-def clone_repo(repo_name, repo_url, branch="main"):
-    """Clone repositori jika belum ada"""
-    if not os.path.exists(repo_name):
-        print(f"📥 Mengunduh {repo_name} dari branch {branch}...")
-        !git clone -b {branch} {repo_url}
-        if repo_name == "yolov5":
-            print("📦 Menginstal dependensi YOLOv5...")
-            !pip install -r yolov5/requirements.txt
-        print(f"✅ {repo_name} berhasil diunduh!")
-        return True
-    else:
-        print(f"📂 {repo_name} sudah ada di sistem")
-        return False
+# Import UI components dan handlers
+from smartcash.ui_components.repository_components import create_repository_ui
+from smartcash.handlers.ui_handlers.repository_handlers import setup_repository_handlers
 
-# Fungsi untuk mengunduh ulang repository
-def update_repo(repo_name, repo_url, branch="main"):
-    """Hapus dan clone ulang repositori"""
-    if os.path.exists(repo_name):
-        print(f"🗑️ Menghapus {repo_name} yang sudah ada...")
-        shutil.rmtree(repo_name)
-    
-    print(f"📥 Mengunduh ulang {repo_name} dari branch {branch}...")
-    !git clone -b {branch} {repo_url}
-    
-    if repo_name == "yolov5":
-        print("📦 Menginstal ulang dependensi YOLOv5...")
-        !pip install -r yolov5/requirements.txt
-    
-    print(f"✅ {repo_name} berhasil diperbarui!")
-    
-    # Coba restart kernel jika dalam Colab
-    try:
-        from google.colab import output
-        print("🔄 Memulai ulang session setelah pembaruan kode...")
-        output.eval_js('window.parent.postMessage({command: "restartKernel"}, "*")')
-        print("✅ Restart manual `Runtime` -> `Restart Session` jika pembaruan belum berdampak.")
-    except ImportError:
-        print("\n⚠️ Tidak dapat memulai ulang session secara otomatis.")
-        print("💡 PENTING: Silakan mulai ulang notebook secara manual untuk menerapkan pembaruan.")
+# Buat UI components
+ui_components = create_repository_ui()
 
-# Clone repositories awal
-clone_repo("smartcash", "https://github.com/masdevid/smartcash.git")
-clone_repo("yolov5", "https://github.com/ultralytics/yolov5.git")
+# Setup handlers untuk UI components
+setup_repository_handlers(ui_components)
 
-# Tambahkan direktori ke path
-if 'smartcash' not in sys.path:
-    sys.path.append('smartcash')
-if 'yolov5' not in sys.path:
-    sys.path.append('yolov5')
-
-# Buat tombol untuk pembaruan repo
-smartcash_button = widgets.Button(
-    description='Perbarui SmartCash',
-    button_style='info',
-    icon='sync'
-)
-
-yolo_button = widgets.Button(
-    description='Perbarui YOLOv5',
-    button_style='warning',
-    icon='sync'
-)
-
-# Tambahkan callback untuk tombol
-def on_smartcash_update_clicked(b):
-    update_repo("smartcash", "https://github.com/masdevid/smartcash.git")
-
-def on_yolo_update_clicked(b):
-    update_repo("yolov5", "https://github.com/ultralytics/yolov5.git")
-
-smartcash_button.on_click(on_smartcash_update_clicked)
-yolo_button.on_click(on_yolo_update_clicked)
-
-# Tampilkan tombol
-print("\n📦 Repository siap digunakan. Gunakan tombol di bawah untuk pembaruan:")
-display(widgets.HBox([smartcash_button, yolo_button]))
+# Tampilkan UI
+display(ui_components['ui'])

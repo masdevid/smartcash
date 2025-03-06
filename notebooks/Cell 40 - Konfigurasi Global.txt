@@ -1,90 +1,121 @@
-# Cell 4: Konfigurasi Global - Pengaturan parameter dan variabel global untuk sistem SmartCash
+# Cell 40 - Konfigurasi Global (refactored)
 
-def create_base_config():
-    """Create base configuration for the project"""
-    config = {
-        "data": {
-            "classes": [
-                "001", "002", "005", "010", "020", "050", "100",
-                "l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100",
-                "l3_sign", "l3_text", "l3_thread"
-            ],
-            "local": {
-                "test": f"{BASE_DIR}/data/test",
-                "train": f"{BASE_DIR}/data/train",
-                "valid": f"{BASE_DIR}/data/valid"
-            },
-            "roboflow": {
-                "api_key": "",  # Will be filled by user input
-                "project": "rupiah-emisi-2022",
-                "version": "3",
-                "workspace": "smartcash-wo2us"
-            },
-            "source": "roboflow"
-        },
-        "model": {
-            "backbone": "efficientnet",
-            "batch_size": 16,
-            "conf_thres": 0.25,
-            "img_size": [640, 640],
-            "iou_thres": 0.45,
-            "memory_limit": 0.6,
-            "num_classes": 17,
-            "pretrained": True,
-            "workers": 4 if not IN_COLAB else 2  # Reduce workers in Colab
-        },
-        "training": {
-            "batch_size": 16,
-            "epochs": 30,
-            "early_stopping_patience": 5,
-            "learning_rate": 0.001,
-            "warmup_epochs": 3,
-            "weight_decay": 0.0005,
-            "optimizer": "adam"
-        },
-        "evaluation": {
-            "metrics": ["accuracy", "precision", "recall", "f1", "mAP", "inference_time"],
-            "save_visualizations": True
-        },
-        "output_dir": f"{BASE_DIR}/runs/train",
-        "detection_mode": "single",
-        "layers": ["banknote"]
-    }
-    
-    # Save configuration
-    config_path = f"{BASE_DIR}/configs/base_config.yaml"
-    with open(config_path, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False)
-    
-    logger.info("✅ Konfigurasi dasar berhasil dibuat")
-    return config
+import os
+import yaml
+import torch
+from pathlib import Path
+from datetime import datetime
 
-def load_config():
-    """Load configuration from file"""
-    try:
-        with open(f"{BASE_DIR}/configs/experiment_config.yaml", 'r') as f:
-            config = yaml.safe_load(f)
-            if config:
-                logger.info("✅ Konfigurasi eksperimen berhasil dimuat")
-                return config
-    except FileNotFoundError:
-        try:
-            with open(f"{BASE_DIR}/configs/base_config.yaml", 'r') as f:
-                config = yaml.safe_load(f)
-                if config:
-                    logger.info("✅ Konfigurasi dasar berhasil dimuat")
-                    return config
-        except FileNotFoundError:
-            logger.warning("⚠️ File konfigurasi tidak ditemukan")
-    return None
+from smartcash.utils.logger import SmartCashLogger
+from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.ui_components.config_components import create_global_config_ui
+from smartcash.handlers.ui_handlers.config_handlers import setup_global_config_handlers
 
-# Create or load configuration
-config = load_config()
-if not config:
-    config = create_base_config()
+# Setup direktori
+BASE_DIR = Path.cwd()
+CONFIG_DIR = BASE_DIR / "configs"
+DATA_DIR = BASE_DIR / "data"
+OUTPUT_DIR = BASE_DIR / "runs"
 
-# Save config for other cells
-with open('config.pkl', 'wb') as f:
-    pickle.dump(config, f)
+# Pastikan direktori ada
+CONFIG_DIR.mkdir(exist_ok=True)
+DATA_DIR.mkdir(exist_ok=True)
+OUTPUT_DIR.mkdir(exist_ok=True)
 
-logger.success("✨ Konfigurasi global berhasil diinisialisasi")
+# Inisialisasi logger dengan emoji
+logger = SmartCashLogger('smartcash')
+logger.start("🚀 Inisialisasi SmartCash")
+
+# Buat konfigurasi default
+config = {
+    'data_dir': str(DATA_DIR),
+    'output_dir': str(OUTPUT_DIR / f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}"),
+    'checkpoints_dir': str(OUTPUT_DIR / "weights"),
+    'model': {
+        'backbone': 'efficientnet',  # 'efficientnet' atau 'cspdarknet'
+        'pretrained': True,
+        'img_size': [640, 640],
+        'batch_size': 16,
+        'memory_limit': 0.7,  # Batas penggunaan memori (0.0-1.0)
+        'workers': 4
+    },
+    'training': {
+        'epochs': 30,
+        'learning_rate': 1e-4,
+        'weight_decay': 5e-4,
+        'momentum': 0.937,
+        'optimizer': 'adamw',  # 'adam', 'adamw', 'sgd'
+        'scheduler': 'cosine',  # 'cosine', 'step', 'plateau'
+        'early_stopping_patience': 5,
+        'save_every': 5,
+        # Augmentasi
+        'fliplr': 0.5,
+        'flipud': 0.0,
+        'hsv_h': 0.015,
+        'hsv_s': 0.7,
+        'hsv_v': 0.4,
+        'degrees': 0.0,
+        'translate': 0.1,
+        'scale': 0.5
+    },
+    # Layer yang akan diaktifkan
+    'layers': ['banknote']  # ['banknote', 'nominal', 'security']
+}
+
+# Simpan konfigurasi ke file
+config_path = CONFIG_DIR / f"train_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
+with open(config_path, 'w') as f:
+    yaml.dump(config, f, default_flow_style=False)
+
+logger.info(f"📝 Konfigurasi disimpan di {config_path}")
+
+# Periksa ketersediaan GPU
+if torch.cuda.is_available():
+    gpu_info = f"GPU: {torch.cuda.get_device_name(0)}"
+    gpu_memory = f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB"
+    logger.info(f"🖥️ {gpu_info}, {gpu_memory}")
+else:
+    logger.warning("⚠️ GPU tidak terdeteksi, menggunakan CPU")
+
+# Inisialisasi layer config manager
+layer_config = get_layer_config()
+active_layers = config['layers']
+available_layers = layer_config.get_layer_names()
+
+# Tampilkan informasi layer yang diaktifkan
+logger.info(f"🔍 Layer yang diaktifkan: {active_layers}")
+
+# Analisis konfigurasi layer
+for layer in active_layers:
+    layer_info = layer_config.get_layer_config(layer)
+    if layer_info:
+        class_names = layer_info['classes']
+        class_ids = layer_info['class_ids']
+        logger.info(f"📊 Layer '{layer}': {len(class_names)} kelas ({', '.join(class_names)})")
+    else:
+        logger.warning(f"⚠️ Layer '{layer}' tidak ditemukan dalam konfigurasi")
+
+# Jumlah total kelas
+total_classes = layer_config.get_total_classes()
+logger.info(f"🔢 Total kelas yang terdeteksi: {total_classes}")
+
+# Buat UI komponen
+ui_components = create_global_config_ui(
+    config=config, 
+    base_dir=BASE_DIR,
+    active_layers=active_layers,
+    available_layers=available_layers
+)
+
+# Setup handlers untuk komponen UI
+setup_global_config_handlers(
+    ui_components=ui_components,
+    config=config,
+    config_path=config_path,
+    logger=logger
+)
+
+# Tampilkan UI
+display(ui_components['ui'])
+
+logger.success("✅ Konfigurasi global siap digunakan")

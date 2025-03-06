@@ -1,7 +1,7 @@
-# 🔍 SmartCash (Work in Progress)
+# 🔍 SmartCash
 ## Deteksi Nilai Mata Uang Rupiah
 
-SmartCash adalah sistem deteksi nilai mata uang Rupiah yang menggunakan YOLOv5 dengan EfficientNet-B4 sebagai backbone. Sistem ini dioptimasi untuk akurasi tinggi dalam berbagai kondisi pengambilan gambar.
+SmartCash adalah sistem deteksi nilai mata uang Rupiah yang menggunakan YOLOv5 dengan berbagai backbone, termasuk EfficientNet. Sistem ini dioptimasi untuk akurasi tinggi dalam berbagai kondisi pengambilan gambar.
 
 ## 📋 Quick Start
 
@@ -19,14 +19,12 @@ pip install -r requirements.txt
 - [Panduan Dataset](docs/dataset/README.md) - Persiapan & preprocessing dataset
 - [Roboflow Integration](docs/dataset/ROBOFLOW.md) - Penggunaan dataset Roboflow
 
-### 3. Jalankan Aplikasi
-```bash
-python run.py
+### 3. Jalankan Aplikasi di Google Colab
+Untuk pengguna yang ingin menjalankan pelatihan atau eksperimen di Google Colab:
 
-atau
-
-python -m smartcash
-```
+- Folder `notebooks/` berisi template cells yang siap di-copy paste ke Colab
+- Template ini telah dikonfigurasi untuk memudahkan setup environment, loading dataset, dan proses pelatihan di Colab
+- Gunakan template sesuai kebutuhan eksperimen Anda
 
 ## 📚 Dokumentasi
 
@@ -39,7 +37,7 @@ python -m smartcash
 
 ### 💻 Dokumentasi Teknis
 - [Arsitektur](docs/technical/ARSITEKTUR.md) - Desain sistem & komponen
-- [Model](docs/technical/MODEL.md) - Implementasi YOLOv5 + EfficientNet
+- [Model](docs/technical/MODEL.md) - Implementasi YOLOv5 dengan berbagai backbone
 - [Dataset](docs/technical/DATASET.md) - Format & preprocessing data
 - [Evaluasi](docs/technical/EVALUASI.md) - Metrik & metodologi evaluasi
 - [API](docs/technical/API.md) - Dokumentasi API & integrasi
@@ -60,22 +58,34 @@ smartcash/
 ├── data/                   # Dataset
 │   ├── raw/               # Data mentah
 │   └── processed/         # Data terproses
+├── datasets/              # Dataset handlers & utilities
 ├── docs/                   # Dokumentasi
 │   ├── dataset/           # Dokumentasi dataset
 │   ├── dev/               # Dokumentasi developer
 │   ├── technical/         # Dokumentasi teknis
 │   └── user_guide/        # Panduan pengguna
-├── notebooks/              # Jupyter notebooks
-│   ├── 01_prepare_dataset.ipynb
-│   ├── 02_train_model.ipynb
-│   └── 03_evaluate_model.ipynb
-├── smartcash/             # Source code
-│   ├── handlers/          # Data & model handlers
-│   ├── models/           # Model implementations
-│   └── utils/            # Utility functions
+├── exceptions/            # Custom exceptions
+├── handlers/              # Data & model handlers
+│   ├── ui_handlers/       # UI-specific handlers
+│   ├── model_handler.py   # Model management
+│   ├── data_manager.py    # Data management
+│   └── evaluation_handler.py # Model evaluation
+├── models/                # Model implementations
+│   ├── backbones/         # Model backbones (EfficientNet, etc.)
+│   ├── necks/             # Model neck components
+│   └── yolov5_model.py    # YOLOv5 implementation
+├── notebooks/             # Jupyter notebooks dengan cells template untuk Google Colab
+├── pretrained/            # Pretrained model weights
+├── runs/                  # Training & evaluation runs
 ├── tests/                 # Unit & integration tests
+├── ui_components/         # UI components for the application
+│   ├── training_components.py   # Training UI
+│   ├── evaluation_components.py # Evaluation UI
+│   └── model_components.py      # Model management UI
+├── utils/                 # Utility functions
+├── __main__.py           # Main application entry point
 ├── .env.example          # Environment template
-├── LICENSE               # MIT License
+├── LICENSE               # License file
 ├── README.md            # This file
 └── requirements.txt     # Python dependencies
 ```
@@ -110,7 +120,7 @@ Dengan ketentuan berikut:
 ## 📚 Sitasi
 ```bibtex
 @software{smartcash2025,
-  title={SmartCash: Indonesian Banknote Detection with YOLOv5 & EfficientNet-B4},
+  title={SmartCash: Indonesian Banknote Detection with YOLOv5 & Various Backbones},
   author={Alfrida Sabar},
   year={2025},
   url={https://github.com/masdevid/smartcash}

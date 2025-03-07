@@ -20,7 +20,7 @@ from smartcash.utils.enhanced_cache import EnhancedCache  # Gunakan enhanced cac
 from smartcash.utils.layer_config_manager import get_layer_config  # Gunakan layer config manager
 
 class MultilayerDataset(Dataset):
-    """Dataset for multi-layer banknote detection dengan konfigurasi terpusat."""
+    """Dataset untuk deteksi multilayer dengan konfigurasi layer terpusat."""
     
     def __init__(
         self,
@@ -29,71 +29,176 @@ class MultilayerDataset(Dataset):
         mode: str = 'train',
         transform = None,
         layers: Optional[List[str]] = None,
+        require_all_layers: bool = False,
         logger: Optional[SmartCashLogger] = None
     ):
         """
-        Initialize dataset.
+        Inisialisasi MultilayerDataset.
         
         Args:
-            data_path: Path to dataset directory
-            img_size: Target image size
-            mode: Dataset mode ('train', 'val', 'test')
-            transform: Custom transformations
-            layers: Layer yang akan diaktifkan (jika None, gunakan semua)
-            logger: Logger instance
+            data_path: Path ke direktori dataset
+            img_size: Ukuran target gambar
+            mode: Mode dataset ('train', 'val', 'test')
+            transform: Transformasi kustom
+            layers: Daftar layer yang akan diaktifkan
+            require_all_layers: Jika True, hanya gambar dengan semua layer yang akan digunakan
+            logger: Logger kustom
         """
         self.data_path = Path(data_path)
         self.img_size = img_size
         self.mode = mode
         self.transform = transform
-        self.logger = logger or get_logger("multilayer_dataset", log_to_file=False)
+        self.require_all_layers = require_all_layers
+        self.logger = logger or SmartCashLogger("multilayer_dataset")
         
-        # Get layer configuration dari layer config manager
+        # Dapatkan konfigurasi layer dari layer config manager
         self.layer_config_manager = get_layer_config()
         self.layers = layers or self.layer_config_manager.get_layer_names()
         
-        # Setup paths
+        # Setup jalur direktori
         self.images_dir = self.data_path / 'images'
         self.labels_dir = self.data_path / 'labels'
         
+        # Validasi direktori
         if not self.images_dir.exists():
-            self.logger.warning(f"Images directory not found: {self.images_dir}")
+            self.logger.warning(f"⚠️ Direktori gambar tidak ditemukan: {self.images_dir}")
             self.images_dir.mkdir(parents=True, exist_ok=True)
             
         if not self.labels_dir.exists():
-            self.logger.warning(f"Labels directory not found: {self.labels_dir}")
+            self.logger.warning(f"⚠️ Direktori label tidak ditemukan: {self.labels_dir}")
             self.labels_dir.mkdir(parents=True, exist_ok=True)
-            
-        self.image_files = self._find_image_files()
         
-        if len(self.image_files) == 0:
-            self.logger.warning(f"No images found in {self.images_dir}")
-            
-    def _find_image_files(self) -> List[Path]:
-        """Find all image files with various extensions."""
+        # Cari file gambar dan validasi label
+        self.valid_samples = self._validate_dataset()
+        
+        if len(self.valid_samples) == 0:
+            self.logger.warning(f"⚠️ Tidak ada sampel valid yang ditemukan di {self.data_path}")
+    
+    def _validate_dataset(self) -> List[Dict]:
+        """
+        Validasi dataset untuk memastikan file gambar dan label valid.
+        
+        Returns:
+            List info sampel valid
+        """
+        valid_samples = []
+        
+        # Cari semua file gambar
         image_files = []
         for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
             image_files.extend(list(self.images_dir.glob(ext)))
-        return sorted(image_files)
         
-    def __len__(self) -> int:
-        return len(self.image_files)
+        self.logger.info(f"🔍 Memvalidasi dataset: {len(image_files)} gambar ditemukan")
         
-    def _normalize_bbox(self, bbox: List[float]) -> List[float]:
+        # Progress bar untuk validasi
+        for img_path in tqdm(image_files, desc="Validasi Dataset"):
+            sample_info = {
+                'image_path': img_path,
+                'label_path': self.labels_dir / f"{img_path.stem}.txt",
+                'available_layers': [],
+                'is_valid': False
+            }
+            
+            # Validasi gambar
+            try:
+                img = cv2.imread(str(img_path))
+                if img is None:
+                    continue
+                sample_info['image_size'] = (img.shape[1], img.shape[0])  # (width, height)
+            except Exception:
+                continue
+            
+            # Validasi label
+            if sample_info['label_path'].exists():
+                try:
+                    # Parse label untuk menentukan layer yang tersedia
+                    layer_classes = self._parse_label_file(sample_info['label_path'])
+                    
+                    # Periksa layer yang tersedia
+                    for layer in self.layers:
+                        layer_config = self.layer_config_manager.get_layer_config(layer)
+                        class_ids = set(layer_config['class_ids'])
+                        if any(cls_id in class_ids for cls_id in layer_classes):
+                            sample_info['available_layers'].append(layer)
+                    
+                    # Tentukan validitas sampel
+                    if self.require_all_layers:
+                        # Harus memiliki semua layer yang diminta
+                        required_layers = set(self.layers)
+                        available_layers = set(sample_info['available_layers'])
+                        sample_info['is_valid'] = required_layers.issubset(available_layers)
+                    else:
+                        # Harus memiliki setidaknya satu layer yang diminta
+                        sample_info['is_valid'] = any(layer in self.layers for layer in sample_info['available_layers'])
+                        
+                except Exception:
+                    sample_info['is_valid'] = False
+            
+            if sample_info['is_valid']:
+                valid_samples.append(sample_info)
+        
+        # Log hasil validasi
+        self.logger.info(f"✅ Dataset tervalidasi: {len(valid_samples)}/{len(image_files)} sampel valid")
+        if self.require_all_layers:
+            self.logger.info(f"ℹ️ Mode require_all_layers=True: Hanya menerima sampel dengan semua layer: {self.layers}")
+        else:
+            self.logger.info(f"ℹ️ Mode require_all_layers=False: Menerima sampel dengan minimal 1 layer dari: {self.layers}")
+            
+        # Log distribusi layer
+        layer_counts = {layer: 0 for layer in self.layer_config_manager.get_layer_names()}
+        for sample in valid_samples:
+            for layer in sample['available_layers']:
+                layer_counts[layer] += 1
+                
+        for layer, count in layer_counts.items():
+            if layer in self.layers and count > 0:
+                self.logger.info(f"📊 Layer '{layer}': {count} sampel")
+            
+        return valid_samples
+    
+    def _parse_label_file(self, label_path: Path) -> List[int]:
         """
-        Normalize bounding box coordinates to ensure they're in [0, 1] range.
+        Parse file label untuk mendapatkan class ID.
         
         Args:
-            bbox: Bounding box coordinates [x_center, y_center, width, height]
+            label_path: Path ke file label
             
         Returns:
-            Normalized coordinates [x_center, y_center, width, height]
+            List class ID
         """
-        # Ensure x_center and y_center are in [0, 1]
+        class_ids = []
+        
+        with open(label_path, 'r') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 5:  # Format YOLO: class_id x y w h
+                    try:
+                        cls_id = int(float(parts[0]))
+                        class_ids.append(cls_id)
+                    except ValueError:
+                        continue
+        
+        return class_ids
+    
+    def __len__(self) -> int:
+        """Mendapatkan jumlah sampel valid."""
+        return len(self.valid_samples)
+    
+    def _normalize_bbox(self, bbox: List[float]) -> List[float]:
+        """
+        Normalisasi koordinat bounding box untuk memastikan berada dalam range [0, 1].
+        
+        Args:
+            bbox: Koordinat bounding box [x_center, y_center, width, height]
+            
+        Returns:
+            Koordinat ternormalisasi
+        """
+        # Pastikan x_center dan y_center ada dalam [0, 1]
         x_center = max(0.0, min(1.0, bbox[0]))
         y_center = max(0.0, min(1.0, bbox[1]))
         
-        # Ensure width and height are valid
+        # Pastikan width dan height valid
         width = max(0.01, min(1.0, bbox[2]))
         if x_center + width/2 > 1.0:
             width = 2 * (1.0 - x_center)
@@ -103,132 +208,160 @@ class MultilayerDataset(Dataset):
             height = 2 * (1.0 - y_center)
             
         return [x_center, y_center, width, height]
+    
+    def _parse_label_by_layer(self, label_path: Path) -> Dict[str, List[Tuple[int, List[float]]]]:
+        """
+        Parse file label dan kelompokkan berdasarkan layer.
         
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-        """Get dataset item dengan format multilayer yang lebih baik."""
+        Args:
+            label_path: Path ke file label
+            
+        Returns:
+            Dict label per layer
+        """
+        layer_labels = {layer: [] for layer in self.layers}
+        
+        # Class ID to layer mapping
+        class_to_layer = {}
+        for layer in self.layers:
+            layer_config = self.layer_config_manager.get_layer_config(layer)
+            for cls_id in layer_config['class_ids']:
+                class_to_layer[cls_id] = layer
+        
+        # Parse label
+        if label_path.exists():
+            with open(label_path, 'r') as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 5:
+                        try:
+                            cls_id = int(float(parts[0]))
+                            coords = [float(x) for x in parts[1:5]]
+                            
+                            # Check if class ID belongs to an active layer
+                            if cls_id in class_to_layer and class_to_layer[cls_id] in self.layers:
+                                layer = class_to_layer[cls_id]
+                                normalized_coords = self._normalize_bbox(coords)
+                                layer_labels[layer].append((cls_id, normalized_coords))
+                        except (ValueError, IndexError):
+                            continue
+        
+        return layer_labels
+    
+    def __getitem__(self, idx: int) -> Dict:
+        """
+        Mendapatkan item dataset dengan format multilayer.
+        
+        Args:
+            idx: Indeks sampel
+            
+        Returns:
+            Dict berisi gambar dan label per layer
+        """
+        if idx >= len(self.valid_samples):
+            raise IndexError(f"Indeks {idx} di luar batas dataset (ukuran: {len(self.valid_samples)})")
+            
+        sample = self.valid_samples[idx]
+        
+        # Load gambar
         try:
-            # Handle empty dataset
-            if len(self.image_files) == 0:
-                dummy_img = torch.zeros((3, self.img_size[1], self.img_size[0]))
-                dummy_targets = {layer: torch.zeros((len(self.layer_config_manager.get_layer_config(layer)['classes']), 5)) 
-                                for layer in self.layers}
-                return dummy_img, dummy_targets
-                
-            img_path = self.image_files[idx]
-            label_path = self.labels_dir / f"{img_path.stem}.txt"
-            
-            # Load and validate image
-            img = cv2.imread(str(img_path))
-            if img is None:
-                self.logger.warning(f"Cannot read image: {img_path}")
-                dummy_img = torch.zeros((3, self.img_size[1], self.img_size[0]))
-                dummy_targets = {layer: torch.zeros((len(self.layer_config_manager.get_layer_config(layer)['classes']), 5)) 
-                                for layer in self.layers}
-                return dummy_img, dummy_targets
-                
+            img = cv2.imread(str(sample['image_path']))
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            
-            # Mapping class ID to layer
-            class_to_layer = {}
-            for layer in self.layers:
-                layer_config = self.layer_config_manager.get_layer_config(layer)
-                for cls_id in layer_config['class_ids']:
-                    class_to_layer[cls_id] = layer
-            
-            # Load and validate labels
-            bboxes = []
-            class_labels = []
-            
-            if label_path.exists():
-                try:
-                    with open(label_path, 'r') as f:
-                        for line in f:
-                            parts = line.strip().split()
-                            if len(parts) >= 5:
-                                class_id = int(float(parts[0]))
-                                coords = list(map(float, parts[1:5]))
-                                
-                                # Validasi class ID dengan layer_config_manager
-                                layer = self.layer_config_manager.get_layer_for_class_id(class_id)
-                                if layer in self.layers:
-                                    normalized_coords = self._normalize_bbox(coords)
-                                    bboxes.append(normalized_coords)
-                                    class_labels.append(class_id)
-                except Exception as e:
-                    self.logger.warning(f"Error reading label {label_path}: {str(e)}")
-            
-            # Apply transformations
-            if self.transform:
-                transformed = self.transform(image=img, bboxes=bboxes, class_labels=class_labels)
-            else:
-                # Default transform (resize and normalize)
-                transform = A.Compose([
-                    A.Resize(height=self.img_size[1], width=self.img_size[0]),
-                    A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
-                transformed = transform(image=img, bboxes=bboxes, class_labels=class_labels)
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal membaca gambar {sample['image_path']}: {str(e)}")
+            # Return dummy image sebagai fallback
+            img = np.zeros((self.img_size[1], self.img_size[0], 3), dtype=np.uint8)
+        
+        # Parse label per layer
+        layer_labels = self._parse_label_by_layer(sample['label_path'])
+        
+        # Siapkan data untuk augmentasi
+        all_bboxes = []
+        all_classes = []
+        for layer in self.layers:
+            for cls_id, bbox in layer_labels[layer]:
+                all_bboxes.append(bbox)
+                all_classes.append(cls_id)
+        
+        # Augmentasi
+        if self.transform:
+            try:
+                transformed = self.transform(
+                    image=img,
+                    bboxes=all_bboxes,
+                    class_labels=all_classes
+                )
+                img = transformed['image']
                 
-            # Validate transformed bboxes
-            validated_bboxes = []
-            validated_class_labels = []
-            
-            for bbox, cls_id in zip(transformed['bboxes'], transformed['class_labels']):
-                try:
-                    for coord in bbox:
-                        if not (0 <= coord <= 1):
-                            raise ValueError(f"Invalid bbox coordinate {bbox}")
-                    validated_bboxes.append(bbox)
-                    validated_class_labels.append(cls_id)
-                except ValueError as e:
-                    self.logger.warning(f"Skipping invalid bbox: {bbox}")
-                    continue
-                    
-            # Update transformed data
-            transformed['bboxes'] = validated_bboxes
-            transformed['class_labels'] = validated_class_labels
-            
-            # Prepare final tensors
-            img_tensor = torch.from_numpy(transformed['image']).permute(2, 0, 1).float()
-            
-            # Ensure all class labels are integers
-            class_labels = [int(cl) for cl in transformed['class_labels']]
-            
-            # Prepare layer-specific targets
-            layer_targets = {}
-            
-            for layer in self.layers:
+                # Reorganisasi hasil augmentasi ke format per layer
+                augmented_layer_labels = {layer: [] for layer in self.layers}
+                
+                # Class ID to layer mapping
+                class_to_layer = {}
+                for layer in self.layers:
+                    layer_config = self.layer_config_manager.get_layer_config(layer)
+                    for cls_id in layer_config['class_ids']:
+                        class_to_layer[cls_id] = layer
+                
+                for i, (cls_id, bbox) in enumerate(zip(transformed['class_labels'], transformed['bboxes'])):
+                    if cls_id in class_to_layer:
+                        layer = class_to_layer[cls_id]
+                        augmented_layer_labels[layer].append((cls_id, bbox))
+                
+                layer_labels = augmented_layer_labels
+                
+            except Exception as e:
+                self.logger.warning(f"⚠️ Augmentasi gagal untuk {sample['image_path']}: {str(e)}")
+        else:
+            # Resize gambar jika tidak ada augmentasi
+            img = cv2.resize(img, self.img_size)
+        
+        # Konversi gambar ke tensor
+        img_tensor = torch.from_numpy(img).permute(2, 0, 1).float() / 255.0
+        
+        # Buat tensor target untuk setiap layer
+        targets = {}
+        for layer in self.layers:
+            if layer in sample['available_layers']:
+                # Layer ini tersedia untuk gambar ini
                 layer_config = self.layer_config_manager.get_layer_config(layer)
                 num_classes = len(layer_config['classes'])
-                class_ids = layer_config['class_ids']
+                local_class_ids = layer_config['class_ids']
                 
-                # Initialize tensors for this layer
-                layer_target = torch.zeros((num_classes, 5))  # [x, y, w, h, conf]
+                # Inisialisasi target untuk layer ini
+                layer_target = torch.zeros((num_classes, 5))  # [class_id, x, y, w, h]
                 
-                # Find boxes for this layer
-                for bbox, cls_id in zip(transformed['bboxes'], transformed['class_labels']):
-                    if cls_id in class_ids:
-                        # Compute index relative to this layer's class range
-                        local_idx = class_ids.index(cls_id)
-                        
-                        # Fill in coordinates and confidence
-                        x_center, y_center, width, height = bbox
-                        layer_target[local_idx, 0] = x_center
-                        layer_target[local_idx, 1] = y_center
-                        layer_target[local_idx, 2] = width
-                        layer_target[local_idx, 3] = height
-                        layer_target[local_idx, 4] = 1.0  # Confidence
+                # Isi dengan data label
+                for cls_id, bbox in layer_labels[layer]:
+                    # Konversi kembali class ID global ke local dalam layer
+                    local_idx = local_class_ids.index(cls_id)
+                    x_center, y_center, width, height = bbox
+                    layer_target[local_idx, 0] = x_center
+                    layer_target[local_idx, 1] = y_center
+                    layer_target[local_idx, 2] = width
+                    layer_target[local_idx, 3] = height
+                    layer_target[local_idx, 4] = 1.0  # Confidence
                 
-                layer_targets[layer] = layer_target
-                
-            return img_tensor, layer_targets
-            
-        except Exception as e:
-            self.logger.error(f"Error loading item {idx}: {str(e)}")
-            # Return zero tensors as fallback
-            dummy_img = torch.zeros((3, self.img_size[1], self.img_size[0]))
-            dummy_targets = {layer: torch.zeros((len(self.layer_config_manager.get_layer_config(layer)['classes']), 5)) 
-                            for layer in self.layers}
-            return dummy_img, dummy_targets
+                targets[layer] = layer_target
+            else:
+                # Layer tidak tersedia, buat tensor kosong
+                layer_config = self.layer_config_manager.get_layer_config(layer)
+                num_classes = len(layer_config['classes'])
+                targets[layer] = torch.zeros((num_classes, 5))
+        
+        # Tambahkan informasi tambahan untuk debugging
+        metadata = {
+            'image_path': str(sample['image_path']),
+            'label_path': str(sample['label_path']),
+            'available_layers': sample['available_layers']
+        }
+        
+        # Return hasil
+        return {
+            'image': img_tensor,
+            'targets': targets,
+            'metadata': metadata
+        }
 
 class DataManager:
     """
@@ -310,7 +443,8 @@ class DataManager:
         split: str = 'train',
         batch_size: int = 32,
         num_workers: int = 4,
-        shuffle: Optional[bool] = None
+        shuffle: Optional[bool] = None,
+        require_all_layers: bool = False  # Add this parameter
     ) -> DataLoader:
         """
         Get DataLoader for specific dataset split.
@@ -319,7 +453,8 @@ class DataManager:
             split: Dataset split ('train', 'valid', 'test')
             batch_size: Batch size
             num_workers: Number of workers
-            shuffle: Whether to shuffle data (defults to True for train, False otherwise)
+            shuffle: Whether to shuffle data (defaults to True for train, False otherwise)
+            require_all_layers: Whether to require samples to have all active layers
             
         Returns:
             DataLoader instance
@@ -340,13 +475,14 @@ class DataManager:
         else:
             raise ValueError(f"Invalid split: {split}")
             
-        # Create dataset
+        # Create dataset with updated parameters
         dataset = MultilayerDataset(
             data_path=data_path,
             img_size=self.target_size,
             mode=split,
             transform=transform,
             layers=self.active_layers,
+            require_all_layers=require_all_layers,  # Pass the new parameter
             logger=self.logger
         )
         
@@ -361,17 +497,19 @@ class DataManager:
         )
     
     def _multilayer_collate_fn(self, batch):
-        """Collate function for multilayer dataset."""
+        """Collate function for enhanced multilayer dataset."""
         # Filter out None values
-        batch = [b for b in batch if b is not None and isinstance(b, tuple) and len(b) == 2]
+        batch = [b for b in batch if b is not None and isinstance(b, dict) and 'image' in b and 'targets' in b]
         
         if len(batch) == 0:
             # Return empty batch with layer structure
             dummy_targets = {layer: torch.zeros((0, len(self.layer_config.get_layer_config(layer)['classes']), 5))
-                             for layer in self.active_layers}
+                            for layer in self.active_layers}
             return torch.zeros((0, 3, self.target_size[0], self.target_size[1])), dummy_targets
             
-        imgs, targets_list = zip(*batch)
+        # Extract images and targets
+        imgs = [item['image'] for item in batch]
+        targets_list = [item['targets'] for item in batch]
         
         # Stack images
         imgs = torch.stack(imgs)
@@ -392,6 +530,9 @@ class DataManager:
                 num_classes = len(self.layer_config.get_layer_config(layer)['classes'])
                 combined_targets[layer] = torch.zeros((len(batch), num_classes, 5))
         
+        # Optionally collect metadata if needed
+        metadata = [item.get('metadata', {}) for item in batch]
+        
         return imgs, combined_targets
         
     def get_train_loader(self, batch_size: int = 32, num_workers: int = 4) -> DataLoader:
@@ -408,15 +549,15 @@ class DataManager:
         
     def get_dataset_stats(self, split: str = 'train') -> Dict:
         """
-        Dapatkan statistik dataset untuk split tertentu.
+        Get dataset statistics for a specific split.
         
         Args:
-            split: Split dataset ('train', 'valid', 'test')
+            split: Dataset split ('train', 'valid', 'test')
             
         Returns:
-            Statistik dataset
+            Dataset statistics
         """
-        # Determine path from config
+        # Create a temporary dataset to use its validation features
         if split == 'train':
             data_path = self.config.get('data', {}).get('local', {}).get('train', 'data/train')
         elif split == 'valid' or split == 'val':
@@ -425,56 +566,38 @@ class DataManager:
             data_path = self.config.get('data', {}).get('local', {}).get('test', 'data/test')
         else:
             raise ValueError(f"Invalid split: {split}")
-            
-        # Statistik dasar
+        
+        # Create dataset without transform for validation only
+        temp_dataset = MultilayerDataset(
+            data_path=data_path,
+            img_size=self.target_size,
+            mode=split,
+            transform=None,
+            layers=self.active_layers,
+            logger=self.logger
+        )
+        
+        # Get basic statistics
         stats = {
-            'image_count': 0,
-            'label_count': 0,
+            'image_count': len(temp_dataset.image_files),
+            'label_count': len([p for p in temp_dataset.valid_samples if p['label_path'].exists()]),
             'layer_stats': {layer: 0 for layer in self.active_layers},
-            'class_stats': {}
+            'class_stats': {},
+            'original': 0,
+            'augmented': 0
         }
         
-        # Hitung jumlah gambar
-        image_dir = Path(data_path) / 'images'
-        if image_dir.exists():
-            stats['image_count'] = len(list(image_dir.glob('*.jpg'))) + len(list(image_dir.glob('*.png')))
-        
-        # Hitung jumlah label
-        label_dir = Path(data_path) / 'labels'
-        if label_dir.exists():
-            stats['label_count'] = len(list(label_dir.glob('*.txt')))
+        # Analyze layer and class distributions
+        for sample in temp_dataset.valid_samples:
+            # Count samples by layer
+            for layer in sample['available_layers']:
+                if layer in stats['layer_stats']:
+                    stats['layer_stats'][layer] += 1
             
-            # Analisis label
-            class_to_layer = {}
-            class_names = {}
-            
-            # Setup mapping dari class ID ke layer dan nama
-            for layer in self.active_layers:
-                layer_config = self.layer_config.get_layer_config(layer)
-                for i, class_id in enumerate(layer_config['class_ids']):
-                    class_to_layer[class_id] = layer
-                    class_names[class_id] = layer_config['classes'][i]
-            
-            # Analisis file label
-            for label_file in label_dir.glob('*.txt'):
-                try:
-                    with open(label_file, 'r') as f:
-                        for line in f:
-                            parts = line.strip().split()
-                            if len(parts) >= 5:
-                                class_id = int(float(parts[0]))
-                                
-                                # Update layer stats
-                                if class_id in class_to_layer:
-                                    layer = class_to_layer[class_id]
-                                    stats['layer_stats'][layer] += 1
-                                    
-                                    # Update class stats
-                                    class_name = class_names.get(class_id, f"unknown_{class_id}")
-                                    if class_name not in stats['class_stats']:
-                                        stats['class_stats'][class_name] = 0
-                                    stats['class_stats'][class_name] += 1
-                except Exception as e:
-                    self.logger.warning(f"Error analyzing label {label_file}: {str(e)}")
+            # Check if sample is original or augmented
+            if 'augmented' in sample['image_path'].name:
+                stats['augmented'] += 1
+            else:
+                stats['original'] += 1
         
         return stats

@@ -11,11 +11,9 @@ import torch
 import yaml
 import gc
 import matplotlib.pyplot as plt
-from IPython.display import clear_output, HTML, display
 from contextlib import contextmanager
 from datetime import datetime
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Callable, Union, Tuple
+from typing import Dict, Any, Optional, List, Tuple
 
 @contextmanager
 def memory_manager():

@@ -30,7 +30,7 @@ config_manager = ConfigManager(
 )
 
 # Try to load existing config
-config = config_manager.load(
+config = config_manager.load_config(
     filename='experiment_config.yaml', 
     fallback_to_pickle=True, 
     use_defaults=True

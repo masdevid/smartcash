@@ -25,7 +25,7 @@ logger = get_logger("model_playground",
 
 # Setup config manager and load configuration
 config_manager = ConfigManager(logger=logger)
-config = config_manager.load()
+config = config_manager.load_config()
 
 # ===== 3. INITIALIZE MODEL HANDLER =====
 try:

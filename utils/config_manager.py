@@ -44,39 +44,39 @@ class ConfigManager:
         self.experiment_config_path = self.config_dir / 'experiment_config.yaml'
         self.pickle_path = self.base_dir / 'config.pkl'
     
-    def load(self, 
-            filename: Optional[str] = None, 
-            fallback_to_pickle: bool = True, 
-            use_defaults: bool = True) -> Dict[str, Any]:
+    def load_config(filename: Optional[str] = None,
+                fallback_to_pickle: bool = True,
+                default_config: Optional[Dict[str, Any]] = None,
+                logger: Optional[Any] = None) -> Dict[str, Any]:
         """
-        Load konfigurasi dari file dengan strategi fallback.
+        Muat konfigurasi dari file yaml atau pickle dengan prioritas yang jelas.
         
         Args:
-            filename: Path lengkap atau nama file konfigurasi (optional)
-            fallback_to_pickle: Menggunakan pickle sebagai backup jika file yaml tidak ditemukan
-            use_defaults: Menggunakan konfigurasi default jika tidak ada file atau pickle ditemukan
+            filename: Nama file konfigurasi (optional)
+            fallback_to_pickle: Flag untuk memuat dari pickle jika yaml tidak ada
+            default_config: Konfigurasi default jika tidak ada file yang ditemukan
+            logger: Optional logger untuk pesan log
             
         Returns:
             Dictionary konfigurasi
         """
-        # Reset config
-        self.config = {}
+        config = {}
         
         # Definisikan file yang akan dicoba dimuat
         files_to_try = []
-        
         if filename:
-            # Jika full path diberikan
+            # If a full path is provided
             if os.path.isabs(filename) or '/' in filename:
                 files_to_try.append(filename)
-            # Jika hanya nama file, tambahkan ke config_dir
             else:
-                files_to_try.append(str(self.config_dir / filename))
+                # If just a filename, append to configs directory
+                files_to_try.append(os.path.join('configs', filename))
         
-        # Tambahkan default paths
+        # Add default files to try
         files_to_try.extend([
-            str(self.experiment_config_path),
-            str(self.default_config_path)
+            'configs/experiment_config.yaml',
+            'configs/training_config.yaml',
+            'configs/base_config.yaml'
         ])
         
         # Coba memuat dari file yaml
@@ -84,23 +84,33 @@ class ConfigManager:
             try:
                 if os.path.exists(file_path):
                     with open(file_path, 'r') as f:
-                        self.config = yaml.safe_load(f)
-                    if self.logger:
-                        self.logger.info(f"📝 Konfigurasi dimuat dari {file_path}")
-                    break
+                        config = yaml.safe_load(f)
+                    if logger:
+                        logger.info(f"📝 Konfigurasi dimuat dari {file_path}")
+                    return config
             except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"⚠️ Gagal memuat konfigurasi dari {file_path}: {str(e)}")
+                if logger:
+                    logger.warning(f"⚠️ Gagal memuat konfigurasi dari {file_path}: {str(e)}")
         
-        # Fallback ke pickle jika diminta
-        if not self.config and fallback_to_pickle and os.path.exists(self.pickle_path):
+        # Coba memuat dari pickle jika fallback_to_pickle=True
+        if fallback_to_pickle and os.path.exists('config.pkl'):
             try:
-                with open(self.pickle_path, 'rb') as f:
-                    self.config = pickle.load(f)
-                if self.logger:
-                    self.logger.info(f"📝 Konfigurasi dimuat dari {self.pickle_path}")
+                with open('config.pkl', 'rb') as f:
+                    config = pickle.load(f)
+                if logger:
+                    logger.info("📝 Konfigurasi dimuat dari config.pkl")
+                return config
             except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"⚠️ Gagal memuat konfigurasi dari pickle: {str(e)}")
+                if logger:
+                    logger.warning(f"⚠️ Gagal memuat konfigurasi dari config.pkl: {str(e)}")
         
-        # Fallback ke default jika belum ada yang
+        # Gunakan konfigurasi default jika semua gagal
+        if default_config:
+            if logger:
+                logger.warning("⚠️ Menggunakan konfigurasi default")
+            return default_config
+        
+        # Jika tidak ada default_config dan semua gagal, kembalikan dictionary kosong
+        if logger:
+            logger.warning("⚠️ Tidak ada konfigurasi yang dimuat, mengembalikan dictionary kosong")
+        return {}

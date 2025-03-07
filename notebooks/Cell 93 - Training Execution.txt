@@ -27,7 +27,7 @@ logger = get_logger("training_execution",
 
 # Setup config manager and load configuration
 config_manager = ConfigManager(logger=logger)
-config = config_manager.load()
+config = config_manager.load_config()
 
 # ===== 3. LOAD TRAINING COMPONENTS =====
 try:

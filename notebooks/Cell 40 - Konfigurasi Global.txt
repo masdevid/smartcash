@@ -32,7 +32,7 @@ config_manager = ConfigManager(
 )
 
 # Try to load existing config or create default
-config = config_manager.load(use_defaults=True)
+config = config_manager.load_config(use_defaults=True)
 
 # ===== 3. SETUP LAYER CONFIG =====
 # Inisialisasi layer config manager

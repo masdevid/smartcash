@@ -13,8 +13,10 @@ from smartcash.handlers.ui_handlers.common_utils import (
     load_config,
     display_gpu_info,
     create_timestamp_filename,
-    plot_metrics
+    plot_metrics,
+    validate_ui_components
 )
+
 
 # Data handling handlers
 from smartcash.handlers.ui_handlers.data_handlers import (
@@ -162,7 +164,7 @@ from smartcash.handlers.ui_handlers.repository_handlers import (
 __all__ = [
     # Common utilities
     'memory_manager', 'is_colab', 'save_config', 'load_config',
-    'display_gpu_info', 'create_timestamp_filename', 'plot_metrics',
+    'display_gpu_info', 'create_timestamp_filename', 'plot_metrics', 'validate_ui_components',
     
     # Data handling
     'on_refresh_info_clicked', 'get_dataset_info', 'on_split_button_clicked',

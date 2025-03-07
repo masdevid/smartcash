@@ -9,10 +9,10 @@ import os
 import sys
 import shutil
 import subprocess
-from pathlib import Path
 from IPython.display import clear_output
-import ipywidgets as widgets
-from typing import Dict, Any, Optional, Tuple, Union, List
+from typing import Dict, Any, Optional, Tuple, List
+
+from handlers.ui_handlers.common_utils import validate_ui_components
 
 def run_subprocess_safely(
     command: List[str], 
@@ -61,17 +61,15 @@ def on_clone_button_clicked(ui_components: Dict[str, Any], logger: Optional[Any]
         ui_components: Dictionary berisi komponen UI dari create_repository_ui()
         logger: Optional logger untuk logging aktivitas
     """
-    # Extract required components
+    # Validate required UI components
     required_components = [
         'clone_button', 'repo_url_input', 'output_dir_input', 
         'branch_dropdown', 'install_deps_checkbox', 
         'status_indicator', 'error_area', 'output_area'
     ]
-    for component in required_components:
-        if component not in ui_components:
-            if logger:
-                logger.error(f"Missing UI component: {component}")
-            return
+    
+    if not validate_ui_components(ui_components, required_components, logger):
+        return
     
     # Disable tombol selama proses
     ui_components['clone_button'].disabled = True
@@ -176,13 +174,15 @@ def on_clone_button_clicked(ui_components: Dict[str, Any], logger: Optional[Any]
             else:
                 ui_components['status_indicator'].value = "<p>Status: <span style='color: green'>✅ Completed</span></p>"
             
+            pass
         except Exception as e:
-            error_message = f"❌ Error cloning repository: {str(e)}"
+            error_message = f"❌ Error: {str(e)}"
             print(error_message)
             ui_components['error_area'].value = f"<div style='color: #721c24; background-color: #f8d7da; padding: 10px; border-radius: 5px;'>{error_message}</div>"
             ui_components['error_area'].layout.display = 'block'
             ui_components['status_indicator'].value = "<p>Status: <span style='color: red'>Error</span></p>"
-        
+            if logger:
+                logger.error(error_message)
         finally:
             # Re-enable button
             ui_components['clone_button'].disabled = False

@@ -244,7 +244,7 @@ def on_pipeline_reload_button_clicked(b, ui_components, config_manager, logger):
         
         try:
             # Reload configuration using ConfigManager
-            config = config_manager.load('experiment_config.yaml')
+            config = config_manager.load_config('experiment_config.yaml')
             
             # Update UI from loaded config
             if config:

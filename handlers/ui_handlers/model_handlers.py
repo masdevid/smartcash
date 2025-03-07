@@ -4,7 +4,6 @@ Author: Alfrida Sabar
 Deskripsi: Handler untuk interaksi UI komponen model, menangani logika untuk inisialisasi, visualisasi, 
            manajemen checkpoint, dan optimasi model. Memperbaiki missing imports dan menyeragamkan device handling.
 """
-
 import os
 import time
 import gc

@@ -24,6 +24,15 @@ def on_test_model_button_clicked(ui_components, model_handler, config, logger, d
         logger: Logger untuk mencatat aktivitas
         device: Device untuk menjalankan model (cuda atau cpu)
     """
+    # Validate UI components
+    required_components = ['test_model_button', 'output', 'backbone_selector', 
+                           'detection_mode_selector', 'img_size_slider', 'pretrained_checkbox']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     # Update tombol ke status loading
     ui_components['test_model_button'].description = "Memproses..."
     ui_components['test_model_button'].disabled = True
@@ -217,12 +226,21 @@ def setup_model_playground_handlers(ui_components, model_handler, config, logger
     Returns:
         Dictionary updated UI components dengan handlers yang sudah di-attach
     """
+    # Validate UI components
+    required_components = ['test_model_button', 'output', 'backbone_selector', 
+                         'detection_mode_selector', 'img_size_slider', 'pretrained_checkbox']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Gunakan GPU jika tersedia
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Setup handler untuk tombol test
     ui_components['test_model_button'].on_click(
-        lambda b: on_test_model_button_clicked(ui_components, model_handler, config, logger, device)
+        lambda button: on_test_model_button_clicked(ui_components, model_handler, config, logger, device)
     )
     
     return ui_components

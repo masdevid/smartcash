@@ -10,8 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-import os  # Added for handling paths
-import ipywidgets as widgets  # Added for widget references
+import os
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
 from contextlib import contextmanager
@@ -36,6 +35,10 @@ def init_ui(ui_components, checkpoint_handler):
         ui_components: Dictionary komponen UI dari create_evaluation_ui()
         checkpoint_handler: Instance dari CheckpointHandler
     """
+    # Validate required UI components
+    if 'model_dropdown' not in ui_components:
+        return
+        
     # Load available checkpoints
     if checkpoint_handler:
         checkpoints = checkpoint_handler.list_checkpoints()
@@ -84,14 +87,14 @@ def evaluate_model(model_path=None, test_dataset=None, conf_threshold=0.25,
         with memory_manager():
             # Jika tidak ada evaluation handler, coba buat baru
             if evaluation_handler is None:
-                from smartcash.handlers.evaluation_handler import EvaluationHandler
-                evaluation_handler = EvaluationHandler(
-                    config=config,
-                    logger=logger
-                )
+                if logger:
+                    logger.warning("⚠️ Evaluation handler tidak tersedia")
+                return None
             
             # Jalankan evaluasi
-            logger.info(f"🔍 Mengevaluasi model dari {model_path}")
+            if logger:
+                logger.info(f"🔍 Mengevaluasi model dari {model_path}")
+            
             results = evaluation_handler.evaluate(
                 eval_type='regular',
                 model_path=model_path,
@@ -101,7 +104,8 @@ def evaluate_model(model_path=None, test_dataset=None, conf_threshold=0.25,
             
             return results
     except Exception as e:
-        logger.error(f"❌ Error saat evaluasi model: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error saat evaluasi model: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
@@ -123,12 +127,20 @@ def evaluate_multiple_runs(model_path=None, test_dataset=None, num_runs=3, conf_
     Returns:
         Dict hasil evaluasi rata-rata
     """
+    if evaluation_handler is None:
+        if logger:
+            logger.warning("⚠️ Evaluation handler tidak tersedia")
+        return None
+        
     try:
-        logger.info(f"🔄 Menjalankan {num_runs} kali evaluasi untuk konsistensi")
+        if logger:
+            logger.info(f"🔄 Menjalankan {num_runs} kali evaluasi untuk konsistensi")
         
         all_results = []
         for i in range(num_runs):
-            logger.info(f"🔍 Run {i+1}/{num_runs}")
+            if logger:
+                logger.info(f"🔍 Run {i+1}/{num_runs}")
+            
             result = evaluate_model(
                 model_path=model_path, 
                 test_dataset=test_dataset, 
@@ -137,11 +149,13 @@ def evaluate_multiple_runs(model_path=None, test_dataset=None, num_runs=3, conf_
                 config=config,
                 logger=logger
             )
+            
             if result:
                 all_results.append(result)
         
         if not all_results:
-            logger.error("❌ Semua run evaluasi gagal")
+            if logger:
+                logger.error("❌ Semua run evaluasi gagal")
             return None
             
         # Agregasi hasil
@@ -177,11 +191,14 @@ def evaluate_multiple_runs(model_path=None, test_dataset=None, num_runs=3, conf_
         if 'sample_detections' in all_results[-1]:
             aggregated_result['sample_detections'] = all_results[-1]['sample_detections']
         
-        logger.success(f"✅ Berhasil mengagregasi hasil dari {len(all_results)} run")
+        if logger:
+            logger.success(f"✅ Berhasil mengagregasi hasil dari {len(all_results)} run")
+            
         return aggregated_result
         
     except Exception as e:
-        logger.error(f"❌ Error saat menjalankan multiple evaluasi: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error saat menjalankan multiple evaluasi: {str(e)}")
         import traceback
         traceback.print_exc()
         return None
@@ -435,6 +452,16 @@ def on_run_evaluation_button_clicked(ui_components, evaluation_handler, checkpoi
         config: Dictionary konfigurasi
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate required UI components
+    required_components = ['model_dropdown', 'dataset_dropdown', 'conf_threshold_slider',
+                          'num_runs_slider', 'confusion_matrix_checkbox',
+                          'class_metrics_checkbox', 'run_evaluation_button', 'evaluation_output']
+                          
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     with ui_components['evaluation_output']:
         clear_output()
         
@@ -517,6 +544,14 @@ def setup_evaluation_handlers(ui_components, evaluation_handler, checkpoint_hand
     Returns:
         Dictionary updated UI components dengan handlers yang sudah di-attach
     """
+    # Validate required UI components
+    required_components = ['model_dropdown', 'dataset_dropdown', 'run_evaluation_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found in evaluation UI")
+            return ui_components
+    
     # Initialize UI with model list
     init_ui(ui_components, checkpoint_handler)
     

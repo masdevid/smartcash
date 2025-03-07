@@ -1,58 +1,64 @@
-# Cell 83: Model Playground (refactored) - Untuk mencoba model secara interaktif
+# Cell 83 - Model Playground (refactored)
 
-import torch
-import gc
-import pickle
-from IPython.display import display
-
+# ===== 1. IMPORT MODULES =====
 # Import UI components dan handlers
 from smartcash.ui_components.model_playground_components import create_model_playground_ui
 from smartcash.handlers.ui_handlers.model_playground_handlers import setup_model_playground_handlers
 
-# ===== 1. LOAD MODEL HANDLER & CONFIG =====
-# Memuat model_handler dan config dari cell sebelumnya jika tersedia, jika tidak, buat baru
-try:
-    # Load config
-    with open('config.pkl', 'rb') as f:
-        config = pickle.load(f)
-        
-    # Setup logger
-    from smartcash.utils.logger import get_logger
-    logger = get_logger("model_playground", log_to_console=True)
-    
-    # Cek apakah model_handler sudah ada
-    if 'model_handler' not in globals():
-        # Initialize model handler
-        from smartcash.handlers.model_handler import ModelHandler
-        model_handler = ModelHandler(config=config, logger=logger)
-        print("✅ Model handler berhasil dibuat")
-except Exception as e:
-    print(f"❌ Gagal memuat komponen: {str(e)}")
-    # Jika tidak ada komponen yang tersedia, buat placeholder untuk UI demo
-    config = {'model': {'backbone': 'efficientnet'}, 'layers': ['banknote']}
-    model_handler = None
-    logger = None
+# Import centralized managers
+from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.logger import get_logger
+from smartcash.utils.environment_manager import EnvironmentManager
 
-# ===== 2. BUAT DAN SETUP UI =====
-# Buat UI components
+# Import model handlers
+from smartcash.handlers.model_handler import ModelHandler
+
+# ===== 2. INITIALIZE MANAGERS =====
+# Setup environment manager
+env_manager = EnvironmentManager()
+
+# Setup logger with environment context
+logger = get_logger("model_playground", 
+                  log_to_console=True, 
+                  log_to_file=True, 
+                  log_to_colab=env_manager.is_colab)
+
+# Setup config manager and load configuration
+config_manager = ConfigManager(logger=logger)
+config = config_manager.load()
+
+# ===== 3. INITIALIZE MODEL HANDLER =====
+try:
+    # Check if model_handler is available from previous cells
+    if 'model_handler' in globals():
+        logger.info("✅ Menggunakan model_handler yang sudah diinisialisasi")
+    else:
+        # Create model handler with loaded configuration
+        model_handler = ModelHandler(
+            config=config,
+            num_classes=config.get('model', {}).get('num_classes', 17),
+            logger=logger
+        )
+        logger.info("✅ Model handler berhasil diinisialisasi")
+except Exception as e:
+    logger.error(f"❌ Error saat inisialisasi model handler: {str(e)}")
+    raise
+
+# ===== 4. CREATE AND SETUP UI =====
+# Create UI components
 ui_components = create_model_playground_ui()
 
-# Setup handlers jika model_handler tersedia
-if model_handler and logger:
-    setup_model_playground_handlers(
-        ui_components=ui_components,
-        model_handler=model_handler,
-        config=config,
-        logger=logger
-    )
-else:
-    print("⚠️ Model handler tidak tersedia. UI akan ditampilkan tapi fungsi tidak akan berjalan.")
+# Setup handlers with validation
+ui_components = setup_model_playground_handlers(
+    ui_components=ui_components, 
+    model_handler=model_handler, 
+    config=config, 
+    logger=logger
+)
 
-# ===== 3. TAMPILKAN UI =====
-# Tampilkan UI
+# ===== 5. DISPLAY UI =====
+# Display the UI
 display(ui_components['ui'])
 
-# ===== 4. CLEANUP =====
-# Bersihkan memori yang tidak digunakan
-gc.collect()
-torch.cuda.empty_cache() if torch.cuda.is_available() else None
+# Log completion
+logger.info("✅ UI Model Playground berhasil diinisialisasi")

@@ -21,6 +21,15 @@ def on_augment_button_clicked(ui_components, aug_manager, data_manager, logger):
         data_manager: Instance dari DataManager
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    required_components = ['augment_button', 'output', 'split_selection', 
+                          'augmentation_type', 'num_workers_slider', 'num_variations_slider']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     # Disable tombol selama proses
     ui_components['augment_button'].disabled = True
     ui_components['augment_button'].description = "Memproses..."
@@ -115,6 +124,14 @@ def on_clean_button_clicked(ui_components, aug_manager, data_manager, logger):
         data_manager: Instance dari DataManager
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    required_components = ['clean_button', 'output', 'split_selection']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     # Disable tombol selama proses
     ui_components['clean_button'].disabled = True
     ui_components['clean_button'].description = "Membersihkan..."
@@ -242,14 +259,23 @@ def setup_augmentation_handlers(ui_components, aug_manager, data_manager, logger
     Returns:
         Dictionary updated UI components dengan handlers yang sudah di-attach
     """
+    # Validate UI components
+    required_components = ['augment_button', 'clean_button', 'output', 'split_selection', 
+                         'augmentation_type', 'num_workers_slider', 'num_variations_slider']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Setup handler untuk tombol augmentasi
     ui_components['augment_button'].on_click(
-        lambda b: on_augment_button_clicked(ui_components, aug_manager, data_manager, logger)
+        lambda button: on_augment_button_clicked(ui_components, aug_manager, data_manager, logger)
     )
     
     # Setup handler untuk tombol clean
     ui_components['clean_button'].on_click(
-        lambda b: on_clean_button_clicked(ui_components, aug_manager, data_manager, logger)
+        lambda button: on_clean_button_clicked(ui_components, aug_manager, data_manager, logger)
     )
     
     return ui_components

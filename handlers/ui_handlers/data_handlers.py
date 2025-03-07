@@ -159,11 +159,24 @@ def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
     Handler untuk tombol split dataset.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_split_dataset_ui()
         data_manager: Instance dari DataManager
         preprocessor: Instance dari UnifiedPreprocessingHandler
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'split_button' not in ui_components:
+        logger.error("❌ UI component 'split_button' not found")
+        return
+    
+    if 'split_status_output' not in ui_components:
+        logger.error("❌ UI component 'split_status_output' not found")
+        return
+    
+    if 'train_ratio_slider' not in ui_components or 'valid_ratio_slider' not in ui_components or 'test_ratio_slider' not in ui_components:
+        logger.error("❌ Required slider UI components not found")
+        return
+    
     # Disable tombol selama proses
     ui_components['split_button'].disabled = True
     ui_components['split_button'].description = "Memproses..."
@@ -218,8 +231,21 @@ def update_total_ratio(ui_components):
     Handler untuk update tampilan total ratio saat slider berubah.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_split_dataset_ui()
     """
+    # Validate UI components
+    if 'train_ratio_slider' not in ui_components or 'valid_ratio_slider' not in ui_components or 'test_ratio_slider' not in ui_components:
+        print("❌ Required ratio slider UI components not found")
+        return
+    
+    if 'total_ratio_text' not in ui_components:
+        print("❌ UI component 'total_ratio_text' not found")
+        return
+    
+    if 'split_button' not in ui_components:
+        print("❌ UI component 'split_button' not found")
+        return
+    
     train = ui_components['train_ratio_slider'].value
     valid = ui_components['valid_ratio_slider'].value
     test = ui_components['test_ratio_slider'].value
@@ -338,16 +364,21 @@ def setup_dataset_info_handlers(ui_components, data_manager, logger):
     Setup handler untuk komponen UI informasi dataset.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_dataset_info_ui()
         data_manager: Instance dari DataManager
         logger: Logger untuk mencatat aktivitas
         
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate UI components
+    if 'refresh_info_button' not in ui_components:
+        logger.error("❌ UI component 'refresh_info_button' not found")
+        return ui_components
+    
     # Bind event handler untuk tombol refresh
     ui_components['refresh_info_button'].on_click(
-        lambda b: on_refresh_info_clicked(ui_components, data_manager, logger)
+        lambda button: on_refresh_info_clicked(ui_components, data_manager, logger)
     )
     
     return ui_components
@@ -357,7 +388,7 @@ def setup_split_dataset_handlers(ui_components, data_manager, preprocessor, logg
     Setup handler untuk komponen UI split dataset.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_split_dataset_ui()
         data_manager: Instance dari DataManager
         preprocessor: Instance dari UnifiedPreprocessingHandler
         logger: Logger untuk mencatat aktivitas
@@ -365,15 +396,24 @@ def setup_split_dataset_handlers(ui_components, data_manager, preprocessor, logg
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate UI components
+    required_components = ['train_ratio_slider', 'valid_ratio_slider', 'test_ratio_slider', 
+                          'total_ratio_text', 'split_button', 'split_status_output']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handlers untuk slider
     ui_components['train_ratio_slider'].observe(
-        lambda _: update_total_ratio(ui_components), names='value'
+        lambda change: update_total_ratio(ui_components), names='value'
     )
     ui_components['valid_ratio_slider'].observe(
-        lambda _: update_total_ratio(ui_components), names='value'
+        lambda change: update_total_ratio(ui_components), names='value'
     )
     ui_components['test_ratio_slider'].observe(
-        lambda _: update_total_ratio(ui_components), names='value'
+        lambda change: update_total_ratio(ui_components), names='value'
     )
     
     # Panggil sekali untuk update nilai awal
@@ -381,7 +421,7 @@ def setup_split_dataset_handlers(ui_components, data_manager, preprocessor, logg
     
     # Bind event handler untuk tombol split
     ui_components['split_button'].on_click(
-        lambda b: on_split_button_clicked(ui_components, data_manager, preprocessor, logger)
+        lambda button: on_split_button_clicked(ui_components, data_manager, preprocessor, logger)
     )
     
     return ui_components

@@ -1,103 +1,27 @@
-# Cell 91: Training Pipeline (refactored)
-
+# Cell 91 - Training Pipeline
+from smartcash.ui_components.training_components import create_training_pipeline_ui
+from smartcash.utils.simple_logger import SimpleLogger
+import yaml
+import pickle
 import os
-import sys
-import gc
-import torch
-from pathlib import Path
 
-# Pastikan path diatur dengan benar
-if os.getcwd() not in sys.path:
-    sys.path.append(os.getcwd())
+# Load config
+config_path = 'configs/experiment_config.yaml'
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+else:
+    config = {'model': {'backbone': 'efficientnet'}}  # Default config
 
-# Pastikan direktori output ada
-os.makedirs("runs/train", exist_ok=True)
-os.makedirs("runs/train/weights", exist_ok=True)
-os.makedirs("logs", exist_ok=True)
+# Create Logger
+logger = SimpleLogger()
 
-# Import modul-modul yang diperlukan
-try:
-    from smartcash.utils.logger import get_logger, SmartCashLogger
-    from smartcash.ui_components.training_components import create_training_pipeline_ui
-    from smartcash.handlers.ui_handlers.training_handlers import setup_training_pipeline_handlers
-    
-    # Setup logger
-    logger = get_logger("training_manager", log_to_console=True, log_to_file=True, log_to_colab=True)
-    logger.info("✅ Modul training berhasil diimport")
-except Exception as e:
-    print(f"❌ Error saat import modul training: {str(e)}")
-    import traceback
-    traceback.print_exc()
-    
-    # Fallback ke logger standard
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    logger = logging.getLogger("training_manager")
-
-# Memuat konfigurasi
-try:
-    import yaml
-    import pickle
-    
-    config_files = [
-        'config.pkl',                  # Pickle dari cell sebelumnya
-        'configs/training_config.yaml',  # YAML dari sistem file
-        'configs/base_config.yaml',     # Fallback default
-    ]
-    
-    for config_file in config_files:
-        try:
-            if config_file.endswith('.pkl'):
-                with open(config_file, 'rb') as f:
-                    config = pickle.load(f)
-            else:
-                with open(config_file, 'r') as f:
-                    config = yaml.safe_load(f)
-                    
-            logger.success(f"✅ Konfigurasi dimuat dari {config_file}")
-            break
-        except Exception as e:
-            logger.warning(f"⚠️ Tidak dapat memuat {config_file}: {str(e)}")
-    
-    # Jika semua metode gagal, gunakan default minimal
-    if 'config' not in locals():
-        logger.warning("⚠️ Menggunakan konfigurasi default minimal")
-        config = {
-            'model': {
-                'backbone': 'efficientnet',
-                'num_classes': 17,
-                'img_size': [640, 640],
-                'batch_size': 16,
-                'workers': 4
-            },
-            'training': {
-                'epochs': 30,
-                'learning_rate': 0.001,
-                'optimizer': 'adam',
-                'batch_size': 16,
-                'early_stopping_patience': 5
-            },
-            'layers': ['banknote', 'nominal', 'security'],
-            'output_dir': 'runs/train'
-        }
-except Exception as e:
-    logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
-    config = {
-        'model': {'backbone': 'efficientnet', 'batch_size': 16},
-        'training': {'epochs': 30, 'batch_size': 16},
-        'layers': ['banknote'],
-        'output_dir': 'runs/train'
-    }
-
-# Buat UI komponen
+# Create UI components
 ui_components = create_training_pipeline_ui()
 
-# Setup handlers untuk komponen UI
-components = setup_training_pipeline_handlers(ui_components, config, logger)
+# Setup handler dengan parameter yang konsisten
+from smartcash.handlers.ui_handlers.training_pipeline_handlers import setup_training_pipeline_handlers
+components_dict = setup_training_pipeline_handlers(ui_components, config, logger)  # components_dict jelas sebagai dictionary
 
-# Tampilkan UI
-from IPython.display import display
+# Display UI
 display(ui_components['ui'])

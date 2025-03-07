@@ -1,99 +1,72 @@
 # Cell 50 - Konfigurasi Pipeline (refactored)
 
-import os
-import yaml
+# ===== 1. IMPORT MODULES =====
 import torch
 from IPython.display import display
 
-from smartcash.utils.logger import SmartCashLogger, get_logger
+# Import UI components dan handlers
 from smartcash.ui_components.config_components import create_pipeline_config_ui
 from smartcash.handlers.ui_handlers.config_handlers import setup_pipeline_config_handlers
 
-# Cek apakah kita berada di Google Colab
-is_colab = False
-try:
-    from google.colab import userdata
-    is_colab = True
-    # Cek apakah API key sudah tersedia di secret
-    api_key_exists = userdata.get('ROBOFLOW_API_KEY') is not None
-except ImportError:
-    api_key_exists = False
+# Import centralized managers
+from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.logger import get_logger
+from smartcash.utils.environment_manager import EnvironmentManager
 
-# Setup logger
-logger = get_logger("pipeline_config", log_to_console=True, log_to_file=True, log_to_colab=is_colab)
+# ===== 2. INITIALIZE MANAGERS =====
+# Setup environment manager
+env_manager = EnvironmentManager()
 
-# Load atau buat konfigurasi
-try:
-    if os.path.exists('configs/experiment_config.yaml'):
-        with open('configs/experiment_config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-            logger.info("📝 Konfigurasi dimuat dari experiment_config.yaml")
-    elif os.path.exists('configs/base_config.yaml'):
-        with open('configs/base_config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-            logger.info("📝 Konfigurasi dimuat dari base_config.yaml")
-    else:
-        # Buat konfigurasi default
-        config = {
-            'model': {
-                'backbone': 'efficientnet',
-                'img_size': [640, 640],
-                'batch_size': 16,
-                'workers': 2
-            },
-            'training': {
-                'batch_size': 16,
-                'epochs': 30,
-                'learning_rate': 0.001,
-                'optimizer': 'adam'
-            },
-            'data': {
-                'source': 'roboflow',
-                'roboflow': {
-                    'workspace': '',
-                    'project': '',
-                    'version': 3
-                },
-                'local': {
-                    'train': 'data/train',
-                    'valid': 'data/valid',
-                    'test': 'data/test'
-                }
-            },
-            'detection_mode': 'single',
-            'layers': ['banknote']
-        }
-        logger.info("📝 Konfigurasi default dibuat")
-        
-        # Buat direktori configs jika belum ada
-        os.makedirs('configs', exist_ok=True)
-    
-except Exception as e:
-    logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
-    # Fallback ke konfigurasi minimal
-    config = {
-        'model': {'backbone': 'efficientnet'},
-        'training': {'batch_size': 16, 'epochs': 30, 'learning_rate': 0.001},
-        'data': {'source': 'roboflow', 'roboflow': {}},
-        'detection_mode': 'single',
-        'layers': ['banknote']
-    }
+# Setup logger with environment context
+logger = get_logger("pipeline_config", 
+                   log_to_console=True, 
+                   log_to_file=True, 
+                   log_to_colab=env_manager.is_colab)
 
-# Buat UI komponen
+# Setup config manager and load configuration
+config_manager = ConfigManager(
+    base_dir=str(env_manager.base_dir),
+    logger=logger
+)
+
+# Try to load existing config
+config = config_manager.load(
+    filename='experiment_config.yaml', 
+    fallback_to_pickle=True, 
+    use_defaults=True
+)
+
+# ===== 3. API KEY DETECTION =====
+# Cek apakah API key tersedia jika di Colab
+api_key_exists = False
+if env_manager.is_colab:
+    try:
+        from google.colab import userdata
+        api_key = userdata.get('ROBOFLOW_API_KEY')
+        if api_key:
+            api_key_exists = True
+            config_manager.set('data.roboflow.api_key', api_key)
+            logger.info("🔑 Roboflow API key terdeteksi")
+    except Exception as e:
+        logger.warning(f"⚠️ Tidak dapat mengakses userdata Colab: {e}")
+
+# ===== 4. CREATE AND SETUP UI =====
+# Buat UI components
 ui_components = create_pipeline_config_ui(
-    config=config,
-    is_colab=is_colab,
+    config=config_manager.config,
+    is_colab=env_manager.is_colab,
     api_key_exists=api_key_exists
 )
 
 # Setup handler dengan dukungan Google Colab
 setup_pipeline_config_handlers(
     ui_components=ui_components,
-    config=config,
+    config=config_manager,
     logger=logger,
-    from_google_colab=is_colab
+    from_google_colab=env_manager.is_colab
 )
 
+# ===== 5. DISPLAY UI =====
 # Tampilkan UI
 display(ui_components['ui'])
 

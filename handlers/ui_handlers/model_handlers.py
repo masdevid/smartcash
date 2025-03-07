@@ -14,7 +14,7 @@ import pandas as pd
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Callable
 
 @contextmanager
 def memory_manager():
@@ -56,6 +56,15 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
         config: Dictionary konfigurasi
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    required_components = ['initialize_button', 'output_area', 'backbone_dropdown', 
+                         'detection_mode_dropdown', 'img_size_slider', 'pretrained_checkbox']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     ui_components['initialize_button'].disabled = True
     ui_components['initialize_button'].description = "Menginisialisasi..."
     
@@ -141,6 +150,15 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
         config: Dictionary konfigurasi
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    required_components = ['create_model_button', 'visualization_output', 'backbone_select',
+                         'mode_select', 'viz_module_select']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     ui_components['create_model_button'].disabled = True
     ui_components['create_model_button'].description = "Memproses..."
     
@@ -257,6 +275,11 @@ def on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger):
         checkpoint_handler: Instance dari CheckpointHandler
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'checkpoints_output' not in ui_components:
+        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        return
+    
     with ui_components['checkpoints_output']:
         clear_output()
         
@@ -334,6 +357,11 @@ def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
         checkpoint_handler: Instance dari CheckpointHandler
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'checkpoints_output' not in ui_components:
+        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        return
+    
     with ui_components['checkpoints_output']:
         clear_output()
         
@@ -398,6 +426,11 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
         model_handler: Instance dari ModelHandler
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'checkpoints_output' not in ui_components:
+        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        return
+    
     with ui_components['checkpoints_output']:
         clear_output()
         
@@ -564,6 +597,11 @@ def on_mount_drive_clicked(ui_components, logger):
         ui_components: Dictionary komponen UI dari create_checkpoint_manager_ui()
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'mount_drive_button' not in ui_components:
+        logger.error("❌ Required UI component 'mount_drive_button' not found")
+        return
+    
     ui_components['mount_drive_button'].disabled = True
     
     try:
@@ -595,6 +633,11 @@ def on_check_memory_clicked(ui_components, memory_optimizer, logger):
         memory_optimizer: Instance dari MemoryOptimizer
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'memory_output' not in ui_components:
+        logger.error("❌ Required UI component 'memory_output' not found")
+        return
+    
     with ui_components['memory_output']:
         clear_output()
         
@@ -656,6 +699,11 @@ def on_clear_memory_clicked(ui_components, memory_optimizer, logger):
         memory_optimizer: Instance dari MemoryOptimizer
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'memory_output' not in ui_components:
+        logger.error("❌ Required UI component 'memory_output' not found")
+        return
+    
     with ui_components['memory_output']:
         clear_output()
         
@@ -714,6 +762,11 @@ def on_optimize_batch_size_clicked(ui_components, memory_optimizer, logger):
         memory_optimizer: Instance dari MemoryOptimizer
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'memory_output' not in ui_components:
+        logger.error("❌ Required UI component 'memory_output' not found")
+        return
+    
     with ui_components['memory_output']:
         clear_output()
         
@@ -772,6 +825,11 @@ def on_clear_cache_clicked(ui_components, cache, logger):
         cache: Instance dari EnhancedCache
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'memory_output' not in ui_components:
+        logger.error("❌ Required UI component 'memory_output' not found")
+        return
+    
     with ui_components['memory_output']:
         clear_output()
         
@@ -823,6 +881,11 @@ def on_verify_cache_clicked(ui_components, cache, logger):
         cache: Instance dari EnhancedCache
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'memory_output' not in ui_components:
+        logger.error("❌ Required UI component 'memory_output' not found")
+        return
+    
     with ui_components['memory_output']:
         clear_output()
         
@@ -902,6 +965,12 @@ def on_export_format_change(change, ui_components):
         change: Change event dari dropdown
         ui_components: Dictionary komponen UI dari create_model_exporter_ui()
     """
+    # Validate UI components
+    required_components = ['onnx_opset_selector', 'optimize_checkbox']
+    for component in required_components:
+        if component not in ui_components:
+            return
+    
     if change['new'] == 'onnx':
         ui_components['onnx_opset_selector'].disabled = False
         ui_components['optimize_checkbox'].disabled = True
@@ -918,6 +987,15 @@ def on_export_button_clicked(ui_components, model_exporter, logger):
         model_exporter: Instance dari ModelExporter
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    required_components = ['export_button', 'export_output', 'export_format_selector',
+                         'optimize_checkbox', 'copy_to_drive_checkbox']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return
+    
     # Update tombol
     ui_components['export_button'].description = "Memproses..."
     ui_components['export_button'].disabled = True
@@ -927,16 +1005,24 @@ def on_export_button_clicked(ui_components, model_exporter, logger):
         
         try:
             # Jalankan ekspor berdasarkan format yang dipilih
-            if ui_components['export_format_selector'].value == 'torchscript':
+            export_format = ui_components['export_format_selector'].value
+            
+            if export_format == 'torchscript':
                 export_path = model_exporter.export_to_torchscript(
                     optimize=ui_components['optimize_checkbox'].value
                 )
-            elif ui_components['export_format_selector'].value == 'onnx':
+            elif export_format == 'onnx':
+                # Check if onnx_opset_selector exists and is enabled
+                if 'onnx_opset_selector' in ui_components and not ui_components['onnx_opset_selector'].disabled:
+                    opset_version = ui_components['onnx_opset_selector'].value
+                else:
+                    opset_version = 12  # Default
+                
                 export_path = model_exporter.export_to_onnx(
-                    opset_version=ui_components['onnx_opset_selector'].value
+                    opset_version=opset_version
                 )
             else:
-                print(f"❌ Format ekspor tidak valid: {ui_components['export_format_selector'].value}")
+                print(f"❌ Format ekspor tidak valid: {export_format}")
                 return
             
             # Cek hasil ekspor
@@ -947,7 +1033,7 @@ def on_export_button_clicked(ui_components, model_exporter, logger):
                 print(f"\n✅ Model berhasil diekspor:")
                 print(f"📁 Path: {export_path}")
                 print(f"📊 Ukuran: {file_size:.2f} MB")
-                print(f"🔄 Format: {ui_components['export_format_selector'].value}")
+                print(f"🔄 Format: {export_format}")
                 print(f"🕒 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
                 
                 # Salin ke Drive jika diminta
@@ -982,6 +1068,14 @@ def setup_model_initialization_handlers(ui_components, model_handler, config, lo
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate required components
+    required_components = ['initialize_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handler untuk tombol inisialisasi
     ui_components['initialize_button'].on_click(
         lambda b: on_initialize_model_clicked(ui_components, model_handler, config, logger)
@@ -1002,6 +1096,14 @@ def setup_model_visualizer_handlers(ui_components, model_handler, config, logger
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate required components
+    required_components = ['create_model_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handler untuk tombol visualisasi
     ui_components['create_model_button'].on_click(
         lambda b: on_visualize_model_clicked(ui_components, model_handler, config, logger)
@@ -1022,6 +1124,14 @@ def setup_checkpoint_manager_handlers(ui_components, checkpoint_handler, model_h
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate required components
+    required_components = ['list_checkpoints_button', 'cleanup_checkpoints_button', 'compare_button', 'mount_drive_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handler untuk tombol daftar checkpoint
     ui_components['list_checkpoints_button'].on_click(
         lambda b: on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger)
@@ -1070,6 +1180,15 @@ def setup_model_optimization_handlers(ui_components, memory_optimizer, cache, lo
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate required components
+    required_components = ['check_memory_button', 'clear_memory_button', 'optimize_button',
+                         'clear_cache_button', 'verify_cache_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handler untuk tombol cek memori
     ui_components['check_memory_button'].on_click(
         lambda b: on_check_memory_clicked(ui_components, memory_optimizer, logger)
@@ -1109,6 +1228,14 @@ def setup_model_exporter_handlers(ui_components, model_exporter, logger):
     Returns:
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
+    # Validate required components
+    required_components = ['export_format_selector', 'export_button']
+    
+    for component in required_components:
+        if component not in ui_components:
+            logger.error(f"❌ Required UI component '{component}' not found")
+            return ui_components
+    
     # Bind event handler untuk perubahan format
     ui_components['export_format_selector'].observe(
         lambda change: on_export_format_change(change, ui_components), 
@@ -1121,6 +1248,7 @@ def setup_model_exporter_handlers(ui_components, model_exporter, logger):
     )
     
     # Set status awal copy_to_drive_checkbox berdasarkan ketersediaan Google Drive
-    ui_components['copy_to_drive_checkbox'].disabled = not os.path.exists("/content/drive")
+    if 'copy_to_drive_checkbox' in ui_components:
+        ui_components['copy_to_drive_checkbox'].disabled = not os.path.exists("/content/drive")
     
     return ui_components

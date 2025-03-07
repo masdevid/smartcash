@@ -1,0 +1,115 @@
+smartcash/
+├── app.py                         # File aplikasi utama
+├── cli.py                         # Command line interface
+├── configs/                       # Konfigurasi aplikasi
+├── data/                         # Data mentah
+├── docs/                        # Dokumentasi
+├── exceptions/                   # Custom exceptions
+│   ├── base.py                  # Exception dasar
+│   └── handler.py               # Handler exception
+├── handlers/                    # Handler untuk berbagai proses
+│   ├── ui_handlers/            # Handler khusus untuk UI
+│   │   ├── augmentation_handlers.py
+│   │   ├── common_utils.py
+│   │   ├── config_handlers.py
+│   │   ├── data_handlers.py
+│   │   ├── dataset_handlers.py
+│   │   ├── directory_handlers.py
+│   │   ├── evaluation_handlers.py
+│   │   ├── model_handlers.py
+│   │   ├── model_playground_handlers.py
+│   │   ├── repository_handlers.py
+│   │   ├── research_handlers.py
+│   │   ├── training_config_handlers.py
+│   │   ├── training_execution_handlers.py
+│   │   └── training_pipeline_handlers.py
+│   ├── backbone_handler.py
+│   ├── base_evaluation_handler.py
+│   ├── checkpoint_handler.py
+│   ├── data_manager.py
+│   ├── dataset_cleanup.py
+│   ├── detection_handler.py
+│   ├── evaluation_handler.py
+│   ├── evaluator.py
+│   ├── model_handler.py
+│   ├── multilayer_dataset_handler.py
+│   ├── multilayer_handler.py
+│   ├── research_scenario_handler.py
+│   ├── roboflow_handler.py
+│   └── unified-preprocessing.py
+├── models/                      # Model-model deep learning
+│   ├── backbones/              # Arsitektur backbone
+│   │   ├── base.py
+│   │   ├── cspdarknet.py
+│   │   └── efficientnet.py
+│   ├── necks/                  # Arsitektur neck
+│   ├── baseline.py
+│   ├── detection_head.py
+│   ├── losses.py
+│   └── yolov5_model.py
+├── notebooks/                   # Notebook eksperimen dan penelitian
+│   ├── Cell 11 - Instalasi Paket.txt
+│   ├── Cell 12 - Cek Instalasi.txt
+│   ├── Cell 20 - Clone Repository.txt
+│   ├── Cell 30 - Setup Direktori.txt
+│   ├── Cell 40 - Konfigurasi Global.txt
+│   ├── Cell 50 - Konfigurasi Pipeline.txt
+│   ├── Cell 60 - Dataset.txt
+│   ├── Cell 71 - Inisialisasi Data Handling.txt
+│   ├── Cell 72 - Informasi Dataset.txt
+│   ├── Cell 73 - Augmentasi Data.txt
+│   ├── Cell 74 - Split Dataset.txt
+│   ├── Cell 75 - Fungsi Utilitas_Data.txt
+│   ├── Cell 81 - Model Initialization.txt
+│   ├── Cell 82 - Model Visualizer.txt
+│   ├── Cell 83 - Model Playground.txt
+│   ├── Cell 84 - Model Checkpoints.txt
+│   ├── Cell 85 - Model Optimization.txt
+│   ├── Cell 86 - Model Exporter.txt
+│   ├── Cell 91 - Training Pipeline.txt
+│   ├── Cell 92 - Training Configuration.txt
+│   ├── Cell 93 - Training Execution.txt
+│   ├── Cell 94 - Model Evaluation.txt
+│   └── Cell 95 - Research Evaluation.txt
+├── pretrained/                  # Model pre-trained
+├── requirements.txt             # Dependensi python
+├── runs/                       # Output training
+├── tests/                      # Unit tests
+├── ui_components/              # Komponen UI
+│   ├── augmentation_components.py
+│   ├── config_components.py
+│   ├── data_components.py
+│   ├── dataset_components.py
+│   ├── directory_components.py
+│   ├── evaluation_components.py
+│   ├── model_components.py
+│   ├── model_playground_components.py
+│   ├── repository_components.py
+│   ├── research_components.py
+│   └── training_components.py
+└── utils/                      # Utilitas
+    ├── coordinate_normalizer.py
+    ├── debug_helper.py
+    ├── early_stopping.py
+    ├── enhanced-cache.py
+    ├── enhanced-dataset-validator.py
+    ├── experiment_tracker.py
+    ├── layer-config-manager.py
+    ├── logger.py
+    ├── memory_optimizer.py
+    ├── metrics.py
+    ├── model_exporter.py
+    ├── model_visualizer.py
+    ├── optimized-augmentation.py
+    ├── polygon_metrics.py
+    ├── preprocessing.py
+    ├── roboflow_downloader.py
+    ├── simple_logger.py
+    ├── training_pipeline.py
+    ├── ui_utils.py
+    └── visualization.py
+
+Konfigurasi:
+├── .env                        # Environment variables
+├── .env.example               # Contoh environment variables
+└── .gitignore                # Git ignore rules

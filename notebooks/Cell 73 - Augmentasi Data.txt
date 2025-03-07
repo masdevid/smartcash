@@ -1,60 +1,42 @@
-# Cell 73: Augmentasi Data (refactored)
-
-import gc
-import pickle
-from IPython.display import display
-
-# Import UI components dan handlers
+# Cell 73 - Augmentasi Data
 from smartcash.ui_components.augmentation_components import create_augmentation_ui
 from smartcash.handlers.ui_handlers.augmentation_handlers import setup_augmentation_handlers
+from smartcash.utils.optimized_augmentation import OptimizedAugmentation
+from smartcash.handlers.data_manager import DataManager
+from smartcash.utils.simple_logger import SimpleLogger
+import yaml
+import os
 
-# ===== 1. LOAD KOMPONEN GLOBAL =====
-# Pastikan objek global tersedia
-try:
-    with open('data_globals.pkl', 'rb') as f:
-        globals_dict = pickle.load(f)
-    
-    data_manager = globals_dict['data_manager']
-    aug_manager = globals_dict['aug_manager']
-    config = globals_dict['config']
-    logger = globals_dict['logger']
-    
-    logger.info("✅ Komponen global berhasil dimuat")
-except Exception as e:
-    print(f"❌ Error loading global objects: {str(e)}")
-    print("💡 Jalankan Cell 7.1 terlebih dahulu untuk menginisialisasi dataset")
-    # Fallback ke placeholder objects jika diperlukan untuk testing UI
-    data_manager = None
-    aug_manager = None
-    config = {}
-    
-    import logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger("augmentation")
-
-# ===== 2. CEK ENVIRONMENT =====
-# Deteksi apakah berjalan di Google Colab
-is_colab = 'google.colab' in str(get_ipython())
-
-# ===== 3. BUAT DAN SETUP UI =====
-# Buat UI komponen
-ui_components = create_augmentation_ui(is_colab=is_colab)
-
-# Setup handlers jika komponen tersedia
-if data_manager and aug_manager:
-    setup_augmentation_handlers(
-        ui_components=ui_components,
-        aug_manager=aug_manager,
-        data_manager=data_manager,
-        logger=logger
-    )
+# Load config
+config_path = 'configs/experiment_config.yaml'
+if os.path.exists(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
 else:
-    logger.warning("⚠️ Komponen data_manager atau aug_manager tidak tersedia!")
-    print("⚠️ UI dibuat tetapi fungsi tidak akan berjalan sampai komponen diperlukan tersedia.")
+    config = {'model': {'backbone': 'efficientnet'}}  # Default config
 
-# ===== 4. TAMPILKAN UI =====
-# Tampilkan UI
+# Create Logger
+logger = SimpleLogger()
+
+# Create data manager
+data_manager = DataManager(
+    config_path='configs/base_config.yaml',
+    data_dir='data',
+    logger=logger
+)
+
+# Create augmentation manager
+aug_manager = OptimizedAugmentation(
+    config=config,
+    logger=logger
+)
+
+# Create UI components - nama variabel konsisten
+ui_components = create_augmentation_ui(is_colab=True)
+
+# Setup handler dengan validasi komponen UI
+# Menyimpan hasil return untuk konsistensi
+ui_components = setup_augmentation_handlers(ui_components, aug_manager, data_manager, logger)
+
+# Display UI
 display(ui_components['ui'])
-
-# Force garbage collection
-gc.collect()

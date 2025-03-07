@@ -1,88 +1,46 @@
 # Cell 40 - Konfigurasi Global (refactored)
 
-import os
-import yaml
+# ===== 1. IMPORT MODULES =====
 import torch
 from pathlib import Path
-from datetime import datetime
+from IPython.display import display
 
-from smartcash.utils.logger import SmartCashLogger
-from smartcash.utils.layer_config_manager import get_layer_config
+# Import UI components dan handlers
 from smartcash.ui_components.config_components import create_global_config_ui
 from smartcash.handlers.ui_handlers.config_handlers import setup_global_config_handlers
 
-# Setup direktori
-BASE_DIR = Path.cwd()
-CONFIG_DIR = BASE_DIR / "configs"
-DATA_DIR = BASE_DIR / "data"
-OUTPUT_DIR = BASE_DIR / "runs"
+# Import centralized managers
+from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.utils.environment_manager import EnvironmentManager
+from smartcash.utils.layer_config_manager import get_layer_config
 
-# Pastikan direktori ada
-CONFIG_DIR.mkdir(exist_ok=True)
-DATA_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+# ===== 2. INITIALIZE MANAGERS =====
+# Setup environment manager
+env_manager = EnvironmentManager()
 
-# Inisialisasi logger dengan emoji
-logger = SmartCashLogger('smartcash')
-logger.start("🚀 Inisialisasi SmartCash")
+# Setup logger with environment context
+logger = get_logger("global_config", 
+                   log_to_console=True, 
+                   log_to_file=True, 
+                   log_to_colab=env_manager.is_colab)
 
-# Buat konfigurasi default
-config = {
-    'data_dir': str(DATA_DIR),
-    'output_dir': str(OUTPUT_DIR / f"train_{datetime.now().strftime('%Y%m%d_%H%M%S')}"),
-    'checkpoints_dir': str(OUTPUT_DIR / "weights"),
-    'model': {
-        'backbone': 'efficientnet',  # 'efficientnet' atau 'cspdarknet'
-        'pretrained': True,
-        'img_size': [640, 640],
-        'batch_size': 16,
-        'memory_limit': 0.7,  # Batas penggunaan memori (0.0-1.0)
-        'workers': 4
-    },
-    'training': {
-        'epochs': 30,
-        'learning_rate': 1e-4,
-        'weight_decay': 5e-4,
-        'momentum': 0.937,
-        'optimizer': 'adamw',  # 'adam', 'adamw', 'sgd'
-        'scheduler': 'cosine',  # 'cosine', 'step', 'plateau'
-        'early_stopping_patience': 5,
-        'save_every': 5,
-        # Augmentasi
-        'fliplr': 0.5,
-        'flipud': 0.0,
-        'hsv_h': 0.015,
-        'hsv_s': 0.7,
-        'hsv_v': 0.4,
-        'degrees': 0.0,
-        'translate': 0.1,
-        'scale': 0.5
-    },
-    # Layer yang akan diaktifkan
-    'layers': ['banknote']  # ['banknote', 'nominal', 'security']
-}
+# Setup config manager and load or create configuration
+config_manager = ConfigManager(
+    base_dir=str(env_manager.base_dir),
+    logger=logger
+)
 
-# Simpan konfigurasi ke file
-config_path = CONFIG_DIR / f"train_config_{datetime.now().strftime('%Y%m%d_%H%M%S')}.yaml"
-with open(config_path, 'w') as f:
-    yaml.dump(config, f, default_flow_style=False)
+# Try to load existing config or create default
+config = config_manager.load(use_defaults=True)
 
-logger.info(f"📝 Konfigurasi disimpan di {config_path}")
-
-# Periksa ketersediaan GPU
-if torch.cuda.is_available():
-    gpu_info = f"GPU: {torch.cuda.get_device_name(0)}"
-    gpu_memory = f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB"
-    logger.info(f"🖥️ {gpu_info}, {gpu_memory}")
-else:
-    logger.warning("⚠️ GPU tidak terdeteksi, menggunakan CPU")
-
+# ===== 3. SETUP LAYER CONFIG =====
 # Inisialisasi layer config manager
 layer_config = get_layer_config()
-active_layers = config['layers']
+active_layers = config_manager.get('layers', ['banknote'])
 available_layers = layer_config.get_layer_names()
 
-# Tampilkan informasi layer yang diaktifkan
+# Log layer information
 logger.info(f"🔍 Layer yang diaktifkan: {active_layers}")
 
 # Analisis konfigurasi layer
@@ -99,23 +57,32 @@ for layer in active_layers:
 total_classes = layer_config.get_total_classes()
 logger.info(f"🔢 Total kelas yang terdeteksi: {total_classes}")
 
+# ===== 4. DISPLAY SYSTEM INFO =====
+# Periksa ketersediaan GPU
+if torch.cuda.is_available():
+    gpu_info = f"GPU: {torch.cuda.get_device_name(0)}"
+    gpu_memory = f"Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB"
+    logger.info(f"🖥️ {gpu_info}, {gpu_memory}")
+else:
+    logger.warning("⚠️ GPU tidak terdeteksi, menggunakan CPU")
+
+# ===== 5. CREATE AND SETUP UI =====
 # Buat UI komponen
 ui_components = create_global_config_ui(
-    config=config, 
-    base_dir=BASE_DIR,
+    config=config_manager.config, 
+    base_dir=env_manager.base_dir,
     active_layers=active_layers,
     available_layers=available_layers
 )
 
-# Setup handlers untuk komponen UI
+# Setup handlers for UI components
 setup_global_config_handlers(
     ui_components=ui_components,
-    config=config,
-    config_path=config_path,
+    config=config_manager,
     logger=logger
 )
 
-# Tampilkan UI
+# Display the UI
 display(ui_components['ui'])
 
 logger.success("✅ Konfigurasi global siap digunakan")

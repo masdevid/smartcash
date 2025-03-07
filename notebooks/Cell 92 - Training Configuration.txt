@@ -1,4 +1,4 @@
-# Cell 92: Training Configuration (refactored)
+# Cell 92 - Training Configuration (refactored)
 
 import os
 import pickle
@@ -9,7 +9,8 @@ from pathlib import Path
 try:
     from smartcash.utils.logger import get_logger
     from smartcash.ui_components.training_components import create_training_config_ui
-    from smartcash.handlers.ui_handlers.training_handlers import setup_training_config_handlers
+    from smartcash.handlers.ui_handlers.training_config_handlers import setup_training_config_handlers
+    from smartcash.handlers.ui_handlers.common_utils import load_config
     
     logger = get_logger("training_config", log_to_console=True, log_to_file=True, log_to_colab=True)
 except Exception as e:
@@ -27,20 +28,14 @@ try:
         components = pickle.load(f)
     
     # Load config
-    with open('config.pkl', 'rb') as f:
-        config = pickle.load(f)
+    config = load_config(fallback_to_pickle=True, logger=logger)
         
 except Exception as e:
     logger.warning(f"⚠️ Komponen training belum diinisialisasi: {str(e)}")
-    logger.info("ℹ️ Jalankan Cell 9.1 terlebih dahulu untuk menginisialisasi pipeline")
+    logger.info("ℹ️ Jalankan Pipeline Initialization terlebih dahulu untuk menginisialisasi pipeline")
     
     # Try to load just the config file
-    try:
-        with open('config.pkl', 'rb') as f:
-            config = pickle.load(f)
-    except:
-        # Fallback to minimal config
-        config = {}
+    config = load_config(fallback_to_pickle=True, logger=logger)
     
     components = {}
 

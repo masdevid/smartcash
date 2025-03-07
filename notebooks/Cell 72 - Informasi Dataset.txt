@@ -1,37 +1,59 @@
-# Cell 72: Informasi Dataset (refactored)
+# Cell 72 - Informasi Dataset (refactored)
 
-import pickle
-from IPython.display import display, HTML
-
-# Import komponen UI
+# ===== 1. IMPORT MODULES =====
+# Import UI components dan handlers
 from smartcash.ui_components.data_components import create_dataset_info_ui
+from smartcash.handlers.ui_handlers.data_handlers import setup_dataset_info_handlers
 
-# Import handler
-from smartcash.handlers.ui_handlers.data_handlers import (
-    setup_dataset_info_handlers,
-    get_dataset_info
-)
+# Import centralized managers
+from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.utils.environment_manager import EnvironmentManager
 
-# Pastikan objek global tersedia
+# Import data modules
+from smartcash.handlers.data_manager import DataManager
+from smartcash.handlers.multilayer_dataset_handler import MultilayerDataManager
+
+# ===== 2. INITIALIZE MANAGERS =====
+# Setup environment manager
+env_manager = EnvironmentManager()
+
+# Setup logger with environment context
+logger = get_logger("dataset_info", 
+                  log_to_console=True, 
+                  log_to_file=True, 
+                  log_to_colab=env_manager.is_colab)
+
+# Setup config manager and load configuration
+config_manager = ConfigManager(logger=logger)
+config = config_manager.load()
+
+# ===== 3. INITIALIZE DATA COMPONENTS =====
+# Create data manager with loaded configuration
 try:
-    with open('data_globals.pkl', 'rb') as f:
-        globals_dict = pickle.load(f)
-    
-    data_manager = globals_dict['data_manager']
-    logger = globals_dict['logger']
-except Exception as e:
-    print(f"❌ Error loading global objects: {str(e)}")
-    print("💡 Jalankan Cell 7.1 terlebih dahulu untuk menginisialisasi dataset")
+    data_manager = MultilayerDataManager(
+        config=config,
+        logger=logger
+    )
+    logger.info("✅ Data manager berhasil diinisialisasi")
+except ImportError:
+    logger.warning("⚠️ MultilayerDataManager tidak tersedia, menggunakan DataManager standar")
+    data_manager = DataManager(
+        config_path='configs/base_config.yaml',
+        data_dir='data',
+        logger=logger
+    )
 
-# Buat UI untuk informasi dataset
-info_ui = create_dataset_info_ui()
+# ===== 4. CREATE AND SETUP UI =====
+# Create UI components
+ui_components = create_dataset_info_ui()
 
-# Setup handler untuk komponen UI
-setup_dataset_info_handlers(info_ui, data_manager, logger)
+# Setup handlers with validation
+ui_components = setup_dataset_info_handlers(ui_components, data_manager, logger)
 
-# Tampilkan UI
-display(info_ui['ui'])
+# ===== 5. DISPLAY UI =====
+# Display the UI
+display(ui_components['ui'])
 
-# Tampilkan informasi dataset awal
-with info_ui['info_output']:
-    get_dataset_info(data_manager, logger)
+# Log completion
+logger.info("✅ UI Informasi Dataset berhasil diinisialisasi")

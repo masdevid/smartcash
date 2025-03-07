@@ -4,6 +4,17 @@ Author: Alfrida Sabar
 Deskripsi: Package initialization untuk UI handlers.
 """
 
+# Common utilities
+from smartcash.handlers.ui_handlers.common_utils import (
+    memory_manager,
+    is_colab,
+    save_config,
+    load_config,
+    display_gpu_info,
+    create_timestamp_filename,
+    plot_metrics
+)
+
 # Data handling handlers
 from smartcash.handlers.ui_handlers.data_handlers import (
     on_refresh_info_clicked,
@@ -29,7 +40,6 @@ from smartcash.handlers.ui_handlers.dataset_handlers import (
 
 # Directory management handlers
 from smartcash.handlers.ui_handlers.directory_handlers import (
-    is_colab,
     setup_google_drive,
     create_directory_structure,
     create_symlinks,
@@ -109,9 +119,8 @@ from smartcash.handlers.ui_handlers.research_handlers import (
     setup_research_handlers
 )
 
-# Training handlers
-from smartcash.handlers.ui_handlers.training_handlers import (
-    # Training execution handlers
+# Training execution handlers
+from smartcash.handlers.ui_handlers.training_execution_handlers import (
     TrainingMetricsTracker,
     metrics_callback,
     update_plot,
@@ -122,23 +131,16 @@ from smartcash.handlers.ui_handlers.training_handlers import (
     on_start_button_clicked,
     run_training_thread,
     on_stop_button_clicked,
-    setup_training_handlers,
-    
-    # Training pipeline handlers
-    on_check_status_button_clicked,
-    init_components,
-    setup_training_pipeline_handlers,
-    
-    # Training config handlers
-    on_generate_name_button_clicked,
-    on_save_config_button_clicked,
-    on_show_lr_schedule_button_clicked,
-    on_backbone_change,
-    setup_training_config_handlers,
-    simulate_lr_schedule
+    setup_training_handlers
 )
 
-# Repository handlers (for completeness)
+# Training pipeline handlers
+from smartcash.handlers.ui_handlers.training_pipeline_handlers import (
+    on_check_status_button_clicked,
+    init_components,
+    setup_training_pipeline_handlers
+)
+# Repository handlers
 from smartcash.handlers.ui_handlers.repository_handlers import (
     setup_repository_handlers,
     on_clone_button_clicked,
@@ -146,6 +148,10 @@ from smartcash.handlers.ui_handlers.repository_handlers import (
 )
 
 __all__ = [
+    # Common utilities
+    'memory_manager', 'is_colab', 'save_config', 'load_config',
+    'display_gpu_info', 'create_timestamp_filename', 'plot_metrics',
+    
     # Data handling
     'on_refresh_info_clicked', 'get_dataset_info', 'on_split_button_clicked',
     'update_total_ratio', 'check_data_availability', 'visualize_batch',
@@ -157,7 +163,7 @@ __all__ = [
     'setup_dataset_handlers',
     
     # Directory
-    'is_colab', 'setup_google_drive', 'create_directory_structure', 'create_symlinks',
+    'setup_google_drive', 'create_directory_structure', 'create_symlinks',
     'get_directory_tree', 'on_setup_button_clicked', 'on_drive_checkbox_changed',
     'setup_directory_handlers',
     
@@ -192,11 +198,15 @@ __all__ = [
     'run_research_evaluation', 'visualize_research_results', 'on_run_button_clicked',
     'load_existing_results', 'setup_research_handlers',
     
-    # Training
+    # Training execution
     'TrainingMetricsTracker', 'metrics_callback', 'update_plot', 'update_metrics_table',
     'update_status', 'run_training', 'backup_to_drive', 'on_start_button_clicked',
     'run_training_thread', 'on_stop_button_clicked', 'setup_training_handlers',
+    
+    # Training pipeline
     'on_check_status_button_clicked', 'init_components', 'setup_training_pipeline_handlers',
+    
+    # Training config
     'on_generate_name_button_clicked', 'on_save_config_button_clicked',
     'on_show_lr_schedule_button_clicked', 'on_backbone_change', 'setup_training_config_handlers',
     'simulate_lr_schedule',

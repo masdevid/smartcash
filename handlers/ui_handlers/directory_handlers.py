@@ -2,14 +2,18 @@
 File: smartcash/handlers/ui_handlers/directory_handlers.py
 Author: Alfrida Sabar
 Deskripsi: Handler untuk UI komponen directory management, menangani setup direktori dan integrasi dengan Google Drive.
+          Updated to use centralized EnvironmentManager.
 """
 
 import os
 import pickle
 from pathlib import Path
 from IPython.display import display, clear_output, HTML
-import ipywidgets as widgets  # Added for widget references
-import sys  # Added for system path manipulation
+import ipywidgets as widgets
+import sys
+
+# Import EnvironmentManager for centralized environment detection
+from smartcash.utils.environment_manager import EnvironmentManager
 
 
 def is_colab():

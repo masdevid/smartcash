@@ -1,318 +1,356 @@
 """
 File: smartcash/handlers/ui_handlers/directory_handlers.py
 Author: Alfrida Sabar
-Deskripsi: Handler untuk UI komponen directory management, menangani setup direktori dan integrasi dengan Google Drive.
-          Updated to use centralized EnvironmentManager.
+Deskripsi: Handler untuk UI komponen setup dan manajemen direktori project, 
+           menangani integrasi Google Drive dan struktur direktori.
 """
 
 import os
-import pickle
-from pathlib import Path
-from IPython.display import display, clear_output, HTML
-import ipywidgets as widgets
 import sys
+import shutil
+import subprocess
+from IPython.display import clear_output, HTML, display
+from pathlib import Path
+from typing import Dict, Any, Optional, List, Tuple, Union, Callable
 
-# Import EnvironmentManager for centralized environment detection
-from smartcash.utils.environment_manager import EnvironmentManager
-
-
-def is_colab():
+def setup_google_drive(mount_point: str = '/content/drive') -> Tuple[bool, str]:
     """
-    Cek apakah notebook berjalan di Google Colab.
+    Mount Google Drive dan verifikasi akses.
     
+    Args:
+        mount_point: Path untuk mount Google Drive
+        
     Returns:
-        Boolean yang menunjukkan apakah berjalan di Colab
+        Tuple berisi (success, message)
     """
     try:
         from google.colab import drive
-        return True
+        
+        # Check if already mounted
+        if os.path.exists(f"{mount_point}/MyDrive"):
+            return True, f"✅ Google Drive sudah terpasang di {mount_point}"
+        
+        # Mount drive
+        drive.mount(mount_point)
+        
+        # Verify mount
+        if os.path.exists(f"{mount_point}/MyDrive"):
+            return True, f"✅ Google Drive berhasil dipasang di {mount_point}"
+        else:
+            return False, "❌ Gagal memverifikasi pemasangan Google Drive"
     except ImportError:
-        return False
-
-def setup_google_drive(drive_path):
-    """
-    Setup Google Drive untuk penyimpanan.
-    
-    Args:
-        drive_path: Path ke direktori SmartCash di Google Drive
-        
-    Returns:
-        Tuple (success, message) menunjukkan keberhasilan dan pesan
-    """
-    try:
-        from google.colab import drive
-        
-        # Cek apakah Google Drive sudah di-mount
-        if not Path('/content/drive').exists() or not Path('/content/drive/MyDrive').exists():
-            drive.mount('/content/drive')
-        
-        # Membuat direktori SmartCash di Drive jika belum ada
-        os.makedirs(drive_path, exist_ok=True)
-        
-        return True, f"✅ Google Drive berhasil di-mount ke {drive_path}"
+        return False, "⚠️ Google Drive hanya dapat dipasang di Google Colab"
     except Exception as e:
-        return False, f"❌ Error saat setup Google Drive: {str(e)}"
+        return False, f"❌ Error saat memasang Google Drive: {str(e)}"
 
-def create_directory_structure(base_dir):
+def create_directory_structure(base_dir: str, drive_path: Optional[str] = None) -> Dict[str, Any]:
     """
-    Buat struktur direktori project.
+    Buat struktur direktori project di direktori target.
     
     Args:
-        base_dir: Path direktori dasar
+        base_dir: Path direktori dasar project
+        drive_path: Optional path ke Google Drive
         
     Returns:
-        Dictionary berisi statistik direktori yang dibuat
+        Dictionary dengan statistik direktori yang dibuat
     """
-    directory_list = [
+    # Define target directory (either local or Drive)
+    target_dir = drive_path if drive_path else base_dir
+    
+    # Define directories to create
+    dirs = [
         "data/train/images",
         "data/train/labels",
         "data/valid/images",
         "data/valid/labels",
         "data/test/images",
         "data/test/labels",
-        "configs",
         "runs/train/weights",
+        "runs/evaluation",
+        "configs",
+        "pretrained",
         "logs"
     ]
     
-    stats = {
-        'created': 0,
-        'existing': 0,
-        'error': 0
+    # Create directories
+    results = {
+        "created": 0,
+        "exists": 0,
+        "error": 0,
+        "directories": []
     }
     
-    for d in directory_list:
+    for d in dirs:
+        full_path = os.path.join(target_dir, d)
         try:
-            dir_path = Path(f"{base_dir}/{d}")
-            if not dir_path.exists():
-                os.makedirs(dir_path, exist_ok=True)
-                stats['created'] += 1
+            if not os.path.exists(full_path):
+                os.makedirs(full_path, exist_ok=True)
+                results["created"] += 1
+                results["directories"].append({"path": full_path, "status": "created"})
             else:
-                stats['existing'] += 1
-        except Exception:
-            stats['error'] += 1
+                results["exists"] += 1
+                results["directories"].append({"path": full_path, "status": "exists"})
+        except Exception as e:
+            results["error"] += 1
+            results["directories"].append({"path": full_path, "status": f"error: {str(e)}"})
     
-    return stats
+    return results
 
-def create_symlinks(drive_path):
+def create_symlinks(base_dir: str, drive_path: str) -> Dict[str, Any]:
     """
-    Buat symlink ke direktori Google Drive untuk akses yang lebih mudah.
+    Buat symlinks dari direktori lokal ke direktori Google Drive.
     
     Args:
-        drive_path: Path ke direktori SmartCash di Google Drive
+        base_dir: Path direktori lokal
+        drive_path: Path direktori di Google Drive
         
     Returns:
-        Dictionary berisi statistik symlink yang dibuat
+        Dictionary dengan statistik symlinks yang dibuat
     """
-    stats = {
-        'created': 0,
-        'existing': 0,
-        'error': 0
+    # Define directories to symlink
+    symlinks = [
+        {"name": "data", "src": os.path.join(base_dir, "data"), "dst": os.path.join(drive_path, "data")},
+        {"name": "runs", "src": os.path.join(base_dir, "runs"), "dst": os.path.join(drive_path, "runs")},
+        {"name": "configs", "src": os.path.join(base_dir, "configs"), "dst": os.path.join(drive_path, "configs")},
+        {"name": "pretrained", "src": os.path.join(base_dir, "pretrained"), "dst": os.path.join(drive_path, "pretrained")}
+    ]
+    
+    results = {
+        "created": 0,
+        "exists": 0,
+        "error": 0,
+        "symlinks": []
     }
     
-    symlinks = {
-        'data': f"{drive_path}/data",
-        'configs': f"{drive_path}/configs",
-        'runs': f"{drive_path}/runs",
-        'logs': f"{drive_path}/logs"
-    }
-    
-    for name, target in symlinks.items():
+    for link in symlinks:
         try:
-            if not os.path.exists(name):
-                os.symlink(target, name)
-                stats['created'] += 1
+            # Ensure target directory exists
+            if not os.path.exists(link["dst"]):
+                os.makedirs(link["dst"], exist_ok=True)
+            
+            # Remove source if it exists but is not a symlink
+            if os.path.exists(link["src"]) and not os.path.islink(link["src"]):
+                if os.path.isdir(link["src"]):
+                    shutil.rmtree(link["src"])
+                else:
+                    os.remove(link["src"])
+            
+            # Create symlink if it doesn't exist
+            if not os.path.exists(link["src"]):
+                os.symlink(link["dst"], link["src"])
+                results["created"] += 1
+                results["symlinks"].append({"name": link["name"], "status": "created"})
             else:
-                stats['existing'] += 1
-        except Exception:
-            stats['error'] += 1
+                results["exists"] += 1
+                results["symlinks"].append({"name": link["name"], "status": "exists"})
+        except Exception as e:
+            results["error"] += 1
+            results["symlinks"].append({"name": link["name"], "status": f"error: {str(e)}"})
     
-    return stats
+    return results
 
-def get_directory_tree(base_dir, max_depth=2):
+def get_directory_tree(base_dir: str, max_depth: int = 3) -> str:
     """
-    Menghasilkan tree view dari direktori project dalam HTML.
+    Generate HTML representation of directory tree.
     
     Args:
-        base_dir: Path direktori dasar
-        max_depth: Kedalaman maksimal directory tree
+        base_dir: Path ke direktori dasar
+        max_depth: Kedalaman maksimum untuk ditampilkan
         
     Returns:
-        String HTML yang menampilkan struktur direktori
+        HTML string dari directory tree
     """
-    def _get_tree(directory, prefix='', is_last=True, depth=0):
+    def _tree_html(path, prefix="", is_last=True, depth=0):
         if depth > max_depth:
             return ""
             
-        base_name = os.path.basename(directory)
-        result = ""
+        name = os.path.basename(path)
+        html = ""
         
+        # Add directory name
         if depth > 0:
-            # Add connector line and directory name
-            result += f"{prefix}{'└── ' if is_last else '├── '}<span style='color: #3498db;'>{base_name}</span><br/>"
-        else:
-            # Root directory
-            result += f"<span style='color: #2980b9; font-weight: bold;'>{base_name}</span><br/>"
-            
-        # Update prefix for children
-        if depth > 0:
+            html += f"{prefix}{'└── ' if is_last else '├── '}<span style='color: #3498db;'>{name}</span><br/>"
             prefix += '    ' if is_last else '│   '
-            
-        # List directory contents
+        else:
+            html += f"<span style='color: #2980b9; font-weight: bold;'>{name}</span><br/>"
+        
+        # List contents
         try:
-            items = list(sorted([x for x in Path(directory).iterdir()]))
+            entries = sorted([e for e in os.listdir(path) if not e.startswith('.')])
             
-            # Only show a subset of items if there are too many
-            if len(items) > 10 and depth > 0:
-                items = items[:10]
-                show_ellipsis = True
+            # Limit number of entries shown
+            if len(entries) > 10 and depth > 1:
+                entries = entries[:10]
+                has_more = True
             else:
-                show_ellipsis = False
+                has_more = False
                 
-            for i, item in enumerate(items):
-                if item.is_dir():
-                    # Recursively process subdirectories
-                    result += _get_tree(str(item), prefix, i == len(items) - 1 and not show_ellipsis, depth + 1)
+            for i, entry in enumerate(entries):
+                entry_path = os.path.join(path, entry)
+                is_entry_last = i == len(entries) - 1 and not has_more
+                
+                if os.path.isdir(entry_path):
+                    html += _tree_html(entry_path, prefix, is_entry_last, depth + 1)
                 elif depth < max_depth:
-                    # Add file name
-                    result += f"{prefix}{'└── ' if i == len(items) - 1 and not show_ellipsis else '├── '}{item.name}<br/>"
-                    
-            if show_ellipsis:
-                result += f"{prefix}└── <i>... dan item lainnya</i><br/>"
-        except Exception:
-            result += f"{prefix}└── <i>Error saat membaca direktori</i><br/>"
+                    html += f"{prefix}{'└── ' if is_entry_last else '├── '}{entry}<br/>"
             
-        return result
+            if has_more:
+                html += f"{prefix}└── <i>... dan item lainnya</i><br/>"
+        except Exception as e:
+            html += f"{prefix}└── <i>Error saat membaca direktori: {str(e)}</i><br/>"
+        
+        return html
     
-    html = "<div style='font-family: monospace;'>"
-    html += _get_tree(base_dir)
+    html = "<div style='font-family: monospace; line-height: 1.5;'>"
+    html += _tree_html(base_dir)
     html += "</div>"
     
     return html
 
-def on_setup_button_clicked(b, ui_components):
+def on_setup_button_clicked(ui_components: Dict[str, Any], logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol setup direktori.
     
     Args:
-        b: Button instance
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_directory_ui()
+        logger: Optional logger untuk mencatat aktivitas
     """
-    # Disable tombol selama proses
-    ui_components['setup_button'].disabled = True
+    # Validate required components
+    required_components = ['setup_button', 'output_area', 'drive_checkbox', 
+                         'drive_path_text', 'status_indicator', 'directory_tree']
     
-    # Clear output area
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return
+    
+    # Disable button during setup
+    ui_components['setup_button'].disabled = True
+    ui_components['setup_button'].description = "Setting up..."
+    
     with ui_components['output_area']:
         clear_output()
         
         try:
+            # Get parameters
             use_drive = ui_components['drive_checkbox'].value
+            drive_path = ui_components['drive_path_text'].value if use_drive else None
+            base_dir = os.getcwd()
             
-            # Setup direktori berdasarkan pilihan
-            if use_drive and is_colab():
-                drive_path = ui_components['drive_path_text'].value
-                success, message = setup_google_drive(drive_path)
+            # Mount Google Drive if needed
+            if use_drive:
+                print("🔄 Mencoba memasang Google Drive...")
+                success, message = setup_google_drive()
+                print(message)
                 
-                if success:
-                    print(message)
-                    base_dir = drive_path
-                    
-                    # Buat struktur direktori di Google Drive
-                    dir_stats = create_directory_structure(base_dir)
-                    print(f"📁 Struktur direktori dibuat di Google Drive:")
-                    print(f"  • {dir_stats['created']} direktori baru dibuat")
-                    print(f"  • {dir_stats['existing']} direktori sudah ada")
-                    
-                    # Buat symlink
-                    link_stats = create_symlinks(base_dir)
-                    print(f"🔗 Symlink dibuat untuk akses yang lebih mudah:")
-                    print(f"  • {link_stats['created']} symlink baru dibuat")
-                    print(f"  • {link_stats['existing']} symlink sudah ada")
-                    
-                    # Update status indicator
-                    ui_components['status_indicator'].value = f"<p>Status: <span style='color: green'>✅ Setup selesai di Google Drive</span></p>"
-                else:
-                    print(message)
-                    print("🔄 Beralih ke direktori lokal sebagai fallback...")
-                    base_dir = os.getcwd()
-                    dir_stats = create_directory_structure(base_dir)
-                    
-                    # Update status indicator
-                    ui_components['status_indicator'].value = f"<p>Status: <span style='color: orange'>⚠️ Menggunakan direktori lokal</span></p>"
-            else:
-                # Gunakan direktori lokal
-                base_dir = os.getcwd()
-                dir_stats = create_directory_structure(base_dir)
-                print(f"📁 Struktur direktori dibuat di lokal:")
-                print(f"  • {dir_stats['created']} direktori baru dibuat")
-                print(f"  • {dir_stats['existing']} direktori sudah ada")
-                
-                # Update status indicator
-                ui_components['status_indicator'].value = f"<p>Status: <span style='color: blue'>✓ Setup selesai di direktori lokal</span></p>"
+                if not success:
+                    ui_components['status_indicator'].value = "<p>Status: <span style='color: red'>Setup Gagal - Google Drive tidak tersedia</span></p>"
+                    ui_components['setup_button'].disabled = False
+                    ui_components['setup_button'].description = "Setup Direktori"
+                    return
             
-            # Simpan path base direktori untuk digunakan di cell lain
-            with open('base_dir.pkl', 'wb') as f:
-                pickle.dump(base_dir, f)
-                
-            print(f"🔍 Base direktori yang digunakan: {base_dir}")
+            # Create directory structure
+            print(f"\n🔄 Membuat struktur direktori di {'Google Drive' if use_drive else 'direktori lokal'}...")
+            dir_results = create_directory_structure(base_dir, drive_path if use_drive else None)
             
-            # Update directory tree
+            print(f"✅ {dir_results['created']} direktori dibuat")
+            print(f"ℹ️ {dir_results['exists']} direktori sudah ada")
+            if dir_results['error'] > 0:
+                print(f"⚠️ {dir_results['error']} error saat membuat direktori")
+            
+            # Create symlinks if using Drive
+            if use_drive:
+                print("\n🔄 Membuat symlinks ke Google Drive...")
+                symlink_results = create_symlinks(base_dir, drive_path)
+                
+                print(f"✅ {symlink_results['created']} symlinks dibuat")
+                print(f"ℹ️ {symlink_results['exists']} symlinks sudah ada")
+                if symlink_results['error'] > 0:
+                    print(f"⚠️ {symlink_results['error']} error saat membuat symlinks")
+            
+            # Update status and directory tree
+            ui_components['status_indicator'].value = "<p>Status: <span style='color: green'>Setup Berhasil</span></p>"
             ui_components['directory_tree'].value = get_directory_tree(base_dir)
+            
+            print("\n✅ Setup direktori selesai!")
+            if use_drive:
+                print("📂 Data akan disimpan di Google Drive untuk persistensi antar sesi")
             
         except Exception as e:
             print(f"❌ Error saat setup direktori: {str(e)}")
-            ui_components['status_indicator'].value = f"<p>Status: <span style='color: red'>❌ Error: {str(e)}</span></p>"
+            ui_components['status_indicator'].value = f"<p>Status: <span style='color: red'>Error - {str(e)}</span></p>"
+            import traceback
+            traceback.print_exc()
         
-        # Re-enable tombol
-        ui_components['setup_button'].disabled = False
+        finally:
+            # Re-enable button
+            ui_components['setup_button'].disabled = False
+            ui_components['setup_button'].description = "Setup Direktori"
 
-def on_drive_checkbox_changed(change, ui_components):
+def on_drive_checkbox_changed(change: Dict[str, Any], ui_components: Dict[str, Any]) -> None:
     """
-    Handler untuk perubahan checkbox Google Drive.
+    Handler untuk perubahan checkbox penggunaan Google Drive.
     
     Args:
-        change: Change event
-        ui_components: Dictionary berisi komponen UI
+        change: Change event dari observe
+        ui_components: Dictionary berisi komponen UI dari create_directory_ui()
     """
-    if change['new']:  # Jika checkbox dinyalakan
-        # Cek apakah berjalan di Colab
-        if is_colab():
-            ui_components['drive_path_text'].disabled = False
-        else:
-            ui_components['drive_checkbox'].value = False
-            with ui_components['output_area']:
-                clear_output()
-                print("⚠️ Google Drive hanya tersedia di Google Colab")
-    else:
-        ui_components['drive_path_text'].disabled = True
+    if 'drive_path_text' not in ui_components:
+        return
+        
+    # Enable/disable drive path text based on checkbox
+    ui_components['drive_path_text'].disabled = not change['new']
 
-def setup_directory_handlers(ui_components):
+def setup_directory_handlers(ui_components: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
     """
-    Setup handler untuk UI komponen directory management.
+    Setup semua event handler untuk UI direktori.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI dari create_directory_ui()
+        logger: Optional logger untuk mencatat aktivitas
         
     Returns:
-        Dictionary berisi komponen UI yang telah disetup handler-nya
+        Dictionary updated UI components dengan handlers yang sudah di-attach
     """
-    # Setup initial state
-    is_running_in_colab = is_colab()
+    # Validate required components
+    required_components = ['setup_button', 'drive_checkbox', 'directory_tree']
+    missing_components = [comp for comp in required_components if comp not in ui_components]
     
-    if not is_running_in_colab:
-        ui_components['drive_checkbox'].value = False
-        ui_components['drive_checkbox'].disabled = True
-        ui_components['drive_path_text'].disabled = True
-        ui_components['status_indicator'].value = "<p>Status: <span style='color: orange'>⚠️ Google Drive tidak tersedia (tidak di Colab)</span></p>"
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing required UI components: {', '.join(missing_components)}")
+        return ui_components
     
-    # Setup event handlers
+    # Setup handler untuk tombol setup
+    ui_components['setup_button'].on_click(
+        lambda b: on_setup_button_clicked(ui_components, logger)
+    )
+    
+    # Setup handler untuk checkbox Drive
     ui_components['drive_checkbox'].observe(
         lambda change: on_drive_checkbox_changed(change, ui_components),
         names='value'
     )
     
-    ui_components['setup_button'].on_click(
-        lambda b: on_setup_button_clicked(b, ui_components)
-    )
+    # Initialize directory tree
+    base_dir = os.getcwd()
+    if os.path.exists(base_dir):
+        ui_components['directory_tree'].value = get_directory_tree(base_dir)
+    
+    # Check if in Google Colab
+    try:
+        import google.colab
+        is_colab = True
+    except ImportError:
+        is_colab = False
+    
+    # Disable drive checkbox if not in Colab
+    if not is_colab:
+        ui_components['drive_checkbox'].disabled = True
+        ui_components['drive_checkbox'].value = False
+        ui_components['drive_path_text'].disabled = True
+        if 'status_indicator' in ui_components:
+            ui_components['status_indicator'].value = "<p>Status: <span style='color: orange'>Google Drive hanya tersedia di Colab</span></p>"
     
     return ui_components

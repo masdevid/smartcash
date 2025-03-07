@@ -1,7 +1,8 @@
 """
 File: smartcash/handlers/ui_handlers/__init__.py
 Author: Alfrida Sabar
-Deskripsi: Package initialization untuk UI handlers.
+Deskripsi: Package initialization untuk UI handlers dengan organisasi imports yang lebih baik
+           dan menyelesaikan masalah circular dependency.
 """
 
 # Common utilities
@@ -140,6 +141,17 @@ from smartcash.handlers.ui_handlers.training_pipeline_handlers import (
     init_components,
     setup_training_pipeline_handlers
 )
+
+# Training config handlers
+from smartcash.handlers.ui_handlers.training_config_handlers import (
+    on_generate_name_button_clicked,
+    on_save_config_button_clicked,
+    on_show_lr_schedule_button_clicked,
+    on_backbone_change,
+    setup_training_config_handlers,
+    simulate_lr_schedule
+)
+
 # Repository handlers
 from smartcash.handlers.ui_handlers.repository_handlers import (
     setup_repository_handlers,

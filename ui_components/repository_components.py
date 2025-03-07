@@ -1,7 +1,8 @@
 """
-File: ui_components/repository_components.py
+File: smartcash/ui_components/repository_components.py
 Author: Alfrida Sabar
-Deskripsi: Komponen UI untuk clone repository dan manajemen repository.
+Deskripsi: Komponen UI untuk clone repository dan manajemen repository. 
+           Menambahkan handling untuk error states dan dokumentasi yang lebih lengkap.
 """
 
 import ipywidgets as widgets
@@ -11,8 +12,21 @@ def create_repository_ui():
     """
     Buat UI komponen untuk clone dan manajemen repository.
     
+    Komponen ini memungkinkan pengguna untuk melakukan clone repository
+    dari GitHub atau sumber git lainnya, memilih branch, dan menginstal
+    dependensi setelah clone.
+    
     Returns:
-        Dictionary berisi komponen UI
+        Dictionary berisi komponen UI:
+        - ui (widgets.VBox): Container utama yang berisi semua komponen UI
+        - repo_url_input (widgets.Text): Input untuk URL repository
+        - custom_repo_checkbox (widgets.Checkbox): Checkbox untuk menggunakan repo custom
+        - output_dir_input (widgets.Text): Input untuk direktori output
+        - branch_dropdown (widgets.Dropdown): Dropdown untuk memilih branch
+        - clone_button (widgets.Button): Tombol untuk menjalankan clone
+        - install_deps_checkbox (widgets.Checkbox): Checkbox untuk instalasi dependensi
+        - status_indicator (widgets.HTML): Indikator status operasi
+        - output_area (widgets.Output): Area untuk menampilkan output
     """
     # Buat header
     header = widgets.HTML("<h2>🔄 Clone Repository</h2>")
@@ -72,9 +86,15 @@ def create_repository_ui():
     # Setup empty output
     output_area = widgets.Output()
     
-    # Status indicator
+    # Status indicator with success, error, and in-progress states
     status_indicator = widgets.HTML(
         value="<p>Status: <span style='color: gray'>Siap</span></p>"
+    )
+    
+    # Error message area for detailed error information
+    error_area = widgets.HTML(
+        value="",
+        layout=widgets.Layout(display='none')
     )
     
     # Create layout
@@ -82,7 +102,8 @@ def create_repository_ui():
         widgets.HBox([repo_url_input, custom_repo_checkbox]),
         widgets.HBox([output_dir_input, branch_dropdown]),
         widgets.HBox([clone_button, install_deps_checkbox]),
-        status_indicator
+        status_indicator,
+        error_area
     ])
     
     # Main UI
@@ -103,5 +124,6 @@ def create_repository_ui():
         'clone_button': clone_button,
         'install_deps_checkbox': install_deps_checkbox,
         'status_indicator': status_indicator,
+        'error_area': error_area,
         'output_area': output_area
     }

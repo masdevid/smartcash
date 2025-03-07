@@ -2,6 +2,7 @@
 File: smartcash/handlers/ui_handlers/common_utils.py
 Author: Alfrida Sabar
 Deskripsi: Utilitas umum untuk handler UI yang digunakan di beberapa modul.
+           Menggabungkan fungsi yang tumpang tindih dan meningkatkan error handling.
 """
 
 import os
@@ -18,7 +19,12 @@ from typing import Dict, Any, Optional, List, Callable, Union, Tuple
 
 @contextmanager
 def memory_manager():
-    """Context manager untuk mengoptimalkan penggunaan memori."""
+    """
+    Context manager untuk mengoptimalkan penggunaan memori.
+    
+    Menggunakan try/finally pattern untuk memastikan cleaning up resources
+    bahkan ketika exceptions muncul.
+    """
     try:
         yield
     finally:
@@ -26,7 +32,7 @@ def memory_manager():
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
-def is_colab():
+def is_colab() -> bool:
     """
     Deteksi apakah kode dijalankan di Google Colab.
     
@@ -34,7 +40,7 @@ def is_colab():
         Boolean yang menunjukkan apakah di Google Colab
     """
     try:
-        from google.colab import drive
+        import google.colab
         return True
     except ImportError:
         return False
@@ -42,9 +48,9 @@ def is_colab():
 def save_config(config: Dict[str, Any], 
                 filename: str = 'experiment_config.yaml',
                 create_pickle: bool = True,
-                logger = None) -> bool:
+                logger: Optional[Any] = None) -> bool:
     """
-    Simpan konfigurasi ke file yaml dan pickle.
+    Simpan konfigurasi ke file yaml dan pickle dengan error handling yang lebih baik.
     
     Args:
         config: Dictionary konfigurasi
@@ -79,12 +85,12 @@ def save_config(config: Dict[str, Any],
             logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
         return False
 
-def load_config(filename: str = None,
-                 fallback_to_pickle: bool = True,
-                 default_config: Dict[str, Any] = None,
-                 logger = None) -> Dict[str, Any]:
+def load_config(filename: Optional[str] = None,
+               fallback_to_pickle: bool = True,
+               default_config: Optional[Dict[str, Any]] = None,
+               logger: Optional[Any] = None) -> Dict[str, Any]:
     """
-    Muat konfigurasi dari file yaml atau pickle.
+    Muat konfigurasi dari file yaml atau pickle dengan prioritas yang jelas.
     
     Args:
         filename: Nama file konfigurasi (optional)
@@ -100,8 +106,14 @@ def load_config(filename: str = None,
     # Definisikan file yang akan dicoba dimuat
     files_to_try = []
     if filename:
-        files_to_try.append(os.path.join('configs', filename))
+        # If a full path is provided
+        if os.path.isabs(filename) or '/' in filename:
+            files_to_try.append(filename)
+        else:
+            # If just a filename, append to configs directory
+            files_to_try.append(os.path.join('configs', filename))
     
+    # Add default files to try
     files_to_try.extend([
         'configs/experiment_config.yaml',
         'configs/training_config.yaml',
@@ -144,15 +156,15 @@ def load_config(filename: str = None,
         logger.warning("⚠️ Tidak ada konfigurasi yang dimuat, mengembalikan dictionary kosong")
     return {}
 
-def display_gpu_info(logger = None):
+def display_gpu_info(logger: Optional[Any] = None) -> Dict[str, Any]:
     """
-    Tampilkan informasi GPU.
+    Tampilkan informasi GPU dengan format yang konsisten.
     
     Args:
         logger: Optional logger untuk pesan log
     
     Returns:
-        Dictionary berisi informasi GPU
+        Dictionary berisi informasi GPU atau status CPU
     """
     gpu_info = {'available': torch.cuda.is_available()}
     
@@ -181,7 +193,7 @@ def display_gpu_info(logger = None):
 
 def create_timestamp_filename(base_name: str, ext: str = 'yaml') -> str:
     """
-    Buat nama file dengan timestamp.
+    Buat nama file dengan timestamp untuk memastikan keunikan.
     
     Args:
         base_name: Nama dasar file
@@ -194,10 +206,10 @@ def create_timestamp_filename(base_name: str, ext: str = 'yaml') -> str:
     return f"{base_name}_{timestamp}.{ext}"
 
 def plot_metrics(metrics: Dict[str, List], 
-                 title: str = 'Training Metrics', 
-                 figsize: Tuple[int, int] = (12, 6)):
+                title: str = 'Training Metrics', 
+                figsize: Tuple[int, int] = (12, 6)):
     """
-    Plot metrics dalam bentuk grafik.
+    Plot metrics dalam bentuk grafik dengan styling yang konsisten.
     
     Args:
         metrics: Dictionary berisi metrics untuk diplot
@@ -206,13 +218,30 @@ def plot_metrics(metrics: Dict[str, List],
     """
     plt.figure(figsize=figsize)
     
+    # Validasi metrics sebelum plotting
+    valid_metrics = {}
     for key, values in metrics.items():
         if isinstance(values, list) and len(values) > 0:
-            # Jika ada 'epochs' key, gunakan sebagai x-axis
-            if 'epochs' in metrics and len(metrics['epochs']) == len(values):
-                plt.plot(metrics['epochs'], values, 'o-', label=key)
-            else:
-                plt.plot(range(1, len(values) + 1), values, 'o-', label=key)
+            valid_metrics[key] = values
+    
+    if not valid_metrics:
+        plt.text(0.5, 0.5, 'Tidak ada data metric yang valid', 
+                ha='center', va='center', fontsize=14)
+        plt.title(title)
+        plt.tight_layout()
+        plt.show()
+        return
+    
+    # Plot valid metrics
+    for key, values in valid_metrics.items():
+        if key.lower() == 'epochs':
+            continue  # Skip 'epochs' key, used as x-axis below
+        
+        # Choose x-axis: epochs if available, otherwise use index
+        if 'epochs' in valid_metrics and len(valid_metrics['epochs']) == len(values):
+            plt.plot(valid_metrics['epochs'], values, 'o-', label=key)
+        else:
+            plt.plot(range(1, len(values) + 1), values, 'o-', label=key)
     
     plt.title(title)
     plt.xlabel('Epoch')
@@ -221,3 +250,29 @@ def plot_metrics(metrics: Dict[str, List],
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+def validate_ui_components(ui_components: Dict[str, Any], 
+                         required_components: List[str], 
+                         logger: Optional[Any] = None) -> bool:
+    """
+    Validate that required UI components exist.
+    
+    Args:
+        ui_components: Dictionary of UI components
+        required_components: List of required component names
+        logger: Optional logger for logging errors
+        
+    Returns:
+        Boolean indicating if all required components are present
+    """
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    
+    if missing_components:
+        error_msg = f"Missing UI components: {', '.join(missing_components)}"
+        if logger:
+            logger.error(f"❌ {error_msg}")
+        else:
+            print(f"❌ {error_msg}")
+        return False
+    
+    return True

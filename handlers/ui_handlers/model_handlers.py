@@ -1,7 +1,8 @@
 """
 File: smartcash/handlers/ui_handlers/model_handlers.py
 Author: Alfrida Sabar
-Deskripsi: Handler untuk interaksi UI komponen model, menangani logika untuk inisialisasi, visualisasi, manajemen checkpoint, dan optimasi model.
+Deskripsi: Handler untuk interaksi UI komponen model, menangani logika untuk inisialisasi, visualisasi, 
+           manajemen checkpoint, dan optimasi model. Memperbaiki missing imports dan menyeragamkan device handling.
 """
 
 import os
@@ -11,10 +12,12 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import datetime  # Added missing import
+import ipywidgets as widgets  # Added missing import
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
 from contextlib import contextmanager
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List, Callable, Union, Tuple
 
 @contextmanager
 def memory_manager():
@@ -27,7 +30,12 @@ def memory_manager():
             torch.cuda.empty_cache()
 
 def setup_gpu():
-    """Setup dan dapatkan informasi GPU."""
+    """
+    Setup dan dapatkan informasi GPU.
+    
+    Returns:
+        Dict berisi informasi GPU atau CPU device
+    """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     gpu_info = {'device': device}
     
@@ -46,7 +54,8 @@ def setup_gpu():
             
     return gpu_info
 
-def on_initialize_model_clicked(ui_components, model_handler, config, logger):
+def on_initialize_model_clicked(ui_components: Dict[str, Any], model_handler: Any, 
+                              config: Dict[str, Any], logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol inisialisasi model.
     
@@ -60,10 +69,11 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
     required_components = ['initialize_button', 'output_area', 'backbone_dropdown', 
                          'detection_mode_dropdown', 'img_size_slider', 'pretrained_checkbox']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return
     
     ui_components['initialize_button'].disabled = True
     ui_components['initialize_button'].description = "Menginisialisasi..."
@@ -84,12 +94,14 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
                 config['layers'] = ['banknote']
             
             # Setup environment
-            logger.info("🔄 Mempersiapkan lingkungan...")
+            if logger:
+                logger.info("🔄 Mempersiapkan lingkungan...")
             gpu_info = setup_gpu()
             
             # Buat model
             with memory_manager():
-                logger.info("🧠 Membuat model...")
+                if logger:
+                    logger.info("🧠 Membuat model...")
                 start_time = time.time()
                 model = model_handler.create_model(backbone_type=config['model']['backbone'])
                 creation_time = time.time() - start_time
@@ -102,17 +114,18 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
                 trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
                 
                 # Log informasi model
-                logger.success(f"✅ Model berhasil dibuat dalam {creation_time:.2f} detik!")
-                logger.info(f"📊 Total Parameter: {total_params:,}")
-                logger.info(f"📊 Parameter Trainable: {trainable_params:,} ({trainable_params/total_params*100:.1f}%)")
-                
-                # Log GPU info jika tersedia
-                if torch.cuda.is_available():
-                    logger.info(f"🖥️ Model berada di {gpu_info['device']} ({gpu_info['name']})")
-                    logger.info(f"🖥️ VRAM Terpakai: {gpu_info['memory_allocated']:.1f} MB")
-                    logger.info(f"🖥️ VRAM Total: {gpu_info['memory_total']:.1f} MB")
-                else:
-                    logger.info(f"🖥️ Model berada di CPU (GPU tidak tersedia)")
+                if logger:
+                    logger.success(f"✅ Model berhasil dibuat dalam {creation_time:.2f} detik!")
+                    logger.info(f"📊 Total Parameter: {total_params:,}")
+                    logger.info(f"📊 Parameter Trainable: {trainable_params:,} ({trainable_params/total_params*100:.1f}%)")
+                    
+                    # Log GPU info jika tersedia
+                    if torch.cuda.is_available():
+                        logger.info(f"🖥️ Model berada di {gpu_info['device']} ({gpu_info['name']})")
+                        logger.info(f"🖥️ VRAM Terpakai: {gpu_info['memory_allocated']:.1f} MB")
+                        logger.info(f"🖥️ VRAM Total: {gpu_info['memory_total']:.1f} MB")
+                    else:
+                        logger.info(f"🖥️ Model berada di CPU (GPU tidak tersedia)")
                 
                 # Tampilkan ringkasan konfigurasi
                 print("📋 Ringkasan Konfigurasi Model:")
@@ -126,7 +139,9 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
                 del model
                 
         except Exception as e:
-            logger.error(f"❌ Error saat inisialisasi model: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error saat inisialisasi model: {str(e)}")
+            print(f"❌ Error saat inisialisasi model: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -139,8 +154,8 @@ def on_initialize_model_clicked(ui_components, model_handler, config, logger):
             # Aktifkan kembali tombol
             ui_components['initialize_button'].disabled = False
             ui_components['initialize_button'].description = "Inisialisasi Model"
-
-def on_visualize_model_clicked(ui_components, model_handler, config, logger):
+def on_visualize_model_clicked(ui_components: Dict[str, Any], model_handler: Any,
+                             config: Dict[str, Any], logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol visualisasi model.
     
@@ -154,10 +169,11 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
     required_components = ['create_model_button', 'visualization_output', 'backbone_select',
                          'mode_select', 'viz_module_select']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return
     
     ui_components['create_model_button'].disabled = True
     ui_components['create_model_button'].description = "Memproses..."
@@ -174,6 +190,9 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
             else:
                 config['layers'] = ['banknote']
             
+            # Determine device consistently
+            device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            
             # Gunakan ModelHandler untuk membuat model
             model = model_handler.create_model(backbone_type=ui_components['backbone_select'].value)
             
@@ -182,7 +201,8 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
                 from smartcash.utils.layer_config_manager import get_layer_config
                 layer_config = get_layer_config()
             except ImportError:
-                logger.warning("⚠️ Import layer_config_manager tidak tersedia")
+                if logger:
+                    logger.warning("⚠️ Import layer_config_manager tidak tersedia")
             
             # Visualisasikan model
             try:
@@ -240,7 +260,8 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
                         print("!pip install torchsummary")
                 
             except ImportError:
-                logger.warning("⚠️ ModelVisualizer tidak tersedia, menggunakan visualisasi sederhana")
+                if logger:
+                    logger.warning("⚠️ ModelVisualizer tidak tersedia, menggunakan visualisasi sederhana")
                 
                 # Visualisasi sederhana
                 total_params = sum(p.numel() for p in model.parameters())
@@ -258,6 +279,8 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
             
         except Exception as e:
             print(f"❌ Gagal membuat atau memvisualisasikan model: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error memvisualisasikan model: {str(e)}")
             import traceback
             traceback.print_exc()
             
@@ -266,7 +289,8 @@ def on_visualize_model_clicked(ui_components, model_handler, config, logger):
             ui_components['create_model_button'].disabled = False
             ui_components['create_model_button'].description = "Buat Model & Visualisasikan"
 
-def on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger):
+def on_list_checkpoints_clicked(ui_components: Dict[str, Any], checkpoint_handler: Any, 
+                              logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol melihat checkpoint.
     
@@ -277,7 +301,8 @@ def on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger):
     """
     # Validate UI components
     if 'checkpoints_output' not in ui_components:
-        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        if logger:
+            logger.error("❌ Required UI component 'checkpoints_output' not found")
         return
     
     with ui_components['checkpoints_output']:
@@ -346,9 +371,12 @@ def on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger):
                 plt.show()
                 
         except Exception as e:
-            logger.error(f"❌ Error saat melihat checkpoint: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error saat melihat checkpoint: {str(e)}")
+            print(f"❌ Error saat melihat checkpoint: {str(e)}")
 
-def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
+def on_cleanup_checkpoints_clicked(ui_components: Dict[str, Any], checkpoint_handler: Any, 
+                                 logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol membersihkan checkpoint.
     
@@ -359,7 +387,8 @@ def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
     """
     # Validate UI components
     if 'checkpoints_output' not in ui_components:
-        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        if logger:
+            logger.error("❌ Required UI component 'checkpoints_output' not found")
         return
     
     with ui_components['checkpoints_output']:
@@ -367,7 +396,8 @@ def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
         
         try:
             # Tampilkan konfirmasi
-            logger.warning("⚠️ Ini akan menghapus checkpoint yang tidak diperlukan. Hanya checkpoint 'best' dan 'latest' yang dipertahankan.")
+            if logger:
+                logger.warning("⚠️ Ini akan menghapus checkpoint yang tidak diperlukan. Hanya checkpoint 'best' dan 'latest' yang dipertahankan.")
             
             # Buat tombol konfirmasi
             confirm_button = widgets.Button(
@@ -390,20 +420,29 @@ def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
                     results = checkpoint_handler.clean_checkpoints(keep_best=True, keep_latest=True)
                     
                     if results and 'removed' in results:
-                        logger.success(f"✅ Berhasil membersihkan {results['removed']} checkpoint")
-                        logger.info(f"📁 Ukuran yang dibebaskan: {results.get('freed_space_mb', 0):.2f} MB")
+                        if logger:
+                            logger.success(f"✅ Berhasil membersihkan {results['removed']} checkpoint")
+                            logger.info(f"📁 Ukuran yang dibebaskan: {results.get('freed_space_mb', 0):.2f} MB")
+                        print(f"✅ Berhasil membersihkan {results['removed']} checkpoint")
+                        print(f"📁 Ukuran yang dibebaskan: {results.get('freed_space_mb', 0):.2f} MB")
                     else:
-                        logger.info("ℹ️ Tidak ada checkpoint yang perlu dibersihkan")
+                        if logger:
+                            logger.info("ℹ️ Tidak ada checkpoint yang perlu dibersihkan")
+                        print("ℹ️ Tidak ada checkpoint yang perlu dibersihkan")
                         
                 except Exception as e:
-                    logger.error(f"❌ Error saat membersihkan checkpoint: {str(e)}")
+                    if logger:
+                        logger.error(f"❌ Error saat membersihkan checkpoint: {str(e)}")
+                    print(f"❌ Error saat membersihkan checkpoint: {str(e)}")
                     
                 # Tampilkan kembali checkpoint yang tersisa
                 on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger)
             
             def on_cancel(b):
                 clear_output()
-                logger.info("ℹ️ Pembersihan checkpoint dibatalkan")
+                if logger:
+                    logger.info("ℹ️ Pembersihan checkpoint dibatalkan")
+                print("ℹ️ Pembersihan checkpoint dibatalkan")
                 
                 # Tampilkan kembali list checkpoint
                 on_list_checkpoints_clicked(ui_components, checkpoint_handler, logger)
@@ -414,9 +453,11 @@ def on_cleanup_checkpoints_clicked(ui_components, checkpoint_handler, logger):
             display(widgets.HBox([confirm_button, cancel_button]))
             
         except Exception as e:
-            logger.error(f"❌ Error saat mempersiapkan pembersihan checkpoint: {str(e)}")
-
-def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_handler, logger):
+            if logger:
+                logger.error(f"❌ Error saat mempersiapkan pembersihan checkpoint: {str(e)}")
+            print(f"❌ Error saat mempersiapkan pembersihan checkpoint: {str(e)}")
+def on_compare_checkpoints_clicked(ui_components: Dict[str, Any], checkpoint_handler: Any, 
+                                model_handler: Any, logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol membandingkan checkpoint.
     
@@ -428,7 +469,8 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
     """
     # Validate UI components
     if 'checkpoints_output' not in ui_components:
-        logger.error("❌ Required UI component 'checkpoints_output' not found")
+        if logger:
+            logger.error("❌ Required UI component 'checkpoints_output' not found")
         return
     
     with ui_components['checkpoints_output']:
@@ -445,7 +487,9 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
                     all_checkpoints.extend(checkpoint_list)
             
             if not all_checkpoints:
-                logger.warning("⚠️ Tidak ada checkpoint yang tersedia untuk dibandingkan")
+                if logger:
+                    logger.warning("⚠️ Tidak ada checkpoint yang tersedia untuk dibandingkan")
+                print("⚠️ Tidak ada checkpoint yang tersedia untuk dibandingkan")
                 return
             
             # Ambil max 5 checkpoint terbaru
@@ -489,12 +533,19 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
                         ckpt2_path = checkpoint2_dropdown.value
                         
                         if ckpt1_path == ckpt2_path:
-                            logger.warning("⚠️ Pilih dua checkpoint yang berbeda untuk dibandingkan")
+                            if logger:
+                                logger.warning("⚠️ Pilih dua checkpoint yang berbeda untuk dibandingkan")
+                            print("⚠️ Pilih dua checkpoint yang berbeda untuk dibandingkan")
                             return
                         
-                        logger.info(f"🔄 Membandingkan checkpoint:")
-                        logger.info(f"• Checkpoint 1: {os.path.basename(ckpt1_path)}")
-                        logger.info(f"• Checkpoint 2: {os.path.basename(ckpt2_path)}")
+                        if logger:
+                            logger.info(f"🔄 Membandingkan checkpoint:")
+                            logger.info(f"• Checkpoint 1: {os.path.basename(ckpt1_path)}")
+                            logger.info(f"• Checkpoint 2: {os.path.basename(ckpt2_path)}")
+                        
+                        print(f"🔄 Membandingkan checkpoint:")
+                        print(f"• Checkpoint 1: {os.path.basename(ckpt1_path)}")
+                        print(f"• Checkpoint 2: {os.path.basename(ckpt2_path)}")
                         
                         # Load checkpoints dan ekstrak informasi
                         ckpt1_info = checkpoint_handler.get_checkpoint_info(ckpt1_path)
@@ -573,7 +624,9 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
                         plt.show()
                         
                     except Exception as e:
-                        logger.error(f"❌ Error saat membandingkan checkpoint: {str(e)}")
+                        if logger:
+                            logger.error(f"❌ Error saat membandingkan checkpoint: {str(e)}")
+                        print(f"❌ Error saat membandingkan checkpoint: {str(e)}")
                         import traceback
                         traceback.print_exc()
             
@@ -587,9 +640,11 @@ def on_compare_checkpoints_clicked(ui_components, checkpoint_handler, model_hand
             ]))
             
         except Exception as e:
-            logger.error(f"❌ Error saat mempersiapkan perbandingan checkpoint: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error saat mempersiapkan perbandingan checkpoint: {str(e)}")
+            print(f"❌ Error saat mempersiapkan perbandingan checkpoint: {str(e)}")
 
-def on_mount_drive_clicked(ui_components, logger):
+def on_mount_drive_clicked(ui_components: Dict[str, Any], logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol mount Google Drive.
     
@@ -599,463 +654,42 @@ def on_mount_drive_clicked(ui_components, logger):
     """
     # Validate UI components
     if 'mount_drive_button' not in ui_components:
-        logger.error("❌ Required UI component 'mount_drive_button' not found")
+        if logger:
+            logger.error("❌ Required UI component 'mount_drive_button' not found")
         return
     
     ui_components['mount_drive_button'].disabled = True
     
     try:
         from google.colab import drive
-        logger.info("🔄 Melakukan mount Google Drive...")
+        if logger:
+            logger.info("🔄 Melakukan mount Google Drive...")
+        print("🔄 Melakukan mount Google Drive...")
         drive.mount('/content/drive')
-        logger.success("✅ Google Drive berhasil di-mount")
+        if logger:
+            logger.success("✅ Google Drive berhasil di-mount")
+        print("✅ Google Drive berhasil di-mount")
         
         # Update tampilan tombol
         ui_components['mount_drive_button'].description = 'Google Drive Terpasang'
         ui_components['mount_drive_button'].button_style = ''
         ui_components['mount_drive_button'].icon = 'check'
     except ImportError:
-        logger.warning("⚠️ Tidak dapat melakukan mount Google Drive (bukan di Colab)")
+        if logger:
+            logger.warning("⚠️ Tidak dapat melakukan mount Google Drive (bukan di Colab)")
+        print("⚠️ Tidak dapat melakukan mount Google Drive (bukan di Colab)")
         ui_components['mount_drive_button'].description = 'Tidak di Colab'
         ui_components['mount_drive_button'].button_style = 'warning'
     except Exception as e:
-        logger.error(f"❌ Error saat mount Google Drive: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error saat mount Google Drive: {str(e)}")
+        print(f"❌ Error saat mount Google Drive: {str(e)}")
         ui_components['mount_drive_button'].disabled = False
         ui_components['mount_drive_button'].description = 'Mount Google Drive (Gagal)'
         ui_components['mount_drive_button'].button_style = 'danger'
 
-def on_check_memory_clicked(ui_components, memory_optimizer, logger):
-    """
-    Handler untuk tombol cek status memori.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        memory_optimizer: Instance dari MemoryOptimizer
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    if 'memory_output' not in ui_components:
-        logger.error("❌ Required UI component 'memory_output' not found")
-        return
-    
-    with ui_components['memory_output']:
-        clear_output()
-        
-        try:
-            # Periksa status memori
-            memory_optimizer.check_gpu_status()
-            
-            # Tambahkan informasi CPU dan RAM
-            try:
-                import psutil
-                cpu_usage = psutil.cpu_percent()
-                ram = psutil.virtual_memory()
-                
-                print(f"\n🖥️ CPU Usage: {cpu_usage}%")
-                print(f"💾 RAM: {ram.used / (1024**3):.2f} GB / {ram.total / (1024**3):.2f} GB ({ram.percent}%)")
-            except ImportError:
-                print("ℹ️ psutil tidak tersedia untuk monitor CPU/RAM")
-            
-            # Visualisasi jika GPU tersedia
-            stats = memory_optimizer.get_optimization_stats()
-            
-            plt.figure(figsize=(15, 5))
-            
-            # Plot GPU Memory (if available)
-            if 'gpu_available' in stats and stats['gpu_available'] and 'total_memory' in stats:
-                plt.subplot(1, 3, 1)
-                
-                # Data untuk pie chart GPU
-                gpu_sizes = [stats['used_memory'], stats['free_memory']]
-                gpu_labels = [f'Terpakai\n{gpu_sizes[0]:.1f} MB', f'Bebas\n{gpu_sizes[1]:.1f} MB']
-                plt.pie(gpu_sizes, labels=gpu_labels, autopct='%1.1f%%', colors=['#ff9999','#66b3ff'])
-                plt.title(f'GPU Memory ({stats["gpu_name"]})')
-            
-            # Plot RAM Usage if psutil available
-            try:
-                import psutil
-                ram = psutil.virtual_memory()
-                
-                plt.subplot(1, 3, 2)
-                ram_sizes = [ram.used / (1024**3), (ram.total - ram.used) / (1024**3)]
-                ram_labels = [f'Terpakai\n{ram_sizes[0]:.1f} GB', f'Bebas\n{ram_sizes[1]:.1f} GB']
-                plt.pie(ram_sizes, labels=ram_labels, autopct='%1.1f%%', colors=['#99ff99','#ffcc99'])
-                plt.title('RAM')
-            except ImportError:
-                pass
-            
-            plt.tight_layout()
-            plt.show()
-        
-        except Exception as e:
-            logger.error(f"❌ Error saat memeriksa status memori: {str(e)}")
-
-def on_clear_memory_clicked(ui_components, memory_optimizer, logger):
-    """
-    Handler untuk tombol membersihkan memori GPU.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        memory_optimizer: Instance dari MemoryOptimizer
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    if 'memory_output' not in ui_components:
-        logger.error("❌ Required UI component 'memory_output' not found")
-        return
-    
-    with ui_components['memory_output']:
-        clear_output()
-        
-        try:
-            # Bersihkan memori
-            before_stats = memory_optimizer.get_optimization_stats()
-            
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                
-            after_stats = memory_optimizer.get_optimization_stats()
-            
-            # Tampilkan hasil pembersihan
-            if 'gpu_available' in before_stats and before_stats['gpu_available']:
-                freed_memory = before_stats['used_memory'] - after_stats['used_memory']
-                logger.success(f"✅ Memori berhasil dibersihkan")
-                logger.info(f"📊 Memory sebelum: {before_stats['used_memory']:.1f} MB")
-                logger.info(f"📊 Memory sesudah: {after_stats['used_memory']:.1f} MB")
-                logger.info(f"📊 Memory dibebaskan: {freed_memory:.1f} MB")
-                
-                # Plot perbandingan
-                plt.figure(figsize=(10, 5))
-                bars = plt.bar(['Sebelum', 'Sesudah'], 
-                           [before_stats['used_memory'], after_stats['used_memory']])
-                
-                # Tambahkan label di atas bar
-                for bar in bars:
-                    height = bar.get_height()
-                    plt.text(
-                        bar.get_x() + bar.get_width()/2.,
-                        height + 1,
-                        f'{height:.1f} MB',
-                        ha='center', 
-                        va='bottom'
-                    )
-                
-                plt.title('Penggunaan Memori GPU')
-                plt.ylabel('Memori Terpakai (MB)')
-                plt.grid(True, linestyle='--', alpha=0.7)
-                plt.tight_layout()
-                plt.show()
-            else:
-                logger.info("ℹ️ Memori berhasil dibersihkan")
-                logger.info("ℹ️ GPU tidak tersedia, membersihkan memori CPU")
-        
-        except Exception as e:
-            logger.error(f"❌ Error saat membersihkan memori: {str(e)}")
-
-def on_optimize_batch_size_clicked(ui_components, memory_optimizer, logger):
-    """
-    Handler untuk tombol optimasi batch size.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        memory_optimizer: Instance dari MemoryOptimizer
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    if 'memory_output' not in ui_components:
-        logger.error("❌ Required UI component 'memory_output' not found")
-        return
-    
-    with ui_components['memory_output']:
-        clear_output()
-        
-        try:
-            # Jalankan optimasi batch size
-            logger.info("🔄 Menjalankan optimasi batch size...")
-            
-            if hasattr(memory_optimizer, 'find_optimal_batch_size'):
-                results = memory_optimizer.find_optimal_batch_size()
-                
-                if results:
-                    logger.success(f"✅ Optimasi batch size selesai")
-                    logger.info(f"📊 Batch size optimal: {results.get('optimal_batch_size', 'N/A')}")
-                    logger.info(f"📊 Memory usage: {results.get('memory_usage_mb', 0):.1f} MB")
-                    logger.info(f"📊 Safety margin: {results.get('safety_margin', 0)*100:.0f}%")
-                    
-                    # Rekomendasi berdasarkan hasil
-                    if 'safe_recommendations' in results:
-                        print("\n💡 Rekomendasi Batch Size:")
-                        for model_type, batch_size in results['safe_recommendations'].items():
-                            print(f"• {model_type}: {batch_size}")
-                else:
-                    logger.warning("⚠️ Tidak dapat menentukan batch size optimal")
-            else:
-                # Fallback jika metode tidak tersedia
-                batch_sizes = [8, 16, 32, 64]
-                memory_usage = []
-                
-                if torch.cuda.is_available():
-                    # Cek memori awal
-                    before_mem = torch.cuda.memory_allocated() / (1024 * 1024)
-                    total_mem = torch.cuda.get_device_properties(0).total_memory / (1024 * 1024)
-                    available_mem = total_mem - before_mem
-                    
-                    # Estimasi batch size berdasarkan memori tersedia
-                    recommended_bs = int(((available_mem * 0.7) // 512) * 8)  # Heuristic formula
-                    recommended_bs = max(8, recommended_bs)  # Minimal 8
-                    recommended_bs = (recommended_bs // 8) * 8  # Round to nearest multiple of 8
-                    
-                    logger.info(f"📊 Memori GPU tersedia: {available_mem:.1f} MB")
-                    logger.info(f"📊 Perkiraan batch size optimal: {recommended_bs}")
-                    logger.info("💡 Ini hanya estimasi. Batch size yang lebih kecil biasanya lebih aman.")
-                else:
-                    logger.warning("⚠️ GPU tidak tersedia, menggunakan estimasi default")
-                    logger.info("📊 Rekomendasi batch size untuk CPU: 8-16")
-        
-        except Exception as e:
-            logger.error(f"❌ Error saat optimasi batch size: {str(e)}")
-
-def on_clear_cache_clicked(ui_components, cache, logger):
-    """
-    Handler untuk tombol clear cache.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        cache: Instance dari EnhancedCache
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    if 'memory_output' not in ui_components:
-        logger.error("❌ Required UI component 'memory_output' not found")
-        return
-    
-    with ui_components['memory_output']:
-        clear_output()
-        
-        try:
-            # Periksa apakah cache tersedia
-            if not cache:
-                logger.warning("⚠️ Cache tidak tersedia")
-                return
-            
-            # Get cache stats before cleaning
-            before_stats = cache.get_stats()
-            
-            # Bersihkan cache
-            if hasattr(cache, 'clear'):
-                cache.clear()
-                logger.success("✅ Cache berhasil dibersihkan")
-            else:
-                logger.warning("⚠️ Metode clear tidak tersedia pada cache")
-                return
-            
-            # Get cache stats after cleaning
-            after_stats = cache.get_stats()
-            
-            # Tampilkan hasil pembersihan
-            logger.info(f"📊 Cache sebelum: {before_stats['cache_size_mb']:.1f} MB ({before_stats['file_count']} file)")
-            logger.info(f"📊 Cache sesudah: {after_stats['cache_size_mb']:.1f} MB ({after_stats['file_count']} file)")
-            logger.info(f"📊 Ruang dibebaskan: {before_stats['cache_size_mb'] - after_stats['cache_size_mb']:.1f} MB")
-            
-            # Visualisasi hasil
-            if before_stats['cache_size_mb'] > 0:
-                plt.figure(figsize=(10, 5))
-                plt.bar(['Sebelum', 'Sesudah'], 
-                      [before_stats['cache_size_mb'], after_stats['cache_size_mb']])
-                plt.title('Ukuran Cache')
-                plt.ylabel('Ukuran (MB)')
-                plt.grid(True, linestyle='--', alpha=0.7)
-                plt.tight_layout()
-                plt.show()
-            
-        except Exception as e:
-            logger.error(f"❌ Error saat membersihkan cache: {str(e)}")
-
-def on_verify_cache_clicked(ui_components, cache, logger):
-    """
-    Handler untuk tombol verify cache.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        cache: Instance dari EnhancedCache
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    if 'memory_output' not in ui_components:
-        logger.error("❌ Required UI component 'memory_output' not found")
-        return
-    
-    with ui_components['memory_output']:
-        clear_output()
-        
-        try:
-            # Periksa apakah cache tersedia
-            if not cache:
-                logger.warning("⚠️ Cache tidak tersedia")
-                return
-            
-            # Verifikasi cache
-            if hasattr(cache, 'verify'):
-                results = cache.verify()
-                
-                if results:
-                    logger.success("✅ Verifikasi cache selesai")
-                    logger.info(f"📊 File terverifikasi: {results.get('verified_files', 0)}")
-                    logger.info(f"📊 File rusak: {results.get('corrupt_files', 0)}")
-                    logger.info(f"📊 File terhapus: {results.get('missing_files', 0)}")
-                    
-                    # Jika ada file yang rusak atau hilang, beri opsi untuk fix
-                    if results.get('corrupt_files', 0) > 0 or results.get('missing_files', 0) > 0:
-                        fix_button = widgets.Button(
-                            description='Perbaiki Cache',
-                            button_style='warning',
-                            icon='wrench'
-                        )
-                        
-                        def on_fix(b):
-                            with ui_components['memory_output']:
-                                clear_output()
-                                
-                                if hasattr(cache, 'repair'):
-                                    repair_results = cache.repair()
-                                    
-                                    if repair_results:
-                                        logger.success("✅ Perbaikan cache selesai")
-                                        logger.info(f"📊 File diperbaiki: {repair_results.get('fixed_files', 0)}")
-                                        logger.info(f"📊 File dibersihkan: {repair_results.get('cleaned_files', 0)}")
-                                    else:
-                                        logger.warning("⚠️ Tidak ada perbaikan yang dilakukan")
-                                else:
-                                    logger.warning("⚠️ Metode repair tidak tersedia pada cache")
-                        
-                        fix_button.on_click(on_fix)
-                        display(fix_button)
-                else:
-                    logger.warning("⚠️ Verifikasi cache gagal")
-            else:
-                # Fallback jika verify tidak tersedia
-                stats = cache.get_stats()
-                logger.info("ℹ️ Informasi Cache:")
-                logger.info(f"📊 Ukuran cache: {stats['cache_size_mb']:.1f} MB")
-                logger.info(f"📊 Jumlah file: {stats['file_count']}")
-                logger.info(f"📊 Batas maksimum: {stats['max_size_mb']:.1f} MB")
-                
-                # Visualisasi penggunaan cache
-                plt.figure(figsize=(10, 5))
-                plt.pie(
-                    [stats['cache_size_mb'], stats['max_size_mb'] - stats['cache_size_mb']],
-                    labels=['Terpakai', 'Tersisa'],
-                    autopct='%1.1f%%',
-                    colors=['#3498db', '#e5e5e5']
-                )
-                plt.title('Penggunaan Cache')
-                plt.axis('equal')
-                plt.tight_layout()
-                plt.show()
-        
-        except Exception as e:
-            logger.error(f"❌ Error saat verifikasi cache: {str(e)}")
-
-def on_export_format_change(change, ui_components):
-    """
-    Handler untuk perubahan format ekspor.
-    
-    Args:
-        change: Change event dari dropdown
-        ui_components: Dictionary komponen UI dari create_model_exporter_ui()
-    """
-    # Validate UI components
-    required_components = ['onnx_opset_selector', 'optimize_checkbox']
-    for component in required_components:
-        if component not in ui_components:
-            return
-    
-    if change['new'] == 'onnx':
-        ui_components['onnx_opset_selector'].disabled = False
-        ui_components['optimize_checkbox'].disabled = True
-    else:
-        ui_components['onnx_opset_selector'].disabled = True
-        ui_components['optimize_checkbox'].disabled = False
-
-def on_export_button_clicked(ui_components, model_exporter, logger):
-    """
-    Handler untuk tombol ekspor model.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_exporter_ui()
-        model_exporter: Instance dari ModelExporter
-        logger: Logger untuk mencatat aktivitas
-    """
-    # Validate UI components
-    required_components = ['export_button', 'export_output', 'export_format_selector',
-                         'optimize_checkbox', 'copy_to_drive_checkbox']
-    
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return
-    
-    # Update tombol
-    ui_components['export_button'].description = "Memproses..."
-    ui_components['export_button'].disabled = True
-    
-    with ui_components['export_output']:
-        clear_output()
-        
-        try:
-            # Jalankan ekspor berdasarkan format yang dipilih
-            export_format = ui_components['export_format_selector'].value
-            
-            if export_format == 'torchscript':
-                export_path = model_exporter.export_to_torchscript(
-                    optimize=ui_components['optimize_checkbox'].value
-                )
-            elif export_format == 'onnx':
-                # Check if onnx_opset_selector exists and is enabled
-                if 'onnx_opset_selector' in ui_components and not ui_components['onnx_opset_selector'].disabled:
-                    opset_version = ui_components['onnx_opset_selector'].value
-                else:
-                    opset_version = 12  # Default
-                
-                export_path = model_exporter.export_to_onnx(
-                    opset_version=opset_version
-                )
-            else:
-                print(f"❌ Format ekspor tidak valid: {export_format}")
-                return
-            
-            # Cek hasil ekspor
-            if export_path:
-                export_file = Path(export_path)
-                file_size = export_file.stat().st_size / (1024 * 1024)  # size in MB
-                
-                print(f"\n✅ Model berhasil diekspor:")
-                print(f"📁 Path: {export_path}")
-                print(f"📊 Ukuran: {file_size:.2f} MB")
-                print(f"🔄 Format: {export_format}")
-                print(f"🕒 Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-                
-                # Salin ke Drive jika diminta
-                if ui_components['copy_to_drive_checkbox'].value and os.path.exists("/content/drive"):
-                    drive_path = model_exporter.copy_to_drive(export_path)
-                    if drive_path:
-                        print(f"\n✅ Model berhasil disalin ke Google Drive:")
-                        print(f"📁 Path: {drive_path}")
-            else:
-                print("❌ Ekspor model gagal")
-                
-        except Exception as e:
-            print(f"❌ Error saat mengekspor model: {str(e)}")
-            import traceback
-            traceback.print_exc()
-        
-        finally:
-            # Reset tombol
-            ui_components['export_button'].description = "Ekspor Model"
-            ui_components['export_button'].disabled = False
-
-def setup_model_initialization_handlers(ui_components, model_handler, config, logger):
+def setup_model_initialization_handlers(ui_components: Dict[str, Any], model_handler: Any, 
+                                      config: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI inisialisasi model.
     
@@ -1071,10 +705,11 @@ def setup_model_initialization_handlers(ui_components, model_handler, config, lo
     # Validate required components
     required_components = ['initialize_button']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return ui_components
     
     # Bind event handler untuk tombol inisialisasi
     ui_components['initialize_button'].on_click(
@@ -1083,7 +718,8 @@ def setup_model_initialization_handlers(ui_components, model_handler, config, lo
     
     return ui_components
 
-def setup_model_visualizer_handlers(ui_components, model_handler, config, logger):
+def setup_model_visualizer_handlers(ui_components: Dict[str, Any], model_handler: Any, 
+                                  config: Dict[str, Any], logger: Optional[Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI visualisasi model.
     
@@ -1099,10 +735,11 @@ def setup_model_visualizer_handlers(ui_components, model_handler, config, logger
     # Validate required components
     required_components = ['create_model_button']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return ui_components
     
     # Bind event handler untuk tombol visualisasi
     ui_components['create_model_button'].on_click(
@@ -1111,7 +748,8 @@ def setup_model_visualizer_handlers(ui_components, model_handler, config, logger
     
     return ui_components
 
-def setup_checkpoint_manager_handlers(ui_components, checkpoint_handler, model_handler, logger):
+def setup_checkpoint_manager_handlers(ui_components: Dict[str, Any], checkpoint_handler: Any, 
+                                    model_handler: Any, logger: Optional[Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI manajemen checkpoint.
     
@@ -1125,12 +763,14 @@ def setup_checkpoint_manager_handlers(ui_components, checkpoint_handler, model_h
         Dictionary berisi updated UI components dengan handler yang telah ditambahkan
     """
     # Validate required components
-    required_components = ['list_checkpoints_button', 'cleanup_checkpoints_button', 'compare_button', 'mount_drive_button']
+    required_components = ['list_checkpoints_button', 'cleanup_checkpoints_button', 
+                         'compare_button', 'mount_drive_button']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return ui_components
     
     # Bind event handler untuk tombol daftar checkpoint
     ui_components['list_checkpoints_button'].on_click(
@@ -1164,91 +804,5 @@ def setup_checkpoint_manager_handlers(ui_components, checkpoint_handler, model_h
         ui_components['mount_drive_button'].disabled = True
         ui_components['mount_drive_button'].description = 'Tidak di Colab'
         ui_components['mount_drive_button'].button_style = 'warning'
-    
-    return ui_components
-
-def setup_model_optimization_handlers(ui_components, memory_optimizer, cache, logger):
-    """
-    Setup handler untuk komponen UI optimasi model.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_optimization_ui()
-        memory_optimizer: Instance dari MemoryOptimizer
-        cache: Instance dari EnhancedCache
-        logger: Logger untuk mencatat aktivitas
-        
-    Returns:
-        Dictionary berisi updated UI components dengan handler yang telah ditambahkan
-    """
-    # Validate required components
-    required_components = ['check_memory_button', 'clear_memory_button', 'optimize_button',
-                         'clear_cache_button', 'verify_cache_button']
-    
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
-    
-    # Bind event handler untuk tombol cek memori
-    ui_components['check_memory_button'].on_click(
-        lambda b: on_check_memory_clicked(ui_components, memory_optimizer, logger)
-    )
-    
-    # Bind event handler untuk tombol bersihkan memori
-    ui_components['clear_memory_button'].on_click(
-        lambda b: on_clear_memory_clicked(ui_components, memory_optimizer, logger)
-    )
-    
-    # Bind event handler untuk tombol optimasi batch size
-    ui_components['optimize_button'].on_click(
-        lambda b: on_optimize_batch_size_clicked(ui_components, memory_optimizer, logger)
-    )
-    
-    # Bind event handler untuk tombol bersihkan cache
-    ui_components['clear_cache_button'].on_click(
-        lambda b: on_clear_cache_clicked(ui_components, cache, logger)
-    )
-    
-    # Bind event handler untuk tombol verifikasi cache
-    ui_components['verify_cache_button'].on_click(
-        lambda b: on_verify_cache_clicked(ui_components, cache, logger)
-    )
-    
-    return ui_components
-
-def setup_model_exporter_handlers(ui_components, model_exporter, logger):
-    """
-    Setup handler untuk komponen UI ekspor model.
-    
-    Args:
-        ui_components: Dictionary komponen UI dari create_model_exporter_ui()
-        model_exporter: Instance dari ModelExporter
-        logger: Logger untuk mencatat aktivitas
-        
-    Returns:
-        Dictionary berisi updated UI components dengan handler yang telah ditambahkan
-    """
-    # Validate required components
-    required_components = ['export_format_selector', 'export_button']
-    
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
-    
-    # Bind event handler untuk perubahan format
-    ui_components['export_format_selector'].observe(
-        lambda change: on_export_format_change(change, ui_components), 
-        names='value'
-    )
-    
-    # Bind event handler untuk tombol ekspor
-    ui_components['export_button'].on_click(
-        lambda b: on_export_button_clicked(ui_components, model_exporter, logger)
-    )
-    
-    # Set status awal copy_to_drive_checkbox berdasarkan ketersediaan Google Drive
-    if 'copy_to_drive_checkbox' in ui_components:
-        ui_components['copy_to_drive_checkbox'].disabled = not os.path.exists("/content/drive")
     
     return ui_components

@@ -2,6 +2,7 @@
 File: smartcash/handlers/ui_handlers/data_handlers.py
 Author: Alfrida Sabar
 Deskripsi: Handler untuk komponen UI data, termasuk statistik dataset dan fungsi utilitas data.
+           Memperbaiki import dan memperbaiki validasi komponen UI.
 """
 
 import gc
@@ -11,10 +12,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import ipywidgets as widgets  # Added for widget references
 from IPython.display import display, clear_output, HTML
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Tuple, Union, Callable
 
 
-def on_refresh_info_clicked(ui_components, data_manager, logger):
+def on_refresh_info_clicked(ui_components: Dict[str, Any], data_manager: Any, logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol refresh informasi dataset.
     
@@ -23,11 +24,17 @@ def on_refresh_info_clicked(ui_components, data_manager, logger):
         data_manager: Instance dari DataManager untuk akses data
         logger: Logger untuk mencatat aktivitas
     """
+    # Validate UI components
+    if 'info_output' not in ui_components:
+        if logger:
+            logger.error("❌ Required UI component 'info_output' not found")
+        return
+        
     with ui_components['info_output']:
         clear_output()
         get_dataset_info(data_manager, logger)
 
-def get_dataset_info(data_manager, logger):
+def get_dataset_info(data_manager: Any, logger: Optional[Any] = None) -> None:
     """
     Ambil dan tampilkan informasi dataset.
     
@@ -152,9 +159,9 @@ def get_dataset_info(data_manager, logger):
                 display(HTML(f"<p><b>{split.capitalize()}</b>: Error - {str(e)}</p>"))
     except Exception as e:
         display(HTML(f"<p>❌ Error mendapatkan informasi dataset: {str(e)}</p>"))
-        logger.error(f"Error mendapatkan informasi dataset: {str(e)}")
-
-def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
+        if logger:
+            logger.error(f"Error mendapatkan informasi dataset: {str(e)}")
+def on_split_button_clicked(ui_components: Dict[str, Any], data_manager: Any, preprocessor: Any, logger: Optional[Any] = None) -> None:
     """
     Handler untuk tombol split dataset.
     
@@ -165,16 +172,13 @@ def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
         logger: Logger untuk mencatat aktivitas
     """
     # Validate UI components
-    if 'split_button' not in ui_components:
-        logger.error("❌ UI component 'split_button' not found")
-        return
+    required_components = ['split_button', 'split_status_output', 'train_ratio_slider', 
+                         'valid_ratio_slider', 'test_ratio_slider']
     
-    if 'split_status_output' not in ui_components:
-        logger.error("❌ UI component 'split_status_output' not found")
-        return
-    
-    if 'train_ratio_slider' not in ui_components or 'valid_ratio_slider' not in ui_components or 'test_ratio_slider' not in ui_components:
-        logger.error("❌ Required slider UI components not found")
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
         return
     
     # Disable tombol selama proses
@@ -188,7 +192,8 @@ def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
         valid_ratio = ui_components['valid_ratio_slider'].value
         test_ratio = ui_components['test_ratio_slider'].value
         
-        logger.info(f"🔄 Memulai split dataset dengan rasio: Train={train_ratio:.2f}, Valid={valid_ratio:.2f}, Test={test_ratio:.2f}...")
+        if logger:
+            logger.info(f"🔄 Memulai split dataset dengan rasio: Train={train_ratio:.2f}, Valid={valid_ratio:.2f}, Test={test_ratio:.2f}...")
         
         # Pemanggilan preprocessor untuk melakukan split dataset
         try:
@@ -201,11 +206,12 @@ def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
             if results.get('success', False):
                 stats = results.get('stats', {})
                 
-                logger.success("✅ Dataset berhasil dibagi")
-                logger.info(f"📊 Statistik:")
-                logger.info(f"• Training: {stats.get('train', 0)} gambar")
-                logger.info(f"• Validation: {stats.get('valid', 0)} gambar")
-                logger.info(f"• Testing: {stats.get('test', 0)} gambar")
+                if logger:
+                    logger.success("✅ Dataset berhasil dibagi")
+                    logger.info(f"📊 Statistik:")
+                    logger.info(f"• Training: {stats.get('train', 0)} gambar")
+                    logger.info(f"• Validation: {stats.get('valid', 0)} gambar")
+                    logger.info(f"• Testing: {stats.get('test', 0)} gambar")
                 
                 # Visualisasikan statistik
                 plt.figure(figsize=(8, 5))
@@ -218,15 +224,19 @@ def on_split_button_clicked(ui_components, data_manager, preprocessor, logger):
                 plt.title('Distribusi Dataset')
                 plt.show()
             else:
-                logger.error(f"❌ Gagal membagi dataset: {results.get('message', 'Unknown error')}")
+                if logger:
+                    logger.error(f"❌ Gagal membagi dataset: {results.get('message', 'Unknown error')}")
+                print(f"❌ Gagal membagi dataset: {results.get('message', 'Unknown error')}")
         except Exception as e:
-            logger.error(f"❌ Error saat split dataset: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error saat split dataset: {str(e)}")
+            print(f"❌ Error saat split dataset: {str(e)}")
         
         # Re-enable tombol
         ui_components['split_button'].disabled = False
         ui_components['split_button'].description = "Split Dataset"
 
-def update_total_ratio(ui_components):
+def update_total_ratio(ui_components: Dict[str, Any]) -> None:
     """
     Handler untuk update tampilan total ratio saat slider berubah.
     
@@ -234,16 +244,12 @@ def update_total_ratio(ui_components):
         ui_components: Dictionary berisi komponen UI dari create_split_dataset_ui()
     """
     # Validate UI components
-    if 'train_ratio_slider' not in ui_components or 'valid_ratio_slider' not in ui_components or 'test_ratio_slider' not in ui_components:
-        print("❌ Required ratio slider UI components not found")
-        return
+    required_components = ['train_ratio_slider', 'valid_ratio_slider', 'test_ratio_slider',
+                         'total_ratio_text', 'split_button']
     
-    if 'total_ratio_text' not in ui_components:
-        print("❌ UI component 'total_ratio_text' not found")
-        return
-    
-    if 'split_button' not in ui_components:
-        print("❌ UI component 'split_button' not found")
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        print(f"❌ Missing UI components: {', '.join(missing_components)}")
         return
     
     train = ui_components['train_ratio_slider'].value
@@ -259,7 +265,7 @@ def update_total_ratio(ui_components):
         ui_components['total_ratio_text'].value = f"<b>Total Ratio: {total:.2f}</b> ❌ (harus 1.0)"
         ui_components['split_button'].disabled = True
 
-def check_data_availability(data_manager, logger):
+def check_data_availability(data_manager: Any, logger: Optional[Any] = None) -> bool:
     """
     Memeriksa ketersediaan data dan menampilkan statistik.
     
@@ -278,32 +284,37 @@ def check_data_availability(data_manager, logger):
                 dataset = data_manager.get_dataset(split)
                 sizes[split] = len(dataset) if dataset else 0
             except Exception as e:
-                logger.warning(f"⚠️ Error mendapatkan ukuran dataset {split}: {str(e)}")
+                if logger:
+                    logger.warning(f"⚠️ Error mendapatkan ukuran dataset {split}: {str(e)}")
                 sizes[split] = 0
         
         # Tampilkan informasi
-        logger.info("🔍 Memeriksa ketersediaan data...")
-        for split, count in sizes.items():
-            status = "✅ Tersedia" if count > 0 else "❌ Tidak tersedia"
-            logger.info(f"{split.capitalize()}: {count} gambar - {status}")
+        if logger:
+            logger.info("🔍 Memeriksa ketersediaan data...")
+            for split, count in sizes.items():
+                status = "✅ Tersedia" if count > 0 else "❌ Tidak tersedia"
+                logger.info(f"{split.capitalize()}: {count} gambar - {status}")
         
         # Periksa apakah data cukup untuk training
         if sizes.get('train', 0) > 0 and sizes.get('valid', 0) > 0:
-            logger.success("✅ Data tersedia untuk training dan validasi")
+            if logger:
+                logger.success("✅ Data tersedia untuk training dan validasi")
             return True
         else:
-            if sizes.get('train', 0) == 0:
+            if sizes.get('train', 0) == 0 and logger:
                 logger.warning("⚠️ Data training tidak tersedia")
-            if sizes.get('valid', 0) == 0:
+            if sizes.get('valid', 0) == 0 and logger:
                 logger.warning("⚠️ Data validasi tidak tersedia")
             
-            logger.info("💡 Gunakan tab 'Split Dataset' untuk menyiapkan data training dan validasi")
+            if logger:
+                logger.info("💡 Gunakan tab 'Split Dataset' untuk menyiapkan data training dan validasi")
             return False
     except Exception as e:
-        logger.error(f"❌ Error saat memeriksa ketersediaan data: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error saat memeriksa ketersediaan data: {str(e)}")
         return False
-
-def visualize_batch(data_manager, split='train', num_images=4, figsize=(15, 10), logger=None):
+def visualize_batch(data_manager: Any, split: str = 'train', num_images: int = 4, 
+                figsize: Tuple[int, int] = (15, 10), logger: Optional[Any] = None) -> None:
     """
     Visualisasikan batch dataset untuk debugging dan verifikasi.
     
@@ -359,7 +370,8 @@ def visualize_batch(data_manager, split='train', num_images=4, figsize=(15, 10),
             logger.error(f"❌ Error saat visualisasi batch: {str(e)}")
         print(f"Gagal melakukan visualisasi: {str(e)}")
 
-def setup_dataset_info_handlers(ui_components, data_manager, logger):
+def setup_dataset_info_handlers(ui_components: Dict[str, Any], data_manager: Any, 
+                              logger: Optional[Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI informasi dataset.
     
@@ -373,7 +385,8 @@ def setup_dataset_info_handlers(ui_components, data_manager, logger):
     """
     # Validate UI components
     if 'refresh_info_button' not in ui_components:
-        logger.error("❌ UI component 'refresh_info_button' not found")
+        if logger:
+            logger.error("❌ UI component 'refresh_info_button' not found")
         return ui_components
     
     # Bind event handler untuk tombol refresh
@@ -383,7 +396,8 @@ def setup_dataset_info_handlers(ui_components, data_manager, logger):
     
     return ui_components
 
-def setup_split_dataset_handlers(ui_components, data_manager, preprocessor, logger):
+def setup_split_dataset_handlers(ui_components: Dict[str, Any], data_manager: Any, 
+                               preprocessor: Any, logger: Optional[Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI split dataset.
     
@@ -400,10 +414,11 @@ def setup_split_dataset_handlers(ui_components, data_manager, preprocessor, logg
     required_components = ['train_ratio_slider', 'valid_ratio_slider', 'test_ratio_slider', 
                           'total_ratio_text', 'split_button', 'split_status_output']
     
-    for component in required_components:
-        if component not in ui_components:
-            logger.error(f"❌ Required UI component '{component}' not found")
-            return ui_components
+    missing_components = [comp for comp in required_components if comp not in ui_components]
+    if missing_components:
+        if logger:
+            logger.error(f"❌ Missing UI components: {', '.join(missing_components)}")
+        return ui_components
     
     # Bind event handlers untuk slider
     ui_components['train_ratio_slider'].observe(

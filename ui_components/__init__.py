@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/__init__.py
 Author: Alfrida Sabar
-Deskripsi: Package initialization untuk UI components.
+Deskripsi: Package initialization untuk UI components dengan pola import yang konsisten.
 """
 
 # Data components
@@ -11,7 +11,6 @@ from smartcash.ui_components.data_components import (
     create_data_utils_ui,
     create_data_handling_ui
 )
-
 
 # Dataset components
 from smartcash.ui_components.dataset_components import (
@@ -56,9 +55,9 @@ from smartcash.ui_components.model_playground_components import (
 
 # Evaluation components
 from smartcash.ui_components.evaluation_components import (
-    create_model_selector_controls as create_eval_model_selector_controls,
-    create_evaluation_settings,
-    create_evaluation_ui
+    create_evaluation_ui,
+    create_model_selector_controls as create_evaluation_model_selector_controls,
+    create_evaluation_settings
 )
 
 # Research components
@@ -110,7 +109,7 @@ __all__ = [
     'create_model_test_controls', 'create_model_playground_ui',
     
     # Evaluation
-    'create_eval_model_selector_controls', 'create_evaluation_settings', 'create_evaluation_ui',
+    'create_evaluation_ui', 'create_evaluation_model_selector_controls', 'create_evaluation_settings',
     
     # Research
     'create_scenario_checkboxes', 'create_evaluation_controls', 'create_research_ui',

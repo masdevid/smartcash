@@ -4,6 +4,6 @@ Author: Alfrida Sabar
 Deskripsi: Package initialization untuk neck models.
 """
 
-from smartcash.models.necks.base import BaseNeck
+from smartcash.models.necks.fpn_pan import FeatureProcessingNeck, PathAggregationNeck   
 
-__all__ = ['BaseNeck']
+__all__ = ['FeatureProcessingNeck', 'PathAggregationNeck']

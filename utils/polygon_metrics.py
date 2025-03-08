@@ -1,136 +1,221 @@
-# File: utils/polygon_metrics.py
-# Author: Alfrida Sabar
-# Deskripsi: Kalkulator metrik khusus untuk deteksi poligon pada uang kertas
+"""
+File: smartcash/utils/polygon_metrics.py
+Author: Alfrida Sabar
+Deskripsi: Utilitas untuk menghitung metrik berbasis polygon seperti IoU (Intersection over Union) untuk evaluasi deteksi objek
+"""
 
-import torch
 import numpy as np
-from shapely.geometry import Polygon
-from typing import List, Dict, Tuple
+from typing import List, Tuple, Dict, Union, Optional
+from shapely.geometry import Polygon, box
 
-class PolygonMetricsCalculator:
-    """
-    Kalkulator metrik untuk evaluasi deteksi poligon 
-    dengan perhitungan akurasi geometri yang lebih presisi
-    """
+
+class PolygonMetrics:
+    """Kelas untuk kalkulasi metrik evaluasi berbasis polygon."""
     
-    def __init__(self, iou_threshold: float = 0.5):
-        self.iou_threshold = iou_threshold
-        self.reset()
-    
-    def reset(self):
-        """Reset semua metrik"""
-        self.tp = 0  # True Positives
-        self.fp = 0  # False Positives
-        self.fn = 0  # False Negatives
-        self.polygon_matches = []
-    
-    def _convert_to_shapely_polygon(
-        self, 
-        polygon_points: torch.Tensor
-    ) -> Polygon:
+    def __init__(self, logger=None):
         """
-        Konversi tensor polygon ke objek Shapely
+        Inisialisasi PolygonMetrics.
         
         Args:
-            polygon_points (torch.Tensor): Tensor koordinat polygon
-        
-        Returns:
-            Polygon: Objek Shapely untuk kalkulasi geometri
+            logger: Logger untuk mencatat aktivitas
         """
-        if polygon_points.dim() == 1:
-            polygon_points = polygon_points.view(-1, 2)
-        
-        return Polygon(polygon_points.cpu().numpy())
+        self.logger = logger
     
-    def calculate_polygon_iou(
+    def calculate_iou(
         self, 
-        pred_polygon: torch.Tensor, 
-        gt_polygon: torch.Tensor
+        box1: Union[List[float], np.ndarray], 
+        box2: Union[List[float], np.ndarray]
     ) -> float:
         """
-        Hitung Intersection over Union (IoU) untuk poligon
+        Hitung IoU (Intersection over Union) antara dua bounding box.
         
         Args:
-            pred_polygon (torch.Tensor): Poligon prediksi
-            gt_polygon (torch.Tensor): Poligon ground truth
-        
+            box1: Bounding box pertama dalam format [x1, y1, x2, y2]
+            box2: Bounding box kedua dalam format [x1, y1, x2, y2]
+            
         Returns:
-            float: Nilai IoU poligon
+            Nilai IoU (0-1)
         """
-        pred_poly = self._convert_to_shapely_polygon(pred_polygon)
-        gt_poly = self._convert_to_shapely_polygon(gt_polygon)
+        # Pastikan box dalam format yang benar
+        if len(box1) != 4 or len(box2) != 4:
+            if self.logger:
+                self.logger.warning("⚠️ Format box tidak valid, harus [x1, y1, x2, y2]")
+            return 0.0
         
-        intersection = pred_poly.intersection(gt_poly).area
-        union = pred_poly.union(gt_poly).area
+        # Ekstrak koordinat
+        x1_1, y1_1, x2_1, y2_1 = box1
+        x1_2, y1_2, x2_2, y2_2 = box2
         
-        return intersection / union if union > 0 else 0
+        # Cek validitas box
+        if x1_1 > x2_1 or y1_1 > y2_1 or x1_2 > x2_2 or y1_2 > y2_2:
+            if self.logger:
+                self.logger.warning("⚠️ Koordinat box tidak valid (x1 > x2 or y1 > y2)")
+            return 0.0
+        
+        # Hitung koordinat intersection
+        x_left = max(x1_1, x1_2)
+        y_top = max(y1_1, y1_2)
+        x_right = min(x2_1, x2_2)
+        y_bottom = min(y2_1, y2_2)
+        
+        # Cek apakah ada intersection
+        if x_right < x_left or y_bottom < y_top:
+            return 0.0
+            
+        # Hitung area intersection
+        intersection_area = (x_right - x_left) * (y_bottom - y_top)
+        
+        # Hitung area masing-masing box
+        box1_area = (x2_1 - x1_1) * (y2_1 - y1_1)
+        box2_area = (x2_2 - x1_2) * (y2_2 - y1_2)
+        
+        # Hitung area union
+        union_area = box1_area + box2_area - intersection_area
+        
+        # Hitung IoU
+        iou = intersection_area / union_area
+        
+        return iou
     
-    def update(
+    def calculate_poly_iou(
         self, 
-        predictions: torch.Tensor, 
-        ground_truth: torch.Tensor
+        poly1: List[Tuple[float, float]], 
+        poly2: List[Tuple[float, float]]
+    ) -> float:
+        """
+        Hitung IoU (Intersection over Union) antara dua polygon.
+        
+        Args:
+            poly1: Polygon pertama sebagai list koordinat [(x1, y1), (x2, y2), ...]
+            poly2: Polygon kedua sebagai list koordinat [(x1, y1), (x2, y2), ...]
+            
+        Returns:
+            Nilai IoU (0-1)
+        """
+        try:
+            # Konversi ke objek Polygon
+            polygon1 = Polygon(poly1)
+            polygon2 = Polygon(poly2)
+            
+            # Cek validitas polygon
+            if not polygon1.is_valid or not polygon2.is_valid:
+                if self.logger:
+                    self.logger.warning("⚠️ Polygon tidak valid")
+                return 0.0
+                
+            # Hitung intersection
+            intersection = polygon1.intersection(polygon2).area
+            
+            # Hitung union
+            union = polygon1.union(polygon2).area
+            
+            # Handle division by zero
+            if union == 0:
+                return 0.0
+                
+            # Hitung IoU
+            iou = intersection / union
+            
+            return iou
+            
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error menghitung Polygon IoU: {str(e)}")
+            return 0.0
+            
+    def box_to_polygon(
+        self, 
+        box: List[float], 
+        format: str = 'xyxy'
+    ) -> List[Tuple[float, float]]:
+        """
+        Konversi bounding box ke format polygon.
+        
+        Args:
+            box: Bounding box dalam format [x1, y1, x2, y2] (xyxy) atau [x, y, w, h] (xywh)
+            format: Format box ('xyxy' atau 'xywh')
+            
+        Returns:
+            List koordinat polygon [(x1, y1), (x2, y2), (x3, y3), (x4, y4)]
+        """
+        if format == 'xyxy':
+            x1, y1, x2, y2 = box
+            return [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+        elif format == 'xywh':
+            x, y, w, h = box
+            return [(x, y), (x+w, y), (x+w, y+h), (x, y+h)]
+        else:
+            if self.logger:
+                self.logger.warning(f"⚠️ Format box tidak didukung: {format}")
+            return []
+            
+    def calculate_mean_iou(
+        self, 
+        boxes_true: List[List[float]], 
+        boxes_pred: List[List[float]], 
+        threshold: float = 0.5
     ) -> Dict[str, float]:
         """
-        Update metrik dengan prediksi dan ground truth poligon
+        Hitung mIoU (mean Intersection over Union) untuk evaluasi deteksi.
         
         Args:
-            predictions (torch.Tensor): Prediksi poligon model
-            ground_truth (torch.Tensor): Ground truth poligon
-        
-        Returns:
-            Dict[str, float]: Metrik untuk batch ini
-        """
-        batch_metrics = {}
-        
-        for pred_poly, gt_poly in zip(predictions, ground_truth):
-            # Cari pasangan poligon dengan IoU tertinggi
-            best_iou = self._find_best_polygon_match(pred_poly, gt_poly)
+            boxes_true: List box ground truth [x1, y1, x2, y2]
+            boxes_pred: List box prediksi [x1, y1, x2, y2]
+            threshold: Threshold IoU untuk true positive
             
-            if best_iou >= self.iou_threshold:
-                self.tp += 1
-                self.polygon_matches.append((pred_poly, gt_poly, best_iou))
-            else:
-                self.fp += 1
-                self.fn += 1
-        
-        return batch_metrics
-    
-    def _find_best_polygon_match(
-        self, 
-        pred_poly: torch.Tensor, 
-        gt_poly: torch.Tensor
-    ) -> float:
-        """
-        Temukan pasangan poligon dengan IoU tertinggi
-        
-        Args:
-            pred_poly (torch.Tensor): Poligon prediksi
-            gt_poly (torch.Tensor): Poligon ground truth
-        
         Returns:
-            float: IoU tertinggi
+            Dictionary berisi mIoU dan metrik terkait
         """
-        return self.calculate_polygon_iou(pred_poly, gt_poly)
-    
-    def compute(self) -> Dict[str, float]:
-        """
-        Hitung metrik akhir untuk deteksi poligon
+        if not boxes_true or not boxes_pred:
+            return {
+                'miou': 0.0,
+                'tp': 0,
+                'fp': len(boxes_pred),
+                'fn': len(boxes_true)
+            }
+            
+        # Hitung IoU untuk semua kombinasi box
+        ious = np.zeros((len(boxes_true), len(boxes_pred)))
+        for i, box_true in enumerate(boxes_true):
+            for j, box_pred in enumerate(boxes_pred):
+                ious[i, j] = self.calculate_iou(box_true, box_pred)
         
-        Returns:
-            Dict[str, float]: Metrik deteksi poligon
-        """
-        precision = self.tp / (self.tp + self.fp) if (self.tp + self.fp) > 0 else 0
-        recall = self.tp / (self.tp + self.fn) if (self.tp + self.fn) > 0 else 0
+        # Temukan matching dengan IoU tertinggi
+        matched_indices = []
         
-        f1_score = (
-            2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0 
-            else 0
-        )
+        # Untuk setiap ground truth, temukan prediksi dengan IoU tertinggi
+        for i in range(len(boxes_true)):
+            if len(boxes_pred) == 0:
+                break
+                
+            # Temukan indeks prediksi dengan IoU tertinggi
+            j = np.argmax(ious[i])
+            
+            # Jika IoU diatas threshold, anggap sebagai match
+            if ious[i, j] >= threshold:
+                matched_indices.append((i, j))
+                
+                # Set IoU ke nol untuk mencegah matching berulang
+                ious[i, :] = 0
+                ious[:, j] = 0
         
+        # Hitung true positives, false positives, false negatives
+        tp = len(matched_indices)
+        fp = len(boxes_pred) - tp
+        fn = len(boxes_true) - tp
+        
+        # Hitung mean IoU dari matched pairs
+        if tp > 0:
+            total_iou = sum(self.calculate_iou(boxes_true[i], boxes_pred[j]) for i, j in matched_indices)
+            miou = total_iou / tp
+        else:
+            miou = 0.0
+            
         return {
-            'polygon_precision': precision,
-            'polygon_recall': recall,
-            'polygon_f1_score': f1_score,
-            'polygon_matching_rate': len(self.polygon_matches) / max(1, self.tp + self.fn)
+            'miou': miou,
+            'tp': tp,
+            'fp': fp,
+            'fn': fn,
+            'precision': tp / max(tp + fp, 1),
+            'recall': tp / max(tp + fn, 1)
         }

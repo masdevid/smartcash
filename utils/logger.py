@@ -1,27 +1,43 @@
-# File: smartcash/utils/logger.py
-# Author: Alfrida Sabar
-# Deskripsi: Logger yang kompatibel dengan Google Colab dengan dukungan emoji dan tampilan berwarna
+"""
+File: smartcash/utils/logger.py
+Author: Alfrida Sabar
+Deskripsi: Logger terintegrasi untuk SmartCash yang mendukung berbagai lingkungan dengan emojis, 
+           warna, dan berbagai output target (file, console, Colab).
+"""
 
 import logging
 import sys
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict, Any, Union
 from datetime import datetime
 from pathlib import Path
-from IPython.display import display, HTML
-import time
+import threading
 
-# Fungsi untuk menambahkan warna ke teks
-def colored_text(text, color=None, weight="normal"):
-    """Tambah warna ke teks menggunakan HTML"""
-    if color:
-        return f'<span style="color:{color}; font-weight:{weight}">{text}</span>'
-    return text
+# Support untuk tampilan Colab
+try:
+    from IPython.display import display, HTML
+    HAS_IPYTHON = True
+except ImportError:
+    HAS_IPYTHON = False
 
-class SmartCashLogger(logging.Logger):
-    """Logger yang kompatibel dengan Google Colab dengan dukungan emoji dan warna"""
+# Support untuk text berwarna di terminal
+try:
+    from termcolor import colored
+    HAS_TERMCOLOR = True
+except ImportError:
+    HAS_TERMCOLOR = False
+
+
+class SmartCashLogger:
+    """
+    Logger yang fleksibel dengan dukungan untuk:
+    - Output ke file, konsol, dan Colab
+    - Emojis untuk konteks log
+    - Text berwarna untuk highlight
+    - Thread safety
+    """
     
-    # Emoji untuk konteks log yang berbeda
+    # Emoji untuk berbagai konteks log
     EMOJIS = {
         'start': '🚀',
         'success': '✅',
@@ -33,23 +49,30 @@ class SmartCashLogger(logging.Logger):
         'time': '⏱️',
         'metric': '📈',
         'save': '💾',
-        'load': '📂'
+        'load': '📂',
+        'debug': '🐞',
+        'config': '⚙️'
     }
     
-    # Warna untuk konteks log yang berbeda
+    # Warna untuk berbagai konteks log
     COLORS = {
-        'start': '#1e88e5',     # biru
-        'success': '#43a047',   # hijau
-        'error': '#e53935',     # merah
-        'warning': '#ff9800',   # oranye
-        'info': '#757575',      # abu-abu
-        'data': '#7b1fa2',      # ungu
-        'model': '#0097a7',     # cyan
-        'time': '#6d4c41',      # coklat
-        'metric': '#00897b',    # teal
-        'save': '#00acc1',      # cyan terang
-        'load': '#26a69a'       # teal terang
+        'start': 'blue',
+        'success': 'green',
+        'error': 'red',
+        'warning': 'yellow',
+        'info': 'white',
+        'data': 'magenta',
+        'model': 'cyan',
+        'time': 'yellow',
+        'metric': 'green',
+        'save': 'cyan',
+        'load': 'cyan',
+        'debug': 'grey',
+        'config': 'blue'
     }
+    
+    # Lock untuk thread safety
+    _lock = threading.RLock()
     
     def __init__(
         self, 
@@ -57,45 +80,91 @@ class SmartCashLogger(logging.Logger):
         level: int = logging.INFO,
         log_to_file: bool = True,
         log_to_console: bool = True,
-        log_dir: str = "logs"
+        log_to_colab: bool = None,
+        log_dir: str = "logs",
+        use_colors: bool = True,
+        use_emojis: bool = True
     ):
         """
         Inisialisasi logger.
         
         Args:
             name: Nama logger
-            level: Level logging
-            log_to_file: Flag untuk mengaktifkan logging ke file
-            log_to_console: Flag untuk mengaktifkan logging ke Colab display
+            level: Level logging (default: INFO)
+            log_to_file: Flag untuk aktivasi logging ke file
+            log_to_console: Flag untuk aktivasi logging ke konsol
+            log_to_colab: Flag untuk aktivasi logging ke Colab (None untuk deteksi otomatis)
             log_dir: Direktori untuk menyimpan file log
+            use_colors: Gunakan warna dalam output
+            use_emojis: Gunakan emoji dalam output
         """
-        # Inisialisasi parent class Logger
-        super().__init__(name, level)
-        
-        self.log_to_colab = log_to_console  # Log ke Colab sama dengan log ke console
+        self.name = name
+        self.level = level
         self.log_to_file = log_to_file
+        self.log_to_console = log_to_console
+        self.use_colors = use_colors and HAS_TERMCOLOR
+        self.use_emojis = use_emojis
         
-        # Buat direktori log jika belum ada
-        self.log_dir = Path(log_dir)
-        if log_to_file:
-            self.log_dir.mkdir(exist_ok=True, parents=True)
+        # Deteksi Colab secara otomatis jika tidak ditentukan
+        if log_to_colab is None:
+            self.log_to_colab = self._detect_colab() and HAS_IPYTHON
+        else:
+            self.log_to_colab = log_to_colab and HAS_IPYTHON
+        
+        # Setup dasar logger
+        self._setup_logger(log_dir)
+    
+    def _detect_colab(self) -> bool:
+        """Deteksi apakah berjalan di Google Colab."""
+        try:
+            import google.colab
+            return True
+        except ImportError:
+            return False
+    
+    def _setup_logger(self, log_dir: str) -> None:
+        """
+        Setup logger dasar.
+        
+        Args:
+            log_dir: Direktori untuk file log
+        """
+        with self._lock:
+            # Setup logger
+            self.logger = logging.getLogger(self.name)
+            self.logger.setLevel(self.level)
             
-            # Set file handler dengan rotasi harian
-            today = datetime.now().strftime("%Y-%m-%d")
-            log_file = self.log_dir / f"smartcash_{today}.log"
+            # Hapus handler yang mungkin sudah ada
+            for handler in self.logger.handlers[:]:
+                self.logger.removeHandler(handler)
             
-            # Cek handler yang sudah ada dan hapus jika perlu
-            for handler in self.handlers[:]:
-                self.removeHandler(handler)
+            # Tambahkan console handler jika diminta
+            if self.log_to_console:
+                console_handler = logging.StreamHandler()
+                console_handler.setLevel(self.level)
+                console_formatter = logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%H:%M:%S'
+                )
+                console_handler.setFormatter(console_formatter)
+                self.logger.addHandler(console_handler)
+            
+            # Tambahkan file handler jika diminta
+            if self.log_to_file:
+                self.log_dir = Path(log_dir)
+                self.log_dir.mkdir(exist_ok=True, parents=True)
                 
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-            file_handler.setFormatter(formatter)
-            self.addHandler(file_handler)
-            self.setLevel(level)
+                today = datetime.now().strftime("%Y-%m-%d")
+                log_file = self.log_dir / f"smartcash_{today}.log"
+                
+                file_handler = logging.FileHandler(log_file, encoding='utf-8')
+                file_handler.setLevel(self.level)
+                file_formatter = logging.Formatter(
+                    '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    datefmt='%Y-%m-%d %H:%M:%S'
+                )
+                file_handler.setFormatter(file_formatter)
+                self.logger.addHandler(file_handler)
     
     def _format_message(
         self, 
@@ -103,29 +172,49 @@ class SmartCashLogger(logging.Logger):
         msg: str,
         color: Optional[str] = None,
         highlight_values: bool = False
-    ) -> str:
-        """Format pesan dengan emoji."""
-        emoji = self.EMOJIS.get(emoji_key, '')
+    ) -> Tuple[str, str]:
+        """
+        Format pesan dengan emoji dan warna.
         
-        # Format untuk file logger - tanpa HTML
+        Args:
+            emoji_key: Kunci emoji dari dict EMOJIS
+            msg: Pesan yang akan diformat
+            color: Warna teks (opsional)
+            highlight_values: Highlight nilai numerik
+            
+        Returns:
+            Tuple (plain_message, html_message)
+        """
+        # Tentukan emoji yang akan digunakan
+        emoji = self.EMOJIS.get(emoji_key, '') if self.use_emojis else ''
+        
+        # Format plain message untuk file logger
         plain_msg = f"{emoji} {msg}" if emoji else msg
         
-        # Jika highlight_values True, cari angka dalam teks untuk di-highlight
-        if highlight_values and self.log_to_colab:
-            words = msg.split()
-            for i, word in enumerate(words):
-                if any(char.isdigit() for char in word):
-                    words[i] = colored_text(word, "#e65100", "bold")  # Oranye tua & bold
+        # Format untuk output HTML (Colab)
+        if self.log_to_colab:
+            # Highlight nilai numerik jika diminta
+            if highlight_values:
+                import re
+                # Regex untuk mendeteksi angka
+                num_pattern = r'\b\d+\.?\d*\b'
+                # Highlight angka dengan warna orange
+                msg = re.sub(num_pattern, 
+                            r'<span style="color: #e65100; font-weight: bold;">\g<0></span>', 
+                            msg)
             
-            formatted_msg = " ".join(words)
+            # Tambahkan warna ke teks jika ditentukan
+            if color:
+                html_msg = f"{emoji} <span style='color: {color};'>{msg}</span>" if emoji else f"<span style='color: {color};'>{msg}</span>"
+            else:
+                html_msg = f"{emoji} {msg}" if emoji else msg
         else:
-            formatted_msg = msg
-        
-        # Format untuk Colab display - dengan HTML
-        if color and self.log_to_colab:
-            html_msg = f"{emoji} {colored_text(formatted_msg, color)}" if emoji else colored_text(formatted_msg, color)
-        else:
-            html_msg = f"{emoji} {formatted_msg}" if emoji else formatted_msg
+            # Jika tidak menggunakan Colab, gunakan plain message
+            html_msg = plain_msg
+            
+            # Tambahkan warna untuk terminal jika diminta
+            if self.use_colors and color and HAS_TERMCOLOR:
+                html_msg = colored(plain_msg, color)
         
         return plain_msg, html_msg
     
@@ -136,123 +225,127 @@ class SmartCashLogger(logging.Logger):
         msg: str,
         color: Optional[str] = None,
         highlight_values: bool = False
-    ):
-        """Helper method untuk logging dengan format."""
-        plain_msg, html_msg = self._format_message(
-            emoji_key, msg, color, highlight_values
-        )
+    ) -> None:
+        """
+        Log pesan dengan format yang sesuai.
         
-        # Waktu untuk timestamp
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        
-        # Log ke file melalui parent Logger
-        if self.log_to_file:
-            level_str = str(level) if isinstance(level, int) else level
-            log_method = getattr(super(), level_str, super().info)
-            log_method(plain_msg)
-        
-        # Tampilkan di Colab jika diaktifkan
-        if self.log_to_colab:
-            display(HTML(f"<div>[{timestamp}] {html_msg}</div>"))
+        Args:
+            level: Level log ('info', 'warning', etc.)
+            emoji_key: Kunci emoji
+            msg: Pesan log
+            color: Warna untuk teks
+            highlight_values: Highlight nilai numerik
+        """
+        with self._lock:
+            plain_msg, html_msg = self._format_message(
+                emoji_key, msg, color, highlight_values
+            )
+            
+            # Waktu untuk timestamp
+            timestamp = datetime.now().strftime("%H:%M:%S")
+            
+            # Log ke file via logger
+            if level == 'debug':
+                self.logger.debug(plain_msg)
+            elif level == 'info':
+                self.logger.info(plain_msg)
+            elif level == 'warning':
+                self.logger.warning(plain_msg)
+            elif level == 'error':
+                self.logger.error(plain_msg)
+            elif level == 'critical':
+                self.logger.critical(plain_msg)
+            
+            # Tampilkan di Colab jika aktif
+            if self.log_to_colab and HAS_IPYTHON:
+                display(HTML(f"<div>[{timestamp}] {html_msg}</div>"))
     
-    def start(self, msg: str):
-        """Log start event dengan rocket emoji."""
-        self.log('info', 'start', msg, self.COLORS['start'])
+    # Shortcut methods for common log levels
+    def debug(self, msg: str) -> None:
+        """Log debug message."""
+        self.log('debug', 'debug', msg, self.COLORS.get('debug'))
     
-    def success(self, msg: str):
-        """Log success event dengan checkmark emoji."""
-        self.log('info', 'success', msg, self.COLORS['success'])
+    def info(self, msg: str) -> None:
+        """Log info message."""
+        self.log('info', 'info', msg, self.COLORS.get('info'))
     
-    def error(self, msg: str):
-        """Log error dengan X emoji."""
-        self.log('error', 'error', msg, self.COLORS['error'])
+    def warning(self, msg: str) -> None:
+        """Log warning message."""
+        self.log('warning', 'warning', msg, self.COLORS.get('warning'))
     
-    def warning(self, msg: str):
-        """Log warning dengan warning emoji."""
-        self.log('warning', 'warning', msg, self.COLORS['warning'])
+    def error(self, msg: str) -> None:
+        """Log error message."""
+        self.log('error', 'error', msg, self.COLORS.get('error'))
     
-    def info(self, msg: str):
-        """Log info dengan info emoji."""
-        self.log('info', 'info', msg, self.COLORS['info'])
+    def critical(self, msg: str) -> None:
+        """Log critical message."""
+        self.log('critical', 'error', msg, self.COLORS.get('error'))
     
-    def metric(self, msg: str):
-        """Log metrics dengan chart emoji dan highlighted numbers."""
-        self.log('info', 'metric', msg, self.COLORS['metric'], highlight_values=True)
+    def success(self, msg: str) -> None:
+        """Log success message."""
+        self.log('info', 'success', msg, self.COLORS.get('success'))
     
-    def data(self, msg: str):
-        """Log data related info dengan clipboard emoji."""
-        self.log('info', 'data', msg, self.COLORS['data'])
+    def start(self, msg: str) -> None:
+        """Log start message."""
+        self.log('info', 'start', msg, self.COLORS.get('start'))
     
-    def model(self, msg: str):
-        """Log model related info dengan robot emoji."""
-        self.log('info', 'model', msg, self.COLORS['model'])
+    def metric(self, msg: str) -> None:
+        """Log metric with highlighted numbers."""
+        self.log('info', 'metric', msg, self.COLORS.get('metric'), highlight_values=True)
     
-    def time(self, msg: str):
-        """Log timing info dengan timer emoji."""
-        self.log('info', 'time', msg, self.COLORS['time'], highlight_values=True)
-        
+    def data(self, msg: str) -> None:
+        """Log data related message."""
+        self.log('info', 'data', msg, self.COLORS.get('data'))
+    
+    def model(self, msg: str) -> None:
+        """Log model related message."""
+        self.log('info', 'model', msg, self.COLORS.get('model'))
+    
+    def time(self, msg: str) -> None:
+        """Log timing information."""
+        self.log('info', 'time', msg, self.COLORS.get('time'), highlight_values=True)
+    
+    def config(self, msg: str) -> None:
+        """Log configuration information."""
+        self.log('info', 'config', msg, self.COLORS.get('config'))
+    
     def progress(self, iterable=None, total=None, desc="Processing", **kwargs):
-        """Buat progress bar yang kompatibel dengan Colab."""
+        """Create a progress bar compatible with various environments."""
         try:
-            from tqdm.notebook import tqdm
-            return tqdm(iterable, total=total, desc=desc, **kwargs)
-        except ImportError:
             from tqdm.auto import tqdm
             return tqdm(iterable, total=total, desc=desc, **kwargs)
+        except ImportError:
+            return iterable  # Fallback to normal iterator if tqdm not available
 
-# Fungsi bantuan untuk mendapatkan logger dengan konfigurasi standar
+
+# Factory function untuk kemudahan penggunaan
 def get_logger(
     name: str, 
-    log_to_console: bool = True, 
+    level: int = logging.INFO,
     log_to_file: bool = True,
-    log_to_colab: bool = False,
-    level: int = logging.INFO
+    log_to_console: bool = True,
+    log_to_colab: bool = None,
+    log_dir: str = "logs"
 ) -> SmartCashLogger:
     """
-    Get atau buat instance SmartCashLogger.
+    Fungsi factory untuk mendapatkan logger.
     
     Args:
-        name: Nama logger yang diinginkan
-        log_to_console: Flag untuk mengaktifkan logging ke konsol
-        log_to_file: Flag untuk mengaktifkan logging ke file
-        log_to_colab: Flag khusus untuk Google Colab (sama dengan log_to_console)
-        level: Level logging (default: INFO)
+        name: Nama logger
+        level: Level logging
+        log_to_file: Aktifkan logging ke file
+        log_to_console: Aktifkan logging ke konsol
+        log_to_colab: Aktifkan logging ke Colab (None untuk deteksi otomatis)
+        log_dir: Direktori untuk file log
         
     Returns:
         Instance SmartCashLogger
     """
-    # Register SmartCashLogger sebagai logger class
-    logging.setLoggerClass(SmartCashLogger)
-    
-    # Get atau buat logger dengan konfigurasi standar
-    logger = logging.getLogger(name)
-    
-    # Gunakan log_to_colab sebagai alias untuk log_to_console jika diberikan
-    if log_to_colab:
-        log_to_console = True
-    
-    # Reinisialisasi logger jika belum memiliki handlers
-    if not logger.handlers:
-        # Buat handler file
-        if log_to_file:
-            log_dir = Path("logs")
-            log_dir.mkdir(exist_ok=True, parents=True)
-            today = datetime.now().strftime("%Y-%m-%d")
-            log_file = log_dir / f"smartcash_{today}.log"
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-                datefmt='%Y-%m-%d %H:%M:%S'
-            )
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
-        
-        # Set level
-        logger.setLevel(level)
-        
-        # Set properti khusus SmartCashLogger
-        if isinstance(logger, SmartCashLogger):
-            logger.log_to_colab = log_to_console
-            logger.log_to_file = log_to_file
-    
-    return logger
+    return SmartCashLogger(
+        name=name,
+        level=level,
+        log_to_file=log_to_file,
+        log_to_console=log_to_console,
+        log_to_colab=log_to_colab,
+        log_dir=log_dir
+    )

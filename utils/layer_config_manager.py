@@ -1,202 +1,159 @@
-# File: smartcash/utils/layer_config_manager.py
-# Author: Alfrida Sabar
-# Deskripsi: Modul untuk pengelolaan konfigurasi layer secara terpusat untuk menghindari redundansi
+"""
+File: smartcash/utils/layer_config_manager.py
+Author: Alfrida Sabar
+Deskripsi: Manager untuk konfigurasi layer deteksi terpusat yang memastikan 
+           konsistensi kelas dan label yang digunakan di seluruh aplikasi.
+"""
 
-from typing import Dict, List, Optional, Union, Set
-import yaml
-from pathlib import Path
-import json
 import os
-from functools import lru_cache
-
-from smartcash.utils.logger import SmartCashLogger
+import json
+import yaml
+from typing import Dict, List, Any, Optional, Union
+from pathlib import Path
+import threading
 
 class LayerConfigManager:
     """
-    Pengelola konfigurasi layer terpusat untuk SmartCash.
-    Menghilangkan duplikasi konfigurasi layer di seluruh aplikasi.
-    Mendukung loading dari file yaml atau default builtin.
+    Manager konfigurasi layer deteksi untuk memastikan konsistensi definisi layer
+    dan kelas yang digunakan di berbagai bagian aplikasi.
+    
+    Menyediakan akses terpusat ke konfigurasi layer dan class mapping,
+    dengan dukungan untuk penyimpanan dan pemulihan konfigurasi.
     """
     
-    # Konfigurasi default jika tidak ada file eksternal
+    # Singleton instance
+    _instance = None
+    _lock = threading.Lock()
+    
+    # Default layer configuration
     DEFAULT_CONFIG = {
         'banknote': {
+            'name': 'banknote',
+            'description': 'Deteksi uang kertas utuh',
             'classes': ['001', '002', '005', '010', '020', '050', '100'],
-            'class_ids': list(range(7))  # 0-6
+            'class_ids': [0, 1, 2, 3, 4, 5, 6],
+            'threshold': 0.25,
+            'enabled': True
         },
         'nominal': {
+            'name': 'nominal',
+            'description': 'Deteksi area nominal',
             'classes': ['l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100'],
-            'class_ids': list(range(7, 14))  # 7-13
+            'class_ids': [7, 8, 9, 10, 11, 12, 13],
+            'threshold': 0.3,
+            'enabled': True
         },
         'security': {
+            'name': 'security',
+            'description': 'Deteksi fitur keamanan',
             'classes': ['l3_sign', 'l3_text', 'l3_thread'],
-            'class_ids': list(range(14, 17))  # 14-16
+            'class_ids': [14, 15, 16],
+            'threshold': 0.35,
+            'enabled': True
         }
     }
     
-    _instance = None
-    
     def __new__(cls, *args, **kwargs):
-        """Implementasi singleton untuk memastikan konfigurasi konsisten."""
-        if cls._instance is None:
-            cls._instance = super(LayerConfigManager, cls).__new__(cls)
-            cls._instance._initialized = False
-        return cls._instance
+        """Implementasi singleton untuk memastikan hanya ada satu instance."""
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(LayerConfigManager, cls).__new__(cls)
+                # Inisialisasi atribut instance di __init__
+            return cls._instance
     
     def __init__(
         self,
-        config_path: Optional[Union[str, Path]] = None,
-        logger: Optional[SmartCashLogger] = None
+        config: Optional[Dict] = None,
+        config_path: Optional[str] = None,
+        logger: Optional[Any] = None
     ):
         """
-        Inisialisasi pengelola konfigurasi layer.
+        Inisialisasi manager konfigurasi layer.
         
         Args:
-            config_path: Path ke file konfigurasi layer (yaml/json)
-            logger: Logger kustom
+            config: Optional konfigurasi layer
+            config_path: Optional path ke file konfigurasi
+            logger: Optional logger untuk mencatat aktivitas
         """
-        # Cek apakah sudah diinisialisasi (untuk singleton)
-        if self._initialized:
+        # Check if already initialized (singleton pattern)
+        if hasattr(self, '_initialized') and self._initialized:
             return
             
-        self.logger = logger or SmartCashLogger(__name__)
-        self.config_path = Path(config_path) if config_path else None
+        self.logger = logger
+        self.config = {}
         
-        # Load konfigurasi
-        self.layer_config = self._load_config()
-        self._class_to_layer_map = self._build_class_to_layer_map()
-        
+        # Set initial configuration
+        if config:
+            self.config = config
+        elif config_path and os.path.exists(config_path):
+            self.load_config(config_path)
+        else:
+            self.config = self.DEFAULT_CONFIG
+            
         self._initialized = True
         
-        self.logger.info(f"✅ Konfigurasi layer dimuat: {len(self.layer_config)} layer tersedia")
+        if self.logger:
+            self.logger.info(f"✅ Layer config manager diinisialisasi dengan {len(self.config)} layer")
     
-    def _load_config(self) -> Dict:
+    def get_layer_config(self, layer_name: str) -> Dict:
         """
-        Load konfigurasi layer dari file atau gunakan default.
-        
-        Returns:
-            Dict konfigurasi layer
-        """
-        if not self.config_path or not self.config_path.exists():
-            self.logger.info("ℹ️ Menggunakan konfigurasi layer default")
-            return self.DEFAULT_CONFIG
-            
-        try:
-            ext = self.config_path.suffix.lower()
-            
-            if ext == '.yaml' or ext == '.yml':
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-            elif ext == '.json':
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            else:
-                self.logger.warning(f"⚠️ Format file konfigurasi tidak didukung: {ext}")
-                return self.DEFAULT_CONFIG
-                
-            # Validasi konfigurasi
-            if self._validate_config(config):
-                self.logger.success(f"✅ Konfigurasi berhasil dimuat dari {self.config_path}")
-                return config
-            else:
-                self.logger.warning("⚠️ Konfigurasi tidak valid, menggunakan default")
-                return self.DEFAULT_CONFIG
-                
-        except Exception as e:
-            self.logger.error(f"❌ Gagal memuat konfigurasi: {str(e)}")
-            return self.DEFAULT_CONFIG
-    
-    def _validate_config(self, config: Dict) -> bool:
-        """
-        Validasi struktur konfigurasi.
+        Dapatkan konfigurasi untuk layer tertentu.
         
         Args:
-            config: Konfigurasi yang akan divalidasi
+            layer_name: Nama layer
             
         Returns:
-            Boolean hasil validasi
+            Dict konfigurasi layer atau dict kosong jika tidak ditemukan
         """
-        if not isinstance(config, dict):
-            return False
-            
-        for layer_name, layer_config in config.items():
-            # Setiap layer harus memiliki 'classes' dan 'class_ids'
-            if not isinstance(layer_config, dict):
-                return False
-                
-            if 'classes' not in layer_config or 'class_ids' not in layer_config:
-                return False
-                
-            if not isinstance(layer_config['classes'], list) or not isinstance(layer_config['class_ids'], list):
-                return False
-                
-            # Jumlah kelas dan class_ids harus sama
-            if len(layer_config['classes']) != len(layer_config['class_ids']):
-                return False
-        
-        return True
+        return self.config.get(layer_name, {})
     
-    def _build_class_to_layer_map(self) -> Dict[int, str]:
+    def get_layer_names(self) -> List[str]:
         """
-        Buat mapping dari class_id ke layer name.
+        Dapatkan daftar nama semua layer yang tersedia.
         
         Returns:
-            Dict mapping {class_id: layer_name}
+            List nama layer
         """
-        class_to_layer = {}
-        
-        for layer_name, layer_config in self.layer_config.items():
-            for class_id in layer_config['class_ids']:
-                class_to_layer[class_id] = layer_name
-                
-        return class_to_layer
+        return list(self.config.keys())
     
-    def get_layer_config(self, layer_name: Optional[str] = None) -> Dict:
+    def get_enabled_layers(self) -> List[str]:
         """
-        Dapatkan konfigurasi untuk layer tertentu atau semua layer.
+        Dapatkan daftar nama layer yang diaktifkan.
         
-        Args:
-            layer_name: Nama layer (jika None, kembalikan semua)
-            
         Returns:
-            Dict konfigurasi layer
+            List nama layer yang enabled=True
         """
-        if layer_name is None:
-            return self.layer_config
+        return [name for name, conf in self.config.items() if conf.get('enabled', True)]
+    
+    def get_class_map(self) -> Dict[int, str]:
+        """
+        Dapatkan mapping class_id ke class_name untuk semua layer.
+        
+        Returns:
+            Dict berisi mapping class_id ke class_name
+        """
+        class_map = {}
+        for layer_name, layer_config in self.config.items():
+            classes = layer_config.get('classes', [])
+            class_ids = layer_config.get('class_ids', [])
             
-        if layer_name in self.layer_config:
-            return self.layer_config[layer_name]
-            
-        self.logger.warning(f"⚠️ Layer tidak ditemukan: {layer_name}")
-        return {}
+            for i, class_id in enumerate(class_ids):
+                if i < len(classes):
+                    class_map[class_id] = classes[i]
+        
+        return class_map
     
     def get_all_class_ids(self) -> List[int]:
         """
         Dapatkan semua class_id dari semua layer.
         
         Returns:
-            List semua class_id
+            List class_id
         """
         class_ids = []
-        
-        for layer_config in self.layer_config.values():
-            class_ids.extend(layer_config['class_ids'])
-            
+        for layer_name, layer_config in self.config.items():
+            class_ids.extend(layer_config.get('class_ids', []))
         return sorted(class_ids)
-    
-    def get_all_classes(self) -> List[str]:
-        """
-        Dapatkan semua class name dari semua layer.
-        
-        Returns:
-            List semua class name
-        """
-        classes = []
-        
-        for layer_config in self.layer_config.values():
-            classes.extend(layer_config['classes'])
-            
-        return classes
     
     def get_layer_for_class_id(self, class_id: int) -> Optional[str]:
         """
@@ -208,118 +165,184 @@ class LayerConfigManager:
         Returns:
             Nama layer atau None jika tidak ditemukan
         """
-        return self._class_to_layer_map.get(class_id)
+        for layer_name, layer_config in self.config.items():
+            if class_id in layer_config.get('class_ids', []):
+                return layer_name
+        return None
     
-    def get_class_name(self, class_id: int) -> Optional[str]:
+    def load_config(self, config_path: str) -> bool:
         """
-        Dapatkan nama kelas berdasarkan class_id.
+        Muat konfigurasi dari file.
         
         Args:
-            class_id: ID kelas
+            config_path: Path ke file konfigurasi (yaml atau json)
             
         Returns:
-            Nama kelas atau None jika tidak ditemukan
+            Boolean yang menunjukkan keberhasilan load
         """
-        layer_name = self.get_layer_for_class_id(class_id)
-        
-        if not layer_name:
-            return None
-            
-        layer_config = self.layer_config[layer_name]
-        class_ids = layer_config['class_ids']
-        classes = layer_config['classes']
-        
         try:
-            idx = class_ids.index(class_id)
-            return classes[idx]
-        except (ValueError, IndexError):
-            return None
-    
-    @lru_cache(maxsize=32)
-    def get_total_classes(self) -> int:
-        """
-        Dapatkan total jumlah kelas dari semua layer.
-        
-        Returns:
-            Total jumlah kelas
-        """
-        return len(self.get_all_class_ids())
-    
-    def save_config(self, output_path: Optional[Union[str, Path]] = None) -> bool:
-        """
-        Simpan konfigurasi layer ke file.
-        
-        Args:
-            output_path: Path output (default: self.config_path)
+            path = Path(config_path)
             
-        Returns:
-            Boolean sukses/gagal
-        """
-        output_path = Path(output_path) if output_path else self.config_path
-        
-        if not output_path:
-            self.logger.error("❌ Path output tidak ditentukan")
-            return False
-            
-        try:
-            # Buat direktori jika belum ada
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            ext = output_path.suffix.lower()
-            
-            if ext == '.yaml' or ext == '.yml':
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    yaml.dump(self.layer_config, f, default_flow_style=False)
-            elif ext == '.json':
-                with open(output_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.layer_config, f, indent=2)
-            else:
-                self.logger.warning(f"⚠️ Format file tidak didukung: {ext}")
+            if not path.exists():
+                if self.logger:
+                    self.logger.warning(f"⚠️ File konfigurasi {config_path} tidak ditemukan")
                 return False
                 
-            self.logger.success(f"✅ Konfigurasi berhasil disimpan ke {output_path}")
+            if path.suffix.lower() == '.yaml' or path.suffix.lower() == '.yml':
+                with open(path, 'r') as f:
+                    config = yaml.safe_load(f)
+            elif path.suffix.lower() == '.json':
+                with open(path, 'r') as f:
+                    config = json.load(f)
+            else:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Format file tidak didukung: {path.suffix}")
+                return False
+            
+            # Check if config contains layer info
+            if 'layers' in config:
+                self.config = config['layers']
+            else:
+                self.config = config
+                
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi layer dimuat dari {config_path}")
+                
             return True
-            
+                
         except Exception as e:
-            self.logger.error(f"❌ Gagal menyimpan konfigurasi: {str(e)}")
+            if self.logger:
+                self.logger.error(f"❌ Gagal memuat konfigurasi layer: {str(e)}")
             return False
-            
-    def get_layer_names(self) -> List[str]:
+    
+    def save_config(self, config_path: str) -> bool:
         """
-        Dapatkan daftar nama layer yang tersedia.
-        
-        Returns:
-            List nama layer
-        """
-        return list(self.layer_config.keys())
-        
-    def filter_classes_by_layers(self, active_layers: List[str]) -> Set[int]:
-        """
-        Filter class_ids berdasarkan layer yang aktif.
+        Simpan konfigurasi ke file.
         
         Args:
-            active_layers: List nama layer yang aktif
+            config_path: Path untuk menyimpan file konfigurasi
             
         Returns:
-            Set class_ids yang termasuk dalam layer aktif
+            Boolean yang menunjukkan keberhasilan save
         """
-        active_class_ids = set()
-        
-        for layer in active_layers:
-            if layer in self.layer_config:
-                active_class_ids.update(self.layer_config[layer]['class_ids'])
+        try:
+            path = Path(config_path)
+            
+            # Ensure directory exists
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            if path.suffix.lower() == '.yaml' or path.suffix.lower() == '.yml':
+                with open(path, 'w') as f:
+                    yaml.dump({'layers': self.config}, f, default_flow_style=False)
+            elif path.suffix.lower() == '.json':
+                with open(path, 'w') as f:
+                    json.dump({'layers': self.config}, f, indent=2)
+            else:
+                # Default to yaml
+                with open(str(path) + '.yaml', 'w') as f:
+                    yaml.dump({'layers': self.config}, f, default_flow_style=False)
+                    
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi layer disimpan ke {config_path}")
                 
-        return active_class_ids
+            return True
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Gagal menyimpan konfigurasi layer: {str(e)}")
+            return False
+    
+    def update_layer_config(self, layer_name: str, config: Dict) -> bool:
+        """
+        Update konfigurasi layer tertentu.
+        
+        Args:
+            layer_name: Nama layer
+            config: Konfigurasi baru
+            
+        Returns:
+            Boolean yang menunjukkan keberhasilan update
+        """
+        try:
+            # Make sure layer exists
+            if layer_name not in self.config:
+                self.config[layer_name] = {}
+                
+            # Update config
+            self.config[layer_name].update(config)
+            
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi layer {layer_name} diperbarui")
+                
+            return True
+                
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Gagal memperbarui konfigurasi layer: {str(e)}")
+            return False
+    
+    def set_layer_enabled(self, layer_name: str, enabled: bool) -> bool:
+        """
+        Aktifkan atau nonaktifkan layer.
+        
+        Args:
+            layer_name: Nama layer
+            enabled: Status enabled
+            
+        Returns:
+            Boolean yang menunjukkan keberhasilan set
+        """
+        if layer_name in self.config:
+            self.config[layer_name]['enabled'] = enabled
+            return True
+        return False
+    
+    def validate_class_ids(self) -> Dict:
+        """
+        Validasi class_id untuk memastikan tidak ada duplikat atau gap.
+        
+        Returns:
+            Dict berisi hasil validasi
+        """
+        all_class_ids = []
+        duplicates = []
+        gaps = []
+        
+        # Collect all class IDs
+        for layer_name, layer_config in self.config.items():
+            class_ids = layer_config.get('class_ids', [])
+            for class_id in class_ids:
+                if class_id in all_class_ids:
+                    duplicates.append((class_id, layer_name))
+                all_class_ids.append(class_id)
+        
+        # Check for gaps
+        all_class_ids = sorted(set(all_class_ids))
+        if all_class_ids:
+            min_id = min(all_class_ids)
+            max_id = max(all_class_ids)
+            for i in range(min_id, max_id + 1):
+                if i not in all_class_ids:
+                    gaps.append(i)
+        
+        # Results
+        return {
+            'valid': not duplicates and not gaps,
+            'duplicates': duplicates,
+            'gaps': gaps,
+            'count': len(set(all_class_ids))
+        }
 
-# Fungsi helper untuk mendapatkan instance
-def get_layer_config(config_path: Optional[Union[str, Path]] = None) -> LayerConfigManager:
+# Global function to get an instance of LayerConfigManager
+def get_layer_config(config_path: Optional[str] = None, logger: Optional[Any] = None) -> LayerConfigManager:
     """
-    Dapatkan instance LayerConfigManager.
+    Fungsi global untuk mendapatkan instance LayerConfigManager.
     
     Args:
-        config_path: Path ke file konfigurasi (opsional)
+        config_path: Optional path ke file konfigurasi
+        logger: Optional logger
         
     Returns:
-        Instance LayerConfigManager
+        Instance LayerConfigManager (singleton)
     """
-    return LayerConfigManager(config_path)
+    return LayerConfigManager(config_path=config_path, logger=logger)

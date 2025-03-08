@@ -1,4 +1,4 @@
-# Cell 20 - Clone Repository (refactored)
+# Cell 20 - Clone Repository (fixed imports)
 
 import os
 import sys
@@ -6,15 +6,48 @@ import shutil
 import ipywidgets as widgets
 from IPython.display import display
 
-# Import UI components dan handlers
-from smartcash.ui_components.repository_components import create_repository_ui
-from smartcash.handlers.ui_handlers.repository_handlers import setup_repository_handlers
-
-# Buat UI components
-ui_components = create_repository_ui()
-
-# Setup handlers untuk UI components
-setup_repository_handlers(ui_components)
-
-# Tampilkan UI
-display(ui_components['ui'])
+try:
+    # Import UI components
+    from smartcash.ui_components.repository_components import create_repository_ui
+    
+    # Gunakan logger yang sederhana sebagai fallback jika SmartCashLogger belum tersedia
+    try:
+        from smartcash.utils.logger import get_logger
+        logger = get_logger("notebook")
+    except ImportError:
+        # Fallback ke logger sederhana jika kelas SmartCashLogger belum diimpor
+        from smartcash.utils.simple_logger import SimpleLogger
+        logger = SimpleLogger("notebook")
+    
+    # Import handlers untuk repository component
+    from smartcash.handlers.ui_handlers.repository_handlers import setup_repository_handlers
+    
+    # Buat UI components
+    ui_components = create_repository_ui()
+    
+    # Setup handlers untuk UI components
+    ui_components = setup_repository_handlers(ui_components, logger)
+    
+    # Tampilkan UI
+    display(ui_components['ui'])
+    
+except ImportError as e:
+    print(f"❌ Error: {str(e)}")
+    print("\n⚠️ Sepertinya ada masalah dengan impor modul. Pastikan repository telah diklon atau buat struktur UI sederhana sebagai fallback.")
+    
+    # Buat UI sederhana sebagai fallback
+    fallback_ui = widgets.VBox([
+        widgets.HTML("<h3>🚀 Clone Repository</h3>"),
+        widgets.Text(value='https://github.com/username/smartcash.git', description='Repository URL:'),
+        widgets.Text(value='smartcash', description='Output Directory:'),
+        widgets.Dropdown(
+            options=['main', 'master', 'dev'],
+            value='main',
+            description='Branch:'
+        ),
+        widgets.Checkbox(value=True, description='Install Dependencies'),
+        widgets.Button(description='Clone Repository', button_style='primary'),
+        widgets.Output()
+    ])
+    
+    display(fallback_ui)

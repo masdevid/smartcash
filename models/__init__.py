@@ -20,8 +20,6 @@ from smartcash.models.losses import YOLOLoss
 from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.models.baseline import BaselineModel
 
-# Experimental models
-from smartcash.models.experiments.backbone_experiment import BackboneExperiment
 
 __all__ = [
     # Backbone models
@@ -30,7 +28,9 @@ __all__ = [
     'BaseBackbone',
     
     # Neck models
-    'BaseNeck',
+    'FeatureProcessingNeck',
+    'PathAggregationNetwork',
+    'FeaturePyramidNetwork',
     
     # Detection components
     'DetectionHead',
@@ -38,8 +38,5 @@ __all__ = [
     
     # Complete models
     'YOLOv5Model',
-    'BaselineModel',
-    
-    # Experimental models
-    'BackboneExperiment'
+    'BaselineModel'
 ]

@@ -1,7 +1,16 @@
 # Cell 12 - Cek Instalasi (refactored)
 
-# ===== 1. CEK ENVIRONMENT COLAB =====
-def setup_colab_environment():
+# ===== 1. IMPORT MODULES =====
+import os
+import sys
+import logging
+import pickle
+from pathlib import Path
+from datetime import datetime
+from typing import Tuple, Dict, List, Optional, Any
+
+# ===== 2. CEK ENVIRONMENT COLAB =====
+def setup_colab_environment() -> Tuple[bool, str]:
     """Setup Google Colab environment if running in Colab"""
     try:
         from google.colab import drive
@@ -19,29 +28,42 @@ def setup_colab_environment():
         print("ℹ️ Tidak berjalan di Google Colab")
         return False, os.getcwd()
 
-# ===== 2. SETUP LOGGING =====
+# ===== 3. SETUP LOGGING =====
 def setup_logging(IN_COLAB=False):
     """Setup logging configuration"""
+    # Buat direktori logs jika belum ada
+    os.makedirs("logs", exist_ok=True)
+    
+    # Setup basic logging configuration
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler(f"logs/smartcash_{datetime.now().strftime('%Y-%m-%d')}.log"),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
     try:
         from smartcash.utils.logger import get_logger, SmartCashLogger
         logger = get_logger("notebook", log_to_console=True, log_to_file=True, log_to_colab=IN_COLAB)
     except Exception as e:
         print(f"⚠️ Gagal mengimpor SmartCashLogger: {str(e)}")
         print("⚠️ Menggunakan logger standard...")
-        logging.basicConfig(
-            level=logging.INFO,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            handlers=[
-                logging.FileHandler(f"logs/smartcash_{datetime.now().strftime('%Y-%m-%d')}.log"),
-                logging.StreamHandler(sys.stdout)
-            ]
-        )
-        from smartcash.utils.simple_logger import SimpleLogger
-        logger = SimpleLogger("notebook")
+        
+        # Import SimpleLogger fallback
+        try:
+            from smartcash.utils.simple_logger import SimpleLogger
+            logger = SimpleLogger("notebook")
+        except Exception as simple_logger_error:
+            print(f"⚠️ Gagal mengimpor SimpleLogger: {str(simple_logger_error)}")
+            # Fallback ke logging standar
+            logger = logging.getLogger("notebook")
+            
     return logger
 
-# ===== 3. SETUP DIRECTORIES =====
-def setup_directories(base_dir):
+# ===== 4. SETUP DIRECTORIES =====
+def setup_directories(base_dir: str) -> str:
     """Setup necessary directories for the project"""
     dirs = [
         "data/train/images",
@@ -60,7 +82,7 @@ def setup_directories(base_dir):
     
     return base_dir
 
-# ===== 4. INITIALIZE GLOBAL VARIABLES =====
+# ===== 5. INITIALIZE GLOBAL VARIABLES =====
 # Setup Colab environment
 IN_COLAB, BASE_DIR = setup_colab_environment()
 
@@ -73,7 +95,7 @@ logger = setup_logging(IN_COLAB)
 # Setup device
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-# ===== 5. DISPLAY ENVIRONMENT INFO =====
+# ===== 6. DISPLAY ENVIRONMENT INFO =====
 print("\n🔍 Informasi Lingkungan:")
 print(f"📊 PyTorch: {torch.__version__}")
 print(f"🖥️ CUDA tersedia: {torch.cuda.is_available()}")
@@ -86,7 +108,6 @@ else:
 print(f"\n📂 Base Directory: {BASE_DIR}")
 
 # Save base directory for other cells
-import pickle
 with open('base_dir.pkl', 'wb') as f:
     pickle.dump(BASE_DIR, f)
 

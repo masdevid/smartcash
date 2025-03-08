@@ -1,121 +1,228 @@
 # File: configs/base_config.yaml
 # Author: Alfrida Sabar
-# Deskripsi: Konfigurasi dasar yang sudah diperbaiki dengan jalur yang konsisten
+# Deskripsi: Konfigurasi dasar untuk SmartCash dengan dukungan untuk semua modul yang direfaktor
 
+# Konfigurasi umum
+app_name: "SmartCash"
+version: "1.0.0"
+description: "Sistem deteksi mata uang Rupiah dengan objek deteksi"
+author: "Alfrida Sabar"
+data_dir: "data"
+output_dir: "runs/train"
+
+# Konfigurasi data
 data:
-  classes:
-  - '001'
-  - '002'
-  - '005'
-  - '010'
-  - '020'
-  - '050'
-  - '100'
-  - 'l2_001'
-  - 'l2_002'
-  - 'l2_005'
-  - 'l2_010'
-  - 'l2_020'
-  - 'l2_050'
-  - 'l2_100'
-  - 'l3_sign'
-  - 'l3_text'
-  - 'l3_thread'
-  local:
-    test: data/test
-    train: data/train
-    valid: data/valid  # Diubah dari 'val' ke 'valid' untuk konsistensi
+  # Sumber data ('local' or 'roboflow')
+  source: "roboflow"
+  
+  # Direktori dataset
+  train_dir: "data/train"
+  valid_dir: "data/valid"
+  test_dir: "data/test"
+  
+  # Konfigurasi Roboflow
   roboflow:
-    api_key: your_roboflow_api_key
-    project: rupiah-emisi-2022
-    version: 3
-    workspace: smartcash-wo2us
-  source: local
-dataset:
-  classes:
-  - '001'
-  - '002'
-  - '005'
-  - '010'
-  - '020'
-  - '050'
-  - '100'
-  - 'l2_001'
-  - 'l2_002'
-  - 'l2_005'
-  - 'l2_010'
-  - 'l2_020'
-  - 'l2_050'
-  - 'l2_100'
-  - 'l3_sign'
-  - 'l3_text'
-  - 'l3_thread'
-  project: rupiah_emisi-baru
-  test_path: ../test/images
-  train_path: ../train/images
-  valid_path: ../valid/images  # Memastikan konsistensi dengan struktur 'valid'
-  version: 3
-  workspace: detection-twl6q
-evaluation:
-  metrics:
-  - accuracy
-  - precision
-  - recall
-  - f1
-  - mAP
-  - inference_time
-  save_path: results/visualizations
-  save_visualizations: true
-experiment_scenarios:
-- backbone: cspdarknet
-  conditions: position
-  description: YOLOv5 Default (CSPDarknet) - Variasi Posisi
-  name: scenario_1
-- backbone: cspdarknet
-  conditions: lighting
-  description: YOLOv5 Default (CSPDarknet) - Variasi Pencahayaan
-  name: scenario_2
-- backbone: efficientnet
-  conditions: position
-  description: YOLOv5 + EfficientNet-B4 - Variasi Posisi
-  name: scenario_3
-- backbone: efficientnet
-  conditions: lighting
-  description: YOLOv5 + EfficientNet-B4 - Variasi Pencahayaan
-  name: scenario_4
+    api_key: ""  # Wajib diisi jika menggunakan Roboflow
+    workspace: "smartcash-wo2us"
+    project: "rupiah-emisi-2022"
+    version: "3"
+  
+  # Pengaturan preprocessing
+  preprocessing:
+    img_size: [640, 640]
+    cache_dir: ".cache/smartcash"
+    num_workers: 4
+    augmentation_enabled: true
+    normalize_enabled: true
+    cache_enabled: true
+    
+    # Ukuran cache yang ditingkatkan
+    cache:
+      max_size_gb: 1.0
+      ttl_hours: 24
+      auto_cleanup: true
+      cleanup_interval_mins: 30
+
+# Konfigurasi model
 model:
-  backbone: cspdarknet
-  batch_size: 16
-  conf_thres: 0.25
-  device: ''
-  img_size:
-  - 640
-  - 640
-  iou_thres: 0.45
-  max_det: 1000
-  memory_limit: 0.6
-  num_classes: 17  # Total class (7 banknote + 7 nominal + 3 security)
+  # Arsitektur model
+  backbone: "efficientnet_b4"
+  framework: "YOLOv5"
+  
+  # Jalur ke file weights
+  weights: "runs/train/weights/best.pt"
   pretrained: true
-  workers: 8
-training:
+  
+  # Parameter inferensi
+  confidence: 0.25
+  iou_threshold: 0.45
+  max_det: 1000
+  
+  # Parameter sumber daya
+  workers: 4
   batch_size: 16
-  degrees: 0.0
-  epochs: 100
+  memory_limit: 0.75  # gunakan 75% CPU saat multiprocessing
+  
+  # Parameter deployment
+  half_precision: true
+  optimized: true
+  export_format: "torchscript"  # 'onnx', 'torchscript'
+
+# Konfigurasi training
+training:
+  # Parameter dasar
+  epochs: 50
+  batch_size: 16
+  img_size: [640, 640]
+  patience: 5
+  
+  # Learning rate
+  lr0: 0.01  # Initial learning rate
+  lrf: 0.01  # Final learning rate
+  
+  # Optimizer
+  optimizer: "Adam"  # "Adam", "AdamW", "SGD"
+  momentum: 0.937
+  weight_decay: 0.0005
+  
+  # Scheduler
+  scheduler: "cosine"  # "linear", "cosine", "step"
+  
+  # Augmentasi
   fliplr: 0.5
   flipud: 0.0
-  hsv_h: 0.015
-  hsv_s: 0.7
-  hsv_v: 0.4
-  image_size: 640
-  learning_rate: 0.01
-  lr0: 0.01
-  lrf: 0.01
-  mixup: 0.0
-  momentum: 0.937
   mosaic: 1.0
-  perspective: 0.0
-  scale: 0.5
-  shear: 0.0
+  mixup: 0.0
   translate: 0.1
-  warmup_epochs: 3
-  weight_decay: 0.0005
+  scale: 0.5
+  hsv_h: 0.015  # HSV Hue
+  hsv_s: 0.7    # HSV Saturation
+  hsv_v: 0.4    # HSV Value
+  degrees: 45
+  
+  # Early stopping
+  early_stopping_patience: 10
+  
+  # Callbacks
+  save_period: 5  # Simpan checkpoint setiap N epochs
+  
+  # Validasi
+  val_interval: 1  # Validasi setiap N epochs
+
+# Konfigurasi layer deteksi
+layers:
+  banknote:
+    name: "banknote"
+    description: "Deteksi uang kertas utuh"
+    classes: ["001", "002", "005", "010", "020", "050", "100"]
+    class_ids: [0, 1, 2, 3, 4, 5, 6]
+    threshold: 0.25
+    enabled: true
+  
+  nominal:
+    name: "nominal"
+    description: "Deteksi area nominal"
+    classes: ["l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100"]
+    class_ids: [7, 8, 9, 10, 11, 12, 13]
+    threshold: 0.30
+    enabled: true
+  
+  security:
+    name: "security"
+    description: "Deteksi fitur keamanan"
+    classes: ["l3_sign", "l3_text", "l3_thread"]
+    class_ids: [14, 15, 16]
+    threshold: 0.35
+    enabled: true
+
+# Konfigurasi environment
+environment:
+  # Flag untuk Google Colab vs. environment lokal
+  use_drive: false
+  mount_path: "/content/drive/MyDrive/SmartCash"
+  symlinks_enabled: true
+  
+  # Konfigurasi GPU
+  force_cpu: false
+  
+  # Direktori untuk logging
+  logs_dir: "logs"
+
+# Konfigurasi validasi dataset
+validation:
+  # Konfigurasi visualisasi
+  visualize_issues: true
+  visualize_dir: "visualizations"
+  
+  # Pemrosesan invalid files
+  move_invalid: false
+  invalid_dir: "invalid"
+  
+  # Perbaikan otomatis
+  auto_fix: false
+  fix_coordinates: true
+  fix_labels: true
+  fix_images: false
+  backup_before_fix: true
+  
+  # Validasi sampel
+  use_sample: false
+  sample_size: 100
+
+# Konfigurasi augmentasi
+augmentation:
+  # Tipe augmentasi yang digunakan
+  types: ["combined"]  # "position", "lighting", "combined", "extreme_rotation"
+  variations_per_type: 2
+  output_prefix: "aug"
+  
+  # Konfigurasi pemrosesan
+  resume: true
+  num_workers: 4
+  
+  # Validasi hasil
+  validate_results: true
+
+# Konfigurasi inferensi dan evaluasi
+inference:
+  # Parameter deteksi
+  conf_threshold: 0.25
+  iou_threshold: 0.45
+  
+  # Flag visualisasi
+  visualize: true
+  show_labels: true
+  show_conf: true
+  show_value: true
+  
+  # Hasil output
+  output_dir: "results/detections"
+
+# Konfigurasi experiment tracking
+experiment:
+  # Nama eksperimen default
+  name: "efficientnet_b4_baseline"
+  
+  # Direktori untuk eksperimen
+  output_dir: "runs/train/experiments"
+  
+  # Parameter tracking
+  auto_save: true
+  save_period: 1
+  metrics_log: true
+  
+  # Visualization
+  visualize_results: true
+
+# Konfigurasi pembersihan dan maintenance
+cleanup:
+  # Pola file augmentasi untuk dibersihkan
+  augmentation_patterns:
+    - "aug_.*"
+    - ".*_augmented.*"
+    - ".*_modified.*"
+  
+  # Pola file yang diabaikan saat pembersihan
+  ignored_patterns:
+    - ".*\.gitkeep"
+    - ".*\.DS_Store"

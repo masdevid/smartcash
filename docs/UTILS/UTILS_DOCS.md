@@ -13,6 +13,7 @@ Modul `utils` pada SmartCash telah mengalami restrukturisasi signifikan untuk me
 7. **Optimalisasi Performa** - Penerapan thread-safety, caching, dan teknik optimasi memory
 8. **Penambahan Augmentation Utils** - Pengembangan subpaket `augmentation/` yang komprehensif untuk memperkaya dataset dengan berbagai teknik augmentasi
 9. **Pembaruan Dataset Utils** - Pengembangan subpaket `dataset/` untuk validasi, pembersihan, dan analisis dataset dengan kemampuan perbaikan otomatis
+10. **Refaktorisasi Enhanced Cache** - Refaktorisasi `enhanced_cache.py` menjadi subpaket `cache/` yang modular dengan pemisahan tanggung jawab
 
 ## Perubahan Detail dan Panduan Migrasi
 
@@ -520,128 +521,118 @@ stats = augmentor.augment_dataset(
 )
 ```
 
-### 9. Pembaruan Dataset Utils
+### 10. Refaktorisasi Enhanced Cache
 
-#### Pengembangan Baru: Paket `dataset/`
+#### Pengembangan Baru: Paket `cache/`
 
-Modul baru `dataset/` telah ditambahkan untuk mempermudah validasi, pembersihan, dan analisis dataset dengan kemampuan perbaikan otomatis:
+Modul `enhanced_cache.py` yang sebelumnya telah direfaktorisasi menjadi subpaket `cache/` yang lebih modular dengan pemisahan tanggung jawab yang jelas:
 
 ```
-utils/dataset/
-├── __init__.py                   # Ekspor komponen utama
-├── dataset_analyzer.py           # Analisis mendalam dataset
-├── dataset_cleaner.py            # Pembersihan dataset
-├── dataset_fixer.py              # Perbaikan otomatis masalah dataset
-├── dataset_utils.py              # Utilitas umum dataset
-├── dataset_validator_core.py     # Inti validasi dataset
-└── enhanced_dataset_validator.py # Validator dataset yang ditingkatkan
+utils/cache/
+├── __init__.py            # Ekspor komponen utama
+├── cache_manager.py       # Kelas utama pengelola cache 
+├── cache_index.py         # Pengelolaan indeks cache
+├── cache_storage.py       # Operasi penyimpanan dan loading
+├── cache_cleanup.py       # Pembersihan dan validasi cache
+└── cache_stats.py         # Statistik penggunaan cache
 ```
 
 #### Fitur Baru:
 
-- **Validasi Multilayer** - Validasi dataset multi-layer dengan format YOLO
-- **Analisis Distribusi** - Analisis distribusi kelas, ukuran gambar, dan bounding box
-- **Perbaikan Otomatis** - Deteksi dan perbaikan koordinat yang tidak valid
-- **Pembersihan Dataset** - Pemindahan dan pembersihan file augmentasi atau tidak valid
-- **Proses Paralel** - Dukungan multithreading untuk proses validasi dan perbaikan
-- **Visualisasi Masalah** - Pembuatan visualisasi otomatis untuk file yang bermasalah
+- **Pemisahan Komponen** - Pemisahan tugas menjadi kelas-kelas khusus dengan tanggung jawab yang jelas
+- **Thread Safety** - Dukungan thread-safety pada semua operasi dengan threading locks
+- **Garbage Collection** - Pembersihan otomatis entri yang kadaluwarsa dan pengelolaan ukuran cache
+- **Monitoring Statistik** - Pelacakan hit/miss rate dan statistik performa lainnya
+- **Dukungan TTL** - Time-to-live untuk entri cache dengan pembersihan otomatis
+- **Verifikasi Integritas** - Pengecekan dan perbaikan integritas cache secara otomatis
 
 #### Perbandingan Sebelum dan Sesudah:
 
 **Sebelum:**
 ```python
-def validate_dataset(data_dir):
-    issues = []
-    for img_file in os.listdir(f"{data_dir}/images"):
-        # Baca gambar secara manual
-        img = cv2.imread(f"{data_dir}/images/{img_file}")
-        if img is None:
-            issues.append(f"Gambar {img_file} tidak dapat dibaca")
-            continue
-            
-        # Periksa label
-        label_file = f"{data_dir}/labels/{os.path.splitext(img_file)[0]}.txt"
-        if not os.path.exists(label_file):
-            issues.append(f"Label untuk {img_file} tidak ditemukan")
-            continue
-            
-        # Baca dan validasi label secara manual
-        with open(label_file, 'r') as f:
-            for line in f:
-                parts = line.strip().split()
-                # Validasi format dan koordinat secara manual
-                # ...
-    
-    return issues
+from smartcash.utils.enhanced_cache import EnhancedCache
 
-# Penggunaan:
-issues = validate_dataset("data/train")
-print(f"Ditemukan {len(issues)} masalah")
+# Inisialisasi cache dengan satu kelas yang menangani semua operasi
+cache = EnhancedCache(".cache/smartcash")
+
+# Cek dan ambil dari cache
+cache_key = f"preprocess_{image_path.name}"
+if cache.exists(cache_key):
+    result = cache.get(cache_key)
+else:
+    # Proses gambar
+    result = process_image(image_path)
+    cache.set(cache_key, result)
 ```
 
 **Sesudah:**
 ```python
-from smartcash.utils.dataset import EnhancedDatasetValidator
+from smartcash.utils.cache import CacheManager
 
-validator = EnhancedDatasetValidator(
-    config=config,
-    data_dir="data",
-    logger=logger,
-    num_workers=4
+# Inisialisasi cache manager dengan konfigurasi yang lebih lengkap
+cache = CacheManager(
+    cache_dir=".cache/preprocessing",
+    max_size_gb=1.0,
+    ttl_hours=24,
+    auto_cleanup=True,
+    cleanup_interval_mins=30,
+    logger=logger
 )
 
-# Validasi dengan fitur perbaikan otomatis dan paralel processing
-validation_stats = validator.validate_dataset(
-    split='train',
-    fix_issues=True,  # Perbaiki masalah otomatis
-    move_invalid=True,  # Pindahkan file tidak valid
-    visualize=True,  # Buat visualisasi masalah
-    sample_size=0  # 0 = proses semua file
-)
+# Cek dan ambil dari cache dengan pembuatan key otomatis
+cache_key = cache.get_cache_key(str(image_path), preprocessing_params)
+if cache.exists(cache_key):
+    result = cache.get(cache_key)
+else:
+    # Proses gambar
+    result = process_image(image_path)
+    cache.put(cache_key, result)
 
-# Analisis statistik dataset
-analysis = validator.analyze_dataset(split='train')
-
-# Informasi terstruktur tentang validasi dan statistik
-print(f"Gambar valid: {validation_stats['valid_images']}/{validation_stats['total_images']}")
-print(f"Label valid: {validation_stats['valid_labels']}/{validation_stats['total_labels']}")
-print(f"Ukuran gambar dominan: {analysis['image_size_distribution']['dominant_size']}")
-print(f"Ketidakseimbangan kelas: {analysis['class_balance']['imbalance_score']:.2f}/10")
+# Akses statistik cache
+stats = cache.get_stats()
+print(f"Cache hit rate: {stats['hit_ratio']:.1f}%")
 ```
 
 #### Panduan Migrasi:
 
 ```python
-from smartcash.utils.dataset import EnhancedDatasetValidator, DatasetAnalyzer, DatasetFixer, DatasetCleaner
-from smartcash.utils.logger import get_logger
+# Kode lama (enhanced_cache.py)
+from smartcash.utils.enhanced_cache import EnhancedCache
 
-# Inisialisasi logger
-logger = get_logger("dataset_validator")
+cache = EnhancedCache(".cache/smartcash")
+result = cache.get("my_key")
+cache.set("my_key", data)
 
-# Inisialisasi validator
-validator = EnhancedDatasetValidator(
-    config=config,
-    data_dir="data",
-    logger=logger,
-    num_workers=4
+# Kode baru (cache package)
+from smartcash.utils.cache import CacheManager
+
+# Inisialisasi dengan opsi tambahan
+cache = CacheManager(
+    cache_dir=".cache/smartcash",
+    max_size_gb=1.0,
+    ttl_hours=24,
+    auto_cleanup=True,
+    logger=logger
 )
 
-# Validasi dataset
-validation_stats = validator.validate_dataset(
-    split='train',
-    fix_issues=True,  # Perbaiki masalah otomatis
-    move_invalid=True,  # Pindahkan file tidak valid
-    visualize=True,  # Buat visualisasi masalah
-    sample_size=0  # 0 = proses semua file
-)
+# EnhancedCache masih tersedia sebagai alias untuk kompatibilitas
+from smartcash.utils.cache import EnhancedCache  # Alias ke CacheManager
 
-# Pembersihan dataset (opsional)
-cleaner = DatasetCleaner(config, "data", logger)
-cleanup_stats = cleaner.cleanup(
-    augmented_only=True,  # Hanya hapus file hasil augmentasi
-    create_backup=True    # Buat backup sebelum menghapus
-)
+# Fungsionalitas baru
+result = cache.get("my_key", measure_time=True)  # Track waktu loading
+cache.put("my_key", data)                        # Simpan data ke cache
+cache.verify_integrity(fix=True)                 # Verifikasi dan perbaiki cache
+cache.cleanup(expired_only=True)                 # Bersihkan entri kadaluwarsa
+stats = cache.get_stats()                        # Dapatkan statistik cache
 ```
+
+#### Kelas Utama:
+
+1. **CacheManager** - Kelas utama yang menyediakan API untuk aplikasi
+2. **CacheIndex** - Mengelola indeks file yang di-cache dengan persistensi
+3. **CacheStorage** - Menangani operasi penyimpanan dan loading data
+4. **CacheCleanup** - Mengelola pembersihan dan validasi cache
+5. **CacheStats** - Mengumpulkan dan melaporkan statistik cache
 
 #### Penggunaan Baru:
 
@@ -839,5 +830,7 @@ Perubahan utama yang telah diimplementasikan meliputi:
 6. **Augmentation Utils**: Penambahan subpaket untuk augmentasi data dengan berbagai metode dan dukungan paralelisme
 
 7. **Dataset Utils**: Pengembangan alat untuk validasi, analisis, dan perbaikan dataset yang komprehensif
+
+8. **Cache System**: Refaktorisasi sistem cache menjadi komponen-komponen modular dengan performa dan keandalan yang lebih baik
 
 Perubahan ini mendorong pengembangan model deteksi mata uang Rupiah yang lebih akurat dan robust dengan performa yang lebih baik, keandalan yang lebih tinggi, dan kemudahan pengembangan di masa depan.

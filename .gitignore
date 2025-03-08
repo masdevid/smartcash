@@ -36,6 +36,7 @@ data/
 dataset/
 !docs/dataset
 !utils/dataset
+!handlers/dataset/
 weights/
 *.pt
 *.pth
@@ -70,6 +71,8 @@ results/
 logs/
 *.csv
 visualizations/
+!handlers/dataset/visualizations/
+
 checkpoints/
 wandb/
 lightning_logs/

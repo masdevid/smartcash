@@ -13,7 +13,7 @@ from smartcash.utils.logger import SmartCashLogger
 from smartcash.models.yolov5_model import YOLOv5Model
 from smartcash.handlers.data_manager import DataManager
 from smartcash.utils.early_stopping import EarlyStopping
-from smartcash.utils.model_checkpoint import ModelCheckpoint
+from smartcash.handlers.checkpoint_handler import CheckpointHandler  # Menggunakan checkpoint_handler yang terkonsolidasi
 
 class MultilayerHandler:
     """Handler for multilayer detection training and inference."""
@@ -51,6 +51,12 @@ class MultilayerHandler:
         # Initialize data manager
         self.data_manager = DataManager(
             config_path=config.get('config_path', 'config.yaml'),
+            logger=self.logger
+        )
+        
+        # Initialize checkpoint handler (menggantikan model_checkpoint)
+        self.checkpoint_handler = CheckpointHandler(
+            output_dir=config.get('training', {}).get('checkpoint_dir', 'runs/train/weights'),
             logger=self.logger
         )
         
@@ -99,12 +105,6 @@ class MultilayerHandler:
             early_stopping = EarlyStopping(
                 patience=self.config['training']['early_stopping_patience'],
                 verbose=True,
-                logger=self.logger
-            )
-            
-            # Initialize model checkpoint
-            checkpoint = ModelCheckpoint(
-                save_dir=self.config['training']['checkpoint_dir'],
                 logger=self.logger
             )
             
@@ -204,12 +204,16 @@ class MultilayerHandler:
                     f"Val Loss: {avg_val_loss:.4f}"
                 )
                 
-                # Save checkpoint
-                checkpoint.save(
+                # Save checkpoint menggunakan checkpoint_handler
+                is_best = early_stopping.is_best(avg_val_loss)
+                self.checkpoint_handler.save_checkpoint(
                     model=self.model,
+                    optimizer=optimizer,
+                    scheduler=scheduler,
                     config=self.config,
                     epoch=epoch,
-                    loss=avg_val_loss
+                    metrics={'loss': avg_val_loss},
+                    is_best=is_best
                 )
                 
                 # Early stopping check

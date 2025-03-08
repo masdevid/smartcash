@@ -23,7 +23,6 @@ from smartcash.utils.training_pipeline import TrainingPipeline
 
 # Helper utilities
 from smartcash.utils.coordinate_normalizer import CoordinateNormalizer
-from smartcash.utils.debug_helper import DebugHelper
 from smartcash.utils.experiment_tracker import ExperimentTracker
 from smartcash.utils.ui_utils import UIHelper
 
@@ -50,7 +49,6 @@ __all__ = [
     
     # Helper utilities
     'CoordinateNormalizer',
-    'DebugHelper',
     'ExperimentTracker',
     'UIHelper'
 ]

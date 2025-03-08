@@ -35,6 +35,7 @@ data/
 */data/
 dataset/
 !docs/dataset
+!utils/dataset
 weights/
 *.pt
 *.pth

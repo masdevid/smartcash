@@ -5,7 +5,7 @@
 import logging
 import sys
 import os
-from typing import Optional
+from typing import Optional, Tuple
 from datetime import datetime
 from pathlib import Path
 from IPython.display import display, HTML

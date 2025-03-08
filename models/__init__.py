@@ -10,7 +10,7 @@ from smartcash.models.backbones.efficientnet import EfficientNetBackbone
 from smartcash.models.backbones.base import BaseBackbone
 
 # Neck models
-from smartcash.models.necks.base import BaseNeck
+from smartcash.models.necks.fpn_pan import FeatureProcessingNeck, PathAggregationNetwork, FeaturePyramidNetwork
 
 # Detection components
 from smartcash.models.detection_head import DetectionHead

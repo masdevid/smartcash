@@ -1,193 +1,282 @@
-# Dokumentasi CheckpointManager
+# Dokumentasi CheckpointManager SmartCash
 
-## Gambaran Umum
+## Deskripsi
 
-`CheckpointManager` adalah komponen utama untuk mengelola proses checkpoint pada model SmartCash. Komponen ini dirancang dengan pendekatan modular untuk menangani berbagai aspek pengelolaan checkpoint seperti penyimpanan, pemuatan, pencarian, dan pengelolaan riwayat training.
+`CheckpointManager` adalah komponen pusat untuk pengelolaan checkpoint model deteksi mata uang Rupiah di SmartCash. 
+Komponen ini menggunakan pola desain Facade untuk menyediakan antarmuka terpadu bagi berbagai operasi checkpoint. Implementasi telah dioptimasi dengan pendekatan yang modular dan mudah dipelihara.
 
-## Struktur Komponen
+## Struktur dan Komponen
 
-Sistem checkpoint terdiri dari beberapa komponen yang saling bekerja sama:
+`CheckpointManager` mengadopsi struktur modular berikut:
 
 ```
 smartcash/handlers/checkpoint/
-├── __init__.py                  # Export komponen utama
-├── checkpoint_manager.py        # Facade utama (entry point)
-├── checkpoint_loader.py         # Pemuatan dan validasi checkpoint
-├── checkpoint_saver.py          # Penyimpanan dan backup checkpoint
-├── checkpoint_finder.py         # Pencarian dan filter checkpoint
-├── checkpoint_history.py        # Pengelolaan riwayat training
-└── checkpoint_utils.py          # Fungsi utilitas umum
+├── __init__.py                     # Export komponen utama
+├── checkpoint_manager.py           # Entry point minimal (facade)
+├── checkpoint_loader.py            # Loading checkpoint model
+├── checkpoint_saver.py             # Penyimpanan checkpoint model
+├── checkpoint_finder.py            # Pencarian checkpoint
+├── checkpoint_history.py           # Pengelolaan riwayat training
+└── checkpoint_utils.py             # Utilitas umum
 ```
 
-## Penggunaan Dasar
+`CheckpointManager` menggabungkan beberapa komponen terspesialisasi menjadi satu antarmuka terpadu:
 
-### Inisialisasi Manager
+- **CheckpointLoader**: Loading model dan state dari checkpoint
+- **CheckpointSaver**: Penyimpanan model ke checkpoint
+- **CheckpointFinder**: Pencarian checkpoint berdasarkan kriteria
+- **CheckpointHistory**: Pengelolaan riwayat checkpoint dan training
+
+## Fitur Utama
+
+### 1. Pengelolaan Checkpoint Model
+
+- Loading dan penyimpanan model dengan metadata komprehensif
+- Support untuk menyimpan state optimizer dan scheduler
+- Loading model dengan atau tanpa strict mode
+- Validasi checkpoint dan validasi kompatibilitas model
+
+### 2. Organisasi Checkpoint Training
+
+- Penyimpanan berbagai jenis checkpoint (best, latest, epoch)
+- Pengelolaan riwayat training dengan metadata lengkap
+- Penyusunan struktur checkpoint yang konsisten dan robust
+- Recovery otomatis dari error dengan emergency checkpoint
+
+### 3. Pencarian Checkpoint
+
+- Pencarian checkpoint terbaik berdasarkan metrik
+- Pencarian checkpoint untuk epoch tertentu
+- Pencarian checkpoint terbaru berdasarkan waktu modifikasi
+- Pencarian berdasarkan backbone dan konfigurasi lainnya
+
+### 4. Pengelolaan History Training
+
+- Pencatatan riwayat training secara komprehensif
+- Dukungan untuk resume training dari checkpoint tertentu
+- Pelacakan checkpoint terbaik berdasarkan metrik
+
+### 5. Optimasi Penyimpanan
+
+- Pembersihan checkpoint lama secara otomatis
+- Pembatasan jumlah checkpoint berdasarkan tipe
+- Menyimpan checkpoint secara periodik berdasarkan epoch
+
+### 6. Integrasi dengan Google Colab
+
+- Dukungan untuk menyalin checkpoint ke Google Drive
+- Deteksi otomatis environment Google Colab
+- Penyimpanan riwayat training dan loading dari Drive
+
+## Kelas Utama
+
+### CheckpointManager
+
+Manager utama untuk pengelolaan checkpoint model SmartCash. Mengimplementasikan pola Facade untuk menyediakan API terpadu ke semua komponen terkait checkpoint.
+
+**Parameter Init:**
+- `output_dir`: Direktori untuk menyimpan checkpoint
+- `logger`: Logger kustom (opsional)
+
+### CheckpointLoader
+
+Komponen untuk loading model checkpoint dengan penanganan error yang robust.
+
+**Metode Utama:**
+- `load_checkpoint()`: Muat checkpoint dengan dukungan berbagai opsi dan resume training
+
+### CheckpointSaver
+
+Komponen untuk penyimpanan model checkpoint dengan penanganan error yang robust.
+
+**Metode Utama:**
+- `save_checkpoint()`: Simpan checkpoint model dengan metadata komprehensif
+
+### CheckpointFinder
+
+Pencarian checkpoint model berdasarkan berbagai kriteria.
+
+**Metode Utama:**
+- `find_best_checkpoint()`: Temukan checkpoint terbaik berdasarkan riwayat training
+- `find_latest_checkpoint()`: Temukan checkpoint terakhir berdasarkan waktu modifikasi
+
+### CheckpointHistory
+
+Pengelolaan riwayat checkpoint dan training.
+
+**Metode Utama:**
+- `update_training_history()`: Update riwayat training dalam file YAML
+
+## Format Metadata Checkpoint
+
+Checkpoint SmartCash menyimpan metadata komprehensif untuk memudahkan resume training dan evaluasi:
 
 ```python
-from smartcash.handlers.checkpoint import CheckpointManager
-from smartcash.utils.logger import get_logger
-
-# Inisialisasi dengan logger kustom (opsional)
-logger = get_logger("training")
-
-# Buat instance checkpoint manager
-checkpoint_manager = CheckpointManager(
-    output_dir="runs/train/weights",
-    logger=logger
-)
+{
+    'epoch': 30,                      # Epoch terakhir
+    'model_state_dict': {...},        # State dict model
+    'optimizer_state_dict': {...},    # State dict optimizer (opsional)
+    'scheduler_state_dict': {...},    # State dict scheduler (opsional)
+    'metrics': {                      # Metrik training
+        'loss': 0.234,
+        'val_loss': 0.345,
+        'mAP': 0.678,
+        'precision': 0.765,
+    },
+    'config': {                       # Konfigurasi training
+        'model': {...},
+        'training': {...},
+    },
+    'timestamp': '2023-05-20T15:30:45.123456',  # Waktu penyimpanan
+}
 ```
 
-### Menyimpan Checkpoint
+## Konvensi Penamaan Checkpoint
 
-```python
-# Menyimpan checkpoint di akhir epoch
-checkpoint_result = checkpoint_manager.save_checkpoint(
-    model=model,
-    optimizer=optimizer,
-    scheduler=scheduler,
-    config=config,
-    epoch=current_epoch,
-    metrics={'loss': val_loss, 'accuracy': val_accuracy},
-    is_best=(val_loss < best_val_loss)
-)
+Checkpoint menggunakan konvensi penamaan yang konsisten:
 
-# Dapatkan path checkpoint yang disimpan
-checkpoint_path = checkpoint_result['path']
-print(f"✅ Checkpoint disimpan ke: {checkpoint_path}")
+```
+smartcash_{backbone}_{dataset}_{type}_{timestamp}.pth
 ```
 
-### Memuat Checkpoint
+Contoh:
+- `smartcash_efficientnet_b4_roboflow_best_20230520_153045.pth`
+- `smartcash_cspdarknet_local_latest_20230520_153045.pth`
+- `smartcash_efficientnet_b4_roboflow_epoch_15_20230520_153045.pth`
 
-```python
-# Memuat checkpoint terbaik
-checkpoint = checkpoint_manager.load_checkpoint(
-    model=model,              # Optional: Langsung muat state ke model
-    optimizer=optimizer,      # Optional: Langsung muat state ke optimizer
-    scheduler=scheduler       # Optional: Langsung muat state ke scheduler
-)
+## Format History Training
 
-# Dapatkan epoch terakhir untuk resume training
-last_epoch = checkpoint.get('epoch', 0)
-print(f"📂 Melanjutkan training dari epoch {last_epoch}")
+History training disimpan dalam format YAML:
+
+```yaml
+total_runs: 45
+runs:
+  - checkpoint_name: "smartcash_efficientnet_b4_roboflow_best_20230520_153045.pth"
+    timestamp: "2023-05-20T15:30:45.123456"
+    is_best: true
+    epoch: 30
+    metrics:
+      loss: 0.234
+      val_loss: 0.345
+      mAP: 0.678
+      precision: 0.765
+last_resume:
+  checkpoint: "smartcash_efficientnet_b4_roboflow_best_20230520_153045.pth"
+  timestamp: "2023-05-21T09:15:30.654321"
 ```
 
-### Mencari Checkpoint
+## Metode Utama di CheckpointManager
 
-```python
-# Mencari checkpoint terbaik
-best_checkpoint_path = checkpoint_manager.find_best_checkpoint()
+### load_checkpoint
 
-# Mencari checkpoint terakhir
-latest_checkpoint_path = checkpoint_manager.find_latest_checkpoint()
+Memuat checkpoint model beserta state optimizer dan scheduler jika disediakan. Jika checkpoint_path tidak diberikan, akan mencari checkpoint terbaik berdasarkan riwayat training.
 
-# Mencari checkpoint berdasarkan epoch
-epoch10_checkpoint = checkpoint_manager.find_checkpoint_by_epoch(10)
+**Parameter:**
+- `checkpoint_path`: Path ke checkpoint (jika None, akan mengambil checkpoint terbaik)
+- `device`: Perangkat untuk memuat model
+- `model`: Model yang akan dimuat dengan weights (opsional)
+- `optimizer`: Optimizer yang akan dimuat dengan state (opsional)
+- `scheduler`: Scheduler yang akan dimuat dengan state (opsional)
 
-# Filter checkpoint berdasarkan karakteristik
-filtered_checkpoints = checkpoint_manager.filter_checkpoints(
-    backbone="efficientnet_b4",  # Filter berdasarkan backbone
-    dataset="roboflow",         # Filter berdasarkan dataset
-    min_epoch=5                 # Filter min epoch
-)
-```
+### save_checkpoint
 
-## Fitur Lanjutan
+Menyimpan checkpoint model beserta metadata lengkap. Flag `is_best` menentukan apakah checkpoint akan disimpan sebagai checkpoint terbaik.
 
-### Membersihkan Checkpoint yang Tidak Digunakan
+**Parameter:**
+- `model`: Model PyTorch
+- `optimizer`: Optimizer
+- `scheduler`: Learning rate scheduler
+- `config`: Konfigurasi training
+- `epoch`: Epoch saat ini
+- `metrics`: Metrik training
+- `is_best`: Apakah ini model terbaik
+- `save_optimizer`: Apakah menyimpan state optimizer
 
-```python
-# Membersihkan checkpoint lama
-deleted_paths = checkpoint_manager.cleanup_checkpoints(
-    max_checkpoints=5,    # Jumlah maks checkpoint per kategori
-    keep_best=True,       # Pertahankan semua checkpoint terbaik
-    keep_latest=True,     # Pertahankan checkpoint latest terakhir
-    max_epochs=5          # Jumlah maks checkpoint epoch
-)
+### find_best_checkpoint
 
-print(f"🧹 {len(deleted_paths)} checkpoint lama dibersihkan")
-```
+Mencari checkpoint terbaik berdasarkan riwayat training. Checkpoint terbaik ditentukan oleh flag `is_best` yang disimpan dalam history.
 
-### Menyalin ke Google Drive (untuk Colab)
+### find_latest_checkpoint
 
-```python
-# Salin checkpoint ke Google Drive
-copied_paths = checkpoint_manager.copy_to_drive(
-    drive_dir="/content/drive/MyDrive/SmartCash/checkpoints",
-    best_only=True  # Hanya salin checkpoint terbaik
-)
+Mencari checkpoint terakhir berdasarkan waktu modifikasi file.
 
-print(f"📤 {len(copied_paths)} checkpoint disalin ke Drive")
-```
+### find_checkpoint_by_epoch
 
-### Riwayat Training & Ekspor
+Mencari checkpoint untuk epoch tertentu.
 
-```python
-# Dapatkan riwayat training
-history = checkpoint_manager.get_training_history()
-print(f"📊 Total sesi training: {history['total_runs']}")
+**Parameter:**
+- `epoch`: Nomor epoch yang dicari
 
-# Ekspor riwayat ke JSON
-json_path = checkpoint_manager.export_history_to_json("training_history.json")
-print(f"💾 Riwayat training disimpan ke {json_path}")
-```
+### list_checkpoints
 
-### Menampilkan Daftar Checkpoint
+Mendapatkan daftar semua checkpoint yang tersedia, dikelompokkan berdasarkan tipe (best, latest, epoch).
 
-```python
-# Tampilkan daftar checkpoint yang tersedia
-checkpoint_manager.display_checkpoints()
-```
+### cleanup_checkpoints
 
-### Validasi Checkpoint
+Membersihkan checkpoint lama berdasarkan kriteria tertentu untuk menghemat ruang penyimpanan.
 
-```python
-# Validasi apakah checkpoint valid
-is_valid, validation_info = checkpoint_manager.validate_checkpoint("path/to/checkpoint.pth")
-if is_valid:
-    print("✅ Checkpoint valid dan lengkap")
-else:
-    print(f"❌ Checkpoint tidak valid: {validation_info['message']}")
-```
+**Parameter:**
+- `max_checkpoints`: Jumlah maksimal checkpoint per kategori
+- `keep_best`: Pertahankan semua checkpoint terbaik
+- `keep_latest`: Pertahankan checkpoint latest terakhir
+- `max_epochs`: Jumlah maksimal checkpoint epoch yang disimpan
 
-## Rekomendasi Penggunaan
+### get_training_history
 
-1. **Penyimpanan Checkpoint Reguler**:
-   - Simpan checkpoint di setiap akhir epoch
-   - Manfaatkan flag `is_best` untuk menandai checkpoint terbaik
+Mendapatkan riwayat training lengkap dari file history.
 
-2. **Mengelola Ukuran Disk**:
-   - Gunakan `cleanup_checkpoints()` secara berkala untuk membersihkan checkpoint lama
-   - Sebaiknya panggil setiap ~10 epoch
+## Integrasi dengan Komponen Lain
 
-3. **Resume Training**:
-   - Selalu gunakan `load_checkpoint()` untuk melanjutkan training yang terhenti
-   - Manfaatkan metadata yang tersimpan di checkpoint
+### 1. Integrasi dengan ModelManager
 
-4. **Backup Checkpoint**:
-   - Gunakan `copy_to_drive()` secara berkala untuk mencadangkan checkpoint penting
+CheckpointManager dapat digunakan dengan ModelManager untuk:
+- Loading model dari checkpoint terbaik
+- Menyimpan checkpoint selama training
+- Mengelola riwayat training dan validasi
 
-## Troubleshooting
+### 2. Integrasi dengan EvaluationManager
 
-### Checkpoint Tidak Ditemukan
+CheckpointManager dapat diintegrasikan dengan EvaluationManager untuk:
+- Evaluasi model dari checkpoint terbaik
+- Perbandingan performa berbagai checkpoint
+- Analisis kemajuan training berdasarkan metrik
 
-- Periksa direktori output: `checkpoint_manager.output_dir`
-- Pastikan direktori tersebut memiliki izin yang tepat
-- Coba gunakan `list_checkpoints()` untuk melihat semua checkpoint yang tersedia
+### 3. Integrasi dengan Google Colab
 
-### Gagal Memuat Model State
+Dukungan khusus untuk environment Google Colab:
+- Deteksi otomatis environment Colab
+- Menyalin checkpoint terbaik ke Google Drive
+- Mengakses checkpoint dari Google Drive
 
-- Coba gunakan `validate_checkpoint()` untuk memeriksa integritas file checkpoint
-- Jika struktur model berubah, gunakan parameter `strict=False` pada `model.load_state_dict()`
+## Penanganan Error
 
-### Riwayat Training Tidak Lengkap
+CheckpointManager memiliki mekanisme robust untuk menangani berbagai error:
 
-- Periksa file `training_history.yaml` di direktori checkpoint
-- Gunakan `export_history_to_json()` untuk mengekspor riwayat ke format yang lebih mudah dibaca
+1. **Recovery dari Invalid Checkpoint**:
+   - Jika checkpoint terbaik tidak valid, gunakan checkpoint terakhir
+   - Jika tidak ada checkpoint yang valid, mulai dari awal
+   
+2. **Non-strict Loading**:
+   - Mendukung loading model dengan `strict=False` jika terjadi error
+   - Memungkinkan loading partial state untuk transfer learning
 
-## Catatan Penting
+3. **Emergency Checkpoint**:
+   - Menyimpan emergency checkpoint jika operasi save normal gagal
+   - Mempertahankan minimal state model untuk menyelamatkan progress
 
-- Semua operasi pada CheckpointManager sudah thread-safe
-- Semua fungsi penyimpanan dilengkapi dengan penanganan error yang robust
-- Gunakan parameter `logger` untuk mendapatkan log yang lebih detail
+4. **Fallback Mechanism**:
+   - Fallback ke default values jika metadata tidak lengkap
+   - Memungkinkan recovery dari checkpoint yang rusak atau tidak lengkap
 
-Dengan menggunakan CheckpointManager dengan benar, Anda dapat mengelola proses checkpoint secara efisien dan mengurangi risiko kehilangan hasil training yang berharga.
+## Kesimpulan
+
+CheckpointManager SmartCash menawarkan:
+
+1. **Antarmuka Terpadu**: Menyederhanakan operasi checkpoint yang kompleks
+2. **Keandalan Tinggi**: Penanganan error robust dan mekanisme recovery
+3. **Modularitas**: Pemisahan tanggung jawab ke komponen terpisah
+4. **Pengelolaan Riwayat**: Pelacakan training history yang komprehensif
+5. **Integrasi Mulus**: Bekerja seamless dengan komponen lain di SmartCash
+6. **Colab Support**: Dukungan khusus untuk Google Colab dan Drive
+
+Dengan fitur-fitur tersebut, CheckpointManager memastikan proses training dapat dilanjutkan dengan mulus, progress training terrekam dengan baik, dan model terbaik dapat dengan mudah ditemukan untuk evaluasi dan deployment.

@@ -1,10 +1,10 @@
 # File: smartcash/handlers/checkpoint/checkpoint_utils.py
 # Author: Alfrida Sabar
-# Deskripsi: Utilitas umum untuk pengelolaan checkpoint
+# Deskripsi: Utilitas umum untuk pengelolaan checkpoint (Diringkas)
 
 import os
 from datetime import datetime
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional
 from pathlib import Path
 
 def generate_checkpoint_name(

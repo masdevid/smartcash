@@ -1,25 +1,19 @@
 # File: smartcash/handlers/checkpoint/checkpoint_history.py
 # Author: Alfrida Sabar
-# Deskripsi: Pengelolaan riwayat checkpoint training
+# Deskripsi: Pengelolaan riwayat checkpoint training (Diringkas)
 
 import yaml
 import json
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from pathlib import Path
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.utils.logger import get_logger
 
 class CheckpointHistory:
-    """
-    Pengelolaan riwayat checkpoint dan training.
-    """
+    """Pengelolaan riwayat checkpoint dan training."""
     
-    def __init__(
-        self,
-        output_dir: Path,
-        logger: Optional[SmartCashLogger] = None
-    ):
+    def __init__(self, output_dir: Path, logger=None):
         """
         Inisialisasi pengelolaan riwayat checkpoint.
         
@@ -28,7 +22,7 @@ class CheckpointHistory:
             logger: Logger kustom (opsional)
         """
         self.output_dir = output_dir
-        self.logger = logger or SmartCashLogger(__name__)
+        self.logger = logger or get_logger("checkpoint_history")
         self.history_file = self.output_dir / 'training_history.yaml'
         
         # Inisialisasi file riwayat jika belum ada
@@ -44,10 +38,9 @@ class CheckpointHistory:
                         'runs': [],
                         'last_resume': None
                     }, f)
-                self.logger.info(f"📝 File riwayat training diinisialisasi: {self.history_file}")
         except Exception as e:
             self.logger.error(f"❌ Gagal menginisialisasi riwayat training: {str(e)}")
-            # Buat file kosong jika gagal untuk mencegah error berikutnya
+            # Buat file kosong jika gagal
             try:
                 with open(self.history_file, 'w') as f:
                     f.write('{}')
@@ -89,9 +82,6 @@ class CheckpointHistory:
             
             with open(self.history_file, 'w') as f:
                 yaml.safe_dump(history, f)
-                
-            self.logger.debug(f"📝 Riwayat training diperbarui: {checkpoint_name}")
-            
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal memperbarui riwayat training: {str(e)}")
     
@@ -113,9 +103,6 @@ class CheckpointHistory:
             
             with open(self.history_file, 'w') as f:
                 yaml.safe_dump(history, f)
-                
-            self.logger.info(f"🔄 Riwayat resume training diperbarui: {Path(checkpoint_path).name}")
-            
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal memperbarui riwayat resume: {str(e)}")
     

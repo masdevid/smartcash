@@ -1,275 +1,341 @@
-# Dokumentasi Model Handler SmartCash
+# Dokumentasi Model Manager SmartCash
 
-## Ringkasan
-Model Handler SmartCash telah direfaktorisasi menjadi komponen yang lebih modular dan terorganisir berdasarkan prinsip *Single Responsibility*. Refaktorisasi ini meningkatkan pemeliharaan kode, mendukung pengujian yang lebih baik, dan memanfaatkan komponen `utils/training` yang telah direfaktorisasi sebelumnya.
+## Deskripsi
 
-## Struktur Komponen
+`ModelManager` adalah komponen pusat untuk pengelolaan model deteksi mata uang Rupiah di SmartCash. 
+Komponen ini menggunakan pola desain Facade untuk menyediakan antarmuka terpadu bagi berbagai operasi model. Implementasi telah dioptimasi dengan pendekatan yang modular dan dapat dipelihara dengan mudah.
+
+## Struktur dan Komponen
+
+`ModelManager` mengadopsi struktur modular berikut:
+
 ```
-smartcash/
-├── handlers/
-│   ├── model_manager.py          # Entry point utama (facade)
-│   └── model/
-│       ├── __init__.py           # Export semua komponen
-│       ├── model_factory.py      # Pembuatan model dengan berbagai backbone
-│       ├── optimizer_factory.py  # Pembuatan optimizer dan scheduler
-│       ├── model_trainer.py      # Training model
-│       ├── model_evaluator.py    # Evaluasi model
-│       ├── model_predictor.py    # Prediksi dengan model terlatih
-│       └── model_experiments.py  # Eksperimen dan hyperparameter tuning
-```
+smartcash/handlers/model/
+├── __init__.py                     # Export komponen utama
+├── model_manager.py                # Entry point minimal (facade)
 
-## Entry Point: ModelManager
-`ModelManager` adalah facade yang menyediakan akses terpadu ke semua komponen model. Kelas ini terletak di `handlers/model_manager.py` dan menyediakan interface yang bersih untuk semua operasi model.
+├── core/                           # Komponen inti model
+│   ├── model_component.py          # Kelas dasar komponen model
+│   ├── model_factory.py            # Factory pembuatan model dan arsitektur
+│   ├── backbone_factory.py         # Factory pembuatan backbone
+│   ├── optimizer_factory.py        # Factory untuk optimizer dan scheduler
+│   ├── model_trainer.py            # Komponen training model
+│   ├── model_evaluator.py          # Komponen evaluasi model
+│   └── model_predictor.py          # Komponen prediksi dengan model
 
-## Penggunaan
+├── experiments/                    # Eksperimen dan riset
+│   ├── experiment_manager.py       # Manajer eksperimen
+│   └── backbone_comparator.py      # Komponen khusus untuk perbandingan backbone
 
-### Inisialisasi
-```python
-from smartcash.handlers.model_manager import ModelManager
+├── observers/                      # Observer untuk monitoring
+│   ├── base_observer.py            # Observer dasar
+│   ├── metrics_observer.py         # Monitoring metrik training
+│   └── colab_observer.py           # Observer khusus Colab
 
-# Inisialisasi dengan konfigurasi
-model_manager = ModelManager(config={
-    'model': {
-        'backbone': 'efficientnet',
-        'num_classes': 7
-    },
-    'training': {
-        'epochs': 30,
-        'batch_size': 16,
-        'learning_rate': 0.001
-    },
-    'output_dir': 'runs/training'
-})
-```
+├── integration/                    # Adapter untuk integrasi
+│   ├── checkpoint_adapter.py       # Adapter untuk CheckpointManager
+│   ├── metrics_adapter.py          # Adapter untuk MetricsCalculator
+│   ├── environment_adapter.py      # Adapter untuk environment
+│   ├── experiment_adapter.py       # Adapter untuk experiment tracking
+│   └── exporter_adapter.py         # Adapter untuk export model
 
-### Training Model
-```python
-# Dapatkan dataloaders
-train_loader = data_manager.get_train_loader()
-val_loader = data_manager.get_val_loader()
-
-# Training model
-results = model_manager.train(
-    train_loader=train_loader,
-    val_loader=val_loader,
-    epochs=30,
-    device='cuda'
-)
-
-# Akses hasil
-best_checkpoint_path = results['best_checkpoint_path']
-print(f"Training selesai dengan val_loss: {results['best_val_loss']}")
+└── visualizations/                 # Visualisasi training dan evaluasi
+    ├── metrics_visualizer.py       # Visualisasi metrik training
+    └── comparison_visualizer.py    # Visualisasi perbandingan model
 ```
 
-### Evaluasi Model
-```python
-# Dapatkan test dataloader
-test_loader = data_manager.get_test_loader()
+`ModelManager` menggabungkan beberapa komponen terspesialisasi menjadi satu antarmuka terpadu:
 
-# Evaluasi model
-metrics = model_manager.evaluate(
-    test_loader=test_loader,
-    checkpoint_path='path/to/checkpoint.pth'
-)
+- **ModelFactory**: Pembuatan model dengan berbagai backbone
+- **BackboneFactory**: Pembuatan backbone (EfficientNet, CSPDarknet)
+- **OptimizerFactory**: Pembuatan optimizer dan scheduler
+- **ModelTrainer**: Training model
+- **ModelEvaluator**: Evaluasi model pada dataset
+- **ModelPredictor**: Prediksi menggunakan model
+- **ExperimentManager**: Eksperimen dan perbandingan model
 
-# Print hasil
-print(f"Akurasi: {metrics['accuracy']:.4f}")
-print(f"F1-Score: {metrics['f1']:.4f}")
-```
+## Fitur Utama
 
-### Prediksi dengan Model
-```python
-# Prediksi single image
-image = torch.tensor(...)  # [C, H, W]
-result = model_manager.predict(
-    images=image,
-    conf_threshold=0.5
-)
+### 1. Pembuatan Model
 
-# Akses hasil
-detections = result['detections']
-```
+- Dukungan untuk multiple backbone architectures (EfficientNet, CSPDarknet)
+- Factory pattern untuk pembuatan model yang fleksibel
+- Integrasi backbone ke dalam arsitektur YOLO secara transparan
+- Loading model dari checkpoint
+- Pembekuan dan unfreeze backbone untuk transfer learning
+- Parameter injection melalui konfigurasi
 
-### Pembekuan/Unfreeze Backbone
-```python
-# Buat model
-model = model_manager.create_model(backbone_type='efficientnet')
+### 2. Training Model
 
-# Bekukan backbone untuk fine-tuning
-model = model_manager.model_factory.freeze_backbone(model)
+- Integrasi dengan TrainingPipeline dari utils
+- Optimizer dan scheduler dengan konfigurasi yang fleksibel
+- Early stopping dengan kriteria yang dapat dikonfigurasi
+- Checkpoint otomatis dan save best model
+- Observer pattern untuk monitoring training
+- Dukungan khusus untuk Google Colab dengan visualisasi real-time
+- Integrasi dengan experiment tracking untuk analisis eksperimen
 
-# Training hanya layer-layer atas
-results = model_manager.train(train_loader, val_loader, model=model)
+### 3. Evaluasi Model
 
-# Lepas pembekuan jika diperlukan
-model = model_manager.model_factory.unfreeze_backbone(model)
+- Evaluasi model pada dataset test
+- Perhitungan metrik evaluasi (mAP, precision, recall, F1)
+- Dukungan untuk evaluasi pada layer spesifik
+- Pengukuran waktu inferensi dan performa
+- Visualisasi hasil evaluasi
 
-# Lanjutkan training dengan seluruh model
-results = model_manager.train(train_loader, val_loader, model=model)
-```
+### 4. Prediksi
 
-### Eksperimen dengan Backbone Berbeda
-```python
-# Bandingkan backbone
-backbones = ['efficientnet', 'cspdarknet']
-results = model_manager.compare_backbones(
-    backbones=backbones,
-    train_loader=train_loader,
-    val_loader=val_loader,
-    test_loader=test_loader
-)
-```
+- Prediksi pada gambar atau batch gambar
+- Pre-processing dan post-processing otomatis
+- Visualisasi hasil deteksi
+- Prediksi pada video dengan visualisasi frame-by-frame
+- Rescaling koordinat ke ukuran gambar asli
 
-### Hyperparameter Tuning
-```python
-# Grid parameter
-param_grid = {
-    'learning_rate': [0.001, 0.0005, 0.0001],
-    'batch_size': [8, 16, 32]
-}
+### 5. Eksperimen dan Perbandingan
 
-# Jalankan tuning
-tuning_results = model_manager.tune_hyperparameters(
-    param_grid=param_grid,
-    train_loader=train_loader,
-    val_loader=val_loader,
-    test_loader=test_loader,
-    max_experiments=5  # Opsional: batasi jumlah eksperimen
-)
-```
+- Perbandingan berbagai backbone dengan kondisi yang sama
+- Perbandingan model dengan ukuran gambar berbeda
+- Perbandingan strategi augmentasi
+- Eksekusi eksperimen secara paralel untuk efisiensi
+- Visualisasi perbandingan performa
+- Tracking eksperimen dengan metrik-metrik penting
 
-## Komponen Individual
+### 6. Export Model
+
+- Export model ke format deployment (TorchScript, ONNX)
+- Optimasi model untuk inferensi
+- Dukungan untuk half precision
+- Pengukuran performa model yang diexport
+- Integrasi dengan Google Drive di Colab
+
+## Kelas Utama
+
+### ModelManager
+
+Kelas utama yang berfungsi sebagai facade, menyembunyikan kompleksitas implementasi dan meningkatkan usability. Mengelola lazy-loading komponen dan menyediakan metode-metode utama untuk:
+- Membuat dan memuat model
+- Training model
+- Evaluasi model
+- Prediksi dengan model
+- Perbandingan backbone
+- Setup environment
+- Export model
+- Tracking eksperimen
 
 ### ModelFactory
-Bertanggung jawab untuk membuat model dengan berbagai backbone dan konfigurasi.
 
-```python
-from smartcash.handlers.model.model_factory import ModelFactory
+Factory untuk pembuatan model dengan berbagai backbone. Bertanggung jawab untuk:
+- Membuat model dengan backbone yang ditentukan
+- Memuat model dari checkpoint
+- Membekukan dan melepas pembekuan backbone untuk fine-tuning
 
-factory = ModelFactory(config)
-model = factory.create_model(backbone_type='efficientnet')
+### BackboneFactory
 
-# Freeze/unfreeze backbone
-model = factory.freeze_backbone(model)  # Bekukan layer backbone
-model = factory.unfreeze_backbone(model)  # Lepaskan pembekuan
-```
-
-### OptimizerFactory
-Membuat optimizer dan scheduler berdasarkan konfigurasi.
-
-```python
-from smartcash.handlers.model.optimizer_factory import OptimizerFactory
-
-factory = OptimizerFactory(config)
-optimizer = factory.create_optimizer(model, lr=0.001)
-scheduler = factory.create_scheduler(optimizer)
-```
+Factory untuk pembuatan backbone dengan berbagai arsitektur. Menyediakan fungsi untuk:
+- Membuat backbone dengan tipe yang ditentukan (EfficientNet, CSPDarknet)
+- Mendapatkan dimensi fitur output backbone
 
 ### ModelTrainer
-Khusus untuk proses training model menggunakan TrainingPipeline yang direfaktor.
 
-```python
-from smartcash.handlers.model.model_trainer import ModelTrainer
-
-trainer = ModelTrainer(config)
-results = trainer.train(train_loader, val_loader)
-
-# Resume training dari checkpoint
-results = trainer.resume_training(
-    train_loader=train_loader,
-    val_loader=val_loader,
-    checkpoint_path='path/to/last_checkpoint.pth'
-)
-```
+Komponen untuk training model. Mengimplementasikan:
+- Training model dengan dataset yang diberikan
+- Integrasi dengan TrainingPipeline
+- Setup callback dan observer untuk monitoring
+- Tracking eksperimen
 
 ### ModelEvaluator
-Khusus untuk evaluasi model dengan metrik yang komprehensif.
 
-```python
-from smartcash.handlers.model.model_evaluator import ModelEvaluator
-
-evaluator = ModelEvaluator(config)
-metrics = evaluator.evaluate(test_loader, model=model)
-
-# Multiple runs untuk metrik yang lebih stabil
-avg_metrics = evaluator.evaluate_multiple_runs(
-    test_loader=test_loader,
-    checkpoint_path='path/to/best.pth',
-    num_runs=3
-)
-```
+Komponen untuk evaluasi model. Menyediakan fungsi untuk:
+- Evaluasi model pada dataset test
+- Evaluasi model pada layer spesifik
 
 ### ModelPredictor
-Khusus untuk melakukan inferensi/prediksi dengan model terlatih.
+
+Komponen untuk prediksi menggunakan model. Bertanggung jawab untuk:
+- Prediksi pada gambar
+- Prediksi pada video
+- Pre-processing dan post-processing gambar
+- Visualisasi hasil deteksi
+
+### ExperimentManager
+
+Manager untuk eksperimen model, fokus pada perbandingan backbone. Menyediakan fungsi untuk:
+- Perbandingan beberapa backbone dengan kondisi yang sama
+- Running eksperimen secara paralel atau serial
+- Visualisasi dan analisis hasil perbandingan
+
+### BackboneComparator
+
+Komponen khusus untuk perbandingan backbone dengan parameter yang berbeda. Memperluas fungsionalitas ExperimentManager dengan opsi perbandingan untuk:
+- Ukuran gambar yang berbeda
+- Strategi augmentasi yang berbeda
+
+## Observers dan Monitoring
+
+### BaseObserver
+
+Kelas dasar untuk monitoring model dan training. Mendefinisikan interface untuk:
+- Update berdasarkan events (training_start, training_end, epoch_start, epoch_end)
+- Callback untuk events tersebut
+
+### MetricsObserver
+
+Observer untuk monitoring dan tracking metrik training. Bertanggung jawab untuk:
+- Menyimpan history metrik training
+- Visualisasi metrik training
+- Penyimpanan metrik ke disk
+
+### ColabObserver
+
+Observer khusus untuk Google Colab. Menyediakan:
+- Visualisasi real-time menggunakan ipywidgets
+- Progress bar yang kompatibel dengan Colab
+- Update grafik metrik secara dinamis
+
+## Adapters untuk Integrasi
+
+### CheckpointAdapter
+
+Adapter untuk integrasi dengan CheckpointManager. Menyediakan fungsi untuk:
+- Menyimpan checkpoint model
+- Memuat checkpoint model
+- Menemukan checkpoint terbaik
+
+### MetricsAdapter
+
+Adapter untuk integrasi dengan MetricsCalculator. Mengelola:
+- Reset dan update metrik
+- Perhitungan metrik final
+- Pengukuran waktu inferensi
+
+### EnvironmentAdapter
+
+Adapter untuk integrasi dengan EnvironmentManager. Bertanggung jawab untuk:
+- Deteksi environment (Colab)
+- Mount Google Drive
+- Setup project environment
+- Penyesuaian path berdasarkan environment
+
+### ExperimentAdapter
+
+Adapter untuk integrasi dengan ExperimentTracker. Menyediakan fungsi untuk:
+- Setting nama eksperimen
+- Start dan end eksperimen
+- Logging metrik
+- Perbandingan eksperimen
+
+### ExporterAdapter
+
+Adapter untuk integrasi dengan ModelExporter. Bertanggung jawab untuk:
+- Export model ke TorchScript
+- Export model ke ONNX
+- Salin model ke Google Drive
+
+## Format Hasil
+
+### Hasil Training
 
 ```python
-from smartcash.handlers.model.model_predictor import ModelPredictor
-
-predictor = ModelPredictor(config)
-results = predictor.predict(images, conf_threshold=0.5)
-
-# Prediksi batch
-batch_results = predictor.predict_batch(
-    dataloader=test_loader,
-    conf_threshold=0.5,
-    max_samples=100
-)
-```
-
-### ModelExperiments
-Menjalankan eksperimen dan membandingkan hasil dari berbagai konfigurasi.
-
-```python
-from smartcash.handlers.model.model_experiments import ModelExperiments
-
-experiments = ModelExperiments(config)
-
-# Single experiment
-scenario = {
-    'name': 'EfficientNet-Test', 
-    'description': 'Test EfficientNet backbone', 
-    'backbone': 'efficientnet'
+{
+    'epoch': 30,                      # Epoch terakhir
+    'best_epoch': 25,                 # Epoch terbaik
+    'best_val_loss': 0.125,           # Validation loss terbaik
+    'early_stopped': True,            # Flag early stopping
+    'metrics_history': { ... },       # History metrik
+    'best_checkpoint_path': '...',    # Path checkpoint terbaik
+    'last_checkpoint_path': '...',    # Path checkpoint terakhir
+    'execution_time': 3600.5          # Waktu eksekusi (detik)
 }
-results = experiments.run_experiment(scenario, train_loader, val_loader, test_loader)
-
-# Compare different backbones
-compare_results = experiments.compare_backbones(
-    backbones=['efficientnet', 'cspdarknet'],
-    train_loader=train_loader,
-    val_loader=val_loader,
-    test_loader=test_loader
-)
 ```
 
-## Integrasi dengan utils/training
-Refaktorisasi ini memanfaatkan komponen dari `utils/training` yang telah direfaktorisasi:
+### Hasil Evaluasi
 
-- **TrainingPipeline** - Digunakan dalam `ModelTrainer` untuk mengelola alur training
-- **MetricsCalculator** - Digunakan dalam `ModelEvaluator` untuk perhitungan metrik yang akurat
-- **Training Callbacks** - Digunakan untuk merespon events training
-
-## Upgrade dari ModelHandler Lama
-
-ModelHandler lama (`handlers/model_handler.py`) tidak lagi digunakan. Sebagai gantinya, gunakan `ModelManager` yang baru sebagai entry point untuk semua fungsionalitas model.
-
-### Contoh Migrasi:
-
-**Kode Lama:**
 ```python
-from smartcash.handlers.model_handler import ModelHandler
-
-model_handler = ModelHandler(config)
-model = model_handler.create_model()
-results = model_handler.train(train_loader, val_loader)
-metrics = model_handler.evaluate(test_loader)
+{
+    'mAP': 0.92,                      # Mean Average Precision
+    'precision': 0.88,                # Precision
+    'recall': 0.89,                   # Recall
+    'f1': 0.885,                      # F1 Score
+    'inference_time': 0.023,          # Waktu inferensi per gambar (detik)
+    'class_metrics': { ... },         # Metrik per kelas
+    'execution_time': 120.5,          # Waktu eksekusi evaluasi (detik)
+    'num_test_batches': 100,          # Jumlah batch test
+    'conf_threshold': 0.25,           # Threshold konfidiensi
+    'iou_threshold': 0.45             # Threshold IoU
+}
 ```
 
-**Kode Baru:**
+### Hasil Prediksi
+
 ```python
-from smartcash.handlers.model_manager import ModelManager
-
-model_manager = ModelManager(config)
-model = model_manager.create_model()
-results = model_manager.train(train_loader, val_loader)
-metrics = model_manager.evaluate(test_loader)
+{
+    'num_images': 5,                  # Jumlah gambar
+    'detections': [ ... ],            # Hasil deteksi per gambar
+    'visualization_paths': [ ... ],   # Path hasil visualisasi
+    'execution_time': 0.85,           # Waktu eksekusi (detik)
+    'fps': 5.88                       # Frame per detik
+}
 ```
+
+### Hasil Perbandingan Backbone
+
+```python
+{
+    'experiment_name': '...',         # Nama eksperimen
+    'experiment_dir': '...',          # Direktori output
+    'num_backbones': 2,               # Jumlah backbone yang dibandingkan
+    'execution_time': 7200.5,         # Waktu eksekusi total (detik)
+    'backbones': ['efficientnet', 'cspdarknet'],  # Backbone yang dibandingkan
+    'results': { ... },               # Hasil per backbone
+    'summary': { ... },               # Ringkasan perbandingan
+    'visualization_paths': { ... }    # Path visualisasi
+}
+```
+
+## Konfigurasi
+
+ModelManager menggunakan beberapa bagian dari konfigurasi utama:
+
+1. **model**: Konfigurasi arsitektur model, parameter inferensi, dan deployment
+2. **training**: Parameter training, optimizer, scheduler, dan augmentasi
+3. **experiment**: Konfigurasi experiment tracking dan visualisasi
+4. **inference**: Parameter deteksi dan visualisasi hasil
+
+## Integrasi dengan Google Colab
+
+ModelManager mendukung integrasi dengan Google Colab melalui:
+- Deteksi otomatis environment Colab
+- ColabObserver untuk visualisasi real-time
+- Integrasi dengan Google Drive via EnvironmentAdapter
+- Progress bar yang kompatibel dengan notebook
+
+## Pola Desain yang Digunakan
+
+1. **Facade Pattern**: ModelManager sebagai entry point
+2. **Factory Pattern**: Pembuatan komponen model, backbone, dan optimizer
+3. **Observer Pattern**: Monitoring training dan metrik
+4. **Adapter Pattern**: Integrasi dengan komponen SmartCash lainnya
+5. **Component Pattern**: ModelComponent sebagai kelas dasar
+6. **Lazy-loading Pattern**: Loading komponen saat dibutuhkan
+
+## Optimasi Performa
+
+1. **GPU Acceleration**: Otomatisasi penggunaan GPU dan half precision
+2. **Paralelisasi**: Eksperimen paralel dengan ThreadPoolExecutor
+3. **Memory Management**: Lazy-loading dan torch.no_grad()
+4. **Caching**: Checkpoint otomatis dan statistik performa
+5. **Optimasi Model**: Export dengan optimasi untuk inferensi
+
+## Kesimpulan
+
+ModelManager adalah komponen pusat untuk pengelolaan model di SmartCash yang menyediakan:
+
+1. **Antarmuka Terpadu**: Entry point untuk semua operasi model
+2. **Modularitas**: Pemisahan komponen dengan tanggung jawab yang jelas
+3. **Fleksibilitas**: Dukungan untuk berbagai backbone dan konfigurasi
+4. **Eksperimen**: Kemampuan untuk membandingkan model dan parameter
+5. **Optimasi**: Fokus pada performa dan efisiensi
+6. **Integrasi**: Integrasi mulus dengan komponen lain di SmartCash
+7. **Colab Support**: Dukungan khusus untuk Google Colab
+
+ModelManager memfasilitasi pembuatan, pelatihan, evaluasi, dan deployment model deteksi mata uang Rupiah dengan antarmuka yang konsisten dan mudah digunakan, mendukung seluruh siklus hidup pengembangan model.

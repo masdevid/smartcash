@@ -8,6 +8,7 @@ from smartcash.handlers.dataset.facades.data_processing_facade import DataProces
 from smartcash.handlers.dataset.facades.data_operations_facade import DataOperationsFacade
 from smartcash.handlers.dataset.facades.visualization_facade import VisualizationFacade
 from smartcash.handlers.dataset.facades.pipeline_facade import PipelineFacade
+from smartcash.handlers.dataset.facades.dataset_explorer_facade import DatasetExplorerFacade
 
 # Export semua komponen publik
 __all__ = [
@@ -17,4 +18,5 @@ __all__ = [
     'DataOperationsFacade',
     'VisualizationFacade',
     'PipelineFacade',
+    'DatasetExplorerFacade',
 ]

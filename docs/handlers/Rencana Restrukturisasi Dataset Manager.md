@@ -114,3 +114,40 @@ smartcash/handlers/dataset/
 - **Path Mapping**: Konversi otomatis path lokal ke path Google Drive
 - **Symlink Support**: Dukungan untuk symlink di Google Drive
 - **Persistensi**: Strategi untuk menyimpan hasil operasi di Google Drive
+
+# Implementasikan file berikut:
+
+1. smartcash/handlers/dataset/visualizations/heatmap/confidence_heatmap.py
+   - Visualisasi tingkat confidence deteksi
+   - Fitur penting: heatmap tingkat confidence antar kelas/layer
+   - Highlight pada prediksi dengan false positive/negative tinggi
+
+2. smartcash/handlers/dataset/visualizations/heatmap/layer_overlap_heatmap.py
+   - Visualisasi tumpang tindih antar layer
+   - Metrics IoU antar layer
+   - Analisis area yang sering overlap
+
+3. smartcash/handlers/dataset/visualizations/charts/distribution_chart.py
+   - Chart yang lebih detail untuk distribusi kelas dan layer
+   - Opsi tambahan: pie chart, bar chart, histogram
+
+4. smartcash/handlers/dataset/visualizations/charts/metrics_chart.py
+   - Visualisasi metrik evaluasi dataset
+   - Support untuk berbagai metrik: distribution, confusion matrix
+
+5. smartcash/handlers/dataset/visualizations/charts/comparison_chart.py
+   - Chart untuk membandingkan distribusi antar split
+   - Opsi tambahan: line chart untuk progress training
+
+6. smartcash/handlers/dataset/visualizations/charts/evolution_chart.py
+   - Chart yang menunjukkan evolusi dataset setelah augmentasi
+   - Analisis perubahan distribusi kelas
+
+7. smartcash/handlers/dataset/visualizations/sample/augmentation_visualizer.py
+   - Visualisasi hasil augmentasi untuk satu gambar
+   - Support berbagai mode augmentasi: lighting, geometric, combined
+
+8. smartcash/handlers/dataset/visualizations/sample/error_samples_visualizer.py
+   - Visualisasi sampel yang mengalami error deteksi
+   - Highlight false positive/negative
+   - Interface untuk menandai sampel problematik

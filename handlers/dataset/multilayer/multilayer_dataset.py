@@ -5,6 +5,7 @@
 import torch
 import numpy as np
 import traceback
+import cv2
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 

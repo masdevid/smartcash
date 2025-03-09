@@ -8,7 +8,6 @@ from smartcash.handlers.dataset.explorers.class_explorer import ClassExplorer
 from smartcash.handlers.dataset.explorers.layer_explorer import LayerExplorer
 from smartcash.handlers.dataset.explorers.image_size_explorer import ImageSizeExplorer
 from smartcash.handlers.dataset.explorers.bbox_explorer import BoundingBoxExplorer
-from smartcash.handlers.dataset.explorers.dataset_explorer_facade import DatasetExplorerFacade
 
 # Ekspor komponen publik
 __all__ = [
@@ -18,5 +17,4 @@ __all__ = [
     'LayerExplorer',
     'ImageSizeExplorer',
     'BoundingBoxExplorer',
-    'DatasetExplorerFacade'
 ]

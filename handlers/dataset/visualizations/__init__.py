@@ -1,18 +1,28 @@
 # File: smartcash/handlers/dataset/visualizations/__init__.py
 # Author: Alfrida Sabar
-# Deskripsi: Package untuk visualisasi dataset
+# Deskripsi: Module visualisasi dataset untuk SmartCash
 
 from smartcash.handlers.dataset.visualizations.visualization_base import VisualizationBase
-from smartcash.handlers.dataset.visualizations.class_distribution_visualizer import ClassDistributionVisualizer
-from smartcash.handlers.dataset.visualizations.layer_distribution_visualizer import LayerDistributionVisualizer
-from smartcash.handlers.dataset.visualizations.sample_image_visualizer import SampleImageVisualizer
-from smartcash.handlers.dataset.visualizations.spatial_heatmap_visualizer import SpatialHeatmapVisualizer
 
-# Export komponen publik
+# Heatmap visualizer
+from smartcash.handlers.dataset.visualizations.heatmap.spatial_density_heatmap import SpatialDensityHeatmap
+from smartcash.handlers.dataset.visualizations.heatmap.class_density_heatmap import ClassDensityHeatmap
+from smartcash.handlers.dataset.visualizations.heatmap.size_distribution_heatmap import SizeDistributionHeatmap
+
+# Sample visualizer
+from smartcash.handlers.dataset.visualizations.sample.sample_grid_visualizer import SampleGridVisualizer
+from smartcash.handlers.dataset.visualizations.sample.annotation_visualizer import AnnotationVisualizer
+
 __all__ = [
+    # Base class
     'VisualizationBase',
-    'ClassDistributionVisualizer',
-    'LayerDistributionVisualizer',
-    'SampleImageVisualizer',
-    'SpatialHeatmapVisualizer'
+    
+    # Heatmap visualizers
+    'SpatialDensityHeatmap',
+    'ClassDensityHeatmap',
+    'SizeDistributionHeatmap',
+    
+    # Sample visualizers
+    'SampleGridVisualizer',
+    'AnnotationVisualizer',
 ]

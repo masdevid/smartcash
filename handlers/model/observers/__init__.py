@@ -4,8 +4,10 @@
 
 from smartcash.handlers.model.observers.base_observer import BaseObserver
 from smartcash.handlers.model.observers.metrics_observer import MetricsObserver
+from smartcash.handlers.model.observers.colab_observer import ColabObserver
 
 __all__ = [
     'BaseObserver',
-    'MetricsObserver'
+    'MetricsObserver',
+    'ColabObserver'
 ]

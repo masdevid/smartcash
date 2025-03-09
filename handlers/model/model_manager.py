@@ -1,21 +1,14 @@
 # File: smartcash/handlers/model/model_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager utama model sebagai facade untuk semua komponen model (versi yang diringkas)
+# Deskripsi: Manager utama model sebagai facade untuk semua komponen model
 
 import torch
+import numpy as np
 from typing import Dict, Optional, Any, List, Union, Tuple
 from pathlib import Path
 
 from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.exceptions.base import ModelError
-
-def is_running_in_colab() -> bool:
-    """Deteksi apakah kode berjalan di Google Colab."""
-    try:
-        import google.colab
-        return True
-    except ImportError:
-        return False
 
 class ModelManager:
     """
@@ -29,328 +22,179 @@ class ModelManager:
         logger: Optional[SmartCashLogger] = None,
         colab_mode: Optional[bool] = None
     ):
-        """
-        Inisialisasi model manager.
-        
-        Args:
-            config: Konfigurasi model dan training
-            logger: Custom logger (opsional)
-            colab_mode: Flag untuk mode Colab (opsional, deteksi otomatis jika None)
-        """
+        """Inisialisasi model manager."""
         self.config = config
         self.logger = logger or get_logger("model_manager")
+        self.colab_mode = self._detect_colab() if colab_mode is None else colab_mode
         
-        # Deteksi otomatis colab_mode jika tidak diberikan
-        self.colab_mode = is_running_in_colab() if colab_mode is None else colab_mode
-        
-        # Setup lazy loading untuk factories dan adapters
-        self._model_factory = None
-        self._optimizer_factory = None
-        self._checkpoint_adapter = None
-        self._metrics_adapter = None
-        self._trainer = None
-        self._evaluator = None 
-        self._predictor = None
-        self._experiment_manager = None
+        # Dictionary untuk lazy-loaded components
+        self._components = {}
         
         self.logger.info(
-            f"🔧 ModelManager diinisialisasi:\n"
-            f"   • Colab mode: {self.colab_mode}\n"
-            f"   • Output dir: {self.config.get('output_dir', 'runs/train')}"
+            f"🔧 ModelManager diinisialisasi (Colab: {self.colab_mode}, "
+            f"Output: {self.config.get('output_dir', 'runs/train')})"
         )
+    
+    def _detect_colab(self) -> bool:
+        """Deteksi apakah running di Google Colab."""
+        try:
+            import google.colab
+            return True
+        except ImportError:
+            return False
+    
+    def _get_component(self, component_id: str, factory_func) -> Any:
+        """
+        Dapatkan komponen dengan lazy initialization.
+        
+        Args:
+            component_id: ID unik untuk komponen
+            factory_func: Fungsi factory untuk membuat komponen
+            
+        Returns:
+            Komponen yang diminta
+        """
+        if component_id not in self._components:
+            self._components[component_id] = factory_func()
+        return self._components[component_id]
     
     @property
     def model_factory(self):
         """Lazy-loaded model factory."""
-        if self._model_factory is None:
-            from smartcash.handlers.model.core.model_factory import ModelFactory
-            self._model_factory = ModelFactory(self.config, self.logger)
-        return self._model_factory
+        return self._get_component('model_factory', lambda: self._create_model_factory())
     
-    @property
-    def optimizer_factory(self):
-        """Lazy-loaded optimizer factory."""
-        if self._optimizer_factory is None:
-            from smartcash.handlers.model.core.optimizer_factory import OptimizerFactory
-            self._optimizer_factory = OptimizerFactory(self.config, self.logger)
-        return self._optimizer_factory
-    
-    @property
-    def checkpoint_adapter(self):
-        """Lazy-loaded checkpoint adapter."""
-        if self._checkpoint_adapter is None:
-            from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
-            self._checkpoint_adapter = CheckpointAdapter(self.config, self.logger)
-        return self._checkpoint_adapter
-    
-    @property
-    def metrics_adapter(self):
-        """Lazy-loaded metrics adapter."""
-        if self._metrics_adapter is None:
-            from smartcash.handlers.model.integration.metrics_adapter import MetricsAdapter
-            self._metrics_adapter = MetricsAdapter(self.logger, self.config)
-        return self._metrics_adapter
+    def _create_model_factory(self):
+        from smartcash.handlers.model.core.model_factory import ModelFactory
+        return ModelFactory(self.config, self.logger)
     
     @property
     def trainer(self):
         """Lazy-loaded model trainer."""
-        if self._trainer is None:
-            from smartcash.handlers.model.core.model_trainer import ModelTrainer
-            self._trainer = ModelTrainer(
-                self.config,
-                self.logger,
-                self.model_factory,
-                self.optimizer_factory,
-                self.checkpoint_adapter,
-                self.metrics_adapter
-            )
-        return self._trainer
+        return self._get_component('trainer', lambda: self._create_trainer())
+    
+    def _create_trainer(self):
+        from smartcash.handlers.model.core.model_trainer import ModelTrainer
+        return ModelTrainer(self.config, self.logger)
     
     @property
     def evaluator(self):
         """Lazy-loaded model evaluator."""
-        if self._evaluator is None:
-            from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
-            self._evaluator = ModelEvaluator(
-                self.config,
-                self.logger,
-                self.model_factory,
-                self.metrics_adapter
-            )
-        return self._evaluator
+        return self._get_component('evaluator', lambda: self._create_evaluator())
+    
+    def _create_evaluator(self):
+        from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
+        return ModelEvaluator(self.config, self.logger)
     
     @property
     def predictor(self):
         """Lazy-loaded model predictor."""
-        if self._predictor is None:
-            from smartcash.handlers.model.core.model_predictor import ModelPredictor
-            self._predictor = ModelPredictor(
-                self.config,
-                self.logger,
-                self.model_factory
-            )
-        return self._predictor
+        return self._get_component('predictor', lambda: self._create_predictor())
+    
+    def _create_predictor(self):
+        from smartcash.handlers.model.core.model_predictor import ModelPredictor
+        return ModelPredictor(self.config, self.logger)
     
     @property
     def experiment_manager(self):
         """Lazy-loaded experiment manager."""
-        if self._experiment_manager is None:
-            from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
-            self._experiment_manager = ExperimentManager(
-                self.config,
-                self.logger,
-                self.model_factory,
-                self.optimizer_factory,
-                self.checkpoint_adapter,
-                self.metrics_adapter
-            )
-        return self._experiment_manager
+        return self._get_component('experiment_manager', lambda: self._create_experiment_manager())
     
-    def create_model(
-        self, 
-        backbone_type: Optional[str] = None,
-        **kwargs
-    ) -> torch.nn.Module:
-        """
-        Buat model baru dengan konfigurasi tertentu.
-        
-        Args:
-            backbone_type: Tipe backbone ('efficientnet', 'cspdarknet', dll)
-            **kwargs: Parameter tambahan untuk ModelFactory
-            
-        Returns:
-            Model yang diinisialisasi
-        """
+    def _create_experiment_manager(self):
+        from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
+        return ExperimentManager(self.config, self.logger)
+    
+    @property
+    def optimizer_factory(self):
+        """Lazy-loaded optimizer factory."""
+        return self._get_component('optimizer_factory', lambda: self._create_optimizer_factory())
+    
+    def _create_optimizer_factory(self):
+        from smartcash.handlers.model.core.optimizer_factory import OptimizerFactory
+        return OptimizerFactory(self.config, self.logger)
+    
+    @property
+    def checkpoint_adapter(self):
+        """Lazy-loaded checkpoint adapter."""
+        return self._get_component('checkpoint_adapter', lambda: self._create_checkpoint_adapter())
+    
+    def _create_checkpoint_adapter(self):
+        from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
+        return CheckpointAdapter(self.config, self.logger)
+    
+    @property
+    def metrics_adapter(self):
+        """Lazy-loaded metrics adapter."""
+        return self._get_component('metrics_adapter', lambda: self._create_metrics_adapter())
+    
+    def _create_metrics_adapter(self):
+        from smartcash.handlers.model.integration.metrics_adapter import MetricsAdapter
+        return MetricsAdapter(self.logger, self.config)
+    
+    @property
+    def environment_adapter(self):
+        """Lazy-loaded environment adapter."""
+        return self._get_component('environment_adapter', lambda: self._create_environment_adapter())
+    
+    def _create_environment_adapter(self):
+        from smartcash.handlers.model.integration.environment_adapter import EnvironmentAdapter
+        return EnvironmentAdapter(self.config, self.logger)
+    
+    @property
+    def experiment_adapter(self):
+        """Lazy-loaded experiment adapter."""
+        return self._get_component('experiment_adapter', lambda: self._create_experiment_adapter())
+    
+    def _create_experiment_adapter(self):
+        from smartcash.handlers.model.integration.experiment_adapter import ExperimentAdapter
+        return ExperimentAdapter(self.config, self.logger)
+    
+    @property
+    def exporter_adapter(self):
+        """Lazy-loaded exporter adapter."""
+        return self._get_component('exporter_adapter', lambda: self._create_exporter_adapter())
+    
+    def _create_exporter_adapter(self):
+        from smartcash.handlers.model.integration.exporter_adapter import ExporterAdapter
+        return ExporterAdapter(self.config, self.logger)
+    
+    # ==== Core Functionality ====
+    
+    def create_model(self, backbone_type=None, **kwargs) -> torch.nn.Module:
+        """Buat model baru dengan konfigurasi tertentu."""
         return self.model_factory.create_model(backbone_type=backbone_type, **kwargs)
     
-    def load_model(
-        self, 
-        checkpoint_path: str,
-        **kwargs
-    ) -> Tuple[torch.nn.Module, Dict]:
-        """
-        Muat model dari checkpoint.
-        
-        Args:
-            checkpoint_path: Path ke file checkpoint
-            **kwargs: Parameter tambahan untuk load_model
-            
-        Returns:
-            Tuple (Model, Metadata checkpoint)
-        """
+    def load_model(self, checkpoint_path, **kwargs) -> Tuple[torch.nn.Module, Dict]:
+        """Load model dari checkpoint."""
         return self.model_factory.load_model(checkpoint_path, **kwargs)
     
-    def train(
-        self,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        model: Optional[torch.nn.Module] = None,
-        **kwargs
-    ) -> Dict:
-        """
-        Train model dengan dataset yang diberikan.
-        
-        Args:
-            train_loader: DataLoader untuk training
-            val_loader: DataLoader untuk validasi
-            model: Model yang akan dilatih (opsional, buat baru jika None)
-            **kwargs: Parameter tambahan untuk training
-            
-        Returns:
-            Dict hasil training
-        """
+    def train(self, train_loader, val_loader, model=None, **kwargs) -> Dict:
+        """Train model dengan dataset yang diberikan."""
         # Setup observers untuk Colab jika perlu
-        if self.colab_mode and 'observers' not in kwargs:
-            from smartcash.handlers.model.observers.colab_observer import ColabObserver
-            kwargs['observers'] = [ColabObserver(self.logger)]
-        elif self.colab_mode and isinstance(kwargs.get('observers', []), list):
-            from smartcash.handlers.model.observers.colab_observer import ColabObserver
-            
-            # Tambahkan ColabObserver jika belum ada
-            if not any(isinstance(obs, ColabObserver) for obs in kwargs['observers']):
-                kwargs['observers'].append(ColabObserver(self.logger))
-        
-        # Train model dengan trainer
-        return self.trainer.train(
-            train_loader=train_loader,
-            val_loader=val_loader,
-            model=model,
-            **kwargs
-        )
+        self._setup_colab_observers(kwargs)
+        return self.trainer.train(train_loader=train_loader, val_loader=val_loader, model=model, **kwargs)
     
-    def evaluate(
-        self,
-        test_loader: torch.utils.data.DataLoader,
-        model: Optional[torch.nn.Module] = None,
-        checkpoint_path: Optional[str] = None,
-        **kwargs
-    ) -> Dict:
-        """
-        Evaluasi model pada test dataset.
-        
-        Args:
-            test_loader: DataLoader untuk testing
-            model: Model yang akan dievaluasi (opsional)
-            checkpoint_path: Path ke checkpoint (opsional, jika model None)
-            **kwargs: Parameter tambahan untuk evaluasi
-            
-        Returns:
-            Dict hasil evaluasi
-        """
+    def evaluate(self, test_loader, model=None, checkpoint_path=None, **kwargs) -> Dict:
+        """Evaluasi model pada test dataset."""
         # Pastikan ada model atau checkpoint
-        if model is None and checkpoint_path is None:
-            checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
-            if checkpoint_path is None:
-                raise ModelError(
-                    "Tidak ada model yang diberikan, dan tidak ada checkpoint yang ditemukan"
-                )
-        
-        # Evaluasi model
-        return self.evaluator.evaluate(
-            test_loader=test_loader,
-            model=model,
-            checkpoint_path=checkpoint_path,
-            **kwargs
-        )
+        model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
+        return self.evaluator.evaluate(test_loader=test_loader, model=model, checkpoint_path=checkpoint_path, **kwargs)
     
-    def predict(
-        self,
-        images: Union[torch.Tensor, np.ndarray, List, str, Path],
-        model: Optional[torch.nn.Module] = None,
-        checkpoint_path: Optional[str] = None,
-        **kwargs
-    ) -> Dict:
-        """
-        Prediksi dengan model.
-        
-        Args:
-            images: Input images
-            model: Model yang akan digunakan (opsional)
-            checkpoint_path: Path ke checkpoint (opsional, jika model None)
-            **kwargs: Parameter tambahan untuk prediksi
-            
-        Returns:
-            Dict hasil prediksi
-        """
+    def predict(self, images, model=None, checkpoint_path=None, **kwargs) -> Dict:
+        """Prediksi dengan model."""
         # Pastikan ada model atau checkpoint
-        if model is None and checkpoint_path is None:
-            checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
-            if checkpoint_path is None:
-                raise ModelError(
-                    "Tidak ada model yang diberikan, dan tidak ada checkpoint yang ditemukan"
-                )
-        
-        # Prediksi
-        return self.predictor.predict(
-            images=images,
-            model=model,
-            checkpoint_path=checkpoint_path,
-            **kwargs
-        )
+        model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
+        return self.predictor.predict(images=images, model=model, checkpoint_path=checkpoint_path, **kwargs)
     
-    def predict_on_video(
-        self,
-        video_path: Union[str, Path],
-        model: Optional[torch.nn.Module] = None,
-        checkpoint_path: Optional[str] = None,
-        **kwargs
-    ) -> str:
-        """
-        Prediksi pada video dengan visualisasi hasil.
-        
-        Args:
-            video_path: Path ke file video
-            model: Model untuk prediksi (opsional)
-            checkpoint_path: Path ke checkpoint (opsional, jika model None)
-            **kwargs: Parameter tambahan untuk predict()
-            
-        Returns:
-            Path ke video hasil
-        """
-        # Load model jika perlu
-        if model is None:
-            if checkpoint_path is not None:
-                model, _ = self.load_model(checkpoint_path)
-            else:
-                checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
-                if checkpoint_path is None:
-                    raise ModelError("Tidak ada model atau checkpoint yang tersedia")
-                model, _ = self.load_model(checkpoint_path)
-        
-        # Prediksi pada video
-        return self.predictor.predict_on_video(
-            video_path=video_path,
-            model=model,
-            **kwargs
-        )
+    def predict_on_video(self, video_path, model=None, checkpoint_path=None, **kwargs) -> str:
+        """Prediksi pada video dengan visualisasi hasil."""
+        # Pastikan ada model atau checkpoint
+        model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
+        return self.predictor.predict_on_video(video_path=video_path, model=model, **kwargs)
     
-    def compare_backbones(
-        self,
-        backbones: List[str],
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: Optional[torch.utils.data.DataLoader] = None,
-        **kwargs
-    ) -> Dict:
-        """
-        Bandingkan beberapa backbone dengan kondisi yang sama.
-        
-        Args:
-            backbones: List backbone yang akan dibandingkan
-            train_loader: DataLoader untuk training
-            val_loader: DataLoader untuk validasi
-            test_loader: DataLoader untuk testing (opsional)
-            **kwargs: Parameter tambahan untuk eksperimen
-            
-        Returns:
-            Dict hasil perbandingan eksperimen
-        """
+    def compare_backbones(self, backbones, train_loader, val_loader, test_loader=None, **kwargs) -> Dict:
+        """Bandingkan beberapa backbone dengan kondisi yang sama."""
         # Setup Colab observer jika perlu
-        if self.colab_mode and 'observers' not in kwargs:
-            from smartcash.handlers.model.observers.colab_observer import ColabObserver
-            kwargs['observers'] = [ColabObserver(self.logger)]
-        
-        # Gunakan experiment manager untuk perbandingan
+        self._setup_colab_observers(kwargs)
         return self.experiment_manager.compare_backbones(
             backbones=backbones,
             train_loader=train_loader,
@@ -359,81 +203,82 @@ class ModelManager:
             **kwargs
         )
     
-    def export_model(
-        self,
-        model: Optional[torch.nn.Module] = None,
-        checkpoint_path: Optional[str] = None,
-        format: str = 'torchscript',
-        **kwargs
-    ) -> Optional[str]:
-        """
-        Export model ke format untuk deployment.
+    def setup_environment(self, use_drive=True, create_symlinks=True) -> Dict[str, Any]:
+        """Setup environment project."""
+        return self.environment_adapter.setup_project_environment(
+            use_drive=use_drive,
+            create_symlinks=create_symlinks
+        )
+    
+    def export_model(self, model=None, checkpoint_path=None, format='torchscript', **kwargs) -> Optional[str]:
+        """Export model ke format untuk deployment."""
+        # Pastikan ada model atau checkpoint
+        model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
-        Args:
-            model: Model yang akan diexport (opsional)
-            checkpoint_path: Path ke checkpoint (opsional, jika model None)
-            format: Format export ('torchscript', 'onnx')
-            **kwargs: Parameter tambahan untuk export
-            
-        Returns:
-            Path ke file hasil export, atau None jika gagal
-        """
-        # Export model terbaik jika tidak ada model atau checkpoint
+        # Export model sesuai format
+        if format.lower() == 'torchscript':
+            return self.exporter_adapter.export_to_torchscript(model=model, **kwargs)
+        elif format.lower() == 'onnx':
+            return self.exporter_adapter.export_to_onnx(model=model, **kwargs)
+        else:
+            self.logger.error(f"❌ Format export '{format}' tidak didukung")
+            return None
+    
+    def track_experiment(self, experiment_name=None, config=None) -> None:
+        """Mulai tracking eksperimen baru."""
+        if experiment_name:
+            self.experiment_adapter.set_experiment_name(experiment_name)
+        self.experiment_adapter.start_experiment(config or self.config)
+        self.logger.info(f"🧪 Mulai tracking eksperimen: {self.experiment_adapter.experiment_name}")
+    
+    def log_experiment_metrics(self, epoch, train_loss, val_loss, lr=None, additional_metrics=None) -> None:
+        """Log metrik eksperimen."""
+        self.experiment_adapter.log_metrics(
+            epoch=epoch, train_loss=train_loss, val_loss=val_loss, 
+            lr=lr, additional_metrics=additional_metrics
+        )
+    
+    def end_experiment(self, final_metrics=None) -> str:
+        """Akhiri eksperimen dan generate laporan."""
+        self.experiment_adapter.end_experiment(final_metrics)
+        return self.experiment_adapter.generate_report()
+    
+    def compare_experiments(self, experiment_names=None, save_to_file=True) -> Any:
+        """Bandingkan beberapa eksperimen."""
+        if experiment_names is None:
+            experiment_names = self.experiment_adapter.list_experiments()
+        
+        if not experiment_names:
+            self.logger.warning("⚠️ Tidak ada eksperimen untuk dibandingkan")
+            return None
+        
+        return self.experiment_adapter.compare_experiments(
+            experiment_names=experiment_names,
+            save_to_file=save_to_file
+        )
+    
+    # ==== Helper Methods ====
+    
+    def _setup_colab_observers(self, kwargs):
+        """Setup observer untuk Colab jika perlu."""
+        if self.colab_mode and 'observers' not in kwargs:
+            from smartcash.handlers.model.observers.colab_observer import ColabObserver
+            kwargs['observers'] = [ColabObserver(self.logger)]
+        elif self.colab_mode and isinstance(kwargs.get('observers', []), list):
+            from smartcash.handlers.model.observers.colab_observer import ColabObserver
+            # Tambahkan ColabObserver jika belum ada
+            if not any(isinstance(obs, ColabObserver) for obs in kwargs['observers']):
+                kwargs['observers'].append(ColabObserver(self.logger))
+    
+    def _ensure_model_or_checkpoint(self, model, checkpoint_path):
+        """Pastikan ada model atau checkpoint path."""
         if model is None and checkpoint_path is None:
-            return self.checkpoint_adapter.export_best_model(
-                format=format,
-                **kwargs
-            )
+            checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
+            if checkpoint_path is None:
+                raise ModelError("Tidak ada model yang diberikan, dan tidak ada checkpoint yang ditemukan")
         
-        # Load model dari checkpoint jika perlu
         if model is None and checkpoint_path is not None:
             model, _ = self.load_model(checkpoint_path)
+            checkpoint_path = None  # Sudah di-load, tidak perlu lagi
         
-        # Implementasi export berdasarkan format
-        try:
-            # Persiapkan parameter export
-            input_shape = kwargs.get('input_shape', [1, 3, 640, 640])
-            output_dir = Path(kwargs.get('output_dir', Path(self.config.get('output_dir', 'runs/export'))))
-            output_dir.mkdir(parents=True, exist_ok=True)
-            filename = kwargs.get('filename', f"model_{format}.{format.lower()}")
-            output_path = str(output_dir / filename)
-            
-            # Export model sesuai format yang diminta
-            if format.lower() == 'torchscript':
-                model.eval()
-                dummy_input = torch.rand(*input_shape)
-                traced_model = torch.jit.trace(model, dummy_input)
-                traced_model.save(output_path)
-                self.logger.success(f"✅ Model berhasil diexport ke TorchScript: {output_path}")
-            elif format.lower() == 'onnx':
-                # Import onnx jika tersedia
-                try:
-                    import onnx
-                    import onnxruntime
-                    
-                    model.eval()
-                    dummy_input = torch.rand(*input_shape)
-                    
-                    torch.onnx.export(
-                        model, dummy_input, output_path, export_params=True,
-                        opset_version=12, do_constant_folding=True,
-                        input_names=['input'], output_names=['output'],
-                        dynamic_axes={'input': {0: 'batch_size'}, 'output': {0: 'batch_size'}}
-                    )
-                    
-                    # Verifikasi model ONNX
-                    onnx_model = onnx.load(output_path)
-                    onnx.checker.check_model(onnx_model)
-                    
-                    self.logger.success(f"✅ Model berhasil diexport ke ONNX: {output_path}")
-                except ImportError:
-                    self.logger.error("❌ ONNX export membutuhkan package 'onnx' dan 'onnxruntime'")
-                    return None
-            else:
-                self.logger.error(f"❌ Format export '{format}' tidak didukung")
-                return None
-                
-            return output_path
-        except Exception as e:
-            self.logger.error(f"❌ Gagal mengexport model: {str(e)}")
-            return None
+        return model, checkpoint_path

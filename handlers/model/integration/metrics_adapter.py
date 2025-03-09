@@ -7,6 +7,7 @@ import numpy as np
 from typing import Dict, Any, Optional, Union, List
 
 from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.utils.metrics import MetricsCalculator
 
 class MetricsAdapter:
     """
@@ -17,7 +18,8 @@ class MetricsAdapter:
     def __init__(
         self,
         logger: Optional[SmartCashLogger] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
+        output_dir: Optional[str] = None
     ):
         """
         Inisialisasi metrics adapter.
@@ -25,64 +27,43 @@ class MetricsAdapter:
         Args:
             logger: Custom logger (opsional)
             config: Konfigurasi untuk metrics (opsional)
+            output_dir: Direktori output untuk visualisasi (opsional)
         """
         self.logger = logger or get_logger("metrics_adapter")
         self.config = config or {}
+        self.output_dir = output_dir
         
         # Metrik configuration
         self.metrics_config = self.config.get('evaluation', {}).get('metrics', {})
         
-        # Lazy-initialized metrics calculator
-        self._metrics_calculator = None
-    
-    @property
-    def metrics_calculator(self):
-        """Lazy initialization of metrics calculator."""
-        if self._metrics_calculator is None:
-            try:
-                # Import MetricsCalculator
-                from smartcash.utils.metrics import MetricsCalculator
-                
-                # Setup konfigurasi metrics calculator
-                conf_threshold = self.metrics_config.get('conf_threshold', 0.25)
-                iou_threshold = self.metrics_config.get('iou_threshold', 0.5)
-                
-                # Buat metrics calculator
-                self._metrics_calculator = MetricsCalculator(
-                    conf_threshold=conf_threshold,
-                    iou_threshold=iou_threshold
-                )
-                
-                self.logger.info(
-                    f"📊 MetricsCalculator diinisialisasi:\n"
-                    f"   • Confidence threshold: {conf_threshold}\n"
-                    f"   • IoU threshold: {iou_threshold}"
-                )
-                
-            except ImportError:
-                self.logger.error("❌ MetricsCalculator tidak ditemukan! Pastikan utils.metrics terimplementasi")
-                # Fallback ke calculator dummy
-                self._metrics_calculator = self._DummyMetricsCalculator()
-                
-        return self._metrics_calculator
+        # Inisialisasi metrics calculator
+        self._metrics_calculator = MetricsCalculator()
+        
+        self.logger.info(
+            f"📊 MetricsAdapter diinisialisasi dengan MetricsCalculator"
+        )
     
     def reset(self) -> None:
         """Reset metrics calculator untuk perhitungan baru."""
-        self.metrics_calculator.reset()
+        self._metrics_calculator.reset()
     
     def update(
         self, 
         predictions: Union[torch.Tensor, np.ndarray, List, Dict], 
         targets: Union[torch.Tensor, np.ndarray, List, Dict]
-    ) -> None:
+    ) -> Dict[str, Any]:
         """
         Update metrics dengan batch prediksi dan target.
         
         Args:
             predictions: Prediksi dari model
             targets: Target ground truth
+            
+        Returns:
+            Dict metrik untuk batch ini
         """
-        self.metrics_calculator.update(predictions, targets)
+        batch_metrics = self._metrics_calculator.update(predictions, targets)
+        return batch_metrics
     
     def compute(self) -> Dict[str, Any]:
         """
@@ -91,7 +72,7 @@ class MetricsAdapter:
         Returns:
             Dictionary berisi metrik evaluasi
         """
-        metrics = self.metrics_calculator.compute()
+        metrics = self._metrics_calculator.compute()
         
         # Log rangkuman metrik
         if metrics:
@@ -199,24 +180,3 @@ class MetricsAdapter:
         )
         
         return stats
-    
-    class _DummyMetricsCalculator:
-        """Fallback calculator jika MetricsCalculator tidak tersedia."""
-        
-        def reset(self) -> None:
-            """Reset metrics calculator."""
-            pass
-        
-        def update(self, predictions, targets) -> None:
-            """Update metrics calculator."""
-            pass
-        
-        def compute(self) -> Dict[str, Any]:
-            """Compute metrics."""
-            return {
-                'note': 'Metrics unavailable - using dummy calculator',
-                'mAP': 0.0,
-                'precision': 0.0,
-                'recall': 0.0,
-                'f1': 0.0
-            }

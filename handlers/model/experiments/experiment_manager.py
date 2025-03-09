@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/experiments/experiment_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager untuk eksperimen model dengan perbandingan backbone (ultra ringkas)
+# Deskripsi: Manager untuk eksperimen model dengan perbandingan backbone (diperbarui)
 
 import torch
 import time
@@ -16,6 +16,7 @@ from smartcash.utils.visualization import ExperimentVisualizer
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.exceptions.base import ModelError, TrainingError
 from smartcash.handlers.model.observers.metrics_observer import MetricsObserver
+from smartcash.utils.observer import ObserverSubject
 
 class ExperimentManager:
     """
@@ -327,7 +328,7 @@ class ExperimentManager:
         if experiment_dir:
             experiment_dir.mkdir(parents=True, exist_ok=True)
             
-        # Setup metrics observer dan early stopper
+        # Setup metrics observer
         metrics_observer = MetricsObserver(
             output_dir=str(experiment_dir) if experiment_dir else None,
             logger=self.logger,
@@ -336,6 +337,7 @@ class ExperimentManager:
             visualize=True
         )
         
+        # Setup observer list
         observers = kwargs.get('observers', [])
         observers.append(metrics_observer)
         

@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/core/model_predictor.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen untuk prediksi menggunakan model yang sudah dilatih
+# Deskripsi: Komponen untuk prediksi menggunakan model yang sudah dilatih (diperbarui)
 
 import torch
 import time
@@ -13,8 +13,9 @@ from smartcash.utils.logger import get_logger
 from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError
 from smartcash.utils.visualization.detection import DetectionVisualizer
+from smartcash.utils.observer import ObserverSubject
 
-class ModelPredictor(ModelComponent):
+class ModelPredictor(ModelComponent, ObserverSubject):
     """Komponen untuk prediksi menggunakan model yang sudah dilatih."""
     
     def _initialize(self):
@@ -30,6 +31,9 @@ class ModelPredictor(ModelComponent):
         # Setup visualizer
         output_dir = inf_cfg.get('output_dir', str(Path(self.config.get('output_dir', 'runs/predict')) / "results"))
         self.detection_visualizer = DetectionVisualizer(output_dir=output_dir, logger=self.logger)
+        
+        # Inisialisasi ObserverSubject
+        self._init_subject()
     
     def process(self, images, model=None, **kwargs):
         """Alias untuk predict()."""
@@ -40,6 +44,7 @@ class ModelPredictor(ModelComponent):
         images, 
         model=None,
         checkpoint_path=None,
+        observers=None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -49,6 +54,7 @@ class ModelPredictor(ModelComponent):
             images: Input gambar untuk prediksi
             model: Model untuk prediksi (opsional)
             checkpoint_path: Path ke checkpoint (opsional)
+            observers: List observer untuk monitoring prediksi
             **kwargs: Parameter tambahan
             
         Returns:
@@ -57,6 +63,11 @@ class ModelPredictor(ModelComponent):
         start_time = time.time()
         
         try:
+            # Tambahkan observer jika ada
+            if observers:
+                for observer in observers:
+                    self.attach(observer)
+                    
             # Load model jika perlu
             if model is None and checkpoint_path is not None:
                 model, _ = self.model_factory.load_model(checkpoint_path)
@@ -85,10 +96,24 @@ class ModelPredictor(ModelComponent):
                 f"🔎 Prediksi pada {len(input_tensors)} gambar (conf: {conf_threshold:.2f}, iou: {iou_threshold:.2f})"
             )
             
+            # Notifikasi observer bahwa prediksi dimulai
+            self.notify_observers('prediction_start', {
+                'model': model,
+                'conf_threshold': conf_threshold,
+                'iou_threshold': iou_threshold,
+                'num_images': len(input_tensors)
+            })
+            
             # Prediksi
             predictions = []
             with torch.no_grad():
-                for inputs in input_tensors:
+                for i, inputs in enumerate(input_tensors):
+                    # Notifikasi observer untuk image processing
+                    self.notify_observers('image_processing_start', {
+                        'image_idx': i
+                    })
+                    
+                    # Forward pass
                     outputs = model(inputs)
                     
                     # Post-processing
@@ -98,7 +123,13 @@ class ModelPredictor(ModelComponent):
                         )
                     else:
                         batch_predictions = outputs
-                        
+                    
+                    # Notifikasi observer untuk image processing selesai
+                    self.notify_observers('image_processing_end', {
+                        'image_idx': i,
+                        'predictions': batch_predictions
+                    })
+                    
                     predictions.append(batch_predictions)
             
             # Proses hasil prediksi
@@ -109,11 +140,21 @@ class ModelPredictor(ModelComponent):
                 results['visualization_paths'] = self._visualize_predictions(
                     original_images, results, output_dir or self.detection_visualizer.output_dir
                 )
+                
+                # Notifikasi observer tentang visualisasi
+                self.notify_observers('visualization_complete', {
+                    'visualization_paths': results['visualization_paths']
+                })
             
             # Hitung waktu dan FPS
             duration = time.time() - start_time
             fps = len(input_tensors) / duration
             results.update({'execution_time': duration, 'fps': fps})
+            
+            # Notifikasi observer bahwa prediksi selesai
+            self.notify_observers('prediction_end', {
+                'results': results
+            })
             
             # Log hasil
             total_detections = sum(len(det['detections']) for det in results['detections'])
@@ -126,6 +167,9 @@ class ModelPredictor(ModelComponent):
         except Exception as e:
             self.logger.error(f"❌ Error prediksi: {str(e)}")
             raise ModelError(f"Gagal prediksi: {str(e)}")
+        finally:
+            # Clean up: detach semua observer
+            self.detach_all()
     
     def predict_on_video(
         self,
@@ -133,6 +177,7 @@ class ModelPredictor(ModelComponent):
         model,
         output_path=None,
         frame_skip=0,
+        observers=None,
         **kwargs
     ) -> str:
         """
@@ -143,6 +188,7 @@ class ModelPredictor(ModelComponent):
             model: Model untuk prediksi
             output_path: Path output (opsional)
             frame_skip: Jumlah frame yang dilewati
+            observers: List observer untuk monitoring prediksi video
             **kwargs: Parameter tambahan
             
         Returns:
@@ -151,6 +197,11 @@ class ModelPredictor(ModelComponent):
         self.logger.info(f"🎬 Prediksi video: {video_path}")
         
         try:
+            # Tambahkan observer jika ada
+            if observers:
+                for observer in observers:
+                    self.attach(observer)
+                    
             # Buka video
             cap = cv2.VideoCapture(str(video_path))
             if not cap.isOpened():
@@ -161,6 +212,14 @@ class ModelPredictor(ModelComponent):
             height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             fps = cap.get(cv2.CAP_PROP_FPS)
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            
+            # Notifikasi observer bahwa prediksi video dimulai
+            self.notify_observers('video_prediction_start', {
+                'video_path': video_path,
+                'total_frames': total_frames,
+                'fps': fps,
+                'resolution': (width, height)
+            })
             
             # Setup output video
             if output_path is None:
@@ -182,6 +241,7 @@ class ModelPredictor(ModelComponent):
             
             # Proses video
             frame_count = 0
+            processed_frames = 0
             start_time = time.time()
             
             while cap.isOpened():
@@ -195,10 +255,22 @@ class ModelPredictor(ModelComponent):
                     if pbar:
                         pbar.update(1)
                     continue
-                    
+                
+                # Notifikasi observer tentang proses frame
+                self.notify_observers('frame_processing_start', {
+                    'frame_count': frame_count,
+                    'total_frames': total_frames
+                })
+                
                 # Predict pada frame
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                results = self.predict(frame_rgb, model=model, visualize=False, **kwargs)
+                results = self.predict(
+                    frame_rgb, 
+                    model=model, 
+                    visualize=False, 
+                    observers=None,  # Tidak perlu attach lagi
+                    **kwargs
+                )
                 
                 # Visualisasi deteksi
                 detection = results['detections'][0]
@@ -210,11 +282,19 @@ class ModelPredictor(ModelComponent):
                 )
                 
                 # Tampilkan FPS
-                fps_text = f"FPS: {frame_count / (time.time() - start_time):.1f}"
+                fps_text = f"FPS: {processed_frames / (time.time() - start_time):.1f}"
                 cv2.putText(vis_frame, fps_text, (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
                 
                 # Tulis frame ke output
                 out.write(vis_frame)
+                processed_frames += 1
+                
+                # Notifikasi observer tentang frame selesai diproses
+                self.notify_observers('frame_processing_end', {
+                    'frame_count': frame_count,
+                    'total_frames': total_frames,
+                    'detections': detection['detections']
+                })
                 
                 # Update progress
                 if pbar:
@@ -226,10 +306,22 @@ class ModelPredictor(ModelComponent):
             if pbar:
                 pbar.close()
                 
-            # Log hasil
+            # Hitung statistik
             duration = time.time() - start_time
+            actual_fps = processed_frames / duration
+            
+            # Notifikasi observer bahwa prediksi video selesai
+            self.notify_observers('video_prediction_end', {
+                'output_path': output_path,
+                'total_frames': total_frames,
+                'processed_frames': processed_frames,
+                'duration': duration,
+                'fps': actual_fps
+            })
+                
+            # Log hasil
             self.logger.success(
-                f"✅ Video selesai: {frame_count} frames diproses ({frame_count/duration:.2f} FPS)"
+                f"✅ Video selesai: {processed_frames} frames diproses ({actual_fps:.2f} FPS)"
             )
             
             return output_path
@@ -237,6 +329,9 @@ class ModelPredictor(ModelComponent):
         except Exception as e:
             self.logger.error(f"❌ Error video: {str(e)}")
             raise ModelError(f"Gagal proses video: {str(e)}")
+        finally:
+            # Clean up: detach semua observer
+            self.detach_all()
     
     def _preprocess_images(self, images, device):
         """

@@ -1,20 +1,36 @@
 # File: smartcash/handlers/model/observers/colab_observer.py
 # Author: Alfrida Sabar
-# Deskripsi: Observer khusus untuk Google Colab
+# Deskripsi: Observer khusus untuk Google Colab (diperbarui)
 
 import time
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import Dict, Any, Optional
 
-from smartcash.handlers.model.observers.base_observer import BaseObserver
+from smartcash.handlers.model.observers.model_observer_interface import ModelObserverInterface
+from smartcash.utils.logger import SmartCashLogger, get_logger
 
-class ColabObserver(BaseObserver):
-    """Observer khusus untuk monitoring dan visualisasi di Google Colab."""
+class ColabObserver(ModelObserverInterface):
+    """
+    Observer khusus untuk monitoring dan visualisasi di Google Colab.
+    Menggunakan interface observer terpadu.
+    """
     
-    def __init__(self, logger=None, create_plots=True, update_every=1):
-        """Inisialisasi Colab observer."""
-        super().__init__(logger, "colab_observer")
+    def __init__(
+        self, 
+        logger: Optional[SmartCashLogger] = None, 
+        create_plots: bool = True, 
+        update_every: int = 1
+    ):
+        """
+        Inisialisasi Colab observer.
+        
+        Args:
+            logger: Custom logger (opsional)
+            create_plots: Flag untuk membuat plot
+            update_every: Interval update plot
+        """
+        super().__init__(name="colab_observer", logger=logger)
         
         self.create_plots = create_plots
         self.update_every = update_every
@@ -36,6 +52,12 @@ class ColabObserver(BaseObserver):
         # Setup widgets jika di Colab
         if self._is_in_colab():
             self._setup_widgets()
+            
+        # Register event handlers
+        self.register('training_start', self._handle_training_start)
+        self.register('training_end', self._handle_training_end)
+        self.register('epoch_start', self._handle_epoch_start)
+        self.register('epoch_end', self._handle_epoch_end)
     
     def _is_in_colab(self):
         """Deteksi apakah running di Colab."""
@@ -82,21 +104,13 @@ class ColabObserver(BaseObserver):
             self.logger.warning(f"⚠️ Tidak dapat setup widgets Colab: {str(e)}")
             self.progress_bar = None
     
-    def update(self, event: str, data: Dict[str, Any] = None) -> None:
-        """Update dari proses training."""
-        data = data or {}
+    def _handle_training_start(self, data: Dict[str, Any]):
+        """
+        Handle training start event.
         
-        if event == 'training_start':
-            self._handle_training_start(data)
-        elif event == 'training_end':
-            self._handle_training_end(data)
-        elif event == 'epoch_start':
-            self._handle_epoch_start(data)
-        elif event == 'epoch_end':
-            self._handle_epoch_end(data)
-    
-    def _handle_training_start(self, data):
-        """Handle training start event."""
+        Args:
+            data: Data event
+        """
         self.start_time = time.time()
         self.total_epochs = data.get('epochs', 100)
         
@@ -127,8 +141,13 @@ class ColabObserver(BaseObserver):
         if self.create_plots:
             self._setup_plots()
     
-    def _handle_training_end(self, data):
-        """Handle training end event."""
+    def _handle_training_end(self, data: Dict[str, Any]):
+        """
+        Handle training end event.
+        
+        Args:
+            data: Data event
+        """
         duration = time.time() - self.start_time if self.start_time else 0
         h, m, s = int(duration // 3600), int((duration % 3600) // 60), int(duration % 60)
         
@@ -158,13 +177,23 @@ class ColabObserver(BaseObserver):
                 if 'best_checkpoint_path' in data:
                     print(f"💾 Best checkpoint: {data['best_checkpoint_path']}")
     
-    def _handle_epoch_start(self, data):
-        """Handle epoch start event."""
+    def _handle_epoch_start(self, data: Dict[str, Any]):
+        """
+        Handle epoch start event.
+        
+        Args:
+            data: Data event
+        """
         if self.progress_bar:
             self.progress_bar.value = data.get('epoch', 0)
     
-    def _handle_epoch_end(self, data):
-        """Handle epoch end event."""
+    def _handle_epoch_end(self, data: Dict[str, Any]):
+        """
+        Handle epoch end event.
+        
+        Args:
+            data: Data event
+        """
         epoch = data.get('epoch', 0)
         metrics = data.get('metrics', {})
         

@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/observers/metrics_observer.py
 # Author: Alfrida Sabar
-# Deskripsi: Observer untuk monitoring dan tracking metrik training
+# Deskripsi: Observer untuk monitoring dan tracking metrik training (diperbarui)
 
 import time
 import json
@@ -8,16 +8,36 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
-from smartcash.handlers.model.observers.base_observer import BaseObserver
+from smartcash.utils.logger import SmartCashLogger, get_logger
+from smartcash.handlers.model.observers.model_observer_interface import ModelObserverInterface
 
-class MetricsObserver(BaseObserver):
-    """Observer untuk monitoring dan tracking metrik training."""
+class MetricsObserver(ModelObserverInterface):
+    """
+    Observer untuk monitoring dan tracking metrik training.
+    Menggunakan interface observer terpadu.
+    """
     
-    def __init__(self, output_dir="runs/train", logger=None, experiment_name=None, save_metrics=True, visualize=True):
-        """Inisialisasi metrics observer."""
-        super().__init__(logger, "metrics_observer")
+    def __init__(
+        self,
+        output_dir: str = "runs/train",
+        logger: Optional[SmartCashLogger] = None,
+        experiment_name: Optional[str] = None,
+        save_metrics: bool = True,
+        visualize: bool = True
+    ):
+        """
+        Inisialisasi metrics observer.
+        
+        Args:
+            output_dir: Direktori output untuk menyimpan metrik
+            logger: Custom logger (opsional)
+            experiment_name: Nama eksperimen
+            save_metrics: Flag untuk menyimpan metrik ke disk
+            visualize: Flag untuk membuat visualisasi metrik
+        """
+        super().__init__(name="metrics_observer", logger=logger)
         
         self.output_dir = Path(output_dir)
         self.experiment_name = experiment_name or f"exp_{int(time.time())}"
@@ -40,24 +60,21 @@ class MetricsObserver(BaseObserver):
         self.epoch_times = {}
         
         self.logger.info(f"🔍 MetricsObserver diinisialisasi ({self.experiment_name})")
-    
-    def update(self, event: str, data: Dict[str, Any] = None) -> None:
-        """Update dari proses training."""
-        data = data or {}
         
-        if event == 'training_start':
-            self._handle_training_start(data)
-        elif event == 'training_end':
-            self._handle_training_end(data)
-        elif event == 'epoch_start':
-            self._handle_epoch_start(data)
-        elif event == 'epoch_end':
-            self._handle_epoch_end(data)
-        elif event == 'batch_end':
-            self._handle_batch_end(data)
+        # Register event handlers
+        self.register('training_start', self._handle_training_start)
+        self.register('training_end', self._handle_training_end)
+        self.register('epoch_start', self._handle_epoch_start)
+        self.register('epoch_end', self._handle_epoch_end)
+        self.register('batch_end', self._handle_batch_end)
     
-    def _handle_training_start(self, data):
-        """Handle training start event."""
+    def _handle_training_start(self, data: Dict[str, Any]):
+        """
+        Handle training start event.
+        
+        Args:
+            data: Data event
+        """
         self.start_time = time.time()
         
         # Reset metrics
@@ -71,8 +88,13 @@ class MetricsObserver(BaseObserver):
             with open(self.metrics_dir / "config.json", 'w') as f:
                 json.dump(data['config'], f, indent=2)
     
-    def _handle_training_end(self, data):
-        """Handle training end event."""
+    def _handle_training_end(self, data: Dict[str, Any]):
+        """
+        Handle training end event.
+        
+        Args:
+            data: Data event
+        """
         if not self.start_time:
             return
             
@@ -96,13 +118,23 @@ class MetricsObserver(BaseObserver):
         if self.visualize:
             self._create_visualizations()
     
-    def _handle_epoch_start(self, data):
-        """Handle epoch start event."""
+    def _handle_epoch_start(self, data: Dict[str, Any]):
+        """
+        Handle epoch start event.
+        
+        Args:
+            data: Data event
+        """
         epoch = data.get('epoch', 0)
         self.epoch_times[epoch] = time.time()
     
-    def _handle_epoch_end(self, data):
-        """Handle epoch end event."""
+    def _handle_epoch_end(self, data: Dict[str, Any]):
+        """
+        Handle epoch end event.
+        
+        Args:
+            data: Data event
+        """
         epoch = data.get('epoch', 0)
         metrics = data.get('metrics', {})
         
@@ -138,8 +170,13 @@ class MetricsObserver(BaseObserver):
         if self.save_metrics and epoch % 10 == 0:
             self._save_metrics_history()
     
-    def _handle_batch_end(self, data):
-        """Handle batch end event."""
+    def _handle_batch_end(self, data: Dict[str, Any]):
+        """
+        Handle batch end event.
+        
+        Args:
+            data: Data event
+        """
         batch_idx = data.get('batch_idx', 0)
         # Hanya simpan setiap 10 batch untuk mengurangi ukuran data
         if batch_idx % 10 == 0:

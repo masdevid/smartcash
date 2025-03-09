@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/core/model_trainer.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen untuk melatih model dengan implementasi minimal dan efisien
+# Deskripsi: Komponen untuk melatih model dengan implementasi minimal
 
 import torch
 import time
@@ -11,8 +11,9 @@ from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError, TrainingError
 from smartcash.utils.training import TrainingPipeline
+from smartcash.utils.observer import ObserverSubject
 
-class ModelTrainer(ModelComponent):
+class ModelTrainer(ModelComponent, ObserverSubject):
     """Komponen untuk melatih model dengan pendekatan standar."""
     
     def _initialize(self):
@@ -26,6 +27,9 @@ class ModelTrainer(ModelComponent):
             'save_every': cfg.get('save_period', 5)
         }
         self.in_colab = self._is_colab()
+        
+        # Inisialisasi ObserverSubject
+        self._init_subject()
     
     def _is_colab(self):
         """Deteksi Google Colab."""
@@ -45,7 +49,7 @@ class ModelTrainer(ModelComponent):
         val_loader,
         model=None,
         checkpoint_path=None,
-        track_experiment=True,
+        observers=None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -56,7 +60,7 @@ class ModelTrainer(ModelComponent):
             val_loader: DataLoader untuk validasi
             model: Model yang akan dilatih (opsional)
             checkpoint_path: Path untuk resume training
-            track_experiment: Flag untuk tracking eksperimen
+            observers: List observer untuk monitoring training
             **kwargs: Parameter tambahan
             
         Returns:
@@ -65,17 +69,27 @@ class ModelTrainer(ModelComponent):
         start_time = time.time()
         
         try:
-            # Siapkan model, optimizer, dan experiment tracker
+            # Tambahkan observer jika ada
+            if observers:
+                for observer in observers:
+                    self.attach(observer)
+                    
+            # Siapkan model
             model = self._prepare_model(model, checkpoint_path)
             device = kwargs.get('device') or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
             model = model.to(device)
             
+            # Notifikasi observer bahwa training dimulai
+            self.notify_observers('training_start', {
+                'model': model,
+                'epochs': kwargs.get('epochs', self.defaults['epochs'])
+            })
+            
             # Buat training pipeline
             pipeline = TrainingPipeline(config=self.config, model_handler=model, logger=self.logger)
             
-            # Setup callbacks
-            self._setup_callbacks(pipeline, kwargs.get('observers', []))
-            exp_tracker = self._setup_experiment(pipeline, track_experiment, kwargs.get('experiment_name'))
+            # Setup callbacks untuk notifikasi observer
+            self._setup_training_callbacks(pipeline)
             
             # Parameter training
             train_params = self._prepare_params(kwargs)
@@ -86,10 +100,8 @@ class ModelTrainer(ModelComponent):
                 **train_params
             )
             
-            # Finalisasi experiment tracking
-            if exp_tracker:
-                exp_tracker.end_experiment(results)
-                results['experiment_report'] = exp_tracker.generate_report()
+            # Notifikasi observer bahwa training selesai
+            self.notify_observers('training_end', results)
             
             # Log hasil
             duration = time.time() - start_time
@@ -106,6 +118,9 @@ class ModelTrainer(ModelComponent):
         except Exception as e:
             self.logger.error(f"❌ Error training: {str(e)}")
             raise TrainingError(f"Gagal training: {str(e)}")
+        finally:
+            # Clean up: detach semua observer
+            self.detach_all()
     
     def _prepare_model(self, model, checkpoint_path):
         """Persiapkan model untuk training."""
@@ -137,44 +152,26 @@ class ModelTrainer(ModelComponent):
             
         # Tambahkan semua parameter lain dari kwargs
         for k, v in kwargs.items():
-            if k not in ['epochs', 'early_stopping', 'early_stopping_patience', 
-                         'save_every', 'checkpoint_path', 'device', 
-                         'observers', 'experiment_name', 'optimizer', 'scheduler']:
+            if k not in params and k not in ['observers']:
                 params[k] = v
                 
         return params
     
-    def _setup_callbacks(self, pipeline, observers):
-        """Setup callbacks dari observers."""
-        for obs in observers:
-            for event in ['epoch_end', 'training_start', 'training_end']:
-                callback = getattr(obs, f'on_{event}', None)
-                if callback:
-                    pipeline.register_callback(event, callback)
-    
-    def _setup_experiment(self, pipeline, track_experiment, experiment_name):
-        """Setup experiment tracking."""
-        if not track_experiment:
-            return None
-            
-        from smartcash.handlers.model.integration.experiment_adapter import ExperimentAdapter
-        exp = ExperimentAdapter(self.config, self.logger)
+    def _setup_training_callbacks(self, pipeline):
+        """Setup callbacks untuk notifikasi observer."""
+        # Training events
+        pipeline.register_callback('training_start', lambda **kwargs: 
+                                  self.notify_observers('training_start', kwargs))
+        pipeline.register_callback('training_end', lambda **kwargs: 
+                                  self.notify_observers('training_end', kwargs))
         
-        if experiment_name:
-            exp.set_experiment_name(experiment_name)
-            
-        exp.start_experiment(self.config)
+        # Epoch events
+        pipeline.register_callback('epoch_start', lambda epoch, **kwargs: 
+                                  self.notify_observers('epoch_start', {'epoch': epoch, **kwargs}))
+        pipeline.register_callback('epoch_end', lambda epoch, metrics, **kwargs: 
+                                  self.notify_observers('epoch_end', {'epoch': epoch, 'metrics': metrics, **kwargs}))
         
-        # Register callback untuk tracking metrics
-        def log_metrics(epoch, metrics, **kwds):
-            exp.log_metrics(
-                epoch=epoch,
-                train_loss=metrics.get('train_loss', 0),
-                val_loss=metrics.get('val_loss', 0),
-                lr=metrics.get('learning_rate'),
-                additional_metrics={k: v for k, v in metrics.items() 
-                                   if k not in ['train_loss', 'val_loss', 'learning_rate']}
-            )
-            
-        pipeline.register_callback('epoch_end', log_metrics)
-        return exp
+        # Checkpoint events
+        pipeline.register_callback('checkpoint_save', lambda checkpoint_path, is_best, **kwargs: 
+                                  self.notify_observers('checkpoint_save', 
+                                                     {'checkpoint_path': checkpoint_path, 'is_best': is_best, **kwargs}))

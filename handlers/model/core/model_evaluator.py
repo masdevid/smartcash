@@ -1,18 +1,19 @@
 # File: smartcash/handlers/model/core/model_evaluator.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen untuk evaluasi model dengan implementasi ringkas
+# Deskripsi: Komponen untuk evaluasi model dengan implementasi minimal
 
 import torch
 import time
-from typing import Dict, Optional, Any, List, Union
+from typing import Dict, Optional, Any
 from pathlib import Path
 from tqdm import tqdm
 
 from smartcash.utils.logger import get_logger
 from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError, EvaluationError
+from smartcash.utils.observer import ObserverSubject
 
-class ModelEvaluator(ModelComponent):
+class ModelEvaluator(ModelComponent, ObserverSubject):
     """Komponen untuk evaluasi model pada dataset test."""
     
     def _initialize(self):
@@ -25,6 +26,9 @@ class ModelEvaluator(ModelComponent):
         self.output_dir = Path(self.config.get('output_dir', 'runs/eval'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.in_colab = self._is_colab()
+        
+        # Inisialisasi ObserverSubject
+        self._init_subject()
     
     def _is_colab(self):
         """Deteksi Google Colab."""
@@ -38,7 +42,7 @@ class ModelEvaluator(ModelComponent):
         """Alias untuk evaluate()."""
         return self.evaluate(test_loader, model, **kwargs)
     
-    def evaluate(self, test_loader, model=None, checkpoint_path=None, **kwargs):
+    def evaluate(self, test_loader, model=None, checkpoint_path=None, observers=None, **kwargs):
         """
         Evaluasi model pada test dataset.
         
@@ -46,6 +50,7 @@ class ModelEvaluator(ModelComponent):
             test_loader: DataLoader untuk testing
             model: Model untuk evaluasi (opsional)
             checkpoint_path: Path ke checkpoint (opsional)
+            observers: List observer untuk monitoring evaluasi
             **kwargs: Parameter tambahan
             
         Returns:
@@ -54,6 +59,11 @@ class ModelEvaluator(ModelComponent):
         start_time = time.time()
         
         try:
+            # Tambahkan observer jika ada
+            if observers:
+                for observer in observers:
+                    self.attach(observer)
+            
             # Load model jika perlu
             model = self._prepare_model(model, checkpoint_path)
             
@@ -62,19 +72,15 @@ class ModelEvaluator(ModelComponent):
             model = model.to(device).eval()
             conf_threshold = kwargs.get('conf_threshold', self.params['conf_threshold'])
             iou_threshold = kwargs.get('iou_threshold', self.params['iou_threshold'])
-            half_precision = kwargs.get('half_precision', torch.cuda.is_available())
-            
-            # Gunakan half precision jika diminta
-            if half_precision and device.type == 'cuda':
-                model = model.half()
             
             # Reset metrics calculator
             self.metrics_adapter.reset()
             
             # Log info evaluasi
-            self.logger.info(
-                f"🔍 Evaluasi model ({len(test_loader)} batch): device={device}, conf={conf_threshold:.2f}"
-            )
+            self.logger.info(f"🔍 Evaluasi model ({len(test_loader)} batch): device={device}, conf={conf_threshold:.2f}")
+            
+            # Notifikasi observer bahwa evaluasi dimulai
+            self.notify_observers('evaluation_start', {'model': model, 'num_batches': len(test_loader)})
             
             # Setup progress bar
             pbar = self._create_progress_bar(test_loader)
@@ -89,9 +95,7 @@ class ModelEvaluator(ModelComponent):
                     outputs = model(inputs)
                     
                     # Post-processing detections
-                    predictions = self._post_process(
-                        model, outputs, conf_threshold, iou_threshold
-                    )
+                    predictions = self._post_process(model, outputs, conf_threshold, iou_threshold)
                     
                     # Update metrics
                     self.metrics_adapter.update(predictions, targets)
@@ -109,67 +113,25 @@ class ModelEvaluator(ModelComponent):
             
             # Add timing and config info
             metrics.update({
-                'num_test_batches': len(test_loader),
+                'execution_time': time.time() - start_time,
                 'conf_threshold': conf_threshold,
-                'iou_threshold': iou_threshold,
-                'execution_time': time.time() - start_time
+                'iou_threshold': iou_threshold
             })
             
-            # Add layer metrics if available
-            if hasattr(model, 'get_layer_metrics'):
-                metrics['layer_metrics'] = model.get_layer_metrics(None, None)
+            # Notifikasi observer bahwa evaluasi selesai
+            self.notify_observers('evaluation_end', {'metrics': metrics})
             
             # Log result
-            self.logger.success(
-                f"✅ Evaluasi selesai: mAP={metrics.get('mAP', 0):.4f}, "
-                f"F1={metrics.get('f1', 0):.4f}"
-            )
+            self.logger.success(f"✅ Evaluasi selesai: mAP={metrics.get('mAP', 0):.4f}, F1={metrics.get('f1', 0):.4f}")
             
             return metrics
             
         except Exception as e:
             self.logger.error(f"❌ Error evaluasi: {str(e)}")
             raise EvaluationError(f"Gagal evaluasi: {str(e)}")
-    
-    def evaluate_on_layers(self, test_loader, model, layers=None, **kwargs):
-        """
-        Evaluasi model pada layer tertentu.
-        
-        Args:
-            test_loader: DataLoader untuk testing
-            model: Model untuk evaluasi
-            layers: Daftar layer (default: dari config)
-            **kwargs: Parameter tambahan
-            
-        Returns:
-            Dict hasil evaluasi per layer
-        """
-        layers = layers or list(self.config.get('layers', {}).keys())
-        self.logger.info(f"🔍 Evaluasi pada {len(layers)} layer: {', '.join(layers)}")
-        
-        results = {}
-        
-        # Evaluasi all layers
-        results['all'] = self.evaluate(test_loader, model, **kwargs)
-        
-        # Evaluasi per layer jika model mendukung
-        if hasattr(model, 'set_active_layers'):
-            for layer in layers:
-                self.logger.info(f"🔍 Evaluasi layer: {layer}")
-                model.set_active_layers([layer])
-                results[layer] = self.evaluate(test_loader, model, **kwargs)
-            
-            # Reset ke semua layer
-            model.set_active_layers(layers)
-        
-        # Log ringkasan
-        self.logger.info("📊 Ringkasan per layer:")
-        for layer, metrics in results.items():
-            self.logger.info(
-                f"   • {layer}: mAP={metrics.get('mAP', 0):.4f}, F1={metrics.get('f1', 0):.4f}"
-            )
-        
-        return results
+        finally:
+            # Clean up: detach semua observer
+            self.detach_all()
     
     def _prepare_model(self, model, checkpoint_path):
         """Persiapkan model untuk evaluasi."""
@@ -212,8 +174,6 @@ class ModelEvaluator(ModelComponent):
     def _post_process(self, model, outputs, conf_threshold, iou_threshold):
         """Post-process output model."""
         if hasattr(model, 'post_process'):
-            return model.post_process(
-                outputs, conf_threshold=conf_threshold, iou_threshold=iou_threshold
-            )
+            return model.post_process(outputs, conf_threshold=conf_threshold, iou_threshold=iou_threshold)
         else:
             return outputs

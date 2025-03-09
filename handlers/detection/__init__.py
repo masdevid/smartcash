@@ -1,6 +1,6 @@
 # File: smartcash/handlers/detection/__init__.py
 # Author: Alfrida Sabar
-# Deskripsi: Export komponen utama untuk detection handler
+# Deskripsi: Package untuk deteksi mata uang Rupiah
 
 from smartcash.handlers.detection.detection_manager import DetectionManager
 

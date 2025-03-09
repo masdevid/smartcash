@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 """
-SmartCash CLI: Command Line Interface untuk SmartCash
-
-Entry point untuk akses fitur-fitur SmartCash melalui command line.
+File: smartcash/cli.py
+Author: Alfrida Sabar
+Deskripsi: Command Line Interface untuk SmartCash dengan fitur kritis 
+yang dioptimalkan dengan struktur proyek terbaru
 """
 
 import os
@@ -11,250 +12,378 @@ import argparse
 import logging
 import yaml
 from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, Optional
 
-# Import handlers
-from handlers.model_handler import ModelHandler
-from handlers.data_manager import DataManager
-from handlers.evaluation_handler import EvaluationHandler 
-from handlers.detection_handler import DetectionHandler
-from handlers.checkpoint_handler import CheckpointHandler
-from handlers.multilayer_dataset_handler import MultilayerDatasetHandler
-from handlers.roboflow_handler import RoboflowHandler
+# Import handlers sesuai struktur proyek terbaru
+from smartcash.handlers.model import ModelManager
+from smartcash.handlers.dataset import DatasetManager
+from smartcash.handlers.evaluation import EvaluationManager
+from smartcash.handlers.detection import DetectionManager
+from smartcash.handlers.preprocessing import PreprocessingManager
+from smartcash.config import get_config_manager
+from smartcash.exceptions import SmartCashError, ErrorHandler
 
-# Import models
-from models import yolov5_model
-
-# Setup logging
+# Setup logging dasar
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler(os.path.join("logs", f"cli_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"))
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("smartcash.cli")
 
 def setup_dirs():
     """Buat direktori yang diperlukan jika belum ada."""
-    os.makedirs("logs", exist_ok=True)
-    os.makedirs("configs", exist_ok=True)
-    os.makedirs("runs", exist_ok=True)
-    os.makedirs("data/raw", exist_ok=True)
-    os.makedirs("data/processed", exist_ok=True)
-    os.makedirs("pretrained", exist_ok=True)
+    dirs = [
+        "logs", "configs", "runs", "pretrained",
+        "data/train/images", "data/train/labels",
+        "data/valid/images", "data/valid/labels",
+        "data/test/images", "data/test/labels"
+    ]
+    for dir_path in dirs:
+        os.makedirs(dir_path, exist_ok=True)
+    
+    # Buat file gitkeep agar folder kosong tetap terlacak di git
+    for dir_path in dirs:
+        gitkeep_path = os.path.join(dir_path, ".gitkeep")
+        if not os.path.exists(gitkeep_path):
+            with open(gitkeep_path, "w") as f:
+                f.write("")
 
-def load_config(config_path):
-    """Load konfigurasi dari file yaml."""
-    try:
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        return config
-    except Exception as e:
-        logger.error(f"Error loading config file: {e}")
-        sys.exit(1)
+def get_log_file() -> str:
+    """Dapatkan path file log yang sesuai."""
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    return os.path.join(log_dir, f"cli_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+def setup_logger(debug_mode: bool) -> None:
+    """Setup logger untuk CLI."""
+    # Tambahkan file handler
+    file_handler = logging.FileHandler(get_log_file())
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    ))
+    logging.getLogger().addHandler(file_handler)
+    
+    # Setup level logging berdasarkan mode debug
+    if debug_mode:
+        logging.getLogger().setLevel(logging.DEBUG)
+        logger.debug("🔍 Mode debug diaktifkan")
+    else:
+        logging.getLogger().setLevel(logging.INFO)
 
 def train(args):
     """Menjalankan pelatihan model."""
-    logger.info(f"Memulai pelatihan dengan konfigurasi: {args.config}")
-    config = load_config(args.config)
+    try:
+        logger.info(f"🏋️ Memulai pelatihan dengan konfigurasi: {args.config}")
+        
+        # Gunakan ConfigManager untuk mengelola konfigurasi
+        config_manager = get_config_manager(args.config)
+        config = config_manager.get_config()
+        
+        # Override config dari argumen CLI
+        if args.epochs:
+            config_manager.set("training.epochs", args.epochs)
+        if args.batch_size:
+            config_manager.set("training.batch_size", args.batch_size)
+        if args.backbone:
+            config_manager.set("model.backbone", args.backbone)
+            
+        # Inisialisasi ModelManager
+        model_manager = ModelManager(config=config)
+        
+        # Setup DatasetManager untuk memuat data
+        dataset_manager = DatasetManager(config=config)
+        train_loader = dataset_manager.get_train_loader()
+        val_loader = dataset_manager.get_val_loader()
+        
+        # Training model
+        if args.resume:
+            logger.info(f"🔄 Melanjutkan pelatihan dari checkpoint: {args.resume}")
+            results = model_manager.train_model(
+                train_loader=train_loader,
+                val_loader=val_loader,
+                resume_from=args.resume
+            )
+        else:
+            results = model_manager.train_model(
+                train_loader=train_loader,
+                val_loader=val_loader
+            )
+        
+        logger.info(f"✅ Pelatihan selesai. Hasil: {results}")
+        
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Pelatihan gagal: {str(e)}")
+        return 1
     
-    # Override config dengan args
-    if args.epochs:
-        config['training']['epochs'] = args.epochs
-    if args.batch_size:
-        config['training']['batch_size'] = args.batch_size
-    
-    # Initialize model handler
-    model_handler = ModelHandler()
-    
-    # Setup model and training
-    model_handler.setup_from_config(config)
-    
-    # Train model
-    if args.resume:
-        logger.info(f"Melanjutkan pelatihan dari checkpoint: {args.resume}")
-        model_handler.train(resume=args.resume)
-    else:
-        model_handler.train()
-    
-    logger.info("Pelatihan selesai")
+    return 0
 
 def evaluate(args):
     """Menjalankan evaluasi model."""
-    logger.info(f"Memulai evaluasi model: {args.model}")
+    try:
+        logger.info(f"📊 Memulai evaluasi model: {args.model}")
+        
+        # Gunakan ConfigManager dengan default
+        config_manager = get_config_manager()
+        config = config_manager.get_config()
+        
+        # Inisialisasi EvaluationManager
+        eval_manager = EvaluationManager(config=config)
+        
+        # Evaluasi model
+        results = eval_manager.evaluate_model(
+            model_path=args.model,
+            dataset_split=args.split,
+            conf_threshold=args.conf
+        )
+        
+        # Simpan hasil jika diperlukan
+        if args.output:
+            logger.info(f"💾 Menyimpan hasil evaluasi ke: {args.output}")
+            eval_manager.save_results(results, args.output)
+        
+        # Tampilkan hasil
+        logger.info("📑 Hasil Evaluasi:")
+        for metric, value in results.items():
+            if isinstance(value, float):
+                logger.info(f"  • {metric}: {value:.4f}")
+            else:
+                logger.info(f"  • {metric}: {value}")
+                
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Evaluasi gagal: {str(e)}")
+        return 1
     
-    # Initialize evaluation handler
-    eval_handler = EvaluationHandler()
-    
-    # Load model
-    eval_handler.load_model(args.model)
-    
-    # Run evaluation
-    results = eval_handler.evaluate(args.data)
-    
-    # Save results if output path is provided
-    if args.output:
-        logger.info(f"Menyimpan hasil evaluasi ke: {args.output}")
-        eval_handler.save_results(results, args.output)
-    
-    # Print results
-    logger.info("Hasil Evaluasi:")
-    for metric, value in results.items():
-        logger.info(f"{metric}: {value}")
+    return 0
 
 def detect(args):
     """Menjalankan deteksi pada gambar."""
-    logger.info(f"Mendeteksi mata uang pada: {args.image}")
+    try:
+        logger.info(f"🔍 Mendeteksi mata uang pada: {args.source}")
+        
+        # Gunakan ConfigManager dengan default
+        config_manager = get_config_manager()
+        config = config_manager.get_config()
+        
+        # Inisialisasi DetectionManager
+        detection_manager = DetectionManager(config=config)
+        
+        # Jalankan deteksi
+        results = detection_manager.detect(
+            source=args.source,
+            model_path=args.model,
+            conf_threshold=args.conf,
+            visualize=args.visualize,
+            output_dir=args.output
+        )
+        
+        # Tampilkan hasil jika tidak banyak
+        if isinstance(results, dict) and 'detections' in results:
+            num_detections = len(results['detections'])
+            logger.info(f"✅ Deteksi berhasil: {num_detections} objek terdeteksi")
+            
+            if num_detections <= 10:  # Batasi output untuk keterbacaan
+                for i, det in enumerate(results['detections']):
+                    logger.info(f"  • Deteksi #{i+1}: {det['class_name']} ({det['confidence']:.2f})")
+            
+            if args.output:
+                logger.info(f"💾 Hasil deteksi disimpan di: {args.output}")
+                
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Deteksi gagal: {str(e)}")
+        return 1
     
-    # Initialize detection handler
-    detect_handler = DetectionHandler()
-    
-    # Load model
-    detect_handler.load_model(args.model)
-    
-    # Run detection
-    results = detect_handler.detect(
-        source=args.image,
-        conf_thres=args.conf,
-        save_results=True if args.output else False,
-        output_path=args.output
-    )
-    
-    # Print results
-    for i, (img_path, detections) in enumerate(results):
-        logger.info(f"Gambar {i+1}: {img_path}")
-        for det in detections:
-            class_id, conf, bbox = det
-            logger.info(f"  - Kelas: {class_id}, Confidence: {conf:.2f}, BBox: {bbox}")
+    return 0
 
 def augment(args):
     """Menjalankan augmentasi dataset."""
-    logger.info(f"Augmentasi dataset: {args.data}")
+    try:
+        logger.info(f"🔄 Augmentasi dataset: split={args.split}")
+        
+        # Gunakan ConfigManager dengan default
+        config_manager = get_config_manager()
+        config = config_manager.get_config()
+        
+        # Inisialisasi PreprocessingManager
+        preprocessing_manager = PreprocessingManager(config=config)
+        
+        # Parse daftar teknik augmentasi
+        augmentation_types = args.techniques.split(',') if args.techniques else ["combined"]
+        
+        # Jalankan augmentasi
+        results = preprocessing_manager.augment_dataset(
+            split=args.split,
+            augmentation_types=augmentation_types,
+            num_variations=args.factor,
+            validate_results=args.validate
+        )
+        
+        if results and 'num_augmented' in results:
+            logger.info(f"✅ Augmentasi selesai. {results['num_augmented']} gambar diaugmentasi")
+            
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Augmentasi gagal: {str(e)}")
+        return 1
     
-    # Initialize data manager
-    data_manager = DataManager()
-    
-    # Run augmentation
-    data_manager.augment_dataset(
-        dataset_path=args.data,
-        output_path=args.output,
-        augmentation_factor=args.factor,
-        techniques=args.techniques.split(',') if args.techniques else None
-    )
-    
-    logger.info(f"Augmentasi selesai. Hasil disimpan di: {args.output}")
+    return 0
 
-def export(args):
-    """Mengekspor model ke format lain."""
-    logger.info(f"Mengekspor model {args.model} ke format {args.format}")
-    
-    # Initialize model handler
-    model_handler = ModelHandler()
-    
-    # Load model
-    model_handler.load_model(args.model)
-    
-    # Export model
-    model_handler.export_model(
-        format=args.format,
-        output_path=args.output,
-        input_shape=args.input_shape if args.input_shape else None
-    )
-    
-    logger.info(f"Model berhasil diekspor ke: {args.output}")
-
-def download_dataset(args):
+def download(args):
     """Download dataset dari Roboflow."""
-    logger.info(f"Mendownload dataset dari Roboflow: {args.dataset}")
+    try:
+        logger.info(f"⬇️ Mendownload dataset dari Roboflow: {args.workspace}/{args.project}")
+        
+        # Gunakan ConfigManager dengan default
+        config_manager = get_config_manager()
+        config = config_manager.get_config()
+        
+        # Override konfigurasi Roboflow
+        config['data']['roboflow'] = {
+            'api_key': args.api_key,
+            'workspace': args.workspace,
+            'project': args.project,
+            'version': args.version
+        }
+        
+        # Inisialisasi DatasetManager
+        dataset_manager = DatasetManager(config=config)
+        
+        # Download dataset
+        results = dataset_manager.download_dataset(
+            output_format=args.format
+        )
+        
+        logger.info(f"✅ Dataset berhasil didownload!")
+            
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Download dataset gagal: {str(e)}")
+        return 1
     
-    # Initialize Roboflow handler
-    roboflow_handler = RoboflowHandler()
+    return 0
+
+def export_model(args):
+    """Mengekspor model ke format lain."""
+    try:
+        logger.info(f"📦 Mengekspor model {args.model} ke format {args.format}")
+        
+        # Gunakan ConfigManager dengan default
+        config_manager = get_config_manager()
+        config = config_manager.get_config()
+        
+        # Inisialisasi ModelManager
+        model_manager = ModelManager(config=config)
+        
+        # Parse input shape jika disediakan
+        if args.input_shape:
+            input_shape = tuple(map(int, args.input_shape.split(',')))
+        else:
+            input_shape = (640, 640)
+        
+        # Export model
+        output_path = model_manager.export_model(
+            model_path=args.model,
+            format=args.format,
+            output_path=args.output,
+            input_shape=input_shape,
+            optimize=args.optimize
+        )
+        
+        logger.info(f"✅ Model berhasil diekspor ke: {output_path}")
+            
+    except Exception as e:
+        error_handler = ErrorHandler()
+        error_handler.handle(e, exit_on_error=False)
+        logger.error(f"❌ Export model gagal: {str(e)}")
+        return 1
     
-    # Load API key from .env or args
-    api_key = args.api_key or os.getenv("ROBOFLOW_API_KEY")
-    if not api_key:
-        logger.error("API key tidak ditemukan. Gunakan --api-key atau set ROBOFLOW_API_KEY di .env")
-        sys.exit(1)
-    
-    # Download dataset
-    roboflow_handler.download_dataset(
-        dataset_name=args.dataset,
-        version=args.version,
-        api_key=api_key,
-        output_format=args.format,
-        output_path=args.output
-    )
-    
-    logger.info(f"Dataset berhasil didownload ke: {args.output}")
+    return 0
 
 def main():
     """Entry point utama CLI."""
     parser = argparse.ArgumentParser(description="SmartCash CLI: Command Line Interface")
-    subparsers = parser.add_subparsers(dest="command", help="Perintah yang tersedia")
-    
-    # Setup debug mode
     parser.add_argument("--debug", action="store_true", help="Tampilkan pesan debug")
+    
+    # Setup subparsers untuk commands
+    subparsers = parser.add_subparsers(dest="command", help="Perintah yang tersedia")
     
     # Train command
     train_parser = subparsers.add_parser("train", help="Melatih model")
-    train_parser.add_argument("--config", required=True, help="Path ke file konfigurasi")
+    train_parser.add_argument("--config", default="configs/base_config.yaml", help="Path ke file konfigurasi")
     train_parser.add_argument("--resume", help="Resume pelatihan dari checkpoint")
     train_parser.add_argument("--epochs", type=int, help="Jumlah epoch")
     train_parser.add_argument("--batch-size", type=int, help="Ukuran batch")
-    train_parser.set_defaults(func=train)
+    train_parser.add_argument("--backbone", help="Backbone model (efficientnet_b4, cspdarknet)")
     
     # Evaluate command
     eval_parser = subparsers.add_parser("eval", help="Evaluasi model")
     eval_parser.add_argument("--model", required=True, help="Path ke model checkpoint")
-    eval_parser.add_argument("--data", required=True, help="Path ke dataset test")
+    eval_parser.add_argument("--split", default="test", choices=["train", "valid", "test"], help="Split dataset untuk evaluasi")
+    eval_parser.add_argument("--conf", type=float, default=0.25, help="Threshold confidence")
     eval_parser.add_argument("--output", help="Path untuk menyimpan hasil evaluasi")
-    eval_parser.set_defaults(func=evaluate)
     
     # Detect command
     detect_parser = subparsers.add_parser("detect", help="Deteksi mata uang pada gambar")
     detect_parser.add_argument("--model", required=True, help="Path ke model checkpoint")
-    detect_parser.add_argument("--image", required=True, help="Path ke gambar atau direktori gambar")
-    detect_parser.add_argument("--output", help="Path untuk menyimpan hasil deteksi")
+    detect_parser.add_argument("--source", required=True, help="Path ke gambar atau direktori gambar")
     detect_parser.add_argument("--conf", type=float, default=0.25, help="Threshold confidence")
-    detect_parser.set_defaults(func=detect)
+    detect_parser.add_argument("--output", help="Direktori untuk menyimpan hasil deteksi")
+    detect_parser.add_argument("--visualize", action="store_true", help="Visualisasikan hasil deteksi")
     
     # Augment command
     augment_parser = subparsers.add_parser("augment", help="Augmentasi dataset")
-    augment_parser.add_argument("--data", required=True, help="Path ke dataset")
-    augment_parser.add_argument("--output", required=True, help="Path output hasil augmentasi")
-    augment_parser.add_argument("--factor", type=int, default=2, help="Faktor augmentasi")
-    augment_parser.add_argument("--techniques", help="Teknik augmentasi yang dipisahkan koma (rotate,flip,blur,etc)")
-    augment_parser.set_defaults(func=augment)
+    augment_parser.add_argument("--split", default="train", choices=["train", "valid", "test"], help="Split dataset untuk augmentasi")
+    augment_parser.add_argument("--factor", type=int, default=2, help="Jumlah variasi per gambar")
+    augment_parser.add_argument("--techniques", help="Teknik augmentasi dipisahkan koma (combined,lighting,position)")
+    augment_parser.add_argument("--validate", action="store_true", help="Validasi hasil augmentasi")
+    
+    # Download command
+    download_parser = subparsers.add_parser("download", help="Download dataset dari Roboflow")
+    download_parser.add_argument("--workspace", required=True, help="Workspace Roboflow")
+    download_parser.add_argument("--project", required=True, help="Nama project di Roboflow")
+    download_parser.add_argument("--version", required=True, help="Versi dataset")
+    download_parser.add_argument("--api-key", required=True, help="Roboflow API key")
+    download_parser.add_argument("--format", default="yolov5", help="Format dataset (default: yolov5)")
     
     # Export command
     export_parser = subparsers.add_parser("export", help="Ekspor model ke format lain")
     export_parser.add_argument("--model", required=True, help="Path ke model checkpoint")
-    export_parser.add_argument("--format", required=True, choices=["onnx", "torchscript", "coreml", "tflite"], help="Format ekspor")
-    export_parser.add_argument("--output", required=True, help="Path output model")
-    export_parser.add_argument("--input-shape", help="Bentuk input (contoh: 640,640,3)")
-    export_parser.set_defaults(func=export)
+    export_parser.add_argument("--format", required=True, choices=["onnx", "torchscript"], help="Format ekspor")
+    export_parser.add_argument("--output", help="Path output model")
+    export_parser.add_argument("--input-shape", help="Bentuk input (contoh: 640,640)")
+    export_parser.add_argument("--optimize", action="store_true", help="Optimasi model untuk inferensi")
     
-    # Download command
-    download_parser = subparsers.add_parser("download", help="Download dataset dari Roboflow")
-    download_parser.add_argument("--dataset", required=True, help="Nama dataset di Roboflow")
-    download_parser.add_argument("--version", required=True, help="Versi dataset")
-    download_parser.add_argument("--api-key", help="Roboflow API key (jika tidak ada di .env)")
-    download_parser.add_argument("--format", default="yolov5", help="Format dataset (default: yolov5)")
-    download_parser.add_argument("--output", default="data/raw", help="Path output dataset")
-    download_parser.set_defaults(func=download_dataset)
-    
+    # Parse arguments
     args = parser.parse_args()
+    
+    # Setup directories dan logging
     setup_dirs()
+    setup_logger(args.debug)
     
-    if args.debug:
-        logging.getLogger().setLevel(logging.DEBUG)
+    # Handler untuk setiap command
+    cmd_handlers = {
+        "train": train,
+        "eval": evaluate,
+        "detect": detect,
+        "augment": augment,
+        "download": download,
+        "export": export_model
+    }
     
-    # Jalankan fungsi sesuai command
-    if hasattr(args, 'func'):
-        args.func(args)
+    if args.command in cmd_handlers:
+        exit_code = cmd_handlers[args.command](args)
+        sys.exit(exit_code)
     else:
         parser.print_help()
+        sys.exit(0)
 
 if __name__ == "__main__":
     main()

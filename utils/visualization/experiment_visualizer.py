@@ -1,195 +1,380 @@
-"""
-File: smartcash/utils/visualization/experiment_visualizer.py
-Author: Alfrida Sabar
-Deskripsi: Visualisasi dan analisis hasil eksperimen untuk perbandingan model
-"""
+# File: smartcash/utils/visualization/experiment_visualizer.py
+# Author: Alfrida Sabar
+# Deskripsi: Visualisasi hasil eksperimen untuk perbandingan model/backbone
 
 import matplotlib.pyplot as plt
-import seaborn as sns
+import numpy as np
+from typing import Dict, List, Optional, Any, Union
+from pathlib import Path
 import pandas as pd
-from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.utils.visualization.research_base import BaseResearchVisualizer
-from smartcash.utils.visualization.research_analysis import ExperimentAnalyzer
-
-class ExperimentVisualizer(BaseResearchVisualizer):
-    """Visualisasi dan analisis hasil eksperimen untuk perbandingan model."""
+class ExperimentVisualizer:
+    """
+    Komponen untuk visualisasi hasil eksperimen model.
+    Digunakan untuk membuat perbandingan visual antara backbone, hyperparameter, dll.
+    """
     
     def __init__(
-        self, 
-        output_dir: str = "results/research/experiments",
-        logger: Optional[Any] = None
+        self,
+        output_dir: str = "runs/experiments/visualizations",
+        figsize: tuple = (12, 8),
+        dpi: int = 150,
+        theme: str = 'default'
     ):
         """
         Inisialisasi experiment visualizer.
         
         Args:
-            output_dir: Direktori untuk menyimpan hasil
-            logger: Logger untuk logging
+            output_dir: Direktori output untuk visualisasi
+            figsize: Ukuran default untuk plot
+            dpi: DPI untuk output gambar
+            theme: Tema visualisasi ('default', 'dark', 'light')
         """
-        super().__init__(output_dir, logger)
-        self.analyzer = ExperimentAnalyzer()
+        self.output_dir = Path(output_dir)
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.figsize = figsize
+        self.dpi = dpi
+        
+        # Setup theme
+        self._setup_theme(theme)
     
-    def visualize_experiment_comparison(
+    def _setup_theme(self, theme: str) -> None:
+        """Setup tema visualisasi."""
+        if theme == 'dark':
+            plt.style.use('dark_background')
+            self.colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#FF6D01', '#46BDC6', '#F94892']
+        elif theme == 'light':
+            plt.style.use('seaborn-v0_8-whitegrid')
+            self.colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#FF6D01', '#46BDC6', '#F94892']
+        else:
+            # Default theme
+            plt.style.use('default')
+            self.colors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853', '#FF6D01', '#46BDC6', '#F94892']
+    
+    def visualize_backbone_comparison(
         self,
-        results_df: pd.DataFrame,
-        title: str = "Perbandingan Eksperimen",
-        filename: Optional[str] = None,
-        highlight_best: bool = True,
-        figsize: Tuple[int, int] = (15, 12)
-    ) -> Dict[str, Any]:
+        results: Dict[str, Dict[str, Any]],
+        metrics: List[str] = None,
+        title: str = "Perbandingan Backbone",
+        output_filename: str = "backbone_comparison",
+        show_values: bool = True
+    ) -> Dict[str, str]:
         """
-        Visualisasikan perbandingan berbagai eksperimen.
+        Visualisasikan perbandingan antar backbone.
         
         Args:
-            results_df: DataFrame hasil eksperimen
+            results: Dictionary hasil eksperimen per backbone
+            metrics: List metrik yang akan divisualisasikan
             title: Judul visualisasi
-            filename: Nama file untuk menyimpan hasil
-            highlight_best: Highlight nilai terbaik
-            figsize: Ukuran figure
+            output_filename: Nama file output (tanpa ekstensi)
+            show_values: Tampilkan nilai pada bar chart
             
         Returns:
-            Dict berisi figure dan hasil analisis
+            Dictionary path visualisasi yang dibuat
         """
-        if results_df.empty:
-            self.logger.warning("⚠️ DataFrame kosong untuk perbandingan eksperimen")
-            return {'status': 'error', 'message': 'Data kosong'}
+        if metrics is None:
+            metrics = ['mAP', 'precision', 'recall', 'f1', 'inference_time']
+            
+        # Filter metrik yang tersedia
+        available_metrics = {}
         
-        # Tampilkan tabel hasil
-        if highlight_best:
-            styled_df = self._create_styled_dataframe(results_df)
-        else:
-            styled_df = results_df.copy()
+        # Proses data
+        for backbone, result in results.items():
+            if 'error' in result:
+                continue
+                
+            if 'evaluation' in result:
+                eval_metrics = result['evaluation']
+                for metric in metrics:
+                    if metric in eval_metrics:
+                        if metric not in available_metrics:
+                            available_metrics[metric] = {}
+                        available_metrics[metric][backbone] = eval_metrics[metric]
         
-        # Setup figure untuk visualisasi
-        fig, axes = plt.subplots(2, 1, figsize=figsize)
+        visualization_paths = {}
         
-        # Identifikasi kolom metrik dan performansi
-        metric_cols = [col for col in results_df.columns if col in 
-                     ['Akurasi', 'Precision', 'Recall', 'F1-Score', 'mAP', 'Accuracy']]
-        time_col = next((col for col in results_df.columns if 'Time' in col or 'Waktu' in col), None)
+        # Buat visualisasi untuk setiap metrik
+        for metric, values in available_metrics.items():
+            plt.figure(figsize=self.figsize)
+            
+            # Siapkan data
+            backbones = list(values.keys())
+            metric_values = list(values.values())
+            
+            # Inversi untuk inference_time (nilai lebih kecil = lebih baik)
+            if metric == 'inference_time':
+                title_suffix = ' (nilai lebih rendah = lebih baik)'
+            else:
+                title_suffix = ' (nilai lebih tinggi = lebih baik)'
+            
+            # Buat bar chart
+            bars = plt.bar(backbones, metric_values, color=self.colors[:len(backbones)])
+            
+            # Tambahkan nilai di atas bar
+            if show_values:
+                for bar in bars:
+                    height = bar.get_height()
+                    plt.text(
+                        bar.get_x() + bar.get_width() / 2,
+                        height,
+                        f'{height:.4f}',
+                        ha='center',
+                        va='bottom',
+                        fontsize=10
+                    )
+            
+            # Label dan judul
+            plt.xlabel('Backbone')
+            plt.ylabel(metric)
+            plt.title(f'{title} - {metric}{title_suffix}')
+            plt.grid(True, alpha=0.3, axis='y')
+            
+            # Simpan visualisasi
+            output_path = self.output_dir / f"{output_filename}_{metric}.png"
+            plt.savefig(output_path, dpi=self.dpi)
+            plt.close()
+            
+            visualization_paths[metric] = str(output_path)
         
-        # Plot 1: Metrik Akurasi
-        self._create_metrics_plot(axes[0], results_df, metric_cols, title)
+        # Buat radar chart jika minimal 3 metrik tersedia
+        radar_metrics = [m for m in ['mAP', 'precision', 'recall', 'f1'] 
+                        if m in available_metrics and len(available_metrics[m]) > 1]
         
-        # Plot 2: Trade-off Akurasi vs Kecepatan
-        self._create_tradeoff_plot(axes[1], results_df, metric_cols, time_col)
+        if len(radar_metrics) >= 3:
+            radar_path = self._create_radar_chart(
+                available_metrics, 
+                radar_metrics,
+                title=f"{title} - Radar Chart",
+                output_filename=f"{output_filename}_radar"
+            )
+            visualization_paths['radar'] = radar_path
         
-        plt.tight_layout()
-        
-        # Simpan jika diminta
-        if filename:
-            self.save_visualization(fig, filename)
-        
-        # Lakukan analisis
-        analysis = self.analyzer.analyze_experiment_results(results_df, metric_cols, time_col)
-        
-        # Return hasil
-        return {
-            'status': 'success',
-            'figure': fig,
-            'styled_df': styled_df,
-            'analysis': analysis
-        }
+        return visualization_paths
     
-    def _create_metrics_plot(
-        self, 
-        ax: plt.Axes, 
-        df: pd.DataFrame, 
-        metric_cols: List[str],
-        title: str
-    ) -> None:
+    def visualize_training_curves(
+        self,
+        metrics_history: Dict[str, List],
+        title: str = "Training Progress",
+        output_filename: str = "training_curves"
+    ) -> Dict[str, str]:
         """
-        Buat plot metrik akurasi.
+        Visualisasikan kurva training dan validasi.
         
         Args:
-            ax: Axes untuk plot
-            df: DataFrame data
-            metric_cols: Kolom metrik
-            title: Judul plot
+            metrics_history: Dictionary berisi metrics history
+            title: Judul visualisasi
+            output_filename: Nama file output (tanpa ekstensi)
+            
+        Returns:
+            Dictionary path visualisasi yang dibuat
         """
-        if metric_cols:
-            model_col = next((col for col in df.columns if col in 
-                           ['Model', 'Backbone', 'Arsitektur']), None)
+        visualization_paths = {}
+        
+        # Training and validation loss
+        if 'train_loss' in metrics_history and 'val_loss' in metrics_history and 'epochs' in metrics_history:
+            plt.figure(figsize=self.figsize)
             
-            # Reshape data untuk plotting
-            plot_data = pd.melt(
-                df,
-                id_vars=[model_col] if model_col else df.index.name,
-                value_vars=metric_cols,
-                var_name='Metric',
-                value_name='Value'
-            )
+            epochs = metrics_history['epochs']
+            train_loss = metrics_history['train_loss']
+            val_loss = metrics_history['val_loss']
             
-            # Plot perbandingan
-            sns.barplot(
-                data=plot_data,
-                x='Metric',
-                y='Value',
-                hue=model_col if model_col else None,
-                ax=ax
-            )
+            plt.plot(epochs, train_loss, 'b-', label='Training Loss', linewidth=2)
+            plt.plot(epochs, val_loss, 'r-', label='Validation Loss', linewidth=2)
             
-            ax.set_title(f"{title} - Metrik Akurasi", size=16)
-            ax.set_xlabel('Metric', size=14)
-            ax.set_ylabel('Value (%)', size=14)
-            ax.grid(True, axis='y', linestyle='--', alpha=0.7)
+            plt.xlabel('Epoch')
+            plt.ylabel('Loss')
+            plt.title(f'{title} - Loss Curves')
+            plt.legend()
+            plt.grid(True, alpha=0.3)
             
-            # Rotate x labels for better readability
-            plt.setp(ax.get_xticklabels(), rotation=45, ha='right')
-        else:
-            ax.text(0.5, 0.5, "Tidak ada data metrik akurasi", 
-                  ha='center', va='center', fontsize=14)
-            ax.set_title("Metrik Akurasi", size=16)
-    
-    def _create_tradeoff_plot(
-        self, 
-        ax: plt.Axes, 
-        df: pd.DataFrame, 
-        metric_cols: List[str],
-        time_col: Optional[str]
-    ) -> None:
+            output_path = self.output_dir / f"{output_filename}_loss.png"
+            plt.savefig(output_path, dpi=self.dpi)
+            plt.close()
+            
+            visualization_paths['loss'] = str(output_path)
+        
+        # Learning rate curve
+        if 'learning_rates' in metrics_history and 'epochs' in metrics_history:
+            plt.figure(figsize=self.figsize)
+            
+            epochs = metrics_history['epochs']
+            learning_rates = metrics_history['learning_rates']
+            
+            plt.plot(epochs, learning_rates, 'g-', linewidth=2)
+            plt.xlabel('Epoch')
+            plt.ylabel('Learning Rate')
+            plt.title(f'{title} - Learning Rate Schedule')
+            plt.grid(True, alpha=0.3)
+            plt.yscale('log')
+            
+            output_path = self.output_dir / f"{output_filename}_lr.png"
+            plt.savefig(output_path, dpi=self.dpi)
+            plt.close()
+            
+            visualization_paths['learning_rate'] = str(output_path)
+        
+        # Metrik tambahan dari epoch_metrics
+        if 'epoch_metrics' in metrics_history and len(metrics_history['epoch_metrics']) > 0:
+            df = pd.DataFrame(metrics_history['epoch_metrics'])
+            
+            # Plot metrik selain loss dan learning rate
+            for col in df.columns:
+                if col not in ['epoch', 'train_loss', 'val_loss', 'learning_rate']:
+                    if df[col].dtype in [np.float64, np.float32, np.int64, np.int32]:
+                        plt.figure(figsize=self.figsize)
+                        plt.plot(df['epoch'], df[col], 'o-', linewidth=2, color=self.colors[0])
+                        plt.xlabel('Epoch')
+                        plt.ylabel(col)
+                        plt.title(f'{title} - {col} per Epoch')
+                        plt.grid(True, alpha=0.3)
+                        
+                        output_path = self.output_dir / f"{output_filename}_{col}.png"
+                        plt.savefig(output_path, dpi=self.dpi)
+                        plt.close()
+                        
+                        visualization_paths[col] = str(output_path)
+        
+        return visualization_paths
+
+    def visualize_parameter_comparison(
+        self,
+        results: Dict[str, Dict[str, Dict[str, Any]]],
+        parameter_name: str,
+        metrics: List[str] = None,
+        title: str = "Perbandingan Parameter",
+        output_filename: str = "parameter_comparison"
+    ) -> Dict[str, str]:
         """
-        Buat plot trade-off akurasi vs kecepatan.
+        Visualisasikan perbandingan hasil dengan parameter berbeda.
         
         Args:
-            ax: Axes untuk plot
-            df: DataFrame data
-            metric_cols: Kolom metrik
-            time_col: Kolom waktu
+            results: Dictionary hasil eksperimen per backbone dan parameter
+            parameter_name: Nama parameter yang dibandingkan
+            metrics: List metrik yang akan divisualisasikan
+            title: Judul visualisasi
+            output_filename: Nama file output (tanpa ekstensi)
+            
+        Returns:
+            Dictionary path visualisasi yang dibuat
         """
-        if metric_cols and time_col:
-            # Pilih metrik representatif (F1 atau mAP)
-            repr_metric = 'mAP' if 'mAP' in metric_cols else 'F1-Score' if 'F1-Score' in metric_cols else metric_cols[0]
-            model_col = next((col for col in df.columns if col in 
-                           ['Model', 'Backbone', 'Arsitektur']), None)
+        if metrics is None:
+            metrics = ['mAP', 'precision', 'recall', 'f1', 'inference_time']
             
-            # Scatter plot
-            ax.scatter(
-                df[time_col], 
-                df[repr_metric], 
-                s=100, 
-                alpha=0.7
-            )
+        visualization_paths = {}
+        
+        # Siapkan data
+        backbones = list(results.keys())
+        parameters = set()
+        
+        # Dapatkan semua parameter values
+        for backbone, params in results.items():
+            for param in params.keys():
+                if param != 'error':
+                    parameters.add(param)
+        
+        parameters = sorted(list(parameters))
+        
+        # Buat visualisasi untuk setiap metrik
+        for metric in metrics:
+            # Buat figure
+            plt.figure(figsize=self.figsize)
             
-            # Tambahkan label pada setiap titik
-            for i, row in df.iterrows():
-                model_name = row[model_col] if model_col and model_col in row else f"Model {i}"
-                ax.annotate(
-                    model_name,
-                    (row[time_col], row[repr_metric]),
-                    xytext=(5, 5),
-                    textcoords="offset points"
-                )
+            # Width untuk bar groups
+            width = 0.8 / len(backbones)
             
-            ax.set_title("Trade-off Akurasi vs Kecepatan", size=16)
-            ax.set_xlabel(f"{time_col} (semakin kecil semakin baik →)", size=14)
-            ax.set_ylabel(f"{repr_metric} (%) (semakin besar semakin baik →)", size=14)
-            ax.grid(True, linestyle='--', alpha=0.7)
+            # Siapkan data untuk plot
+            for i, backbone in enumerate(backbones):
+                param_values = []
+                for param in parameters:
+                    if param in results[backbone] and 'error' not in results[backbone][param]:
+                        if 'evaluation' in results[backbone][param] and metric in results[backbone][param]['evaluation']:
+                            param_values.append(results[backbone][param]['evaluation'][metric])
+                        else:
+                            param_values.append(0)
+                    else:
+                        param_values.append(0)
+                
+                # Plot bar chart
+                x = np.arange(len(parameters))
+                offset = i * width - 0.4 + width/2
+                plt.bar(x + offset, param_values, width, label=backbone, color=self.colors[i % len(self.colors)])
             
-            # Tambahkan regions untuk interpretasi
-            self._add_tradeoff_regions(ax)
-        else:
-            ax.text(0.5, 0.5, "Data tidak cukup untuk analisis trade-off", 
-                  ha='center', va='center', fontsize=14)
-            ax.set_title("Trade-off Akurasi vs Kecepatan", size=16)
+            # Atur x-axis
+            plt.xlabel(parameter_name)
+            plt.ylabel(metric)
+            plt.title(f'{title} - {metric} per {parameter_name}')
+            plt.xticks(np.arange(len(parameters)), parameters)
+            plt.legend()
+            plt.grid(True, alpha=0.3, axis='y')
+            
+            # Simpan visualisasi
+            output_path = self.output_dir / f"{output_filename}_{metric}.png"
+            plt.savefig(output_path, dpi=self.dpi)
+            plt.close()
+            
+            visualization_paths[metric] = str(output_path)
+        
+        return visualization_paths
+    
+    def _create_radar_chart(
+        self,
+        metrics_data: Dict[str, Dict[str, float]],
+        metrics_to_show: List[str],
+        title: str = "Radar Chart Comparison",
+        output_filename: str = "radar_chart"
+    ) -> str:
+        """
+        Buat radar chart untuk perbandingan metrik utama.
+        
+        Args:
+            metrics_data: Dictionary metrik dan nilai untuk backbone
+            metrics_to_show: List metrik yang akan ditampilkan
+            title: Judul chart
+            output_filename: Nama file output (tanpa ekstensi)
+            
+        Returns:
+            Path ke file visualisasi
+        """
+        # Setup radar chart
+        fig = plt.figure(figsize=(10, 10))
+        
+        # Setup angles for radar chart
+        angles = np.linspace(0, 2*np.pi, len(metrics_to_show), endpoint=False).tolist()
+        angles += angles[:1]  # Close the loop
+        
+        ax = plt.subplot(111, polar=True)
+        
+        # Plot untuk setiap backbone
+        backbones = set()
+        for metric in metrics_to_show:
+            if metric in metrics_data:
+                for backbone in metrics_data[metric].keys():
+                    backbones.add(backbone)
+        
+        for i, backbone in enumerate(backbones):
+            values = []
+            for metric in metrics_to_show:
+                if metric in metrics_data and backbone in metrics_data[metric]:
+                    values.append(metrics_data[metric][backbone])
+                else:
+                    values.append(0)
+            
+            # Close the loop
+            values += values[:1]
+            
+            # Plot values
+            ax.plot(angles, values, 'o-', linewidth=2, label=backbone, color=self.colors[i % len(self.colors)])
+            ax.fill(angles, values, alpha=0.1, color=self.colors[i % len(self.colors)])
+        
+        # Set labels
+        ax.set_thetagrids(np.degrees(angles[:-1]), metrics_to_show)
+        ax.set_ylim(0, 1)
+        plt.legend(loc='upper right')
+        plt.title(title)
+        
+        # Simpan visualisasi
+        output_path = self.output_dir / f"{output_filename}.png"
+        plt.savefig(output_path, dpi=self.dpi)
+        plt.close()
+        
+        return str(output_path)

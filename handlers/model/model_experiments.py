@@ -1,23 +1,20 @@
 # File: smartcash/handlers/model/model_experiments.py
 # Author: Alfrida Sabar
-# Deskripsi: Handler untuk menjalankan eksperimen model dengan konfigurasi berbeda
+# Deskripsi: Kelas untuk melakukan berbagai eksperimen model di SmartCash
 
-import time
-import torch
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Optional, Any, List, Union, Tuple
 from pathlib import Path
+import json
+import time
 
-from smartcash.utils.logger import SmartCashLogger
-from smartcash.handlers.model.model_factory import ModelFactory
-from smartcash.handlers.model.model_trainer import ModelTrainer
-from smartcash.handlers.model.model_evaluator import ModelEvaluator
+from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.exceptions.base import ModelError
+from smartcash.utils.visualization import ExperimentVisualizer  # Menggunakan visualizer yang sudah ada
 
 class ModelExperiments:
     """
-    Handler untuk menjalankan dan membandingkan berbagai eksperimen model
-    dengan konfigurasi yang berbeda.
+    Kelas untuk melakukan berbagai eksperimen model di SmartCash.
+    Menyediakan antarmuka sederhana untuk berbagai jenis eksperimen.
     """
     
     def __init__(
@@ -29,318 +26,362 @@ class ModelExperiments:
         Inisialisasi model experiments.
         
         Args:
-            config: Konfigurasi dasar
+            config: Konfigurasi model dan training
             logger: Custom logger (opsional)
         """
         self.config = config
-        self.logger = logger or SmartCashLogger(__name__)
+        self.logger = logger or get_logger("model_experiments")
         
-        # Setup factories dan handlers
-        self.model_factory = ModelFactory(config, logger)
-        self.trainer = ModelTrainer(config, logger)
-        self.evaluator = ModelEvaluator(config, logger)
+        # Lazy-loaded managers
+        self._experiment_manager = None
+        self._backbone_comparator = None
         
-        # Hasil eksperimen
-        self.results = {}
-        
-        # Output direktori
-        self.output_dir = Path(config.get('output_dir', 'runs/experiments'))
+        # Setup output directory
+        self.output_dir = Path(config.get('output_dir', 'runs/train')) / "experiments"
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        self.logger.info(f"🧪 ModelExperiments diinisialisasi")
+        # Inisialisasi visualizer dari utils/visualization
+        self.visualizer = ExperimentVisualizer(
+            output_dir=str(self.output_dir / "visualizations")
+        )
+        
+        self.logger.info(f"🧪 ModelExperiments diinisialisasi, output: {self.output_dir}")
     
-    def run_experiment(
-        self,
-        scenario: Dict,
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader
-    ) -> Dict:
-        """
-        Jalankan eksperimen berdasarkan skenario.
-        
-        Args:
-            scenario: Konfigurasi skenario eksperimen
-            train_loader: DataLoader untuk training
-            val_loader: DataLoader untuk validasi
-            test_loader: DataLoader untuk testing
-            
-        Returns:
-            Dict berisi hasil eksperimen
-        """
-        self.logger.info(f"🧪 Memulai eksperimen: {scenario['name']}")
-        self.logger.info(f"📝 Deskripsi: {scenario['description']}")
-        
-        # Simpan konfigurasi awal
-        original_config = self.config.copy()
-        
-        try:
-            # Update konfigurasi sesuai skenario
-            experiment_config = original_config.copy()
-            if 'backbone' in scenario:
-                experiment_config['model'] = experiment_config.get('model', {})
-                experiment_config['model']['backbone'] = scenario['backbone']
-                
-            if 'learning_rate' in scenario:
-                experiment_config['training'] = experiment_config.get('training', {})
-                experiment_config['training']['learning_rate'] = scenario['learning_rate']
-                
-            if 'batch_size' in scenario:
-                experiment_config['training'] = experiment_config.get('training', {})
-                experiment_config['training']['batch_size'] = scenario['batch_size']
-            
-            # Buat trainer dan evaluator khusus untuk eksperimen ini
-            experiment_trainer = ModelTrainer(experiment_config, self.logger)
-            experiment_evaluator = ModelEvaluator(experiment_config, self.logger)
-                
-            # Buat model sesuai skenario
-            model = self.model_factory.create_model(
-                backbone_type=scenario.get('backbone')
-            )
-            
-            # Training model dengan skenario
-            training_results = experiment_trainer.train(
-                train_loader=train_loader,
-                val_loader=val_loader,
-                model=model
-            )
-            
-            # Evaluasi model pada test set
-            eval_metrics = experiment_evaluator.evaluate(
-                test_loader=test_loader,
-                checkpoint_path=training_results['best_checkpoint_path']
-            )
-            
-            # Tambahkan metrik evaluasi ke hasil
-            full_results = {
-                **training_results,
-                'metrics': eval_metrics,
-                'scenario': scenario
-            }
-            
-            # Simpan hasil
-            self.results[scenario['name']] = full_results
-            
-            # Log hasil
-            self.logger.success(
-                f"✅ Eksperimen selesai: {scenario['name']}\n"
-                f"📊 Hasil:\n"
-                f"   • Best Val Loss: {training_results.get('best_val_loss', 'N/A'):.4f}\n"
-                f"   • Test Accuracy: {eval_metrics.get('accuracy', 'N/A'):.4f}\n"
-                f"   • Precision: {eval_metrics.get('precision', 'N/A'):.4f}\n"
-                f"   • Recall: {eval_metrics.get('recall', 'N/A'):.4f}\n"
-                f"   • F1 Score: {eval_metrics.get('f1', 'N/A'):.4f}\n"
-                f"   • Inference Time: {eval_metrics.get('inference_time', 'N/A')*1000:.2f} ms/batch"
-            )
-            
-            return full_results
-            
-        except Exception as e:
-            self.logger.error(f"❌ Eksperimen gagal: {str(e)}")
-            raise e
+    @property
+    def experiment_manager(self):
+        """Lazy-loaded experiment manager."""
+        if self._experiment_manager is None:
+            from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
+            self._experiment_manager = ExperimentManager(self.config, self.logger)
+        return self._experiment_manager
     
-    def run_multiple_experiments(
-        self,
-        scenarios: List[Dict],
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader
-    ) -> Dict[str, Dict]:
-        """
-        Jalankan beberapa eksperimen dan bandingkan hasilnya.
-        
-        Args:
-            scenarios: List skenario eksperimen
-            train_loader: DataLoader untuk training
-            val_loader: DataLoader untuk validasi
-            test_loader: DataLoader untuk testing
-            
-        Returns:
-            Dict berisi hasil semua eksperimen
-        """
-        all_results = {}
-        
-        for i, scenario in enumerate(scenarios):
-            self.logger.info(f"🧪 Eksperimen {i+1}/{len(scenarios)}: {scenario['name']}")
-            
-            try:
-                result = self.run_experiment(
-                    scenario=scenario,
-                    train_loader=train_loader,
-                    val_loader=val_loader,
-                    test_loader=test_loader
-                )
-                
-                all_results[scenario['name']] = result
-                
-            except Exception as e:
-                self.logger.error(f"❌ Eksperimen {scenario['name']} gagal: {str(e)}")
-                all_results[scenario['name']] = {'error': str(e)}
-        
-        # Buat perbandingan
-        self._compare_experiments(all_results)
-        
-        return all_results
-    
-    def _compare_experiments(self, results: Dict[str, Dict]) -> None:
-        """
-        Bandingkan hasil beberapa eksperimen dan tampilkan dalam bentuk tabel.
-        
-        Args:
-            results: Dict berisi hasil eksperimen
-        """
-        try:
-            # Ekstrak metrik untuk perbandingan
-            comparison_data = []
-            
-            for name, result in results.items():
-                if 'error' in result:
-                    # Skip eksperimen yang gagal
-                    continue
-                
-                metrics = result.get('metrics', {})
-                
-                experiment_data = {
-                    'Eksperimen': name,
-                    'Backbone': result.get('scenario', {}).get('backbone', 'N/A'),
-                    'Akurasi': metrics.get('accuracy', 0) * 100,
-                    'Presisi': metrics.get('precision', 0) * 100,
-                    'Recall': metrics.get('recall', 0) * 100,
-                    'F1 Score': metrics.get('f1', 0) * 100,
-                    'mAP': metrics.get('mAP', 0) * 100,
-                    'Inference Time (ms)': metrics.get('inference_time', 0) * 1000,
-                    'Best Val Loss': result.get('best_val_loss', 0)
-                }
-                
-                comparison_data.append(experiment_data)
-            
-            # Buat dataframe
-            if comparison_data:
-                df = pd.DataFrame(comparison_data)
-                
-                # Simpan ke CSV
-                csv_path = self.output_dir / "experiments_comparison.csv"
-                df.to_csv(csv_path, index=False)
-                
-                # Log tabel perbandingan
-                self.logger.info(f"📊 Perbandingan Eksperimen:")
-                
-                # Format tabel untuk logger
-                table_str = "\n"
-                headers = ["Eksperimen", "Backbone", "Akurasi", "F1", "Inf. Time"]
-                
-                # Header
-                header_row = "| " + " | ".join(headers) + " |"
-                separator = "|-" + "-|-".join(["-" * len(h) for h in headers]) + "-|"
-                table_str += header_row + "\n" + separator + "\n"
-                
-                # Rows
-                for data in comparison_data:
-                    row = f"| {data['Eksperimen']} | {data['Backbone']} | "
-                    row += f"{data['Akurasi']:.2f}% | {data['F1 Score']:.2f}% | "
-                    row += f"{data['Inference Time (ms)']:.2f}ms |"
-                    table_str += row + "\n"
-                
-                self.logger.info(table_str)
-                self.logger.info(f"💾 Hasil lengkap tersimpan di {csv_path}")
-                
-        except Exception as e:
-            self.logger.error(f"❌ Gagal membandingkan eksperimen: {str(e)}")
+    @property
+    def backbone_comparator(self):
+        """Lazy-loaded backbone comparator."""
+        if self._backbone_comparator is None:
+            from smartcash.handlers.model.experiments.backbone_comparator import BackboneComparator
+            self._backbone_comparator = BackboneComparator(
+                self.config, 
+                self.logger, 
+                self.experiment_manager
+            )
+        return self._backbone_comparator
     
     def compare_backbones(
         self,
         backbones: List[str],
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader
-    ) -> Dict[str, Dict]:
+        train_loader,
+        val_loader,
+        test_loader = None,
+        parallel: bool = False,
+        visualize: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Bandingkan performa berbagai backbone.
+        Bandingkan beberapa backbone dengan kondisi yang sama.
         
         Args:
-            backbones: List backbone yang akan dibandingkan
+            backbones: List backbone untuk dibandingkan
             train_loader: DataLoader untuk training
             val_loader: DataLoader untuk validasi
-            test_loader: DataLoader untuk testing
+            test_loader: DataLoader untuk testing (opsional)
+            parallel: Jalankan perbandingan secara paralel
+            visualize: Buat visualisasi hasil
+            **kwargs: Parameter tambahan
             
         Returns:
-            Dict berisi hasil eksperimen untuk setiap backbone
+            Dict hasil perbandingan
         """
-        # Buat skenario untuk setiap backbone
-        scenarios = [
-            {
-                'name': f"Backbone-{backbone}",
-                'description': f"Evaluasi model dengan backbone {backbone}",
-                'backbone': backbone
-            }
-            for backbone in backbones
-        ]
-        
-        # Jalankan eksperimen
-        return self.run_multiple_experiments(
-            scenarios=scenarios,
+        # Jalankan eksperimen perbandingan backbone
+        results = self.experiment_manager.compare_backbones(
+            backbones=backbones,
             train_loader=train_loader,
             val_loader=val_loader,
-            test_loader=test_loader
+            test_loader=test_loader,
+            parallel=parallel,
+            **kwargs
         )
+        
+        # Buat visualisasi jika diminta menggunakan ExperimentVisualizer
+        if visualize and 'results' in results:
+            experiment_name = results.get('experiment_name', f"backbone_comparison_{int(time.time())}")
+            
+            # Visualisasi perbandingan backbone
+            viz_paths = self.visualizer.visualize_backbone_comparison(
+                results['results'],
+                title=f"Perbandingan Backbone - {experiment_name}",
+                output_filename=f"{experiment_name}_backbone"
+            )
+            
+            # Tambahkan path visualisasi ke hasil
+            if 'visualization_paths' not in results:
+                results['visualization_paths'] = {}
+                
+            results['visualization_paths'].update(viz_paths)
+            
+            # Visualisasi training curves untuk setiap backbone
+            for backbone, backbone_results in results['results'].items():
+                if 'error' not in backbone_results and 'metrics_history' in backbone_results:
+                    training_viz_paths = self.visualizer.visualize_training_curves(
+                        backbone_results['metrics_history'],
+                        title=f"Training Progress - {backbone}",
+                        output_filename=f"{experiment_name}_{backbone}_training"
+                    )
+                    
+                    if backbone not in results['visualization_paths']:
+                        results['visualization_paths'][backbone] = {}
+                        
+                    results['visualization_paths'][backbone].update(training_viz_paths)
+            
+            self.logger.info(f"📊 Visualisasi perbandingan backbone dibuat: {len(viz_paths)} plot")
+        
+        return results
     
-    def hyperparameter_tuning(
+    def compare_image_sizes(
         self,
-        param_grid: Dict[str, List],
-        train_loader: torch.utils.data.DataLoader,
-        val_loader: torch.utils.data.DataLoader,
-        test_loader: torch.utils.data.DataLoader,
-        max_experiments: Optional[int] = None
-    ) -> Dict[str, Dict]:
+        backbones: List[str],
+        image_sizes: List[List[int]],
+        train_loader,
+        val_loader,
+        test_loader = None,
+        visualize: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
         """
-        Lakukan grid search untuk hyperparameter tuning.
+        Bandingkan backbone dengan ukuran gambar yang berbeda.
         
         Args:
-            param_grid: Dict parameter dan nilai yang akan dievaluasi
+            backbones: List backbone untuk dibandingkan
+            image_sizes: List ukuran gambar untuk dibandingkan
             train_loader: DataLoader untuk training
             val_loader: DataLoader untuk validasi
-            test_loader: DataLoader untuk testing
-            max_experiments: Maksimum jumlah eksperimen (opsional)
+            test_loader: DataLoader untuk testing (opsional)
+            visualize: Buat visualisasi hasil
+            **kwargs: Parameter tambahan
             
         Returns:
-            Dict berisi hasil eksperimen untuk setiap kombinasi parameter
+            Dict hasil perbandingan
         """
-        from itertools import product
-        
-        # Generate kombinasi parameter
-        param_names = list(param_grid.keys())
-        param_values = list(param_grid.values())
-        combinations = list(product(*param_values))
-        
-        # Batasi jumlah eksperimen jika diperlukan
-        if max_experiments is not None and len(combinations) > max_experiments:
-            import random
-            random.shuffle(combinations)
-            combinations = combinations[:max_experiments]
-            
-        # Buat skenario untuk setiap kombinasi parameter
-        scenarios = []
-        for combo in combinations:
-            param_combo = {name: value for name, value in zip(param_names, combo)}
-            
-            # Generate nama eksperimen
-            scenario_name = "_".join([f"{k}-{v}" for k, v in param_combo.items()])
-            
-            # Buat skenario
-            scenario = {
-                'name': f"HPTuning-{scenario_name}",
-                'description': f"Tuning dengan parameter: {param_combo}",
-                **param_combo  # Tambahkan parameter sebagai atribut skenario
-            }
-            
-            scenarios.append(scenario)
-        
-        # Jalankan semua skenario
-        self.logger.info(f"🧪 Menjalankan {len(scenarios)} eksperimen hyperparameter tuning")
-        
-        return self.run_multiple_experiments(
-            scenarios=scenarios,
+        # Jalankan eksperimen perbandingan ukuran gambar
+        results = self.backbone_comparator.compare_with_image_sizes(
+            backbones=backbones,
+            image_sizes=image_sizes,
             train_loader=train_loader,
             val_loader=val_loader,
-            test_loader=test_loader
+            test_loader=test_loader,
+            **kwargs
         )
+        
+        # Buat visualisasi jika diminta menggunakan ExperimentVisualizer
+        if visualize and 'results' in results:
+            experiment_name = results.get('experiment_name', f"image_size_comparison_{int(time.time())}")
+            
+            # Visualisasi untuk setiap backbone
+            for backbone, sizes_results in results['results'].items():
+                if 'error' in sizes_results:
+                    continue
+                    
+                # Filter hasil yang tidak error
+                valid_results = {
+                    size: result for size, result in sizes_results.items() 
+                    if 'error' not in result
+                }
+                
+                # Visualisasi parameter comparison
+                viz_paths = self.visualizer.visualize_parameter_comparison(
+                    {backbone: valid_results},
+                    parameter_name="Image Size",
+                    title=f"{backbone} - Perbandingan Ukuran Gambar",
+                    output_filename=f"{experiment_name}_{backbone}_sizes"
+                )
+                
+                # Tambahkan path visualisasi ke hasil
+                if 'visualization_paths' not in results:
+                    results['visualization_paths'] = {}
+                    
+                if backbone not in results['visualization_paths']:
+                    results['visualization_paths'][backbone] = {}
+                    
+                results['visualization_paths'][backbone].update(viz_paths)
+            
+            self.logger.info(f"📊 Visualisasi perbandingan ukuran gambar dibuat")
+        
+        return results
+    
+    def compare_augmentations(
+        self,
+        backbones: List[str],
+        augmentation_types: List[str],
+        train_loader,
+        val_loader,
+        test_loader = None,
+        visualize: bool = True,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Bandingkan backbone dengan tipe augmentasi yang berbeda.
+        
+        Args:
+            backbones: List backbone untuk dibandingkan
+            augmentation_types: List tipe augmentasi untuk dibandingkan
+            train_loader: DataLoader untuk training
+            val_loader: DataLoader untuk validasi
+            test_loader: DataLoader untuk testing (opsional)
+            visualize: Buat visualisasi hasil
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Dict hasil perbandingan
+        """
+        # Jalankan eksperimen perbandingan augmentasi
+        results = self.backbone_comparator.compare_with_augmentations(
+            backbones=backbones,
+            augmentation_types=augmentation_types,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            **kwargs
+        )
+        
+        # Buat visualisasi jika diminta menggunakan ExperimentVisualizer
+        if visualize and 'results' in results:
+            experiment_name = results.get('experiment_name', f"augmentation_comparison_{int(time.time())}")
+            
+            # Visualisasi untuk setiap backbone
+            for backbone, aug_results in results['results'].items():
+                if 'error' in aug_results:
+                    continue
+                    
+                # Filter hasil yang tidak error
+                valid_results = {
+                    aug: result for aug, result in aug_results.items()
+                    if 'error' not in result
+                }
+                
+                # Visualisasi parameter comparison
+                viz_paths = self.visualizer.visualize_parameter_comparison(
+                    {backbone: valid_results},
+                    parameter_name="Augmentation Type",
+                    title=f"{backbone} - Perbandingan Tipe Augmentasi",
+                    output_filename=f"{experiment_name}_{backbone}_augmentations"
+                )
+                
+                # Tambahkan path visualisasi ke hasil
+                if 'visualization_paths' not in results:
+                    results['visualization_paths'] = {}
+                    
+                if backbone not in results['visualization_paths']:
+                    results['visualization_paths'][backbone] = {}
+                    
+                results['visualization_paths'][backbone].update(viz_paths)
+            
+            self.logger.info(f"📊 Visualisasi perbandingan tipe augmentasi dibuat")
+        
+        return results
+    
+    def analyze_results(
+        self,
+        result_path: Union[str, Path],
+        output_format: str = 'markdown',
+        **kwargs
+    ) -> Union[str, Dict[str, Any]]:
+        """
+        Analisis hasil eksperimen yang sudah disimpan.
+        
+        Args:
+            result_path: Path ke file hasil eksperimen
+            output_format: Format output ('markdown', 'json', 'dict')
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Hasil analisis dalam format yang diminta
+        """
+        try:
+            # Load hasil eksperimen
+            path = Path(result_path)
+            if not path.exists():
+                raise ModelError(f"File hasil eksperimen tidak ditemukan: {path}")
+            
+            # Baca hasil
+            with open(path, 'r') as f:
+                results = json.load(f)
+            
+            # Proses hasil analisis menjadi format yang diminta
+            if output_format == 'json':
+                return json.dumps(results, indent=2)
+            elif output_format == 'dict':
+                return results
+            else:  # markdown
+                return self._create_markdown_analysis(results)
+        
+        except Exception as e:
+            self.logger.error(f"❌ Gagal menganalisis hasil eksperimen: {str(e)}")
+            raise ModelError(f"Gagal menganalisis hasil eksperimen: {str(e)}")
+    
+    def _create_markdown_analysis(self, results: Dict[str, Any]) -> str:
+        """
+        Buat analisis dalam format Markdown.
+        
+        Args:
+            results: Hasil eksperimen
+            
+        Returns:
+            Markdown analisis
+        """
+        markdown = f"# Analisis Hasil Eksperimen\n\n"
+        
+        # Informasi eksperimen
+        markdown += "## Informasi Eksperimen\n\n"
+        
+        for key, value in results.items():
+            if key not in ['results', 'summary', 'visualization_paths']:
+                markdown += f"- **{key}**: {value}\n"
+        
+        # Ringkasan
+        if 'summary' in results:
+            summary = results['summary']
+            
+            # Backbone atau kombinasi terbaik
+            if 'best_backbone' in summary:
+                markdown += f"\n## 🏆 Backbone Terbaik: {summary['best_backbone']}\n\n"
+                markdown += f"- **Metrik**: {summary.get('best_metric', 'unknown')}\n"
+                markdown += f"- **Nilai**: {summary.get('best_value', 0):.4f}\n"
+            
+            # Perbandingan metrik
+            if 'metrics_comparison' in summary:
+                markdown += "\n## Perbandingan Metrik\n\n"
+                
+                for metric, data in summary['metrics_comparison'].items():
+                    if not isinstance(data, dict):
+                        continue
+                        
+                    markdown += f"### {metric}\n\n"
+                    markdown += f"- **Best**: {data.get('best_backbone', 'N/A')} ({data.get('best_value', 0):.4f})\n"
+                    markdown += f"- **Average**: {data.get('average', 0):.4f}\n"
+        
+        # Visualisasi
+        if 'visualization_paths' in results:
+            viz_paths = results['visualization_paths']
+            
+            if isinstance(viz_paths, dict):
+                markdown += "\n## Visualisasi\n\n"
+                
+                # Visualisasi umum
+                for name, path in viz_paths.items():
+                    if isinstance(path, str):
+                        # Dapatkan path relatif jika mungkin
+                        rel_path = path
+                        markdown += f"- [{name.replace('_', ' ').title()}]({rel_path})\n"
+                    elif isinstance(path, dict):
+                        # Lewati, ini backbone atau parameter tertentu
+                        pass
+                
+                # Visualisasi per backbone
+                for name, paths in viz_paths.items():
+                    if isinstance(paths, dict):
+                        markdown += f"\n### {name}\n\n"
+                        for viz_name, viz_path in paths.items():
+                            rel_path = viz_path
+                            markdown += f"- [{viz_name.replace('_', ' ').title()}]({rel_path})\n"
+        
+        return markdown

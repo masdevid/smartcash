@@ -3,7 +3,7 @@
 # Deskripsi: Kelas dasar untuk facade dataset yang mengelola komponen-komponen utama
 
 from pathlib import Path
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Callable
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
@@ -56,7 +56,7 @@ class DatasetBaseFacade:
             f"   • Layers aktif: {self.active_layers}"
         )
     
-    def _get_component(self, component_id: str, factory_func) -> Any:
+    def _get_component(self, component_id: str, factory_func: Callable) -> Any:
         """
         Dapatkan komponen dengan lazy initialization.
         

@@ -8,7 +8,6 @@ from smartcash.handlers.dataset.core.dataset_transformer import DatasetTransform
 from smartcash.handlers.dataset.core.dataset_validator import DatasetValidator
 from smartcash.handlers.dataset.core.dataset_augmentor import DatasetAugmentor
 from smartcash.handlers.dataset.core.dataset_balancer import DatasetBalancer
-from smartcash.handlers.dataset.core.dataset_explorer import DatasetExplorer
 
 # Export semua komponen publik
 __all__ = [
@@ -18,5 +17,4 @@ __all__ = [
     'DatasetValidator',
     'DatasetAugmentor',
     'DatasetBalancer',
-    'DatasetExplorer',
 ]

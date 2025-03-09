@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.dataset import EnhancedDatasetValidator
 from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.handlers.dataset.multilayer_label_handler import MultilayerLabelHandler
+from smartcash.handlers.dataset.multilayer.multilayer_label_handler import MultilayerLabelHandler
 
 
 class DatasetValidatorAdapter:

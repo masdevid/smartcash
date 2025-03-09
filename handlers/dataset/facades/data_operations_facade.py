@@ -8,7 +8,7 @@ from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFa
 from smartcash.handlers.dataset.operations.dataset_split_operation import DatasetSplitOperation
 from smartcash.handlers.dataset.operations.dataset_merge_operation import DatasetMergeOperation
 from smartcash.handlers.dataset.operations.dataset_reporting_operation import DatasetReportingOperation
-from smartcash.handlers.dataset.core.dataset_explorer import DatasetExplorer
+from smartcash.handlers.dataset.explorers.dataset_explorer_facade import DatasetExplorerFacade
 
 
 class DataOperationsFacade(DatasetBaseFacade):
@@ -18,9 +18,10 @@ class DataOperationsFacade(DatasetBaseFacade):
     """
     
     @property
-    def explorer(self) -> DatasetExplorer:
+    def explorer(self) -> DatasetExplorerFacade:
         """Akses ke komponen explorer dengan lazy initialization."""
-        return self._get_component('explorer', lambda: DatasetExplorer(
+        return self._get_component('explorer', lambda: DatasetExplorerFacade(
+            config=self.config,
             data_dir=str(self.data_dir),
             logger=self.logger
         ))
@@ -50,7 +51,7 @@ class DataOperationsFacade(DatasetBaseFacade):
             logger=self.logger
         ))
     
-    # ===== Metode dari DatasetExplorer =====
+    # ===== Metode dari DatasetExplorerFacade =====
     
     def get_split_statistics(self) -> Dict[str, Dict[str, int]]:
         """

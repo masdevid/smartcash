@@ -3,7 +3,7 @@
 # Deskripsi: Facade khusus untuk operasi loading data dan dataloader
 
 import torch
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 
 from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFacade
 from smartcash.handlers.dataset.core.dataset_loader import DatasetLoader

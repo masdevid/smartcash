@@ -29,7 +29,7 @@
 - `base_evaluation_handler.py`: Base evaluation handler
 - `evaluator.py`: Core evaluation functionality
 
-### UI Handlers (`handlers/ui_handlers/`)
+### UI Handlers (`smartcash/ui_handlers/`)
 - `config_handlers.py` (17KB): Configuration UI handling
 - `model_handlers.py` (36KB): Model UI operations
 - `repository_handlers.py` (10KB): Repository management

@@ -8,7 +8,7 @@ from pathlib import Path
 from smartcash.ui_components.data_components import create_split_dataset_ui
 
 # Import handler
-from smartcash.handlers.ui_handlers.data_handlers import setup_split_dataset_handlers
+from smartcash.ui_handlers.data_handlers import setup_split_dataset_handlers
 
 # Pastikan objek global tersedia
 try:

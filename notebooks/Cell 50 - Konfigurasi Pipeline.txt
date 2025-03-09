@@ -6,7 +6,7 @@ from IPython.display import display
 
 # Import UI components dan handlers
 from smartcash.ui_components.config_components import create_pipeline_config_ui
-from smartcash.handlers.ui_handlers.config_handlers import setup_pipeline_config_handlers
+from smartcash.ui_handlers.config_handlers import setup_pipeline_config_handlers
 
 # Import centralized managers
 from smartcash.utils.config_manager import ConfigManager

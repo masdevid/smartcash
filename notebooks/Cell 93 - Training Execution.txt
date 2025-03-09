@@ -7,8 +7,8 @@ import torch
 
 # Import UI components dan handlers
 from smartcash.ui_components.training_components import create_training_ui
-from smartcash.handlers.ui_handlers.training_execution_handlers import setup_training_handlers
-from smartcash.handlers.ui_handlers.common_utils import memory_manager
+from smartcash.ui_handlers.training_execution_handlers import setup_training_handlers
+from smartcash.ui_handlers.common_utils import memory_manager
 
 # Import centralized managers
 from smartcash.utils.config_manager import ConfigManager

@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Import UI components dan handlers
 from smartcash.ui_components.directory_components import create_directory_ui
-from smartcash.handlers.ui_handlers.directory_handlers import setup_directory_handlers
+from smartcash.ui_handlers.directory_handlers import setup_directory_handlers
 
 # Buat UI components
 ui_components = create_directory_ui()

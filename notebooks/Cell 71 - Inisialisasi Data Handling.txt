@@ -17,7 +17,7 @@ if os.getcwd() not in sys.path:
 from smartcash.ui_components.data_components import create_data_handling_ui
 
 # Import handler komponen UI
-from smartcash.handlers.ui_handlers.data_handlers import (
+from smartcash.ui_handlers.data_handlers import (
     setup_dataset_info_handlers,
     setup_split_dataset_handlers,
     check_data_availability,

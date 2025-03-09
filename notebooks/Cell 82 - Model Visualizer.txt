@@ -6,7 +6,7 @@ import pickle
 
 # Import komponen UI dan handler
 from smartcash.ui_components.model_components import create_model_visualizer_ui
-from smartcash.handlers.ui_handlers.model_handlers import setup_model_visualizer_handlers
+from smartcash.ui_handlers.model_handlers import setup_model_visualizer_handlers
 
 # Setup logger
 from smartcash.utils.logger import get_logger

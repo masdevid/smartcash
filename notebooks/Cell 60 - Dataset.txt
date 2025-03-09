@@ -7,7 +7,7 @@ import yaml
 
 # Import UI components dan handlers
 from smartcash.ui_components.dataset_components import create_dataset_ui
-from smartcash.handlers.ui_handlers.dataset_handlers import setup_dataset_handlers
+from smartcash.ui_handlers.dataset_handlers import setup_dataset_handlers
 from smartcash.utils.roboflow_downloader import RoboflowDownloader
 
 # ===== 1. CEK GOOGLE COLAB & MOUNT DRIVE =====

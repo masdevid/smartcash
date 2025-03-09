@@ -3,7 +3,7 @@
 # ===== 1. IMPORT MODULES =====
 # Import UI components dan handlers
 from smartcash.ui_components.data_components import create_dataset_info_ui
-from smartcash.handlers.ui_handlers.data_handlers import setup_dataset_info_handlers
+from smartcash.ui_handlers.data_handlers import setup_dataset_info_handlers
 
 # Import centralized managers
 from smartcash.utils.config_manager import ConfigManager

@@ -10,7 +10,7 @@ from contextlib import contextmanager
 
 # Impor komponen UI dan handler
 from smartcash.ui_components.model_components import create_model_initialization_ui
-from smartcash.handlers.ui_handlers.model_handlers import setup_model_initialization_handlers
+from smartcash.ui_handlers.model_handlers import setup_model_initialization_handlers
 
 # ===== 1. ENVIRONMENT SETUP =====
 # Add smartcash to PYTHONPATH

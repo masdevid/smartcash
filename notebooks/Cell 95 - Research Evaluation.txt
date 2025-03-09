@@ -7,7 +7,7 @@ from IPython.display import display
 
 # Import UI components dan handlers
 from smartcash.ui_components.research_components import create_research_ui
-from smartcash.handlers.ui_handlers.research_handlers import setup_research_handlers
+from smartcash.ui_handlers.research_handlers import setup_research_handlers
 
 # ===== 1. DEFINISI SKENARIO PENELITIAN =====
 # Definisikan skenario penelitian yang perlu dievaluasi

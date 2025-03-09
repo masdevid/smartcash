@@ -1,6 +1,6 @@
 # Cell 73 - Augmentasi Data
 from smartcash.ui_components.augmentation_components import create_augmentation_ui
-from smartcash.handlers.ui_handlers.augmentation_handlers import setup_augmentation_handlers
+from smartcash.ui_handlers.augmentation_handlers import setup_augmentation_handlers
 from smartcash.utils.optimized_augmentation import OptimizedAugmentation
 from smartcash.handlers.data_manager import DataManager
 from smartcash.utils.simple_logger import SimpleLogger

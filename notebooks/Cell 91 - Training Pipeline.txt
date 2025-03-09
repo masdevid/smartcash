@@ -20,7 +20,7 @@ logger = SimpleLogger()
 ui_components = create_training_pipeline_ui()
 
 # Setup handler dengan parameter yang konsisten
-from smartcash.handlers.ui_handlers.training_pipeline_handlers import setup_training_pipeline_handlers
+from smartcash.ui_handlers.training_pipeline_handlers import setup_training_pipeline_handlers
 components_dict = setup_training_pipeline_handlers(ui_components, config, logger)  # components_dict jelas sebagai dictionary
 
 # Display UI

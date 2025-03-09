@@ -3,7 +3,7 @@
 # ===== 1. IMPORT MODULES =====
 # Import UI components dan handlers
 from smartcash.ui_components.model_playground_components import create_model_playground_ui
-from smartcash.handlers.ui_handlers.model_playground_handlers import setup_model_playground_handlers
+from smartcash.ui_handlers.model_playground_handlers import setup_model_playground_handlers
 
 # Import centralized managers
 from smartcash.utils.config_manager import ConfigManager

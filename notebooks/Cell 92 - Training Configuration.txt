@@ -9,8 +9,8 @@ from pathlib import Path
 try:
     from smartcash.utils.logger import get_logger
     from smartcash.ui_components.training_components import create_training_config_ui
-    from smartcash.handlers.ui_handlers.training_config_handlers import setup_training_config_handlers
-    from smartcash.handlers.ui_handlers.common_utils import load_config
+    from smartcash.ui_handlers.training_config_handlers import setup_training_config_handlers
+    from smartcash.ui_handlers.common_utils import load_config
     
     logger = get_logger("training_config", log_to_console=True, log_to_file=True, log_to_colab=True)
 except Exception as e:

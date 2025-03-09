@@ -13,7 +13,7 @@ if os.getcwd() not in sys.path:
 
 # Import komponen UI dan handlers
 from smartcash.ui_components.evaluation_components import create_evaluation_ui
-from smartcash.handlers.ui_handlers.evaluation_handlers import setup_evaluation_handlers
+from smartcash.ui_handlers.evaluation_handlers import setup_evaluation_handlers
 
 # ===== 1. LOAD COMPONENTS =====
 # Memuat komponen dari training

@@ -17,6 +17,9 @@ from smartcash.utils.visualization.research_utils import (
 
 # Import dari paket analysis
 from smartcash.utils.visualization.analysis import ExperimentAnalyzer, ScenarioAnalyzer
+from smartcash.utils.visualization.result_visualizer import ResultVisualizer
+from smartcash.utils.visualization.evaluation_visualizer import EvaluationVisualizer
+
 
 # Fungsi-fungsi helper untuk visualisasi cepat
 def setup_visualization():
@@ -40,5 +43,7 @@ __all__ = [
     'find_common_metrics',
     'create_benchmark_table',
     'create_win_rate_table',
-    'setup_visualization'
+    'setup_visualization',
+    'ResultVisualizer'  ,
+    'EvaluationVisualizer'
 ]

@@ -7,7 +7,7 @@ from IPython.display import display, HTML
 from smartcash.ui_components.data_components import create_data_utils_ui
 
 # Import handler
-from smartcash.handlers.ui_handlers.data_handlers import (
+from smartcash.ui_handlers.data_handlers import (
     check_data_availability,
     visualize_batch
 )

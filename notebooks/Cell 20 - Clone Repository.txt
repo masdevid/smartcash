@@ -20,7 +20,7 @@ try:
         logger = SimpleLogger("notebook")
     
     # Import handlers untuk repository component
-    from smartcash.handlers.ui_handlers.repository_handlers import setup_repository_handlers
+    from smartcash.ui_handlers.repository_handlers import setup_repository_handlers
     
     # Buat UI components
     ui_components = create_repository_ui()

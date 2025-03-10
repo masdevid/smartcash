@@ -8,6 +8,7 @@ import os
 import time
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
 
 def create_status_indicator(status, message):
     """Buat indikator status dengan styling konsisten."""

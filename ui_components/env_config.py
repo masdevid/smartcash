@@ -18,13 +18,16 @@ def create_env_config_ui():
     # Colab info panel
     colab_panel = widgets.HTML("")
     
+    # Button group (horizontal layout)
+    button_group = widgets.HBox(layout=widgets.Layout(display='flex', flex_flow='row wrap'))
+    
     # Google Drive button
     drive_btn = widgets.Button(
         description='Connect Google Drive',
         button_style='info',
         icon='link',
         tooltip='Connect to Google Drive',
-        layout={'margin': '10px 0', 'display': 'none'}
+        layout={'margin': '10px 10px 10px 0', 'display': 'none'}
     )
     
     # Directory structure button
@@ -35,6 +38,9 @@ def create_env_config_ui():
         tooltip='Create necessary directories',
         layout={'margin': '10px 0'}
     )
+    
+    # Add buttons to horizontal group
+    button_group.children = [drive_btn, dir_btn]
     
     # Status output
     status = widgets.Output(layout={'width': '100%', 'border': '1px solid #ddd', 'min_height': '100px', 'margin': '10px 0'})
@@ -65,8 +71,7 @@ def create_env_config_ui():
     main.children = [
         header,
         colab_panel,
-        drive_btn,
-        dir_btn,
+        button_group,
         status,
         help_info
     ]

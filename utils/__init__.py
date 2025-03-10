@@ -4,11 +4,9 @@
 
 # Logging utilities
 from smartcash.utils.logger import SmartCashLogger, get_logger
-from smartcash.utils.simple_logger import SimpleLogger
 
 # Metrics and evaluation
-from smartcash.utils.metrics import MetricsCalculator
-from smartcash.utils.polygon_metrics import PolygonMetrics
+from smartcash.utils.evaluation_metrics import MetricsCalculator
 
 # Visualization tools
 from smartcash.utils.visualization import ResultVisualizer
@@ -19,22 +17,33 @@ from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.utils.preprocessing import PreprocessingPipeline
 from smartcash.utils.memory_optimizer import MemoryOptimizer
 from smartcash.utils.model_exporter import ModelExporter
-from smartcash.utils.training_pipeline import TrainingPipeline
 
 # Helper utilities
-from smartcash.utils.coordinate_normalizer import CoordinateNormalizer
+from smartcash.utils.coordinate_utils import CoordinateUtils, calculate_iou
 from smartcash.utils.experiment_tracker import ExperimentTracker
 from smartcash.utils.ui_utils import UIHelper
+
+# Configuration and environment
+from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.environment_manager import EnvironmentManager
+from smartcash.utils.layer_config_manager import LayerConfigManager, get_layer_config
+from smartcash.utils.logging_factory import LoggingFactory
+
+# Observer pattern
+from smartcash.utils.observer import (
+    EventTopics, 
+    EventDispatcher, 
+    ObserverPriority
+)
 
 __all__ = [
     # Logging utilities
     'SmartCashLogger',
     'get_logger',
-    'SimpleLogger',
+    'LoggingFactory',
     
     # Metrics and evaluation
     'MetricsCalculator',
-    'PolygonMetrics',
     
     # Visualization tools
     'ResultVisualizer',
@@ -45,10 +54,21 @@ __all__ = [
     'PreprocessingPipeline',
     'MemoryOptimizer',
     'ModelExporter',
-    'TrainingPipeline',
     
     # Helper utilities
-    'CoordinateNormalizer',
+    'CoordinateUtils',
+    'calculate_iou',
     'ExperimentTracker',
-    'UIHelper'
+    'UIHelper',
+    
+    # Configuration and environment
+    'ConfigManager',
+    'EnvironmentManager',
+    'LayerConfigManager',
+    'get_layer_config',
+    
+    # Observer pattern
+    'EventTopics',
+    'EventDispatcher',
+    'ObserverPriority'
 ]

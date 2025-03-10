@@ -2,162 +2,300 @@
 
 ## Ringkasan Perubahan Utama
 
-1. **Restrukturisasi Sistem Logging** - Penggabungan `simple_logger.py` menjadi `SmartCashLogger` yang lebih komprehensif
-2. **Paket Visualisasi Terpadu** - Migrasi dari `visualization.py` menjadi subpaket `visualization/`
-3. **Reorganisasi Utilitas Koordinat** - Penggabungan `coordinate_normalizer.py` dan `polygon_metrics.py` menjadi `coordinate_utils.py`
-4. **Restrukturisasi Training Pipeline** - Transformasi `training_pipeline.py` menjadi subpaket `training/`
-5. **Pembaruan Sistem Metrik** - Migrasi dari fungsi metrik sederhana menjadi kelas `MetricsCalculator`
-6. **Penghapusan Komponen Usang** - Penghapusan `debug_helper.py` dengan pengalihan fungsionalitasnya ke modul logger
-7. **Optimalisasi Performa** - Penerapan thread-safety, caching, dan optimasi memory
-8. **Penambahan Augmentation Utils** - Pengembangan subpaket `augmentation/` untuk memperkaya dataset
-9. **Pembaruan Dataset Utils** - Pengembangan subpaket `dataset/` untuk validasi dan analisis dataset
-10. **Refaktorisasi Enhanced Cache** - Refaktorisasi `enhanced_cache.py` menjadi subpaket `cache/` yang modular
-11. **Implementasi Observer Pattern Terkonsolidasi** - Pengembangan subpaket `observer/` untuk menggantikan implementasi observer yang tersebar di berbagai modul
+1. **Restrukturisasi Sistem Logging** - Penggabungan sistem logging ke dalam `SmartCashLogger` yang lebih komprehensif dengan dukungan emojis dan warna
+2. **Reorganisasi Utilitas Koordinat** - Implementasi `coordinate_utils.py` dengan dukungan untuk berbagai format bounding box
+3. **Pembaruan Sistem Metrik** - Pengembangan `MetricsCalculator` untuk evaluasi model deteksi
+4. **Pengelolaan Konfigurasi Terpusat** - Penambahan `ConfigManager` yang mengelola berbagai sumber konfigurasi
+5. **Pengelolaan Environment Runtime** - Implementasi `EnvironmentManager` untuk deteksi dan setup environment (Colab/local)
+6. **Early Stopping yang Ditingkatkan** - Perbaikan dan peningkatan fitur `EarlyStopping`
+7. **Pelacakan Eksperimen** - Penambahan `ExperimentTracker` untuk mencatat dan menyimpan hasil eksperimen
+8. **Pengelolaan Konfigurasi Layer** - Implementasi `LayerConfigManager` untuk konsistensi konfigurasi layer deteksi
+9. **Optimasi Memory** - Penambahan `MemoryOptimizer` untuk optimasi penggunaan RAM/GPU
+10. **Eksporter Model** - Penambahan `ModelExporter` untuk mengekspor model ke format produksi
+11. **Utilitas UI** - Implementasi `UIHelper` dan komponen UI untuk notebook/Colab
+12. **Factory Logger** - Penambahan `LoggingFactory` untuk pembuatan dan konfigurasi logger
+13. **Observer Pattern Terkonsolidasi** - Implementasi observer pattern terpusat untuk komunikasi antar komponen
+14. **Modul Visualisasi** - Refaktorisasi visualisasi menjadi subpaket dengan berbagai visualizer
+15. **Validasi Dataset** - Pengembangan komponen untuk validasi, analisis, dan perbaikan dataset
+16. **Pipeline Training** - Implementasi pipeline training modular dengan sistem callback
+17. **Augmentasi Dataset** - Pengembangan komponen untuk augmentasi dataset dengan berbagai transformasi
+18. **Pengelolaan Cache** - Implementasi sistem cache dengan fitur TTL, cleanup, dan monitoring
 
-## Struktur File Baru
+## Struktur File Lengkap
 
 ```
 utils/
-├── __init__.py              # File inisialisasi dengan export modul utama
-├── logger.py                # Menggantikan simple_logger.py dengan SmartCashLogger
-├── coordinate_utils.py      # Menggantikan coordinate_normalizer.py dan polygon_metrics.py
-├── metrics.py               # Kelas MetricsCalculator yang baru
-├── config_manager.py        # Pengelolaan konfigurasi terpusat
-├── environment_manager.py   # Pengelolaan environment (Colab/lokal)
-├── early_stopping.py        # Handler early stopping dengan perbaikan
-├── experiment_tracker.py    # Pelacakan dan penyimpanan eksperimen training
-├── layer_config_manager.py  # Pengelolaan konfigurasi layer deteksi
-├── memory_optimizer.py      # Optimasi penggunaan memori (GPU/CPU)
-├── model_exporter.py        # Ekspor model ke format produksi
-├── ui_utils.py              # Utilitas UI untuk notebook/Colab
-├── visualization/           # Subpaket visualisasi baru
-│   ├── __init__.py          # Inisialisasi subpaket visualisasi
-│   ├── base.py              # Kelas dasar visualisasi (VisualizationHelper)
-│   ├── detection.py         # Visualisasi deteksi objek (DetectionVisualizer)
-│   ├── metrics.py           # Visualisasi metrik (MetricsVisualizer)
-│   ├── research.py          # Visualisasi penelitian (ResearchVisualizer)
-│   ├── research_utils.py    # Utilitas visualisasi penelitian
-│   ├── scenario_visualizer.py # Visualisasi skenario penelitian
+├── __init__.py                # File inisialisasi dengan export modul utama
+├── logger.py                  # Logger dengan dukungan emojis dan warna
+├── coordinate_utils.py        # Utilitas untuk operasi koordinat dan bounding box
+├── evaluation_metrics.py      # Kelas MetricsCalculator untuk evaluasi model
+├── config_manager.py          # Pengelolaan konfigurasi terpusat
+├── environment_manager.py     # Pengelolaan environment runtime
+├── early_stopping.py          # Handler early stopping dengan perbaikan
+├── experiment_tracker.py      # Pelacakan dan visualisasi eksperimen
+├── layer_config_manager.py    # Pengelolaan konfigurasi layer deteksi
+├── memory_optimizer.py        # Optimasi penggunaan RAM/GPU
+├── model_exporter.py          # Eksport model ke format produksi (ONNX, TorchScript)
+├── ui_utils.py                # Utilitas UI untuk notebook/Colab
+├── preprocessing.py           # Utilitas preprocessing data
+├── logging_factory.py         # Factory untuk pembuatan dan konfigurasi logger
+├── model_visualizer.py        # Visualisasi model dan arsitektur
+├── observer/                  # Sistem observer pattern terkonsolidasi
+│   ├── __init__.py            # Definisi topik event standar (EventTopics)
+│   ├── base_observer.py       # Kelas dasar untuk semua observer
+│   ├── event_dispatcher.py    # Dispatcher pusat untuk event
+│   ├── event_registry.py      # Registry untuk pelacakan observer
+│   ├── observer_manager.py    # Manager dengan factory pattern
+│   └── decorators.py          # Decorator untuk metode observable
+├── visualization/             # Komponen visualisasi hasil dan eksperimen
+│   ├── __init__.py            # Export class utama visualisasi
+│   ├── base.py                # Kelas dasar visualisasi (VisualizationHelper)
+│   ├── detection.py           # Visualisasi deteksi (DetectionVisualizer)
+│   ├── metrics.py             # Visualisasi metrik (MetricsVisualizer)
+│   ├── research.py            # Visualisasi penelitian (ResearchVisualizer)
+│   ├── research_utils.py      # Utilitas visualisasi
 │   ├── experiment_visualizer.py # Visualisasi eksperimen
-│   ├── evaluation_visualizer.py # Visualisasi evaluasi model
-│   ├── research_analysis.py # Analisis hasil penelitian
-│   └── analysis/            # Subpaket untuk analisis visualisasi
-│       ├── __init__.py
-│       ├── experiment_analyzer.py # Analisis eksperimen
-│       └── scenario_analyzer.py # Analisis skenario
-├── training/                # Subpaket training baru
-│   ├── __init__.py          # Inisialisasi subpaket training
-│   ├── training_pipeline.py # Kelas utama pipeline
-│   ├── training_callback.py # Sistem callback (TrainingCallbacks)
-│   ├── training_metrics.py  # Pengelolaan metrik (TrainingMetrics)
-│   ├── training_epoch.py    # Handler epoch training (TrainingEpoch)
-│   └── validation_epoch.py  # Handler epoch validasi (ValidationEpoch)
-├── augmentation/            # Subpaket augmentasi baru
-│   ├── __init__.py          # Inisialisasi subpaket augmentasi 
-│   ├── augmentation_base.py # Kelas dasar (AugmentationBase)
-│   ├── augmentation_pipeline.py # Pipeline augmentasi (AugmentationPipeline)
-│   ├── augmentation_processor.py # Prosesor augmentasi (AugmentationProcessor)
-│   ├── augmentation_validator.py # Validator hasil (AugmentationValidator)
-│   ├── augmentation_checkpoint.py # Pengelolaan checkpoint (AugmentationCheckpoint)
-│   └── augmentation_manager.py # Pengelolaan keseluruhan (AugmentationManager)
-├── dataset/                 # Subpaket dataset baru
-│   ├── __init__.py          # Inisialisasi subpaket dataset
-│   ├── enhanced_dataset_validator.py # Validator utama (EnhancedDatasetValidator)
-│   ├── dataset_validator_core.py # Inti validasi (DatasetValidatorCore)
-│   ├── dataset_analyzer.py  # Analisis dataset (DatasetAnalyzer)
-│   ├── dataset_fixer.py     # Perbaikan dataset (DatasetFixer)
-│   ├── dataset_cleaner.py   # Pembersihan dataset (DatasetCleaner)
-│   └── dataset_utils.py     # Utilitas dataset umum (DatasetUtils)
-├── cache/                   # Subpaket cache baru
-│   ├── __init__.py          # Inisialisasi subpaket cache
-│   ├── cache_manager.py     # Pengelolaan cache (CacheManager)
-│   ├── cache_index.py       # Pengelolaan index cache (CacheIndex)
-│   ├── cache_storage.py     # Penyimpanan data cache (CacheStorage)
-│   ├── cache_cleanup.py     # Pembersihan cache (CacheCleanup)
-│   └── cache_stats.py       # Statistik cache (CacheStats)
-└── observer/                # Subpaket observer pattern terkonsolidasi
-    ├── __init__.py          # Export definisi utama dan topik standar (EventTopics)
-    ├── base_observer.py     # Kelas dasar untuk semua observer (BaseObserver)
-    ├── event_dispatcher.py  # Dispatcher pusat untuk event (EventDispatcher)
-    ├── event_registry.py    # Registry untuk pelacakan observer (EventRegistry)
-    ├── observer_manager.py  # Manager dengan factory pattern (ObserverManager)
-    └── decorators.py        # Decorator untuk metode observable (@observable, @observe)
+│   ├── scenario_visualizer.py # Visualisasi skenario
+│   ├── evaluation_visualizer.py # Visualisasi evaluasi
+│   └── research_analysis.py   # Analisis hasil penelitian
+├── dataset/                   # Validasi dan analisis dataset
+│   ├── __init__.py            # Export class utama dataset
+│   ├── dataset_utils.py       # Utilitas dataset
+│   ├── dataset_analyzer.py    # Analisis dataset
+│   ├── dataset_validator_core.py # Inti validasi dataset
+│   ├── dataset_fixer.py       # Perbaikan dataset
+│   ├── dataset_cleaner.py     # Pembersihan dataset
+│   └── enhanced_dataset_validator.py # Validator dataset yang ditingkatkan
+├── training/                  # Komponen training pipeline
+│   ├── __init__.py            # Export class utama training
+│   ├── training_pipeline.py   # Pipeline utama training
+│   ├── training_callbacks.py  # Sistem callback training
+│   ├── training_metrics.py    # Pengelolaan metrik training
+│   ├── training_epoch.py      # Handler epoch training
+│   └── validation_epoch.py    # Handler epoch validasi
+├── augmentation/              # Komponen augmentasi dataset
+│   ├── __init__.py            # Export class utama augmentasi
+│   ├── augmentation_base.py   # Kelas dasar augmentasi
+│   ├── augmentation_pipeline.py # Pipeline transformasi
+│   ├── augmentation_processor.py # Pemrosesan gambar
+│   ├── augmentation_validator.py # Validasi hasil augmentasi
+│   ├── augmentation_checkpoint.py # Pengelolaan checkpoint
+│   └── augmentation_manager.py # Manager augmentasi
+└── cache/                     # Pengelolaan cache data
+    ├── __init__.py            # Export class utama cache
+    ├── cache_manager.py       # Manager cache
+    ├── cache_index.py         # Pengelolaan index cache
+    ├── cache_storage.py       # Penyimpanan data cache
+    ├── cache_cleanup.py       # Pembersihan dan integritas cache
+    └── cache_stats.py         # Statistik performa cache
 ```
 
-## Observer Pattern Terkonsolidasi
+## Komponen dan Kelas Utama
 
-### Deskripsi
-Observer pattern terkonsolidasi (`utils/observer/`) menyediakan satu implementasi terpusat untuk menggantikan semua implementasi observer pattern yang tersebar di berbagai modul. Paket ini mengimplementasikan pola desain Observer dengan fitur lanjutan seperti event berbasis topik, prioritas observer, dukungan asinkron, dan integrasi dengan komponen lain di SmartCash.
+### Core Utilities
+1. **SmartCashLogger** (`logger.py`): Logger dengan dukungan emojis, warna, dan output ke berbagai target
+2. **ConfigManager** (`config_manager.py`): Pengelolaan konfigurasi dengan dukungan berbagai sumber
+3. **CoordinateUtils** (`coordinate_utils.py`): Utilitas untuk normalisasi dan konversi koordinat
+4. **MetricsCalculator** (`evaluation_metrics.py`): Perhitungan metrik evaluasi model deteksi
+5. **EnvironmentManager** (`environment_manager.py`): Deteksi environment runtime (Colab/local)
+6. **LayerConfigManager** (`layer_config_manager.py`): Pengelolaan konfigurasi layer deteksi
+7. **MemoryOptimizer** (`memory_optimizer.py`): Optimasi penggunaan RAM/GPU untuk training
+8. **ModelExporter** (`model_exporter.py`): Eksport model ke format produksi
+9. **ExperimentTracker** (`experiment_tracker.py`): Pelacakan dan visualisasi eksperimen
+10. **UIHelper** (`ui_utils.py`): Utilitas UI untuk notebook/Colab
+11. **LoggingFactory** (`logging_factory.py`): Factory untuk pembuatan dan konfigurasi logger
 
-### Fitur Utama Observer Pattern
-1. **Arsitektur Terpusat**: Satu implementasi yang digunakan oleh seluruh aplikasi
-2. **Thread-Safety**: Mendukung penggunaan dalam lingkungan multithreading
-3. **Event Berbasis Topik**: Sistem hierarki event dengan namespace (seperti `training.epoch.end`)
-4. **Prioritas Observer**: Observer dengan prioritas lebih tinggi dijalankan lebih dahulu
-5. **Dukungan Asinkron**: Mode sinkron dan asinkron untuk penanganan event
-6. **Event Filtering**: Filter observer berdasarkan pola atau kriteria lain
-7. **Propagasi Konteks**: Menyertakan informasi tambahan dalam notifikasi
-8. **Error Handling Robust**: Mencegah satu observer yang gagal mengganggu observer lain
-9. **Decorator untuk Observable**: Memudahkan membuat metode menjadi observable
-10. **Factory Pattern**: Pembuatan observer dengan berbagai konfigurasi
-11. **Weak References**: Mencegah memory leak dengan menggunakan weak references
-12. **Integrasi dengan Tqdm**: Monitoring progres dengan tqdm
-13. **Integrasi dengan Logger**: Konsistensi dengan sistem logging SmartCash
+### Observer Pattern
+1. **BaseObserver** (`observer/base_observer.py`): Kelas dasar untuk semua observer
+2. **EventDispatcher** (`observer/event_dispatcher.py`): Dispatching event ke observer yang terdaftar
+3. **EventRegistry** (`observer/event_registry.py`): Registry untuk menyimpan mapping event ke observer
+4. **ObserverManager** (`observer/observer_manager.py`): Factory pattern untuk membuat observer
+5. **EventTopics** (`observer/__init__.py`): Konstanta untuk topik event standar
+6. **observable** (`observer/decorators.py`): Decorator untuk membuat metode observable
 
-### Komponen Utama Observer Pattern
+### Modul Visualisasi
+1. **VisualizationHelper** (`visualization/base.py`): Utilitas umum untuk visualisasi
+2. **DetectionVisualizer** (`visualization/detection.py`): Visualisasi hasil deteksi
+3. **MetricsVisualizer** (`visualization/metrics.py`): Visualisasi metrik evaluasi
+4. **ResearchVisualizer** (`visualization/research.py`): Visualisasi penelitian
+5. **ExperimentVisualizer** (`visualization/experiment_visualizer.py`): Visualisasi eksperimen
+6. **ScenarioVisualizer** (`visualization/scenario_visualizer.py`): Visualisasi skenario
+7. **EvaluationVisualizer** (`visualization/evaluation_visualizer.py`): Visualisasi evaluasi
 
-1. **BaseObserver**: Kelas dasar untuk semua observer dengan fitur prioritas dan filtering
-2. **EventDispatcher**: Sentral pendistribusian event ke observer dengan notifikasi sinkron/asinkron
-3. **EventRegistry**: Pengelolaan registry observer dan event dengan weak references
-4. **ObserverManager**: Factory untuk pembuatan observer berbagai jenis dengan mudah
-5. **@observable**: Decorator untuk menandai metode yang mengirim notifikasi
-6. **@observe**: Decorator untuk kelas yang menjadi observer
-7. **EventTopics**: Definisi topik event standar aplikasi SmartCash
+### Modul Dataset
+1. **DatasetUtils** (`dataset/dataset_utils.py`): Utilitas umum untuk operasi dataset
+2. **DatasetAnalyzer** (`dataset/dataset_analyzer.py`): Analisis statistik dataset
+3. **DatasetValidatorCore** (`dataset/dataset_validator_core.py`): Inti validasi dataset
+4. **DatasetFixer** (`dataset/dataset_fixer.py`): Perbaikan masalah dataset
+5. **DatasetCleaner** (`dataset/dataset_cleaner.py`): Pembersihan dataset
+6. **EnhancedDatasetValidator** (`dataset/enhanced_dataset_validator.py`): Validator komprehensif
 
-### Topik Event Standard
+### Modul Training
+1. **TrainingPipeline** (`training/training_pipeline.py`): Pipeline utama training
+2. **TrainingCallbacks** (`training/training_callbacks.py`): Sistem callback untuk event training
+3. **TrainingMetrics** (`training/training_metrics.py`): Pengelolaan metrik training
+4. **TrainingEpoch** (`training/training_epoch.py`): Handler untuk epoch training
+5. **ValidationEpoch** (`training/validation_epoch.py`): Handler untuk epoch validasi
 
-Observer pattern mendefinisikan topik standard yang dapat digunakan di seluruh aplikasi:
+### Modul Augmentasi
+1. **AugmentationBase** (`augmentation/augmentation_base.py`): Kelas dasar untuk augmentasi
+2. **AugmentationPipeline** (`augmentation/augmentation_pipeline.py`): Pipeline transformasi
+3. **AugmentationProcessor** (`augmentation/augmentation_processor.py`): Pemrosesan gambar
+4. **AugmentationValidator** (`augmentation/augmentation_validator.py`): Validasi hasil
+5. **AugmentationCheckpoint** (`augmentation/augmentation_checkpoint.py`): Pengelolaan checkpoint
+6. **AugmentationManager** (`augmentation/augmentation_manager.py`): Manager augmentasi
 
-- `training.*`: Event terkait proses training (start, end, epoch, batch)
-- `evaluation.*`: Event terkait proses evaluasi model
-- `detection.*`: Event terkait proses deteksi objek
-- `preprocessing.*`: Event terkait preprocessing data
-- `checkpoint.*`: Event terkait checkpoint model
-- `resource.*`: Event terkait penggunaan resource sistem
-- `ui.*`: Event terkait pembaruan UI
+### Modul Cache
+1. **CacheManager** (`cache/cache_manager.py`): Manager utama cache
+2. **CacheIndex** (`cache/cache_index.py`): Pengelolaan index cache
+3. **CacheStorage** (`cache/cache_storage.py`): Penyimpanan data cache
+4. **CacheCleanup** (`cache/cache_cleanup.py`): Pembersihan dan validasi cache
+5. **CacheStats** (`cache/cache_stats.py`): Statistik penggunaan cache
 
-### Jenis Observer Utama
+### Konstanta DatasetUtils
 
-1. **TrainingObserver**: Monitoring proses training dan metrics
-2. **ProgressObserver**: Monitoring progres dengan tqdm
-3. **MetricsObserver**: Pengumpulan dan analisis metrics
-4. **LoggingObserver**: Pencatatan event ke log
-5. **UIObserver**: Pembaruan elemen UI berdasarkan event
-
-### Panduan Migrasi
-
-Untuk migrasi dari implementasi lama (yang tersebar di handlers/), lihat dokumen panduan migrasi lengkap di `docs/migration-observer-pattern.md`.
-
-## Panduan Migrasi Komponen
-
-### 1. Migrasi Logger
-
-| SimpleLogger (Lama) | SmartCashLogger (Baru) |
-|---------------------|------------------------|
-| `log()` | `info()` |
-| `log_info()` | `info()` |
-| `log_warning()` | `warning()` |
-| `log_error()` | `error()` |
-| `log_success()` | `success()` |
-| N/A | `start()` |
-| N/A | `metric()` |
-| N/A | `time()` |
-| N/A | `model()` |
-| N/A | `config()` |
-| N/A | `progress()` |
+DatasetUtils menggunakan beberapa konstanta penting untuk operasi dataset:
 
 ```python
-# Kode lama
+# Ekstensi file gambar yang didukung
+IMG_EXTENSIONS = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
+
+# Nama split dataset standar
+DEFAULT_SPLITS = ['train', 'valid', 'test']
+
+# Rasio default untuk pemecahan dataset
+DEFAULT_SPLIT_RATIOS = {'train': 0.7, 'valid': 0.15, 'test': 0.15}
+
+# Random seed default
+DEFAULT_RANDOM_SEED = 42
+```
+
+Konstanta ini digunakan dalam berbagai metode seperti `find_image_files()`, `split_dataset()`, dan `get_split_statistics()`.
+
+## Fitur Menonjol
+
+1. **Thread Safety pada Logging**: SmartCashLogger dirancang untuk aman digunakan dalam konteks multithreading
+2. **Dukungan Emojis dan Warna**: Output log dengan emojis dan warna untuk meningkatkan keterbacaan
+3. **Deteksi Environment Otomatis**: Deteksi dan setup otomatis untuk environment Colab/local
+4. **Integrasi dengan Google Drive**: Dukungan untuk menyimpan data di Google Drive saat berjalan di Colab
+5. **Pelacakan Eksperimen Komprehensif**: Fitur untuk mencatat, menyimpan, dan memvisualisasikan hasil eksperimen
+6. **Optimasi Memory Cerdas**: Fitur untuk mengoptimalkan penggunaan memory, terutama untuk GPU
+7. **Utilitas UI Beragam**: Komponen UI bervariasi untuk membuat notebook/Colab interaktif
+8. **Logging Factory Pattern**: Pembuatan dan konfigurasi logger dengan factory pattern
+9. **Pengelolaan Layer Deteksi Terpusat**: Konsistensi konfigurasi layer deteksi di seluruh aplikasi
+10. **Normalisasi Koordinat Multi-Format**: Dukungan berbagai format koordinat (xyxy, xywh, yolo)
+11. **Observer Pattern Terkonsolidasi**: Implementasi terpusat observer pattern dengan event berbasis topik
+
+## Fitur SmartCashLogger
+
+### Emojis Kontekstual
+- 🚀 `start` - Memulai proses atau aplikasi
+- ✅ `success` - Operasi berhasil
+- ❌ `error` - Error atau kegagalan
+- ⚠️ `warning` - Peringatan
+- ℹ️ `info` - Informasi umum
+- 📊 `data` - Informasi terkait data
+- 🤖 `model` - Informasi terkait model
+- ⏱️ `time` - Informasi waktu atau performa
+- 📈 `metric` - Metrik atau evaluasi
+- 💾 `save` - Penyimpanan data atau model
+- 📂 `load` - Pemuatan data atau model
+- 🐞 `debug` - Informasi debugging
+- ⚙️ `config` - Informasi konfigurasi
+
+### Metode Logging
+- `info()` - Log informasi umum
+- `warning()` - Log peringatan
+- `error()` - Log error
+- `success()` - Log keberhasilan
+- `start()` - Log permulaan proses
+- `metric()` - Log metrik dengan highlight nilai
+- `data()` - Log informasi data
+- `model()` - Log informasi model
+- `time()` - Log informasi waktu/performa
+- `config()` - Log informasi konfigurasi
+- `progress()` - Buat progress bar dengan tqdm
+
+## EventTopics dan Konstanta Observer
+
+Observer pattern menggunakan sistem event berbasis topik untuk memisahkan pengirim dan penerima notifikasi. Berikut adalah topik event standar yang didefinisikan dalam `observer/__init__.py`:
+
+```python
+class EventTopics:
+    """Definisi topik event standar untuk SmartCash."""
+    
+    # Topik training
+    TRAINING_START = "training.start"
+    TRAINING_END = "training.end"
+    EPOCH_START = "training.epoch.start"
+    EPOCH_END = "training.epoch.end"
+    BATCH_END = "training.batch.end"
+    
+    # Topik evaluasi
+    EVALUATION_START = "evaluation.start"
+    EVALUATION_END = "evaluation.end"
+    EVAL_BATCH_END = "evaluation.batch.end"
+    
+    # Topik deteksi
+    DETECTION_START = "detection.start"
+    DETECTION_END = "detection.end"
+    OBJECT_DETECTED = "detection.object.detected"
+    
+    # Topik preprocessing
+    PREPROCESSING_START = "preprocessing.start"
+    PREPROCESSING_END = "preprocessing.end"
+    
+    # Topik checkpoint
+    CHECKPOINT_SAVE = "checkpoint.save"
+    CHECKPOINT_LOAD = "checkpoint.load"
+    BEST_MODEL_SAVED = "checkpoint.best_model.saved"
+    
+    # Topik resource
+    MEMORY_WARNING = "resource.memory.warning"
+    GPU_UTILIZATION = "resource.gpu.utilization"
+    
+    # Topik UI
+    UI_UPDATE = "ui.update"
+    PROGRESS_UPDATE = "ui.progress.update"
+```
+
+### Konstanta Prioritas Observer
+
+```python
+class ObserverPriority:
+    """Definisi prioritas untuk observer."""
+    CRITICAL = 100  # Observer yang harus dijalankan pertama
+    HIGH = 75       # Observer dengan prioritas tinggi
+    NORMAL = 50     # Prioritas default
+    LOW = 25        # Observer dengan prioritas rendah
+    LOWEST = 0      # Observer yang harus dijalankan terakhir
+```
+
+### Mapping Event ke Handler
+
+Event dispatcher menggunakan registry untuk memetakan topik event ke handler (observer). Contoh mapping internal:
+
+```python
+# Contoh internal Registry dalam EventRegistry
+{
+    "training.epoch.end": [
+        {"observer": <LoggingObserver instance>, "priority": 75},
+        {"observer": <MetricsObserver instance>, "priority": 50},
+        {"observer": <UIObserver instance>, "priority": 25}
+    ],
+    "detection.object.detected": [
+        {"observer": <DetectionLogger instance>, "priority": 50},
+        {"observer": <ResultsCollector instance>, "priority": 50}
+    ]
+}
+```
+
+## Panduan Migrasi
+
+### 1. Migrasi ke SmartCashLogger
+
+```python
+# Kode lama (jika ada)
 from smartcash.utils.simple_logger import SimpleLogger
 logger = SimpleLogger("module_name")
 logger.log("Pesan")
@@ -168,288 +306,121 @@ logger = get_logger("module_name")
 logger.info("Pesan")
 ```
 
-### 2. Migrasi Visualisasi
+### 2. Migrasi ke CoordinateUtils
 
 ```python
-# Kode lama
-from smartcash.utils.visualization import visualize_detections
-
-# Kode baru
-from smartcash.utils.visualization import DetectionVisualizer, visualize_detection
-
-# Cara 1 - instance lengkap
-detector_vis = DetectionVisualizer(output_dir="results/deteksi")
-result_img = detector_vis.visualize_detection(image, detections, filename="hasil.jpg")
-
-# Cara 2 - fungsi helper
-result_img = visualize_detection(image, detections, output_path="hasil.jpg")
-```
-
-### 3. Migrasi Utilitas Koordinat
-
-```python
-# Kode lama
-from smartcash.utils.coordinate_normalizer import normalize_coordinates
-from smartcash.utils.polygon_metrics import calculate_iou
-
 # Kode baru
 from smartcash.utils.coordinate_utils import CoordinateUtils
 
-norm_coords = CoordinateUtils.normalize_coordinates(coords, image_size, format='pascal_voc')
-iou = CoordinateUtils.calculate_iou(bbox1, bbox2)
+coord_utils = CoordinateUtils()
+normalized_bbox = coord_utils.normalize_bbox(bbox, image_size, format='xyxy')
+iou = coord_utils.calculate_iou(box1, box2, format='xyxy')
 ```
 
-### 4. Migrasi Training Pipeline
+### 3. Migrasi ke ConfigManager
 
 ```python
-# Kode lama
-from smartcash.utils.training_pipeline import train_model
-
 # Kode baru
-from smartcash.utils.training import TrainingPipeline
+from smartcash.utils.config_manager import ConfigManager
 
-pipeline = TrainingPipeline(
-    config={
-        'training': {
-            'epochs': 30,
-            'batch_size': 16,
-            'early_stopping_patience': 10
-        }
-    },
-    model_handler=model_handler,
-    data_manager=data_manager,
+config = ConfigManager.load_config(
+    filename="experiment_config.yaml",
+    fallback_to_pickle=True,
+    default_config={"training": {"epochs": 30}},
     logger=logger
 )
+```
 
-# Registrasi callback
-def on_epoch_end(epoch, metrics, **kwargs):
-    print(f"Epoch {epoch} selesai: val_loss={metrics['val_loss']:.4f}")
+### 4. Migrasi ke EnvironmentManager
 
-pipeline.register_callback('epoch_end', on_epoch_end)
+```python
+# Kode baru
+from smartcash.utils.environment_manager import EnvironmentManager
 
-# Training
-results = pipeline.train(
-    dataloaders={
-        'train': train_loader,
-        'val': val_loader
-    }
+env_manager = EnvironmentManager(logger=logger)
+if env_manager.is_colab:
+    env_manager.mount_drive()
+    env_manager.setup_directories(use_drive=True)
+```
+
+### 5. Migrasi ke ExperimentTracker
+
+```python
+# Kode baru
+from smartcash.utils.experiment_tracker import ExperimentTracker
+
+tracker = ExperimentTracker("experiment_name", logger=logger)
+tracker.start_experiment(config=config)
+
+# Setiap epoch
+tracker.log_metrics(
+    epoch=epoch,
+    train_loss=train_loss,
+    val_loss=val_loss,
+    lr=current_lr,
+    additional_metrics={"precision": precision, "recall": recall}
 )
+
+# Akhir eksperimen
+tracker.end_experiment(final_metrics=final_metrics)
+tracker.plot_metrics()
 ```
 
-### 5. Migrasi Sistem Metrik
+### 6. Migrasi ke Observer Pattern
 
 ```python
-# Kode lama
-from smartcash.utils.metrics import calculate_precision_recall, calculate_map
+# Kode baru - Registrasi Observer
+from smartcash.utils.observer import EventDispatcher, EventTopics, ObserverPriority
 
-# Kode baru
-from smartcash.utils.metrics import MetricsCalculator
+# Mendefinisikan observer
+class TrainingMonitor:
+    def update(self, event_type, sender, **data):
+        if event_type == EventTopics.EPOCH_END:
+            epoch = data.get('epoch')
+            metrics = data.get('metrics', {})
+            print(f"Epoch {epoch} selesai dengan metrics: {metrics}")
 
-metrics_calc = MetricsCalculator()
-metrics_calc.update(predictions, targets)
-final_metrics = metrics_calc.compute()
+# Registrasi observer dengan prioritas
+monitor = TrainingMonitor()
+EventDispatcher.register(EventTopics.EPOCH_END, monitor, priority=ObserverPriority.HIGH)
 
-precision = final_metrics['precision']
-recall = final_metrics['recall']
-mAP = final_metrics['mAP']
-```
-
-### 6. Migrasi dari Debug Helper
-
-```python
-# Kode lama
-from smartcash.utils.debug_helper import debug_print, print_memory_usage
-
-# Kode baru
-from smartcash.utils.logger import get_logger
-
-logger = get_logger("module_name")
-logger.debug("Nilai variabel: " + str(var))
-system_info = logger.get_system_info()
-logger.info(f"Penggunaan GPU: {system_info['gpu_memory_used_mb']:.2f} MB")
-```
-
-### 7. Migrasi Observer Pattern
-
-```python
-# Kode lama - registrasi observer
-trainer.register_observer(observer)
-trainer.register_callback('epoch_end', callback_func)
-
-# Kode baru - registrasi observer dengan EventDispatcher
+# Kode baru - Mengirim notifikasi
 from smartcash.utils.observer import EventDispatcher, EventTopics
-EventDispatcher.register(EventTopics.EPOCH_END, observer)
 
-# Kode lama - mengirim notifikasi
-self._notify_observers('epoch_end', epoch=epoch, metrics=metrics)
+def train_epoch(epoch, model, dataloader):
+    # Kode training...
+    metrics = {"loss": loss, "accuracy": accuracy}
+    
+    # Kirim notifikasi ke semua observer
+    EventDispatcher.notify(
+        event_type=EventTopics.EPOCH_END,
+        sender=self,
+        epoch=epoch,
+        metrics=metrics
+    )
 
-# Kode baru - mengirim notifikasi dengan EventDispatcher
-from smartcash.utils.observer import EventDispatcher, EventTopics
-EventDispatcher.notify(EventTopics.EPOCH_END, self, epoch=epoch, metrics=metrics)
+# Kode baru - Menggunakan decorator @observable
+from smartcash.utils.observer.decorators import observable, EventTopics
 
-# Kode baru - menggunakan decorator @observable
-from smartcash.utils.observer import observable, EventTopics
-
-@observable(event_type=EventTopics.EPOCH_END, include_args=True)
-def end_epoch(self, epoch, metrics):
-    # kode...
-    return results
-
-# Kode baru - menggunakan decorator @observe
-from smartcash.utils.observer import observe, EventTopics
-
-@observe(event_types=[EventTopics.EPOCH_END, EventTopics.TRAINING_END])
-class MyMonitor:
-    def update(self, event_type, sender, **kwargs):
-        # Handle event...
+class Trainer:
+    @observable(event_type=EventTopics.EPOCH_END)
+    def end_epoch(self, epoch, metrics):
+        # Kode akhir epoch...
+        return metrics  # Hasil akan otomatis dikirim ke observer
 ```
-
-### 8. Migrasi Augmentation Utils
-
-```python
-# Kode baru
-from smartcash.utils.augmentation import AugmentationManager
-
-augmentor = AugmentationManager(
-    config=config,
-    output_dir="data",
-    logger=logger,
-    num_workers=4
-)
-
-stats = augmentor.augment_dataset(
-    split='train',
-    augmentation_types=['combined', 'lighting'],
-    num_variations=3,
-    output_prefix='aug',
-    resume=True,
-    validate_results=True
-)
-```
-
-### 9. Migrasi Dataset Utils
-
-```python
-# Kode baru
-from smartcash.utils.dataset import EnhancedDatasetValidator
-
-validator = EnhancedDatasetValidator(
-    config=config,
-    data_dir="data",
-    logger=logger,
-    num_workers=4
-)
-
-validation_stats = validator.validate_dataset(
-    split='train',
-    fix_issues=True,
-    move_invalid=True,
-    visualize=True
-)
-```
-
-### 10. Migrasi Enhanced Cache
-
-```python
-# Kode lama
-from smartcash.utils.enhanced_cache import EnhancedCache
-
-cache = EnhancedCache(".cache/smartcash")
-
-# Kode baru
-from smartcash.utils.cache import CacheManager
-
-cache = CacheManager(
-    cache_dir=".cache/smartcash",
-    max_size_gb=1.0,
-    ttl_hours=24,
-    auto_cleanup=True,
-    logger=logger
-)
-
-# API yang ditingkatkan
-result = cache.get("my_key", measure_time=True)
-cache.put("my_key", data)
-stats = cache.get_stats()
-```
-
-## Komponen dan Kelas Utama
-
-### Core Utilities
-1. **SmartCashLogger** (`logger.py`): Logger berbasis emojis dengan dukungan Colab
-2. **ConfigManager** (`config_manager.py`): Pengelolaan konfigurasi terpusat
-3. **CoordinateUtils** (`coordinate_utils.py`): Utilitas koordinat dan bounding box
-4. **MetricsCalculator** (`metrics.py`): Perhitungan metrik evaluasi model
-5. **EnvironmentManager** (`environment_manager.py`): Deteksi environment runtime
-6. **LayerConfigManager** (`layer_config_manager.py`): Pengelolaan layer deteksi
-7. **MemoryOptimizer** (`memory_optimizer.py`): Optimasi RAM/GPU untuk training
-8. **ModelExporter** (`model_exporter.py`): Ekspor model ke format produksi
-9. **ExperimentTracker** (`experiment_tracker.py`): Pelacakan eksperimen training
-
-### Modul Training
-1. **TrainingPipeline** (`training/training_pipeline.py`): Pipeline utama training
-2. **TrainingCallbacks** (`training/training_callback.py`): Sistem event-hook
-3. **TrainingMetrics** (`training/training_metrics.py`): Pengelolaan metrik training
-4. **TrainingEpoch** & **ValidationEpoch** (`training/training_epoch.py`, `training/validation_epoch.py`): Pengelolaan epoch
-
-### Modul Augmentasi
-1. **AugmentationManager** (`augmentation/augmentation_manager.py`): Pengelolaan augmentasi
-2. **AugmentationPipeline** (`augmentation/augmentation_pipeline.py`): Pipeline transformasi
-3. **AugmentationProcessor** (`augmentation/augmentation_processor.py`): Pemrosesan gambar
-4. **AugmentationValidator** (`augmentation/augmentation_validator.py`): Validasi hasil
-5. **AugmentationCheckpoint** (`augmentation/augmentation_checkpoint.py`): Pengelolaan checkpoint
-
-### Modul Dataset
-1. **EnhancedDatasetValidator** (`dataset/enhanced_dataset_validator.py`): Validator utama
-2. **DatasetAnalyzer** (`dataset/dataset_analyzer.py`): Analisis statistik dataset
-3. **DatasetFixer** (`dataset/dataset_fixer.py`): Perbaikan masalah dataset
-4. **DatasetCleaner** (`dataset/dataset_cleaner.py`): Pembersihan dataset
-5. **DatasetUtils** (`dataset/dataset_utils.py`): Utilitas umum dataset
-
-### Modul Cache
-1. **CacheManager** (`cache/cache_manager.py`): Pengelolaan cache
-2. **CacheIndex** (`cache/cache_index.py`): Manajemen index cache
-3. **CacheStorage** (`cache/cache_storage.py`): Penyimpanan data
-4. **CacheCleanup** (`cache/cache_cleanup.py`): Pembersihan dan integritas cache
-5. **CacheStats** (`cache/cache_stats.py`): Statistik performa cache
-
-### Modul Observer
-1. **BaseObserver** (`observer/base_observer.py`): Kelas dasar untuk semua observer
-2. **EventDispatcher** (`observer/event_dispatcher.py`): Dispatcher event ke observer
-3. **EventRegistry** (`observer/event_registry.py`): Pengelolaan registry observer
-4. **ObserverManager** (`observer/observer_manager.py`): Factory untuk pembuatan observer
-5. **EventTopics** (`observer/__init__.py`): Definisi topik standard
-6. **Decorators** (`observer/decorators.py`): Decorator @observable dan @observe
-
-### Modul Visualisasi
-1. **DetectionVisualizer** (`visualization/detection.py`): Visualisasi hasil deteksi
-2. **MetricsVisualizer** (`visualization/metrics.py`): Visualisasi metrik evaluasi
-3. **ResearchVisualizer** (`visualization/research.py`): Visualisasi penelitian
-4. **ExperimentVisualizer** (`visualization/experiment_visualizer.py`): Visualisasi eksperimen
-5. **EvaluationVisualizer** (`visualization/evaluation_visualizer.py`): Visualisasi evaluasi
-6. **ScenarioVisualizer** (`visualization/scenario_visualizer.py`): Visualisasi skenario
-7. **ExperimentAnalyzer** & **ScenarioAnalyzer** (`visualization/analysis/`): Analisis hasil
-
-## Fitur Baru yang Menonjol
-
-1. **Thread Safety pada Logging**: Logging aman untuk multithreading
-2. **Pipeline Training dengan Callback**: Sistem callback untuk custom hooks
-3. **Metrics Calculator**: Metrik per kelas dan pengukuran waktu inferensi
-4. **Augmentasi dengan Paralelisasi**: Proses augmentasi gambar yang lebih cepat
-5. **Validasi Dataset**: Deteksi dan perbaikan otomatis dataset
-6. **Cache dengan TTL**: Time-to-live untuk entri cache dan pembersihan otomatis
-7. **Environment Manager**: Deteksi otomatis lingkungan Colab/lokal
-8. **Experiment Tracker**: Pelacakan dan visualisasi eksperimen
-9. **Model Exporter**: Ekspor model ke format produksi (ONNX, TorchScript)
-10. **Layer Config Manager**: Pengelolaan layer deteksi terpusat
-11. **Observer Pattern Terkonsolidasi**: Sistem observer terpusat dengan fitur lanjutan
 
 ## Kesimpulan
 
 Perubahan pada modul `utils` SmartCash meningkatkan:
-1. **Modularitas**: Pemisahan komponen dengan tanggung jawab yang jelas
-2. **Pemeliharaan**: Struktur terorganisir memudahkan perbaikan dan pengembangan
-3. **Performa**: Optimasi melalui threading, caching, dan manajemen memori
+1. **Modularitas**: Komponen dengan tanggung jawab yang jelas dan terpisah
+2. **Keandalan**: Thread safety dan error handling yang lebih baik
+3. **Performa**: Optimasi memory dan dukungan multithreading
 4. **Kegunaan**: API yang lebih konsisten dan intuitif
-5. **Fitur**: Penambahan kemampuan baru seperti augmentasi data, validasi dataset, dan observer pattern terkonsolidasi
-6. **Konsistensi**: Penyeragaman pola desain dan konvensi penamaan di seluruh kode
+5. **Visualisasi**: Komponen visualisasi beragam untuk berbagai kebutuhan
+6. **Eksperimen**: Pelacakan dan analisis eksperimen yang lebih baik
+7. **Portabilitas**: Dukungan environment Colab/local yang lebih baik
+8. **Komunikasi**: Observer pattern terpadu untuk komunikasi antar komponen
+9. **Dataset**: Validasi, analisis, dan augmentasi dataset yang komprehensif
+10. **Training**: Pipeline training modular dengan sistem callback dan metrik
+
+Refaktorisasi ini menghasilkan sistem yang lebih terorganisir, efisien, dan mudah dipelihara dengan kemampuan yang jauh lebih luas dari versi sebelumnya.

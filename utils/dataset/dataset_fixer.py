@@ -1,25 +1,22 @@
 """
 File: smartcash/utils/dataset/dataset_fixer.py
 Author: Alfrida Sabar
-Deskripsi: Modul untuk perbaikan dan pembersihan dataset dengan kemampuan auto-fixing berbagai masalah
+Deskripsi: Modul untuk perbaikan dan pembersihan dataset dengan kemampuan auto-fixing berbagai masalah (versi ringkas)
 """
 
-import os
-import shutil
+import cv2
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
-import time
 import threading
+from tqdm.auto import tqdm
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.utils.dataset.dataset_utils import DatasetUtils, IMG_EXTENSIONS, DEFAULT_SPLITS
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
 
 class DatasetFixer:
-    """
-    Kelas untuk perbaikan dan pembersihan dataset.
-    """
+    """Kelas untuk perbaikan dan pembersihan dataset."""
     
     def __init__(
         self,
@@ -27,28 +24,12 @@ class DatasetFixer:
         data_dir: Optional[Union[str, Path]] = None,
         logger: Optional[SmartCashLogger] = None
     ):
-        """
-        Inisialisasi dataset fixer.
-        
-        Args:
-            config: Konfigurasi aplikasi
-            data_dir: Direktori dataset
-            logger: Logger kustom
-        """
         self.logger = logger or SmartCashLogger(__name__)
         self.config = config
-        
-        # Setup path
         self.data_dir = Path(data_dir) if data_dir else Path(config.get('data_dir', 'data'))
-        
-        # Load layer config
         self.layer_config_manager = get_layer_config()
         self.active_layers = config.get('layers', ['banknote'])
-        
-        # Setup utils
         self.utils = DatasetUtils(config, str(self.data_dir), logger)
-        
-        # Lock untuk thread safety
         self._lock = threading.RLock()
     
     def fix_dataset(
@@ -59,55 +40,30 @@ class DatasetFixer:
         fix_images: bool = False,
         backup: bool = True
     ) -> Dict:
-        """
-        Perbaiki masalah umum dalam dataset.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            fix_coordinates: Perbaiki koordinat yang tidak valid
-            fix_labels: Perbaiki format label yang tidak valid
-            fix_images: Coba perbaiki gambar yang rusak
-            backup: Buat backup sebelum perbaikan
-            
-        Returns:
-            Dict statistik perbaikan
-        """
+        """Perbaiki masalah umum dalam dataset."""
         # Buat backup jika diminta
         if backup:
             backup_dir = self.utils.backup_directory(self.data_dir / split)
             if backup_dir is None:
                 self.logger.error(f"❌ Gagal membuat backup, membatalkan perbaikan")
-                return {
-                    'status': 'error',
-                    'message': 'Backup gagal'
-                }
+                return {'status': 'error', 'message': 'Backup gagal'}
         
         # Setup direktori
         split_dir = self.utils.get_split_path(split)
-        images_dir = split_dir / 'images'
-        labels_dir = split_dir / 'labels'
+        images_dir, labels_dir = split_dir / 'images', split_dir / 'labels'
         
         if not images_dir.exists() or not labels_dir.exists():
             self.logger.error(f"❌ Direktori dataset tidak lengkap: {split_dir}")
-            return {
-                'status': 'error',
-                'message': f'Direktori tidak lengkap: {split_dir}'
-            }
+            return {'status': 'error', 'message': f'Direktori tidak lengkap: {split_dir}'}
         
         # Statistik perbaikan
         fix_stats = {
-            'processed': 0,
-            'fixed_labels': 0,
-            'fixed_coordinates': 0,
-            'fixed_images': 0,
-            'skipped': 0,
-            'errors': 0,
-            'backup_created': backup
+            'processed': 0, 'fixed_labels': 0, 'fixed_coordinates': 0,
+            'fixed_images': 0, 'skipped': 0, 'errors': 0, 'backup_created': backup
         }
         
         # Temukan semua file gambar
         image_files = self.utils.find_image_files(images_dir)
-        
         if not image_files:
             self.logger.warning(f"⚠️ Tidak ada gambar ditemukan di {images_dir}")
             return fix_stats
@@ -115,34 +71,24 @@ class DatasetFixer:
         # Proses setiap gambar
         self.logger.info(f"🔧 Memperbaiki dataset {split}: {len(image_files)} gambar")
         
-        for img_path in image_files:
+        for img_path in tqdm(image_files, desc=f"Memperbaiki {split}"):
             try:
-                # Proses gambar
+                # Proses gambar jika diminta
                 fixed_image = False
-                
                 if fix_images:
                     fixed_image = self._fix_image(img_path)
-                    if fixed_image:
-                        fix_stats['fixed_images'] += 1
+                    if fixed_image: fix_stats['fixed_images'] += 1
                 
-                # Proses label
+                # Proses label jika diminta
                 label_path = labels_dir / f"{img_path.stem}.txt"
-                
                 if label_path.exists() and (fix_coordinates or fix_labels):
                     fixed_label, fixed_coords = self._fix_label(
-                        label_path,
-                        fix_coordinates=fix_coordinates,
-                        fix_format=fix_labels
+                        label_path, fix_coordinates=fix_coordinates, fix_format=fix_labels
                     )
-                    
-                    if fixed_label:
-                        fix_stats['fixed_labels'] += 1
-                    
-                    if fixed_coords:
-                        fix_stats['fixed_coordinates'] += fixed_coords
+                    if fixed_label: fix_stats['fixed_labels'] += 1
+                    if fixed_coords: fix_stats['fixed_coordinates'] += fixed_coords
                 
                 fix_stats['processed'] += 1
-                
             except Exception as e:
                 self.logger.error(f"❌ Error saat memperbaiki {img_path.name}: {str(e)}")
                 fix_stats['errors'] += 1
@@ -159,36 +105,21 @@ class DatasetFixer:
         return fix_stats
     
     def _fix_image(self, img_path: Path) -> bool:
-        """
-        Perbaiki gambar yang rusak.
-        
-        Args:
-            img_path: Path ke file gambar
-            
-        Returns:
-            Boolean yang menunjukkan keberhasilan perbaikan
-        """
+        """Perbaiki gambar yang rusak."""
         try:
-            import cv2
-            
             # Baca gambar
             img = cv2.imread(str(img_path))
-            
-            # Jika gambar tidak bisa dibaca, tidak bisa diperbaiki
-            if img is None:
-                return False
+            if img is None: return False
             
             # Cek kualitas gambar
             issues = []
+            h, w = img.shape[:2]
             
             # Cek resolusi (terlalu kecil?)
-            h, w = img.shape[:2]
             if h < 100 or w < 100:
                 issues.append("resolusi rendah")
-                
                 # Resize gambar
-                target_size = (max(w, 100), max(h, 100))
-                img = cv2.resize(img, target_size, interpolation=cv2.INTER_CUBIC)
+                img = cv2.resize(img, (max(w, 100), max(h, 100)), interpolation=cv2.INTER_CUBIC)
             
             # Cek kontras
             gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -196,37 +127,27 @@ class DatasetFixer:
             
             if contrast < 20:
                 issues.append("kontras rendah")
-                
                 # Perbaiki kontras
                 clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
                 gray = clahe.apply(gray)
-                
-                # Convert kembali ke BGR jika diperlukan
                 if len(img.shape) == 3:
-                    # Ini adalah pendekatan sederhana, ideal menggunakan transformasi di ruang warna lain
                     img = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
             
             # Cek blur
             laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
-            
             if laplacian_var < 100:
                 issues.append("blur")
-                
-                # Tidak banyak yang bisa dilakukan untuk gambar blur,
-                # namun kita bisa mencoba sharpening sederhana
-                kernel = np.array([[-1,-1,-1], 
-                                   [-1, 9,-1],
-                                   [-1,-1,-1]])
+                # Sharpening
+                kernel = np.array([[-1,-1,-1], [-1, 9,-1], [-1,-1,-1]])
                 img = cv2.filter2D(img, -1, kernel)
             
-            # Jika ada isu yang diperbaiki, simpan gambar
+            # Simpan gambar jika ada isu yang diperbaiki
             if issues:
                 cv2.imwrite(str(img_path), img)
                 self.logger.info(f"🔧 Gambar {img_path.name} diperbaiki: {', '.join(issues)}")
                 return True
                 
             return False
-            
         except Exception as e:
             self.logger.error(f"❌ Gagal memperbaiki gambar {img_path.name}: {str(e)}")
             return False
@@ -237,24 +158,13 @@ class DatasetFixer:
         fix_coordinates: bool = True,
         fix_format: bool = True
     ) -> Tuple[bool, int]:
-        """
-        Perbaiki file label.
-        
-        Args:
-            label_path: Path ke file label
-            fix_coordinates: Perbaiki koordinat yang tidak valid
-            fix_format: Perbaiki format label yang tidak valid
-            
-        Returns:
-            Tuple (label_fixed, coordinates_fixed_count)
-        """
+        """Perbaiki file label."""
         try:
             # Baca file label
             with open(label_path, 'r') as f:
                 lines = f.readlines()
             
-            if not lines:
-                return False, 0
+            if not lines: return False, 0
             
             fixed_lines = []
             fixed_something = False
@@ -265,17 +175,12 @@ class DatasetFixer:
                 parts = line.split()
                 
                 # Skip baris kosong
-                if not parts:
-                    continue
+                if not parts: continue
                 
                 # Perbaiki format
                 if fix_format and len(parts) != 5:
-                    # Tidak bisa memperbaiki jika format terlalu rusak
-                    if len(parts) < 5:
-                        continue
-                    
-                    # Ambil lima bagian pertama saja
-                    parts = parts[:5]
+                    if len(parts) < 5: continue # Format terlalu rusak
+                    parts = parts[:5] # Ambil 5 bagian pertama
                     fixed_something = True
                 
                 try:
@@ -285,8 +190,7 @@ class DatasetFixer:
                     
                     # Validasi class ID
                     if self.layer_config_manager.get_layer_for_class_id(cls_id) is None:
-                        # Tidak bisa memperbaiki class ID yang tidak valid
-                        continue
+                        continue # Class ID tidak valid
                     
                     # Perbaiki koordinat
                     fixed_bbox = bbox.copy()

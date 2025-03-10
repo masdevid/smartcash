@@ -21,19 +21,16 @@ class DatasetUtils:
     """Utilitas umum untuk operasi dataset SmartCash."""
 
     def __init__(self, config: Optional[Dict] = None, data_dir: Optional[str] = None, logger=None):
-        """Inisialisasi DatasetUtils."""
         self.config = config or {}
         self.data_dir = Path(data_dir or self.config.get('data_dir', 'data'))
         self.logger = logger or get_logger("dataset_utils")
         self._cache = {}
         
-        # Setup layer config jika tersedia
         if config:
             self.layer_config = get_layer_config()
             self.active_layers = config.get('layers', self.layer_config.get_layer_names())
-            
-            # Buat mapping untuk lookup cepat
             self.class_to_layer, self.class_to_name = {}, {}
+            
             for layer_name in self.layer_config.get_layer_names():
                 layer_config = self.layer_config.get_layer_config(layer_name)
                 for i, cls_id in enumerate(layer_config['class_ids']):
@@ -46,26 +43,22 @@ class DatasetUtils:
     def get_split_path(self, split: str) -> Path:
         """Dapatkan path untuk split dataset tertentu."""
         split = 'valid' if split in ('val', 'validation') else split
-        
         if self.config:
             split_paths = self.config.get('data', {}).get('local', {})
-            if split in split_paths:
-                return Path(split_paths[split])
-            
+            if split in split_paths: return Path(split_paths[split])
         return self.data_dir / split
     
     def get_class_name(self, cls_id: int) -> str:
         """Dapatkan nama kelas dari ID kelas."""
         if not hasattr(self, 'class_to_name'): return f"Class-{cls_id}"
         if cls_id in self.class_to_name: return self.class_to_name[cls_id]
-            
+        
         for layer_name in self.layer_config.get_layer_names():
             layer_config = self.layer_config.get_layer_config(layer_name)
             if cls_id in layer_config['class_ids']:
                 idx = layer_config['class_ids'].index(cls_id)
                 if idx < len(layer_config['classes']):
                     return layer_config['classes'][idx]
-        
         return f"Class-{cls_id}"
     
     def get_layer_from_class(self, cls_id: int) -> Optional[str]:
@@ -86,24 +79,18 @@ class DatasetUtils:
         if not dir_path.exists():
             self.logger.warning(f"⚠️ Direktori tidak ditemukan: {dir_path}")
             return []
-            
-        # Kumpulkan semua file gambar
+        
         image_files = []
         for ext in IMG_EXTENSIONS:
             image_files.extend(list(dir_path.glob(ext)))
         
         if not with_labels: return image_files
-            
-        # Cari path labels
-        labels_dir = None
-        if (dir_path / 'labels').exists():
-            labels_dir = dir_path / 'labels'
-        elif 'images' in dir_path.parts[-1]:
-            labels_dir = dir_path.parent / 'labels'
-            
-        if not labels_dir: return image_files
         
-        # Filter hanya yang punya label
+        labels_dir = None
+        if (dir_path / 'labels').exists(): labels_dir = dir_path / 'labels'
+        elif 'images' in dir_path.parts[-1]: labels_dir = dir_path.parent / 'labels'
+        
+        if not labels_dir: return image_files
         return [img for img in image_files if (labels_dir / f"{img.stem}.txt").exists()]
     
     def get_random_sample(self, items: List, sample_size: int, seed: int = DEFAULT_RANDOM_SEED) -> List:
@@ -125,20 +112,10 @@ class DatasetUtils:
             height, width = target_size[1], target_size[0] if target_size else (640, 640)
             return np.zeros((height, width, 3), dtype=np.uint8)
     
-    def parse_yolo_label(self, label_path: Path, 
-                        parse_callback: Optional[Callable] = None) -> List[Dict]:
-        """
-        Parse file label YOLO.
-        
-        Args:
-            label_path: Path file label
-            parse_callback: Callback function untuk validasi/pemrosesan lanjutan
-            
-        Returns:
-            List dictionary bbox
-        """
+    def parse_yolo_label(self, label_path: Path, parse_callback: Optional[Callable] = None) -> List[Dict]:
+        """Parse file label YOLO."""
         if not label_path.exists(): return []
-            
+        
         bboxes = []
         try:
             with open(label_path, 'r') as f:
@@ -149,32 +126,25 @@ class DatasetUtils:
                             cls_id = int(float(parts[0]))
                             x, y, w, h = map(float, parts[1:5])
                             
-                            # Validasi koordinat dasar
-                            if not (0 <= x <= 1 and 0 <= y <= 1 and w > 0.001 and h > 0.001):
-                                continue
-                                
-                            # Buat data bbox dasar
+                            if not (0 <= x <= 1 and 0 <= y <= 1 and w > 0.001 and h > 0.001): continue
+                            
                             bbox_data = {'class_id': cls_id, 'bbox': [x, y, w, h], 'line_idx': i}
                             
-                            # Tambahkan data tambahan jika config tersedia
                             if hasattr(self, 'class_to_name'):
                                 bbox_data.update({
                                     'class_name': self.get_class_name(cls_id),
                                     'layer': self.get_layer_from_class(cls_id) or 'unknown'
                                 })
                             
-                            # Jika ada callback untuk validasi/pemrosesan lanjutan
                             if parse_callback:
                                 bbox_data = parse_callback(bbox_data, line, i)
-                                if not bbox_data:  # Skip jika callback mengembalikan None/False
-                                    continue
+                                if not bbox_data: continue
                             
                             bboxes.append(bbox_data)
-                        except (ValueError, IndexError):
-                            continue
+                        except (ValueError, IndexError): continue
         except Exception as e:
             self.logger.debug(f"⚠️ Error saat membaca label {label_path}: {str(e)}")
-            
+        
         return bboxes
     
     def get_available_layers(self, label_path: Path) -> List[str]:
@@ -185,7 +155,7 @@ class DatasetUtils:
         for bbox in self.parse_yolo_label(label_path):
             if 'layer' in bbox and bbox['layer'] != 'unknown' and bbox['layer'] in self.active_layers:
                 available_layers.add(bbox['layer'])
-                
+        
         return list(available_layers)
     
     def get_split_statistics(self, splits: List[str] = DEFAULT_SPLITS) -> Dict[str, Dict[str, int]]:
@@ -201,7 +171,6 @@ class DatasetUtils:
                 stats[split] = {'images': 0, 'labels': 0, 'status': 'missing'}
                 continue
             
-            # Hitung file
             image_count = sum(len(list(images_dir.glob(ext))) for ext in IMG_EXTENSIONS)
             label_count = len(list(labels_dir.glob('*.txt')))
             
@@ -211,11 +180,10 @@ class DatasetUtils:
                 'status': 'valid' if image_count > 0 and label_count > 0 else 'empty'
             }
         
-        # Log ringkasan
-        log_lines = ["📊 Ringkasan dataset:"]
-        for split in splits:
-            s = stats.get(split, {})
-            log_lines.append(f"   • {split.capitalize()}: {s.get('images', 0)} gambar, {s.get('labels', 0)} label")
+        log_lines = ["📊 Ringkasan dataset:"] + [
+            f"   • {split.capitalize()}: {s.get('images', 0)} gambar, {s.get('labels', 0)} label"
+            for split, s in stats.items()
+        ]
         
         self.logger.info("\n".join(log_lines))
         return stats
@@ -227,12 +195,10 @@ class DatasetUtils:
             self.logger.warning(f"⚠️ Direktori sumber tidak ditemukan: {source_path}")
             return None
         
-        # Buat path backup dengan suffix
         suffix = suffix or datetime.now().strftime("%Y%m%d_%H%M%S")
         parent_dir = source_path.parent
         backup_path = parent_dir / f"{source_path.name}_backup_{suffix}"
         
-        # Jika sudah ada, tambahkan angka
         i = 1
         while backup_path.exists():
             backup_path = parent_dir / f"{source_path.name}_backup_{suffix}_{i}"
@@ -255,17 +221,14 @@ class DatasetUtils:
         
         for file_path in file_list:
             try:
-                # Setup target path dan buat direktori
                 rel_path = file_path.relative_to(source_dir)
                 dest_path = target_path / rel_path
                 dest_path.parent.mkdir(parents=True, exist_ok=True)
                 
-                # Salin file
                 if not dest_path.exists():
                     shutil.copy2(file_path, dest_path)
                     stats['moved'] += 1
-                else:
-                    stats['skipped'] += 1
+                else: stats['skipped'] += 1
             except Exception as e:
                 self.logger.error(f"❌ Gagal memindahkan {file_path}: {str(e)}")
                 stats['errors'] += 1
@@ -302,21 +265,18 @@ class DatasetUtils:
                      stratify_by_class: bool = True,
                      random_seed: int = DEFAULT_RANDOM_SEED) -> Dict[str, int]:
         """Pecah dataset menjadi train/valid/test."""
-        # Validasi rasio
         if abs(sum(split_ratios.values()) - 1.0) > 1e-10:
             raise ValueError(f"Total rasio harus 1.0, didapat: {sum(split_ratios.values())}")
             
         random.seed(random_seed)
         source_dir = source_dir or self.data_dir
         
-        # Cek source direktori
         if not ((source_dir / 'images').exists() and (source_dir / 'labels').exists()):
             raise ValueError(f"Source dir harus berisi subdirektori images/ dan labels/: {source_dir}")
-            
-        self.logger.info(f"📊 Memecah dataset dengan rasio: {split_ratios}")
         
-        # Cari valid files
+        self.logger.info(f"📊 Memecah dataset dengan rasio: {split_ratios}")
         valid_files = []
+        
         for img_path in self.find_image_files(source_dir / 'images', True):
             label_path = source_dir / 'labels' / f"{img_path.stem}.txt"
             if label_path.exists():
@@ -325,7 +285,7 @@ class DatasetUtils:
         if not valid_files:
             self.logger.error("❌ Tidak ada file valid dengan pasangan gambar/label")
             return {split: 0 for split in split_ratios.keys()}
-            
+        
         self.logger.info(f"🔍 Ditemukan {len(valid_files)} file valid dengan pasangan gambar/label")
         
         # Stratify jika diminta
@@ -338,12 +298,11 @@ class DatasetUtils:
                 if main_class not in files_by_class:
                     files_by_class[main_class] = []
                 files_by_class[main_class].append((img_path, label_path))
-                    
-            # Log distribusi kelas
-            self.logger.info(f"📊 Distribusi kelas:")
-            for cls, files in files_by_class.items():
-                cls_name = self.get_class_name(cls) if isinstance(cls, int) else str(cls)
-                self.logger.info(f"   • Kelas {cls_name}: {len(files)} sampel")
+            
+            self.logger.info("📊 Distribusi kelas:" + "".join(
+                f"\n   • Kelas {self.get_class_name(cls) if isinstance(cls, int) else str(cls)}: {len(files)} sampel"
+                for cls, files in files_by_class.items()
+            ))
         else:
             files_by_class = {'all': valid_files}
         
@@ -362,18 +321,17 @@ class DatasetUtils:
                 split_files[split].extend(files[start_idx:end_idx])
                 start_idx = end_idx
         
-        # Log alokasi
-        self.logger.info(f"📊 Pembagian dataset:" + 
-                        "".join(f"\n   • {split.capitalize()}: {len(files)} sampel" 
-                              for split, files in split_files.items()))
+        self.logger.info("📊 Pembagian dataset:" + "".join(
+            f"\n   • {split.capitalize()}: {len(files)} sampel" 
+            for split, files in split_files.items()
+        ))
         
         # Salin file
         splits_count = {}
         for split, files in split_files.items():
             if files:
                 target_dir = self.get_split_path(split)
-                copied = self.copy_dataset_files(files, target_dir, desc=f"Copying to {split}")
-                splits_count[split] = copied
-                
+                splits_count[split] = self.copy_dataset_files(files, target_dir, desc=f"Copying to {split}")
+        
         self.logger.success(f"✅ Pemecahan dataset selesai")
         return splits_count

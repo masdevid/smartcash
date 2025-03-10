@@ -21,7 +21,7 @@ from smartcash.handlers.dataset import DatasetManager
 from smartcash.handlers.evaluation import EvaluationManager
 from smartcash.handlers.detection import DetectionManager
 from smartcash.handlers.preprocessing import PreprocessingManager
-from smartcash.config import get_config_manager
+from smartcash.configs import get_config_manager
 from smartcash.exceptions import SmartCashError, ErrorHandler
 
 # Setup logging dasar

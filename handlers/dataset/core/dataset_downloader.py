@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.utils.logger import get_logger
-from smartcash.config import get_config_manager
+from smartcash.configs import get_config_manager
 
 
 class DatasetDownloader:

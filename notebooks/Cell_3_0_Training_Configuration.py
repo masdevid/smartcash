@@ -1,5 +1,5 @@
-# Cell 3.1 - Backbone Selection
-# Pilih backbone untuk model SmartCash
+# Cell 3.0 - Training Configuration
+# Konfigurasi parameter training model SmartCash
 
 # Setup import paths (jika diperlukan)
 import sys, os

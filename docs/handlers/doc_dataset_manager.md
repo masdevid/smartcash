@@ -185,7 +185,7 @@ Konfigurasi dataset dalam format dictionary yang mendukung:
 
 ```python
 from smartcash.handlers.dataset import DatasetManager
-from smartcash.config import get_config_manager
+from smartcash.configs import get_config_manager
 
 # Dapatkan konfigurasi
 config_manager = get_config_manager("configs/rupiah_detection.yaml")

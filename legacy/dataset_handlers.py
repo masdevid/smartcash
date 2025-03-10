@@ -16,7 +16,7 @@ try:
     from smartcash.handlers.dataset import DatasetManager
     from smartcash.utils.logger import get_logger
     from smartcash.utils.observer import EventDispatcher, EventTopics
-    from smartcash.config import get_config
+    from smartcash.configs import get_config
 except ImportError:
     # Placeholder saat modul belum ada
     def get_logger(name):

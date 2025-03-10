@@ -392,7 +392,7 @@ class DetectionManager:
     def _get_default_config(self) -> Dict[str, Any]:
         """Dapatkan konfigurasi default dari ConfigManager."""
         try:
-            from smartcash.config import get_config_manager
+            from smartcash.configs import get_config_manager
             config_manager = get_config_manager()
             
             # Coba load dari file jika ada

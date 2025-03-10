@@ -468,3 +468,5 @@ debug_logger = SmartCashLogger(
 
 cache = CacheManager(logger=debug_logger)
 ```
+
+

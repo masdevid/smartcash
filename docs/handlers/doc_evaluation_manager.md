@@ -27,10 +27,6 @@ smartcash/handlers/evaluation/
 │   ├── checkpoint_manager_adapter.py    # Adapter untuk CheckpointManager
 │   ├── visualization_adapter.py         # Adapter untuk visualisasi
 │   └── adapters_factory.py              # Factory untuk adapter
-└── observers/                           # Observer pattern
-    ├── base_observer.py                 # Observer dasar
-    ├── progress_observer.py             # Monitoring progres
-    └── metrics_observer.py              # Monitoring metrik
 ```
 
 `EvaluationManager` menggabungkan beberapa pipeline terspesialisasi menjadi satu antarmuka terpadu:
@@ -73,43 +69,12 @@ smartcash/handlers/evaluation/
 - Dukungan untuk eksport dan sharing hasil
 - Penyimpanan metrik untuk analisis jangka panjang
 
-### 5. Integrasi dengan Komponen Lain
+### 5. Integrasi dengan Observer Pattern
 
-- Adapter pattern untuk integrasi dengan komponan lain
-- Factory pattern untuk inisialisasi komponen
-- Observer pattern untuk progress monitoring dan metrics tracking
+- Implementasi langsung dengan `utils/observer` untuk memantau proses
+- Notifikasi event untuk setiap tahap evaluasi
+- Observer untuk progress tracking dan metrics monitoring
 - Integrasi dengan logger untuk informatif logs
-- Pemanfaatan berbagai utilitas SmartCash
-
-## Kelas Utama
-
-### EvaluationManager
-
-Manager utama evaluasi sebagai facade yang menyederhanakan antarmuka untuk evaluasi model dengan menggunakan berbagai adapter dan pipeline.
-
-### Pipeline-Pipeline Evaluasi
-
-#### EvaluationPipeline
-
-Pipeline evaluasi dengan berbagai komponen yang dapat dikonfigurasi, menggabungkan beberapa komponen evaluasi menjadi satu alur kerja.
-
-#### BatchEvaluationPipeline
-
-Pipeline untuk evaluasi batch model yang dapat mengevaluasi beberapa model dengan dataset yang sama secara paralel.
-
-#### ResearchPipeline
-
-Pipeline untuk evaluasi skenario penelitian dan perbandingan model dalam konteks perbandingan skenario penelitian dengan visualisasi hasil.
-
-### Core Components
-
-#### ModelEvaluator
-
-Komponen untuk evaluasi model dengan berbagai strategi yang melakukan proses evaluasi pada model dengan dataset yang diberikan.
-
-#### ReportGenerator
-
-Generator laporan hasil evaluasi model dalam berbagai format (JSON, CSV, Markdown, HTML).
 
 ## Metode Utama di EvaluationManager
 
@@ -129,55 +94,94 @@ Mengevaluasi berbagai skenario penelitian, seperti model dengan backbone berbeda
 
 Membuat laporan hasil evaluasi dalam berbagai format. Format yang didukung: JSON, CSV, Markdown, dan HTML.
 
-### visualize_results
-
-Membuat visualisasi dari hasil evaluasi, seperti perbandingan mAP, F1-score, waktu inferensi, dan metrik lainnya.
-
-## Adapters
-
-### MetricsAdapter
-
-Adapter untuk MetricsCalculator dari utils.metrics yang menyediakan antarmuka yang konsisten untuk menghitung dan mengelola metrik evaluasi.
-
-### ModelManagerAdapter
-
-Adapter untuk ModelManager yang menyediakan antarmuka untuk loading dan persiapan model untuk evaluasi.
-
-### DatasetAdapter
-
-Adapter untuk DatasetManager yang menyediakan antarmuka untuk akses dataset dan pembuatan dataloader untuk evaluasi.
-
-### CheckpointManagerAdapter
-
-Adapter untuk CheckpointManager yang menyediakan antarmuka untuk pencarian dan validasi checkpoint model.
-
-### VisualizationAdapter
-
-Adapter untuk integrasi visualisasi evaluasi yang menghubungkan pipeline evaluasi dengan komponen visualisasi.
-
-## Observer Pattern
-
-### ProgressObserver
-
-Observer untuk monitoring progres evaluasi yang menampilkan progress bar dan informasi runtime.
-
-### MetricsObserver
-
-Observer untuk monitoring dan pencatatan metrik evaluasi yang berguna untuk tracking eksperimen dan visualisasi hasil.
-
 ## Format Hasil
 
 ### Hasil Evaluasi Model Tunggal
 
-Hasil evaluasi berisi informasi seperti metrik (mAP, precision, recall, F1), waktu inferensi, informasi model, dan dataset.
+```python
+{
+    'metrics': {
+        'mAP': 0.92,                      # Mean Average Precision
+        'precision': 0.88,                # Precision
+        'recall': 0.89,                   # Recall
+        'f1': 0.885,                      # F1 Score
+        'inference_time': 0.023,          # Waktu inferensi rata-rata
+        'fps': 43.5,                      # Frame per detik
+        'class_metrics': {...}            # Metrik per kelas
+    },
+    'total_execution_time': 120.5,        # Waktu eksekusi total (detik)
+    'visualization_paths': {
+        'confusion_matrix': '/path/to/confusion_matrix.png',
+        'pr_curve': '/path/to/pr_curve.png'
+    },
+    'report_path': '/path/to/report.json' # Path laporan hasil
+}
+```
 
 ### Hasil Evaluasi Batch
 
-Hasil evaluasi batch berisi informasi tentang evaluasi beberapa model, metrik perbandingan, dan visualisasi perbandingan performa.
+```python
+{
+    'model_results': {                    # Hasil untuk setiap model
+        'model1': {...},                  # Hasil model 1
+        'model2': {...}                   # Hasil model 2
+    },
+    'summary': {                          # Ringkasan perbandingan
+        'best_model': 'model1',           # Model terbaik
+        'best_map': 0.92,                 # mAP terbaik
+        'average_map': 0.89,              # Rata-rata mAP
+        'metrics_table': {...}            # Tabel perbandingan
+    },
+    'plots': {                            # Visualisasi perbandingan
+        'map_comparison': '/path/to/map_comparison.png',
+        'inference_time': '/path/to/inference_time.png'
+    },
+    'total_execution_time': 300.8         # Waktu eksekusi total (detik)
+}
+```
 
 ### Hasil Evaluasi Skenario Penelitian
 
-Hasil evaluasi skenario penelitian berisi informasi tentang berbagai skenario, perbandingan backbone, dan kondisi pengujian yang berbeda.
+```python
+{
+    'scenario_results': {                 # Hasil untuk setiap skenario
+        'scenario1': {...},               # Hasil skenario 1
+        'scenario2': {...}                # Hasil skenario 2
+    },
+    'summary': {                          # Ringkasan perbandingan
+        'best_scenario': 'scenario1',     # Skenario terbaik
+        'best_map': 0.94,                 # mAP terbaik
+        'backbone_comparison': {          # Perbandingan backbone
+            'efficientnet': {'mAP': 0.93, 'F1': 0.91},
+            'cspdarknet': {'mAP': 0.89, 'F1': 0.88}
+        },
+        'condition_comparison': {         # Perbandingan kondisi
+            'Posisi Bervariasi': {'mAP': 0.88, 'F1': 0.86},
+            'Pencahayaan Bervariasi': {'mAP': 0.85, 'F1': 0.84}
+        }
+    },
+    'plots': {                            # Visualisasi perbandingan
+        'backbone_comparison': '/path/to/backbone_comparison.png',
+        'condition_comparison': '/path/to/condition_comparison.png'
+    },
+    'total_execution_time': 600.5         # Waktu eksekusi total (detik)
+}
+```
+
+## Event Utama
+
+- `evaluation.manager.start`: Evaluasi model dimulai
+- `evaluation.manager.complete`: Evaluasi model selesai
+- `evaluation.batch.start`: Evaluasi batch dimulai
+- `evaluation.batch.complete`: Evaluasi batch selesai
+- `evaluation.research.start`: Evaluasi skenario penelitian dimulai
+- `evaluation.research.complete`: Evaluasi skenario penelitian selesai
+- `evaluation.pipeline.start`: Pipeline evaluasi dimulai
+- `evaluation.pipeline.complete`: Pipeline evaluasi selesai
+- `evaluation.batch_start`: Batch evaluasi dimulai
+- `evaluation.batch_complete`: Batch evaluasi selesai
+- `evaluation.report.start`: Pembuatan laporan dimulai
+- `evaluation.report.complete`: Pembuatan laporan selesai
 
 ## Konfigurasi
 

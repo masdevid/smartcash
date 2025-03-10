@@ -1,6 +1,6 @@
 # File: smartcash/handlers/evaluation/evaluation_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager untuk evaluasi model dengan direct injection
+# Deskripsi: Manager untuk evaluasi model dengan pendekatan ringkas dan direct injection
 
 import os
 import time
@@ -8,15 +8,10 @@ import torch
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 
-from smartcash.utils.logger import SmartCashLogger, get_logger
+from smartcash.utils.logger import get_logger
 from smartcash.utils.metrics import MetricsCalculator
-from smartcash.utils.observer.event_dispatcher import EventDispatcher
-from smartcash.utils.observer.observer_manager import ObserverManager
-from smartcash.handlers.evaluation.core.model_evaluator import ModelEvaluator
-from smartcash.handlers.evaluation.core.report_generator import ReportGenerator
-from smartcash.handlers.evaluation.pipeline.evaluation_pipeline import EvaluationPipeline
-from smartcash.handlers.evaluation.pipeline.batch_evaluation_pipeline import BatchEvaluationPipeline
-from smartcash.handlers.evaluation.pipeline.research_pipeline import ResearchPipeline
+from smartcash.utils.observer import EventDispatcher, ObserverManager
+from smartcash.handlers.evaluation.pipeline import EvaluationPipeline, BatchEvaluationPipeline, ResearchPipeline
 
 class EvaluationManager:
     """
@@ -27,7 +22,7 @@ class EvaluationManager:
     def __init__(
         self,
         config: Dict,
-        logger: Optional[SmartCashLogger] = None,
+        logger = None,
         colab_mode: Optional[bool] = None
     ):
         """
@@ -41,7 +36,7 @@ class EvaluationManager:
         self.config = config
         self.logger = logger or get_logger("evaluation_manager")
         
-        # Coba auto-detect colab mode jika tidak dispesifikasikan
+        # Auto-detect colab mode jika tidak dispesifikasikan
         if colab_mode is None:
             try:
                 import google.colab
@@ -54,14 +49,10 @@ class EvaluationManager:
         # Setup observer manager
         self.observer_manager = ObserverManager()
         
-        # Cache untuk komponen
-        self._model_evaluator = None
-        self._report_generator = None
-        self._evaluation_pipeline = None
-        self._batch_pipeline = None
-        self._research_pipeline = None
+        # Cache untuk komponen lazy-load
+        self._components = {}
         
-        # Parameter evaluasi dari config
+        # Parameter dari config
         eval_config = self.config.get('evaluation', {})
         self.output_dir = Path(eval_config.get('output_dir', 'results/evaluation'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -73,15 +64,15 @@ class EvaluationManager:
     
     def evaluate_model(
         self,
-        model: Optional[torch.nn.Module] = None,
-        model_path: Optional[str] = None,
-        dataset_path: Optional[str] = None,
-        dataloader: Optional[torch.utils.data.DataLoader] = None,
-        device: Optional[str] = None,
-        conf_threshold: Optional[float] = None,
-        visualize: bool = True,
-        generate_report: bool = True,
-        report_format: str = 'json',
+        model = None,
+        model_path = None,
+        dataset_path = None,
+        dataloader = None,
+        device = None,
+        conf_threshold = None,
+        visualize = True,
+        generate_report = True,
+        report_format = 'json',
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -101,20 +92,17 @@ class EvaluationManager:
             
         Returns:
             Dictionary hasil evaluasi
-            
-        Raises:
-            ValueError: Jika tidak cukup parameter untuk evaluasi
         """
         self.logger.info("🚀 Mulai evaluasi model")
         
-        # Validasi input
+        # Validasi input dasar
         if model is None and model_path is None:
             raise ValueError("Harus menyediakan model atau model_path")
         
         if dataloader is None and dataset_path is None:
             raise ValueError("Harus menyediakan dataloader atau dataset_path")
         
-        # Notifikasi evaluasi dimulai
+        # Notifikasi event
         EventDispatcher.notify("evaluation.manager.start", self, {
             'model_path': model_path,
             'dataset_path': dataset_path
@@ -124,10 +112,10 @@ class EvaluationManager:
             # Ukur waktu eksekusi
             start_time = time.time()
             
-            # Gunakan evaluation pipeline untuk evaluasi model
-            eval_pipeline = self._get_evaluation_pipeline()
+            # Dapatkan evaluation pipeline
+            pipeline = self._get_component('evaluation_pipeline', EvaluationPipeline)
             
-            # Set parameter yang belum ditentukan dari config
+            # Set parameter dari config jika belum ditentukan
             if device is None:
                 device = self.config.get('evaluation', {}).get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
             
@@ -135,7 +123,7 @@ class EvaluationManager:
                 conf_threshold = self.config.get('evaluation', {}).get('conf_threshold', 0.25)
             
             # Jalankan pipeline
-            results = eval_pipeline.run(
+            results = pipeline.run(
                 model=model,
                 model_path=model_path,
                 dataset_path=dataset_path,
@@ -145,21 +133,21 @@ class EvaluationManager:
                 **kwargs
             )
             
-            # Tambahkan waktu eksekusi total
+            # Tambahkan waktu eksekusi
             execution_time = time.time() - start_time
             results['total_execution_time'] = execution_time
             
-            # Buat visualisasi jika diminta
+            # Buat visualisasi
             if visualize:
                 visualization_paths = self._create_visualizations(results)
                 results['visualization_paths'] = visualization_paths
             
-            # Buat laporan jika diminta
+            # Buat laporan
             if generate_report:
                 report_path = self._generate_report(results, report_format)
                 results['report_path'] = report_path
             
-            # Notifikasi evaluasi selesai
+            # Notifikasi selesai
             EventDispatcher.notify("evaluation.manager.complete", self, {
                 'execution_time': execution_time,
                 'metrics': results.get('metrics', {})
@@ -170,24 +158,19 @@ class EvaluationManager:
             
         except Exception as e:
             self.logger.error(f"❌ Evaluasi model gagal: {str(e)}")
-            
-            # Notifikasi error
-            EventDispatcher.notify("evaluation.manager.error", self, {
-                'error': str(e)
-            })
-            
+            EventDispatcher.notify("evaluation.manager.error", self, {'error': str(e)})
             raise
     
     def evaluate_batch(
         self,
-        models: Optional[List[torch.nn.Module]] = None,
-        model_paths: Optional[List[str]] = None,
-        dataset_path: str = None,
-        dataloader: Optional[torch.utils.data.DataLoader] = None,
-        parallel: bool = True,
-        visualize: bool = True,
-        generate_report: bool = True,
-        report_format: str = 'markdown',
+        models = None,
+        model_paths = None,
+        dataset_path = None,
+        dataloader = None,
+        parallel = True,
+        visualize = True,
+        generate_report = True,
+        report_format = 'markdown',
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -206,42 +189,36 @@ class EvaluationManager:
             
         Returns:
             Dictionary hasil evaluasi
-            
-        Raises:
-            ValueError: Jika tidak cukup parameter untuk evaluasi
         """
         self.logger.info("🚀 Mulai evaluasi batch model")
         
-        # Validasi input
+        # Validasi input dasar
         if (models is None or len(models) == 0) and (model_paths is None or len(model_paths) == 0):
             raise ValueError("Harus menyediakan models atau model_paths")
         
         if dataloader is None and dataset_path is None:
             raise ValueError("Harus menyediakan dataloader atau dataset_path")
         
-        # Ukur waktu eksekusi
+        # Notifikasi dan timing
         start_time = time.time()
-        
-        # Notifikasi evaluasi batch dimulai
         EventDispatcher.notify("evaluation.batch.start", self, {
-            'num_models': len(models) if models is not None else len(model_paths),
+            'num_models': len(models or model_paths),
             'dataset_path': dataset_path
         })
         
         try:
-            # Gunakan batch evaluation pipeline
-            batch_pipeline = self._get_batch_pipeline()
+            # Dapatkan batch pipeline
+            batch_pipeline = self._get_component('batch_pipeline', BatchEvaluationPipeline)
             
             # Convert models ke model_paths jika perlu
             if models is not None and model_paths is None:
                 model_paths = []
                 for i, model in enumerate(models):
-                    # Simpan model ke temporary checkpoint
                     temp_path = str(self.output_dir / f"temp_model_{i}.pt")
                     torch.save(model.state_dict(), temp_path)
                     model_paths.append(temp_path)
             
-            # Jalankan batch evaluation
+            # Jalankan evaluasi batch
             results = batch_pipeline.run(
                 model_paths=model_paths,
                 dataset_path=dataset_path,
@@ -250,21 +227,18 @@ class EvaluationManager:
                 **kwargs
             )
             
-            # Tambahkan waktu eksekusi total
+            # Tambahkan waktu eksekusi
             execution_time = time.time() - start_time
             results['total_execution_time'] = execution_time
             
-            # Buat visualisasi jika diminta
+            # Visualisasi dan laporan
             if visualize:
-                visualization_paths = self._create_batch_visualizations(results)
-                results['plots'] = visualization_paths
+                results['plots'] = self._create_batch_visualizations(results)
             
-            # Buat laporan jika diminta
             if generate_report:
-                report_path = self._generate_report(results, report_format)
-                results['report_path'] = report_path
+                results['report_path'] = self._generate_report(results, report_format)
             
-            # Notifikasi evaluasi batch selesai
+            # Notifikasi selesai
             EventDispatcher.notify("evaluation.batch.complete", self, {
                 'execution_time': execution_time,
                 'num_models': len(model_paths)
@@ -275,18 +249,13 @@ class EvaluationManager:
             
         except Exception as e:
             self.logger.error(f"❌ Evaluasi batch gagal: {str(e)}")
-            
-            # Notifikasi error
-            EventDispatcher.notify("evaluation.batch.error", self, {
-                'error': str(e)
-            })
-            
+            EventDispatcher.notify("evaluation.batch.error", self, {'error': str(e)})
             raise
         finally:
-            # Hapus temporary checkpoint jika ada
+            # Cleanup temporary files
             if models is not None and model_paths is not None:
                 for path in model_paths:
-                    if path.startswith(str(self.output_dir / "temp_model_")):
+                    if str(path).startswith(str(self.output_dir / "temp_model_")):
                         try:
                             os.remove(path)
                         except:
@@ -295,9 +264,9 @@ class EvaluationManager:
     def evaluate_research_scenarios(
         self,
         scenarios: Dict[str, Dict],
-        visualize: bool = True,
-        generate_report: bool = True,
-        report_format: str = 'markdown',
+        visualize = True,
+        generate_report = True,
+        report_format = 'markdown',
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -312,49 +281,38 @@ class EvaluationManager:
             
         Returns:
             Dictionary hasil evaluasi
-            
-        Raises:
-            ValueError: Jika tidak ada skenario yang valid
         """
         self.logger.info(f"🔬 Mulai evaluasi {len(scenarios)} skenario penelitian")
         
-        # Validasi input
+        # Validasi input dasar
         if not scenarios:
             raise ValueError("Harus menyediakan minimal satu skenario")
         
-        # Notifikasi evaluasi skenario dimulai
+        # Notifikasi dan timing
+        start_time = time.time()
         EventDispatcher.notify("evaluation.research.start", self, {
             'num_scenarios': len(scenarios)
         })
         
         try:
-            # Ukur waktu eksekusi
-            start_time = time.time()
-            
-            # Gunakan research pipeline
-            research_pipeline = self._get_research_pipeline()
+            # Dapatkan research pipeline
+            research_pipeline = self._get_component('research_pipeline', ResearchPipeline)
             
             # Jalankan evaluasi skenario
-            results = research_pipeline.run(
-                scenarios=scenarios,
-                **kwargs
-            )
+            results = research_pipeline.run(scenarios=scenarios, **kwargs)
             
-            # Tambahkan waktu eksekusi total
+            # Tambahkan waktu eksekusi
             execution_time = time.time() - start_time
             results['total_execution_time'] = execution_time
             
-            # Buat visualisasi jika diminta
+            # Visualisasi dan laporan
             if visualize:
-                visualization_paths = self._create_research_visualizations(results)
-                results['plots'] = visualization_paths
+                results['plots'] = self._create_research_visualizations(results)
             
-            # Buat laporan jika diminta
             if generate_report:
-                report_path = self._generate_report(results, report_format)
-                results['report_path'] = report_path
+                results['report_path'] = self._generate_report(results, report_format)
             
-            # Notifikasi evaluasi skenario selesai
+            # Notifikasi selesai
             EventDispatcher.notify("evaluation.research.complete", self, {
                 'execution_time': execution_time,
                 'num_scenarios': len(scenarios)
@@ -365,20 +323,15 @@ class EvaluationManager:
             
         except Exception as e:
             self.logger.error(f"❌ Evaluasi skenario penelitian gagal: {str(e)}")
-            
-            # Notifikasi error
-            EventDispatcher.notify("evaluation.research.error", self, {
-                'error': str(e)
-            })
-            
+            EventDispatcher.notify("evaluation.research.error", self, {'error': str(e)})
             raise
     
     def generate_report(
         self,
         results: Dict[str, Any],
-        format: str = 'json',
-        output_path: Optional[str] = None,
-        include_plots: bool = True,
+        format = 'json',
+        output_path = None,
+        include_plots = True,
         **kwargs
     ) -> str:
         """
@@ -394,23 +347,23 @@ class EvaluationManager:
         Returns:
             Path ke laporan
         """
-        report_generator = self._get_report_generator()
+        # Dapatkan report generator
+        from smartcash.handlers.evaluation.core.report_generator import ReportGenerator
+        report_generator = self._get_component('report_generator', ReportGenerator)
         
-        # Buat path output jika belum ada
+        # Buat output path jika belum ada
         if output_path is None:
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             output_path = str(self.output_dir / "reports" / f"report_{timestamp}.{format}")
         
-        # Generate report
-        report_path = report_generator.generate(
+        # Buat report
+        return report_generator.generate(
             results=results,
             format=format,
             output_path=output_path,
             include_plots=include_plots,
             **kwargs
         )
-        
-        return report_path
     
     def _setup_default_observers(self):
         """Setup observer default untuk logging dan progress tracking."""
@@ -421,164 +374,63 @@ class EvaluationManager:
             name="EvaluationLogger",
             group="default_observers"
         )
-        
-        # Observer untuk progress tracking dalam penelitian
-        if self.colab_mode:
-            # Tambahan observer khusus untuk Colab
-            pass
     
-    def _get_model_evaluator(self) -> ModelEvaluator:
+    def _get_component(self, name, component_class, **kwargs):
         """
-        Lazy-load model evaluator.
-        
-        Returns:
-            ModelEvaluator instance
-        """
-        if self._model_evaluator is None:
-            metrics_calculator = MetricsCalculator()
-            self._model_evaluator = ModelEvaluator(
-                config=self.config,
-                metrics_calculator=metrics_calculator,
-                logger=self.logger.get_child("model_evaluator") if hasattr(self.logger, 'get_child') else self.logger
-            )
-            
-        return self._model_evaluator
-    
-    def _get_report_generator(self) -> ReportGenerator:
-        """
-        Lazy-load report generator.
-        
-        Returns:
-            ReportGenerator instance
-        """
-        if self._report_generator is None:
-            self._report_generator = ReportGenerator(
-                config=self.config,
-                logger=self.logger.get_child("report_generator") if hasattr(self.logger, 'get_child') else self.logger
-            )
-            
-        return self._report_generator
-    
-    def _get_evaluation_pipeline(self) -> EvaluationPipeline:
-        """
-        Lazy-load evaluation pipeline.
-        
-        Returns:
-            EvaluationPipeline instance
-        """
-        if self._evaluation_pipeline is None:
-            self._evaluation_pipeline = EvaluationPipeline(
-                config=self.config,
-                logger=self.logger.get_child("evaluation_pipeline") if hasattr(self.logger, 'get_child') else self.logger
-            )
-            
-        return self._evaluation_pipeline
-    
-    def _get_batch_pipeline(self) -> BatchEvaluationPipeline:
-        """
-        Lazy-load batch evaluation pipeline.
-        
-        Returns:
-            BatchEvaluationPipeline instance
-        """
-        if self._batch_pipeline is None:
-            self._batch_pipeline = BatchEvaluationPipeline(
-                config=self.config,
-                logger=self.logger.get_child("batch_pipeline") if hasattr(self.logger, 'get_child') else self.logger
-            )
-            
-        return self._batch_pipeline
-    
-    def _get_research_pipeline(self) -> ResearchPipeline:
-        """
-        Lazy-load research pipeline.
-        
-        Returns:
-            ResearchPipeline instance
-        """
-        if self._research_pipeline is None:
-            self._research_pipeline = ResearchPipeline(
-                config=self.config,
-                logger=self.logger.get_child("research_pipeline") if hasattr(self.logger, 'get_child') else self.logger
-            )
-            
-        return self._research_pipeline
-    
-    def _create_visualizations(self, results: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Buat visualisasi untuk hasil evaluasi model tunggal.
+        Lazy-load komponen.
         
         Args:
-            results: Hasil evaluasi
+            name: Nama komponen untuk cache
+            component_class: Kelas komponen yang akan dibuat
+            **kwargs: Parameter tambahan untuk constructor
             
         Returns:
-            Dictionary path visualisasi
+            Instance komponen
         """
-        # Di sini kita akan menggunakan visualizer untuk membuat plot
-        # Karena implementasi visualization_adapter sudah baik, kita bisa tetap menggunakannya
-        # atau beralih ke utils.visualization langsung
-        
-        # Untuk sekarang, kita akan mengembalikan dummy paths
+        if name not in self._components:
+            self._components[name] = component_class(
+                config=self.config,
+                logger=self.logger.get_child(name) if hasattr(self.logger, 'get_child') else self.logger,
+                **kwargs
+            )
+        return self._components[name]
+    
+    def _create_visualizations(self, results: Dict[str, Any]) -> Dict[str, str]:
+        """Buat visualisasi untuk hasil evaluasi model tunggal."""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        plots_dir = self.output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
         
         return {
-            'confusion_matrix': str(self.output_dir / "plots" / f"confusion_matrix_{timestamp}.png"),
-            'pr_curve': str(self.output_dir / "plots" / f"pr_curve_{timestamp}.png")
+            'confusion_matrix': str(plots_dir / f"confusion_matrix_{timestamp}.png"),
+            'pr_curve': str(plots_dir / f"pr_curve_{timestamp}.png")
         }
     
     def _create_batch_visualizations(self, results: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Buat visualisasi untuk hasil evaluasi batch.
-        
-        Args:
-            results: Hasil evaluasi batch
-            
-        Returns:
-            Dictionary path visualisasi
-        """
+        """Buat visualisasi untuk hasil evaluasi batch."""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        plots_dir = self.output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
         
         return {
-            'map_comparison': str(self.output_dir / "plots" / f"map_comparison_{timestamp}.png"),
-            'inference_time': str(self.output_dir / "plots" / f"inference_time_{timestamp}.png")
+            'map_comparison': str(plots_dir / f"map_comparison_{timestamp}.png"),
+            'inference_time': str(plots_dir / f"inference_time_{timestamp}.png")
         }
     
     def _create_research_visualizations(self, results: Dict[str, Any]) -> Dict[str, str]:
-        """
-        Buat visualisasi untuk hasil evaluasi skenario penelitian.
-        
-        Args:
-            results: Hasil evaluasi skenario
-            
-        Returns:
-            Dictionary path visualisasi
-        """
+        """Buat visualisasi untuk hasil evaluasi skenario penelitian."""
         timestamp = time.strftime("%Y%m%d_%H%M%S")
+        plots_dir = self.output_dir / "plots"
+        plots_dir.mkdir(parents=True, exist_ok=True)
         
         return {
-            'backbone_comparison': str(self.output_dir / "plots" / f"backbone_comparison_{timestamp}.png"),
-            'condition_comparison': str(self.output_dir / "plots" / f"condition_comparison_{timestamp}.png")
+            'backbone_comparison': str(plots_dir / f"backbone_comparison_{timestamp}.png"),
+            'condition_comparison': str(plots_dir / f"condition_comparison_{timestamp}.png")
         }
     
     def _generate_report(self, results: Dict[str, Any], format: str) -> str:
-        """
-        Buat laporan hasil evaluasi.
-        
-        Args:
-            results: Hasil evaluasi
-            format: Format laporan
-            
-        Returns:
-            Path ke laporan
-        """
-        timestamp = time.strftime("%Y%m%d_%H%M%S")
-        output_path = str(self.output_dir / "reports" / f"report_{timestamp}.{format}")
-        
-        report_generator = self._get_report_generator()
-        report_path = report_generator.generate(
+        """Generate laporan hasil evaluasi."""
+        return self.generate_report(
             results=results,
-            format=format,
-            output_path=output_path
+            format=format
         )
-        
-        return report_path

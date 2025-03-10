@@ -118,8 +118,9 @@ class DatasetDownloader:
             # Akses project dan download dataset
             workspace_obj = rf.workspace(workspace)
             project_obj = workspace_obj.project(project)
-            dataset = project_obj.version(version).download(
-                format=format,
+            version_obj = project_obj.version(version)
+            dataset = version_obj.download(
+                model_format=format,
                 location=output_dir,
                 **kwargs
             )

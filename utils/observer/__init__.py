@@ -70,7 +70,6 @@ class EventTopics:
     DOWNLOAD = "download"
     DOWNLOAD_START = "download.start"
     DOWNLOAD_PROGRESS = "download.progress"
-    DOWNLOAD_COMPLETE = "download.complete"
     DOWNLOAD_ERROR = "download.error"
     DOWNLOAD_END = "download.end"
     

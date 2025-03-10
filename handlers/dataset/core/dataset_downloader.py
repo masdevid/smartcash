@@ -55,62 +55,97 @@ class DatasetDownloader:
         if not self.api_key:
             self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Fitur download mungkin tidak berfungsi.")
     
-    def download_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True) -> str:
-        """Download dataset dari Roboflow dengan progress bar dan dukungan resume."""
-        if not self.api_key:
-            raise ValueError("Roboflow API key diperlukan untuk download dataset")
+    def download_dataset(
+        self,
+        format: str = "yolov5",
+        api_key: Optional[str] = None,
+        workspace: Optional[str] = None,
+        project: Optional[str] = None,
+        version: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        show_progress: bool = True,
+        **kwargs
+    ) -> str:
+        """
+        Download dataset dari Roboflow.
+        
+        Args:
+            format: Format dataset ('yolov5', 'coco', etc)
+            api_key: Roboflow API key
+            workspace: Roboflow workspace
+            project: Roboflow project
+            version: Roboflow version
+            output_dir: Directory untuk menyimpan dataset
+            show_progress: Tampilkan progress bar
+            **kwargs: Parameter tambahan untuk Roboflow API
             
-        self.logger.start(f"🔄 Mendownload dataset Roboflow {self.workspace}/{self.project}:{self.version} format {format}")
+        Returns:
+            Path ke direktori dataset
+        """
+        # Gunakan nilai config jika parameter tidak diberikan
+        api_key = api_key or self.config['data']['roboflow'].get('api_key')
+        workspace = workspace or self.config['data']['roboflow'].get('workspace')
+        project = project or self.config['data']['roboflow'].get('project')
+        version = version or self.config['data']['roboflow'].get('version')
+        output_dir = output_dir or os.path.join(self.data_dir, f"roboflow_{workspace}_{project}_{version}")
         
-        # Cek apakah dataset sudah ada
-        download_dir = self.data_dir / f"roboflow_{self.project}_{self.version}"
-        dataset_info_path = download_dir / "dataset_info.json"
-        os.makedirs(download_dir, exist_ok=True)
+        # Validasi
+        if not api_key:
+            raise ValueError("🔑 API key tidak tersedia. Berikan api_key melalui parameter atau config.")
+        if not workspace or not project or not version:
+            raise ValueError("📋 Workspace, project, dan version diperlukan untuk download dataset.")
         
-        if download_dir.exists() and dataset_info_path.exists():
-            try:
-                with open(dataset_info_path, 'r') as f:
-                    info = json.load(f)
-                
-                if (info.get('completed', False) and info.get('workspace') == self.workspace and
-                    info.get('project') == self.project and info.get('version') == self.version and
-                    info.get('format') == format):
-                    self.logger.info(f"✅ Dataset sudah ada di {download_dir}")
-                    return str(download_dir)
-            except:
-                pass
+        # Buat directory jika belum ada
+        os.makedirs(output_dir, exist_ok=True)
         
-        # Download dataset
-        url = f"https://app.roboflow.com/ds/download?workspace={self.workspace}&project={self.project}&version={self.version}&format={format}&api_key={self.api_key}"
-        zip_path = self.temp_dir / f"{self.project}_{self.version}_{format}.zip"
-        
-        self.download_file(
-            url=url,
-            output_path=zip_path,
-            resume=resume,
-            progress_bar=show_progress,
-            metadata={'workspace': self.workspace, 'project': self.project, 'version': self.version, 'format': format}
+        # Notifikasi start download
+        self.logger.info(f"🚀 Memulai download dataset {workspace}/{project} versi {version}")
+        EventDispatcher.notify(
+            event_type=EventTopics.DOWNLOAD_START,
+            sender=self,
+            workspace=workspace,
+            project=project,
+            version=version
         )
         
-        # Ekstrak dataset
-        self.logger.info(f"📦 Mengekstrak dataset...")
-        self.extract_zip(zip_path=zip_path, output_dir=download_dir, remove_zip=True, show_progress=show_progress)
-        
-        # Simpan info dataset
-        dataset_info = {
-            'workspace': self.workspace, 'project': self.project, 'version': self.version, 'format': format,
-            'timestamp': time.time(), 'completed': True, 'splits': self._count_files(download_dir)
-        }
-        
-        with open(dataset_info_path, 'w') as f:
-            json.dump(dataset_info, f, indent=2)
-        
-        # Log hasil
-        splits_info = dataset_info.get('splits', {})
-        self.logger.success(f"✅ Dataset berhasil diunduh ke {download_dir} 📥\n" +
-                           f"   Train: {splits_info.get('train', 0)}, Valid: {splits_info.get('valid', 0)}, Test: {splits_info.get('test', 0)}")
-        
-        return str(download_dir)
+        try:
+            # Import Roboflow hanya jika diperlukan
+            from roboflow import Roboflow
+            
+            # Inisialisasi Roboflow
+            rf = Roboflow(api_key=api_key)
+            
+            # Akses project dan download dataset
+            workspace_obj = rf.workspace(workspace)
+            project_obj = workspace_obj.project(project)
+            dataset = project_obj.version(version).download(
+                format=format,
+                location=output_dir,
+                **kwargs
+            )
+            
+            self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
+            
+            # Notifikasi download selesai
+            EventDispatcher.notify(
+                event_type=EventTopics.DOWNLOAD_END,
+                sender=self,
+                workspace=workspace,
+                project=project,
+                version=version,
+                output_dir=output_dir
+            )
+            
+            return output_dir
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error download dataset: {str(e)}")
+            EventDispatcher.notify(
+                event_type=EventTopics.DOWNLOAD_ERROR,
+                sender=self,
+                error=str(e)
+            )
+            raise
     
     def export_to_local(self, roboflow_dir: Union[str, Path], show_progress: bool = True) -> Tuple[str, str, str]:
         """Export dataset Roboflow ke struktur folder lokal standar."""

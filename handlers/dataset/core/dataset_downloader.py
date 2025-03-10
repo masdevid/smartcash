@@ -76,7 +76,6 @@ class DatasetDownloader:
             version: Roboflow version
             output_dir: Directory untuk menyimpan dataset
             show_progress: Tampilkan progress bar
-            **kwargs: Parameter tambahan untuk Roboflow API
             
         Returns:
             Path ke direktori dataset
@@ -120,7 +119,7 @@ class DatasetDownloader:
             version_obj = project_obj.version(version)
             dataset = version_obj.download(
                 model_format=format,
-                location=output_dir,
+                location=output_dir
             )
             
             self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")

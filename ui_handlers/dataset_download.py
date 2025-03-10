@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_handlers/dataset_download.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI download dataset SmartCash.
+Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi ObserverManager.
 """
 
 import os
@@ -57,11 +57,20 @@ def setup_download_handlers(ui_components, config=None):
     
     # Coba import DatasetManager dan utilitas yang diperlukan
     dataset_manager = None
+    logger = None
+    observer_manager = None
     try:
         from smartcash.handlers.dataset import DatasetManager
         from smartcash.utils.logger import get_logger
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        from smartcash.utils.observer import EventTopics
+        
         logger = get_logger("dataset_download")
         dataset_manager = DatasetManager(config, logger=logger)
+        
+        # Inisialisasi ObserverManager
+        observer_manager = ObserverManager(auto_register=True)
+        
     except ImportError as e:
         print(f"Info: Beberapa modul tidak tersedia, akan menggunakan simulasi. ({str(e)})")
         
@@ -109,6 +118,53 @@ def setup_download_handlers(ui_components, config=None):
         </div>
         """
     
+    # Setup progress observer jika observer_manager tersedia
+    download_observers_group = "download_observers"
+    
+    # Fungsi untuk update progress UI
+    def update_progress_callback(event_type, sender, progress=0, total=100, message=None, **kwargs):
+        # Update progress bar
+        ui_components['download_progress'].value = int(progress * 100 / total) if total > 0 else 0
+        ui_components['download_progress'].description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
+        
+        # Display message jika ada
+        if message:
+            with ui_components['download_status']:
+                display(create_status_indicator("info", message))
+    
+    # Setup observer untuk download progress jika observer_manager tersedia
+    if observer_manager:
+        try:
+            # Buat progress observer
+            progress_observer = observer_manager.create_simple_observer(
+                event_type=EventTopics.DOWNLOAD_PROGRESS,
+                callback=update_progress_callback,
+                name="DownloadProgressObserver",
+                group=download_observers_group
+            )
+            
+            # Buat logger observer untuk event download
+            logger_observer = observer_manager.create_logging_observer(
+                event_types=[
+                    EventTopics.DOWNLOAD_START,
+                    EventTopics.DOWNLOAD_END,
+                    EventTopics.DOWNLOAD_ERROR
+                ],
+                log_level="info",
+                name="DownloadLoggerObserver",
+                format_string="{event_type}: {message}",
+                include_timestamp=True,
+                logger_name="dataset_download",
+                group=download_observers_group
+            )
+            
+            if logger:
+                logger.info("✅ Observer untuk download telah dikonfigurasi")
+            
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error saat setup observer: {str(e)}")
+    
     # Handler untuk download dataset
     def on_download_click(b):
         with ui_components['download_status']:
@@ -116,8 +172,22 @@ def setup_download_handlers(ui_components, config=None):
             display(create_status_indicator("info", "🔄 Memulai download dataset..."))
             
             try:
+                # Reset progress
+                ui_components['download_progress'].value = 0
+                ui_components['download_progress'].description = "0%"
+                
                 # Ambil opsi download yang dipilih
                 download_option = ui_components['download_options'].value
+                
+                # Notifikasi awal download menggunakan observer pattern
+                if observer_manager:
+                    from smartcash.utils.observer import EventDispatcher, EventTopics
+                    EventDispatcher.notify(
+                        event_type=EventTopics.DOWNLOAD_START,
+                        sender="download_handler",
+                        message=f"Memulai download dataset dari {download_option}",
+                        timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                    )
                 
                 if download_option == 'Roboflow (Online)':
                     # Ambil settings dari form
@@ -143,6 +213,17 @@ def setup_download_handlers(ui_components, config=None):
                         if not api_key:
                             display(create_status_indicator("error", 
                                 "❌ API Key Roboflow tidak tersedia. Tambahkan secret ROBOFLOW_API_KEY di Google Colab untuk melanjutkan."))
+                            
+                            # Notifikasi error menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_ERROR,
+                                    sender="download_handler",
+                                    message="API Key Roboflow tidak tersedia",
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                                
                             # Open help accordion automatically
                             display(HTML("<script>document.querySelector('.accordion button').click();</script>"))
                             return
@@ -154,23 +235,9 @@ def setup_download_handlers(ui_components, config=None):
                         config['data']['roboflow']['project'] = project
                         config['data']['roboflow']['version'] = version
                     
-                    # Progress update function
-                    def update_progress(sender, progress, total, message=None, **kwargs):
-                        ui_components['download_progress'].value = int(progress * 100 / total) if total > 0 else 0
-                        ui_components['download_progress'].description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
-                        if message:
-                            display(create_status_indicator("info", message))
-                    
                     # Download dataset menggunakan DatasetManager jika tersedia
                     if dataset_manager:
                         try:
-                            # Daftarkan observer untuk update progress jika tersedia
-                            try:
-                                from smartcash.utils.observer import EventDispatcher, EventTopics
-                                EventDispatcher.register(EventTopics.DOWNLOAD_PROGRESS, update_progress)
-                            except ImportError:
-                                pass
-                            
                             display(create_status_indicator("info", "🔑 Menggunakan DatasetManager untuk download..."))
                             
                             # Download dataset
@@ -190,29 +257,74 @@ def setup_download_handlers(ui_components, config=None):
                             except:
                                 # Jika export_to_local tidak tersedia, gunakan dataset_path sebagai dir
                                 data_dir = dataset_path
+                                
+                            # Notifikasi sukses menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_END,
+                                    sender="download_handler",
+                                    message=f"Download dataset berhasil",
+                                    dataset_path=dataset_path,
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                                
                         except Exception as e:
                             display(create_status_indicator("error", f"❌ Error dari DatasetManager: {str(e)}"))
+                            
+                            # Notifikasi error menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_ERROR,
+                                    sender="download_handler",
+                                    message=f"Error dari DatasetManager: {str(e)}",
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                                
                             raise e
                     else:
                         # Simulasi download dari Roboflow jika DatasetManager tidak tersedia
                         display(create_status_indicator("info", "ℹ️ DatasetManager tidak tersedia, melakukan simulasi download..."))
                         
+                        # Simulasi progress dengan observer pattern
                         total_steps = 5
                         for i in range(total_steps + 1):
+                            # Update progress bar langsung
                             ui_components['download_progress'].value = int(i * 100 / total_steps)
                             ui_components['download_progress'].description = f"{int(i * 100 / total_steps)}%"
                             
-                            if i == 1:
-                                display(create_status_indicator("info", "🔑 Autentikasi API Roboflow..."))
+                            # Pesan berdasarkan tahap
+                            message = ""
+                            if i == 0:
+                                message = "🔄 Inisialisasi download..."
+                            elif i == 1:
+                                message = "🔑 Autentikasi API Roboflow..."
                             elif i == 2:
-                                display(create_status_indicator("info", "📂 Mengunduh metadata project..."))
+                                message = "📂 Mengunduh metadata project..."
                             elif i == 3:
-                                display(create_status_indicator("info", "🖼️ Mengunduh gambar..."))
+                                message = "🖼️ Mengunduh gambar..."
                             elif i == 4:
-                                display(create_status_indicator("info", "🏷️ Mengunduh label..."))
+                                message = "🏷️ Mengunduh label..."
                             elif i == 5:
-                                display(create_status_indicator("info", "⚙️ Memvalidasi hasil..."))
-                                
+                                message = "⚙️ Memvalidasi hasil..."
+                            
+                            # Tampilkan pesan
+                            if message:
+                                display(create_status_indicator("info", message))
+                            
+                            # Notifikasi progress menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_PROGRESS,
+                                    sender="download_handler",
+                                    progress=i,
+                                    total=total_steps,
+                                    message=message,
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                            
                             time.sleep(0.5)  # Simulasi delay
                         
                         # Buat direktori jika belum ada
@@ -220,11 +332,22 @@ def setup_download_handlers(ui_components, config=None):
                         for split in ['train', 'valid', 'test']:
                             for subdir in ['images', 'labels']:
                                 os.makedirs(os.path.join(data_dir, split, subdir), exist_ok=True)
+                                
+                        # Notifikasi sukses menggunakan observer pattern
+                        if observer_manager:
+                            from smartcash.utils.observer import EventDispatcher, EventTopics
+                            EventDispatcher.notify(
+                                event_type=EventTopics.DOWNLOAD_END,
+                                sender="download_handler",
+                                message=f"Download dataset berhasil",
+                                dataset_path=data_dir,
+                                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                            )
                     
                     # Tampilkan sukses
                     display(create_status_indicator(
                         "success", 
-                        f"✅ Dataset berhasil diunduh dari Roboflow ke {data_dir}"
+                        f"✅ Dataset berhasil diunduh dari Roboflow ke {data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}"
                     ))
                     
                     # Tampilkan statistik dataset jika dataset_manager tersedia
@@ -263,12 +386,12 @@ def setup_download_handlers(ui_components, config=None):
                     <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
                         <h4>📂 Struktur Direktori</h4>
                         <ul>
-                            <li><code>{data_dir}/train/images</code> - Gambar training</li>
-                            <li><code>{data_dir}/train/labels</code> - Label training</li>
-                            <li><code>{data_dir}/valid/images</code> - Gambar validasi</li>
-                            <li><code>{data_dir}/valid/labels</code> - Label validasi</li>
-                            <li><code>{data_dir}/test/images</code> - Gambar testing</li>
-                            <li><code>{data_dir}/test/labels</code> - Label testing</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/train/images</code> - Gambar training</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/train/labels</code> - Label training</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/valid/images</code> - Gambar validasi</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/valid/labels</code> - Label validasi</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/test/images</code> - Gambar testing</li>
+                            <li><code>{data_dir if 'data_dir' in locals() else config.get('data_dir', 'data')}/test/labels</code> - Label testing</li>
                         </ul>
                     </div>
                     """
@@ -281,6 +404,17 @@ def setup_download_handlers(ui_components, config=None):
                     
                     if not upload_widget.value:
                         display(create_status_indicator("warning", "⚠️ Silahkan pilih file ZIP untuk diupload"))
+                        
+                        # Notifikasi error menggunakan observer pattern
+                        if observer_manager:
+                            from smartcash.utils.observer import EventDispatcher, EventTopics
+                            EventDispatcher.notify(
+                                event_type=EventTopics.DOWNLOAD_ERROR,
+                                sender="download_handler",
+                                message="File ZIP tidak dipilih",
+                                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                            )
+                            
                         return
                     
                     # Info file
@@ -293,6 +427,19 @@ def setup_download_handlers(ui_components, config=None):
                     if dataset_manager:
                         try:
                             display(create_status_indicator("info", "📤 Proses upload..."))
+                            
+                            # Notifikasi progress menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_PROGRESS,
+                                    sender="download_handler",
+                                    progress=1,
+                                    total=2,
+                                    message="📤 Proses upload...",
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                            
                             ui_components['download_progress'].value = 50
                             ui_components['download_progress'].description = "50%"
                             
@@ -304,6 +451,19 @@ def setup_download_handlers(ui_components, config=None):
                                 f.write(file_content)
                             
                             display(create_status_indicator("info", "📂 Ekstraksi file..."))
+                            
+                            # Notifikasi progress menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_PROGRESS,
+                                    sender="download_handler",
+                                    progress=2,
+                                    total=2,
+                                    message="📂 Ekstraksi file...",
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                            
                             ui_components['download_progress'].value = 75
                             ui_components['download_progress'].description = "75%"
                             
@@ -322,6 +482,19 @@ def setup_download_handlers(ui_components, config=None):
                                 "success", 
                                 f"✅ File {file_name} ({file_size/1024:.1f} KB) berhasil diupload dan diekstrak ke {imported_dir or target_dir}"
                             ))
+                            
+                            # Notifikasi sukses menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_END,
+                                    sender="download_handler",
+                                    message=f"Upload dan ekstraksi file berhasil",
+                                    file_name=file_name,
+                                    file_size=file_size,
+                                    target_dir=imported_dir or target_dir,
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
                             
                             # Validasi dataset
                             try:
@@ -345,17 +518,54 @@ def setup_download_handlers(ui_components, config=None):
                             
                         except Exception as e:
                             display(create_status_indicator("error", f"❌ Error saat mengimport dataset: {str(e)}"))
+                            
+                            # Notifikasi error menggunakan observer pattern
+                            if observer_manager:
+                                from smartcash.utils.observer import EventDispatcher, EventTopics
+                                EventDispatcher.notify(
+                                    event_type=EventTopics.DOWNLOAD_ERROR,
+                                    sender="download_handler",
+                                    message=f"Error saat mengimport dataset: {str(e)}",
+                                    timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                                )
+                                
                             raise e
                     else:
                         # Simulasi proses upload dan ekstraksi
                         ui_components['download_progress'].value = 50
                         ui_components['download_progress'].description = "50%"
                         display(create_status_indicator("info", "📤 Proses upload..."))
+                        
+                        # Notifikasi progress menggunakan observer pattern
+                        if observer_manager:
+                            from smartcash.utils.observer import EventDispatcher, EventTopics
+                            EventDispatcher.notify(
+                                event_type=EventTopics.DOWNLOAD_PROGRESS,
+                                sender="download_handler",
+                                progress=1,
+                                total=2,
+                                message="📤 Proses upload...",
+                                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                            )
+                        
                         time.sleep(1)
                         
                         ui_components['download_progress'].value = 100
                         ui_components['download_progress'].description = "100%"
                         display(create_status_indicator("info", "📂 Ekstraksi file..."))
+                        
+                        # Notifikasi progress menggunakan observer pattern
+                        if observer_manager:
+                            from smartcash.utils.observer import EventDispatcher, EventTopics
+                            EventDispatcher.notify(
+                                event_type=EventTopics.DOWNLOAD_PROGRESS,
+                                sender="download_handler",
+                                progress=2,
+                                total=2,
+                                message="📂 Ekstraksi file...",
+                                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                            )
+                        
                         time.sleep(1)
                         
                         # Buat direktori jika belum ada
@@ -366,9 +576,43 @@ def setup_download_handlers(ui_components, config=None):
                             "success", 
                             f"✅ File {file_name} ({file_size/1024:.1f} KB) berhasil diupload dan diekstrak ke {target_dir}"
                         ))
+                        
+                        # Notifikasi sukses menggunakan observer pattern
+                        if observer_manager:
+                            from smartcash.utils.observer import EventDispatcher, EventTopics
+                            EventDispatcher.notify(
+                                event_type=EventTopics.DOWNLOAD_END,
+                                sender="download_handler",
+                                message=f"Upload dan ekstraksi file berhasil",
+                                file_name=file_name,
+                                file_size=file_size,
+                                target_dir=target_dir,
+                                timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                            )
                 
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+                
+                # Notifikasi error menggunakan observer pattern
+                if observer_manager:
+                    from smartcash.utils.observer import EventDispatcher, EventTopics
+                    EventDispatcher.notify(
+                        event_type=EventTopics.DOWNLOAD_ERROR,
+                        sender="download_handler",
+                        message=f"Error dalam proses download: {str(e)}",
+                        timestamp=time.strftime("%Y-%m-%d %H:%M:%S")
+                    )
+    
+    # Fungsi cleanup untuk unregister observer saat UI tidak lagi digunakan
+    def cleanup():
+        if observer_manager:
+            try:
+                observer_manager.unregister_group(download_observers_group)
+                if logger:
+                    logger.info("✅ Observer untuk download telah dibersihkan")
+            except Exception as e:
+                if logger:
+                    logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
     
     # Register handler untuk tombol download
     ui_components['download_button'].on_click(on_download_click)
@@ -380,5 +624,8 @@ def setup_download_handlers(ui_components, config=None):
         api_settings[1].value = config['data']['roboflow'].get('workspace', 'smartcash-wo2us')
         api_settings[2].value = config['data']['roboflow'].get('project', 'rupiah-emisi-2022')
         api_settings[3].value = str(config['data']['roboflow'].get('version', '3'))
+    
+    # Tambahkan fungsi cleanup ke komponen UI
+    ui_components['cleanup'] = cleanup
     
     return ui_components

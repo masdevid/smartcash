@@ -1,12 +1,11 @@
 # File: smartcash/handlers/dataset/dataset_manager.py
-# Deskripsi: Manager utama dataset dengan adapter untuk kompatibilitas observer
+# Deskripsi: Manager utama dataset yang menggabungkan semua facade
 
-from typing import Dict, Optional, List, Any, Union
+from typing import Dict, Optional, List, Any
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.handlers.dataset.facades.pipeline_facade import PipelineFacade
-from smartcash.utils.observer import BaseObserver, EventDispatcher
-from smartcash.utils.observer.compatibility_observer import CompatibilityObserver
+from smartcash.utils.observer.base_observer import BaseObserver
 
 
 class DatasetManager(PipelineFacade):
@@ -30,61 +29,37 @@ class DatasetManager(PipelineFacade):
         Args:
             observer: Observer yang akan didaftarkan
         """
-        # Periksa apakah observer sudah merupakan BaseObserver atau perlu dibungkus
+        # Validasi tipe observer
         if not isinstance(observer, BaseObserver):
-            try:
-                # Coba bungkus dengan CompatibilityObserver
-                compat_observer = CompatibilityObserver(observer)
-                observer = compat_observer
-                self.logger.debug(f"🔄 Membungkus observer dengan CompatibilityObserver: {compat_observer.name}")
-            except Exception as e:
-                raise TypeError(f"Observer harus merupakan instance dari BaseObserver atau memiliki metode yang kompatibel: {str(e)}")
+            # Jika bukan instance BaseObserver, berikan pesan error yang jelas
+            observer_type = type(observer).__name__
+            supported_type = BaseObserver.__name__
+            module_path = BaseObserver.__module__
+            
+            # Informasi detail untuk debugging
+            error_msg = (
+                f"Observer harus merupakan instance dari {supported_type}, bukan {observer_type}. "
+                f"Pastikan observer mewarisi {module_path}.{supported_type}."
+            )
+            raise TypeError(error_msg)
         
-        # Daftarkan untuk event preprocessing
-        events = [
-            "preprocessing",
-            "preprocessing.start",
-            "preprocessing.end",
-            "preprocessing.progress",
-            "preprocessing.validation",
-            "preprocessing.augmentation"
-        ]
-        
-        for event in events:
-            EventDispatcher.register(event, observer)
-        
-        # Tambahkan ke list untuk tracking
+        # Tambahkan ke daftar observer
         if observer not in self.observers:
             self.observers.append(observer)
-            
-        self.logger.debug(f"✅ Observer {observer.name} berhasil didaftarkan")
+            self.logger.debug(f"✅ Observer {observer.name} berhasil didaftarkan")
     
-    def unregister_observer(self, observer: Any) -> None:
+    def unregister_observer(self, observer: BaseObserver) -> None:
         """
         Membatalkan pendaftaran observer.
         
         Args:
             observer: Observer yang akan dibatalkan pendaftarannya
         """
-        # Cari observer asli atau yang dibungkus
-        target_observer = None
-        for registered_observer in self.observers:
-            if registered_observer == observer:
-                target_observer = registered_observer
-                break
-            elif isinstance(registered_observer, CompatibilityObserver) and registered_observer.observer == observer:
-                target_observer = registered_observer
-                break
-        
-        if target_observer:
-            # Batalkan pendaftaran
-            EventDispatcher.unregister_from_all(target_observer)
-            self.observers.remove(target_observer)
-            self.logger.debug(f"🗑️ Observer {getattr(target_observer, 'name', 'unknown')} berhasil dihapus")
-        else:
-            self.logger.warning(f"⚠️ Observer tidak ditemukan, tidak dapat membatalkan pendaftaran")
+        if observer in self.observers:
+            self.observers.remove(observer)
+            self.logger.debug(f"🗑️ Observer {observer.name} berhasil dihapus")
     
-    def get_observers(self) -> List[Any]:
+    def get_observers(self) -> List[BaseObserver]:
         """
         Mendapatkan daftar observer yang terdaftar.
         
@@ -92,3 +67,23 @@ class DatasetManager(PipelineFacade):
             List observer yang terdaftar
         """
         return self.observers.copy()
+    
+    def _notify_observers(self, event: str, **kwargs) -> None:
+        """
+        Mengirimkan notifikasi ke semua observer.
+        
+        Args:
+            event: Event yang terjadi
+            **kwargs: Parameter tambahan
+        """
+        for observer in self.observers:
+            try:
+                # Cek apakah observer memiliki metode khusus untuk event ini
+                event_method = f"on_{event}"
+                if hasattr(observer, event_method) and callable(getattr(observer, event_method)):
+                    getattr(observer, event_method)(**kwargs)
+                # Jika tidak, gunakan metode update umum
+                elif hasattr(observer, "update") and callable(getattr(observer, "update")):
+                    observer.update(event, self, **kwargs)
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error pada observer {observer.name}: {str(e)}")

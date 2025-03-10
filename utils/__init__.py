@@ -27,7 +27,6 @@ from smartcash.utils.logging_factory import LoggingFactory
 from smartcash.utils.observer import (
     EventTopics, 
     EventDispatcher, 
-    ObserverPriority
 )
 
 __all__ = [
@@ -58,5 +57,4 @@ __all__ = [
     # Observer pattern
     'EventTopics',
     'EventDispatcher',
-    'ObserverPriority'
 ]

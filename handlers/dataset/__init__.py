@@ -16,7 +16,7 @@ from smartcash.handlers.dataset.multilayer.multilayer_dataset import MultilayerD
 from smartcash.handlers.dataset.multilayer.multilayer_label_handler import MultilayerLabelHandler
 
 # Collate functions
-from smartcash.handlers.dataset.collate_functions import multilayer_collate_fn, flat_collate_fn
+from smartcash.handlers.dataset.collate_fn import multilayer_collate_fn, flat_collate_fn
 
 # Export semua komponen publik
 __all__ = [

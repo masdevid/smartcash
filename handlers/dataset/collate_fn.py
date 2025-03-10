@@ -1,4 +1,4 @@
-# File: smartcash/handlers/dataset/collate_functions.py
+# File: smartcash/handlers/dataset/collate_fn.py
 # Author: Alfrida Sabar
 # Deskripsi: Collate functions untuk dataset multilayer (versi ultra-ringkas)
 

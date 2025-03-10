@@ -12,7 +12,7 @@ from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.cache import CacheManager
 from smartcash.handlers.dataset.multilayer.multilayer_dataset import MultilayerDataset
 from smartcash.handlers.dataset.core.dataset_transformer import DatasetTransformer
-from smartcash.handlers.dataset.collate_functions import multilayer_collate_fn, flat_collate_fn
+from smartcash.handlers.dataset.collate_fn import multilayer_collate_fn, flat_collate_fn
 
 class DatasetLoader:
     """Loader untuk dataset dari berbagai sumber dengan DataLoader yang teroptimasi."""

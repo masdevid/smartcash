@@ -3,6 +3,7 @@ File: smartcash/ui_handlers/dataset_download.py
 Author: Alfrida Sabar (refactored)
 Deskripsi: Handler untuk UI download dataset SmartCash.
 """
+
 import os
 import time
 import sys
@@ -62,6 +63,29 @@ def setup_download_handlers(ui_components, config=None):
         dataset_manager = DatasetManager(config, logger=logger)
     except ImportError as e:
         print(f"Info: Beberapa modul tidak tersedia, akan menggunakan simulasi. ({str(e)})")
+        
+    # Coba mendapatkan Roboflow API key dari Google Secret (jika di Colab)
+    try:
+        from google.colab import userdata
+        roboflow_api_key = userdata.get('ROBOFLOW_API_KEY')
+        if roboflow_api_key:
+            # Update API key field with the value from secrets
+            ui_components['roboflow_settings'].children[0].value = roboflow_api_key
+            
+            # Add info message about using secret
+            api_key_info = """
+            <div style="padding: 8px 12px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
+                     color: #0c5460; margin: 10px 0; border-radius: 4px;">
+                <p><i>ℹ️ API Key diisi otomatis dari Google Secret.</i></p>
+            </div>
+            """
+            # Add info message below API key field
+            with ui_components['download_status']:
+                from IPython.display import HTML
+                display(HTML(api_key_info))
+    except:
+        # Not in Colab or secret not set
+        pass
     
     # Handler untuk download dataset
     def on_download_click(b):
@@ -83,8 +107,21 @@ def setup_download_handlers(ui_components, config=None):
                     
                     # Validasi API key
                     if not api_key:
-                        display(create_status_indicator("warning", "⚠️ API Key Roboflow tidak boleh kosong"))
-                        return
+                        # Coba sekali lagi dari userdata jika belum diisi
+                        try:
+                            from google.colab import userdata
+                            api_key = userdata.get('ROBOFLOW_API_KEY')
+                            if api_key:
+                                api_settings[0].value = api_key
+                                display(create_status_indicator("info", "🔑 API Key diambil dari Google Secret"))
+                        except:
+                            pass
+                            
+                        # Jika masih kosong, tampilkan peringatan
+                        if not api_key:
+                            display(create_status_indicator("warning", 
+                                "⚠️ API Key Roboflow tidak boleh kosong. Lihat bagian 'Bantuan' untuk cara setup API key."))
+                            return
                     
                     # Update config
                     if config:

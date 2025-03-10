@@ -59,7 +59,7 @@ def setup_download_handlers(ui_components, config=None):
         print(f"Info: {str(e)}")
     
     # Tambahkan API key info widget
-    api_key_info = HTML(
+    api_key_info = widgets.HTML(
         """<div style="padding: 10px; border-left: 4px solid #856404; 
                      color: #856404; margin: 5px 0; border-radius: 4px; background-color: #fff3cd">
                 <p><i>⚠️ API Key diperlukan untuk download dari Roboflow</i></p>
@@ -74,7 +74,7 @@ def setup_download_handlers(ui_components, config=None):
         if roboflow_api_key:
             ui_components['roboflow_settings'].children[0].value = roboflow_api_key
             has_api_key = True
-            api_key_info = HTML(
+            api_key_info = widgets.HTML(
                 """<div style="padding: 10px; border-left: 4px solid #0c5460; 
                      color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
                     <p><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>

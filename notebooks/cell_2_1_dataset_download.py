@@ -1,6 +1,6 @@
 # Cell 2.1 - Dataset Download
-# Persiapan dataset untuk training model SmartCash dengan implementasi ObserverManager
-# %%capture
+# Persiapan dataset untuk training model SmartCash
+
 import sys
 from pathlib import Path
 from IPython.display import display
@@ -9,55 +9,48 @@ from IPython.display import display
 if not any('smartcash' in p for p in sys.path):
     sys.path.append('.')
 
-# Baca konfigurasi jika tersedia
+# Load konfigurasi dengan ConfigManager
 try:
     from smartcash.utils.config_manager import ConfigManager
-    config_dir = Path("configs")
-    config_file = config_dir / "base_config.yaml"
     
-    # Pastikan direktori config ada
-    config_dir.mkdir(parents=True, exist_ok=True)
+    # Pastikan direktori configs ada
+    Path("configs").mkdir(parents=True, exist_ok=True)
     
-    # Gunakan method statis dari ConfigManager untuk load config
+    # Load konfigurasi
     config = ConfigManager.load_config(
-        filename=str(config_file), 
-        fallback_to_pickle=True
+        filename="configs/base_config.yaml", 
+        fallback_to_pickle=True,
+        default_config={
+            'data': {
+                'source': 'roboflow',
+                'roboflow': {'workspace': 'smartcash-wo2us', 'project': 'rupiah-emisi-2022', 'version': '3'},
+            },
+            'data_dir': 'data'
+        }
     )
     
-    if not config:
-        print("⚠️ Konfigurasi tidak ditemukan, menggunakan konfigurasi default")
-        config = {}
 except Exception as e:
-    print(f"ℹ️ Menggunakan konfigurasi default ({str(e)})")
-    config = {}  # Gunakan konfigurasi default dalam handler
+    print(f"⚠️ Error loading config: {str(e)}")
+    config = {
+        'data': {
+            'source': 'roboflow',
+            'roboflow': {'workspace': 'smartcash-wo2us', 'project': 'rupiah-emisi-2022', 'version': '3'},
+        },
+        'data_dir': 'data'
+    }
 
-# Import komponen UI dan handler
-try:
-    from smartcash.ui_components.dataset_download import create_dataset_download_ui
-    from smartcash.ui_handlers.dataset_download import setup_download_handlers
-except ImportError as e:
-    print(f"❌ Error: {str(e)}")
-    print("🔄 Memuat fallback UI...")
-    
-    # Fallback jika komponen tidak tersedia
-    import ipywidgets as widgets
-    def create_dataset_download_ui():
-        return {'ui': widgets.HTML("<h3>⚠️ Komponen UI tidak tersedia</h3><p>Pastikan semua modul terinstall dengan benar</p>")}
-    
-    def setup_download_handlers(ui_components, config=None):
-        return ui_components
+# Import UI components
+from smartcash.ui_components.dataset_download import create_dataset_download_ui
+from smartcash.ui_handlers.dataset_download import setup_download_handlers
 
-# Buat dan setup komponen UI
+# Buat dan setup UI
 ui_components = create_dataset_download_ui()
 ui_components = setup_download_handlers(ui_components, config)
 
 # Tampilkan UI
 display(ui_components['ui'])
 
-# Register cleanup function untuk dipanggil saat notebook dibersihkan
-try:
-    if 'cleanup' in ui_components:
-        import atexit
-        atexit.register(ui_components['cleanup'])
-except:
-    pass
+# Register cleanup untuk melepas observer
+if 'cleanup' in ui_components:
+    import atexit
+    atexit.register(ui_components['cleanup'])

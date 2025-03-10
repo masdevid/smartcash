@@ -1,6 +1,6 @@
 # File: smartcash/handlers/dataset/core/dataset_downloader.py
 # Author: Alfrida Sabar
-# Deskripsi: Downloader dataset terintegrasi dengan dukungan resume, retry, dan paralel
+# Deskripsi: Downloader dataset terintegrasi dengan dukungan threading dan progress tracking
 
 import os, json, time, hashlib, threading, zipfile, dotenv
 import requests, shutil
@@ -10,17 +10,19 @@ from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.utils.logger import get_logger
-from smartcash.configs import get_config_manager
 from smartcash.utils.observer import EventDispatcher, EventTopics
+from smartcash.utils.config_manager import ConfigManager
+
 
 class DatasetDownloader:
-    """Downloader dataset dari berbagai sumber dengan dukungan paralel, resume, dan retry."""
+    """Downloader dataset dari berbagai sumber dengan dukungan paralel dan progress tracking."""
     
     def __init__(
         self,
         config: Optional[Dict] = None,
         data_dir: Optional[str] = None,
         api_key: Optional[str] = None,
+        config_file: Optional[str] = None,
         logger = None,
         num_workers: int = 4,
         chunk_size: int = 8192,
@@ -31,7 +33,15 @@ class DatasetDownloader:
         dotenv.load_dotenv()
         
         # Setup paths dan konfigurasi
-        self.config = config or get_config_manager().get_config()
+        if config is None and config_file is not None:
+            self.config = ConfigManager.load_config(
+                filename=str(config_file), 
+                fallback_to_pickle=True,
+                logger=self.logger
+            )
+        else:
+            self.config = config or {}
+            
         self.data_dir = Path(data_dir if data_dir else self.config.get('data_dir', 'data'))
         self.temp_dir = self.data_dir / ".temp"
         os.makedirs(self.data_dir, exist_ok=True)
@@ -46,8 +56,8 @@ class DatasetDownloader:
         self.file_locks = {}
         
         # Roboflow settings
-        self.api_key = api_key or self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.getenv("ROBOFLOW_API_KEY")
         rf_config = self.config.get('data', {}).get('roboflow', {})
+        self.api_key = api_key or rf_config.get('api_key') or os.getenv("ROBOFLOW_API_KEY")
         self.workspace = rf_config.get('workspace', 'smartcash-wo2us')
         self.project = rf_config.get('project', 'rupiah-emisi-2022')
         self.version = rf_config.get('version', '3')
@@ -81,10 +91,10 @@ class DatasetDownloader:
             Path ke direktori dataset
         """
         # Gunakan nilai config jika parameter tidak diberikan
-        api_key = api_key or self.config['data']['roboflow'].get('api_key')
-        workspace = workspace or self.config['data']['roboflow'].get('workspace')
-        project = project or self.config['data']['roboflow'].get('project')
-        version = version or self.config['data']['roboflow'].get('version')
+        api_key = api_key or self.api_key
+        workspace = workspace or self.workspace
+        project = project or self.project
+        version = version or self.version
         output_dir = output_dir or os.path.join(self.data_dir, f"roboflow_{workspace}_{project}_{version}")
         
         # Validasi
@@ -117,6 +127,12 @@ class DatasetDownloader:
             workspace_obj = rf.workspace(workspace)
             project_obj = workspace_obj.project(project)
             version_obj = project_obj.version(version)
+            
+            # Gunakan tqdm untuk progress tracking jika diminta
+            if show_progress:
+                self.logger.info(f"⏳ Downloading dataset dari Roboflow (tidak support resume)")
+            
+            # Download dataset - tidak support resume untuk Roboflow
             dataset = version_obj.download(
                 model_format=format,
                 location=output_dir
@@ -126,7 +142,7 @@ class DatasetDownloader:
             
             # Notifikasi download selesai
             EventDispatcher.notify(
-                event_type=EventTopics.DOWNLOAD_END,
+                event_type=EventTopics.DOWNLOAD_COMPLETE,
                 sender=self,
                 workspace=workspace,
                 project=project,
@@ -188,8 +204,15 @@ class DatasetDownloader:
         self.logger.success(f"✅ Dataset berhasil diexport: {total_files} file → {self.data_dir}")
         return output_dirs
             
-    def pull_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True,
-               api_key: str = None, workspace: str = None, project: str = None, version: str = None) -> tuple:
+    def pull_dataset(
+        self, 
+        format: str = "yolov5", 
+        show_progress: bool = True,
+        api_key: str = None, 
+        workspace: str = None, 
+        project: str = None, 
+        version: str = None
+    ) -> tuple:
         """One-step untuk download dan setup dataset siap pakai."""
         try:
             # Override parameter sementara jika diberikan
@@ -206,7 +229,14 @@ class DatasetDownloader:
                 return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
             
             # Download dari Roboflow dan export ke lokal
-            roboflow_dir = self.download_dataset(format=format,api_key=api_key, workspace=workspace, project=project, version=version, show_progress=show_progress)
+            roboflow_dir = self.download_dataset(
+                format=format, 
+                api_key=api_key, 
+                workspace=workspace, 
+                project=project, 
+                version=version, 
+                show_progress=show_progress
+            )
             return self.export_to_local(roboflow_dir, show_progress)
         except Exception as e:
             self.logger.error(f"❌ Gagal pull dataset: {str(e)}")
@@ -238,97 +268,39 @@ class DatasetDownloader:
         
         return info
     
-    # ===== File download methods =====
-    
-    def download_file(self, url: str, output_path: Union[str, Path], resume: bool = True,
-                    progress_bar: bool = True, metadata: Optional[Dict[str, Any]] = None) -> Path:
-        """Download file tunggal dengan dukungan resume."""
+    def download_file(self, url: str, output_path: Union[str, Path], 
+                     progress_bar: bool = True) -> Path:
+        """Download file tunggal dengan progress tracking."""
         output_path = Path(output_path)
         os.makedirs(output_path.parent, exist_ok=True)
         
-        # Setup file locking dan info
+        # Setup file locking
         file_id = hashlib.md5(f"{url}_{str(output_path)}".encode()).hexdigest()
         if file_id not in self.file_locks:
             self.file_locks[file_id] = threading.Lock()
         lock = self.file_locks[file_id]
-        resume_info_path = self.temp_dir / f"{file_id}.json"
         
         with lock:
-            # Cek file sudah ada dan lengkap
-            if output_path.exists() and resume and resume_info_path.exists():
-                try:
-                    with open(resume_info_path) as f:
-                        info = json.load(f)
-                    if info.get('completed') and info.get('size') == output_path.stat().st_size:
-                        self.logger.info(f"✅ File sudah ada: {output_path}")
-                        return output_path
-                except:
-                    pass
-            
-            # Setup resume
-            start_byte, temp_file_path = 0, self.temp_dir / f"{file_id}.part"
-            if temp_file_path.exists() and resume and resume_info_path.exists():
-                try:
-                    with open(resume_info_path) as f:
-                        info = json.load(f)
-                    if time.time() - info.get('timestamp', 0) < 24*60*60 and temp_file_path.stat().st_size == info.get('downloaded', 0):
-                        start_byte = temp_file_path.stat().st_size
-                        self.logger.info(f"🔄 Resume download dari {start_byte/1024/1024:.1f} MB")
-                except:
-                    pass
-            
-            # Simpan info resume
-            resume_info = {'url': url, 'output_path': str(output_path), 'timestamp': time.time(), 
-                          'downloaded': start_byte, 'completed': False}
-            if metadata:
-                resume_info['metadata'] = metadata
-            with open(resume_info_path, 'w') as f:
-                json.dump(resume_info, f)
-            
             # Download dengan retry
             try:
-                headers = {'Range': f'bytes={start_byte}-'} if start_byte > 0 else {}
-                
                 for attempt in range(self.retry_limit):
                     try:
-                        with requests.get(url, stream=True, headers=headers, timeout=self.timeout) as response:
+                        with requests.get(url, stream=True, timeout=self.timeout) as response:
                             response.raise_for_status()
                             
                             # Setup progress bar
                             total_size = int(response.headers.get('content-length', 0))
-                            if start_byte > 0 and response.status_code == 206 and 'content-range' in response.headers:
-                                try:
-                                    total_size = int(response.headers['content-range'].split('/')[-1])
-                                except:
-                                    pass
-                            
-                            progress = tqdm(total=total_size + start_byte if total_size > 0 else None,
-                                           initial=start_byte, unit='B', unit_scale=True,
-                                           desc=f"Download {output_path.name}") if progress_bar else None
+                            progress = tqdm(total=total_size, unit='B', unit_scale=True,
+                                          desc=f"Download {output_path.name}") if progress_bar else None
                             
                             # Download file chunks
-                            mode = 'ab' if start_byte > 0 else 'wb'
-                            with open(temp_file_path, mode) as f:
-                                downloaded = start_byte
+                            with open(output_path, 'wb') as f:
                                 for chunk in response.iter_content(chunk_size=self.chunk_size):
                                     if chunk:
                                         f.write(chunk)
-                                        downloaded += len(chunk)
                                         if progress: progress.update(len(chunk))
-                                        
-                                        # Update info periodik
-                                        if downloaded % (self.chunk_size * 100) == 0:
-                                            resume_info.update({'downloaded': downloaded, 'timestamp': time.time()})
-                                            with open(resume_info_path, 'w') as info_file:
-                                                json.dump(resume_info, info_file)
                             
                             if progress: progress.close()
-                            
-                            # Selesaikan download
-                            shutil.move(temp_file_path, output_path)
-                            resume_info.update({'completed': True, 'size': output_path.stat().st_size, 'timestamp': time.time()})
-                            with open(resume_info_path, 'w') as info_file:
-                                json.dump(resume_info, info_file)
                             
                             self.logger.info(f"✅ Download selesai: {output_path}")
                             return output_path
@@ -345,9 +317,6 @@ class DatasetDownloader:
                 
             except Exception as e:
                 self.logger.error(f"❌ Download gagal: {str(e)}")
-                resume_info.update({'error': str(e), 'timestamp': time.time()})
-                with open(resume_info_path, 'w') as info_file:
-                    json.dump(resume_info, info_file)
                 raise
     
     def extract_zip(self, zip_path: Union[str, Path], output_dir: Optional[Union[str, Path]] = None,
@@ -382,6 +351,23 @@ class DatasetDownloader:
         except Exception as e:
             self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
             raise
+    
+    def import_from_zip(self, zip_path: Union[str, Path], target_dir: Optional[Union[str, Path]] = None,
+                      format: str = "yolov5") -> str:
+        """Import dataset dari file zip."""
+        self.logger.info(f"📦 Importing dataset dari {zip_path}...")
+        
+        # Extract zip
+        extract_dir = self.extract_zip(zip_path, target_dir, remove_zip=False)
+        
+        # Verify dataset structure
+        for split in ['train', 'valid', 'test']:
+            split_dir = Path(extract_dir) / split
+            for subdir in ['images', 'labels']:
+                os.makedirs(split_dir / subdir, exist_ok=True)
+        
+        self.logger.success(f"✅ Dataset berhasil diimport ke {extract_dir}")
+        return str(extract_dir)
     
     # ===== Helper methods =====
     

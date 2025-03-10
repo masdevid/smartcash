@@ -72,6 +72,7 @@ class EventTopics:
     DOWNLOAD_PROGRESS = "download.progress"
     DOWNLOAD_ERROR = "download.error"
     DOWNLOAD_END = "download.end"
+    DOWNLOAD_COMPLETE = "download.complete"
     
     @classmethod
     def get_all_topics(cls):

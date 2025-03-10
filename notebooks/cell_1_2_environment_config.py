@@ -1,5 +1,5 @@
 """
-Cell 1.1 - Environment Configuration
+Cell 1.2 - Environment Configuration
 Setup lingkungan kerja untuk project SmartCash.
 """
 

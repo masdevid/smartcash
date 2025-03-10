@@ -39,7 +39,7 @@ def setup_env_handlers(ui):
             clear_output()
             system_info = f"""
             <div style="background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 5px;">
-                <h4>📊 System Information</h4>
+                <h4 style="color:#000">📊 System Information</h4>
                 <ul>
                     <li><b>Python:</b> {platform.python_version()}</li>
                     <li><b>OS:</b> {platform.system()} {platform.release()}</li>

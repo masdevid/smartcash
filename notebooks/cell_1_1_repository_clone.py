@@ -1,5 +1,5 @@
 """
-Cell 1.0 - Project Setup
+Cell 1.1 - Repository Clone
 Sel ini menangani clone repository YOLOv5 dan SmartCash.
 """
 

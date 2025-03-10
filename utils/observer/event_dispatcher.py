@@ -55,7 +55,7 @@ class EventDispatcher:
         return cls._thread_pool
     
     @classmethod
-    def register(cls, event_type: str, observer: BaseObserver, priority: Optional[int] = None) -> None:
+    def register(cls, event_type: str, observer: Any, priority: Optional[int] = None) -> None:
         """
         Mendaftarkan observer untuk event tertentu.
         
@@ -64,6 +64,11 @@ class EventDispatcher:
             observer: Observer yang akan didaftarkan
             priority: Prioritas opsional (jika None, gunakan prioritas observer)
         """
+        # Validasi observer secara eksplisit
+        from smartcash.utils.observer.base_observer import BaseObserver
+        if not isinstance(observer, BaseObserver):
+            raise TypeError(f"Observer harus merupakan instance dari BaseObserver, bukan {type(observer)}")
+        
         registry = EventRegistry()
         registry.register(event_type, observer, priority)
         

@@ -26,14 +26,14 @@ def setup_env_handlers(ui):
     def detect_environment():
         # Deteksi environment menggunakan EnvironmentManager
         is_colab = env_manager.is_colab
-        drive_mounted = env_manager.is_drive_mounted()
+        drive_mounted = env_manager.is_drive_mounted
         
         # Update UI berdasarkan status
         if is_colab:
             if drive_mounted:
                 ui['colab_panel'].value = styled_html(
                     content=f"{create_section_title('☁️ Google Colab Environment', 'Terdeteksi').value}"
-                    f"{create_info_alert('Google Drive sudah terhubung di /content/drive/MyDrive', 'success', '✅').value}",
+                    f"{create_info_alert('Google Drive sudah terhubung di ' + str(env_manager.drive_path), 'success', '✅').value}",
                     style={"padding": "10px", "margin": "10px 0"}
                 ).value
                 
@@ -60,19 +60,18 @@ def setup_env_handlers(ui):
             clear_output()
             
             # Dapatkan informasi environment dari EnvironmentManager
-            env_info = env_manager.get_environment_info()
+            sys_info = env_manager.get_system_info()
             
-            # Tambahkan info system
+            # Format system items
             system_items = [
-                f"<b>Python:</b> {env_info['python_version']}",
-                f"<b>OS:</b> {env_info['os_name']} {env_info['os_version']}",
-                f"<b>Path:</b> {env_info['cwd']}",
-                f"<b>Google Drive:</b> {'Terhubung' if drive_mounted else 'Tidak terhubung'}"
+                f"<b>Python:</b> {sys_info['python_version'].split()[0]}",
+                f"<b>Base Directory:</b> {sys_info['base_dir']}",
+                f"<b>Google Drive:</b> {'Terhubung' if sys_info['drive_mounted'] else 'Tidak terhubung'}"
             ]
             
             # Tambahkan info GPU jika tersedia
-            if 'gpu_info' in env_info and env_info['gpu_info']:
-                system_items.append(f"<b>GPU:</b> {env_info['gpu_info']}")
+            if 'cuda_available' in sys_info and sys_info['cuda_available']:
+                system_items.append(f"<b>GPU:</b> {sys_info['cuda_device']} ({sys_info['cuda_memory']:.1f} GB)")
             
             # Buat HTML untuk system info
             system_info_content = "<ul>" + "".join([f"<li>{item}</li>" for item in system_items]) + "</ul>"
@@ -90,7 +89,7 @@ def setup_env_handlers(ui):
         with ui['status']:
             clear_output()
             # Cek jika Google Drive sudah terhubung
-            drive_mounted = env_manager.is_drive_mounted()
+            drive_mounted = env_manager.is_drive_mounted
             
             if drive_mounted:
                 display(create_status_indicator("info", "ℹ️ Google Drive sudah terhubung. Mencoba menghubungkan kembali..."))
@@ -99,62 +98,60 @@ def setup_env_handlers(ui):
             
             try:
                 # Mount drive menggunakan EnvironmentManager
-                mount_result = env_manager.mount_drive()
+                success, message = env_manager.mount_drive()
                 
-                if not mount_result['success']:
-                    display(create_status_indicator("error", f"❌ Gagal menghubungkan ke Google Drive: {mount_result['message']}"))
+                if not success:
+                    display(create_status_indicator("error", f"❌ Gagal menghubungkan ke Google Drive: {message}"))
                     return
                 
-                # Mendapatkan drive path dari EnvironmentManager
-                drive_path = env_manager.get_drive_path('SmartCash')
+                display(create_status_indicator("success", message))
                 
-                # Buat direktori SmartCash jika belum ada
-                if not drive_path.exists():
-                    drive_path.mkdir(parents=True)
+                # Create symlinks
+                symlink_stats = env_manager.create_symlinks()
+                if symlink_stats['created'] > 0:
                     display(create_status_indicator(
-                        "success", f"✅ Direktori {drive_path} berhasil dibuat di Google Drive"
+                        "success", f"✅ {symlink_stats['created']} symlinks berhasil dibuat"
                     ))
-                else:
+                elif symlink_stats['existing'] > 0:
                     display(create_status_indicator(
-                        "info", f"ℹ️ Direktori {drive_path} sudah ada di Google Drive"
-                    ))
-                
-                # Membuat symlink dari EnvironmentManager
-                symlink_result = env_manager.create_symlink(drive_path, 'SmartCash_Drive')
-                if symlink_result['success']:
-                    display(create_status_indicator(
-                        "success", f"✅ {symlink_result['message']}"
-                    ))
-                else:
-                    display(create_status_indicator(
-                        "info", f"ℹ️ {symlink_result['message']}"
+                        "info", f"ℹ️ {symlink_stats['existing']} symlinks sudah ada"
                     ))
                 
                 # Update button
                 ui['drive_button'].description = 'Reconnect Google Drive'
                 ui['drive_button'].icon = 'refresh'
                 
-                # Get Drive usage statistics
-                drive_stats = env_manager.get_drive_stats()
-                if drive_stats['success']:
-                    stats = drive_stats['data']
-                    storage_info = f"""
-                    <h4>💾 Drive Usage Stats</h4>
-                    <ul>
-                        <li>Total: {stats['total_gb']:.1f} GB</li>
-                        <li>Used: {stats['used_gb']:.1f} GB ({stats['usage_percent']:.1f}%)</li>
-                        <li>Free: {stats['free_gb']:.1f} GB</li>
-                    </ul>
-                    """
-                    
-                    display(styled_html(
-                        content=storage_info,
-                        style={"background": "#f8f9fa", "padding": "10px", "margin": "10px 0", "border-radius": "5px"}
-                    ))
+                # Get system info with Drive stats
+                sys_info = env_manager.get_system_info()
+                if 'cuda_memory' in sys_info:
+                    # Format disk usage stats jika tersedia
+                    try:
+                        import shutil
+                        drive_usage = shutil.disk_usage('/content/drive')
+                        total_gb = drive_usage.total / (1024**3)
+                        used_gb = drive_usage.used / (1024**3)
+                        free_gb = drive_usage.free / (1024**3)
+                        usage_percent = (used_gb / total_gb) * 100
+                        
+                        storage_info = f"""
+                        <h4>💾 Drive Usage Stats</h4>
+                        <ul>
+                            <li>Total: {total_gb:.1f} GB</li>
+                            <li>Used: {used_gb:.1f} GB ({usage_percent:.1f}%)</li>
+                            <li>Free: {free_gb:.1f} GB</li>
+                        </ul>
+                        """
+                        
+                        display(styled_html(
+                            content=storage_info,
+                            style={"background": "#f8f9fa", "padding": "10px", "margin": "10px 0", "border-radius": "5px"}
+                        ))
+                    except:
+                        pass
                 
                 # Success message
                 display(create_info_alert(
-                    message=f"Google Drive berhasil terhubung. Data akan disimpan di {drive_path}",
+                    message=f"Google Drive berhasil terhubung. Data akan disimpan di {env_manager.drive_path}",
                     alert_type="success",
                     icon="✅"
                 ))
@@ -169,14 +166,9 @@ def setup_env_handlers(ui):
             display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
             
             # Gunakan EnvironmentManager untuk setup direktori
-            setup_result = env_manager.setup_directories(
-                base_dirs=['data', 'models', 'runs', 'configs', 'logs', 'results'],
-                data_subdirs=['train', 'valid', 'test'],
-                runs_subdirs=['train', 'detect'],
-                use_drive=env_manager.is_drive_mounted()
-            )
+            dir_stats = env_manager.setup_directories(use_drive=env_manager.is_drive_mounted)
             
-            if setup_result['success']:
+            if dir_stats['error'] == 0:
                 # Tampilkan info direktori
                 display(create_section_title("✅ Struktur Direktori", "Berhasil Dibuat"))
                 
@@ -184,11 +176,10 @@ def setup_env_handlers(ui):
                 dir_info = """
                 <ul>
                     <li><code>data/</code> - Dataset training, validasi, dan testing</li>
-                    <li><code>models/</code> - Model yang diexport</li>
-                    <li><code>runs/</code> - Hasil training dan deteksi</li>
                     <li><code>configs/</code> - File konfigurasi</li>
+                    <li><code>runs/</code> - Hasil training dan weights</li>
                     <li><code>logs/</code> - Log proses</li>
-                    <li><code>results/</code> - Hasil evaluasi dan visualisasi</li>
+                    <li><code>exports/</code> - Model yang diexport</li>
                 </ul>
                 """
                 
@@ -197,17 +188,21 @@ def setup_env_handlers(ui):
                     style={"padding": "10px", "margin": "10px 0"}
                 ))
                 
-                # Tampilkan daftar direktori yang baru dibuat
-                if 'created_dirs' in setup_result and setup_result['created_dirs']:
-                    created_dirs = setup_result['created_dirs']
-                    dir_list = "".join([f"<li><code>{d}</code></li>" for d in created_dirs])
-                    display(create_info_alert(
-                        message=f"<b>Direktori baru yang dibuat:</b><ul>{dir_list}</ul>",
-                        alert_type="success",
-                        icon="📁"
-                    ))
+                # Tampilkan statistik pembuatan direktori
+                stats_message = f"<b>Statistik:</b> {dir_stats['created']} direktori baru dibuat, {dir_stats['existing']} sudah ada sebelumnya."
+                display(create_info_alert(
+                    message=stats_message,
+                    alert_type="success",
+                    icon="📁"
+                ))
+                
+                # Tampilkan directory tree jika ada direktori baru yang dibuat
+                if dir_stats['created'] > 0:
+                    display(HTML("<h4>🌲 Struktur Direktori:</h4>"))
+                    tree_html = env_manager.get_directory_tree(max_depth=2)
+                    display(HTML(tree_html))
             else:
-                display(create_status_indicator("error", f"❌ Gagal membuat struktur direktori: {setup_result['message']}"))
+                display(create_status_indicator("error", f"❌ Terjadi error saat membuat {dir_stats['error']} direktori"))
     
     # Register handlers
     ui['drive_button'].on_click(on_drive_connect)

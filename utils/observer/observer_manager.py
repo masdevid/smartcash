@@ -1,6 +1,5 @@
 # File: smartcash/utils/observer/observer_manager.py
-# Author: Alfrida Sabar
-# Deskripsi: Manager untuk observer pattern di SmartCash
+# Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan dictionary storage
 
 import inspect
 from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
@@ -12,12 +11,7 @@ from smartcash.utils.logger import get_logger
 
 
 class ObserverManager:
-    """
-    Manager untuk observer pattern di SmartCash.
-    
-    ObserverManager menyediakan factory pattern untuk membuat observer
-    dan mengintegrasikan dengan modul lain di SmartCash.
-    """
+    """Manager untuk observer pattern di SmartCash."""
     
     # Logger
     _logger = get_logger("observer_manager")
@@ -25,19 +19,14 @@ class ObserverManager:
     # Lock untuk thread-safety
     _lock = threading.RLock()
     
-    # Set untuk menyimpan semua observer yang dibuat
+    # Set untuk menyimpan semua observer yang dibuat (menggunakan set karena BaseObserver sudah bisa di-hash)
     _observers: Set[BaseObserver] = set()
     
     # Dictionary untuk menyimpan observer berdasarkan grupnya
     _observer_groups: Dict[str, Set[BaseObserver]] = {}
     
     def __init__(self, auto_register: bool = True):
-        """
-        Inisialisasi ObserverManager.
-        
-        Args:
-            auto_register: Otomatis mendaftarkan observer yang dibuat ke dispatcher
-        """
+        """Inisialisasi ObserverManager."""
         self.auto_register = auto_register
     
     def create_simple_observer(
@@ -49,20 +38,7 @@ class ObserverManager:
         event_filter: Optional[Any] = None,
         group: Optional[str] = None
     ) -> BaseObserver:
-        """
-        Membuat simple observer dengan callback function.
-        
-        Args:
-            event_type: Tipe event atau list tipe event yang akan diobservasi
-            callback: Function yang akan dipanggil saat event terjadi
-            name: Nama observer (opsional)
-            priority: Prioritas observer
-            event_filter: Filter event (opsional)
-            group: Grup observer untuk pengelompokan (opsional)
-            
-        Returns:
-            Observer yang dibuat
-        """
+        """Membuat simple observer dengan callback function."""
         # Validasi callback
         if not callable(callback):
             raise TypeError("callback harus merupakan callable")
@@ -96,10 +72,7 @@ class ObserverManager:
             else:
                 EventDispatcher.register(event_type, observer, priority)
         
-        self._logger.debug(
-            f"🔧 Membuat simple observer '{observer.name}' untuk event '{event_type}'"
-        )
-        
+        self._logger.debug(f"🔧 Membuat simple observer '{observer.name}' untuk event '{event_type}'")
         return observer
     
     def create_observer(
@@ -112,21 +85,7 @@ class ObserverManager:
         group: Optional[str] = None,
         **kwargs
     ) -> BaseObserver:
-        """
-        Membuat dan mendaftarkan observer dari kelas yang diberikan.
-        
-        Args:
-            observer_class: Kelas observer yang akan dibuat
-            event_type: Tipe event atau list tipe event yang akan diobservasi
-            name: Nama observer (opsional)
-            priority: Prioritas observer (opsional)
-            event_filter: Filter event (opsional)
-            group: Grup observer untuk pengelompokan (opsional)
-            **kwargs: Parameter tambahan untuk constructor
-            
-        Returns:
-            Observer yang dibuat
-        """
+        """Membuat dan mendaftarkan observer dari kelas yang diberikan."""
         # Validasi kelas
         if not inspect.isclass(observer_class) or not issubclass(observer_class, BaseObserver):
             raise TypeError(f"observer_class harus merupakan subclass dari BaseObserver")
@@ -161,10 +120,7 @@ class ObserverManager:
             else:
                 EventDispatcher.register(event_type, observer, observer.priority)
         
-        self._logger.debug(
-            f"🔧 Membuat observer '{observer_class.__name__}' untuk event '{event_type}'"
-        )
-        
+        self._logger.debug(f"🔧 Membuat observer '{observer_class.__name__}' untuk event '{event_type}'")
         return observer
     
     def create_progress_observer(
@@ -177,21 +133,7 @@ class ObserverManager:
         callback: Optional[Callable] = None,
         group: Optional[str] = None
     ) -> BaseObserver:
-        """
-        Membuat observer untuk monitoring progress dengan tqdm.
-        
-        Args:
-            event_types: List tipe event yang akan diobservasi
-            total: Total langkah untuk progress bar
-            desc: Deskripsi progress
-            name: Nama observer (opsional)
-            use_tqdm: Gunakan tqdm (jika False, hanya menggunakan callback)
-            callback: Callback tambahan saat progress diupdate
-            group: Grup observer untuk pengelompokan (opsional)
-            
-        Returns:
-            Progress observer
-        """
+        """Membuat observer untuk monitoring progress dengan tqdm."""
         # Import tqdm jika perlu
         if use_tqdm:
             try:
@@ -206,11 +148,7 @@ class ObserverManager:
                 super().__init__(*args, **kwargs)
                 self.progress = 0
                 self.total = total
-                self.pbar = None
-                
-                # Buat progress bar jika menggunakan tqdm
-                if use_tqdm:
-                    self.pbar = tqdm(total=total, desc=desc)
+                self.pbar = tqdm(total=total, desc=desc) if use_tqdm else None
             
             def update(self, event_type, sender, **kwargs):
                 # Update progres
@@ -240,25 +178,7 @@ class ObserverManager:
             name = f"ProgressObserver_{desc}"
         
         # Buat observer
-        observer = ProgressObserver(name=name)
-        
-        # Tambahkan ke set dan grup jika perlu
-        with self._lock:
-            self._observers.add(observer)
-            if group is not None:
-                if group not in self._observer_groups:
-                    self._observer_groups[group] = set()
-                self._observer_groups[group].add(observer)
-        
-        # Daftarkan ke event dispatcher
-        if self.auto_register:
-            EventDispatcher.register_many(event_types, observer)
-        
-        self._logger.debug(
-            f"🔧 Membuat progress observer '{observer.name}' untuk {len(event_types)} event"
-        )
-        
-        return observer
+        return self.create_observer(ProgressObserver, event_types, name=name, group=group)
     
     def create_logging_observer(
         self,
@@ -271,22 +191,7 @@ class ObserverManager:
         logger_name: Optional[str] = None,
         group: Optional[str] = None
     ) -> BaseObserver:
-        """
-        Membuat observer untuk logging event.
-        
-        Args:
-            event_types: List tipe event yang akan diobservasi
-            log_level: Level log ("debug", "info", "warning", "error")
-            name: Nama observer (opsional)
-            format_string: Format string untuk logging
-            include_timestamp: Sertakan timestamp dalam log
-            include_sender: Sertakan informasi sender dalam log
-            logger_name: Nama logger (opsional)
-            group: Grup observer untuk pengelompokan (opsional)
-            
-        Returns:
-            Logging observer
-        """
+        """Membuat observer untuk logging event."""
         # Buat custom logger jika diperlukan
         logger = get_logger(logger_name or "event_logger")
         
@@ -300,11 +205,7 @@ class ObserverManager:
                 if format_string is not None:
                     # Gunakan string template jika disediakan
                     try:
-                        message = format_string.format(
-                            event_type=event_type,
-                            sender=sender,
-                            **kwargs
-                        )
+                        message = format_string.format(event_type=event_type, sender=sender, **kwargs)
                     except KeyError as e:
                         message = f"Event '{event_type}' terjadi (error format: {e})"
                 else:
@@ -322,10 +223,9 @@ class ObserverManager:
                     # Tambahkan data lain jika ada
                     if kwargs:
                         # Filter data yang akan ditampilkan
-                        filtered_data = {
-                            k: v for k, v in kwargs.items()
-                            if k not in ('timestamp', 'notification_id') and not k.startswith('_')
-                        }
+                        filtered_data = {k: v for k, v in kwargs.items()
+                                        if k not in ('timestamp', 'notification_id') 
+                                        and not k.startswith('_')}
                         if filtered_data:
                             message += f" dengan data: {filtered_data}"
                 
@@ -337,51 +237,17 @@ class ObserverManager:
             name = f"LoggingObserver_{log_level}"
         
         # Buat observer
-        observer = LoggingObserver(name=name)
-        
-        # Tambahkan ke set dan grup jika perlu
-        with self._lock:
-            self._observers.add(observer)
-            if group is not None:
-                if group not in self._observer_groups:
-                    self._observer_groups[group] = set()
-                self._observer_groups[group].add(observer)
-        
-        # Daftarkan ke event dispatcher
-        if self.auto_register:
-            EventDispatcher.register_many(event_types, observer)
-        
-        self._logger.debug(
-            f"🔧 Membuat logging observer '{observer.name}' untuk {len(event_types)} event"
-        )
-        
-        return observer
+        return self.create_observer(LoggingObserver, event_types, name=name, group=group)
     
     def get_observers_by_group(self, group: str) -> List[BaseObserver]:
-        """
-        Mendapatkan semua observer dalam grup tertentu.
-        
-        Args:
-            group: Nama grup
-            
-        Returns:
-            List observer dalam grup
-        """
+        """Mendapatkan semua observer dalam grup tertentu."""
         with self._lock:
             if group not in self._observer_groups:
                 return []
             return list(self._observer_groups[group])
     
     def unregister_group(self, group: str) -> int:
-        """
-        Membatalkan registrasi semua observer dalam grup tertentu.
-        
-        Args:
-            group: Nama grup
-            
-        Returns:
-            Jumlah observer yang dibatalkan registrasinya
-        """
+        """Membatalkan registrasi semua observer dalam grup tertentu."""
         observers = self.get_observers_by_group(group)
         
         for observer in observers:
@@ -393,19 +259,11 @@ class ObserverManager:
                 del self._observer_groups[group]
         
         count = len(observers)
-        self._logger.debug(
-            f"🔌 Membatalkan registrasi {count} observer dari grup '{group}'"
-        )
-        
+        self._logger.debug(f"🔌 Membatalkan registrasi {count} observer dari grup '{group}'")
         return count
     
     def unregister_all(self) -> int:
-        """
-        Membatalkan registrasi semua observer yang dikelola.
-        
-        Returns:
-            Jumlah observer yang dibatalkan registrasinya
-        """
+        """Membatalkan registrasi semua observer yang dikelola."""
         with self._lock:
             count = len(self._observers)
             
@@ -416,60 +274,33 @@ class ObserverManager:
             self._observers.clear()
             self._observer_groups.clear()
         
-        self._logger.debug(
-            f"🔌 Membatalkan registrasi {count} observer yang dikelola"
-        )
-        
+        self._logger.debug(f"🔌 Membatalkan registrasi {count} observer yang dikelola")
         return count
     
     def get_all_observers(self) -> List[BaseObserver]:
-        """
-        Mendapatkan semua observer yang dikelola.
-        
-        Returns:
-            List observer
-        """
+        """Mendapatkan semua observer yang dikelola."""
         with self._lock:
             return list(self._observers)
     
     def get_observer_count(self) -> int:
-        """
-        Mendapatkan jumlah observer yang dikelola.
-        
-        Returns:
-            Jumlah observer
-        """
+        """Mendapatkan jumlah observer yang dikelola."""
         with self._lock:
             return len(self._observers)
     
     def get_group_count(self) -> int:
-        """
-        Mendapatkan jumlah grup observer.
-        
-        Returns:
-            Jumlah grup
-        """
+        """Mendapatkan jumlah grup observer."""
         with self._lock:
             return len(self._observer_groups)
     
     def get_stats(self) -> Dict[str, Any]:
-        """
-        Mendapatkan statistik manager.
-        
-        Returns:
-            Dictionary statistik
-        """
+        """Mendapatkan statistik manager."""
         with self._lock:
             stats = {
                 'observer_count': len(self._observers),
                 'group_count': len(self._observer_groups),
-                'groups': {
-                    group: len(observers)
-                    for group, observers in self._observer_groups.items()
-                }
+                'groups': {group: len(observers) for group, observers in self._observer_groups.items()}
             }
         
         # Tambahkan statistik dari dispatcher
         stats.update(EventDispatcher.get_stats())
-        
         return stats

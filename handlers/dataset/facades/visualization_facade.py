@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Any, Tuple
 
 from smartcash.utils.observer import EventTopics, notify
 from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFacade
-from smartcash.utils.visualization import DataVisualizationHelper
+from smartcash.utils.visualization.data import DataVisualizationHelper
 
 
 class VisualizationFacade(DatasetBaseFacade):

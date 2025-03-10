@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/explorers/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Package untuk komponen eksplorasi dataset SmartCash
 
 from smartcash.handlers.dataset.explorers.base_explorer import BaseExplorer

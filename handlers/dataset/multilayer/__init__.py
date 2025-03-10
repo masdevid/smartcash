@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/multilayer/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Komponen dataset multilayer
 
 from smartcash.handlers.dataset.multilayer.multilayer_dataset_base import MultilayerDatasetBase

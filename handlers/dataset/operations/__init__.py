@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/operations/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Inisialisasi paket operasi dataset
 
 from smartcash.handlers.dataset.operations.dataset_reporting_operation import DatasetReportingOperation

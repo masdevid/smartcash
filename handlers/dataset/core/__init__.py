@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/core/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Komponen inti untuk operasi dataset
 
 from smartcash.handlers.dataset.core.dataset_loader import DatasetLoader

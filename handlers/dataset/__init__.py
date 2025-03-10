@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Package untuk pengelolaan dataset multilayer SmartCash (versi terstruktur)
 
 # Facade utama dan manager

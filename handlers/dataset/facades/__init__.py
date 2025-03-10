@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/facades/__init__.py
-# Author: Alfrida Sabar
 # Deskripsi: Komponen facade untuk dataset
 
 from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFacade

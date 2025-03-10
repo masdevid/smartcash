@@ -1,136 +1,86 @@
-# Ringkasan Dokumentasi Dataset Manager SmartCash
+# Dokumentasi DatasetManager SmartCash
 
 ## Deskripsi
 
-`DatasetManager` adalah komponen pusat untuk pengelolaan dataset multilayer mata uang Rupiah di SmartCash. Komponen ini menggunakan pola desain Facade Composite untuk menyediakan antarmuka terpadu bagi berbagai operasi dataset. Implementasi mengadopsi pendekatan yang modular, atomic, dan mudah diuji dengan menerapkan prinsip Single Responsibility.
+`DatasetManager` adalah komponen pusat untuk pengelolaan dataset multilayer mata uang Rupiah di SmartCash. Komponen ini menggunakan pola desain Facade untuk menyediakan antarmuka terpadu dan modular bagi berbagai operasi dataset.
 
-## Struktur dan Komponen
+## Struktur File Lengkap
 
 ```
 smartcash/handlers/dataset/
-├── __init__.py                          # Export komponen utama
-├── dataset_manager.py                   # Entry point minimal
-├── facades/                             # Facades terpisah untuk fungsi spesifik
-│   ├── dataset_base_facade.py           # Kelas dasar untuk semua facade
-│   ├── data_loading_facade.py           # Operasi loading dan dataloader
-│   ├── data_processing_facade.py        # Validasi, augmentasi, balancing
-│   ├── data_operations_facade.py        # Split, merge, cleanup
-│   ├── visualization_facade.py          # Visualisasi dataset
-│   ├── dataset_explorer_facade.py       # Facade untuk semua explorer
-│   └── pipeline_facade.py               # Menggabungkan semua facade
-├── multilayer/                          # Komponen dataset multilayer
-│   ├── multilayer_dataset_base.py       # Kelas dasar
-│   ├── multilayer_dataset.py            # Dataset multilayer
-│   └── multilayer_label_handler.py      # Handler label
-├── core/                                # Komponen inti
-│   ├── dataset_loader.py                # Loader dataset spesifik
-│   ├── dataset_downloader.py            # Downloader dataset
-│   ├── dataset_transformer.py           # Transformasi data
-│   ├── dataset_validator.py             # Validasi dataset
-│   ├── dataset_augmentor.py             # Augmentasi dataset
-│   ├── dataset_balancer.py              # Balancer dataset
-│   └── download_manager.py              # Manager untuk download
-├── operations/                          # Operasi pada dataset
-│   ├── dataset_split_operation.py       # Pemecahan dataset
-│   ├── dataset_merge_operation.py       # Penggabungan dataset
-│   └── dataset_reporting_operation.py   # Pelaporan dataset
-├── explorers/                           # Eksplorasi dataset
-│   ├── base_explorer.py                 # Kelas dasar untuk semua explorer
-│   ├── validation_explorer.py           # Validasi integritas
-│   ├── class_explorer.py                # Distribusi kelas
-│   ├── layer_explorer.py                # Distribusi layer
-│   ├── image_size_explorer.py           # Ukuran gambar
-│   └── bbox_explorer.py                 # Bounding box
-├── integration/                         # Adapter untuk integrasi
-│   ├── validator_adapter.py             # Adapter untuk EnhancedDatasetValidator
-│   └── colab_drive_adapter.py           # Adapter untuk Google Drive di Colab
-└── visualizations/                      # Visualisasi dataset
-    ├── visualization_base.py            # Kelas dasar untuk semua visualisasi
-    ├── heatmap/                         # Visualizer heatmap
-    │   ├── spatial_density_heatmap.py   # Heatmap kepadatan spasial
-    │   ├── class_density_heatmap.py     # Heatmap kepadatan kelas
-    │   └── size_distribution_heatmap.py # Heatmap distribusi ukuran
-    └── sample/                          # Visualizer sampel
-        ├── sample_grid_visualizer.py    # Grid sampel gambar
-        └── annotation_visualizer.py     # Visualisasi anotasi
+├── __init__.py                     # Export komponen utama
+├── dataset_manager.py              # Entry point minimal (facade utama)
+│
+├── core/                           # Komponen inti dataset
+│   ├── dataset_loader.py           # Loader dataset
+│   ├── dataset_downloader.py       # Downloader dataset
+│   ├── dataset_transformer.py      # Transformasi dataset
+│   ├── dataset_validator.py        # Validator dataset
+│   ├── dataset_augmentor.py        # Augmentasi dataset
+│   └── dataset_balancer.py         # Penyeimbangan dataset
+│
+├── facades/                        # Facade untuk operasi dataset
+│   ├── pipeline_facade.py          # Facade untuk pipeline lengkap
+│   ├── data_loading_facade.py      # Facade untuk loading data
+│   ├── data_processing_facade.py   # Facade untuk preprocessing
+│   ├── data_operations_facade.py   # Facade untuk operasi dataset
+│   ├── visualization_facade.py     # Facade untuk visualisasi
+│   └── dataset_explorer_facade.py  # Facade untuk eksplorasi dataset
+│
+├── explorers/                      # Komponen eksplorasi dataset
+│   ├── base_explorer.py            # Kelas dasar explorer
+│   ├── validation_explorer.py      # Explorer untuk validasi
+│   ├── bbox_image_explorer.py      # Explorer untuk bbox dan ukuran gambar
+│   └── distribution_explorer.py    # Explorer untuk distribusi kelas/layer
+│
+├── multilayer/                     # Komponen dataset multilayer
+│   ├── multilayer_dataset_base.py  # Kelas dasar dataset multilayer
+│   ├── multilayer_dataset.py       # Implementasi dataset multilayer
+│   └── multilayer_label_handler.py # Handler label multilayer
+│
+├── operations/                     # Operasi manipulasi dataset
+│   ├── dataset_split_operation.py  # Operasi split dataset
+│   ├── dataset_merge_operation.py  # Operasi merge dataset
+│   └── dataset_reporting_operation.py  # Operasi pelaporan dataset
+│
+└── dataset_utils_adapter.py        # Adapter untuk integrasi utils/dataset
 ```
 
 ## Fitur Utama
 
-### 1. Pengelolaan Dataset Multilayer
+### 1. Arsitektur Modular
+- Facade pattern untuk antarmuka terpadu
+- Komponen terpisah dengan tanggung jawab spesifik
+- Lazy loading untuk efisiensi memori
 
-Mendukung dataset dengan beberapa layer deteksi:
-- `banknote`: Deteksi mata uang kertas (nominal penuh)
-- `nominal`: Deteksi area nominal tertentu
-- `security`: Deteksi fitur keamanan (tanda tangan, text, benang pengaman)
+### 2. Manajemen Dataset Multilayer
+- Dukungan untuk dataset dengan beberapa layer deteksi
+- Fleksibilitas dalam konfigurasi layer
+- Penanganan label multilayer yang kompleks
 
-### 2. Loading dan Pemrosesan Data
+### 3. Preprocessing Dataset
+- Transformasi gambar dengan Albumentations
+- Augmentasi dengan berbagai teknik
+- Validasi dan pembersihan dataset
+- Penyeimbangan kelas
 
-- Load dataset dari sumber lokal atau Roboflow API
-- Transformasi dan augmentasi data dengan berbagai teknik
-- Support untuk cache dataset untuk mempercepat loading
-- Penggunaan DataLoader PyTorch dengan konfigurasi optimal
-- Collate functions khusus untuk dataset multilayer
-- Dukungan download dataset dengan retry dan resume
+### 4. Loading dan Transformasi
+- DataLoader PyTorch yang teroptimasi
+- Konfigurasi transformasi yang fleksibel
+- Dukungan untuk berbagai mode (train/val/test)
 
-### 3. Validasi dan Analisis Dataset
-
-- Validasi integritas file gambar dan label
-- Analisis distribusi kelas dan layer
+### 5. Eksplorasi dan Analisis
+- Statistik distribusi kelas dan layer
 - Analisis ukuran gambar dan bounding box
-- Deteksi ketidakseimbangan kelas dan layer
-- Perbaikan otomatis untuk masalah umum dataset
-- Integrasi dengan EnhancedDatasetValidator
-
-### 4. Augmentasi dan Penyeimbangan
-
-- Augmentasi dataset dengan berbagai teknik (posisi, pencahayaan, kombinasi)
-- Penyeimbangan distribusi kelas dengan undersampling
-- Support untuk augmentasi progresif dan evaluasi hasil
-- Kombinasi kustom parameter augmentasi
-- Paralelisasi proses augmentasi dan balancing
-
-### 5. Visualisasi dan Pelaporan
-
-- Visualisasi distribusi kelas dan layer
-- Visualisasi ukuran objek (width, height, area, aspect ratio)
-- Heatmap kepadatan spasial, kelas, dan ukuran
-- Visualisasi sampel dengan bounding box per kelas/layer
-- Visualisasi perbandingan layer anotasi
-- Pembuatan laporan komprehensif dataset (markdown, JSON)
-
-### 6. Pipeline Dataset Lengkap
-
-- Setup pipeline lengkap (download, validasi, augmentasi, balancing)
-- Dukungan untuk automatic cleanup dan verifikasi hasil
-- Task reporting dan progress tracking dengan tqdm
-- Integrasi dengan Google Colab
-- Factory pattern untuk pembuatan komponen dataset
-
-### 7. Integrasi dengan Environment Lain
-
-- Integrasi dengan Google Drive melalui ColabDriveAdapter
-- Dukungan untuk symlink dan path mapping
-- Factory pattern untuk pembuatan komponen dengan dependency injection
+- Visualisasi dataset
 
 ## Kelas Utama
 
-### DatasetManager
-
-Kelas utama yang menggabungkan semua facade dan menyediakan antarmuka terpadu:
+### 1. DatasetManager (PipelineFacade)
+Facade utama yang menggabungkan semua komponen:
 
 ```python
 class DatasetManager(PipelineFacade):
-    """
-    Manager utama untuk dataset SmartCash.
-    
-    Menggunakan pola composite facade yang menggabungkan:
-    - DataLoadingFacade: Operasi loading data dan pembuatan dataloader
-    - DataProcessingFacade: Operasi validasi, augmentasi, dan balancing
-    - DataOperationsFacade: Operasi manipulasi dataset
-    - VisualizationFacade: Operasi visualisasi dataset
-    """
-    
     def __init__(
         self,
         config: Dict,
@@ -142,137 +92,11 @@ class DatasetManager(PipelineFacade):
         super().__init__(config, data_dir, cache_dir, logger)
 ```
 
-### DatasetComponentFactory
-
-Factory pattern untuk pembuatan komponen dataset:
-
-```python
-class DatasetComponentFactory:
-    """
-    Factory untuk membuat komponen dataset terintegrasi.
-    """
-    
-    @staticmethod
-    def create_validator(...): """Membuat validator dataset."""
-    
-    @staticmethod
-    def create_augmentor(...): """Membuat augmentor dataset."""
-    
-    @staticmethod
-    def create_multilayer_dataset(...): """Membuat multilayer dataset."""
-    
-    # ... metode factory lainnya
-```
-
-### DatasetBaseFacade
-
-Kelas dasar untuk semua facade dataset:
-
-```python
-class DatasetBaseFacade:
-    """
-    Kelas dasar untuk facade dataset.
-    Menyediakan fitur registrasi dan lazy initialization.
-    """
-    
-    def __init__(self, config, data_dir=None, cache_dir=None, logger=None): """Inisialisasi."""
-    
-    def _get_component(self, component_id, factory_func): """Lazy initialization komponen."""
-```
-
-## Facade yang Tersedia
-
-### 1. DataLoadingFacade
-
-Menyediakan fungsi untuk loading dataset dan pembuatan dataloader:
-
-- `get_dataset(split)`: Dapatkan dataset untuk split tertentu
-- `get_dataloader(split)`: Dapatkan dataloader untuk split tertentu
-- `get_all_dataloaders()`: Dapatkan semua dataloader (train, val, test)
-- `download_dataset()`: Download dataset dari Roboflow
-- `export_to_local()`: Export dataset Roboflow ke struktur folder lokal
-- `convert_dataset_format()`: Konversi dataset dari satu format ke format lain
-
-### 2. DataProcessingFacade
-
-Menyediakan fungsi untuk pemrosesan dataset:
-
-- `validate_dataset(split)`: Validasi dataset menggunakan validator terintegrasi
-- `analyze_dataset(split)`: Analisis mendalam dataset
-- `fix_dataset(split)`: Perbaiki masalah dataset
-- `augment_dataset()`: Augmentasi dataset
-- `balance_by_undersampling()`: Seimbangkan dataset
-
-### 3. DataOperationsFacade
-
-Menyediakan fungsi untuk operasi dataset:
-
-- `get_split_statistics()`: Dapatkan statistik untuk semua split dataset
-- `split_dataset()`: Pecah dataset menjadi train/val/test
-- `merge_splits()`: Gabungkan semua split menjadi satu direktori flat
-- `generate_dataset_report()`: Buat laporan lengkap tentang dataset
-
-### 4. VisualizationFacade
-
-Menyediakan fungsi untuk visualisasi dataset:
-
-- `visualize_class_distribution()`: Visualisasi distribusi kelas
-- `visualize_layer_distribution()`: Visualisasi distribusi layer
-- `visualize_sample_images()`: Visualisasi sampel gambar dari dataset dengan bounding box
-- `visualize_augmentation_comparison()`: Visualisasi perbandingan berbagai jenis augmentasi
-
-### 5. DatasetExplorerFacade
-
-Menyediakan fungsi untuk eksplorasi dataset secara mendalam:
-
-- `analyze_dataset()`: Lakukan analisis komprehensif
-- `analyze_class_distribution()`: Analisis distribusi kelas
-- `analyze_layer_distribution()`: Analisis distribusi layer
-- `analyze_image_sizes()`: Analisis ukuran gambar
-- `analyze_bounding_boxes()`: Analisis bounding box
-
-### 6. PipelineFacade (DatasetManager)
-
-Menyediakan fungsi untuk pipeline dataset lengkap:
-
-- `setup_full_pipeline()`: Setup pipeline lengkap (download, validasi, augmentasi, balancing)
-
-## Format dan Struktur Data
-
-### Format Label
-
-Dataset menggunakan format label YOLO:
-```
-<class_id> <x_center> <y_center> <width> <height>
-```
-
-### Struktur File
-
-```
-data/
-├── train/                # Training data
-│   ├── images/           # Gambar training
-│   └── labels/           # Label YOLO training
-├── valid/                # Validation data
-│   ├── images/           # Gambar validasi
-│   └── labels/           # Label YOLO validasi
-└── test/                 # Test data
-    ├── images/           # Gambar test
-    └── labels/           # Label YOLO test
-
-.cache/smartcash/         # Cache untuk mempercepat loading
-visualizations/           # Output visualisasi
-runs/train/experiments/   # Output eksperimen
-```
-
-### MultilayerDataset
-
-Inti dari DatasetManager adalah komponen `MultilayerDataset` yang mengelola dataset dengan multiple detection layers:
+### 2. MultilayerDataset
+Dataset khusus untuk mendukung multilayer:
 
 ```python
 class MultilayerDataset(MultilayerDatasetBase):
-    """Dataset untuk deteksi multilayer."""
-    
     def __init__(
         self,
         data_path: str,
@@ -284,96 +108,126 @@ class MultilayerDataset(MultilayerDatasetBase):
         logger: Optional[SmartCashLogger] = None,
         config: Optional[Dict] = None
     ):
-        # ...
+        """Inisialisasi MultilayerDataset."""
 ```
 
-Output item dataset dalam format berikut:
+### 3. DatasetUtilsAdapter
+Adapter untuk integrasi komponen utils:
 
 ```python
-{
-    'image': img_tensor,  # Tensor gambar [C, H, W]
-    'targets': {          # Dict target per layer
-        'banknote': tensor_banknote,  # [n_classes, 5] format [x, y, w, h, conf]
-        'nominal': tensor_nominal,    # [n_classes, 5]
-        'security': tensor_security   # [n_classes, 5]
-    },
-    'metadata': {         # Metadata tambahan
-        'image_path': str(path),
-        'label_path': str(label_path),
-        'available_layers': ['banknote', 'nominal']  # Layer yang tersedia
-    }
-}
+class DatasetUtilsAdapter:
+    def __init__(
+        self, 
+        config: Dict, 
+        data_dir: Optional[str] = None, 
+        logger: Optional[SmartCashLogger] = None
+    ):
+        """Inisialisasi adapter."""
+```
+
+## Metode Utama
+
+### Setup Pipeline Lengkap
+```python
+def setup_full_pipeline(self, **kwargs) -> Dict[str, Any]:
+    """Setup pipeline lengkap untuk dataset."""
+    # Download, validasi, augmentasi, penyeimbangan
+```
+
+### Loading Dataset
+```python
+def get_dataset(self, split: str, **kwargs):
+    """Dapatkan dataset untuk split tertentu."""
+
+def get_dataloader(self, split: str, **kwargs):
+    """Dapatkan dataloader untuk split tertentu."""
+```
+
+### Preprocessing
+```python
+def validate_dataset(self, split: str, **kwargs):
+    """Validasi dataset."""
+
+def augment_dataset(self, **kwargs):
+    """Augmentasi dataset."""
+
+def balance_by_undersampling(self, split: str, **kwargs):
+    """Seimbangkan dataset dengan undersampling."""
+```
+
+### Eksplorasi
+```python
+def analyze_dataset(self, split: str, **kwargs):
+    """Analisis mendalam dataset."""
+
+def visualize_class_distribution(self, split: str = 'train', **kwargs):
+    """Visualisasikan distribusi kelas."""
 ```
 
 ## Konfigurasi
 
-DatasetManager menggunakan konfigurasi dalam format dictionary yang mencakup parameter seperti direktori data, parameter preprocessing, augmentasi, dan detail layer.
+Konfigurasi dataset dalam format dictionary yang mendukung:
+- Direktori data
+- Konfigurasi layer
+- Parameter preprocessing
+- Pengaturan augmentasi
 
-## Integrasi dengan Google Colab
+## Integrasi dengan Komponen Lain
 
-```python
-# Deteksi dan setup untuk Google Colab
-colab_adapter = ColabDriveAdapter(
-    mount_path="/content/drive/MyDrive/SmartCash",
-    local_path="/content/SmartCash",
-    auto_mount=True
-)
+1. **CheckpointManager**: Loading model dari checkpoint
+2. **ModelManager**: Training dan evaluasi model
+3. **Observer Pattern**: Monitoring event dataset
+4. **Google Colab**: Dukungan lingkungan notebook
 
-# Setup symlink untuk direktori penting
-colab_adapter.setup_symlinks(['data', 'models', 'configs'])
+## Cara Penggunaan
 
-# Gunakan DatasetManager dengan path lokal
-dataset_manager = DatasetManager(config, data_dir="/content/SmartCash/data")
-```
-
-## Optimasi Performa
-
-- **Multiprocessing**: Paralelisasi berbagai operasi dataset
-- **Caching**: Mempercepat loading dengan cache
-- **Progress Tracking**: Menggunakan tqdm untuk tracking operasi yang memakan waktu
-- **Lazy Initialization**: Komponen diinisialisasi hanya saat dibutuhkan
-
-## Panduan Migrasi
-
-Jika menggunakan versi lama dataset_manager.py, berikut panduan migrasi ke versi baru:
-
-### 1. Inisialisasi
+### 1. Inisialisasi DatasetManager
 
 ```python
-# Versi Baru
 from smartcash.handlers.dataset import DatasetManager
 from smartcash.config import get_config_manager
 
-config_manager = get_config_manager("configs/base_config.yaml")
+# Dapatkan konfigurasi
+config_manager = get_config_manager("configs/rupiah_detection.yaml")
 config = config_manager.get_config()
 
+# Inisialisasi DatasetManager
 dataset_manager = DatasetManager(
     config=config,
-    data_dir="data",
+    data_dir="data/rupiah_banknotes",
     cache_dir=".cache/smartcash"
 )
 ```
 
-### 2. Loading Dataset
+### 2. Download dan Setup Dataset
 
 ```python
-# Shortcut baru tersedia
-train_loader = dataset_manager.get_train_loader(batch_size=16)
-val_loader = dataset_manager.get_val_loader(batch_size=16)
-```
-
-### 3. Validasi dan Augmentasi
-
-```python
-# Validasi dengan opsi baru
-dataset_manager.validate_dataset(
-    split='train',
-    fix_issues=True,
-    visualize=True
+# Download dataset dari Roboflow
+dataset_path = dataset_manager.download_dataset(
+    format="yolov5", 
+    show_progress=True
 )
 
-# Augmentasi dengan opsi baru
-dataset_manager.augment_dataset(
+# Export ke struktur lokal
+train_dir, val_dir, test_dir = dataset_manager.export_to_local(dataset_path)
+```
+
+### 3. Validasi Dataset
+
+```python
+# Validasi dataset training
+validation_results = dataset_manager.validate_dataset(
+    split='train', 
+    fix_issues=True,  # Perbaiki masalah otomatis
+    visualize=True    # Buat visualisasi masalah
+)
+```
+
+### 4. Augmentasi Dataset
+
+```python
+# Augmentasi dataset training
+augmentation_stats = dataset_manager.augment_dataset(
     split='train',
     augmentation_types=['combined', 'lighting'],
     num_variations=2,
@@ -381,27 +235,70 @@ dataset_manager.augment_dataset(
 )
 ```
 
-### 4. Pipeline Lengkap
+### 5. Penyeimbangan Kelas
 
 ```python
-dataset_manager.setup_full_pipeline(
+# Seimbangkan dataset dengan undersampling
+balance_results = dataset_manager.balance_by_undersampling(
+    split='train', 
+    target_ratio=2.0,  # Rasio maksimal antar kelas
+    backup=True
+)
+```
+
+### 6. Loading DataLoader
+
+```python
+# Dapatkan DataLoader untuk training
+train_loader = dataset_manager.get_train_loader(
+    batch_size=16,
+    num_workers=4,
+    shuffle=True
+)
+
+# Dapatkan semua DataLoader sekaligus
+all_loaders = dataset_manager.get_all_dataloaders(
+    batch_size=16,
+    require_all_layers=True
+)
+```
+
+### 7. Analisis Dataset
+
+```python
+# Analisis distribusi kelas
+class_analysis = dataset_manager.analyze_dataset(
+    split='train', 
+    sample_size=1000,  # Analisis sampel
+    detailed=True
+)
+
+# Visualisasi distribusi
+dataset_manager.visualize_class_distribution(
+    split='train', 
+    save_path='visualizations/class_distribution.png'
+)
+```
+
+### 8. Pipeline Lengkap
+
+```python
+# Setup pipeline lengkap
+pipeline_results = dataset_manager.setup_full_pipeline(
     download_dataset=True,
     validate_dataset=True,
     fix_issues=True,
     augment_data=True,
-    balance_classes=False,
+    balance_classes=True,
     visualize_results=True
 )
 ```
 
 ## Kesimpulan
 
-DatasetManager SmartCash yang baru menawarkan:
-
-1. **Struktur Modular**: Pemisahan tugas sesuai prinsip Single Responsibility
-2. **Pola Desain Modern**: Facade, Adapter, Factory, Strategy, Composite
-3. **Keamanan yang Lebih Baik**: Validasi input dan pengelolaan error yang lebih robust
-4. **Pemeliharaan yang Lebih Mudah**: Komponen terisolasi memudahkan update
-5. **Performa Lebih Baik**: Caching, parallelism, dan optimasi memory
-6. **Integrasi yang Lebih Kuat**: Dengan utils/dataset dan extensions lainnya
-7. **Dokumentasi yang Lebih Baik**: Docstring lengkap dan logging yang informatif
+`DatasetManager` menyediakan:
+1. Antarmuka terpadu untuk operasi dataset
+2. Fleksibilitas dalam konfigurasi dan preprocessing
+3. Dukungan penuh untuk dataset multilayer
+4. Optimasi performa dengan lazy loading
+5. Integrasi mulus dengan komponen SmartCash

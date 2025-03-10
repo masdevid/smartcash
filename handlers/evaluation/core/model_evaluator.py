@@ -1,6 +1,6 @@
 # File: smartcash/handlers/evaluation/core/model_evaluator.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen utama untuk evaluasi model
+# Deskripsi: Komponen utama untuk evaluasi model yang disederhanakan
 
 import time
 import torch
@@ -10,22 +10,19 @@ from tqdm.auto import tqdm
 
 from smartcash.utils.logger import SmartCashLogger, get_logger
 from smartcash.handlers.evaluation.core.evaluation_component import EvaluationComponent
-from smartcash.handlers.evaluation.integration.metrics_adapter import MetricsAdapter
-from smartcash.handlers.evaluation.integration.model_manager_adapter import ModelManagerAdapter
-from smartcash.handlers.evaluation.integration.dataset_adapter import DatasetAdapter
+from smartcash.utils.metrics import MetricsCalculator
+from smartcash.utils.observer.event_dispatcher import EventDispatcher
 
 class ModelEvaluator(EvaluationComponent):
     """
-    Komponen untuk evaluasi model dengan berbagai strategi.
+    Komponen untuk evaluasi model dengan direct injection.
     Melakukan proses evaluasi pada model dengan dataset yang diberikan.
     """
     
     def __init__(
         self,
         config: Dict,
-        metrics_adapter: Optional[MetricsAdapter] = None,
-        model_adapter: Optional[ModelManagerAdapter] = None,
-        dataset_adapter: Optional[DatasetAdapter] = None,
+        metrics_calculator: Optional[MetricsCalculator] = None,
         logger: Optional[SmartCashLogger] = None,
         name: str = "ModelEvaluator"
     ):
@@ -34,119 +31,75 @@ class ModelEvaluator(EvaluationComponent):
         
         Args:
             config: Konfigurasi evaluasi
-            metrics_adapter: Adapter untuk MetricsCalculator
-            model_adapter: Adapter untuk ModelManager
-            dataset_adapter: Adapter untuk DatasetManager
+            metrics_calculator: Instance dari MetricsCalculator
             logger: Logger kustom (opsional)
             name: Nama komponen
         """
         super().__init__(config, logger, name)
         
-        # Inisialisasi adapter
-        self.metrics_adapter = metrics_adapter or MetricsAdapter(config, logger)
-        self.model_adapter = model_adapter or ModelManagerAdapter(config, logger)
-        self.dataset_adapter = dataset_adapter or DatasetAdapter(config, logger)
+        # Inisialisasi metrics_calculator
+        self.metrics_calculator = metrics_calculator or MetricsCalculator()
+
+        # Parameter evaluasi dari config
+        eval_config = self.config.get('evaluation', {})
+        self.conf_threshold = eval_config.get('conf_threshold', 0.25)
+        self.iou_threshold = eval_config.get('iou_threshold', 0.5)
+        self.half_precision = eval_config.get('half_precision', False)
     
     def process(
         self,
-        model_path: str,
-        dataset_path: str,
-        observers: Optional[List] = None,
+        model: torch.nn.Module,
+        dataloader: torch.utils.data.DataLoader,
+        device: str = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
-        Proses evaluasi model.
+        Proses evaluasi model menggunakan direct injection.
         
         Args:
-            model_path: Path ke checkpoint model
-            dataset_path: Path ke dataset evaluasi
-            observers: List observer (opsional)
+            model: Model PyTorch untuk evaluasi
+            dataloader: DataLoader dengan dataset evaluasi
+            device: Device untuk evaluasi ('cuda', 'cpu')
             **kwargs: Parameter tambahan
-                - batch_size: Ukuran batch
-                - num_workers: Jumlah worker
-                - device: Device untuk evaluasi ('cuda', 'cpu')
-                - half_precision: Gunakan half precision
-            
+        
         Returns:
             Dictionary hasil evaluasi
         """
-        # Validasi input
-        self.validate_inputs(model_path=model_path, dataset_path=dataset_path)
+        # Default device jika tidak dispesifikasikan
+        if device is None:
+            device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
-        # Notifikasi observers
-        self.notify_observers(observers, 'evaluation_start', {
-            'model_path': model_path,
-            'dataset_path': dataset_path
+        # Pastikan model berada pada device yang benar dan dalam mode evaluasi
+        model = model.to(device)
+        model.eval()
+        
+        # Gunakan half precision jika diperlukan
+        if self.half_precision and device == 'cuda':
+            model = model.half()
+            self.logger.info("🔄 Menggunakan half precision (FP16)")
+        
+        # Reset metrics calculator
+        self.metrics_calculator.reset()
+        
+        # Notifikasi start
+        self.notify('evaluation_start', {
+            'num_batches': len(dataloader),
+            'device': device
         })
         
         try:
-            # Ambil parameter dari kwargs
-            batch_size = kwargs.get('batch_size')
-            num_workers = kwargs.get('num_workers')
-            device = kwargs.get('device', 'cuda' if torch.cuda.is_available() else 'cpu')
-            half_precision = kwargs.get('half_precision')
-            
-            # Ukur waktu
+            # Ukur waktu eksekusi
             start_time = time.time()
             
-            # Load model
-            self.logger.info(f"🔄 Loading model: {model_path}")
-            model = self.model_adapter.load_model(
-                model_path=model_path,
-                device=device,
-                backbone=kwargs.get('backbone')
-            )
-            
-            # Prepare model for evaluation
-            model = self.model_adapter.prepare_model_for_evaluation(
-                model=model,
-                half_precision=half_precision
-            )
-            
-            # Verifikasi dataset
-            self.logger.info(f"🔄 Verifikasi dataset: {dataset_path}")
-            self.dataset_adapter.verify_dataset(dataset_path)
-            
-            # Load data
-            self.logger.info(f"🔄 Loading dataset untuk evaluasi")
-            dataloader = self.dataset_adapter.get_eval_loader(
-                dataset_path=dataset_path,
-                batch_size=batch_size,
-                num_workers=num_workers
-            )
-            
-            # Reset metrics
-            self.metrics_adapter.reset()
-            
-            # Notifikasi observers
-            self.notify_observers(observers, 'evaluation_dataloader_ready', {
-                'num_batches': len(dataloader),
-                'num_samples': len(dataloader.dataset) if hasattr(dataloader, 'dataset') else 0
-            })
-            
-            # Jalankan evaluasi
-            self.logger.info(f"🚀 Menjalankan evaluasi pada {len(dataloader)} batch")
-            results = self.evaluate(
-                model=model,
-                dataloader=dataloader,
-                device=device,
-                observers=observers,
-                **kwargs
-            )
+            # Evaluasi model
+            results = self._evaluate(model, dataloader, device, **kwargs)
             
             # Hitung waktu total
             total_time = time.time() - start_time
             results['total_time'] = total_time
             
-            # Log hasil
-            self.metrics_adapter.log_metrics(results)
-            
-            # Tambahkan info model dan dataset
-            results['model_info'] = self.model_adapter.get_model_info(model_path)
-            results['dataset_info'] = self.dataset_adapter.get_dataset_info(dataset_path)
-            
-            # Notifikasi observers
-            self.notify_observers(observers, 'evaluation_complete', results)
+            # Notifikasi complete
+            self.notify('evaluation_complete', results)
             
             self.logger.success(f"✅ Evaluasi selesai dalam {total_time:.2f}s")
             return results
@@ -154,21 +107,18 @@ class ModelEvaluator(EvaluationComponent):
         except Exception as e:
             self.logger.error(f"❌ Evaluasi gagal: {str(e)}")
             
-            # Notifikasi observers
-            self.notify_observers(observers, 'evaluation_error', {
-                'error': str(e),
-                'model_path': model_path,
-                'dataset_path': dataset_path
+            # Notifikasi error
+            self.notify('evaluation_error', {
+                'error': str(e)
             })
             
             raise
     
-    def evaluate(
+    def _evaluate(
         self,
         model: torch.nn.Module,
         dataloader: torch.utils.data.DataLoader,
         device: str,
-        observers: Optional[List] = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -178,91 +128,91 @@ class ModelEvaluator(EvaluationComponent):
             model: Model PyTorch
             dataloader: DataLoader untuk evaluasi
             device: Device untuk evaluasi
-            observers: List observer (opsional)
             **kwargs: Parameter tambahan
             
         Returns:
             Dictionary hasil evaluasi
         """
-        # Pastikan model dalam mode evaluasi
-        model.eval()
-        
-        # Inisialisasi variabel tracking
+        # Inisialisasi tracking waktu
         inference_times = []
         
-        # Evaluasi batch-by-batch
+        # Progress bar dengan tqdm
+        progress_bar = tqdm(dataloader, desc="Evaluasi", unit="batch")
+        
+        # Evaluasi batch-by-batch dengan no_grad untuk efisiensi memori
         with torch.no_grad():
-            for batch_idx, (images, targets) in enumerate(tqdm(dataloader, desc="Evaluasi")):
-                # Pindahkan ke device yang sesuai
-                images = images.to(device)
-                targets = targets.to(device)
+            for batch_idx, batch in enumerate(progress_bar):
+                # Proses batch sesuai formatnya
+                if isinstance(batch, dict) and 'image' in batch and 'targets' in batch:
+                    # Format multilayer dataset
+                    images = batch['image'].to(device)
+                    targets = batch['targets']
+                elif isinstance(batch, (list, tuple)) and len(batch) == 2:
+                    # Format standar (images, targets)
+                    images, targets = batch
+                    images = images.to(device)
+                    targets = targets.to(device) if isinstance(targets, torch.Tensor) else targets
+                else:
+                    self.logger.warning(f"⚠️ Format batch tidak didukung: {type(batch)}")
+                    continue
                 
-                # Notifikasi observers
-                self.notify_observers(observers, 'batch_start', {
+                # Notifikasi batch start
+                self.notify('batch_start', {
                     'batch_idx': batch_idx,
-                    'batch_size': images.shape[0],
-                    'total_batches': len(dataloader)
+                    'batch_size': images.shape[0] if isinstance(images, torch.Tensor) else 0,
                 })
                 
-                # Inferensi
+                # Inferensi dengan pengukuran waktu
                 start_time = time.time()
                 predictions = model(images)
                 inference_time = time.time() - start_time
                 inference_times.append(inference_time)
                 
-                # Update metrics
-                self.metrics_adapter.update(predictions, targets)
+                # Update metrics dengan hasil prediksi
+                self.metrics_calculator.update(
+                    predictions, 
+                    targets,
+                    conf_threshold=self.conf_threshold,
+                    iou_threshold=self.iou_threshold
+                )
                 
-                # Notifikasi observers
-                self.notify_observers(observers, 'batch_complete', {
+                # Update progress bar dengan informasi FPS
+                if inference_times:
+                    avg_time = np.mean(inference_times[-10:]) if len(inference_times) >= 10 else np.mean(inference_times)
+                    fps = 1.0 / avg_time if avg_time > 0 else 0
+                    progress_bar.set_postfix({
+                        'FPS': f'{fps:.1f}',
+                        'Infer': f'{avg_time*1000:.1f}ms'
+                    })
+                
+                # Notifikasi batch complete
+                self.notify('batch_complete', {
                     'batch_idx': batch_idx,
-                    'inference_time': inference_time,
-                    'batch_size': images.shape[0]
+                    'inference_time': inference_time
                 })
-                
-                # Log progress setiap 10 batch
-                if (batch_idx + 1) % 10 == 0:
-                    avg_time = np.mean(inference_times[-10:])
-                    fps = 1.0 / avg_time
-                    self.logger.debug(f"📊 Batch {batch_idx + 1}/{len(dataloader)}, FPS: {fps:.2f}")
         
         # Hitung metrik final
-        metrics = self.metrics_adapter.compute()
+        metrics = self.metrics_calculator.compute()
         
-        # Update inference time
+        # Tambahkan informasi waktu inferensi
         if inference_times:
-            metrics['inference_time'] = np.mean(inference_times)
-            metrics['fps'] = 1.0 / metrics['inference_time']
+            avg_inference_time = np.mean(inference_times)
+            metrics['inference_time'] = avg_inference_time
+            metrics['fps'] = 1.0 / avg_inference_time if avg_inference_time > 0 else 0
+            self.logger.info(f"⏱️ Waktu inferensi rata-rata: {avg_inference_time*1000:.2f}ms ({metrics['fps']:.1f} FPS)")
         
-        return metrics
+        return {
+            'metrics': metrics,
+            'inference_times': inference_times,
+            'num_samples': len(dataloader.dataset) if hasattr(dataloader, 'dataset') else len(dataloader) * dataloader.batch_size
+        }
     
-    def validate_inputs(
-        self,
-        model_path: Optional[str] = None,
-        dataset_path: Optional[str] = None,
-        **kwargs
-    ) -> bool:
+    def notify(self, event: str, data: Dict[str, Any] = None):
         """
-        Validasi input sebelum evaluasi.
+        Notify observers menggunakan EventDispatcher.
         
         Args:
-            model_path: Path ke checkpoint model
-            dataset_path: Path ke dataset evaluasi
-            **kwargs: Parameter tambahan
-            
-        Returns:
-            True jika valid
-            
-        Raises:
-            ValueError: Jika validasi gagal
+            event: Nama event
+            data: Data event (opsional)
         """
-        # Validasi model_path
-        if model_path and not model_path.endswith(('.pt', '.pth')):
-            raise ValueError(f"Format checkpoint tidak valid: {model_path}")
-        
-        # Validasi dataset_path
-        if dataset_path:
-            if not self.dataset_adapter.verify_dataset(dataset_path):
-                raise ValueError(f"Dataset tidak valid: {dataset_path}")
-        
-        return True
+        EventDispatcher.notify(f"evaluation.{event}", self, data or {})

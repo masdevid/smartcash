@@ -1,11 +1,12 @@
 # File: smartcash/handlers/evaluation/core/evaluation_component.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen dasar untuk evaluasi model
+# Deskripsi: Komponen dasar yang disederhanakan untuk evaluasi model
 
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from abc import ABC, abstractmethod
 
 from smartcash.utils.logger import SmartCashLogger, get_logger
+from smartcash.utils.observer.event_dispatcher import EventDispatcher
 
 class EvaluationComponent(ABC):
     """
@@ -44,33 +45,12 @@ class EvaluationComponent(ABC):
         """
         pass
     
-    def validate_inputs(self, **kwargs) -> bool:
+    def notify(self, event: str, data: Dict[str, Any] = None):
         """
-        Validasi input sebelum proses.
+        Notify observers menggunakan EventDispatcher.
         
         Args:
-            **kwargs: Parameter untuk divalidasi
-            
-        Returns:
-            True jika valid
-            
-        Raises:
-            ValueError: Jika validasi gagal
-        """
-        return True
-    
-    def notify_observers(self, observers: List, event: str, data: Dict[str, Any] = None):
-        """
-        Notifikasi observer tentang event.
-        
-        Args:
-            observers: List observer
             event: Nama event
-            data: Data tambahan (opsional)
+            data: Data event (opsional)
         """
-        if not observers:
-            return
-            
-        for observer in observers:
-            if hasattr(observer, 'update'):
-                observer.update(event, data or {})
+        EventDispatcher.notify(f"evaluation.{event}", self, data or {})

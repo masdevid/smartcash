@@ -155,16 +155,27 @@ def setup_download_handlers(ui_components, config=None):
                     if dataset_manager:
                         display(create_status_indicator("info", "🔑 Mengunduh dataset dari Roboflow..."))
                         
-                        # Check if in Google Colab
-                        is_colab = 'google.colab' in str(get_ipython())
-                        use_drive = is_colab and Path('/content/drive/MyDrive').exists()
-                        
-                        # Set data dir based on environment
-                        if use_drive:
-                            data_dir = '/content/drive/MyDrive/SmartCash/data'
-                            display(create_status_indicator("info", "📁 Menggunakan Google Drive untuk penyimpanan"))
-                        else:
+                        # Use EnvironmentManager to detect Colab and handle Drive
+                        try:
+                            from smartcash.utils.environment_manager import EnvironmentManager
+                            env_manager = EnvironmentManager()
+                            
+                            # Check if in Colab and mount Drive if needed
+                            if env_manager.is_colab and not env_manager.is_drive_mounted:
+                                display(create_status_indicator("info", "📁 Menghubungkan ke Google Drive..."))
+                                env_manager.mount_drive()
+                            
+                            # Use environment-appropriate path
+                            if env_manager.is_drive_mounted:
+                                data_dir = str(env_manager.drive_path / 'data')
+                                display(create_status_indicator("info", "📁 Menggunakan Google Drive untuk penyimpanan"))
+                            else:
+                                data_dir = config.get('data_dir', 'data')
+                        except Exception as e:
+                            # Fallback to config data_dir if EnvironmentManager fails
                             data_dir = config.get('data_dir', 'data')
+                            if logger:
+                                logger.warning(f"⚠️ Gagal menggunakan EnvironmentManager: {str(e)}")
                         
                         # Ensure data directory exists
                         Path(data_dir).mkdir(parents=True, exist_ok=True)

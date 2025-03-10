@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_handlers/dependency_installer.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI instalasi dependencies SmartCash
+Deskripsi: Handler untuk UI instalasi dependencies SmartCash dengan fitur uncheck all dan SmartCash requirements
 """
 
 import os
@@ -14,7 +14,25 @@ import ipywidgets as widgets
 from pathlib import Path
 
 def setup_dependency_handlers(ui):
-    """Setup handler untuk UI instalasi dependencies"""
+    """Setup handler untuk UI instalasi dependencies dengan fitur check/uncheck all"""
+    
+    # Handler untuk check all button
+    def on_check_all(b):
+        # Dapatkan semua checkbox dari grid
+        checkboxes = [child for child in ui['checkbox_grid'].children if isinstance(child, widgets.Checkbox)]
+        
+        # Set semua ke checked
+        for checkbox in checkboxes:
+            checkbox.value = True
+    
+    # Handler untuk uncheck all button
+    def on_uncheck_all(b):
+        # Dapatkan semua checkbox dari grid
+        checkboxes = [child for child in ui['checkbox_grid'].children if isinstance(child, widgets.Checkbox)]
+        
+        # Set semua ke unchecked
+        for checkbox in checkboxes:
+            checkbox.value = False
     
     # Handler untuk install packages
     def on_install(b):
@@ -39,6 +57,26 @@ def setup_dependency_handlers(ui):
             if ui['notebook_req'].value:
                 display(HTML("<p>📋 Notebook packages ditambahkan ke daftar instalasi</p>"))
                 packages.append("notebook_requirements")
+            
+            if ui['smartcash_req'].value:
+                display(HTML("<p>📋 SmartCash requirements ditambahkan ke daftar instalasi</p>"))
+                packages.append("smartcash_requirements")
+            
+            if ui['opencv_req'].value:
+                display(HTML("<p>📋 OpenCV ditambahkan ke daftar instalasi</p>"))
+                packages.append("opencv-python")
+            
+            if ui['matplotlib_req'].value:
+                display(HTML("<p>📋 Matplotlib ditambahkan ke daftar instalasi</p>"))
+                packages.append("matplotlib")
+            
+            if ui['pandas_req'].value:
+                display(HTML("<p>📋 Pandas ditambahkan ke daftar instalasi</p>"))
+                packages.append("pandas")
+            
+            if ui['seaborn_req'].value:
+                display(HTML("<p>📋 Seaborn ditambahkan ke daftar instalasi</p>"))
+                packages.append("seaborn")
             
             # Add custom packages
             custom = ui['custom_packages'].value.strip()
@@ -138,6 +176,20 @@ def setup_dependency_handlers(ui):
                             display(HTML(f"<p>❌ Error saat install Notebook packages:</p><pre>{result.stderr}</pre>"))
                     except Exception as e:
                         display(HTML(f"<p>❌ Exception saat install Notebook packages: {str(e)}</p>"))
+
+                elif package == "smartcash_requirements":
+                    display(HTML(f"<p>🔄 Menginstall SmartCash requirements... (package {i+1}/{len(packages)})</p>"))
+                    
+                    try:
+                        # SmartCash core requirements
+                        cmd = f"{sys.executable} -m pip install pyyaml termcolor python-dotenv roboflow {force_flag}"
+                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+                        if result.returncode == 0:
+                            display(HTML("<p>✅ SmartCash requirements berhasil diinstall</p>"))
+                        else:
+                            display(HTML(f"<p>❌ Error saat install SmartCash requirements:</p><pre>{result.stderr}</pre>"))
+                    except Exception as e:
+                        display(HTML(f"<p>❌ Exception saat install SmartCash requirements: {str(e)}</p>"))
                 
                 else:
                     # Custom package
@@ -217,6 +269,31 @@ def setup_dependency_handlers(ui):
             except ImportError:
                 display(HTML("<p>❌ matplotlib: Not installed</p>"))
             
+            # Check SmartCash Requirements
+            try:
+                import yaml
+                display(HTML(f"<p>✅ PyYAML: v{yaml.__version__}</p>"))
+            except ImportError:
+                display(HTML("<p>❌ PyYAML: Not installed</p>"))
+            
+            try:
+                import termcolor
+                display(HTML("<p>✅ termcolor: installed</p>"))
+            except ImportError:
+                display(HTML("<p>❌ termcolor: Not installed</p>"))
+            
+            try:
+                import dotenv
+                display(HTML(f"<p>✅ python-dotenv: v{dotenv.__version__}</p>"))
+            except ImportError:
+                display(HTML("<p>❌ python-dotenv: Not installed</p>"))
+
+            try:
+                import roboflow
+                display(HTML("<p>✅ roboflow: installed</p>"))
+            except ImportError:
+                display(HTML("<p>❌ roboflow: Not installed</p>"))
+            
             # Check YOLOv5 requirements (numpy, scipy, etc)
             try:
                 import numpy as np
@@ -235,6 +312,12 @@ def setup_dependency_handlers(ui):
                 display(HTML(f"<p>✅ SciPy: v{scipy.__version__}</p>"))
             except ImportError:
                 display(HTML("<p>❌ SciPy: Not installed</p>"))
+            
+            try:
+                import seaborn as sns
+                display(HTML(f"<p>✅ Seaborn: v{sns.__version__}</p>"))
+            except ImportError:
+                display(HTML("<p>❌ Seaborn: Not installed</p>"))
             
             # Check for custom packages
             custom = ui['custom_packages'].value.strip()
@@ -258,5 +341,7 @@ def setup_dependency_handlers(ui):
     # Register handlers
     ui['install_button'].on_click(on_install)
     ui['check_button'].on_click(on_check)
+    ui['check_all_button'].on_click(on_check_all)
+    ui['uncheck_all_button'].on_click(on_uncheck_all)
     
     return ui

@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/dependency_installer.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Komponen UI untuk instalasi dependencies SmartCash
+Deskripsi: Komponen UI untuk instalasi dependencies SmartCash dengan grid layout dan uncheck all button
 """
 
 import ipywidgets as widgets
@@ -9,7 +9,7 @@ from IPython.display import HTML
 from pathlib import Path
 
 def create_dependency_ui():
-    """Buat UI untuk instalasi dependencies"""
+    """Buat UI untuk instalasi dependencies dengan grid layout dan uncheck all button"""
     main = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
@@ -27,6 +27,17 @@ def create_dependency_ui():
     # Package list - checkboxes
     package_list_header = widgets.HTML("<h3>🛠️ Package List</h3>")
     
+    # Checkbox group with grid layout
+    checkbox_grid = widgets.GridBox(
+        layout=widgets.Layout(
+            grid_template_columns='repeat(3, 1fr)',
+            grid_gap='10px',
+            width='100%',
+            padding='10px 0'
+        )
+    )
+    
+    # Create checkboxes for packages
     yolov5_req = widgets.Checkbox(
         value=True,
         description='YOLOv5 requirements',
@@ -37,7 +48,7 @@ def create_dependency_ui():
     
     torch_req = widgets.Checkbox(
         value=True,
-        description='PyTorch (torch, torchvision)',
+        description='PyTorch',
         disabled=False,
         indent=False,
         layout=widgets.Layout(margin='5px 0')
@@ -45,7 +56,7 @@ def create_dependency_ui():
     
     albumentations_req = widgets.Checkbox(
         value=True,
-        description='Albumentations (augmentation)',
+        description='Albumentations',
         disabled=False,
         indent=False,
         layout=widgets.Layout(margin='5px 0')
@@ -53,11 +64,81 @@ def create_dependency_ui():
     
     notebook_req = widgets.Checkbox(
         value=True,
-        description='Notebook (ipywidgets, tqdm)',
+        description='Notebook tools',
         disabled=False,
         indent=False,
         layout=widgets.Layout(margin='5px 0')
     )
+    
+    smartcash_req = widgets.Checkbox(
+        value=True,
+        description='SmartCash requirements',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    opencv_req = widgets.Checkbox(
+        value=True,
+        description='OpenCV',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    matplotlib_req = widgets.Checkbox(
+        value=True,
+        description='Matplotlib',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    pandas_req = widgets.Checkbox(
+        value=True,
+        description='Pandas',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    seaborn_req = widgets.Checkbox(
+        value=True,
+        description='Seaborn',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(margin='5px 0')
+    )
+    
+    # Add checkboxes to grid
+    checkbox_grid.children = [
+        yolov5_req, torch_req, albumentations_req, 
+        notebook_req, smartcash_req, opencv_req,
+        matplotlib_req, pandas_req, seaborn_req
+    ]
+    
+    # Button to check/uncheck all
+    button_container = widgets.HBox(layout=widgets.Layout(
+        justify_content='space-between',
+        width='100%',
+        margin='5px 0 15px 0'
+    ))
+    
+    check_all_button = widgets.Button(
+        description='Check All',
+        button_style='primary',
+        icon='check-square',
+        layout=widgets.Layout(width='auto')
+    )
+    
+    uncheck_all_button = widgets.Button(
+        description='Uncheck All',
+        button_style='warning',
+        icon='square',
+        layout=widgets.Layout(width='auto')
+    )
+    
+    button_container.children = [check_all_button, uncheck_all_button]
     
     # Custom package list
     custom_packages = widgets.Textarea(
@@ -69,7 +150,7 @@ def create_dependency_ui():
     )
     
     # Install button and options
-    button_group = widgets.HBox(layout=widgets.Layout(display='flex', flex_flow='row wrap'))
+    action_button_group = widgets.HBox(layout=widgets.Layout(display='flex', flex_flow='row wrap'))
     
     install_button = widgets.Button(
         description='Install Packages',
@@ -88,7 +169,7 @@ def create_dependency_ui():
     )
     
     # Add buttons to group
-    button_group.children = [install_button, check_button]
+    action_button_group.children = [install_button, check_button]
     
     # Force reinstall option
     force_reinstall = widgets.Checkbox(
@@ -116,13 +197,11 @@ def create_dependency_ui():
     # Assemble package card
     package_card.children = [
         package_list_header,
-        yolov5_req,
-        torch_req,
-        albumentations_req,
-        notebook_req,
+        button_container,
+        checkbox_grid,
         custom_packages,
         force_reinstall,
-        button_group,
+        action_button_group,
         install_progress
     ]
     
@@ -136,7 +215,12 @@ def create_dependency_ui():
                 <li><b>Force Reinstall:</b> Paksa reinstall package meskipun sudah terinstall</li>
                 <li><b>Check Installations:</b> Periksa versi package yang terinstall</li>
             </ol>
-            <p><b>Catatan:</b> YOLOv5 requirements sudah mencakup package seperti numpy, opencv, dan scipy.</p>
+            <p><b>Catatan Package:</b></p>
+            <ul>
+                <li><b>YOLOv5 requirements:</b> Package dasar untuk YOLOv5 (numpy, opencv, scipy, dll)</li>
+                <li><b>SmartCash requirements:</b> Package khusus untuk SmartCash (pyyaml, termcolor, tqdm)</li>
+                <li><b>Notebook tools:</b> ipywidgets, tqdm, dan tools lain untuk notebook</li>
+            </ul>
         </div>
     """)], selected_index=None)
     
@@ -157,10 +241,18 @@ def create_dependency_ui():
         'torch_req': torch_req,
         'albumentations_req': albumentations_req,
         'notebook_req': notebook_req,
+        'smartcash_req': smartcash_req,
+        'opencv_req': opencv_req,
+        'matplotlib_req': matplotlib_req,
+        'pandas_req': pandas_req,
+        'seaborn_req': seaborn_req,
         'custom_packages': custom_packages,
         'force_reinstall': force_reinstall,
         'install_button': install_button,
         'check_button': check_button,
+        'check_all_button': check_all_button,
+        'uncheck_all_button': uncheck_all_button,
         'install_progress': install_progress,
-        'status': status
+        'status': status,
+        'checkbox_grid': checkbox_grid
     }

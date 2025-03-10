@@ -16,7 +16,6 @@ from smartcash.utils.model_exporter import ModelExporter
 # Helper utilities
 from smartcash.utils.coordinate_utils import CoordinateUtils, calculate_iou
 from smartcash.utils.experiment_tracker import ExperimentTracker
-from smartcash.utils.ui_utils import UIHelper
 
 # Configuration and environment
 from smartcash.utils.config_manager import ConfigManager
@@ -49,7 +48,6 @@ __all__ = [
     'CoordinateUtils',
     'calculate_iou',
     'ExperimentTracker',
-    'UIHelper',
     
     # Configuration and environment
     'ConfigManager',

@@ -1,19 +1,12 @@
 """
 File: smartcash/handlers/preprocessing/__init__.py
 Author: Alfrida Sabar
-Deskripsi: File inisialisasi untuk paket preprocessing, mengekspor komponen-komponen
-           utama yang digunakan dalam preprocessing dataset SmartCash.
+Deskripsi: File inisialisasi untuk paket preprocessing.
 """
 
-from smartcash.handlers.preprocessing.preprocessing_manager import PreprocessingManager
-from smartcash.handlers.preprocessing.pipeline.preprocessing_pipeline import PreprocessingPipeline
-from smartcash.handlers.preprocessing.pipeline.validation_pipeline import ValidationPipeline
-from smartcash.handlers.preprocessing.pipeline.augmentation_pipeline import AugmentationPipeline
+from smartcash.handlers.preprocessing.manager import PreprocessingManager
+from smartcash.handlers.preprocessing.validators import DatasetValidator
+from smartcash.handlers.preprocessing.augmentors import DatasetAugmentor
+from smartcash.handlers.preprocessing.analyzers import DatasetAnalyzer
 
-# Ekspor kelas utama
-__all__ = [
-    'PreprocessingManager',
-    'PreprocessingPipeline',
-    'ValidationPipeline',
-    'AugmentationPipeline'
-]
+__all__ = ['PreprocessingManager', 'DatasetValidator', 'DatasetAugmentor', 'DatasetAnalyzer']

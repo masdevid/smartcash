@@ -22,7 +22,6 @@ smartcash/handlers/evaluation/
 │   └── research_pipeline.py             # Pipeline penelitian
 ├── integration/                         # Adapter untuk integrasi
 │   ├── metrics_adapter.py               # Adapter untuk MetricsCalculator
-│   ├── model_manager_adapter.py         # Adapter untuk ModelManager
 │   ├── dataset_adapter.py               # Adapter untuk DatasetManager
 │   ├── checkpoint_manager_adapter.py    # Adapter untuk CheckpointManager
 │   ├── visualization_adapter.py         # Adapter untuk visualisasi

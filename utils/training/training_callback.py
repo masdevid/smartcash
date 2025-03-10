@@ -1,37 +1,69 @@
 """
 File: smartcash/utils/training/training_callbacks.py
 Author: Alfrida Sabar
-Deskripsi: Sistem callback untuk proses training dengan event-handler pattern
+Deskripsi: Sistem callback untuk proses training dengan pendekatan observer pattern
+           yang terintegrasi dengan implementasi observer terkonsolidasi
 """
 
-from typing import Dict, List, Callable, Any
+from typing import Dict, List, Callable, Any, Optional, Union
+import functools
+
+from smartcash.utils.observer import (
+    EventDispatcher, EventTopics, ObserverManager, BaseObserver
+)
+from smartcash.utils.logger import get_logger, SmartCashLogger
+
 
 class TrainingCallbacks:
     """
     Sistem callback untuk proses training dengan pendekatan event-handler.
+    Menggunakan observer pattern terkonsolidasi dari utils/observer.
     Mendukung berbagai tipe callback pada berbagai titik dalam training pipeline.
     """
     
-    def __init__(self, logger=None):
+    # Mapping event lama ke EventTopics
+    EVENT_MAPPING = {
+        'batch_end': EventTopics.BATCH_END,
+        'epoch_end': EventTopics.EPOCH_END,
+        'training_end': EventTopics.TRAINING_END,
+        'validation_end': EventTopics.VALIDATION_END,
+        'checkpoint_saved': EventTopics.CHECKPOINT_SAVE,
+    }
+    
+    def __init__(self, logger: Optional[SmartCashLogger] = None):
         """
         Inisialisasi sistem callback.
         
         Args:
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger
+        self.logger = logger or get_logger("TrainingCallbacks")
         
-        # Daftar event yang didukung
-        self.supported_events = [
-            'batch_end',    # Setelah setiap batch
-            'epoch_end',    # Setelah setiap epoch
-            'training_end', # Setelah proses training selesai
-            'validation_end',  # Setelah validasi
-            'checkpoint_saved', # Setelah checkpoint disimpan
-        ]
+        # Daftar event yang didukung (menggunakan format lama untuk kompatibilitas)
+        self.supported_events = list(self.EVENT_MAPPING.keys())
         
-        # Dictionary untuk menyimpan callback
-        self.callbacks = {event: [] for event in self.supported_events}
+        # Observer Manager untuk mengelola observer
+        self.observer_manager = ObserverManager(auto_register=True)
+        
+        # Simpan referensi ke observer yang dibuat untuk pengelolaan
+        self._observer_refs = {}  # {(event, callback_id): observer}
+    
+    def _get_event_topic(self, event: str) -> str:
+        """
+        Konversi event lama ke format EventTopics.
+        
+        Args:
+            event: Nama event (format lama)
+            
+        Returns:
+            EventTopic yang sesuai
+        """
+        if event in self.EVENT_MAPPING:
+            return self.EVENT_MAPPING[event]
+        
+        # Fallback ke event original jika tidak ada dalam mapping
+        self.logger.warning(f"⚠️ Event tidak dalam mapping: {event}, menggunakan as-is")
+        return event
     
     def register(self, event: str, callback: Callable) -> bool:
         """
@@ -44,13 +76,31 @@ class TrainingCallbacks:
         Returns:
             Bool yang menunjukkan keberhasilan registrasi
         """
-        if event in self.callbacks:
-            self.callbacks[event].append(callback)
-            return True
-        else:
-            if self.logger:
-                self.logger.warning(f"⚠️ Event tidak didukung: {event}")
+        if event not in self.supported_events:
+            self.logger.warning(f"⚠️ Event tidak didukung: {event}")
             return False
+        
+        # Konversi ke EventTopics
+        event_topic = self._get_event_topic(event)
+        
+        # Buat adapter untuk callback
+        # Format lama menggunakan **kwargs, format baru menggunakan (event_type, sender, **kwargs)
+        adapter_callback = lambda event_type, sender, **kwargs: callback(**kwargs)
+        
+        # Buat observer
+        callback_id = id(callback)
+        observer = self.observer_manager.create_simple_observer(
+            event_type=event_topic,
+            callback=adapter_callback,
+            name=f"CallbackObserver_{event}_{callback_id}",
+            priority=0
+        )
+        
+        # Simpan referensi ke observer
+        self._observer_refs[(event, callback_id)] = observer
+        
+        self.logger.debug(f"🔌 Registered callback untuk '{event}' (Topic: {event_topic})")
+        return True
     
     def unregister(self, event: str, callback: Callable) -> bool:
         """
@@ -63,9 +113,20 @@ class TrainingCallbacks:
         Returns:
             Bool yang menunjukkan keberhasilan penghapusan
         """
-        if event in self.callbacks and callback in self.callbacks[event]:
-            self.callbacks[event].remove(callback)
+        callback_id = id(callback)
+        key = (event, callback_id)
+        
+        if key in self._observer_refs:
+            observer = self._observer_refs[key]
+            
+            # Unregister dari EventDispatcher
+            event_topic = self._get_event_topic(event)
+            EventDispatcher.unregister(event_topic, observer)
+            
+            # Hapus dari observer refs
+            del self._observer_refs[key]
             return True
+        
         return False
     
     def clear(self, event: str = None) -> None:
@@ -76,11 +137,27 @@ class TrainingCallbacks:
             event: Nama event (optional, jika None akan menghapus semua)
         """
         if event is None:
-            # Reset semua callback
-            self.callbacks = {event: [] for event in self.supported_events}
-        elif event in self.callbacks:
-            # Reset callback untuk event tertentu
-            self.callbacks[event] = []
+            # Unregister semua observer
+            for key, observer in list(self._observer_refs.items()):
+                event_name, _ = key
+                event_topic = self._get_event_topic(event_name)
+                EventDispatcher.unregister(event_topic, observer)
+            
+            # Reset observer refs
+            self._observer_refs = {}
+        else:
+            # Unregister observer untuk event tertentu
+            keys_to_remove = []
+            for key, observer in self._observer_refs.items():
+                event_name, _ = key
+                if event_name == event:
+                    event_topic = self._get_event_topic(event)
+                    EventDispatcher.unregister(event_topic, observer)
+                    keys_to_remove.append(key)
+            
+            # Hapus referensi
+            for key in keys_to_remove:
+                del self._observer_refs[key]
     
     def trigger(self, event: str, **kwargs) -> None:
         """
@@ -90,15 +167,14 @@ class TrainingCallbacks:
             event: Nama event
             **kwargs: Parameter yang akan diteruskan ke callback
         """
-        if event not in self.callbacks:
+        if event not in self.supported_events:
             return
-            
-        for callback in self.callbacks[event]:
-            try:
-                callback(**kwargs)
-            except Exception as e:
-                if self.logger:
-                    self.logger.warning(f"⚠️ Error pada callback {event}: {str(e)}")
+        
+        # Konversi ke EventTopics
+        event_topic = self._get_event_topic(event)
+        
+        # Trigger event via EventDispatcher
+        EventDispatcher.notify(event_topic, self, **kwargs)
     
     def get_callback_count(self, event: str = None) -> Dict[str, int]:
         """
@@ -111,11 +187,15 @@ class TrainingCallbacks:
             Dict berisi jumlah callback per event atau untuk event tertentu
         """
         if event is not None:
-            if event in self.callbacks:
-                return {event: len(self.callbacks[event])}
-            return {event: 0}
+            count = sum(1 for key in self._observer_refs if key[0] == event)
+            return {event: count}
         
-        return {event: len(callbacks) for event, callbacks in self.callbacks.items()}
+        # Hitung untuk semua event
+        counts = {}
+        for supported_event in self.supported_events:
+            counts[supported_event] = sum(1 for key in self._observer_refs if key[0] == supported_event)
+        
+        return counts
     
     def add_default_callbacks(self) -> None:
         """

@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.utils.logger import get_logger
 from smartcash.configs import get_config_manager
-
+from smartcash.utils.observer import EventDispatcher, EventTopics
 
 class DatasetDownloader:
     """Downloader dataset dari berbagai sumber dengan dukungan paralel, resume, dan retry."""

@@ -14,7 +14,7 @@ from smartcash.utils.visualization.research import ResearchVisualizer, visualize
 from smartcash.utils.visualization.experiment_visualizer import ExperimentVisualizer
 from smartcash.utils.visualization.scenario_visualizer import ScenarioVisualizer
 from smartcash.utils.visualization.evaluation_visualizer import EvaluationVisualizer
-from smartcash.utils.visualization.result_visualizer import ResultVisualizer
+# from smartcash.utils.visualization.result_visualizer import ResultVisualizer
 
 # Import dari utilitas visualisasi
 from smartcash.utils.visualization.research_utils import (
@@ -45,7 +45,7 @@ __all__ = [
     'ExperimentVisualizer',
     'ScenarioVisualizer',
     'EvaluationVisualizer',
-    'ResultVisualizer',
+    # 'ResultVisualizer',
     
     # Analisis
     'ExperimentAnalyzer',

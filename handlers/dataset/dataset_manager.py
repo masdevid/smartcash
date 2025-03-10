@@ -1,12 +1,12 @@
 # File: smartcash/handlers/dataset/dataset_manager.py
-# Deskripsi: Manager utama dataset dengan implementasi ObserverManager
+# Deskripsi: Manager utama dataset dengan adapter untuk kompatibilitas observer
 
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, List, Any, Union
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.handlers.dataset.facades.pipeline_facade import PipelineFacade
-from smartcash.utils.observer import BaseObserver
-from smartcash.utils.observer.observer_manager import ObserverManager
+from smartcash.utils.observer import BaseObserver, EventDispatcher
+from smartcash.utils.observer.compatibility_observer import CompatibilityObserver
 
 
 class DatasetManager(PipelineFacade):
@@ -21,71 +21,70 @@ class DatasetManager(PipelineFacade):
     ):
         """Inisialisasi DatasetManager."""
         super().__init__(config, data_dir, cache_dir, logger)
-        
-        # Inisialisasi ObserverManager untuk mengelola observer
-        self.observer_manager = ObserverManager(auto_register=False)
-        
-        # Simpan observer terpisah untuk backward compatibility
         self.observers = []
     
-    def register_observer(self, observer: BaseObserver) -> None:
+    def register_observer(self, observer: Any) -> None:
         """
         Mendaftarkan observer untuk DatasetManager.
         
         Args:
             observer: Observer yang akan didaftarkan
         """
-        # Validasi tipe observer
+        # Periksa apakah observer sudah merupakan BaseObserver atau perlu dibungkus
         if not isinstance(observer, BaseObserver):
-            raise TypeError(f"Observer harus merupakan instance dari BaseObserver, bukan {type(observer)}")
+            try:
+                # Coba bungkus dengan CompatibilityObserver
+                compat_observer = CompatibilityObserver(observer)
+                observer = compat_observer
+                self.logger.debug(f"🔄 Membungkus observer dengan CompatibilityObserver: {compat_observer.name}")
+            except Exception as e:
+                raise TypeError(f"Observer harus merupakan instance dari BaseObserver atau memiliki metode yang kompatibel: {str(e)}")
         
-        # Daftarkan observer untuk event-event preprocessing
-        preprocessing_events = [
+        # Daftarkan untuk event preprocessing
+        events = [
             "preprocessing",
             "preprocessing.start",
-            "preprocessing.end", 
+            "preprocessing.end",
             "preprocessing.progress",
             "preprocessing.validation",
             "preprocessing.augmentation"
         ]
         
-        for event in preprocessing_events:
-            self.observer_manager._get_thread_pool()
-            self.observer_manager.create_simple_observer(
-                event_type=event,
-                callback=observer.update,
-                name=f"{observer.name}_proxy_{event}",
-                priority=observer.priority
-            )
+        for event in events:
+            EventDispatcher.register(event, observer)
         
-        # Tambahkan ke list internal untuk backward compatibility
+        # Tambahkan ke list untuk tracking
         if observer not in self.observers:
             self.observers.append(observer)
             
         self.logger.debug(f"✅ Observer {observer.name} berhasil didaftarkan")
     
-    def unregister_observer(self, observer: BaseObserver) -> None:
+    def unregister_observer(self, observer: Any) -> None:
         """
         Membatalkan pendaftaran observer.
         
         Args:
             observer: Observer yang akan dibatalkan pendaftarannya
         """
-        # Hapus dari list internal
-        if observer in self.observers:
-            self.observers.remove(observer)
-            
-        # ObserverManager tidak memiliki mekanisme untuk menghapus observer berdasarkan
-        # observer asli, jadi kita perlu menghapus semua observer yang kita buat
-        self.observer_manager.unregister_all()
+        # Cari observer asli atau yang dibungkus
+        target_observer = None
+        for registered_observer in self.observers:
+            if registered_observer == observer:
+                target_observer = registered_observer
+                break
+            elif isinstance(registered_observer, CompatibilityObserver) and registered_observer.observer == observer:
+                target_observer = registered_observer
+                break
         
-        # Daftarkan ulang semua observer yang tersisa
-        for remaining_observer in self.observers:
-            self.register_observer(remaining_observer)
-            
-        self.logger.debug(f"🗑️ Observer {observer.name} berhasil dihapus")
+        if target_observer:
+            # Batalkan pendaftaran
+            EventDispatcher.unregister_from_all(target_observer)
+            self.observers.remove(target_observer)
+            self.logger.debug(f"🗑️ Observer {getattr(target_observer, 'name', 'unknown')} berhasil dihapus")
+        else:
+            self.logger.warning(f"⚠️ Observer tidak ditemukan, tidak dapat membatalkan pendaftaran")
     
-    def get_observers(self) -> List[BaseObserver]:
+    def get_observers(self) -> List[Any]:
         """
         Mendapatkan daftar observer yang terdaftar.
         

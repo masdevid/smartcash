@@ -206,7 +206,7 @@ class DatasetDownloader:
                 return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
             
             # Download dari Roboflow dan export ke lokal
-            roboflow_dir = self.download_dataset(format=format, show_progress=show_progress, resume=resume)
+            roboflow_dir = self.download_dataset(format=format,api_key=api_key, workspace=workspace, project=project, version=version, show_progress=show_progress)
             return self.export_to_local(roboflow_dir, show_progress)
         except Exception as e:
             self.logger.error(f"❌ Gagal pull dataset: {str(e)}")

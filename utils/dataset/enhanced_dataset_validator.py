@@ -11,12 +11,11 @@ from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 import time
 import threading
-import concurrent
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.dataset.dataset_validator_core import DatasetValidatorCore
 from smartcash.utils.dataset.dataset_analyzer import DatasetAnalyzer
-from smartcash.utils.dataset.dataset_utils import DatasetUtils, DEFAULT_SPLITS
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
 from smartcash.utils.dataset.dataset_fixer import DatasetFixer
 
 class EnhancedDatasetValidator:

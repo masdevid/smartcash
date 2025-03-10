@@ -7,7 +7,7 @@ from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFa
 from smartcash.handlers.dataset.dataset_utils_adapter import DatasetUtilsAdapter
 from smartcash.handlers.dataset.operations.dataset_merge_operation import DatasetMergeOperation
 from smartcash.handlers.dataset.operations.dataset_reporting_operation import DatasetReportingOperation
-from smartcash.utils.dataset import DEFAULT_SPLITS
+from smartcash.utils.dataset.dataset_utils import DEFAULT_SPLITS
 
 
 class DataOperationsFacade(DatasetBaseFacade):

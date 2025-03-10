@@ -6,6 +6,7 @@ Deskripsi: Modul untuk perbaikan dan pembersihan dataset dengan kemampuan auto-f
 
 import os
 import shutil
+import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 import time
@@ -13,7 +14,7 @@ import threading
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.utils.dataset.dataset_utils import DatasetUtils
+from smartcash.utils.dataset.dataset_utils import DatasetUtils, IMG_EXTENSIONS, DEFAULT_SPLITS
 
 class DatasetFixer:
     """
@@ -45,7 +46,7 @@ class DatasetFixer:
         self.active_layers = config.get('layers', ['banknote'])
         
         # Setup utils
-        self.utils = DatasetUtils(logger)
+        self.utils = DatasetUtils(config, str(self.data_dir), logger)
         
         # Lock untuk thread safety
         self._lock = threading.RLock()
@@ -82,7 +83,7 @@ class DatasetFixer:
                 }
         
         # Setup direktori
-        split_dir = self.data_dir / split
+        split_dir = self.utils.get_split_path(split)
         images_dir = split_dir / 'images'
         labels_dir = split_dir / 'labels'
         

@@ -4,7 +4,6 @@ Author: Alfrida Sabar
 Deskripsi: Modul inti untuk validasi dataset dengan fokus pada fungsionalitas validasi utama
 """
 
-import os
 import cv2
 import numpy as np
 from pathlib import Path
@@ -13,7 +12,7 @@ import threading
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.utils.dataset.dataset_utils import DatasetUtils
+from smartcash.utils.dataset.dataset_utils import DatasetUtils, IMG_EXTENSIONS
 
 class DatasetValidatorCore:
     """
@@ -100,7 +99,7 @@ class DatasetValidatorCore:
             result['missing_label'] = True
             return result
         
-        # Validasi isi label menggunakan callback untuk parse_yolo_label
+        # Validasi isi label menggunakan utils.parse_yolo_label dengan callback
         try:
             # Fungsi callback untuk custom processing
             def validate_label_line(bbox_data, line, line_idx):
@@ -117,8 +116,9 @@ class DatasetValidatorCore:
                     'fixed': False
                 }
                 
-                # Cek layer
-                layer_name = self.layer_config_manager.get_layer_for_class_id(cls_id)
+                # Cek layer - gunakan layer_name dari bbox_data
+                layer_name = bbox_data.get('layer', 
+                              self.layer_config_manager.get_layer_for_class_id(cls_id))
                 if layer_name:
                     line_result['layer'] = layer_name
                     # Update statistik layer
@@ -126,7 +126,8 @@ class DatasetValidatorCore:
                         result['layer_stats'][layer_name] += 1
                     
                     # Update statistik kelas
-                    class_name = self.layer_config_manager.get_class_name(cls_id)
+                    class_name = bbox_data.get('class_name', 
+                                self.utils.get_class_name(cls_id))
                     if class_name:
                         if class_name not in result['class_stats']:
                             result['class_stats'][class_name] = 0
@@ -135,10 +136,6 @@ class DatasetValidatorCore:
                     line_result['issues'].append(f"Class ID tidak valid: {cls_id}")
                     line_result['valid'] = False
                 
-                # Validasi koordinat sudah dilakukan dalam parse_yolo_label
-                # tapi kita tambahkan pengecekan tambahan jika perlu
-                
-                # Return hasil validasi baris untuk dimasukkan ke dalam array label_lines
                 return line_result
             
             # Parse label dengan callback validasi
@@ -154,11 +151,8 @@ class DatasetValidatorCore:
             result['label_lines'] = bboxes
             
             # Cek apakah ada layer yang aktif
-            result['has_active_layer'] = False
-            for layer in self.active_layers:
-                if layer in result['layer_stats'] and result['layer_stats'][layer] > 0:
-                    result['has_active_layer'] = True
-                    break
+            result['has_active_layer'] = any(layer in result['layer_stats'] and result['layer_stats'][layer] > 0 
+                                           for layer in self.active_layers)
             
             # Status akhir
             valid_lines = sum(1 for box in bboxes if box.get('valid', False))

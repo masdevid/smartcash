@@ -5,7 +5,7 @@
 import os, cv2, shutil, random, numpy as np, collections
 from tqdm.auto import tqdm
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Any, Union, Callable
+from typing import Dict, List, Tuple, Optional, Any, Union, Callable, Set
 from pathlib import Path
 
 from smartcash.utils.logger import get_logger
@@ -275,9 +275,8 @@ class DatasetUtils:
     def copy_dataset_files(self, source_files: List[Tuple[Path, Path]], target_dir: Path, 
                           use_symlinks: bool = False, desc: str = "Copying files") -> int:
         """Salin file-file dataset (gambar dan label)."""
-        # Buat direktori output
-        os.makedirs(target_dir / 'images', exist_ok=True)
-        os.makedirs(target_dir / 'labels', exist_ok=True)
+        (target_dir / 'images').mkdir(parents=True, exist_ok=True)
+        (target_dir / 'labels').mkdir(parents=True, exist_ok=True)
         
         copied_count = 0
         with tqdm(source_files, desc=desc) as pbar:
@@ -287,14 +286,11 @@ class DatasetUtils:
                 
                 try:
                     if use_symlinks:
-                        # Buat symlink
                         if not target_img.exists(): target_img.symlink_to(img_path.resolve())
                         if not target_label.exists(): target_label.symlink_to(label_path.resolve())
                     else:
-                        # Salin file
                         if not target_img.exists(): shutil.copy2(img_path, target_img)
                         if not target_label.exists(): shutil.copy2(label_path, target_label)
-                    
                     copied_count += 1
                 except Exception as e:
                     self.logger.debug(f"⚠️ Gagal menyalin {img_path.name}: {str(e)}")
@@ -321,11 +317,10 @@ class DatasetUtils:
         
         # Cari valid files
         valid_files = []
-        for ext in IMG_EXTENSIONS:
-            for img_path in (source_dir / 'images').glob(ext):
-                label_path = source_dir / 'labels' / f"{img_path.stem}.txt"
-                if label_path.exists():
-                    valid_files.append((img_path, label_path))
+        for img_path in self.find_image_files(source_dir / 'images', True):
+            label_path = source_dir / 'labels' / f"{img_path.stem}.txt"
+            if label_path.exists():
+                valid_files.append((img_path, label_path))
         
         if not valid_files:
             self.logger.error("❌ Tidak ada file valid dengan pasangan gambar/label")
@@ -368,22 +363,16 @@ class DatasetUtils:
                 start_idx = end_idx
         
         # Log alokasi
-        self.logger.info(
-            f"📊 Pembagian dataset:\n" +
-            "\n".join(f"   • {split.capitalize()}: {len(files)} sampel" 
-                    for split, files in split_files.items())
-        )
+        self.logger.info(f"📊 Pembagian dataset:" + 
+                        "".join(f"\n   • {split.capitalize()}: {len(files)} sampel" 
+                              for split, files in split_files.items()))
         
         # Salin file
         splits_count = {}
         for split, files in split_files.items():
             if files:
                 target_dir = self.get_split_path(split)
-                copied = self.copy_dataset_files(
-                    source_files=files,
-                    target_dir=target_dir,
-                    desc=f"Copying to {split}"
-                )
+                copied = self.copy_dataset_files(files, target_dir, desc=f"Copying to {split}")
                 splits_count[split] = copied
                 
         self.logger.success(f"✅ Pemecahan dataset selesai")

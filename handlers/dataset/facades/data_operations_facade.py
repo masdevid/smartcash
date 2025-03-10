@@ -1,22 +1,22 @@
 # File: smartcash/handlers/dataset/facades/data_operations_facade.py
-# Author: Alfrida Sabar
 # Deskripsi: Facade untuk operasi manipulasi dataset seperti split, merge, dan pelaporan
 
 from typing import Dict, List, Optional, Any
 
 from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFacade
-from smartcash.handlers.dataset.operations.dataset_split_operation import DatasetSplitOperation
+from smartcash.handlers.dataset.dataset_utils_adapter import DatasetUtilsAdapter
 from smartcash.handlers.dataset.operations.dataset_merge_operation import DatasetMergeOperation
 from smartcash.handlers.dataset.operations.dataset_reporting_operation import DatasetReportingOperation
-from smartcash.handlers.dataset.facades.dataset_explorer_facade import DatasetExplorerFacade
+from smartcash.utils.dataset import DEFAULT_SPLITS
 
 
 class DataOperationsFacade(DatasetBaseFacade):
     """Facade untuk operasi manipulasi dataset."""
     
     @property
-    def explorer(self) -> DatasetExplorerFacade:
+    def explorer(self) -> 'DatasetExplorerFacade':
         """Lazy load explorer."""
+        from smartcash.handlers.dataset.facades.dataset_explorer_facade import DatasetExplorerFacade
         return self._get_component('explorer', lambda: DatasetExplorerFacade(
             config=self.config,
             data_dir=str(self.data_dir),
@@ -24,9 +24,10 @@ class DataOperationsFacade(DatasetBaseFacade):
         ))
     
     @property
-    def split_operation(self) -> DatasetSplitOperation:
-        """Lazy load split_operation."""
-        return self._get_component('split_operation', lambda: DatasetSplitOperation(
+    def utils_adapter(self) -> DatasetUtilsAdapter:
+        """Lazy load utils_adapter."""
+        return self._get_component('utils_adapter', lambda: DatasetUtilsAdapter(
+            config=self.config,
             data_dir=str(self.data_dir),
             logger=self.logger
         ))
@@ -66,7 +67,7 @@ class DataOperationsFacade(DatasetBaseFacade):
     
     def split_dataset(self, **kwargs) -> Dict[str, int]:
         """Pecah dataset menjadi train/val/test."""
-        return self.split_operation.split_dataset(**kwargs)
+        return self.utils_adapter.split_dataset(**kwargs)
     
     def merge_splits(self, **kwargs) -> Dict[str, int]:
         """Gabungkan semua split menjadi direktori flat."""
@@ -78,7 +79,7 @@ class DataOperationsFacade(DatasetBaseFacade):
     
     # ===== Reporting Methods =====
     
-    def generate_dataset_report(self, splits: List[str] = ['train', 'valid', 'test'], 
+    def generate_dataset_report(self, splits: List[str] = DEFAULT_SPLITS, 
                           **kwargs) -> Dict[str, Any]:
         """Generate laporan lengkap tentang dataset."""
         return self.reporting_operation.generate_dataset_report(splits, **kwargs)

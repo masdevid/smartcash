@@ -1,23 +1,28 @@
 # File: smartcash/handlers/dataset/dataset_utils_adapter.py
-# Author: Alfrida Sabar
-# Deskripsi: Adapter utama untuk mengintegrasikan utils/dataset dengan handlers/dataset
+# Deskripsi: Adapter untuk integrasi utils/dataset ke handlers/dataset
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 
+from smartcash.utils.observer import EventTopics, notify
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.dataset import (
     EnhancedDatasetValidator, 
     DatasetAnalyzer,
     DatasetFixer
 )
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
 from smartcash.utils.augmentation import AugmentationManager
-from smartcash.utils.observer import EventTopics, notify
 
 class DatasetUtilsAdapter:
-    """Adapter yang mengintegrasikan komponen utils/dataset dengan handlers/dataset."""
+    """Adapter untuk mengintegrasikan komponen utils/dataset dengan handlers/dataset."""
     
-    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger: Optional[SmartCashLogger] = None):
+    def __init__(
+        self, 
+        config: Dict, 
+        data_dir: Optional[str] = None, 
+        logger: Optional[SmartCashLogger] = None
+    ):
         """Inisialisasi adapter."""
         self.config = config
         self.data_dir = data_dir or config.get('data_dir', 'data')
@@ -38,8 +43,7 @@ class DatasetUtilsAdapter:
         return self._get_component('validator', lambda: EnhancedDatasetValidator(
             config=self.config,
             data_dir=self.data_dir,
-            logger=self.logger,
-            num_workers=self.config.get('model', {}).get('workers', 4)
+            logger=self.logger
         ))
     
     @property
@@ -68,6 +72,15 @@ class DatasetUtilsAdapter:
             output_dir=self.data_dir,
             logger=self.logger,
             num_workers=self.config.get('model', {}).get('workers', 4)
+        ))
+    
+    @property
+    def utils(self) -> DatasetUtils:
+        """Lazy load utils."""
+        return self._get_component('utils', lambda: DatasetUtils(
+            config=self.config,
+            data_dir=self.data_dir,
+            logger=self.logger
         ))
     
     def validate_dataset(self, split: str, **kwargs) -> Dict[str, Any]:
@@ -126,31 +139,15 @@ class DatasetUtilsAdapter:
             self.logger.error(f"❌ Augmentasi dataset gagal: {str(e)}")
             raise
     
-    def validate_dataset_for_multilayer(self, data_path: Path, **kwargs) -> List[Dict]:
-        """Validasi dataset untuk penggunaan dengan MultilayerDataset."""
-        notify(EventTopics.VALIDATION_EVENT, self, 
-               action="multilayer_validation_start", data_path=str(data_path))
+    def split_dataset(self, **kwargs) -> Dict:
+        """Split dataset menggunakan DatasetUtils."""
+        notify(EventTopics.PREPROCESSING, self, action="split", **kwargs)
         
         try:
-            valid_files = self.validator.get_valid_files(
-                data_dir=str(data_path),
-                split=data_path.name,
-                check_images=True,
-                check_labels=True
-            )
-            
-            notify(EventTopics.VALIDATION_EVENT, self, 
-                   action="multilayer_validation_complete",
-                   data_path=str(data_path),
-                   total_valid=len(valid_files))
-            
-            self.logger.info(f"✅ Validasi multilayer: {len(valid_files)} file valid")
-            return valid_files
+            result = self.utils.split_dataset(**kwargs)
+            notify(EventTopics.PREPROCESSING, self, action="split_complete", result=result)
+            return result
         except Exception as e:
-            notify(EventTopics.VALIDATION_EVENT, self, 
-                   action="multilayer_validation_error",
-                   data_path=str(data_path),
-                   error=str(e))
-            
-            self.logger.error(f"❌ Validasi multilayer gagal: {str(e)}")
-            return []
+            notify(EventTopics.PREPROCESSING, self, action="split_error", error=str(e))
+            self.logger.error(f"❌ Split dataset gagal: {str(e)}")
+            raise

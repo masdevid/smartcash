@@ -1,5 +1,4 @@
 # File: smartcash/handlers/dataset/facades/pipeline_facade.py
-# Author: Alfrida Sabar
 # Deskripsi: Facade untuk menjalankan pipeline dataset lengkap
 
 import time

@@ -1,10 +1,8 @@
 # File: smartcash/handlers/dataset/facades/data_processing_facade.py
-# Author: Alfrida Sabar
-# Deskripsi: Facade untuk operasi pemrosesan data dengan adapter pattern
+# Deskripsi: Facade untuk operasi pemrosesan dataset (validasi, augmentasi, balancing)
 
 from typing import Dict, Optional, Any
 
-from smartcash.utils.observer import EventTopics, notify
 from smartcash.handlers.dataset.facades.dataset_base_facade import DatasetBaseFacade
 from smartcash.handlers.dataset.dataset_utils_adapter import DatasetUtilsAdapter
 from smartcash.handlers.dataset.core.dataset_balancer import DatasetBalancer
@@ -48,31 +46,12 @@ class DataProcessingFacade(DatasetBaseFacade):
         """Augmentasi dataset."""
         return self.utils_adapter.augment_dataset(**kwargs)
     
-    def augment_with_combinations(self, **kwargs) -> Dict[str, Any]:
-        """Augmentasi dengan kombinasi parameter kustom."""
-        notify(EventTopics.AUGMENTATION_EVENT, self, action="start_custom", parameters=kwargs)
-        
-        try:
-            result = self.utils_adapter.augmentor.augment_with_combinations(**kwargs)
-            notify(EventTopics.AUGMENTATION_EVENT, self, action="complete_custom", result=result)
-            return result
-        except Exception as e:
-            notify(EventTopics.AUGMENTATION_EVENT, self, action="error_custom", error=str(e))
-            self.logger.error(f"❌ Augmentasi kombinasi gagal: {str(e)}")
-            raise
-    
     # ===== Metode dari DatasetBalancer =====
     
     def analyze_class_distribution(self, split: str = 'train', per_layer: bool = True) -> Dict[str, Any]:
         """Analisis distribusi kelas dalam dataset."""
-        notify(EventTopics.PREPROCESSING, self, action="analyze_distribution", split=split)
-        result = self.balancer.analyze_class_distribution(split, per_layer)
-        notify(EventTopics.PREPROCESSING, self, action="analyze_distribution_complete", result=result)
-        return result
+        return self.balancer.analyze_class_distribution(split, per_layer)
     
     def balance_by_undersampling(self, split: str = 'train', **kwargs) -> Dict[str, Any]:
         """Seimbangkan dataset dengan undersampling."""
-        notify(EventTopics.PREPROCESSING, self, action="balance", split=split)
-        result = self.balancer.balance_by_undersampling(split, **kwargs)
-        notify(EventTopics.PREPROCESSING, self, action="balance_complete", result=result)
-        return result
+        return self.balancer.balance_by_undersampling(split, **kwargs)

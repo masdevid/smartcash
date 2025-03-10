@@ -1,23 +1,19 @@
 # File: smartcash/handlers/dataset/multilayer/multilayer_dataset.py
-# Author: Alfrida Sabar
-# Deskripsi: Dataset multilayer yang terintegrasi dengan utils/dataset
+# Deskripsi: Dataset multilayer yang terintegrasi dengan EnhancedDatasetValidator
 
 import torch
 import numpy as np
-import traceback
-import cv2
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 
 from smartcash.utils.logger import SmartCashLogger
-from smartcash.utils.observer import EventTopics, notify
+from smartcash.utils.dataset.enhanced_dataset_validator import EnhancedDatasetValidator
 from smartcash.handlers.dataset.multilayer.multilayer_dataset_base import MultilayerDatasetBase
 from smartcash.handlers.dataset.multilayer.multilayer_label_handler import MultilayerLabelHandler
-from smartcash.handlers.dataset.dataset_utils_adapter import DatasetUtilsAdapter
 
 
 class MultilayerDataset(MultilayerDatasetBase):
-    """Dataset multilayer dengan integrasi utils/dataset melalui adapter."""
+    """Dataset multilayer dengan validasi terintegrasi menggunakan EnhancedDatasetValidator."""
     
     def __init__(
         self,
@@ -37,15 +33,11 @@ class MultilayerDataset(MultilayerDatasetBase):
         self.require_all_layers = require_all_layers
         self.config = config or {}
         
-        # Notifikasi inisialisasi
-        notify(EventTopics.PREPROCESSING, self, action="dataset_init", 
-               data_path=str(self.data_path), mode=mode, layers=self.layers)
-        
         # Init komponen
         self.label_handler = MultilayerLabelHandler(layers=self.layers, logger=self.logger)
-        self.utils_adapter = DatasetUtilsAdapter(
+        self.validator = EnhancedDatasetValidator(
             config=self.config if self.config else {'layers': self.layers},
-            data_dir=str(self.data_path),
+            data_dir=str(self.data_path.parent),
             logger=self.logger
         )
         
@@ -53,20 +45,17 @@ class MultilayerDataset(MultilayerDatasetBase):
         self.image_files = self._find_image_files()
         self.valid_samples = self._validate_dataset()
         
-        # Notifikasi selesai
-        notify(EventTopics.PREPROCESSING, self, action="dataset_init_complete",
-               data_path=str(self.data_path), valid_samples=len(self.valid_samples))
-        
         if len(self.valid_samples) == 0:
             self.logger.warning(f"⚠️ Tidak ada sampel valid di {self.data_path}")
     
     def _validate_dataset(self) -> List[Dict]:
-        """Validasi dataset menggunakan utils_adapter."""
+        """Validasi dataset menggunakan EnhancedDatasetValidator."""
         try:
             # Dapatkan file valid
-            valid_files = self.utils_adapter.validator.get_valid_files(
-                data_dir=str(self.data_path),
-                split=self.data_path.name,
+            split = self.data_path.name
+            valid_files = self.validator.get_valid_files(
+                data_dir=str(self.data_path.parent),
+                split=split,
                 check_images=True,
                 check_labels=True
             )
@@ -74,24 +63,19 @@ class MultilayerDataset(MultilayerDatasetBase):
             # Filter berdasarkan layer
             result = []
             for file_info in valid_files:
-                label_path = Path(file_info['label_path'])
-                available_layers = self.label_handler.get_available_layers(label_path)
-                
                 # Cek apakah file mempunyai layer yang diperlukan
                 if self.require_all_layers:
                     # Harus ada semua layer
-                    if all(layer in available_layers for layer in self.layers):
-                        file_info['available_layers'] = available_layers
+                    if all(layer in file_info['available_layers'] for layer in self.layers):
                         result.append(file_info)
                 else:
                     # Cukup ada satu layer
-                    if any(layer in available_layers for layer in self.layers):
-                        file_info['available_layers'] = available_layers
+                    if any(layer in file_info['available_layers'] for layer in self.layers):
                         result.append(file_info)
             
             return result
         except Exception as e:
-            self.logger.error(f"❌ Validasi multilayer gagal: {str(e)}")
+            self.logger.error(f"❌ Validasi dataset gagal: {str(e)}")
             return []
     
     def __getitem__(self, idx: int) -> Dict:
@@ -101,15 +85,17 @@ class MultilayerDataset(MultilayerDatasetBase):
             
         sample = self.valid_samples[idx]
         
-        # Load gambar dan label
+        # Load gambar
         try:
-            img = self._load_image(sample['image_path'])
+            img_path = Path(sample['image_path'])
+            img = self._load_image(img_path)
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal baca gambar {sample['image_path']}: {str(e)}")
             img = np.zeros((self.img_size[1], self.img_size[0], 3), dtype=np.uint8)
         
         # Parse label per layer
-        layer_labels = self.label_handler.parse_label_by_layer(sample['label_path'])
+        label_path = Path(sample['label_path'])
+        layer_labels = self.label_handler.parse_label_by_layer(label_path)
         
         # Flatten bbox dan class untuk augmentasi
         all_bboxes, all_classes = [], []
@@ -137,9 +123,10 @@ class MultilayerDataset(MultilayerDatasetBase):
                             augmented_layer_labels[layer].append((cls_id, bbox))
                     layer_labels = augmented_layer_labels
             except Exception as e:
-                self.logger.debug(f"⚠️ Augmentasi gagal: {traceback.format_exc()}")
+                self.logger.debug(f"⚠️ Augmentasi gagal: {str(e)}")
         elif img.shape[:2] != self.img_size:
             # Resize jika tidak ada transform
+            import cv2
             img = cv2.resize(img, self.img_size)
         
         # Konversi gambar ke tensor

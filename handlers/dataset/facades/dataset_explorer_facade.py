@@ -1,17 +1,15 @@
 # File: smartcash/handlers/dataset/facades/dataset_explorer_facade.py
-# Author: Alfrida Sabar
-# Deskripsi: Facade untuk mengakses semua explorer dataset SmartCash
+# Deskripsi: Facade untuk eksplorasi dan analisis dataset
 
 from typing import Dict, List, Optional, Any, Union
 from concurrent.futures import ThreadPoolExecutor
 import time
+import concurrent
 
 from smartcash.utils.logger import SmartCashLogger
-from smartcash.handlers.dataset.explorers.validation_explorer import ValidationExplorer
-from smartcash.handlers.dataset.explorers.class_explorer import ClassExplorer
-from smartcash.handlers.dataset.explorers.layer_explorer import LayerExplorer
-from smartcash.handlers.dataset.explorers.image_size_explorer import ImageSizeExplorer
-from smartcash.handlers.dataset.explorers.bbox_explorer import BoundingBoxExplorer
+from smartcash.utils.dataset import EnhancedDatasetValidator, DatasetAnalyzer
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
+
 
 class DatasetExplorerFacade:
     """Facade untuk akses terpadu ke semua explorer dataset."""
@@ -27,14 +25,10 @@ class DatasetExplorerFacade:
         self.data_dir = data_dir or config.get('data_dir', 'data')
         self.logger = logger or SmartCashLogger(__name__)
         
-        # Inisialisasi explorers
-        self.explorers = {
-            'validation': ValidationExplorer(config, data_dir, logger),
-            'class': ClassExplorer(config, data_dir, logger),
-            'layer': LayerExplorer(config, data_dir, logger),
-            'image_size': ImageSizeExplorer(config, data_dir, logger),
-            'bbox': BoundingBoxExplorer(config, data_dir, logger)
-        }
+        # Inisialisasi komponen
+        self.validator = EnhancedDatasetValidator(config, self.data_dir, logger)
+        self.analyzer = DatasetAnalyzer(config, self.data_dir, logger)
+        self.utils = DatasetUtils(config, self.data_dir, logger)
         
         self.logger.info(f"🧭 DatasetExplorerFacade diinisialisasi: {self.data_dir}")
     
@@ -49,83 +43,80 @@ class DatasetExplorerFacade:
         start_time = time.time()
         self.logger.info(f"📊 Analisis komprehensif: {split}")
         
-        # Tentukan explorer yang akan digunakan
-        explorers_to_use = {
-            'validation': self.explorers['validation'],
-            'class_balance': self.explorers['class'],
-            'layer_balance': self.explorers['layer'],
-            'image_size_distribution': self.explorers['image_size']
-        }
-        
-        # Tambahkan bbox explorer jika detailed
-        if detailed:
-            explorers_to_use['bbox_statistics'] = self.explorers['bbox']
-        
-        # Jalankan analisis
-        results = {}
-        
-        if parallel:
-            # Analisis paralel
-            with ThreadPoolExecutor(max_workers=min(4, len(explorers_to_use))) as executor:
-                # Submit tasks
-                futures = {
-                    executor.submit(explorer.explore, split, sample_size): name 
-                    for name, explorer in explorers_to_use.items()
-                }
-                
-                # Kumpulkan hasil
-                for future in futures:
-                    name = futures[future]
-                    try:
-                        results[name] = future.result()
-                    except Exception as e:
-                        self.logger.error(f"❌ Explorer {name} error: {e}")
-                        results[name] = {'error': str(e)}
-        else:
-            # Analisis sekuensial
-            for name, explorer in explorers_to_use.items():
-                try:
-                    results[name] = explorer.explore(split, sample_size)
-                except Exception as e:
-                    self.logger.error(f"❌ Explorer {name} error: {e}")
-                    results[name] = {'error': str(e)}
+        # Gunakan analyzer dari utils/dataset
+        result = self.analyzer.analyze_dataset(split, sample_size, detailed)
         
         # Tambahkan waktu eksekusi
-        results['execution_time'] = time.time() - start_time
+        result['execution_time'] = time.time() - start_time
         
-        self.logger.success(f"✅ Analisis '{split}' selesai: {results['execution_time']:.2f}s")
-        return results
+        self.logger.success(f"✅ Analisis '{split}' selesai: {result['execution_time']:.2f}s")
+        return result
     
     def get_split_statistics(self) -> Dict[str, Dict[str, int]]:
         """Dapatkan statistik dasar untuk semua split dataset."""
-        return self.explorers['validation'].get_split_statistics()
+        return self.utils.get_split_statistics()
     
     def get_class_statistics(self, split: str) -> Dict[str, Any]:
         """Dapatkan statistik kelas untuk split tertentu."""
-        return self.explorers['class'].get_class_statistics(split)
+        # Validasi dataset untuk dapatkan statistik kelas
+        validation_results = self.validator.validate_dataset(
+            split=split, 
+            fix_issues=False, 
+            move_invalid=False, 
+            visualize=False
+        )
+        
+        if 'class_stats' in validation_results:
+            return {'class_stats': validation_results['class_stats']}
+        
+        # Fallback: gunakan analyzer untuk dapatkan statistik kelas
+        analysis = self.analyzer.analyze_dataset(split, sample_size=0, detailed=False)
+        return analysis.get('class_balance', {})
     
     def get_layer_statistics(self, split: str) -> Dict[str, Any]:
         """Dapatkan statistik layer untuk split tertentu."""
-        return self.explorers['layer'].get_layer_statistics(split)
+        # Validasi dataset untuk dapatkan statistik layer
+        validation_results = self.validator.validate_dataset(
+            split=split, 
+            fix_issues=False, 
+            move_invalid=False, 
+            visualize=False
+        )
+        
+        if 'layer_stats' in validation_results:
+            return {'layer_stats': validation_results['layer_stats']}
+        
+        # Fallback: gunakan analyzer untuk dapatkan statistik layer
+        analysis = self.analyzer.analyze_dataset(split, sample_size=0, detailed=False)
+        return analysis.get('layer_balance', {})
     
     def get_dataset_sizes(self, split: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """Dapatkan ukuran gambar dalam dataset."""
-        return self.explorers['image_size'].get_dataset_sizes(split)
+        splits = [split] if split else ['train', 'valid', 'test']
+        sizes = {}
+        
+        for current_split in splits:
+            sizes[current_split] = self.analyzer.analyze_image_sizes(current_split)
+            
+        return sizes
     
-    # Metode khusus per explorer
+    # Metode khusus per analisis
     
     def analyze_class_distribution(self, split: str, sample_size: int = 0) -> Dict[str, Any]:
         """Analisis khusus untuk distribusi kelas."""
-        return self.explorers['class'].explore(split, sample_size)
+        analysis = self.analyzer.analyze_dataset(split, sample_size, detailed=False)
+        return analysis.get('class_balance', {})
     
     def analyze_layer_distribution(self, split: str, sample_size: int = 0) -> Dict[str, Any]:
         """Analisis khusus untuk distribusi layer."""
-        return self.explorers['layer'].explore(split, sample_size)
+        analysis = self.analyzer.analyze_dataset(split, sample_size, detailed=False)
+        return analysis.get('layer_balance', {})
     
     def analyze_image_sizes(self, split: str, sample_size: int = 0) -> Dict[str, Any]:
         """Analisis khusus untuk ukuran gambar."""
-        return self.explorers['image_size'].explore(split, sample_size)
+        return self.analyzer.analyze_image_sizes(split, sample_size)
     
     def analyze_bounding_boxes(self, split: str, sample_size: int = 0) -> Dict[str, Any]:
         """Analisis khusus untuk bounding box."""
-        return self.explorers['bbox'].explore(split, sample_size)
+        analysis = self.analyzer.analyze_dataset(split, sample_size, detailed=True)
+        return analysis.get('bbox_statistics', {})

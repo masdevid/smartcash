@@ -1,94 +1,73 @@
 # File: smartcash/handlers/dataset/facades/dataset_base_facade.py
 # Author: Alfrida Sabar
-# Deskripsi: Kelas dasar untuk facade dataset yang mengelola komponen-komponen utama
+# Deskripsi: Kelas dasar untuk facade dataset dengan integrasi environment_manager
 
 from pathlib import Path
 from typing import Dict, Optional, Any, Callable
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.utils.logger import get_logger
 from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.utils.environment_manager import EnvironmentManager
 
 
 class DatasetBaseFacade:
-    """
-    Kelas dasar untuk facade dataset yang mengelola inisialisasi komponen dan konfigurasi.
-    Menyediakan fitur registrasi dan akses komponen melalui lazy initialization.
-    """
+    """Kelas dasar untuk facade dataset dengan environment manager."""
     
     def __init__(
         self,
         config: Dict,
         data_dir: Optional[str] = None,
         cache_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None
+        logger=None
     ):
-        """
-        Inisialisasi DatasetBaseFacade.
-        
-        Args:
-            config: Konfigurasi dataset
-            data_dir: Direktori dataset (opsional)
-            cache_dir: Direktori cache (opsional)
-            logger: Logger kustom (opsional)
-        """
+        """Inisialisasi DatasetBaseFacade."""
         self.config = config
-        self.logger = logger or SmartCashLogger(__name__)
+        self.logger = logger or get_logger(__name__)
+        self.env_manager = EnvironmentManager(logger=self.logger)
         
         # Setup paths
-        self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.cache_dir = Path(cache_dir or config.get('data', {}).get('preprocessing', {}).get('cache_dir', '.cache/smartcash'))
+        self.data_dir = Path(data_dir) if data_dir else self.env_manager.get_path('data')
+        cache_path = config.get('data', {}).get('preprocessing', {}).get('cache_dir', '.cache/smartcash')
+        self.cache_dir = Path(cache_dir) if cache_dir else self.env_manager.get_path(cache_path)
+        
+        # Model dan training params
         self.img_size = tuple(config.get('model', {}).get('img_size', [640, 640]))
         self.batch_size = config.get('model', {}).get('batch_size', 16)
         self.num_workers = config.get('model', {}).get('workers', 4)
         
-        # Aktifkan layer sesuai konfigurasi
+        # Layer config
         self.layer_config = get_layer_config()
         self.active_layers = config.get('layers', ['banknote'])
         
-        # Dictionary untuk menyimpan komponen yang di-lazy load
+        # Lazy-loaded components
         self._components = {}
         
         self.logger.info(
-            f"🔧 DatasetBaseFacade diinisialisasi:\n"
-            f"   • Data dir: {self.data_dir}\n"
-            f"   • Img size: {self.img_size}\n"
-            f"   • Batch size: {self.batch_size}\n"
-            f"   • Layers aktif: {self.active_layers}"
+            f"🔧 {self.__class__.__name__} diinisialisasi: {self.data_dir}"
         )
     
     def _get_component(self, component_id: str, factory_func: Callable) -> Any:
-        """
-        Dapatkan komponen dengan lazy initialization.
-        
-        Args:
-            component_id: ID unik untuk komponen
-            factory_func: Fungsi factory untuk membuat komponen jika belum ada
-            
-        Returns:
-            Komponen yang diminta
-        """
+        """Lazy load komponnen."""
         if component_id not in self._components:
             self._components[component_id] = factory_func()
         return self._components[component_id]
     
     def _get_split_path(self, split: str) -> Path:
-        """
-        Dapatkan path untuk split dataset.
-        
-        Args:
-            split: Split dataset ('train', 'val', 'test')
-            
-        Returns:
-            Path ke direktori split dataset
-        """
-        # Normalisasi nama split
+        """Dapatkan path untuk split dataset."""
         if split in ('val', 'validation'):
             split = 'valid'
             
-        # Cek konfigurasi khusus untuk path split
+        # Cek config atau gunakan default
         split_paths = self.config.get('data', {}).get('local', {})
-        if split in split_paths:
-            return Path(split_paths[split])
+        return Path(split_paths[split]) if split in split_paths else self.data_dir / split
+        
+    def get_colab_path(self, path: Path) -> str:
+        """Dapatkan path user-friendly untuk Colab."""
+        if not self.env_manager.is_colab:
+            return str(path)
             
-        # Fallback ke path default
-        return self.data_dir / split
+        abs_path = Path(path).absolute()
+        if '/content/drive/' in str(abs_path):
+            return f"📂 Drive: {str(abs_path).replace('/content/drive/MyDrive/', '')}"
+        else:
+            return f"📂 Colab: {str(abs_path).replace('/content/', '')}"

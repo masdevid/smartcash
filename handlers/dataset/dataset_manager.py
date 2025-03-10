@@ -1,6 +1,6 @@
 # File: smartcash/handlers/dataset/dataset_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager utama dataset yang menggabungkan semua facade ke dalam satu antarmuka
+# Deskripsi: Manager utama dataset yang menggabungkan semua facade
 
 from typing import Dict, Optional
 
@@ -10,14 +10,13 @@ from smartcash.handlers.dataset.facades.pipeline_facade import PipelineFacade
 
 class DatasetManager(PipelineFacade):
     """
-    Manager utama untuk dataset SmartCash yang menyediakan antarmuka terpadu
-    untuk semua operasi dan pipeline terkait dataset.
+    Manager utama untuk dataset SmartCash yang menyediakan antarmuka terpadu.
     
-    Menggunakan pola composite facade yang menggabungkan:
-    - DataLoadingFacade: Operasi loading data dan pembuatan dataloader
-    - DataProcessingFacade: Operasi validasi, augmentasi, dan balancing
-    - DataOperationsFacade: Operasi manipulasi dataset seperti split dan merge
-    - VisualizationFacade: Operasi visualisasi dataset
+    Menggabungkan facade:
+    - DataLoadingFacade: Loading data dan pembuatan dataloader
+    - DataProcessingFacade: Validasi, augmentasi, dan balancing
+    - DataOperationsFacade: Manipulasi dataset seperti split dan merge
+    - VisualizationFacade: Visualisasi dataset
     """
     
     def __init__(
@@ -27,13 +26,5 @@ class DatasetManager(PipelineFacade):
         cache_dir: Optional[str] = None,
         logger: Optional[SmartCashLogger] = None
     ):
-        """
-        Inisialisasi DatasetManager.
-        
-        Args:
-            config: Konfigurasi dataset
-            data_dir: Direktori dataset (opsional)
-            cache_dir: Direktori cache (opsional)
-            logger: Logger kustom (opsional)
-        """
+        """Inisialisasi DatasetManager."""
         super().__init__(config, data_dir, cache_dir, logger)

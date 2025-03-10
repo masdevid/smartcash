@@ -66,6 +66,13 @@ class EventTopics:
     UI_UPDATE = "ui.update"
     UI_REFRESH = "ui.refresh"
     
+    # Download events
+    DOWNLOAD = "download"
+    DOWNLOAD_START = "download.start"
+    DOWNLOAD_PROGRESS = "download.progress"
+    DOWNLOAD_COMPLETE = "download.complete"
+    DOWNLOAD_ERROR = "download.error"
+    
     @classmethod
     def get_all_topics(cls):
         """Mendapatkan semua topik event yang didefinisikan."""

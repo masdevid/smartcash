@@ -64,28 +64,49 @@ def setup_download_handlers(ui_components, config=None):
     except ImportError as e:
         print(f"Info: Beberapa modul tidak tersedia, akan menggunakan simulasi. ({str(e)})")
         
+    # Tambahkan info tentang API key
+    api_key_info = widgets.HTML(
+        value="",
+        layout=widgets.Layout(margin='10px 0', width='100%')
+    )
+    
+    # Tambahkan elemen info ke container download settings setelah elemen pertama (Roboflow settings)
+    download_settings_container = widgets.VBox([ui_components['roboflow_settings'], api_key_info])
+    
     # Coba mendapatkan Roboflow API key dari Google Secret (jika di Colab)
+    has_api_key = False
+    
     try:
         from google.colab import userdata
         roboflow_api_key = userdata.get('ROBOFLOW_API_KEY')
         if roboflow_api_key:
             # Update API key field with the value from secrets
             ui_components['roboflow_settings'].children[0].value = roboflow_api_key
+            has_api_key = True
             
-            # Add info message about using secret
-            api_key_info = """
+            # Update info message about using secret
+            api_key_info.value = """
             <div style="padding: 8px 12px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-                     color: #0c5460; margin: 10px 0; border-radius: 4px;">
-                <p><i>ℹ️ API Key diisi otomatis dari Google Secret.</i></p>
+                     color: #0c5460; margin: 5px 0; border-radius: 4px;">
+                <p><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>
             </div>
             """
-            # Add info message below API key field
-            with ui_components['download_status']:
-                from IPython.display import HTML
-                display(HTML(api_key_info))
+        else:
+            # No API key in Google Secret
+            api_key_info.value = """
+            <div style="padding: 8px 12px; background-color: #fff3cd; border-left: 4px solid #856404; 
+                     color: #856404; margin: 5px 0; border-radius: 4px;">
+                <p><i>⚠️ API Key Roboflow tidak ditemukan. <a href="#" onclick="document.querySelector('.accordion-title:contains(\"Bantuan\")').click();">Lihat panduan setup API Key</a>.</i></p>
+            </div>
+            """
     except:
-        # Not in Colab or secret not set
-        pass
+        # Not in Colab or secret not available
+        api_key_info.value = """
+        <div style="padding: 8px 12px; background-color: #fff3cd; border-left: 4px solid #856404; 
+                 color: #856404; margin: 5px 0; border-radius: 4px;">
+            <p><i>⚠️ Google Secret tidak tersedia. <a href="#" onclick="document.querySelector('.accordion-title:contains(\"Bantuan\")').click();">Lihat panduan setup API Key</a>.</i></p>
+        </div>
+        """
     
     # Handler untuk download dataset
     def on_download_click(b):
@@ -119,8 +140,10 @@ def setup_download_handlers(ui_components, config=None):
                             
                         # Jika masih kosong, tampilkan peringatan
                         if not api_key:
-                            display(create_status_indicator("warning", 
-                                "⚠️ API Key Roboflow tidak boleh kosong. Lihat bagian 'Bantuan' untuk cara setup API key."))
+                            display(create_status_indicator("error", 
+                                "❌ API Key Roboflow tidak tersedia. Tambahkan secret ROBOFLOW_API_KEY di Google Colab untuk melanjutkan."))
+                            # Open help accordion automatically
+                            display(HTML("<script>document.querySelector('.accordion button').click();</script>"))
                             return
                     
                     # Update config
@@ -349,11 +372,10 @@ def setup_download_handlers(ui_components, config=None):
     # Register handler untuk tombol download
     ui_components['download_button'].on_click(on_download_click)
     
-    # Populate form dengan nilai default dari config
-    if config:
-        # Populate Roboflow settings
+    # Populate form dengan nilai default dari config jika tidak ada dari Google Secret
+    if config and not has_api_key:
+        # Populate Roboflow settings (kecuali API key yang telah diset)
         api_settings = ui_components['roboflow_settings'].children
-        api_settings[0].value = config['data']['roboflow'].get('api_key', '')
         api_settings[1].value = config['data']['roboflow'].get('workspace', 'smartcash-wo2us')
         api_settings[2].value = config['data']['roboflow'].get('project', 'rupiah-emisi-2022')
         api_settings[3].value = str(config['data']['roboflow'].get('version', '3'))

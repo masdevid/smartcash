@@ -32,11 +32,11 @@ def create_dataset_download_ui():
     
     # Roboflow settings
     roboflow_settings = widgets.VBox([
-        widgets.Text(
+        widgets.Password(
             value='',
             description='API Key:',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%')
+            layout=widgets.Layout(width='70%', display='none')  # Hidden by default
         ),
         widgets.Text(
             value='smartcash-wo2us',

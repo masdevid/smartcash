@@ -155,17 +155,17 @@ class DatasetDownloader:
         self.logger.success(f"✅ Dataset berhasil diexport: {total_files} file → {self.data_dir}")
         return output_dirs
             
-    def pull_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True, 
-                api_key: Optional[str] = None) -> Tuple[str, str, str]:
+    def pull_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True,
+               api_key: str = None, workspace: str = None, project: str = None, version: str = None) -> tuple:
         """One-step untuk download dan setup dataset siap pakai."""
         try:
-            # Jika api_key diberikan, gunakan untuk override konfigurasi
-            if api_key:
-                original_api_key = self.api_key
-                self.api_key = api_key
-                
-            # Tampilkan info dataset yang akan didownload
-            self.get_dataset_info()
+            # Override parameter sementara jika diberikan
+            old_values = {}
+            for param in ['api_key', 'workspace', 'project', 'version']:
+                val = locals()[param]
+                if val is not None:
+                    old_values[param] = getattr(self, param)
+                    setattr(self, param, val)
             
             # Jika dataset sudah ada
             if self._is_dataset_available():
@@ -175,14 +175,13 @@ class DatasetDownloader:
             # Download dari Roboflow dan export ke lokal
             roboflow_dir = self.download_dataset(format=format, show_progress=show_progress, resume=resume)
             return self.export_to_local(roboflow_dir, show_progress)
-                
         except Exception as e:
             self.logger.error(f"❌ Gagal pull dataset: {str(e)}")
             raise
         finally:
-            # Kembalikan api_key original jika diubah
-            if api_key and 'original_api_key' in locals():
-                self.api_key = original_api_key
+            # Kembalikan nilai semula
+            for param, val in old_values.items():
+                setattr(self, param, val)
     
     def get_dataset_info(self) -> Dict:
         """Mendapatkan informasi dataset dari konfigurasi dan status lokal."""

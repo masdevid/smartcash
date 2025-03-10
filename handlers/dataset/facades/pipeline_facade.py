@@ -33,7 +33,6 @@ class PipelineFacade(DatasetBaseFacade):
     def setup_full_pipeline(self, **kwargs) -> Dict[str, Any]:
         """Setup pipeline lengkap untuk dataset."""
         start_time = time.time()
-        self.logger.info(f"🚀 Setup pipeline dataset dimulai")
         
         # Setup observer untuk pipeline
         self.observer_manager.create_logging_observer(
@@ -41,34 +40,27 @@ class PipelineFacade(DatasetBaseFacade):
             name="PipelineLogger", group="pipeline"
         )
         
-        # Setup progress observer jika diperlukan
-        if kwargs.get('show_progress', True):
-            self.observer_manager.create_progress_observer(
-                event_types=[EventTopics.PREPROCESSING_PROGRESS],
-                total=sum([1 if kwargs.get(k, False) else 0 for k in 
-                       ['download_dataset', 'validate_dataset', 'augment_data', 
-                        'balance_classes', 'visualize_results']]) or 1,
-                desc="Dataset Pipeline", name="PipelineProgress", group="pipeline"
-            )
-        
         # Notifikasi mulai pipeline
         self.observer_manager.create_simple_observer(
             event_type=EventTopics.PREPROCESSING_START,
-            callback=lambda *args, **kw: None,
+            callback=lambda *args, **kw: self.logger.start("🚀 Pipeline dataset dimulai"),
             name="PipelineStart"
         )
         
-        results = {
-            'download': None, 'validation': {}, 'fixes': {},
-            'augmentation': None, 'balancing': None, 'visualization': {},
-            'splits': {}
-        }
+        results = {'download': None, 'validation': {}, 'fixes': {}, 'augmentation': None, 
+                'balancing': None, 'visualization': {}, 'splits': {}}
         
         try:
             # 1. Download dataset
             if kwargs.get('download_dataset', True):
                 try:
-                    paths = self.loading_facade.pull_dataset(show_progress=kwargs.get('show_progress', True))
+                    # Ekstrak parameter download yang diperlukan dari kwargs
+                    download_params = {'show_progress': kwargs.get('show_progress', True)}
+                    for param in ['format', 'resume', 'api_key', 'workspace', 'project', 'version']:
+                        if param in kwargs:
+                            download_params[param] = kwargs[param]
+                    
+                    paths = self.loading_facade.pull_dataset(**download_params)
                     results['download'] = {'train_path': paths[0], 'val_path': paths[1], 'test_path': paths[2]}
                 except Exception as e:
                     self.logger.error(f"❌ Download gagal: {str(e)}")
@@ -126,12 +118,9 @@ class PipelineFacade(DatasetBaseFacade):
             # Notifikasi selesai
             self.observer_manager.create_simple_observer(
                 event_type=EventTopics.PREPROCESSING_END,
-                callback=lambda *args, **kw: None,
+                callback=lambda *args, **kw: self.logger.success(f"✅ Pipeline selesai dalam {elapsed_time:.2f} detik"),
                 name="PipelineEnd"
             )
-            
-            self.logger.success(f"✅ Pipeline selesai dalam {elapsed_time:.2f} detik")
-        
         return results
     
     def unregister_observers(self):

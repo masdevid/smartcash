@@ -78,7 +78,7 @@ class DataLoadingFacade(DatasetBaseFacade):
         """Export dataset Roboflow ke struktur folder lokal."""
         return self.downloader.export_to_local(roboflow_dir, **kwargs)
     
-    def pull_dataset(self, **kwargs) -> tuple:
+    def pull_dataset(self, **kwargs):
         """Download dan setup dataset dalam satu langkah."""
         return self.downloader.pull_dataset(**kwargs)
     

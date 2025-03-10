@@ -3,7 +3,6 @@ File: smartcash/ui_handlers/dataset_download.py
 Author: Alfrida Sabar (refactored)
 Deskripsi: Handler untuk UI download dataset SmartCash.
 """
-
 import os
 import time
 import sys

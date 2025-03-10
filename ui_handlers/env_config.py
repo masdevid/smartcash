@@ -1,86 +1,106 @@
 """
 File: smartcash/ui_handlers/env_config.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI konfigurasi environment SmartCash
+Deskripsi: Handler untuk UI konfigurasi environment SmartCash yang menggunakan EnvironmentManager
 """
 
 import os
 import platform
 import subprocess
+import sys
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
-
-from smartcash.utils.ui_utils import (
-    create_info_alert, create_status_indicator, styled_html,
-    create_section_title
-)
-from smartcash.utils.environment_manager import EnvironmentManager
 
 def setup_env_handlers(ui):
     """Setup handler untuk UI konfigurasi environment"""
     
-    # Inisialisasi environment manager
-    env_manager = EnvironmentManager()
+    # Coba import EnvironmentManager
+    try:
+        from smartcash.utils.environment_manager import EnvironmentManager
+        from smartcash.utils.logger import get_logger
+        logger = get_logger("env_config")
+        env_manager = EnvironmentManager(logger=logger)
+        using_env_manager = True
+    except ImportError:
+        print("Info: EnvironmentManager tidak tersedia, menggunakan implementasi default.")
+        env_manager = None
+        using_env_manager = False
     
     # Deteksi environment
     def detect_environment():
-        # Deteksi environment menggunakan EnvironmentManager
-        is_colab = env_manager.is_colab
-        drive_mounted = env_manager.is_drive_mounted
+        is_colab = False
         
-        # Update UI berdasarkan status
-        if is_colab:
-            if drive_mounted:
-                ui['colab_panel'].value = styled_html(
-                    content=f"{create_section_title('☁️ Google Colab Environment', 'Terdeteksi').value}"
-                    f"{create_info_alert('Google Drive sudah terhubung di ' + str(env_manager.drive_path), 'success', '✅').value}",
-                    style={"padding": "10px", "margin": "10px 0"}
-                ).value
-                
-                # Update tombol
-                ui['drive_button'].description = 'Reconnect Google Drive'
-                ui['drive_button'].icon = 'refresh'
+        if using_env_manager:
+            is_colab = env_manager.is_colab
+            
+            # Display message based on environment
+            if is_colab:
+                ui['colab_panel'].value = """
+                    <div style="padding: 10px; background: #d1ecf1; border-left: 4px solid #0c5460; color: #0c5460; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #0c5460;">☁️ Google Colab Terdeteksi</h3>
+                        <p>Project akan dikonfigurasi untuk berjalan di Google Colab.</p>
+                    </div>
+                """
+                ui['drive_button'].layout.display = ''
             else:
-                ui['colab_panel'].value = styled_html(
-                    content=f"{create_section_title('☁️ Google Colab Environment', 'Terdeteksi').value}"
-                    f"{create_info_alert('Project akan dikonfigurasi untuk berjalan di Google Colab. Hubungkan Google Drive untuk menyimpan data.', 'info', 'ℹ️').value}",
-                    style={"padding": "10px", "margin": "10px 0"}
-                ).value
+                ui['colab_panel'].value = """
+                    <div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #155724;">💻 Environment Lokal Terdeteksi</h3>
+                        <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
+                    </div>
+                """
+                
+            # Get system info from environment manager
+            system_info = env_manager.get_system_info()
             
-            ui['drive_button'].layout.display = ''
+            with ui['status']:
+                clear_output()
+                info_html = f"""
+                <div style="background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 5px;">
+                    <h4>📊 System Information</h4>
+                    <ul>
+                        <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
+                        <li><b>Base Directory:</b> {system_info.get('base_dir', 'Unknown')}</li>
+                        <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda_available', False) else 'No'}</li>
+                    </ul>
+                </div>
+                """
+                display(HTML(info_html))
         else:
-            ui['colab_panel'].value = styled_html(
-                content=f"{create_section_title('💻 Environment Lokal', 'Terdeteksi').value}"
-                f"{create_info_alert('Project akan dikonfigurasi untuk berjalan di environment lokal.', 'success', '✅').value}",
-                style={"padding": "10px", "margin": "10px 0"}
-            ).value
-        
-        # Display system info
-        with ui['status']:
-            clear_output()
+            # Fallback implementation
+            try:
+                import google.colab
+                is_colab = True
+                ui['colab_panel'].value = """
+                    <div style="padding: 10px; background: #d1ecf1; border-left: 4px solid #0c5460; color: #0c5460; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #0c5460;">☁️ Google Colab Terdeteksi</h3>
+                        <p>Project akan dikonfigurasi untuk berjalan di Google Colab.</p>
+                    </div>
+                """
+                ui['drive_button'].layout.display = ''
+            except ImportError:
+                is_colab = False
+                ui['colab_panel'].value = """
+                    <div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #155724;">💻 Environment Lokal Terdeteksi</h3>
+                        <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
+                    </div>
+                """
             
-            # Dapatkan informasi environment dari EnvironmentManager
-            sys_info = env_manager.get_system_info()
-            
-            # Format system items
-            system_items = [
-                f"<b>Python:</b> {sys_info['python_version'].split()[0]}",
-                f"<b>Base Directory:</b> {sys_info['base_dir']}",
-                f"<b>Google Drive:</b> {'Terhubung' if sys_info['drive_mounted'] else 'Tidak terhubung'}"
-            ]
-            
-            # Tambahkan info GPU jika tersedia
-            if 'cuda_available' in sys_info and sys_info['cuda_available']:
-                system_items.append(f"<b>GPU:</b> {sys_info['cuda_device']} ({sys_info['cuda_memory']:.1f} GB)")
-            
-            # Buat HTML untuk system info
-            system_info_content = "<ul>" + "".join([f"<li>{item}</li>" for item in system_items]) + "</ul>"
-            
-            # Tampilkan dengan styled_html
-            display(styled_html(
-                content=f"{create_section_title('📊 System Information', '').value}{system_info_content}",
-                style={"background": "#f8f9fa", "padding": "10px", "margin": "10px 0", "border-radius": "5px"}
-            ))
+            # Display system info
+            with ui['status']:
+                clear_output()
+                system_info = f"""
+                <div style="background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 5px;">
+                    <h4>📊 System Information</h4>
+                    <ul>
+                        <li><b>Python:</b> {platform.python_version()}</li>
+                        <li><b>OS:</b> {platform.system()} {platform.release()}</li>
+                        <li><b>Path:</b> {Path.cwd()}</li>
+                    </ul>
+                </div>
+                """
+                display(HTML(system_info))
         
         return is_colab
     
@@ -88,121 +108,143 @@ def setup_env_handlers(ui):
     def on_drive_connect(b):
         with ui['status']:
             clear_output()
-            # Cek jika Google Drive sudah terhubung
-            drive_mounted = env_manager.is_drive_mounted
             
-            if drive_mounted:
-                display(create_status_indicator("info", "ℹ️ Google Drive sudah terhubung. Mencoba menghubungkan kembali..."))
-            else:
-                display(create_status_indicator("info", "🔄 Menghubungkan ke Google Drive..."))
-            
-            try:
-                # Mount drive menggunakan EnvironmentManager
+            if using_env_manager:
+                display(HTML('<p>🔄 Menghubungkan ke Google Drive menggunakan EnvironmentManager...</p>'))
                 success, message = env_manager.mount_drive()
                 
-                if not success:
-                    display(create_status_indicator("error", f"❌ Gagal menghubungkan ke Google Drive: {message}"))
-                    return
-                
-                display(create_status_indicator("success", message))
-                
-                # Create symlinks
-                symlink_stats = env_manager.create_symlinks()
-                if symlink_stats['created'] > 0:
-                    display(create_status_indicator(
-                        "success", f"✅ {symlink_stats['created']} symlinks berhasil dibuat"
+                if success:
+                    # Create symlinks
+                    display(HTML('<p>🔄 Membuat symlink ke Google Drive...</p>'))
+                    symlink_stats = env_manager.create_symlinks()
+                    
+                    display(HTML(
+                        f"""<div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                            <h3 style="margin-top: 0; color: #155724;">✅ Google Drive Terhubung</h3>
+                            <p>Data akan disimpan di {env_manager.drive_path}</p>
+                            <p>Symlinks dibuat: {symlink_stats['created']}, yang sudah ada: {symlink_stats['existing']}</p>
+                        </div>"""
                     ))
-                elif symlink_stats['existing'] > 0:
-                    display(create_status_indicator(
-                        "info", f"ℹ️ {symlink_stats['existing']} symlinks sudah ada"
+                    
+                    # Display directory tree
+                    display(HTML("<h4>📂 Struktur direktori:</h4>"))
+                    tree_html = env_manager.get_directory_tree(max_depth=2)
+                    display(HTML(tree_html))
+                    
+                else:
+                    display(HTML(
+                        f"""<div style="padding: 10px; background: #f8d7da; border-left: 4px solid #721c24; color: #721c24; margin: 10px 0;">
+                            <h3 style="margin-top: 0; color: #721c24;">❌ Gagal Terhubung ke Google Drive</h3>
+                            <p>Error: {message}</p>
+                        </div>"""
                     ))
-                
-                # Update button
-                ui['drive_button'].description = 'Reconnect Google Drive'
-                ui['drive_button'].icon = 'refresh'
-                
-                # Get system info with Drive stats
-                sys_info = env_manager.get_system_info()
-                if 'cuda_memory' in sys_info:
-                    # Format disk usage stats jika tersedia
-                    try:
-                        import shutil
-                        drive_usage = shutil.disk_usage('/content/drive')
-                        total_gb = drive_usage.total / (1024**3)
-                        used_gb = drive_usage.used / (1024**3)
-                        free_gb = drive_usage.free / (1024**3)
-                        usage_percent = (used_gb / total_gb) * 100
-                        
-                        storage_info = f"""
-                        <h4>💾 Drive Usage Stats</h4>
-                        <ul>
-                            <li>Total: {total_gb:.1f} GB</li>
-                            <li>Used: {used_gb:.1f} GB ({usage_percent:.1f}%)</li>
-                            <li>Free: {free_gb:.1f} GB</li>
-                        </ul>
-                        """
-                        
-                        display(styled_html(
-                            content=storage_info,
-                            style={"background": "#f8f9fa", "padding": "10px", "margin": "10px 0", "border-radius": "5px"}
+            else:
+                # Fallback implementation
+                try:
+                    display(HTML('<p>🔄 Menghubungkan ke Google Drive...</p>'))
+                    from google.colab import drive
+                    drive.mount('/content/drive')
+                    
+                    # Create SmartCash directory in Drive if needed
+                    drive_path = Path('/content/drive/MyDrive/SmartCash')
+                    if not drive_path.exists():
+                        drive_path.mkdir(parents=True)
+                        display(HTML(
+                            f'<p>✅ Direktori <code>{drive_path}</code> berhasil dibuat di Google Drive</p>'
                         ))
-                    except:
-                        pass
-                
-                # Success message
-                display(create_info_alert(
-                    message=f"Google Drive berhasil terhubung. Data akan disimpan di {env_manager.drive_path}",
-                    alert_type="success",
-                    icon="✅"
-                ))
-                
-            except Exception as e:
-                display(create_status_indicator("error", f"❌ Gagal terhubung ke Google Drive: {str(e)}"))
+                    else:
+                        display(HTML(
+                            f'<p>ℹ️ Direktori <code>{drive_path}</code> sudah ada di Google Drive</p>'
+                        ))
+                        
+                    # Create symlink
+                    if not Path('SmartCash_Drive').exists():
+                        os.symlink(drive_path, 'SmartCash_Drive')
+                        display(HTML(
+                            '<p>✅ Symlink <code>SmartCash_Drive</code> berhasil dibuat</p>'
+                        ))
+                    else:
+                        display(HTML(
+                            '<p>ℹ️ Symlink <code>SmartCash_Drive</code> sudah ada</p>'
+                        ))
+                        
+                    display(HTML(
+                        """<div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                            <h3 style="margin-top: 0; color: #155724;">✅ Google Drive Terhubung</h3>
+                            <p>Data akan disimpan di <code>/content/drive/MyDrive/SmartCash</code></p>
+                        </div>"""
+                    ))
+                    
+                except Exception as e:
+                    display(HTML(
+                        f"""<div style="padding: 10px; background: #f8d7da; border-left: 4px solid #721c24; color: #721c24; margin: 10px 0;">
+                            <h3 style="margin-top: 0; color: #721c24;">❌ Gagal Terhubung ke Google Drive</h3>
+                            <p>Error: {str(e)}</p>
+                        </div>"""
+                    ))
     
     # Directory structure setup handler
     def on_dir_setup(b):
         with ui['status']:
             clear_output()
-            display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
             
-            # Gunakan EnvironmentManager untuk setup direktori
-            dir_stats = env_manager.setup_directories(use_drive=env_manager.is_drive_mounted)
-            
-            if dir_stats['error'] == 0:
-                # Tampilkan info direktori
-                display(create_section_title("✅ Struktur Direktori", "Berhasil Dibuat"))
+            if using_env_manager:
+                display(HTML('<p>🔄 Membuat struktur direktori dengan EnvironmentManager...</p>'))
                 
-                # Daftar direktori utama
-                dir_info = """
-                <ul>
-                    <li><code>data/</code> - Dataset training, validasi, dan testing</li>
-                    <li><code>configs/</code> - File konfigurasi</li>
-                    <li><code>runs/</code> - Hasil training dan weights</li>
-                    <li><code>logs/</code> - Log proses</li>
-                    <li><code>exports/</code> - Model yang diexport</li>
-                </ul>
-                """
+                # Setup directories using EnvironmentManager
+                use_drive = env_manager.is_drive_mounted
+                stats = env_manager.setup_directories(use_drive=use_drive)
                 
-                display(styled_html(
-                    content=dir_info,
-                    style={"padding": "10px", "margin": "10px 0"}
+                # Display stats
+                display(HTML(
+                    f"""<div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #155724;">✅ Struktur Direktori Berhasil Dibuat</h3>
+                        <p>Direktori baru: {stats['created']}, sudah ada: {stats['existing']}, error: {stats.get('error', 0)}</p>
+                    </div>"""
                 ))
                 
-                # Tampilkan statistik pembuatan direktori
-                stats_message = f"<b>Statistik:</b> {dir_stats['created']} direktori baru dibuat, {dir_stats['existing']} sudah ada sebelumnya."
-                display(create_info_alert(
-                    message=stats_message,
-                    alert_type="success",
-                    icon="📁"
-                ))
+                # Display directory tree
+                display(HTML("<h4>📂 Struktur direktori yang dibuat:</h4>"))
+                tree_html = env_manager.get_directory_tree(max_depth=3)
+                display(HTML(tree_html))
                 
-                # Tampilkan directory tree jika ada direktori baru yang dibuat
-                if dir_stats['created'] > 0:
-                    display(HTML("<h4>🌲 Struktur Direktori:</h4>"))
-                    tree_html = env_manager.get_directory_tree(max_depth=2)
-                    display(HTML(tree_html))
             else:
-                display(create_status_indicator("error", f"❌ Terjadi error saat membuat {dir_stats['error']} direktori"))
+                # Fallback implementation
+                # Create necessary directories
+                dirs = [
+                    'data/train/images', 'data/train/labels',
+                    'data/valid/images', 'data/valid/labels',
+                    'data/test/images', 'data/test/labels',
+                    'models', 'runs/train', 'runs/detect',
+                    'configs', 'logs', 'results'
+                ]
+                
+                display(HTML('<p>🔄 Membuat struktur direktori...</p>'))
+                
+                created = 0
+                existing = 0
+                for d in dirs:
+                    path = Path(d)
+                    if not path.exists():
+                        path.mkdir(parents=True, exist_ok=True)
+                        created += 1
+                    else:
+                        existing += 1
+                    
+                display(HTML(
+                    f"""<div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
+                        <h3 style="margin-top: 0; color: #155724;">✅ Struktur Direktori Berhasil Dibuat</h3>
+                        <p>Direktori baru: {created}, sudah ada: {existing}</p>
+                        <ul>
+                            <li><code>data/</code> - Dataset training, validasi, dan testing</li>
+                            <li><code>models/</code> - Model yang diexport</li>
+                            <li><code>runs/</code> - Hasil training dan deteksi</li>
+                            <li><code>configs/</code> - File konfigurasi</li>
+                            <li><code>logs/</code> - Log proses</li>
+                            <li><code>results/</code> - Hasil evaluasi dan visualisasi</li>
+                        </ul>
+                    </div>"""
+                ))
     
     # Register handlers
     ui['drive_button'].on_click(on_drive_connect)

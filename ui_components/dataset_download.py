@@ -3,7 +3,6 @@ File: smartcash/ui_components/dataset_download.py
 Author: Alfrida Sabar (refactored)
 Deskripsi: Komponen UI untuk download dataset SmartCash dari berbagai sumber.
 """
-
 import ipywidgets as widgets
 from IPython.display import HTML
 

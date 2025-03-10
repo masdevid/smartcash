@@ -241,7 +241,7 @@ def setup_download_handlers(ui_components, config=None):
                             display(create_status_indicator("info", "🔑 Menggunakan DatasetManager untuk download..."))
                             
                             # Download dataset
-                            dataset_path = dataset_manager.download_dataset(
+                            dataset_path = dataset_manager.pull_dataset(
                                 format="yolov5",
                                 api_key=api_key,
                                 workspace=workspace,

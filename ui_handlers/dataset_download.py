@@ -8,6 +8,7 @@ import os
 import time
 import sys
 from pathlib import Path
+import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
 
 # Untuk import handlers dan utils

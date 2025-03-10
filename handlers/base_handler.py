@@ -8,7 +8,7 @@ from pathlib import Path
 
 from smartcash.utils.logger import SmartCashLogger, get_logger
 from smartcash.utils.logging_factory import LoggingFactory
-from smartcash.config.config_manager import get_config_manager
+from smartcash.configs.config_manager import get_config_manager
 from smartcash.exceptions.handler import ErrorHandler
 from smartcash.exceptions.factory import ErrorFactory
 

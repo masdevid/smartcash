@@ -11,8 +11,10 @@ from smartcash.utils.logger import get_logger
 from smartcash.utils.layer_config_manager import get_layer_config
 from smartcash.handlers.dataset.core.dataset_validator import DatasetValidator
 from smartcash.handlers.dataset.explorers.base_explorer import BaseExplorer
-from smartcash.handlers.dataset.visualizations.distribution_visualizer import DistributionVisualizer
-from smartcash.handlers.dataset.visualizations.sample_visualizer import SampleVisualizer
+
+# Penggunaan komponen visualisasi dari utils/visualization
+from smartcash.utils.visualization.metrics import MetricsVisualizer
+from smartcash.utils.visualization.detection import DetectionVisualizer
 
 
 class DatasetReportingOperation:
@@ -29,7 +31,16 @@ class DatasetReportingOperation:
         self.layer_config = get_layer_config()
         self.validator = DatasetValidator(config, data_dir, logger=self.logger)
         self.explorers = self._init_explorers()
-        self.visualizers = self._init_visualizers()
+        
+        # Inisialisasi visualizers dari utils/visualization
+        self.metrics_visualizer = MetricsVisualizer(
+            output_dir=str(self.output_dir), 
+            logger=self.logger
+        )
+        self.detection_visualizer = DetectionVisualizer(
+            output_dir=str(self.output_dir),
+            logger=self.logger
+        )
         
         self.logger.info(f"🧮 DatasetReportingOperation diinisialisasi: {self.data_dir}")
     
@@ -43,15 +54,6 @@ class DatasetReportingOperation:
             'validation': ValidationExplorer(self.config, str(self.data_dir), self.logger),
             'distribution': DistributionExplorer(self.config, str(self.data_dir), self.logger),
             'bbox_image': BBoxImageExplorer(self.config, str(self.data_dir), self.logger)
-        }
-    
-    def _init_visualizers(self) -> Dict[str, Any]:
-        """Inisialisasi visualizer untuk berbagai jenis visualisasi."""
-        return {
-            'distribution': DistributionVisualizer(config=self.config, data_dir=str(self.data_dir), 
-                                                  output_dir=str(self.output_dir), logger=self.logger),
-            'sample': SampleVisualizer(config=self.config, data_dir=str(self.data_dir), 
-                                      output_dir=str(self.output_dir), logger=self.logger)
         }
     
     def generate_dataset_report(self, splits: List[str] = ['train', 'valid', 'test'], 
@@ -120,21 +122,90 @@ class DatasetReportingOperation:
             return {'error': str(e)}
     
     def _process_visualizations(self, split: str, sample_count: int) -> Dict[str, str]:
-        """Buat visualisasi dataset dan kembalikan path file hasil."""
+        """Buat visualisasi dataset dan kembalikan path file hasil menggunakan visualizer dari utils/visualization."""
         visualizations = {}
         try:
-            visualizations['class_distribution'] = self.visualizers['distribution'].visualize_class_distribution(
-                split=split, save_path=str(self.output_dir / f"{split}_class_distribution.png"))
+            # Visualisasi distribusi kelas menggunakan MetricsVisualizer
+            class_distribution = self.explorers['distribution'].analyze_class_distribution(split)
+            class_data = {
+                'classes': list(class_distribution.get('counts', {}).keys()),
+                'counts': list(class_distribution.get('counts', {}).values())
+            }
+            class_vis_path = str(self.output_dir / f"{split}_class_distribution.png")
+            self.metrics_visualizer.plot_bar(
+                data=class_data,
+                x_key='classes',
+                y_key='counts', 
+                title=f'Distribusi Kelas ({split})',
+                filepath=class_vis_path
+            )
+            visualizations['class_distribution'] = class_vis_path
             
-            visualizations['layer_distribution'] = self.visualizers['distribution'].visualize_layer_distribution(
-                split=split, save_path=str(self.output_dir / f"{split}_layer_distribution.png"))
+            # Visualisasi distribusi layer menggunakan MetricsVisualizer
+            layer_distribution = self.explorers['distribution'].analyze_layer_distribution(split)
+            layer_data = {
+                'layers': list(layer_distribution.get('counts', {}).keys()),
+                'counts': list(layer_distribution.get('counts', {}).values())
+            }
+            layer_vis_path = str(self.output_dir / f"{split}_layer_distribution.png")
+            self.metrics_visualizer.plot_bar(
+                data=layer_data,
+                x_key='layers',
+                y_key='counts',
+                title=f'Distribusi Layer ({split})',
+                filepath=layer_vis_path
+            )
+            visualizations['layer_distribution'] = layer_vis_path
             
-            visualizations['samples'] = self.visualizers['sample'].visualize_samples(
-                split=split, num_samples=sample_count, save_path=str(self.output_dir / f"{split}_samples.png"))
+            # Visualisasi sampel gambar menggunakan DetectionVisualizer
+            samples_path = str(self.output_dir / f"{split}_samples.png")
+            # Ambil sampel gambar dari split
+            sample_images = self._get_sample_images(split, sample_count)
+            
+            if sample_images:
+                # Kombinasikan gambar sampel menggunakan DetectionVisualizer
+                self.detection_visualizer.visualize_multiple_images(
+                    images=sample_images,
+                    filepath=samples_path,
+                    title=f'Sampel Gambar ({split})',
+                    grid_size=(3, 3)  # Asumsi 3x3 grid untuk 9 gambar
+                )
+                visualizations['samples'] = samples_path
+            
         except Exception as e:
             self.logger.error(f"❌ Gagal visualisasi {split}: {str(e)}")
             visualizations['error'] = str(e)
+        
         return visualizations
+    
+    def _get_sample_images(self, split: str, count: int = 9):
+        """Ambil sampel gambar dari split tertentu."""
+        try:
+            # Dapatkan daftar gambar dari direktori split
+            split_dir = self.data_dir / split / 'images'
+            if not split_dir.exists():
+                self.logger.warning(f"⚠️ Direktori gambar untuk split {split} tidak ditemukan")
+                return []
+            
+            import cv2
+            import random
+            from glob import glob
+            
+            # Dapatkan daftar file gambar
+            image_files = glob(f"{split_dir}/*.jpg") + glob(f"{split_dir}/*.png")
+            
+            # Batasi jumlah sampel ke count atau jumlah total gambar jika lebih kecil
+            count = min(count, len(image_files))
+            
+            # Pilih sampel secara acak
+            if count > 0:
+                sample_files = random.sample(image_files, count)
+                return [cv2.imread(img_file) for img_file in sample_files]
+            return []
+            
+        except Exception as e:
+            self.logger.error(f"❌ Gagal mengambil sampel gambar: {str(e)}")
+            return []
     
     def _create_dataset_summary(self, report: Dict) -> Dict:
         """Buat ringkasan dataset dari laporan lengkap."""

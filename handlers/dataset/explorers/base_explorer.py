@@ -16,20 +16,8 @@ class BaseExplorer(ABC):
     oleh explorer spesifik.
     """
     
-    def __init__(
-        self,
-        config: Dict,
-        data_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None
-    ):
-        """
-        Inisialisasi BaseExplorer.
-        
-        Args:
-            config: Konfigurasi dataset/aplikasi
-            data_dir: Direktori dataset (opsional)
-            logger: Logger kustom (opsional)
-        """
+    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger: Optional[SmartCashLogger] = None):
+        """Inisialisasi BaseExplorer."""
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
         self.logger = logger or SmartCashLogger(__name__)
@@ -52,31 +40,14 @@ class BaseExplorer(ABC):
         self.logger.info(f"🔍 {self.__class__.__name__} diinisialisasi untuk: {self.data_dir}")
     
     def _get_split_path(self, split: str) -> Path:
-        """
-        Dapatkan path untuk split dataset tertentu.
-        
-        Args:
-            split: Nama split ('train', 'valid', 'test')
-            
-        Returns:
-            Path ke direktori split
-        """
+        """Dapatkan path untuk split dataset tertentu."""
         # Handling untuk nama split yang berbeda
         if split in ('val', 'validation'):
             split = 'valid'
-            
         return self.data_dir / split
     
     def _get_class_name(self, cls_id: int) -> str:
-        """
-        Dapatkan nama kelas berdasarkan ID kelas.
-        
-        Args:
-            cls_id: ID kelas
-            
-        Returns:
-            Nama kelas
-        """
+        """Dapatkan nama kelas berdasarkan ID kelas."""
         if cls_id in self.class_to_name:
             return self.class_to_name[cls_id]
             

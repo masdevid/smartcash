@@ -1,8 +1,8 @@
 # File: smartcash/handlers/dataset/core/dataset_validator.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen untuk validasi dataset SmartCash
+# Deskripsi: Komponen validasi dataset dengan integrasi EnhancedDatasetValidator
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any, Optional
 from pathlib import Path
 
 from smartcash.utils.logger import SmartCashLogger
@@ -10,26 +10,10 @@ from smartcash.utils.dataset import EnhancedDatasetValidator
 
 
 class DatasetValidator:
-    """
-    Komponen untuk validasi dataset SmartCash.
-    """
+    """Komponen untuk validasi dataset SmartCash menggunakan EnhancedDatasetValidator."""
     
-    def __init__(
-        self,
-        config: Dict,
-        data_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None,
-        num_workers: int = 4
-    ):
-        """
-        Inisialisasi DatasetValidator.
-        
-        Args:
-            config: Konfigurasi dataset
-            data_dir: Direktori dataset (opsional)
-            logger: Logger kustom (opsional)
-            num_workers: Jumlah worker untuk paralelisasi
-        """
+    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger: Optional[SmartCashLogger] = None,
+                num_workers: int = 4):
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
         self.logger = logger or SmartCashLogger(__name__)
@@ -37,7 +21,7 @@ class DatasetValidator:
         
         # Inisialisasi validator dari utils
         self.enhanced_validator = EnhancedDatasetValidator(
-            config=config,
+            config=config, 
             data_dir=str(self.data_dir),
             logger=logger,
             num_workers=num_workers
@@ -49,27 +33,9 @@ class DatasetValidator:
             f"   • Num workers: {num_workers}"
         )
     
-    def validate_dataset(
-        self,
-        split: str,
-        fix_issues: bool = False,
-        visualize: bool = True,
-        sample_size: int = 0,
-        move_invalid: bool = False
-    ) -> Dict[str, Any]:
-        """
-        Validasi dataset menggunakan EnhancedDatasetValidator.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            fix_issues: Jika True, coba perbaiki masalah yang ditemukan
-            visualize: Jika True, buat visualisasi masalah
-            sample_size: Jumlah sampel yang akan divalidasi (0 untuk semua)
-            move_invalid: Jika True, pindahkan file yang tidak valid
-            
-        Returns:
-            Dict berisi statistik validasi
-        """
+    def validate_dataset(self, split: str, fix_issues: bool = False, visualize: bool = True,
+                        sample_size: int = 0, move_invalid: bool = False) -> Dict[str, Any]:
+        """Validasi dataset menggunakan EnhancedDatasetValidator."""
         self.logger.info(
             f"🔍 Validasi dataset '{split}':\n"
             f"   • Fix issues: {fix_issues}\n"
@@ -111,23 +77,8 @@ class DatasetValidator:
         
         return result
     
-    def analyze_dataset(
-        self,
-        split: str,
-        sample_size: int = 0,
-        detailed: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Analisis dataset menggunakan EnhancedDatasetValidator.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            sample_size: Jumlah sampel yang akan dianalisis (0 untuk semua)
-            detailed: Jika True, lakukan analisis lebih mendalam
-            
-        Returns:
-            Dict berisi hasil analisis dataset
-        """
+    def analyze_dataset(self, split: str, sample_size: int = 0, detailed: bool = True) -> Dict[str, Any]:
+        """Analisis dataset menggunakan EnhancedDatasetValidator."""
         self.logger.info(
             f"🔍 Analisis dataset '{split}':\n"
             f"   • Sample size: {sample_size if sample_size > 0 else 'all'}\n"
@@ -154,38 +105,20 @@ class DatasetValidator:
         )
         
         # Log kelas underrepresented dan overrepresented
-        underrepresented = class_balance.get('underrepresented_classes', [])
-        overrepresented = class_balance.get('overrepresented_classes', [])
+        underrep_classes = class_balance.get('underrepresented_classes', [])
+        overrep_classes = class_balance.get('overrepresented_classes', [])
         
-        if underrepresented:
-            self.logger.info(f"⚠️ Kelas kurang terwakili: {', '.join(underrepresented[:5])}")
+        if underrep_classes:
+            self.logger.info(f"⚠️ Kelas kurang terwakili: {', '.join(underrep_classes[:5])}")
         
-        if overrepresented:
-            self.logger.info(f"ℹ️ Kelas dominan: {', '.join(overrepresented[:5])}")
+        if overrep_classes:
+            self.logger.info(f"ℹ️ Kelas dominan: {', '.join(overrep_classes[:5])}")
         
         return result
     
-    def fix_dataset(
-        self,
-        split: str,
-        fix_coordinates: bool = True,
-        fix_labels: bool = True,
-        fix_images: bool = False,
-        backup: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Perbaiki masalah dataset menggunakan EnhancedDatasetValidator.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            fix_coordinates: Jika True, perbaiki koordinat tidak valid
-            fix_labels: Jika True, perbaiki format label
-            fix_images: Jika True, perbaiki gambar rusak (resize, konversi format)
-            backup: Jika True, buat backup sebelum perbaikan
-            
-        Returns:
-            Dict berisi statistik perbaikan
-        """
+    def fix_dataset(self, split: str, fix_coordinates: bool = True, fix_labels: bool = True,
+                   fix_images: bool = False, backup: bool = True) -> Dict[str, Any]:
+        """Perbaiki masalah dataset menggunakan EnhancedDatasetValidator."""
         self.logger.info(
             f"🔧 Perbaikan dataset '{split}':\n"
             f"   • Fix coordinates: {fix_coordinates}\n"
@@ -218,10 +151,5 @@ class DatasetValidator:
         return result
     
     def get_validator_instance(self) -> EnhancedDatasetValidator:
-        """
-        Dapatkan instance EnhancedDatasetValidator langsung.
-        
-        Returns:
-            Instance EnhancedDatasetValidator
-        """
+        """Dapatkan instance EnhancedDatasetValidator langsung."""
         return self.enhanced_validator

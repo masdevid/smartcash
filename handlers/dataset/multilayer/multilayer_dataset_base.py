@@ -1,13 +1,12 @@
-# File: smartcash/handlers/dataset/multilayer_dataset_base.py
+# File: smartcash/handlers/dataset/multilayer/multilayer_dataset_base.py
 # Author: Alfrida Sabar
-# Deskripsi: Kelas dasar untuk dataset multilayer
+# Deskripsi: Kelas dasar untuk dataset multilayer (versi ringkas)
 
-import os
 import torch
 import cv2
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple
 from torch.utils.data import Dataset
 
 from smartcash.utils.logger import SmartCashLogger
@@ -25,41 +24,27 @@ class MultilayerDatasetBase(Dataset):
         layers: Optional[List[str]] = None,
         logger: Optional[SmartCashLogger] = None
     ):
-        """
-        Inisialisasi MultilayerDatasetBase.
-        
-        Args:
-            data_path: Path ke direktori dataset
-            img_size: Ukuran target gambar
-            mode: Mode dataset ('train', 'val', 'test')
-            transform: Transformasi kustom
-            layers: Daftar layer yang akan diaktifkan
-            logger: Logger kustom
-        """
+        """Inisialisasi MultilayerDatasetBase."""
         self.data_path = Path(data_path)
         self.img_size = img_size
         self.mode = mode
         self.transform = transform
         self.logger = logger or SmartCashLogger("multilayer_dataset")
         
-        # Dapatkan konfigurasi layer dari layer config manager
+        # Konfigurasi layer
         self.layer_config_manager = get_layer_config()
         self.layers = layers or self.layer_config_manager.get_layer_names()
         
-        # Setup jalur direktori
+        # Setup direktori
         self.images_dir = self.data_path / 'images'
         self.labels_dir = self.data_path / 'labels'
         
-        # Validasi direktori
-        if not self.images_dir.exists():
-            self.logger.warning(f"⚠️ Direktori gambar tidak ditemukan: {self.images_dir}")
-            self.images_dir.mkdir(parents=True, exist_ok=True)
-            
-        if not self.labels_dir.exists():
-            self.logger.warning(f"⚠️ Direktori label tidak ditemukan: {self.labels_dir}")
-            self.labels_dir.mkdir(parents=True, exist_ok=True)
+        for dir_path in [self.images_dir, self.labels_dir]:
+            if not dir_path.exists():
+                self.logger.warning(f"⚠️ Direktori tidak ditemukan: {dir_path}")
+                dir_path.mkdir(parents=True, exist_ok=True)
         
-        # Class ID to layer mapping untuk lookup cepat
+        # Class ID to layer mapping
         self.class_to_layer = {}
         for layer in self.layers:
             layer_config = self.layer_config_manager.get_layer_config(layer)
@@ -74,33 +59,19 @@ class MultilayerDatasetBase(Dataset):
         return len(self.valid_samples)
         
     def _load_image(self, image_path: Path) -> np.ndarray:
-        """
-        Membaca gambar dari file.
-        
-        Args:
-            image_path: Path ke file gambar
-            
-        Returns:
-            Array gambar (RGB)
-        """
+        """Membaca gambar dari file."""
         try:
             img = cv2.imread(str(image_path))
             if img is None:
                 raise ValueError(f"Gagal membaca gambar: {image_path}")
-            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            return img
+            return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal membaca gambar {image_path}: {str(e)}")
-            # Return dummy image sebagai fallback
+            # Return dummy image
             return np.zeros((self.img_size[1], self.img_size[0], 3), dtype=np.uint8)
     
     def _find_image_files(self) -> List[Path]:
-        """
-        Menemukan semua file gambar dalam direktori.
-        
-        Returns:
-            List path file gambar
-        """
+        """Menemukan semua file gambar dalam direktori."""
         image_files = []
         for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
             image_files.extend(list(self.images_dir.glob(ext)))
@@ -109,27 +80,11 @@ class MultilayerDatasetBase(Dataset):
         return image_files
     
     def get_layer_dimension(self, layer: str) -> int:
-        """
-        Mendapatkan dimensi layer (jumlah kelas).
-        
-        Args:
-            layer: Nama layer
-            
-        Returns:
-            Jumlah kelas dalam layer
-        """
+        """Mendapatkan dimensi layer (jumlah kelas)."""
         layer_config = self.layer_config_manager.get_layer_config(layer)
         return len(layer_config['classes'])
     
     def get_layer_class_ids(self, layer: str) -> List[int]:
-        """
-        Mendapatkan class ID untuk layer tertentu.
-        
-        Args:
-            layer: Nama layer
-            
-        Returns:
-            List class ID
-        """
+        """Mendapatkan class ID untuk layer tertentu."""
         layer_config = self.layer_config_manager.get_layer_config(layer)
         return layer_config['class_ids']

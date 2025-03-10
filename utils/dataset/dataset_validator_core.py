@@ -9,12 +9,11 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Set
-import random
-import time
 import threading
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
 
 class DatasetValidatorCore:
     """
@@ -48,6 +47,9 @@ class DatasetValidatorCore:
         # Setup direktori untuk file tidak valid
         self.invalid_dir = self.data_dir / 'invalid'
         
+        # Inisialisasi utils
+        self.utils = DatasetUtils(config=config, data_dir=str(self.data_dir), logger=logger)
+        
         # Lock untuk thread safety
         self._lock = threading.RLock()
 
@@ -75,14 +77,10 @@ class DatasetValidatorCore:
         
         # Validasi gambar
         try:
-            img = cv2.imread(str(img_path))
-            if img is None:
-                result['issues'].append(f"Gambar tidak dapat dibaca: {img_path.name}")
-                result['corrupt'] = True
-                return result
-                
-            if img.size == 0:
-                result['issues'].append(f"Gambar kosong: {img_path.name}")
+            # Gunakan utils.load_image untuk membaca gambar
+            img = self.utils.load_image(img_path)
+            if img is None or img.size == 0:
+                result['issues'].append(f"Gambar tidak dapat dibaca atau kosong: {img_path.name}")
                 result['corrupt'] = True
                 return result
                 
@@ -102,146 +100,77 @@ class DatasetValidatorCore:
             result['missing_label'] = True
             return result
         
-        # Validasi isi label
+        # Validasi isi label menggunakan callback untuk parse_yolo_label
         try:
-            with open(label_path, 'r') as f:
-                label_lines = f.readlines()
+            # Fungsi callback untuk custom processing
+            def validate_label_line(bbox_data, line, line_idx):
+                cls_id = bbox_data['class_id']
+                bbox = bbox_data['bbox']
+                
+                # Struktur hasil validasi baris
+                line_result = {
+                    'text': line.strip(),
+                    'valid': True,
+                    'class_id': cls_id,
+                    'bbox': bbox,
+                    'issues': [],
+                    'fixed': False
+                }
+                
+                # Cek layer
+                layer_name = self.layer_config_manager.get_layer_for_class_id(cls_id)
+                if layer_name:
+                    line_result['layer'] = layer_name
+                    # Update statistik layer
+                    if layer_name in result['layer_stats']:
+                        result['layer_stats'][layer_name] += 1
+                    
+                    # Update statistik kelas
+                    class_name = self.layer_config_manager.get_class_name(cls_id)
+                    if class_name:
+                        if class_name not in result['class_stats']:
+                            result['class_stats'][class_name] = 0
+                        result['class_stats'][class_name] += 1
+                else:
+                    line_result['issues'].append(f"Class ID tidak valid: {cls_id}")
+                    line_result['valid'] = False
+                
+                # Validasi koordinat sudah dilakukan dalam parse_yolo_label
+                # tapi kita tambahkan pengecekan tambahan jika perlu
+                
+                # Return hasil validasi baris untuk dimasukkan ke dalam array label_lines
+                return line_result
             
-            if not label_lines:
-                result['issues'].append(f"File label kosong")
+            # Parse label dengan callback validasi
+            bboxes = self.utils.parse_yolo_label(label_path, parse_callback=validate_label_line)
+            
+            # Jika tidak ada bboxes, file label mungkin kosong atau format salah
+            if not bboxes:
+                result['issues'].append(f"File label kosong atau format tidak valid")
                 result['empty_label'] = True
                 return result
             
-            result['label_lines'] = []
-            valid_label_lines = []
-            has_issue = False
-            fixed_something = False
-            
-            # Mengumpulkan statistik per layer dan kelas
-            layer_counts = {layer: 0 for layer in self.layer_config_manager.get_layer_names()}
-            class_counts = {}
-            
-            # Validasi setiap baris label
-            for i, line in enumerate(label_lines):
-                line_result = self._validate_label_line(line, i, layer_counts, class_counts)
-                
-                if line_result['issues']:
-                    has_issue = True
-                
-                if line_result.get('fixed', False):
-                    fixed_something = True
-                    valid_label_lines.append(
-                        f"{line_result['class_id']} {' '.join(map(str, line_result['bbox']))}\n"
-                    )
-                elif line_result['valid']:
-                    valid_label_lines.append(
-                        f"{line_result['class_id']} {' '.join(map(str, line_result['bbox']))}\n"
-                    )
-                
-                result['label_lines'].append(line_result)
-            
-            # Simpan statistik layer dan kelas
-            result['layer_stats'] = layer_counts
-            result['class_stats'] = class_counts
-            
-            # Cek apakah ada label yang valid
-            result['label_valid'] = any(line.get('valid', False) for line in result['label_lines'])
+            # Simpan hasil validasi baris
+            result['label_lines'] = bboxes
             
             # Cek apakah ada layer yang aktif
             result['has_active_layer'] = False
             for layer in self.active_layers:
-                if layer in layer_counts and layer_counts[layer] > 0:
+                if layer in result['layer_stats'] and result['layer_stats'][layer] > 0:
                     result['has_active_layer'] = True
                     break
-                    
-            # Status final
+            
+            # Status akhir
+            valid_lines = sum(1 for box in bboxes if box.get('valid', False))
+            result['label_valid'] = valid_lines > 0
+            
             if result['label_valid'] and result['image_valid']:
                 result['status'] = 'valid'
             
-            # Set fixed flag jika ada perbaikan
-            if fixed_something:
-                result['fixed'] = True
-                result['fixed_bbox'] = valid_label_lines
-            
         except Exception as e:
             result['issues'].append(f"Error saat membaca label: {str(e)}")
-            
+        
         return result
-        
-    def _validate_label_line(self, line: str, line_index: int, layer_counts: Dict[str, int], class_counts: Dict[str, int]) -> Dict:
-        """
-        Validasi satu baris label.
-        
-        Args:
-            line: String baris label
-            line_index: Indeks baris
-            layer_counts: Dictionary untuk menghitung jumlah objek per layer
-            class_counts: Dictionary untuk menghitung jumlah objek per kelas
-            
-        Returns:
-            Dict hasil validasi baris
-        """
-        line_result = {
-            'text': line.strip(),
-            'valid': False,
-            'class_id': None,
-            'layer': None,
-            'bbox': None,
-            'issues': [],
-            'fixed': False
-        }
-        
-        parts = line.strip().split()
-        if len(parts) < 5:
-            line_result['issues'].append(f"Label tidak lengkap pada baris {line_index+1}")
-            return line_result
-        
-        try:
-            cls_id = int(float(parts[0]))
-            bbox = [float(x) for x in parts[1:5]]
-            
-            # Cek apakah class ID valid
-            layer_name = self.layer_config_manager.get_layer_for_class_id(cls_id)
-            if layer_name:
-                line_result['layer'] = layer_name
-                layer_counts[layer_name] += 1
-                
-                class_name = self.layer_config_manager.get_class_name(cls_id)
-                if class_name:
-                    if class_name not in class_counts:
-                        class_counts[class_name] = 0
-                    class_counts[class_name] += 1
-            else:
-                line_result['issues'].append(f"Class ID tidak valid: {cls_id}")
-                return line_result
-            
-            # Cek apakah koordinat valid (0-1)
-            invalid_coords = [i for i, coord in enumerate(bbox) if not (0 <= coord <= 1)]
-            if invalid_coords:
-                coord_names = ['x_center', 'y_center', 'width', 'height']
-                invalid_names = [coord_names[i] for i in invalid_coords]
-                
-                line_result['issues'].append(
-                    f"Koordinat tidak valid: {', '.join(invalid_names)}"
-                )
-                
-                # Fix koordinat jika diminta
-                fixed_bbox = [max(0.001, min(0.999, coord)) for coord in bbox]
-                line_result['bbox'] = fixed_bbox
-                line_result['fixed'] = True
-            else:
-                line_result['bbox'] = bbox
-            
-            line_result['class_id'] = cls_id
-            
-            # Tandai sebagai valid jika tidak ada masalah atau telah diperbaiki
-            if not line_result['issues'] or line_result['fixed']:
-                line_result['valid'] = True
-            
-        except ValueError:
-            line_result['issues'].append(f"Format tidak valid pada baris {line_index+1}")
-        
-        return line_result
     
     def visualize_issues(
         self,
@@ -261,10 +190,13 @@ class DatasetValidatorCore:
             Boolean sukses/gagal
         """
         try:
-            # Baca gambar
-            img = cv2.imread(str(img_path))
+            # Gunakan utils.load_image untuk membaca gambar
+            img = self.utils.load_image(img_path)
             if img is None:
                 return False
+            
+            # Convert RGB ke BGR untuk OpenCV    
+            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
                 
             # Buat nama file output
             vis_path = vis_dir / f"{img_path.stem}_issues.jpg"
@@ -273,7 +205,7 @@ class DatasetValidatorCore:
             h, w = img.shape[:2]
             
             # Gambar kotak merah untuk label tidak valid, hijau untuk yang valid
-            for line_result in result['label_lines']:
+            for line_result in result.get('label_lines', []):
                 if not line_result.get('bbox'):
                     continue
                     
@@ -295,10 +227,10 @@ class DatasetValidatorCore:
                 cv2.rectangle(img, (x1, y1), (x2, y2), color, thickness)
                 
                 # Tambahkan label
-                class_name = self.layer_config_manager.get_class_name(cls_id) if cls_id is not None else "Unknown"
+                class_name = self.utils.get_class_name(cls_id) if cls_id is not None else "Unknown"
                 label_text = f"ID: {cls_id}, Class: {class_name}"
                 
-                if line_result.get('issues'):
+                if 'issues' in line_result and line_result['issues']:
                     label_text += f", Issues: {len(line_result['issues'])}"
                     
                 cv2.putText(
@@ -312,7 +244,7 @@ class DatasetValidatorCore:
                 )
             
             # Tambahkan teks ringkasan masalah di bagian atas gambar
-            issues_text = f"Issues: {len(result['issues'])}"
+            issues_text = f"Issues: {len(result.get('issues', []))}"
             cv2.putText(
                 img,
                 issues_text,

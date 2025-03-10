@@ -1,6 +1,6 @@
 # File: smartcash/handlers/dataset/core/dataset_augmentor.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen untuk augmentasi dataset SmartCash
+# Deskripsi: Komponen untuk augmentasi dataset SmartCash dengan integrasi AugmentationManager
 
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -10,26 +10,10 @@ from smartcash.utils.augmentation import AugmentationManager
 
 
 class DatasetAugmentor:
-    """
-    Komponen untuk augmentasi dataset dengan berbagai metode.
-    """
+    """Komponen untuk augmentasi dataset dengan berbagai metode."""
     
-    def __init__(
-        self,
-        config: Dict,
-        data_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None,
-        num_workers: int = 4
-    ):
-        """
-        Inisialisasi DatasetAugmentor.
-        
-        Args:
-            config: Konfigurasi augmentasi
-            data_dir: Direktori dataset (opsional)
-            logger: Logger kustom (opsional)
-            num_workers: Jumlah worker untuk paralelisasi
-        """
+    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger: Optional[SmartCashLogger] = None,
+                num_workers: int = 4):
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
         self.logger = logger or SmartCashLogger(__name__)
@@ -51,21 +35,7 @@ class DatasetAugmentor:
         )
     
     def augment_dataset(self, **kwargs) -> Dict[str, Any]:
-        """
-        Augmentasi dataset menggunakan AugmentationManager.
-        
-        Args:
-            **kwargs: Parameter untuk AugmentationManager.augment_dataset
-                split: Split dataset ('train', 'valid', 'test')
-                augmentation_types: List jenis augmentasi ('combined', 'lighting', 'geometric', etc.)
-                num_variations: Jumlah variasi per gambar
-                output_prefix: Prefix untuk nama file output
-                resume: Jika True, lanjutkan augmentasi yang terganggu
-                validate_results: Jika True, validasi hasil augmentasi
-            
-        Returns:
-            Dict berisi statistik augmentasi
-        """
+        """Augmentasi dataset menggunakan AugmentationManager."""
         # Ekstrak parameter umum
         split = kwargs.pop('split', 'train')
         augmentation_types = kwargs.pop('augmentation_types', ['combined'])
@@ -105,20 +75,7 @@ class DatasetAugmentor:
         return stats
     
     def augment_with_combinations(self, **kwargs) -> Dict[str, Any]:
-        """
-        Augmentasi dataset dengan kombinasi parameter kustom.
-        
-        Args:
-            **kwargs: Parameter untuk AugmentationManager.augment_with_combinations
-                split: Split dataset ('train', 'valid', 'test')
-                combinations: List kombinasi parameter augmentasi
-                output_prefix: Prefix untuk nama file output
-                resume: Jika True, lanjutkan augmentasi yang terganggu
-                validate_results: Jika True, validasi hasil augmentasi
-            
-        Returns:
-            Dict berisi statistik augmentasi
-        """
+        """Augmentasi dataset dengan kombinasi parameter kustom."""
         # Ekstrak parameter umum
         split = kwargs.pop('split', 'train')
         combinations = kwargs.pop('combinations', [{'translate': 0.2, 'scale': 0.6}])
@@ -155,12 +112,7 @@ class DatasetAugmentor:
         return stats
     
     def get_available_augmentation_types(self) -> List[str]:
-        """
-        Dapatkan daftar jenis augmentasi yang tersedia.
-        
-        Returns:
-            List nama jenis augmentasi
-        """
+        """Dapatkan daftar jenis augmentasi yang tersedia."""
         return [
             'position',      # Augmentasi posisi (rotasi, translasi, skala)
             'lighting',      # Augmentasi pencahayaan (brightness, contrast, hue)

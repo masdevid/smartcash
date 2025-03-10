@@ -1,18 +1,17 @@
 """
 File: smartcash/utils/dataset/enhanced_dataset_validator.py
 Author: Alfrida Sabar
-Deskripsi: Modul validasi dataset yang telah direfaktor dengan pendekatan komponen-komponen terpisah
+Deskripsi: Modul validasi dataset yang dioptimasi dengan menghilangkan duplikasi kode
 """
 
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Set
-import json
 from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
-import random
 import time
 import threading
+import concurrent
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.dataset.dataset_validator_core import DatasetValidatorCore
@@ -53,10 +52,12 @@ class EnhancedDatasetValidator:
         # Setup path
         self.data_dir = Path(data_dir) if data_dir else Path(config.get('data_dir', 'data'))
         
-        # Setup komponen
+        # Setup utilitas dataset (menggantikan implementasi terpisah)
+        self.utils = DatasetUtils(config=config, data_dir=str(self.data_dir), logger=logger)
+        
+        # Setup komponen-komponen lain
         self.validator_core = DatasetValidatorCore(config, data_dir, logger)
         self.analyzer = DatasetAnalyzer(config, data_dir, logger)
-        self.utils = DatasetUtils(logger)
         self.fixer = DatasetFixer(config, data_dir, logger)
         
         # Setup direktori untuk file tidak valid
@@ -88,16 +89,17 @@ class EnhancedDatasetValidator:
         """
         start_time = time.time()
         
-        split_dir = self.data_dir / split
-        images_dir = split_dir / 'images'
-        labels_dir = split_dir / 'labels'
+        # Gunakan utils.get_split_path untuk konsistensi
+        split_path = self.utils.get_split_path(split)
+        images_dir = split_path / 'images'
+        labels_dir = split_path / 'labels'
         
         # Pastikan direktori ada
         if not images_dir.exists() or not labels_dir.exists():
-            self.logger.error(f"❌ Direktori dataset tidak lengkap: {split_dir}")
+            self.logger.error(f"❌ Direktori dataset tidak lengkap: {split_path}")
             return {
                 'status': 'error',
-                'message': f"Direktori dataset tidak lengkap: {split_dir}",
+                'message': f"Direktori dataset tidak lengkap: {split_path}",
                 'stats': {}
             }
         
@@ -111,7 +113,7 @@ class EnhancedDatasetValidator:
             (self.invalid_dir / split / 'images').mkdir(parents=True, exist_ok=True)
             (self.invalid_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
         
-        # Temukan semua file gambar
+        # Gunakan utils.find_image_files untuk konsistensi
         image_files = self.utils.find_image_files(images_dir)
             
         if not image_files:
@@ -125,7 +127,7 @@ class EnhancedDatasetValidator:
                 }
             }
             
-        # Jika sample_size ditentukan, ambil sampel acak
+        # Jika sample_size ditentukan, gunakan utils.get_random_sample
         if 0 < sample_size < len(image_files):
             image_files = self.utils.get_random_sample(image_files, sample_size)
             self.logger.info(f"🔍 Menggunakan sampel {sample_size} gambar dari total {len(image_files)}")
@@ -306,15 +308,16 @@ class EnhancedDatasetValidator:
             if result.get('label_exists', False) and not result.get('label_valid', False):
                 invalid_labels.append(Path(result['label_path']))
         
-        # Pindahkan file
+        # Gunakan utils.move_invalid_files untuk pemindahan file
+        split_path = self.utils.get_split_path(split)
         img_stats = self.utils.move_invalid_files(
-            self.data_dir / split / 'images',
+            split_path / 'images',
             self.invalid_dir / split / 'images',
             invalid_images
         )
         
         label_stats = self.utils.move_invalid_files(
-            self.data_dir / split / 'labels',
+            split_path / 'labels',
             self.invalid_dir / split / 'labels',
             invalid_labels
         )
@@ -386,7 +389,8 @@ class EnhancedDatasetValidator:
     def analyze_dataset(
         self,
         split: str = 'train',
-        sample_size: int = 0
+        sample_size: int = 0,
+        detailed: bool = True
     ) -> Dict:
         """
         Analisis mendalam tentang dataset.
@@ -394,6 +398,7 @@ class EnhancedDatasetValidator:
         Args:
             split: Split dataset
             sample_size: Jika > 0, gunakan sampel
+            detailed: Jika True, lakukan analisis lebih detail
             
         Returns:
             Dict hasil analisis
@@ -412,19 +417,23 @@ class EnhancedDatasetValidator:
             'validation': validation_results,
             'image_size_distribution': self.analyzer.analyze_image_sizes(split, sample_size),
             'class_balance': self.analyzer.analyze_class_balance(validation_results),
-            'layer_balance': self.analyzer.analyze_layer_balance(validation_results),
-            'bbox_statistics': self.analyzer.analyze_bbox_statistics(split, sample_size)
+            'layer_balance': self.analyzer.analyze_layer_balance(validation_results)
         }
+        
+        # Tambahkan analisis bbox jika detailed
+        if detailed:
+            analysis['bbox_statistics'] = self.analyzer.analyze_bbox_statistics(split, sample_size)
         
         # Log hasil analisis
         self.logger.info(
             f"📊 Analisis Dataset {split}:\n"
             f"   • Ketidakseimbangan kelas: {analysis['class_balance']['imbalance_score']:.2f}/10\n"
             f"   • Ketidakseimbangan layer: {analysis['layer_balance']['imbalance_score']:.2f}/10\n"
-            f"   • Ukuran gambar yang dominan: {analysis['image_size_distribution']['dominant_size']}\n"
-            f"   • Rasio aspek dominan: {analysis['image_size_distribution']['dominant_aspect_ratio']}\n"
-            f"   • Ukuran bbox rata-rata: {analysis['bbox_statistics']['mean_width']:.2f}x{analysis['bbox_statistics']['mean_height']:.2f}"
+            f"   • Ukuran gambar yang dominan: {analysis['image_size_distribution']['dominant_size']}"
         )
+        
+        if detailed and 'bbox_statistics' in analysis:
+            self.logger.info(f"   • Ukuran bbox rata-rata: {analysis['bbox_statistics'].get('mean_width', 0):.2f}x{analysis['bbox_statistics'].get('mean_height', 0):.2f}")
         
         return analysis
     
@@ -456,3 +465,78 @@ class EnhancedDatasetValidator:
             fix_images=fix_images,
             backup=backup
         )
+        
+    def get_valid_files(
+        self,
+        data_dir: str,
+        split: str,
+        check_images: bool = True,
+        check_labels: bool = True
+    ) -> List[Dict]:
+        """
+        Dapatkan daftar file valid dalam dataset.
+        
+        Args:
+            data_dir: Direktori data
+            split: Split dataset ('train', 'valid', 'test')
+            check_images: Jika True, validasi integritas gambar
+            check_labels: Jika True, validasi label
+            
+        Returns:
+            List dict dengan info file yang valid
+        """
+        # Gunakan path dari utils
+        split_path = Path(data_dir) / split if split else Path(data_dir)
+        images_dir = split_path / 'images'
+        labels_dir = split_path / 'labels'
+        
+        if not images_dir.exists():
+            self.logger.warning(f"⚠️ Direktori gambar tidak ditemukan: {images_dir}")
+            return []
+            
+        # Gunakan utils.find_image_files
+        image_files = self.utils.find_image_files(images_dir, with_labels=False)
+        
+        if not image_files:
+            self.logger.warning(f"⚠️ Tidak ada gambar ditemukan di {images_dir}")
+            return []
+            
+        # Validasi basic files
+        valid_files = []
+        
+        for img_path in tqdm(image_files, desc=f"Mencari file valid di {split}"):
+            label_path = labels_dir / f"{img_path.stem}.txt"
+            available_layers = []
+            
+            # Check apakah memenuhi kriteria
+            is_valid = True
+            
+            if check_labels and not label_path.exists():
+                is_valid = False
+            elif check_labels:
+                # Cek isi label dan layer yang tersedia
+                available_layers = self.utils.get_available_layers(label_path)
+                
+                # Jika tidak ada layer yang valid, skip file
+                if not available_layers:
+                    is_valid = False
+            
+            if check_images and is_valid:
+                # Cek integritas gambar
+                try:
+                    img = self.utils.load_image(img_path)
+                    if img is None:
+                        is_valid = False
+                except Exception:
+                    is_valid = False
+            
+            # Tambahkan ke daftar jika valid
+            if is_valid:
+                valid_files.append({
+                    'image_path': str(img_path),
+                    'label_path': str(label_path),
+                    'available_layers': available_layers
+                })
+        
+        self.logger.info(f"✅ Ditemukan {len(valid_files)} file valid dari {len(image_files)} total")
+        return valid_files

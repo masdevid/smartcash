@@ -14,51 +14,22 @@ from smartcash.utils.layer_config_manager import get_layer_config
 
 
 class DatasetBalancer:
-    """
-    Komponen untuk menyeimbangkan distribusi kelas dalam dataset.
-    """
+    """Komponen untuk menyeimbangkan distribusi kelas dalam dataset."""
     
-    def __init__(
-        self,
-        data_dir: Optional[str] = None,
-        output_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None
-    ):
-        """
-        Inisialisasi DatasetBalancer.
-        
-        Args:
-            data_dir: Direktori dataset
-            output_dir: Direktori output (jika None, gunakan data_dir/balanced)
-            logger: Logger kustom (opsional)
-        """
+    def __init__(self, data_dir: Optional[str] = None, output_dir: Optional[str] = None, 
+                 logger: Optional[SmartCashLogger] = None):
         self.data_dir = Path(data_dir) if data_dir else Path('data')
         self.output_dir = Path(output_dir) if output_dir else self.data_dir / 'balanced'
         self.logger = logger or SmartCashLogger(__name__)
         
         # Inisialisasi layer config untuk mendapatkan informasi kelas
         self.layer_config = get_layer_config()
-        
         self.logger.info(f"⚖️ DatasetBalancer diinisialisasi: {self.data_dir}")
     
-    def analyze_class_distribution(
-        self, 
-        split: str = 'train',
-        per_layer: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Analisis distribusi kelas dalam split dataset.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            per_layer: Jika True, analisis per layer
-            
-        Returns:
-            Dict berisi statistik distribusi kelas
-        """
+    def analyze_class_distribution(self, split: str = 'train', per_layer: bool = True) -> Dict[str, Any]:
+        """Analisis distribusi kelas dalam split dataset."""
         split_dir = self.data_dir / split
-        images_dir = split_dir / 'images'
-        labels_dir = split_dir / 'labels'
+        images_dir, labels_dir = split_dir / 'images', split_dir / 'labels'
         
         if not (images_dir.exists() and labels_dir.exists()):
             self.logger.warning(f"⚠️ Split {split} tidak ditemukan atau tidak lengkap")
@@ -66,11 +37,10 @@ class DatasetBalancer:
             
         self.logger.info(f"🔍 Menganalisis distribusi kelas di split '{split}'")
         
-        # Inisialisasi counter untuk seluruh dataset
+        # Inisialisasi counter
         class_counts: Counter[int] = collections.Counter()
-        
-        # Inisialisasi counter per layer jika diminta
         layer_class_counts = {}
+        
         if per_layer:
             for layer_name in self.layer_config.get_layer_names():
                 layer_class_counts[layer_name] = collections.Counter()
@@ -90,8 +60,7 @@ class DatasetBalancer:
                         img_found = True
                         break
                 
-                if not img_found:
-                    continue
+                if not img_found: continue
                 
                 # Baca file label dan hitung kelas
                 try:
@@ -104,9 +73,8 @@ class DatasetBalancer:
                                     # Update counter global
                                     class_counts[cls_id] += 1
                                     
-                                    # Update counter per layer jika diminta
+                                    # Update counter per layer jika diperlukan
                                     if per_layer:
-                                        # Cari layer yang memiliki kelas ini
                                         for layer_name in self.layer_config.get_layer_names():
                                             layer_config = self.layer_config.get_layer_config(layer_name)
                                             if cls_id in layer_config['class_ids']:
@@ -133,11 +101,9 @@ class DatasetBalancer:
             # Hitung ketidakseimbangan
             min_count = most_common[-1][1] if most_common else 0
             max_count = most_common[0][1] if most_common else 0
-            
             imbalance_ratio = max_count / min_count if min_count > 0 else float('inf')
         else:
-            dominant_classes = []
-            minority_classes = []
+            dominant_classes, minority_classes = [], []
             imbalance_ratio = 0
         
         # Format hasil
@@ -151,7 +117,7 @@ class DatasetBalancer:
             'classes_count': len(class_counts)
         }
         
-        # Tambahkan statistik per layer jika diminta
+        # Tambahkan statistik per layer jika diperlukan
         if per_layer:
             layer_stats = {}
             for layer_name, counts in layer_class_counts.items():
@@ -161,7 +127,6 @@ class DatasetBalancer:
                     layer_most_common = counts.most_common()
                     layer_min_count = layer_most_common[-1][1] if layer_most_common else 0
                     layer_max_count = layer_most_common[0][1] if layer_most_common else 0
-                    
                     layer_imbalance = layer_max_count / layer_min_count if layer_min_count > 0 else float('inf')
                     
                     layer_stats[layer_name] = {
@@ -170,11 +135,7 @@ class DatasetBalancer:
                         'imbalance_ratio': layer_imbalance
                     }
                 else:
-                    layer_stats[layer_name] = {
-                        'total_objects': 0,
-                        'class_counts': {},
-                        'imbalance_ratio': 0
-                    }
+                    layer_stats[layer_name] = {'total_objects': 0, 'class_counts': {}, 'imbalance_ratio': 0}
             
             result['layer_stats'] = layer_stats
         
@@ -206,27 +167,10 @@ class DatasetBalancer:
         
         return result
     
-    def balance_by_undersampling(
-        self,
-        split: str = 'train',
-        max_samples_per_class: Optional[int] = None,
-        min_samples_per_class: int = 0,
-        target_ratio: float = 1.0,
-        random_seed: int = 42
-    ) -> Dict[str, Any]:
-        """
-        Seimbangkan dataset dengan mengurangi jumlah sampel kelas dominan (undersampling).
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            max_samples_per_class: Jumlah sampel maksimum per kelas (opsional)
-            min_samples_per_class: Jumlah sampel minimum per kelas
-            target_ratio: Rasio maksimum antara kelas dengan sampel terbanyak dan tersedikit
-            random_seed: Seed untuk random state
-            
-        Returns:
-            Dict berisi statistik penyeimbangan
-        """
+    def balance_by_undersampling(self, split: str = 'train', max_samples_per_class: Optional[int] = None,
+                               min_samples_per_class: int = 0, target_ratio: float = 1.0,
+                               random_seed: int = 42) -> Dict[str, Any]:
+        """Seimbangkan dataset dengan mengurangi jumlah sampel kelas dominan (undersampling)."""
         # Set random seed
         random.seed(random_seed)
         
@@ -374,9 +318,7 @@ class DatasetBalancer:
         initial_ratio = initial_distribution.get('imbalance_ratio', 0)
         final_ratio = final_distribution.get('imbalance_ratio', 0)
         
-        improvement = 0
-        if initial_ratio > 0:
-            improvement = ((initial_ratio - final_ratio) / initial_ratio) * 100
+        improvement = ((initial_ratio - final_ratio) / initial_ratio) * 100 if initial_ratio > 0 else 0
         
         self.logger.success(
             f"✅ Penyeimbangan dengan undersampling selesai:\n"
@@ -397,15 +339,7 @@ class DatasetBalancer:
         }
     
     def _get_class_name(self, cls_id: int) -> str:
-        """
-        Dapatkan nama kelas berdasarkan ID kelas.
-        
-        Args:
-            cls_id: ID kelas
-            
-        Returns:
-            Nama kelas atau string ID jika tidak ditemukan
-        """
+        """Dapatkan nama kelas berdasarkan ID kelas."""
         for layer_name in self.layer_config.get_layer_names():
             layer_config = self.layer_config.get_layer_config(layer_name)
             class_ids = layer_config['class_ids']

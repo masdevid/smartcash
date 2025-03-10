@@ -2,20 +2,15 @@
 # Author: Alfrida Sabar
 # Deskripsi: Explorer khusus untuk validasi integritas dataset
 
+import cv2
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from tqdm.auto import tqdm
 
-import cv2
-import numpy as np
-
 from smartcash.handlers.dataset.explorers.base_explorer import BaseExplorer
 
 class ValidationExplorer(BaseExplorer):
-    """
-    Explorer khusus untuk validasi integritas dataset.
-    Memeriksa keberadaan dan validitas file gambar dan label.
-    """
+    """Explorer khusus untuk validasi integritas dataset."""
     
     def explore(self, split: str, sample_size: int = 0) -> Dict[str, Any]:
         """
@@ -122,12 +117,7 @@ class ValidationExplorer(BaseExplorer):
         
         return stats
     
-    def _analyze_validation_stats(
-        self,
-        images_dir: Path,
-        labels_dir: Path,
-        image_files: List[Path]
-    ) -> Dict[str, int]:
+    def _analyze_validation_stats(self, images_dir: Path, labels_dir: Path, image_files: List[Path]) -> Dict[str, int]:
         """
         Analisis statistik validasi dasar.
         

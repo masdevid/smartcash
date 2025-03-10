@@ -1,645 +1,369 @@
 # File: smartcash/handlers/dataset/core/dataset_downloader.py
 # Author: Alfrida Sabar
-# Deskripsi: Downloader dataset dari berbagai sumber seperti Roboflow dengan dukungan paralel
+# Deskripsi: Downloader dataset terintegrasi dengan dukungan resume, retry, dan paralel
 
-import os
-import dotenv
-import shutil
-import json
-import time
-from typing import Dict, List, Optional, Tuple, Union, Any
+import os, json, time, hashlib, threading, zipfile, dotenv
+import requests, shutil
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union, Any
 from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.utils.logger import get_logger
 from smartcash.config import get_config_manager
-from smartcash.handlers.dataset.core.download_manager import DownloadManager
+
 
 class DatasetDownloader:
-    """
-    Downloader dataset dari berbagai sumber seperti Roboflow, Kaggle, atau custom URL.
-    Mendukung konversi format dan ekstraksi dari berbagai sumber.
-    """
+    """Downloader dataset dari berbagai sumber dengan dukungan paralel, resume, dan retry."""
     
     def __init__(
         self,
         config: Optional[Dict] = None,
         data_dir: Optional[str] = None,
         api_key: Optional[str] = None,
-        logger: Optional = None,
-        num_workers: int = 4
+        logger = None,
+        num_workers: int = 4,
+        chunk_size: int = 8192,
+        retry_limit: int = 3
     ):
-        """
-        Inisialisasi DatasetDownloader.
-        
-        Args:
-            config: Konfigurasi untuk download
-            data_dir: Direktori target dataset
-            api_key: API key untuk layanan eksternal (misalnya Roboflow)
-            logger: Logger kustom (opsional)
-            num_workers: Jumlah worker untuk download paralel
-        """
+        """Inisialisasi DatasetDownloader."""
         self.logger = logger or get_logger("dataset_downloader")
-        
-        # Load environment variables untuk API key
         dotenv.load_dotenv()
         
-        # Prioritaskan config yang diberikan langsung, jika tidak ada baru load dari config manager
-        if config:
-            self.config = config
-        else:
-            config_manager = get_config_manager()
-            self.config = config_manager.get_config()
-            
-        # Setup data directory
+        # Setup paths dan konfigurasi
+        self.config = config or get_config_manager().get_config()
         self.data_dir = Path(data_dir if data_dir else self.config.get('data_dir', 'data'))
-        os.makedirs(self.data_dir, exist_ok=True)
-        
-        # Direktori untuk file sementara
         self.temp_dir = self.data_dir / ".temp"
+        os.makedirs(self.data_dir, exist_ok=True)
         os.makedirs(self.temp_dir, exist_ok=True)
         
-        # Set API Key dengan prioritas:
-        # 1. Parameter api_key
-        # 2. Config dari roboflow.api_key
-        # 3. Environment variable ROBOFLOW_API_KEY
-        self.api_key = api_key or \
-                      self.config.get('data', {}).get('roboflow', {}).get('api_key') or \
-                      os.getenv("ROBOFLOW_API_KEY")
+        # Download parameters
+        self.num_workers = num_workers
+        self.chunk_size = chunk_size
+        self.retry_limit = retry_limit
+        self.retry_delay = 1.0
+        self.timeout = 30
+        self.file_locks = {}
+        
+        # Roboflow settings
+        self.api_key = api_key or self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.getenv("ROBOFLOW_API_KEY")
+        rf_config = self.config.get('data', {}).get('roboflow', {})
+        self.workspace = rf_config.get('workspace', 'smartcash-wo2us')
+        self.project = rf_config.get('project', 'rupiah-emisi-2022')
+        self.version = rf_config.get('version', '3')
         
         if not self.api_key:
-            self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Beberapa fitur mungkin tidak berfungsi.")
-            
-        # Inisialisasi download manager
-        self.download_manager = DownloadManager(
-            output_dir=self.temp_dir,
-            num_workers=num_workers,
-            logger=self.logger
-        )
-        
-        # Siapkan informasi Roboflow
-        roboflow_config = self.config.get('data', {}).get('roboflow', {})
-        self.workspace = roboflow_config.get('workspace', 'smartcash-wo2us')
-        self.project = roboflow_config.get('project', 'rupiah-emisi-2022')
-        self.version = roboflow_config.get('version', '3')
-        
-        self.logger.info(
-            f"🔧 DatasetDownloader diinisialisasi dengan {num_workers} workers:\n"
-            f"   • Data dir: {self.data_dir}\n"
-            f"   • Roboflow: {self.workspace}/{self.project}:{self.version}"
-        )
+            self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Fitur download mungkin tidak berfungsi.")
     
-    def download_dataset(
-        self, 
-        format: str = "yolov5", 
-        show_progress: bool = True,
-        resume: bool = True
-    ) -> str:
-        """
-        Download dataset dari Roboflow dengan progress bar dan dukungan resume.
-        
-        Args:
-            format: Format dataset ('yolov5', 'coco', 'pascal', dll)
-            show_progress: Tampilkan progress bar
-            resume: Coba resume download jika sebelumnya gagal
-            
-        Returns:
-            Path ke direktori dataset yang didownload
-        """
+    def download_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True) -> str:
+        """Download dataset dari Roboflow dengan progress bar dan dukungan resume."""
         if not self.api_key:
             raise ValueError("Roboflow API key diperlukan untuk download dataset")
             
-        self.logger.start(
-            f"🔄 Mendownload dataset dari Roboflow...\n"
-            f"   Workspace: {self.workspace}\n"
-            f"   Project: {self.project}\n"
-            f"   Version: {self.version}\n"
-            f"   Format: {format}"
-        )
+        self.logger.start(f"🔄 Mendownload dataset Roboflow {self.workspace}/{self.project}:{self.version} format {format}")
         
-        try:
-            # Persiapkan direktori output
-            download_dir = self.data_dir / f"roboflow_{self.project}_{self.version}"
-            os.makedirs(download_dir, exist_ok=True)
-            
-            # Buat URL download menggunakan Roboflow API
-            download_url = self._generate_download_url(format)
-            
-            # Path untuk file zip dataset
-            zip_filename = f"{self.project}_{self.version}_{format}.zip"
-            zip_path = self.temp_dir / zip_filename
-            
-            # Cek apakah dataset sudah pernah didownload dan diekstrak
-            dataset_info_path = download_dir / "dataset_info.json"
-            
-            if download_dir.exists() and dataset_info_path.exists():
-                try:
-                    with open(dataset_info_path, 'r') as f:
-                        info = json.load(f)
-                    
-                    if (
-                        info.get('completed', False) and 
-                        info.get('workspace') == self.workspace and
-                        info.get('project') == self.project and
-                        info.get('version') == self.version and
-                        info.get('format') == format
-                    ):
-                        self.logger.info(f"✅ Dataset sudah ada di {download_dir}")
-                        return str(download_dir)
-                except (json.JSONDecodeError, FileNotFoundError):
-                    # Info file rusak atau tidak ada, lanjutkan download
-                    pass
-            
-            # Download dataset dengan download manager
-            self.download_manager.download_file(
-                url=download_url,
-                output_path=zip_path,
-                resume=resume,
-                progress_bar=show_progress,
-                metadata={
-                    'workspace': self.workspace,
-                    'project': self.project,
-                    'version': self.version,
-                    'format': format
-                }
-            )
-            
-            # Ekstrak dataset
-            self.logger.info(f"📦 Mengekstrak dataset...")
-            self.download_manager.extract_zip(
-                zip_path=zip_path,
-                output_dir=download_dir,
-                remove_zip=True,
-                show_progress=show_progress
-            )
-            
-            # Simpan info dataset
-            dataset_info = {
-                'workspace': self.workspace,
-                'project': self.project,
-                'version': self.version,
-                'format': format,
-                'timestamp': time.time(),
-                'completed': True,
-                'splits': self._count_dataset_files(download_dir)
-            }
-            
-            with open(dataset_info_path, 'w') as f:
-                json.dump(dataset_info, f, indent=2)
-            
-            # Log hasil
-            splits_info = dataset_info.get('splits', {})
-            self.logger.success(
-                f"✅ Dataset berhasil diunduh ke {download_dir} 📥\n"
-                f"   Train: {splits_info.get('train', 'N/A')} gambar\n"
-                f"   Valid: {splits_info.get('valid', 'N/A')} gambar\n"
-                f"   Test: {splits_info.get('test', 'N/A')} gambar"
-            )
-            
-            return str(download_dir)
-            
-        except Exception as e:
-            self.logger.error(f"❌ Gagal download dataset: {str(e)}")
-            raise
-    
-    def download_dataset_format(
-        self,
-        format: str = "yolov5",
-        output_dir: Optional[str] = None,
-        show_progress: bool = True,
-        resume: bool = True
-    ) -> str:
-        """
-        Download dataset dalam format tertentu (yolov5, coco, pascal, dll).
+        # Cek apakah dataset sudah ada
+        download_dir = self.data_dir / f"roboflow_{self.project}_{self.version}"
+        dataset_info_path = download_dir / "dataset_info.json"
+        os.makedirs(download_dir, exist_ok=True)
         
-        Args:
-            format: Format dataset yang diinginkan
-            output_dir: Direktori output kustom (opsional)
-            show_progress: Tampilkan progress bar
-            resume: Coba resume download jika sebelumnya gagal
-            
-        Returns:
-            Path ke direktori dataset yang didownload
-        """
-        # Tentukan direktori output
-        if output_dir:
-            target_dir = Path(output_dir)
-        else:
-            target_dir = self.data_dir / f"{self.project}_{format}"
-        
-        # Berikan ke download_dataset dasar
-        return self.download_dataset(
-            format=format,
-            show_progress=show_progress,
-            resume=resume
-        )
-    
-    def _generate_download_url(self, format: str) -> str:
-        """
-        Generate URL download untuk Roboflow API.
-        
-        Args:
-            format: Format dataset
-            
-        Returns:
-            URL untuk download dataset
-        """
-        base_url = "https://app.roboflow.com/ds/download"
-        url = f"{base_url}?workspace={self.workspace}&project={self.project}&version={self.version}&format={format}&api_key={self.api_key}"
-        return url
-    
-    def _count_dataset_files(self, dataset_dir: Path) -> Dict[str, int]:
-        """
-        Hitung jumlah file di setiap split dataset.
-        
-        Args:
-            dataset_dir: Direktori dataset
-            
-        Returns:
-            Dict berisi jumlah file per split
-        """
-        splits = {}
-        
-        for split in ['train', 'valid', 'test']:
-            images_dir = dataset_dir / split / 'images'
-            if images_dir.exists():
-                image_count = len(list(images_dir.glob('*.jpg'))) + \
-                             len(list(images_dir.glob('*.jpeg'))) + \
-                             len(list(images_dir.glob('*.png')))
-                splits[split] = image_count
-            else:
-                splits[split] = 0
+        if download_dir.exists() and dataset_info_path.exists():
+            try:
+                with open(dataset_info_path, 'r') as f:
+                    info = json.load(f)
                 
-        return splits
-    
-    def export_to_local(
-        self, 
-        roboflow_dir: Union[str, Path],
-        show_progress: bool = True,
-        num_workers: int = 4
-    ) -> Tuple[str, str, str]:
-        """
-        Export dataset Roboflow ke struktur folder lokal yang standar.
-        Mendukung copy atau symlink paralel.
+                if (info.get('completed', False) and info.get('workspace') == self.workspace and
+                    info.get('project') == self.project and info.get('version') == self.version and
+                    info.get('format') == format):
+                    self.logger.info(f"✅ Dataset sudah ada di {download_dir}")
+                    return str(download_dir)
+            except:
+                pass
         
-        Args:
-            roboflow_dir: Direktori dataset Roboflow
-            show_progress: Tampilkan progress bar
-            num_workers: Jumlah worker untuk proses paralel
-            
-        Returns:
-            Tuple (train_dir, valid_dir, test_dir)
-        """
+        # Download dataset
+        url = f"https://app.roboflow.com/ds/download?workspace={self.workspace}&project={self.project}&version={self.version}&format={format}&api_key={self.api_key}"
+        zip_path = self.temp_dir / f"{self.project}_{self.version}_{format}.zip"
+        
+        self.download_file(
+            url=url,
+            output_path=zip_path,
+            resume=resume,
+            progress_bar=show_progress,
+            metadata={'workspace': self.workspace, 'project': self.project, 'version': self.version, 'format': format}
+        )
+        
+        # Ekstrak dataset
+        self.logger.info(f"📦 Mengekstrak dataset...")
+        self.extract_zip(zip_path=zip_path, output_dir=download_dir, remove_zip=True, show_progress=show_progress)
+        
+        # Simpan info dataset
+        dataset_info = {
+            'workspace': self.workspace, 'project': self.project, 'version': self.version, 'format': format,
+            'timestamp': time.time(), 'completed': True, 'splits': self._count_files(download_dir)
+        }
+        
+        with open(dataset_info_path, 'w') as f:
+            json.dump(dataset_info, f, indent=2)
+        
+        # Log hasil
+        splits_info = dataset_info.get('splits', {})
+        self.logger.success(f"✅ Dataset berhasil diunduh ke {download_dir} 📥\n" +
+                           f"   Train: {splits_info.get('train', 0)}, Valid: {splits_info.get('valid', 0)}, Test: {splits_info.get('test', 0)}")
+        
+        return str(download_dir)
+    
+    def export_to_local(self, roboflow_dir: Union[str, Path], show_progress: bool = True) -> Tuple[str, str, str]:
+        """Export dataset Roboflow ke struktur folder lokal standar."""
         self.logger.start("📤 Mengexport dataset ke struktur folder lokal...")
+        rf_path = Path(roboflow_dir)
         
-        try:
-            rf_path = Path(roboflow_dir)
+        # Persiapkan file yang akan di-copy
+        file_copy_tasks = []
+        for split in ['train', 'valid', 'test']:
+            src_dir = rf_path / split
+            target_dir = self.data_dir / split
             
-            # Pastikan direktori tujuan ada
-            os.makedirs(self.data_dir, exist_ok=True)
-            
-            # Mencari semua file untuk estimasi total
-            file_copy_tasks = []
-            
-            for split in ['train', 'valid', 'test']:
-                # Source dan target paths
-                src_dir = rf_path / split
-                target_dir = self.data_dir / split
+            for item in ['images', 'labels']:
+                os.makedirs(target_dir / item, exist_ok=True)
+                src_item_dir = src_dir / item
                 
-                # Buat direktori target
-                os.makedirs(target_dir / 'images', exist_ok=True)
-                os.makedirs(target_dir / 'labels', exist_ok=True)
-                
-                # Tambahkan task untuk copy gambar
-                for item in ['images', 'labels']:
-                    src_item_dir = src_dir / item
-                    
-                    if src_item_dir.exists():
-                        for file_path in src_item_dir.glob('*'):
-                            if file_path.is_file():
-                                target_path = target_dir / item / file_path.name
-                                
-                                # Tambahkan ke task jika belum ada
-                                if not target_path.exists():
-                                    file_copy_tasks.append((file_path, target_path))
-            
-            # Copy file secara paralel
-            total_files = len(file_copy_tasks)
-            
-            if total_files == 0:
-                self.logger.info("✅ Tidak ada file baru yang perlu di-copy")
-            else:
-                self.logger.info(f"🔄 Memindahkan {total_files} file...")
-                
-                # Progress bar
-                progress = None
-                if show_progress:
-                    progress = tqdm(total=total_files, desc="Copying files", unit="file")
-                
-                # Copy dengan ThreadPoolExecutor
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    # Submit tasks
-                    futures = []
-                    for src_path, dest_path in file_copy_tasks:
-                        future = executor.submit(shutil.copy2, src_path, dest_path)
-                        futures.append(future)
-                    
-                    # Update progress saat selesai
-                    for future in futures:
-                        future.result()  # Tunggu selesai
-                        if progress:
-                            progress.update(1)
-                
-                # Tutup progress bar
-                if progress:
-                    progress.close()
-            
-            # Return paths untuk train, valid, dan test
-            output_dirs = [
-                str(self.data_dir / 'train'),
-                str(self.data_dir / 'valid'),
-                str(self.data_dir / 'test')
-            ]
-            
-            self.logger.success(
-                f"✅ Dataset berhasil diexport ke struktur folder lokal\n"
-                f"   Total file: {total_files}\n"
-                f"   Output: {self.data_dir}"
-            )
-            
-            return tuple(output_dirs)
-            
-        except Exception as e:
-            self.logger.error(f"❌ Gagal mengexport dataset: {str(e)}")
-            raise e
-    
-    def pull_dataset(self, 
-                    format: str = "yolov5",
-                    show_progress: bool = True, 
-                    resume: bool = True) -> Tuple[str, str, str]:
-        """
-        Download dan setup dataset dari Roboflow dengan progress tracking.
-        Satu-step untuk mendapatkan dataset siap pakai.
+                if src_item_dir.exists():
+                    for file_path in src_item_dir.glob('*'):
+                        if file_path.is_file():
+                            target_path = target_dir / item / file_path.name
+                            if not target_path.exists():
+                                file_copy_tasks.append((file_path, target_path))
         
-        Args:
-            format: Format dataset ('yolov5', 'coco', dll)
-            show_progress: Tampilkan progress bar
-            resume: Coba resume download jika ada
+        # Copy file secara paralel
+        total_files = len(file_copy_tasks)
+        if total_files == 0:
+            self.logger.info("✅ Tidak ada file baru yang perlu di-copy")
+        else:
+            self.logger.info(f"🔄 Memindahkan {total_files} file...")
+            progress = tqdm(total=total_files, desc="Copying files", unit="file") if show_progress else None
             
-        Returns:
-            Tuple paths (train, valid, test)
-        """
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                futures = [executor.submit(shutil.copy2, src, dst) for src, dst in file_copy_tasks]
+                for future in futures:
+                    future.result()
+                    if progress: progress.update(1)
+            
+            if progress: progress.close()
+        
+        # Return paths
+        output_dirs = tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
+        self.logger.success(f"✅ Dataset berhasil diexport: {total_files} file → {self.data_dir}")
+        return output_dirs
+            
+    def pull_dataset(self, format: str = "yolov5", show_progress: bool = True, resume: bool = True) -> Tuple[str, str, str]:
+        """One-step untuk download dan setup dataset siap pakai."""
         try:
             # Tampilkan info dataset yang akan didownload
             self.get_dataset_info()
             
-            # Jika dataset sudah ada, konfirmasi jika perlu redownload
+            # Jika dataset sudah ada
             if self._is_dataset_available():
                 self.logger.info("✅ Dataset sudah tersedia di lokal")
-                return (
-                    str(self.data_dir / 'train'),
-                    str(self.data_dir / 'valid'),
-                    str(self.data_dir / 'test')
-                )
+                return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
             
-            # Download dari Roboflow
-            roboflow_dir = self.download_dataset(
-                format=format,
-                show_progress=show_progress,
-                resume=resume
-            )
-            
-            # Export ke struktur folder lokal
+            # Download dari Roboflow dan export ke lokal
+            roboflow_dir = self.download_dataset(format=format, show_progress=show_progress, resume=resume)
             return self.export_to_local(roboflow_dir, show_progress)
             
         except Exception as e:
-            self.logger.error(f"❌ Gagal melakukan pull dataset: {str(e)}")
-            raise e
+            self.logger.error(f"❌ Gagal pull dataset: {str(e)}")
+            raise
     
     def get_dataset_info(self) -> Dict:
-        """
-        Mendapatkan informasi dataset dari konfigurasi dan pengecekan lokal.
+        """Mendapatkan informasi dataset dari konfigurasi dan status lokal."""
+        is_available = self._is_dataset_available()
+        local_stats = self._get_local_stats() if is_available else {}
         
-        Returns:
-            Dict informasi dataset
-        """
+        info = {
+            'name': self.project,
+            'workspace': self.workspace,
+            'version': self.version,
+            'is_available_locally': is_available,
+            'local_stats': local_stats
+        }
+        
+        # Log informasi
+        if is_available:
+            self.logger.info(f"🔍 Dataset (Lokal): {info['name']} v{info['version']} | "
+                            f"Train: {local_stats.get('train', 0)}, Valid: {local_stats.get('valid', 0)}, Test: {local_stats.get('test', 0)}")
+        else:
+            self.logger.info(f"🔍 Dataset (akan didownload): {info['name']} v{info['version']} dari {info['workspace']}")
+        
+        return info
+    
+    # ===== File download methods =====
+    
+    def download_file(self, url: str, output_path: Union[str, Path], resume: bool = True,
+                    progress_bar: bool = True, metadata: Optional[Dict[str, Any]] = None) -> Path:
+        """Download file tunggal dengan dukungan resume."""
+        output_path = Path(output_path)
+        os.makedirs(output_path.parent, exist_ok=True)
+        
+        # Setup file locking dan info
+        file_id = hashlib.md5(f"{url}_{str(output_path)}".encode()).hexdigest()
+        if file_id not in self.file_locks:
+            self.file_locks[file_id] = threading.Lock()
+        lock = self.file_locks[file_id]
+        resume_info_path = self.temp_dir / f"{file_id}.json"
+        
+        with lock:
+            # Cek file sudah ada dan lengkap
+            if output_path.exists() and resume and resume_info_path.exists():
+                try:
+                    with open(resume_info_path) as f:
+                        info = json.load(f)
+                    if info.get('completed') and info.get('size') == output_path.stat().st_size:
+                        self.logger.info(f"✅ File sudah ada: {output_path}")
+                        return output_path
+                except:
+                    pass
+            
+            # Setup resume
+            start_byte, temp_file_path = 0, self.temp_dir / f"{file_id}.part"
+            if temp_file_path.exists() and resume and resume_info_path.exists():
+                try:
+                    with open(resume_info_path) as f:
+                        info = json.load(f)
+                    if time.time() - info.get('timestamp', 0) < 24*60*60 and temp_file_path.stat().st_size == info.get('downloaded', 0):
+                        start_byte = temp_file_path.stat().st_size
+                        self.logger.info(f"🔄 Resume download dari {start_byte/1024/1024:.1f} MB")
+                except:
+                    pass
+            
+            # Simpan info resume
+            resume_info = {'url': url, 'output_path': str(output_path), 'timestamp': time.time(), 
+                          'downloaded': start_byte, 'completed': False}
+            if metadata:
+                resume_info['metadata'] = metadata
+            with open(resume_info_path, 'w') as f:
+                json.dump(resume_info, f)
+            
+            # Download dengan retry
+            try:
+                headers = {'Range': f'bytes={start_byte}-'} if start_byte > 0 else {}
+                
+                for attempt in range(self.retry_limit):
+                    try:
+                        with requests.get(url, stream=True, headers=headers, timeout=self.timeout) as response:
+                            response.raise_for_status()
+                            
+                            # Setup progress bar
+                            total_size = int(response.headers.get('content-length', 0))
+                            if start_byte > 0 and response.status_code == 206 and 'content-range' in response.headers:
+                                try:
+                                    total_size = int(response.headers['content-range'].split('/')[-1])
+                                except:
+                                    pass
+                            
+                            progress = tqdm(total=total_size + start_byte if total_size > 0 else None,
+                                           initial=start_byte, unit='B', unit_scale=True,
+                                           desc=f"Download {output_path.name}") if progress_bar else None
+                            
+                            # Download file chunks
+                            mode = 'ab' if start_byte > 0 else 'wb'
+                            with open(temp_file_path, mode) as f:
+                                downloaded = start_byte
+                                for chunk in response.iter_content(chunk_size=self.chunk_size):
+                                    if chunk:
+                                        f.write(chunk)
+                                        downloaded += len(chunk)
+                                        if progress: progress.update(len(chunk))
+                                        
+                                        # Update info periodik
+                                        if downloaded % (self.chunk_size * 100) == 0:
+                                            resume_info.update({'downloaded': downloaded, 'timestamp': time.time()})
+                                            with open(resume_info_path, 'w') as info_file:
+                                                json.dump(resume_info, info_file)
+                            
+                            if progress: progress.close()
+                            
+                            # Selesaikan download
+                            shutil.move(temp_file_path, output_path)
+                            resume_info.update({'completed': True, 'size': output_path.stat().st_size, 'timestamp': time.time()})
+                            with open(resume_info_path, 'w') as info_file:
+                                json.dump(resume_info, info_file)
+                            
+                            self.logger.info(f"✅ Download selesai: {output_path}")
+                            return output_path
+                            
+                    except (requests.RequestException, IOError) as e:
+                        if attempt < self.retry_limit - 1:
+                            delay = self.retry_delay * (2 ** attempt)  # Exponential backoff
+                            self.logger.warning(f"⚠️ Download gagal, retry dalam {delay:.1f}s: {str(e)}")
+                            time.sleep(delay)
+                        else:
+                            raise
+                
+                raise RuntimeError(f"Gagal download setelah {self.retry_limit} percobaan")
+                
+            except Exception as e:
+                self.logger.error(f"❌ Download gagal: {str(e)}")
+                resume_info.update({'error': str(e), 'timestamp': time.time()})
+                with open(resume_info_path, 'w') as info_file:
+                    json.dump(resume_info, info_file)
+                raise
+    
+    def extract_zip(self, zip_path: Union[str, Path], output_dir: Optional[Union[str, Path]] = None,
+                   remove_zip: bool = True, show_progress: bool = True) -> Path:
+        """Ekstrak file zip dengan progress bar."""
+        zip_path, output_dir = Path(zip_path), Path(output_dir or zip_path.parent)
+        os.makedirs(output_dir, exist_ok=True)
+        
         try:
-            # Dapatkan info lokal jika tersedia
-            is_available = self._is_dataset_available()
+            # Ekstrak dengan progress
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                files = zip_ref.infolist()
+                total_size = sum(f.file_size for f in files)
+                
+                progress = tqdm(total=total_size, unit='B', unit_scale=True,
+                               desc=f"Extract {zip_path.name}") if show_progress else None
+                
+                for file in files:
+                    zip_ref.extract(file, output_dir)
+                    if progress: progress.update(file.file_size)
+                
+                if progress: progress.close()
             
-            # Ukuran dataset lokal
-            local_stats = self._get_local_stats() if is_available else {}
+            # Hapus zip jika diminta
+            if remove_zip:
+                zip_path.unlink()
+                self.logger.info(f"🗑️ Zip dihapus: {zip_path}")
             
-            # Gabungkan dengan informasi dari konfigurasi
-            roboflow_config = self.config.get('data', {}).get('roboflow', {})
-            
-            info = {
-                'name': self.project,
-                'workspace': self.workspace,
-                'version': self.version,
-                'is_available_locally': is_available,
-                'local_stats': local_stats,
-                'config': {
-                    'workspace': roboflow_config.get('workspace'),
-                    'project': roboflow_config.get('project'),
-                    'version': roboflow_config.get('version')
-                }
-            }
-            
-            # Log informasi dataset
-            if is_available:
-                self.logger.info(
-                    f"🔍 Dataset Info (Lokal):\n"
-                    f"   Nama: {info['name']} (Versi: {info['version']})\n"
-                    f"   Workspace: {info['workspace']}\n"
-                    f"   Total gambar: {sum(local_stats.values())}\n"
-                    f"   Train: {local_stats.get('train', 0)} gambar\n"
-                    f"   Valid: {local_stats.get('valid', 0)} gambar\n"
-                    f"   Test: {local_stats.get('test', 0)} gambar"
-                )
-            else:
-                self.logger.info(
-                    f"🔍 Dataset Info (akan didownload):\n"
-                    f"   Nama: {info['name']} (Versi: {info['version']})\n"
-                    f"   Workspace: {info['workspace']}\n"
-                    f"   Status: Belum tersedia, akan didownload dari Roboflow"
-                )
-            
-            return info
+            self.logger.success(f"✅ Ekstraksi selesai: {output_dir}")
+            return output_dir
             
         except Exception as e:
-            self.logger.error(f"❌ Gagal mendapatkan info dataset: {str(e)}")
-            return {
-                'name': self.project,
-                'workspace': self.workspace,
-                'version': self.version,
-                'is_available_locally': False,
-                'error': str(e)
-            }
+            self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
+            raise
+    
+    # ===== Helper methods =====
+    
+    def _count_files(self, dir_path: Path) -> Dict[str, int]:
+        """Hitung file pada setiap split dataset."""
+        counts = {}
+        for split in ['train', 'valid', 'test']:
+            images_dir = dir_path / split / 'images'
+            if images_dir.exists():
+                counts[split] = sum(1 for _ in images_dir.glob('*.jpg')) + sum(1 for _ in images_dir.glob('*.jpeg')) + sum(1 for _ in images_dir.glob('*.png'))
+        return counts
     
     def _is_dataset_available(self) -> bool:
-        """
-        Cek apakah dataset sudah tersedia di lokal.
-        
-        Returns:
-            True jika dataset tersedia
-        """
-        # Cek keberadaan direktori dan file minimal
+        """Cek apakah dataset sudah tersedia di lokal."""
         for split in ['train', 'valid', 'test']:
             split_dir = self.data_dir / split
-            images_dir = split_dir / 'images'
-            labels_dir = split_dir / 'labels'
-            
-            if not (split_dir.exists() and images_dir.exists() and labels_dir.exists()):
+            if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
                 return False
-                
-            # Cek keberadaan file gambar
-            image_files = list(images_dir.glob('*.jpg')) + \
-                         list(images_dir.glob('*.jpeg')) + \
-                         list(images_dir.glob('*.png'))
-                         
-            if len(image_files) == 0:
+            if not list((split_dir / 'images').glob('*.*')):
                 return False
-        
         return True
     
     def _get_local_stats(self) -> Dict[str, int]:
-        """
-        Dapatkan statistik dataset lokal.
-        
-        Returns:
-            Dict berisi jumlah file per split
-        """
-        stats = {}
-        
-        for split in ['train', 'valid', 'test']:
-            images_dir = self.data_dir / split / 'images'
-            if images_dir.exists():
-                image_count = len(list(images_dir.glob('*.jpg'))) + \
-                              len(list(images_dir.glob('*.jpeg'))) + \
-                              len(list(images_dir.glob('*.png')))
-                stats[split] = image_count
-            else:
-                stats[split] = 0
-                
-        return stats
-    
-    def convert_dataset_format(
-        self, 
-        source_format: str, 
-        target_format: str,
-        source_dir: Optional[Union[str, Path]] = None,
-        target_dir: Optional[Union[str, Path]] = None,
-        show_progress: bool = True
-    ) -> str:
-        """
-        Konversi dataset dari satu format ke format lain.
-        
-        Args:
-            source_format: Format sumber ('yolov5', 'coco', dll)
-            target_format: Format target
-            source_dir: Direktori dataset sumber (opsional)
-            target_dir: Direktori dataset target (opsional)
-            show_progress: Tampilkan progress bar
-            
-        Returns:
-            Path direktori hasil konversi
-        """
-        # Saat ini hanya support konversi dengan download ulang dari Roboflow
-        # TODO: Implementasi konversi format lokal untuk format umum
-        
-        self.logger.info(f"🔄 Konversi dataset dari {source_format} ke {target_format}")
-        
-        # Download dalam format target
-        return self.download_dataset(
-            format=target_format,
-            show_progress=show_progress
-        )
-    
-    def download_dataset_from_custom_source(
-        self,
-        url: str,
-        output_dir: Optional[str] = None,
-        format: str = "custom",
-        extract: bool = True,
-        resume: bool = True,
-        show_progress: bool = True
-    ) -> str:
-        """
-        Download dataset dari URL kustom (non-Roboflow).
-        
-        Args:
-            url: URL sumber dataset
-            output_dir: Direktori output
-            format: Format dataset untuk tracking
-            extract: Ekstrak zip jika file merupakan zip
-            resume: Coba resume download jika gagal
-            show_progress: Tampilkan progress bar
-            
-        Returns:
-            Path ke direktori dataset
-        """
-        # Tentukan direktori output
-        if output_dir:
-            target_dir = Path(output_dir)
-        else:
-            target_dir = self.data_dir / f"custom_{Path(url).name}"
-        
-        # Buat direktori output
-        os.makedirs(target_dir, exist_ok=True)
-        
-        self.logger.info(f"🔄 Mendownload dataset dari URL kustom: {url}")
-        
-        # Download dengan download manager
-        try:
-            # Filename dari URL
-            filename = Path(url).name
-            if not filename:
-                filename = "dataset.zip" if extract else "dataset.dat"
-                
-            # Download file
-            downloaded_file = self.download_manager.download_file(
-                url=url,
-                output_path=target_dir / filename,
-                resume=resume,
-                progress_bar=show_progress
-            )
-            
-            # Ekstrak jika diminta dan file adalah zip
-            if extract and filename.lower().endswith('.zip'):
-                self.logger.info(f"📦 Mengekstrak dataset...")
-                target_dir = self.download_manager.extract_zip(
-                    zip_path=downloaded_file,
-                    output_dir=target_dir,
-                    remove_zip=True,
-                    show_progress=show_progress
-                )
-                
-            # Cek struktur dataset dan buat info
-            dataset_info = {
-                'source_url': url,
-                'format': format,
-                'timestamp': time.time(),
-                'completed': True,
-                'splits': self._count_dataset_files(target_dir)
-            }
-            
-            # Simpan info
-            with open(target_dir / "dataset_info.json", 'w') as f:
-                json.dump(dataset_info, f, indent=2)
-                
-            # Log hasil
-            splits_info = dataset_info.get('splits', {})
-            self.logger.success(
-                f"✅ Dataset berhasil diunduh ke {target_dir} 📥\n"
-                f"   Train: {splits_info.get('train', 'N/A')} gambar\n"
-                f"   Valid: {splits_info.get('valid', 'N/A')} gambar\n"
-                f"   Test: {splits_info.get('test', 'N/A')} gambar"
-            )
-            
-            return str(target_dir)
-            
-        except Exception as e:
-            self.logger.error(f"❌ Gagal download dataset dari URL kustom: {str(e)}")
-            raise
+        """Hitung statistik dataset lokal."""
+        return {split: sum(1 for _ in (self.data_dir / split / 'images').glob('*.*')) 
+                for split in ['train', 'valid', 'test'] 
+                if (self.data_dir / split / 'images').exists()}

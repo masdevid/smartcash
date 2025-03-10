@@ -8,11 +8,11 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
-import random
 from tqdm.auto import tqdm
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.utils.dataset.dataset_utils import DatasetUtils
 
 class DatasetAnalyzer:
     """
@@ -42,6 +42,9 @@ class DatasetAnalyzer:
         # Load layer config
         self.layer_config_manager = get_layer_config()
         self.active_layers = config.get('layers', ['banknote'])
+        
+        # Inisialisasi utils
+        self.utils = DatasetUtils(config=config, data_dir=str(self.data_dir), logger=logger)
     
     def analyze_image_sizes(
         self,
@@ -58,7 +61,8 @@ class DatasetAnalyzer:
         Returns:
             Dict statistik ukuran gambar
         """
-        images_dir = self.data_dir / split / 'images'
+        split_path = self.utils.get_split_path(split)
+        images_dir = split_path / 'images'
         
         if not images_dir.exists():
             return {
@@ -67,10 +71,8 @@ class DatasetAnalyzer:
                 'sizes': {}
             }
         
-        # Temukan semua file gambar
-        image_files = []
-        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
-            image_files.extend(list(images_dir.glob(ext)))
+        # Temukan semua file gambar menggunakan utils
+        image_files = self.utils.find_image_files(images_dir, with_labels=False)
             
         if not image_files:
             return {
@@ -81,8 +83,7 @@ class DatasetAnalyzer:
             
         # Jika sample_size ditentukan, ambil sampel acak
         if 0 < sample_size < len(image_files):
-            random.seed(42)  # Untuk hasil yang konsisten
-            image_files = random.sample(image_files, sample_size)
+            image_files = self.utils.get_random_sample(image_files, sample_size)
         
         # Analisis ukuran
         size_counts = {}
@@ -92,8 +93,9 @@ class DatasetAnalyzer:
         
         for img_path in tqdm(image_files, desc="Analisis Ukuran Gambar"):
             try:
-                img = cv2.imread(str(img_path))
-                if img is None:
+                # Gunakan utils.load_image dengan parameter target_size=None
+                img = self.utils.load_image(img_path, target_size=None)
+                if img is None or img.size == 0:
                     continue
                     
                 h, w = img.shape[:2]
@@ -290,140 +292,5 @@ class DatasetAnalyzer:
         Returns:
             Dict statistik bounding box
         """
-        images_dir = self.data_dir / split / 'images'
-        labels_dir = self.data_dir / split / 'labels'
-        
-        if not images_dir.exists() or not labels_dir.exists():
-            return {
-                'status': 'error',
-                'message': f"Direktori tidak lengkap",
-                'bbox_count': 0
-            }
-        
-        # Temukan semua file gambar
-        image_files = []
-        for ext in ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']:
-            image_files.extend(list(images_dir.glob(ext)))
-            
-        if not image_files:
-            return {
-                'status': 'error',
-                'message': f"Tidak ada gambar ditemukan",
-                'bbox_count': 0
-            }
-            
-        # Jika sample_size ditentukan, ambil sampel acak
-        if 0 < sample_size < len(image_files):
-            random.seed(42)  # Untuk hasil yang konsisten
-            image_files = random.sample(image_files, sample_size)
-        
-        # Analisis bbox
-        width_vals = []
-        height_vals = []
-        area_vals = []
-        aspect_ratio_vals = []
-        class_bbox_sizes = {}
-        
-        for img_path in tqdm(image_files, desc="Analisis Bounding Box"):
-            # Baca gambar untuk mendapatkan dimensi
-            try:
-                img = cv2.imread(str(img_path))
-                if img is None:
-                    continue
-                    
-                img_h, img_w = img.shape[:2]
-                
-                # Baca label
-                label_path = labels_dir / f"{img_path.stem}.txt"
-                if not label_path.exists():
-                    continue
-                    
-                with open(label_path, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) < 5:
-                            continue
-                            
-                        try:
-                            cls_id = int(float(parts[0]))
-                            x_center, y_center, width, height = map(float, parts[1:5])
-                            
-                            # Skip koordinat tidak valid
-                            if not all(0 <= x <= 1 for x in [x_center, y_center, width, height]):
-                                continue
-                                
-                            # Convert ke pixel
-                            pixel_width = width * img_w
-                            pixel_height = height * img_h
-                            pixel_area = pixel_width * pixel_height
-                            
-                            # Hitung rasio aspek
-                            aspect_ratio = pixel_width / max(1, pixel_height)
-                            
-                            # Tambahkan ke statistik
-                            width_vals.append(pixel_width)
-                            height_vals.append(pixel_height)
-                            area_vals.append(pixel_area)
-                            aspect_ratio_vals.append(aspect_ratio)
-                            
-                            # Track per kelas
-                            class_name = self.layer_config_manager.get_class_name(cls_id) or f"Unknown_{cls_id}"
-                            if class_name not in class_bbox_sizes:
-                                class_bbox_sizes[class_name] = {
-                                    'widths': [],
-                                    'heights': [],
-                                    'areas': [],
-                                    'count': 0
-                                }
-                                
-                            class_bbox_sizes[class_name]['widths'].append(pixel_width)
-                            class_bbox_sizes[class_name]['heights'].append(pixel_height)
-                            class_bbox_sizes[class_name]['areas'].append(pixel_area)
-                            class_bbox_sizes[class_name]['count'] += 1
-                            
-                        except (ValueError, IndexError, ZeroDivisionError):
-                            continue
-                            
-            except Exception:
-                continue
-        
-        # Hitung statistik
-        if not width_vals:
-            return {
-                'status': 'error',
-                'message': "Tidak ada bounding box valid ditemukan",
-                'bbox_count': 0
-            }
-            
-        # Statistik global
-        bbox_stats = {
-            'status': 'success',
-            'bbox_count': len(width_vals),
-            'mean_width': np.mean(width_vals),
-            'mean_height': np.mean(height_vals),
-            'mean_area': np.mean(area_vals),
-            'mean_aspect_ratio': np.mean(aspect_ratio_vals),
-            'min_width': np.min(width_vals),
-            'max_width': np.max(width_vals),
-            'min_height': np.min(height_vals),
-            'max_height': np.max(height_vals),
-            'min_area': np.min(area_vals),
-            'max_area': np.max(area_vals)
-        }
-        
-        # Statistik per kelas
-        class_stats = {}
-        for cls, stats in class_bbox_sizes.items():
-            if stats['count'] > 0:
-                class_stats[cls] = {
-                    'count': stats['count'],
-                    'mean_width': np.mean(stats['widths']),
-                    'mean_height': np.mean(stats['heights']),
-                    'mean_area': np.mean(stats['areas']),
-                    'min_area': np.min(stats['areas']),
-                    'max_area': np.max(stats['areas'])
-                }
-        
-        bbox_stats['class_stats'] = class_stats
-        
-        return bbox_stats
+        split_path = self.utils.get_split_path(split)
+        images_dir

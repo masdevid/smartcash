@@ -1,11 +1,12 @@
 """
-Cell 1.2 - Environment Configuration
+Cell 1.1 - Environment Configuration
 Setup lingkungan kerja untuk project SmartCash.
 """
 
 import sys
-from IPython.display import display
 import os
+from IPython.display import display
+import ipywidgets as widgets
 
 # Pastikan smartcash ada di path
 if not any('smartcash' in p for p in sys.path):

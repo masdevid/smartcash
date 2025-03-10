@@ -1,4 +1,4 @@
-# Cell 2.0 - Dataset Preparation
+# Cell 2.1 - Dataset Download
 # Persiapan dataset untuk training model SmartCash
 
 from smartcash.ui_components.dataset import create_dataset_preparation_ui

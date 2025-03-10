@@ -64,7 +64,6 @@ class DatasetDownloader:
         version: Optional[str] = None,
         output_dir: Optional[str] = None,
         show_progress: bool = True,
-        **kwargs
     ) -> str:
         """
         Download dataset dari Roboflow.
@@ -122,7 +121,6 @@ class DatasetDownloader:
             dataset = version_obj.download(
                 model_format=format,
                 location=output_dir,
-                **kwargs
             )
             
             self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")

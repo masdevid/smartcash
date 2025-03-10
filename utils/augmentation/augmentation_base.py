@@ -4,24 +4,16 @@ Author: Alfrida Sabar
 Deskripsi: Kelas dasar untuk augmentasi dengan fungsionalitas umum untuk pemrosesan gambar dan label
 """
 
-import os
-import cv2
-import numpy as np
-from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
-import json
-import random
-from tqdm.auto import tqdm
 import time
 import threading
+from pathlib import Path
+from typing import Dict, Optional
 
 from smartcash.utils.logger import SmartCashLogger
 from smartcash.utils.layer_config_manager import get_layer_config
 
 class AugmentationBase:
-    """
-    Kelas dasar untuk augmentasi dengan fungsionalitas umum.
-    """
+    """Kelas dasar untuk augmentasi dengan fungsionalitas umum."""
     
     def __init__(
         self,
@@ -29,14 +21,7 @@ class AugmentationBase:
         output_dir: Optional[str] = None,
         logger: Optional[SmartCashLogger] = None
     ):
-        """
-        Inisialisasi kelas dasar augmentasi.
-        
-        Args:
-            config: Konfigurasi aplikasi
-            output_dir: Direktori output
-            logger: Logger kustom
-        """
+        """Inisialisasi kelas dasar augmentasi."""
         self.logger = logger or SmartCashLogger(__name__)
         self.config = config
         
@@ -46,34 +31,28 @@ class AugmentationBase:
         
         # Load layer config
         self.layer_config_manager = get_layer_config()
-        self.active_layers = config.get('layers', ['banknote'])
-        
-        # Validasi layer yang aktif
-        self._validate_layers()
+        self.active_layers = self._validate_active_layers(config.get('layers', ['banknote']))
         
         # Thread lock untuk statistik
         self._stats_lock = threading.RLock()
     
-    def _validate_layers(self) -> None:
-        """Validasi layer yang aktif."""
-        for layer in self.active_layers[:]:
-            if layer not in self.layer_config_manager.get_layer_names():
-                self.logger.warning(f"⚠️ Layer tidak dikenali: {layer}")
-                self.active_layers.remove(layer)
+    def _validate_active_layers(self, layers: list) -> list:
+        """Validasi dan filter layer yang aktif."""
+        valid_layers = [
+            layer for layer in layers 
+            if layer in self.layer_config_manager.get_layer_names()
+        ]
         
-        if not self.active_layers:
-            self.logger.warning("⚠️ Tidak ada layer aktif yang valid, fallback ke 'banknote'")
-            self.active_layers = ['banknote']
+        if not valid_layers:
+            self.logger.warning("⚠️ Tidak ada layer valid, menggunakan 'banknote'")
+            return ['banknote']
+        
+        return valid_layers
     
     def reset_stats(self) -> Dict:
-        """
-        Reset statistik augmentasi.
-        
-        Returns:
-            Dict statistik kosong
-        """
+        """Reset statistik augmentasi."""
         with self._stats_lock:
-            stats = {
+            return {
                 'processed': 0,
                 'augmented': 0,
                 'failed': 0,
@@ -88,4 +67,3 @@ class AugmentationBase:
                 'duration': 0.0,
                 'start_time': time.time()
             }
-            return stats

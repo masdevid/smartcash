@@ -120,22 +120,27 @@ class DatasetDownloader:
 
         self.file_processor.export_to_local(rf_path, self.data_dir, show_progress, self.num_workers)
         self.validator.verify_local_dataset(self.data_dir)
-        
-        output_dirs = tuple(str(self.data_dir/split) for split in DEFAULT_SPLITS)
+            
+        # Explicit Path conversion for output directories
+        output_dirs = tuple(str(Path(self.data_dir) / split) for split in DEFAULT_SPLITS)
         self.logger.success(f"✅ Dataset berhasil diexport: {len(list(self.data_dir.glob('**/*')))} file → {self.data_dir}")
         return output_dirs
             
-    def pull_dataset(self,format: str = "yolov5pytorch",show_progress: bool = True,**kwargs) -> tuple:
+    def pull_dataset(
+        self, 
+        format: str = "yolov5pytorch", 
+        show_progress: bool = True,
+        **kwargs
+    ) -> tuple:
         """One-step untuk download dan setup dataset siap pakai."""
         try:
-            # Temporary parameter override
             old_values = {k: getattr(self, k) for k in kwargs.keys() if hasattr(self, k)}
             for k, v in kwargs.items(): 
                 if hasattr(self, k): setattr(self, k, v)
 
             if self.validator.is_dataset_available(self.data_dir, verify_content=True):
                 self.logger.info("✅ Dataset sudah tersedia di lokal")
-                return tuple(str(self.data_dir/split) for split in DEFAULT_SPLITS)
+                return tuple(str(Path(self.data_dir) / split) for split in DEFAULT_SPLITS)
             
             self.logger.info("🔄 Dataset belum tersedia atau tidak lengkap, mendownload dari Roboflow...")
             return self.export_to_local(
@@ -159,7 +164,7 @@ class DatasetDownloader:
         if not zipfile.is_zipfile(zip_path):
             raise ValueError(f"❌ File bukan format ZIP yang valid: {zip_path}")
 
-        extract_dir = (target_dir or self.data_dir)/zip_path.stem
+        extract_dir = Path(target_dir or self.data_dir) / zip_path.stem
         self.file_processor.extract_zip(zip_path, extract_dir, remove_zip=False, show_progress=True)
         
         if not self.file_processor.fix_dataset_structure(extract_dir):

@@ -48,7 +48,7 @@ class RoboflowDownloader:
                 classes = metadata['project']['classes']
                 splits = metadata.get('version', {}).get('splits', {})
                 split_info = " | ".join(f"{s}: {c}" for s, c in splits.items() if c > 0)
-                class_names = [f"{k} ({v})" for k, v in classes.items()]
+                class_names = [f"{k} ({v})" for k, v in classes.items()]  # Fix here
                 
                 self.logger.info(
                     f"📊 Dataset memiliki {len(classes)} kelas dengan "

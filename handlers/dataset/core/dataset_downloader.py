@@ -49,8 +49,7 @@ class DatasetDownloader:
                                               'rupiah-emisi-2022' if attr == 'project' else '3'))
 
         # Inisialisasi komponen
-        self.rf_downloader = RoboflowDownloader(logger=self.logger, timeout=self.timeout,
-                                              chunk_size=self.chunk_size, retry_limit=self.retry_limit)
+        self.rf_downloader = RoboflowDownloader(logger=self.logger, timeout=self.timeout,chunk_size=self.chunk_size, retry_limit=self.retry_limit)
         self.validator = DownloadValidator(logger=self.logger)
         self.file_processor = FileProcessor(logger=self.logger, num_workers=self.num_workers)
         
@@ -63,7 +62,7 @@ class DatasetDownloader:
 
     def download_dataset(self,format: str = "yolov5pytorch",api_key: Optional[str] = None,workspace: Optional[str] = None,project: Optional[str] = None,version: Optional[str] = None,output_dir: Optional[str] = None,show_progress: bool = True,verify_integrity: bool = True) -> str:
         """Download dataset dari Roboflow."""
-        params = {k: v or getattr(self, k) for k in ['api_key', 'workspace', 'project', 'version']}
+        params = {k: (locals().get(k) or getattr(self, k)) for k in ['api_key', 'workspace', 'project', 'version']}
         output_dir = output_dir or os.path.join(self.data_dir, f"roboflow_{params['workspace']}_{params['project']}_{params['version']}")
         
         if not params['api_key']:

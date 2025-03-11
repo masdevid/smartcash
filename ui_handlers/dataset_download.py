@@ -192,7 +192,7 @@ def setup_download_handlers(ui_components, config=None):
                             # Update with new config
                             dataset_manager.config = config
                             dataset_paths = dataset_manager.pull_dataset(
-                                format="yolov5",
+                                format="yolov5pytorch",
                                 api_key=api_key,
                                 workspace=workspace,
                                 project=project,

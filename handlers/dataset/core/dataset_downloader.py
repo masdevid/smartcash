@@ -78,7 +78,7 @@ class DatasetDownloader:
     
     def download_dataset(
         self,
-        format: str = "yolov5",
+        format: str = "yolov5pytorch",
         api_key: Optional[str] = None,
         workspace: Optional[str] = None,
         project: Optional[str] = None,
@@ -90,7 +90,7 @@ class DatasetDownloader:
         Download dataset dari Roboflow.
         
         Args:
-            format: Format dataset ('yolov5', 'coco', etc)
+            format: Format dataset ('yolov5pytorch', 'coco', etc)
             api_key: Roboflow API key
             workspace: Roboflow workspace
             project: Roboflow project
@@ -144,7 +144,7 @@ class DatasetDownloader:
                 self.logger.info(f"⏳ Downloading dataset dari Roboflow")
                 
                 # Implementasi download manual dengan progress tracking
-                download_url = f"https://api.roboflow.com/{workspace}/{project}/{version}/zip?api_key={api_key}"
+                download_url = f"https://api.roboflow.com/{workspace}/{project}/{version}/{format}?api_key={api_key}"
                 
                 # Jika url tidak valid, gunakan implementasi default dari Roboflow
                 if not download_url or not download_url.startswith('http'):

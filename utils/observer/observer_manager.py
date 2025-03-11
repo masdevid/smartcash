@@ -72,7 +72,6 @@ class ObserverManager:
             else:
                 EventDispatcher.register(event_type, observer, priority)
         
-        self._logger.debug(f"🔧 Membuat simple observer '{observer.name}' untuk event '{event_type}'")
         return observer
     
     def create_observer(
@@ -120,7 +119,6 @@ class ObserverManager:
             else:
                 EventDispatcher.register(event_type, observer, observer.priority)
         
-        self._logger.debug(f"🔧 Membuat observer '{observer_class.__name__}' untuk event '{event_type}'")
         return observer
     
     def create_progress_observer(

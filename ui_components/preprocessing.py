@@ -14,14 +14,19 @@ def create_preprocessing_ui():
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("<h2>🔧 Dataset Preprocessing</h2><p>Preprocessing dataset untuk training model SmartCash</p>")
+    header = widgets.HTML("""
+    <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+        <h2 style="color: inherit; margin-top: 0;">🔧 Dataset Preprocessing</h2>
+        <p style="color: inherit; margin-bottom: 0;">Preprocessing dataset untuk training model SmartCash</p>
+    </div>
+    """)
     
     # Preprocessing options
     preprocess_options = widgets.VBox([
         widgets.IntRangeSlider(
             value=[640, 640],
             min=320,
-            max=1280,
+            max=640,
             step=32,
             description='Image size:',
             style={'description_width': 'initial'},
@@ -80,7 +85,18 @@ def create_preprocessing_ui():
         icon='cog'
     )
     
-    preprocess_status = widgets.Output()
+    # Collapsible log output
+    log_accordion = widgets.Accordion(
+        children=[widgets.Output(
+            layout=widgets.Layout(
+                max_height='300px', 
+                overflow='auto'
+            )
+        )],
+        selected_index=None
+    )
+    log_accordion.set_title(0, "📋 Preprocessing Logs")
+    
     preprocess_progress = widgets.IntProgress(
         value=0,
         min=0,
@@ -99,7 +115,7 @@ def create_preprocessing_ui():
     info_box = widgets.HTML("""
     <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
              color: #0c5460; margin: 10px 0; border-radius: 4px;">
-        <h4 style="margin-top: 0;">ℹ️ Tentang Preprocessing</h4>
+        <h4 style="margin-top: 0; color: inherit;">ℹ️ Tentang Preprocessing</h4>
         <p>Preprocessing meliputi:</p>
         <ul>
             <li><strong>Resize</strong>: Ubah ukuran gambar menjadi ukuran yang seragam</li>
@@ -117,7 +133,7 @@ def create_preprocessing_ui():
         advanced_settings,
         widgets.HBox([preprocess_button]),
         preprocess_progress,
-        preprocess_status
+        log_accordion
     ]
     
     # Dictionary untuk akses ke komponen dari luar
@@ -127,7 +143,7 @@ def create_preprocessing_ui():
         'cache_settings': cache_settings,
         'preprocess_button': preprocess_button,
         'preprocess_progress': preprocess_progress,
-        'preprocess_status': preprocess_status
+        'preprocess_status': log_accordion.children[0]
     }
     
     return ui_components

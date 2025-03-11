@@ -95,6 +95,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         workers=workers
                     )
                 
+                # Expand logs accordion
+                if isinstance(preprocess_status.parent, widgets.Accordion):
+                    preprocess_status.parent.selected_index = 0
+                
                 # Tampilkan progress bar
                 preprocess_progress.layout.visibility = 'visible'
                 preprocess_progress.value = 0

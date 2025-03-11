@@ -18,16 +18,44 @@ try:
     logger = get_logger("dataset_preprocessing")
     env_manager = EnvironmentManager()
     
-    # Load konfigurasi
-    config = ConfigManager.load_config(
-        filename="configs/base_config.yaml", 
-        fallback_to_pickle=True,
-        logger=logger
-    )
+    # Load konfigurasi, cari file di beberapa lokasi standar
+    config_files = [
+        "configs/base_config.yaml",
+        "configs/dataset_config.yaml",
+        "config.yaml"
+    ]
     
-    logger.info("✅ Environment dan konfigurasi berhasil dimuat")
+    config = None
+    for file_path in config_files:
+        try:
+            config = ConfigManager.load_config(
+                filename=file_path, 
+                fallback_to_pickle=True,
+                logger=logger
+            )
+            if config:
+                logger.info(f"✅ Konfigurasi berhasil dimuat dari {file_path}")
+                break
+        except Exception as e:
+            pass
+    
+    # Jika tidak ada file yang ditemukan, buat config default
+    if not config:
+        logger.warning("⚠️ Tidak ada file konfigurasi ditemukan, menggunakan default")
+        config = {
+            'data': {
+                'preprocessing': {
+                    'img_size': [640, 640],
+                    'cache_dir': '.cache/smartcash',
+                    'num_workers': 4,
+                    'normalize_enabled': True,
+                    'cache_enabled': True
+                }
+            },
+            'data_dir': 'data'
+        }
 except Exception as e:
-    print(f"ℹ️ Fallback ke konfigurasi default: {str(e)}")
+    print(f"⚠️ Fallback ke konfigurasi default: {str(e)}")
     config = {}
 
 # Import komponen UI dan handler

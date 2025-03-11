@@ -67,6 +67,14 @@ class DatasetDownloader:
         
         if not self.api_key:
             self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Fitur download mungkin tidak berfungsi.")
+
+    def download_roboflow(self, version_obj, format: str = "yolov5", output_dir: Optional[str] = None): 
+        dataset = version_obj.download(model_format=format, location=output_dir)
+        self._verify_download(output_dir)
+        
+        self.logger.success(f"✅ Dataset {version_obj.workspace}/{version_obj.project}:{version_obj.version} berhasil didownload ke {output_dir}")
+        self._notify_download_complete(version_obj.workspace, version_obj.project, version_obj.version, output_dir)
+        return dataset.location
     
     def download_dataset(
         self,
@@ -128,8 +136,7 @@ class DatasetDownloader:
             rf = Roboflow(api_key=api_key)
             
             # Akses project dan download dataset
-            workspace_obj = rf.workspace(workspace)
-            project_obj = workspace_obj.project(project)
+            project_obj = rf.workspace(workspace).project(project)
             version_obj = project_obj.version(version)
             
             # Gunakan tqdm untuk progress tracking jika diminta
@@ -142,12 +149,7 @@ class DatasetDownloader:
                 # Jika url tidak valid, gunakan implementasi default dari Roboflow
                 if not download_url or not download_url.startswith('http'):
                     self.logger.warning("⚠️ URL download tidak valid, menggunakan metode default Roboflow")
-                    dataset = version_obj.download(model_format=format, location=output_dir)
-                    self._verify_download(output_dir)
-                    
-                    self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
-                    self._notify_download_complete(workspace, project, version, output_dir)
-                    return output_dir
+                    return self.download_roboflow(version_obj, format, output_dir)
                 
                 # Download manual dengan progress tracking
                 zip_path = output_path / "dataset.zip"
@@ -157,18 +159,7 @@ class DatasetDownloader:
                 self.logger.info(f"📦 Mengekstrak dataset...")
                 self.extract_zip(zip_path, output_path, remove_zip=True, show_progress=True)
             else:
-                # Download tanpa progress tracking menggunakan API Roboflow
-                dataset = version_obj.download(model_format=format, location=output_dir)
-            
-            # Verifikasi hasil download
-            self._verify_download(output_dir)
-            
-            self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
-            
-            # Notifikasi download selesai
-            self._notify_download_complete(workspace, project, version, output_dir)
-            
-            return output_dir
+                return self.download_roboflow(version_obj, format, output_dir)
             
         except Exception as e:
             self.logger.error(f"❌ Error download dataset: {str(e)}")

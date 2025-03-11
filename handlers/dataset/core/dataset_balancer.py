@@ -24,7 +24,6 @@ class DatasetBalancer:
         
         # Inisialisasi layer config untuk mendapatkan informasi kelas
         self.layer_config = get_layer_config()
-        self.logger.info(f"⚖️ DatasetBalancer diinisialisasi: {self.data_dir}")
     
     def analyze_class_distribution(self, split: str = 'train', per_layer: bool = True) -> Dict[str, Any]:
         """Analisis distribusi kelas dalam split dataset."""

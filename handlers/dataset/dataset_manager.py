@@ -35,8 +35,6 @@ class DatasetManager(PipelineFacade):
         
         # Setup observer untuk monitoring
         self._setup_observers()
-        
-        self.logger.info(f"🔄 DatasetManager diinisialisasi dengan ObserverManager terintegrasi")
     
     def _setup_observers(self):
         """Setup observer untuk monitoring operasi dataset."""
@@ -97,8 +95,7 @@ class DatasetManager(PipelineFacade):
     
     def unregister_observers(self) -> None:
         """Membatalkan registrasi semua observer dataset."""
-        count = self.observer_manager.unregister_all()
-        self.logger.info(f"🔌 Membatalkan registrasi {count} observer dataset")
+        self.observer_manager.unregister_all()
     
     def get_observer_stats(self) -> Dict[str, Any]:
         """

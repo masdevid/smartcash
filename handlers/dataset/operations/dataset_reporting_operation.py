@@ -42,8 +42,6 @@ class DatasetReportingOperation:
             logger=self.logger
         )
         
-        self.logger.info(f"🧮 DatasetReportingOperation diinisialisasi: {self.data_dir}")
-    
     def _init_explorers(self) -> Dict[str, BaseExplorer]:
         """Inisialisasi explorer untuk berbagai jenis analisis."""
         from smartcash.handlers.dataset.explorers.validation_explorer import ValidationExplorer

@@ -51,7 +51,6 @@ class HandlerRegistry:
             
             # Daftarkan handler
             cls._registry[handler_name] = handler_class
-            cls._logger.debug(f"✅ Handler '{handler_name}' didaftarkan")
             
             return handler_class
             

@@ -30,8 +30,6 @@ class DatasetExplorerFacade:
         self.analyzer = DatasetAnalyzer(config, self.data_dir, logger)
         self.utils = DatasetUtils(config, self.data_dir, logger)
         
-        self.logger.info(f"🧭 DatasetExplorerFacade diinisialisasi: {self.data_dir}")
-    
     def analyze_dataset(
         self, 
         split: str, 

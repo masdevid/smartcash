@@ -18,7 +18,6 @@ class DatasetSplitOperation:
         self.data_dir = Path(data_dir)
         self.output_dir = Path(output_dir) if output_dir else self.data_dir
         self.logger = logger or SmartCashLogger(__name__)
-        self.logger.info(f"🔧 DatasetSplitOperation diinisialisasi: {self.data_dir}")
     
     def split_dataset(self, train_ratio: float = 0.7, val_ratio: float = 0.2, test_ratio: float = 0.1,
                       random_seed: int = 42, stratify_by_class: bool = True, create_symlinks: bool = False) -> Dict[str, int]:

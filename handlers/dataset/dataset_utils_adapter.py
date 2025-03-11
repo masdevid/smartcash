@@ -42,7 +42,6 @@ class DatasetUtilsAdapter:
         # Setup ObserverManager
         self.observer_manager = observer_manager or ObserverManager(auto_register=True)
         
-        self.logger.info(f"🔄 DatasetUtilsAdapter diinisialisasi untuk: {self.data_dir}")
     
     def _get_component(self, name: str, factory_func):
         """Helper untuk lazy loading komponen."""

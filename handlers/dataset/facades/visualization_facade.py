@@ -27,8 +27,6 @@ class VisualizationFacade(DatasetBaseFacade):
         
         # Setup ObserverManager
         self.observer_manager = ObserverManager(auto_register=True)
-        
-        self.logger.info(f"🖼️ VisualizationFacade diinisialisasi: {self.data_dir}")
     
     @property
     def visualizer(self) -> DataVisualizationHelper:

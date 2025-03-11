@@ -71,11 +71,6 @@ class EventDispatcher:
         
         registry = EventRegistry()
         registry.register(event_type, observer, priority)
-        
-        if cls._logging_enabled:
-            cls._logger.debug(
-                f"🔌 Mendaftarkan observer {observer.name} untuk event '{event_type}' dengan prioritas {priority or observer.priority}"
-            )
     
     @classmethod
     def register_many(cls, event_types: List[str], observer: BaseObserver, priority: Optional[int] = None) -> None:

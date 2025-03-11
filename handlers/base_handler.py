@@ -62,8 +62,6 @@ class BaseHandler:
         # Track waktu eksekusi
         self.execution_times = {}
         
-        self.logger.debug(f"🔧 {self.handler_name} diinisialisasi")
-    
     def run(self, operation: str, **kwargs):
         """
         Metode wrapper untuk menjalankan operasi dengan error handling.

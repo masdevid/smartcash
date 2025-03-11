@@ -18,7 +18,6 @@ class DatasetMergeOperation:
         self.data_dir = Path(data_dir)
         self.output_dir = Path(output_dir) if output_dir else self.data_dir / 'merged'
         self.logger = logger or SmartCashLogger(__name__)
-        self.logger.info(f"🔧 DatasetMergeOperation diinisialisasi: {self.data_dir}")
     
     def merge_splits(self, splits: List[str] = ['train', 'valid', 'test'], unique_files: bool = True) -> Dict[str, int]:
         """Gabungkan beberapa split menjadi satu dataset flat."""

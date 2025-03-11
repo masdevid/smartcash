@@ -38,7 +38,6 @@ class DatasetAdapter:
                 config=config,
                 data_dir=config.get('data_dir', 'data')
             )
-            self.logger.debug(f"✅ DatasetManager berhasil diinisialisasi")
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal menginisialisasi DatasetManager: {str(e)}")
             self.dataset_manager = None

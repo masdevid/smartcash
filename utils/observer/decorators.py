@@ -210,11 +210,6 @@ def observe(
             if not hasattr(instance, '_observers'):
                 instance._observers = []
             instance._observers.append(observer)
-            
-            _logger.debug(
-                f"🔌 Mendaftarkan observer untuk {instance.__class__.__name__} ke {len(event_types)} event"
-            )
-            
             return instance
         
         # Ganti metode __new__

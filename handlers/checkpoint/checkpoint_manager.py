@@ -45,7 +45,6 @@ class CheckpointManager:
         self.finder = CheckpointFinder(self.output_dir, self.logger)
         self.history = CheckpointHistory(self.output_dir, self.logger)
         
-        self.logger.info(f"🔧 CheckpointManager diinisialisasi: {self.output_dir}")
     
     # API untuk loading checkpoint
     def load_checkpoint(self, checkpoint_path=None, device=None, model=None, optimizer=None, scheduler=None):

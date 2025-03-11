@@ -37,7 +37,6 @@ class BaseExplorer(ABC):
                 if i < len(layer_config['classes']):
                     self.class_to_name[cls_id] = layer_config['classes'][i]
         
-        self.logger.info(f"🔍 {self.__class__.__name__} diinisialisasi untuk: {self.data_dir}")
     
     def _get_split_path(self, split: str) -> Path:
         """Dapatkan path untuk split dataset tertentu."""

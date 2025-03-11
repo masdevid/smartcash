@@ -41,10 +41,6 @@ class DatasetBaseFacade:
         
         # Lazy-loaded components
         self._components = {}
-        
-        self.logger.info(
-            f"🔧 {self.__class__.__name__} diinisialisasi: {self.data_dir}"
-        )
     
     def _get_component(self, component_id: str, factory_func: Callable) -> Any:
         """Lazy load komponnen."""

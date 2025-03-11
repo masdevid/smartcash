@@ -1,228 +1,139 @@
 # File: configs/base_config.yaml
 # Author: Alfrida Sabar
-# Deskripsi: Konfigurasi dasar untuk SmartCash dengan dukungan untuk semua modul yang direfaktor
+# Deskripsi: Konfigurasi dasar untuk sistem SmartCash dengan dukungan preprocessing terpisah
 
-# Konfigurasi umum
-app_name: "SmartCash"
-version: "1.0.0"
-description: "Sistem deteksi mata uang Rupiah dengan objek deteksi"
-author: "Alfrida Sabar"
-data_dir: "data"
-output_dir: "runs/train"
+# Informasi project
+project:
+  name: 'SmartCash'
+  version: '1.0.0'
+  description: 'Sistem deteksi denominasi mata uang dengan YOLOv5 dan EfficientNet'
 
-# Konfigurasi data
+# Struktur dasar data
 data:
-  # Sumber data ('local' or 'roboflow')
-  source: "roboflow"
-  
-  # Direktori dataset
-  train_dir: "data/train"
-  valid_dir: "data/valid"
-  test_dir: "data/test"
-  
-  # Konfigurasi Roboflow
+  dir: 'data'                    # Direktori utama data
+  processed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessing
+  local:
+    train: 'data/train'
+    valid: 'data/valid'
+    test: 'data/test'
+  processed:
+    train: 'data/preprocessed/train'
+    valid: 'data/preprocessed/valid'
+    test: 'data/preprocessed/test'
+  source: 'roboflow'
   roboflow:
-    api_key: ""  # Wajib diisi jika menggunakan Roboflow
-    workspace: "smartcash-wo2us"
-    project: "rupiah-emisi-2022"
-    version: "3"
-  
-  # Pengaturan preprocessing
-  preprocessing:
-    img_size: [640, 640]
-    cache_dir: ".cache/smartcash"
-    num_workers: 4
-    augmentation_enabled: true
-    normalize_enabled: true
-    cache_enabled: true
-    
-    # Ukuran cache yang ditingkatkan
-    cache:
-      max_size_gb: 1.0
-      ttl_hours: 24
-      auto_cleanup: true
-      cleanup_interval_mins: 30
-
-# Konfigurasi model
-model:
-  # Arsitektur model
-  backbone: "efficientnet_b4"
-  framework: "YOLOv5"
-  
-  # Jalur ke file weights
-  weights: "runs/train/weights/best.pt"
-  pretrained: true
-  
-  # Parameter inferensi
-  confidence: 0.25
-  iou_threshold: 0.45
-  max_det: 1000
-  
-  # Parameter sumber daya
-  workers: 4
-  batch_size: 16
-  memory_limit: 0.75  # gunakan 75% CPU saat multiprocessing
-  
-  # Parameter deployment
-  half_precision: true
-  optimized: true
-  export_format: "torchscript"  # 'onnx', 'torchscript'
-
-# Konfigurasi training
-training:
-  # Parameter dasar
-  epochs: 50
-  batch_size: 16
-  img_size: [640, 640]
-  patience: 5
-  
-  # Learning rate
-  lr0: 0.01  # Initial learning rate
-  lrf: 0.01  # Final learning rate
-  
-  # Optimizer
-  optimizer: "Adam"  # "Adam", "AdamW", "SGD"
-  momentum: 0.937
-  weight_decay: 0.0005
-  
-  # Scheduler
-  scheduler: "cosine"  # "linear", "cosine", "step"
-  
-  # Augmentasi
-  fliplr: 0.5
-  flipud: 0.0
-  mosaic: 1.0
-  mixup: 0.0
-  translate: 0.1
-  scale: 0.5
-  hsv_h: 0.015  # HSV Hue
-  hsv_s: 0.7    # HSV Saturation
-  hsv_v: 0.4    # HSV Value
-  degrees: 45
-  
-  # Early stopping
-  early_stopping_patience: 10
-  
-  # Callbacks
-  save_period: 5  # Simpan checkpoint setiap N epochs
-  
-  # Validasi
-  val_interval: 1  # Validasi setiap N epochs
+    api_key: ''  # Diisi oleh user atau dari Google Secret
+    workspace: 'smartcash-wo2us'
+    project: 'rupiah-emisi-2022'
+    version: '3'
 
 # Konfigurasi layer deteksi
 layers:
-  banknote:
-    name: "banknote"
-    description: "Deteksi uang kertas utuh"
-    classes: ["001", "002", "005", "010", "020", "050", "100"]
-    class_ids: [0, 1, 2, 3, 4, 5, 6]
-    threshold: 0.25
-    enabled: true
-  
-  nominal:
-    name: "nominal"
-    description: "Deteksi area nominal"
-    classes: ["l2_001", "l2_002", "l2_005", "l2_010", "l2_020", "l2_050", "l2_100"]
-    class_ids: [7, 8, 9, 10, 11, 12, 13]
-    threshold: 0.30
-    enabled: true
-  
-  security:
-    name: "security"
-    description: "Deteksi fitur keamanan"
-    classes: ["l3_sign", "l3_text", "l3_thread"]
-    class_ids: [14, 15, 16]
-    threshold: 0.35
-    enabled: true
+  - 'banknote'  # Deteksi uang kertas utuh
+  - 'nominal'   # Deteksi area nominal
+  - 'security'  # Deteksi fitur keamanan
 
-# Konfigurasi environment
-environment:
-  # Flag untuk Google Colab vs. environment lokal
-  use_drive: false
-  mount_path: "/content/drive/MyDrive/SmartCash"
-  symlinks_enabled: true
-  
-  # Konfigurasi GPU
-  force_cpu: false
-  
-  # Direktori untuk logging
-  logs_dir: "logs"
+# Konfigurasi model
+model:
+  backbone: 'EfficientNet-B4'  # Backbone yang digunakan
+  input_size: [640, 640]       # Ukuran input model
+  confidence: 0.25             # Threshold untuk deteksi
+  iou_threshold: 0.45          # Threshold untuk NMS
+  max_detections: 100          # Jumlah maksimum deteksi
+  transfer_learning: true      # Menggunakan transfer learning
+  pretrained: true             # Menggunakan bobot pre-trained
+  workers: 4                   # Jumlah worker untuk dataloader
 
-# Konfigurasi validasi dataset
-validation:
-  # Konfigurasi visualisasi
-  visualize_issues: true
-  visualize_dir: "visualizations"
-  
-  # Pemrosesan invalid files
-  move_invalid: false
-  invalid_dir: "invalid"
-  
-  # Perbaikan otomatis
-  auto_fix: false
-  fix_coordinates: true
-  fix_labels: true
-  fix_images: false
-  backup_before_fix: true
-  
-  # Validasi sampel
-  use_sample: false
-  sample_size: 100
+# Konfigurasi training
+training:
+  epochs: 30
+  batch_size: 16
+  early_stopping_patience: 10
+  optimizer: 'Adam'
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  lr_scheduler: 'ReduceLROnPlateau'
+  lr_patience: 3
+  lr_factor: 0.1
 
 # Konfigurasi augmentasi
 augmentation:
-  # Tipe augmentasi yang digunakan
-  types: ["combined"]  # "position", "lighting", "combined", "extreme_rotation"
-  variations_per_type: 2
-  output_prefix: "aug"
-  
-  # Konfigurasi pemrosesan
-  resume: true
-  num_workers: 4
-  
-  # Validasi hasil
-  validate_results: true
+  enabled: true
+  num_variations: 2
+  output_prefix: 'aug'
+  types:
+    - 'position'
+    - 'lighting'
+    - 'combined'
+  position:
+    fliplr: 0.5
+    degrees: 10
+    translate: 0.1
+    scale: 0.1
+  lighting:
+    hsv_h: 0.015
+    hsv_s: 0.7
+    hsv_v: 0.4
+    contrast: 0.3
+    brightness: 0.3
 
-# Konfigurasi inferensi dan evaluasi
-inference:
-  # Parameter deteksi
-  conf_threshold: 0.25
-  iou_threshold: 0.45
-  
-  # Flag visualisasi
-  visualize: true
-  show_labels: true
-  show_conf: true
-  show_value: true
-  
-  # Hasil output
-  output_dir: "results/detections"
+# Konfigurasi preprocessing
+preprocessing:
+  output_dir: 'data/preprocessed'
+  save_visualizations: true
+  vis_dir: 'visualizations'
+  normalization:
+    enabled: true
+    method: 'minmax'
+  validate:
+    enabled: true
+    fix_issues: true
+    move_invalid: true
 
-# Konfigurasi experiment tracking
-experiment:
-  # Nama eksperimen default
-  name: "efficientnet_b4_baseline"
-  
-  # Direktori untuk eksperimen
-  output_dir: "runs/train/experiments"
-  
-  # Parameter tracking
-  auto_save: true
-  save_period: 1
-  metrics_log: true
-  
-  # Visualization
+# Konfigurasi untuk pembersihan dataset
+cleanup:
+  augmentation_patterns:
+    - 'aug_.*'
+    - '.*_augmented.*'
+    - '.*_modified.*'
+    - '.*_processed.*'
+  ignored_patterns:
+    - '.*\.gitkeep'
+    - '.*\.DS_Store'
+  backup_dir: 'data/backup'
+  backup_enabled: true
+
+# Konfigurasi evaluasi
+evaluation:
+  metrics:
+    - 'precision'
+    - 'recall'
+    - 'mAP'
+    - 'f1'
+  test_batch_size: 8
+  save_predictions: true
   visualize_results: true
 
-# Konfigurasi pembersihan dan maintenance
-cleanup:
-  # Pola file augmentasi untuk dibersihkan
-  augmentation_patterns:
-    - "aug_.*"
-    - ".*_augmented.*"
-    - ".*_modified.*"
-  
-  # Pola file yang diabaikan saat pembersihan
-  ignored_patterns:
-    - ".*\.gitkeep"
-    - ".*\.DS_Store"
+# Konfigurasi logger
+logging:
+  level: 'INFO'
+  use_colors: true
+  use_emojis: true
+  log_to_file: true
+  logs_dir: 'logs'
+
+# Konfigurasi cache
+cache:
+  enabled: true
+  dir: '.cache/smartcash'
+  max_size_gb: 1.0
+  ttl_hours: 24
+  auto_cleanup: true
+
+# Konfigurasi UI
+ui:
+  theme: 'default'  # default, dark, light
+  plot_style: 'seaborn'
+  max_displayed_items: 20
+  enable_animations: true

@@ -1,13 +1,36 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan implementasi ObserverManager.
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan implementasi ObserverManager
+           dan perbaikan untuk fungsi cleanup.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
 import os, sys
 from pathlib import Path
+
+def create_status_indicator(status, message):
+    """Buat indikator status dengan styling konsisten."""
+    status_styles = {
+        'success': {'icon': '✅', 'color': 'green'},
+        'warning': {'icon': '⚠️', 'color': 'orange'},
+        'error': {'icon': '❌', 'color': 'red'},
+        'info': {'icon': 'ℹ️', 'color': 'blue'}
+    }
+    
+    style = status_styles.get(status, status_styles['info'])
+    
+    status_html = f"""
+    <div style="margin: 5px 0; padding: 8px 12px; 
+                border-radius: 4px; background-color: #f8f9fa;">
+        <span style="color: {style['color']}; font-weight: bold;"> 
+            {style['icon']} {message}
+        </span>
+    </div>
+    """
+    
+    return HTML(status_html)
 
 def setup_preprocessing_handlers(ui_components, config=None):
     """Setup handlers untuk UI preprocessing dataset."""
@@ -19,7 +42,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     'img_size': [640, 640],
                     'num_workers': 4,
                     'normalize_enabled': True,
-                    'cache_enabled': True
+                    'cache_enabled': True,
+                    'output_dir': 'data/preprocessed'
                 }
             },
             'data_dir': 'data'
@@ -62,15 +86,22 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Kelompok observer untuk preprocessing
     preprocessing_observers_group = "preprocessing_observers"
     
+    # Fungsi untuk mendapatkan direktori output preprocessing
+    def get_preprocessing_output_dir():
+        """Mendapatkan direktori output preprocessing dari konfigurasi."""
+        if config and 'data' in config and 'preprocessing' in config['data'] and 'output_dir' in config['data']['preprocessing']:
+            return config['data']['preprocessing']['output_dir']
+        return os.path.join(config.get('data_dir', 'data'), 'preprocessed')
+    
     # Fungsi untuk cek apakah dataset sudah dipreprocess
     def check_preprocessed_dataset():
         """Cek apakah dataset sudah dipreprocess."""
-        data_dir = config.get('data_dir', 'data')
+        output_dir = get_preprocessing_output_dir()
         splits = ['train', 'valid', 'test']
         
         # Cek apakah direktori train/valid/test memiliki gambar yang sudah dipreprocess
         for split in splits:
-            split_path = Path(data_dir) / split
+            split_path = Path(output_dir) / split
             if not split_path.exists() or not any((split_path / 'images').glob('*')):
                 return False
         
@@ -83,24 +114,30 @@ def setup_preprocessing_handlers(ui_components, config=None):
             display(create_status_indicator("warning", "🗑️ Membersihkan data preprocessing..."))
             
             try:
-                data_dir = config.get('data_dir', 'data')
+                # Gunakan direktori output preprocessing
+                output_dir = get_preprocessing_output_dir()
                 splits = ['train', 'valid', 'test']
                 
                 # Hapus direktori gambar dan label untuk setiap split
+                files_deleted = 0
                 for split in splits:
-                    split_path = Path(data_dir) / split
+                    split_path = Path(output_dir) / split
                     if split_path.exists():
                         for subdir in ['images', 'labels']:
                             full_subdir = split_path / subdir
                             if full_subdir.exists():
                                 # Hapus file dalam direktori
                                 for file_path in full_subdir.glob('*'):
-                                    file_path.unlink()
+                                    if file_path.is_file():
+                                        file_path.unlink()
+                                        files_deleted += 1
                 
-                display(create_status_indicator("success", "✅ Data preprocessing berhasil dibersihkan"))
+                display(create_status_indicator("success", 
+                    f"✅ Data preprocessing berhasil dibersihkan ({files_deleted} file dihapus)"))
                 
-                # Sembunyikan tombol cleanup
-                cleanup_button.layout.display = 'none'
+                # Sembunyikan tombol cleanup jika semua file sudah dihapus
+                if not check_preprocessed_dataset():
+                    cleanup_button.layout.display = 'none'
                 
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
@@ -119,7 +156,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             with preprocess_status:
                 display(create_status_indicator("info", message))
     
-    # Setup observer untuk download progress jika observer_manager tersedia
+    # Setup observer untuk preprocessing progress jika observer_manager tersedia
     if observer_manager:
         try:
             # Buat progress observer
@@ -178,6 +215,14 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     config['data']['preprocessing']['cache_enabled'] = enable_cache
                     config['data']['preprocessing']['num_workers'] = workers
                 
+                # Pastikan direktori output preprocessing ada dalam config
+                if 'data' not in config:
+                    config['data'] = {}
+                if 'preprocessing' not in config['data']:
+                    config['data']['preprocessing'] = {}
+                if 'output_dir' not in config['data']['preprocessing']:
+                    config['data']['preprocessing']['output_dir'] = os.path.join(config.get('data_dir', 'data'), 'preprocessed')
+                
                 # Tampilkan progress bar
                 preprocess_progress.layout.visibility = 'visible'
                 preprocess_progress.value = 0
@@ -187,6 +232,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     display(create_status_indicator("info", "⚙️ Menggunakan PreprocessingManager untuk preprocessing..."))
                     
                     try:
+                        # Perbarui konfigurasi PreprocessingManager
+                        preprocessing_manager.config = config
+                        
                         # Jalankan preprocessing pipeline
                         result = preprocessing_manager.run_full_pipeline(
                             splits=['train', 'valid', 'test'],
@@ -229,6 +277,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                             
                             summary_html += f"""
                                     <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
+                                    <li><b>Output directory:</b> {config['data']['preprocessing']['output_dir']}</li>
                                 </ul>
                             </div>
                             """
@@ -238,6 +287,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
                             
                             # Tampilkan tombol cleanup
                             cleanup_button.layout.display = ''
+                            
+                            # Verifikasi hasil preprocessing
+                            output_dir = config['data']['preprocessing']['output_dir']
+                            if check_preprocessed_dataset():
+                                display(create_status_indicator("success", 
+                                    f"✅ Dataset berhasil dipreprocess dan tersedia di {output_dir}"))
+                            else:
+                                display(create_status_indicator("warning", 
+                                    "⚠️ Preprocessing selesai tetapi beberapa file mungkin gagal dibuat"))
                         else:
                             display(create_status_indicator(
                                 "warning", 
@@ -259,6 +317,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 preprocess_progress.layout.visibility = 'hidden'
                 # Enable kembali tombol preprocessing
                 preprocess_button.disabled = False
+                
+                # Cek apakah ada data preprocessed untuk menampilkan tombol cleanup
+                if check_preprocessed_dataset():
+                    cleanup_button.layout.display = ''
     
     # Fungsi cleanup untuk unregister observer
     def cleanup():
@@ -303,25 +365,3 @@ def setup_preprocessing_handlers(ui_components, config=None):
         preprocess_options.children[3].value = preproc_config.get('num_workers', 4)
     
     return ui_components
-
-def create_status_indicator(status, message):
-    """Buat indikator status dengan styling konsisten."""
-    status_styles = {
-        'success': {'icon': '✅', 'color': 'green'},
-        'warning': {'icon': '⚠️', 'color': 'orange'},
-        'error': {'icon': '❌', 'color': 'red'},
-        'info': {'icon': 'ℹ️', 'color': 'blue'}
-    }
-    
-    style = status_styles.get(status, status_styles['info'])
-    
-    status_html = f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: #f8f9fa;">
-        <span style="color: {style['color']}; font-weight: bold;"> 
-            {style['icon']} {message}
-        </span>
-    </div>
-    """
-    
-    return HTML(status_html)

@@ -284,7 +284,7 @@ def setup_dependency_handlers(ui):
             
             try:
                 import dotenv
-                display(HTML(f"<p>✅ python-dotenv: v{dotenv.__version__}</p>"))
+                display(HTML(f"<p>✅ python-dotenv:installed</p>"))
             except ImportError:
                 display(HTML("<p>❌ python-dotenv: Not installed</p>"))
 

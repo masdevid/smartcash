@@ -1,11 +1,13 @@
 """
 File: smartcash/ui_handlers/dataset_download.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi ObserverManager.
+Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi ObserverManager
+           dan perbaikan untuk upload file lokal.
 """
 
 import os
 import time
+import tempfile
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
@@ -105,12 +107,16 @@ def setup_download_handlers(ui_components, config=None):
     
     # Handler untuk download dataset
     def on_download_click(b):
-        with ui_components['download_status']:
-            clear_output()
-            display(create_status_indicator("info", "🔄 Memulai download dataset..."))
-            ui_components['download_progress'].value = 0
-            
-            try:
+        # Disable tombol download saat sedang berjalan
+        ui_components['download_button'].disabled = True
+        ui_components['download_progress'].layout.visibility = 'visible'
+        
+        try:
+            with ui_components['download_status']:
+                clear_output()
+                display(create_status_indicator("info", "🔄 Memulai download dataset..."))
+                ui_components['download_progress'].value = 0
+                
                 # Ambil opsi download yang dipilih
                 download_option = ui_components['download_options'].value
                 
@@ -205,7 +211,20 @@ def setup_download_handlers(ui_components, config=None):
                                     valid_structure = False
                                     break
                             
-                            if valid_structure:
+                            # Verifikasi jumlah file setiap split
+                            file_stats = {}
+                            for split in ['train', 'valid', 'test']:
+                                split_dir = Path(data_dir) / split
+                                img_count = sum(1 for _ in (split_dir / 'images').glob('*.*')) if (split_dir / 'images').exists() else 0
+                                label_count = sum(1 for _ in (split_dir / 'labels').glob('*.txt')) if (split_dir / 'labels').exists() else 0
+                                file_stats[split] = (img_count, label_count)
+                                
+                            # Log hasil verifikasi
+                            display(create_status_indicator("info", 
+                                f"📊 Statistik dataset: Train {file_stats['train'][0]} gambar, "
+                                f"Valid {file_stats['valid'][0]} gambar, Test {file_stats['test'][0]} gambar"))
+                            
+                            if valid_structure and all(stats[0] > 0 and stats[1] > 0 for stats in file_stats.values()):
                                 display(create_status_indicator("success", 
                                     "✅ Struktur dataset valid dan siap digunakan"))
                             else:
@@ -240,46 +259,102 @@ def setup_download_handlers(ui_components, config=None):
                         display(create_status_indicator("warning", "⚠️ Silahkan pilih file ZIP untuk diupload"))
                         return
                     
-                    # Info file
-                    file_info = next(iter(upload_widget.value.values()))
-                    file_name = file_info.get('metadata', {}).get('name', 'unknown.zip')
-                    file_size = file_info.get('metadata', {}).get('size', 0)
-                    file_content = file_info.get('content', b'')
+                    # Buat target directory jika belum ada
+                    if not os.path.exists(target_dir):
+                        os.makedirs(target_dir, exist_ok=True)
                     
                     # Process upload
                     if dataset_manager:
                         display(create_status_indicator("info", "📤 Memproses file upload..."))
-                        ui_components['download_progress'].value = 50
+                        ui_components['download_progress'].value = 20
                         
                         try:
-                            # Save uploaded file
-                            os.makedirs(os.path.dirname(os.path.join(target_dir, file_name)), exist_ok=True)
-                            temp_zip_path = os.path.join(target_dir, file_name)
+                            # Info file pertama yang diupload
+                            file_key = next(iter(upload_widget.value))
+                            file_info = upload_widget.value[file_key]
+                            file_name = file_info.get('metadata', {}).get('name', 'unknown.zip')
+                            file_size = file_info.get('metadata', {}).get('size', 0)
+                            file_content = file_info.get('content', b'')
                             
-                            with open(temp_zip_path, 'wb') as f:
-                                f.write(file_content)
+                            # Pastikan file adalah ZIP
+                            if not file_name.lower().endswith('.zip'):
+                                display(create_status_indicator("error", 
+                                    "❌ File harus berformat ZIP (.zip)"))
+                                return
+                            
+                            # Buat temporary file
+                            with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_file:
+                                temp_path = temp_file.name
+                                temp_file.write(file_content)
+                                
+                            ui_components['download_progress'].value = 50
+                            display(create_status_indicator("info", 
+                                f"📦 File {file_name} ({file_size/1024/1024:.2f} MB) berhasil diunggah"))
                             
                             # Import dataset from zip
-                            display(create_status_indicator("info", "📂 Ekstraksi file..."))
+                            display(create_status_indicator("info", "📂 Ekstraksi dan proses file..."))
                             ui_components['download_progress'].value = 75
                             
-                            imported_dir = dataset_manager.import_from_zip(
-                                zip_path=temp_zip_path,
-                                target_dir=target_dir,
-                                format="yolov5"
+                            from smartcash.handlers.dataset.core.dataset_downloader import DatasetDownloader
+                            downloader = DatasetDownloader(config, logger=logger)
+                            
+                            # Import dataset
+                            imported_dir = downloader.import_from_zip(
+                                zip_path=temp_path,
+                                target_dir=target_dir
                             )
                             
+                            # Update config data_dir
+                            config['data_dir'] = target_dir
+                            if dataset_manager:
+                                dataset_manager.config = config
+                            
+                            # Verifikasi hasil import
+                            valid_structure = True
+                            file_stats = {}
+                            
+                            for split in ['train', 'valid', 'test']:
+                                split_dir = Path(target_dir) / split
+                                if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
+                                    valid_structure = False
+                                img_count = sum(1 for _ in (split_dir / 'images').glob('*.*')) if (split_dir / 'images').exists() else 0
+                                label_count = sum(1 for _ in (split_dir / 'labels').glob('*.txt')) if (split_dir / 'labels').exists() else 0
+                                file_stats[split] = (img_count, label_count)
+                                
+                            # Hapus temporary file
+                            try:
+                                os.unlink(temp_path)
+                            except:
+                                pass
+                                
                             ui_components['download_progress'].value = 100
                             display(create_status_indicator("success", 
-                                f"✅ File berhasil diproses: {file_name} ({file_size/1024:.1f} KB)"))
+                                f"✅ Dataset berhasil diimport ke {target_dir}"))
+                                
+                            # Log hasil verifikasi
+                            display(create_status_indicator("info", 
+                                f"📊 Statistik dataset: Train {file_stats['train'][0]} gambar, "
+                                f"Valid {file_stats['valid'][0]} gambar, Test {file_stats['test'][0]} gambar"))
+                            
+                            if valid_structure and all(stats[0] > 0 for split, stats in file_stats.items() if split == 'train'):
+                                display(create_status_indicator("success", 
+                                    "✅ Dataset valid dan siap digunakan"))
+                            else:
+                                display(create_status_indicator("warning", 
+                                    "⚠️ Struktur dataset belum lengkap, mungkin perlu validasi"))
                             
                         except Exception as e:
                             display(create_status_indicator("error", f"❌ Error: {str(e)}"))
                     else:
                         display(create_status_indicator("error", "❌ DatasetManager tidak tersedia"))
-            
-            except Exception as e:
+        
+        except Exception as e:
+            with ui_components['download_status']:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+        
+        finally:
+            # Enable kembali tombol download
+            ui_components['download_button'].disabled = False
     
     # Register handlers
     ui_components['download_button'].on_click(on_download_click)

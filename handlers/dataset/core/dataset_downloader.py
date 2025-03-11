@@ -1,6 +1,9 @@
-# File: smartcash/handlers/dataset/core/dataset_downloader.py
-# Author: Alfrida Sabar
-# Deskripsi: Downloader dataset terintegrasi dengan dukungan threading dan progress tracking
+"""
+File: smartcash/handlers/dataset/core/dataset_downloader.py
+Author: Alfrida Sabar
+Deskripsi: Downloader dataset terintegrasi dengan dukungan threading, progress tracking
+           dan verifikasi hasil download
+"""
 
 import os, json, time, hashlib, threading, zipfile, dotenv
 import requests, shutil
@@ -138,6 +141,10 @@ class DatasetDownloader:
                 location=output_dir
             )
             
+            # Verifikasi hasil download
+            if not self._verify_download(output_dir):
+                raise ValueError("❌ Download tidak lengkap atau rusak, silakan coba lagi")
+            
             self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
             
             # Notifikasi download selesai
@@ -161,10 +168,55 @@ class DatasetDownloader:
             )
             raise
     
+    def _verify_download(self, output_dir: Union[str, Path]) -> bool:
+        """
+        Verifikasi hasil download dataset.
+        
+        Args:
+            output_dir: Direktori output download
+            
+        Returns:
+            Boolean yang menunjukkan apakah download valid
+        """
+        output_path = Path(output_dir)
+        
+        # Periksa struktur direktori
+        required_dirs = ['train', 'valid', 'test']
+        for subdir in required_dirs:
+            subdir_path = output_path / subdir
+            if not (subdir_path.exists() and 
+                    (subdir_path / 'images').exists() and 
+                    (subdir_path / 'labels').exists()):
+                self.logger.warning(f"⚠️ Struktur direktori tidak lengkap: {subdir_path}")
+                return False
+                
+        # Periksa minimal ada file di setiap direktori
+        has_files = True
+        for subdir in required_dirs:
+            img_dir = output_path / subdir / 'images'
+            label_dir = output_path / subdir / 'labels'
+            
+            img_files = list(img_dir.glob('*.[jJ][pP]*[gG]')) + list(img_dir.glob('*.png'))
+            label_files = list(label_dir.glob('*.txt'))
+            
+            if not img_files:
+                self.logger.warning(f"⚠️ Tidak ada gambar di {img_dir}")
+                has_files = False
+                
+            if not label_files:
+                self.logger.warning(f"⚠️ Tidak ada label di {label_dir}")
+                has_files = False
+                
+        return has_files
+    
     def export_to_local(self, roboflow_dir: Union[str, Path], show_progress: bool = True) -> Tuple[str, str, str]:
         """Export dataset Roboflow ke struktur folder lokal standar."""
         self.logger.start("📤 Mengexport dataset ke struktur folder lokal...")
         rf_path = Path(roboflow_dir)
+        
+        # Verifikasi sumber ada
+        if not rf_path.exists():
+            raise FileNotFoundError(f"❌ Direktori sumber tidak ditemukan: {rf_path}")
         
         # Persiapkan file yang akan di-copy
         file_copy_tasks = []
@@ -199,10 +251,42 @@ class DatasetDownloader:
             
             if progress: progress.close()
         
+        # Verifikasi hasil export
+        self._verify_local_dataset()
+            
         # Return paths
         output_dirs = tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
         self.logger.success(f"✅ Dataset berhasil diexport: {total_files} file → {self.data_dir}")
         return output_dirs
+    
+    def _verify_local_dataset(self) -> bool:
+        """
+        Verifikasi dataset lokal setelah export.
+        
+        Returns:
+            Boolean yang menunjukkan apakah dataset valid
+        """
+        # Periksa struktur direktori
+        for split in ['train', 'valid', 'test']:
+            split_dir = self.data_dir / split
+            images_dir = split_dir / 'images'
+            labels_dir = split_dir / 'labels'
+            
+            if not (images_dir.exists() and labels_dir.exists()):
+                self.logger.warning(f"⚠️ Struktur direktori tidak lengkap: {split_dir}")
+                return False
+                
+            # Hitung file
+            img_count = sum(1 for _ in images_dir.glob('*.[jJ][pP]*[gG]')) + sum(1 for _ in images_dir.glob('*.png'))
+            label_count = sum(1 for _ in labels_dir.glob('*.txt'))
+            
+            self.logger.info(f"📊 Split {split}: {img_count} gambar, {label_count} label")
+            
+            if img_count == 0 or label_count == 0:
+                self.logger.warning(f"⚠️ Split {split} tidak memiliki gambar/label")
+                return False
+                
+        return True
             
     def pull_dataset(
         self, 
@@ -223,8 +307,8 @@ class DatasetDownloader:
                     old_values[param] = getattr(self, param)
                     setattr(self, param, val)
             
-            # Jika dataset sudah ada
-            if self._is_dataset_available():
+            # Jika dataset sudah ada dan lengkap, gunakan itu
+            if self._is_dataset_available(verify_content=True):
                 self.logger.info("✅ Dataset sudah tersedia di lokal")
                 return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
             
@@ -245,6 +329,154 @@ class DatasetDownloader:
             # Kembalikan nilai semula
             for param, val in old_values.items():
                 setattr(self, param, val)
+    
+    def import_from_zip(
+        self, 
+        zip_path: Union[str, Path], 
+        target_dir: Optional[Union[str, Path]] = None,
+        format: str = "yolov5"
+    ) -> str:
+        """Import dataset dari file zip."""
+        self.logger.info(f"📦 Importing dataset dari {zip_path}...")
+        
+        # Verifikasi file zip
+        zip_path = Path(zip_path)
+        if not zip_path.exists():
+            raise FileNotFoundError(f"❌ File zip tidak ditemukan: {zip_path}")
+            
+        if not zipfile.is_zipfile(zip_path):
+            raise ValueError(f"❌ File bukan format ZIP yang valid: {zip_path}")
+            
+        # Extract zip
+        target_dir = Path(target_dir) if target_dir else self.data_dir
+        extract_dir = target_dir / zip_path.stem
+        extract_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Lakukan ekstraksi
+        self.extract_zip(zip_path, extract_dir, remove_zip=False, show_progress=True)
+        
+        # Fix struktur dataset jika perlu
+        valid_structure = self._fix_dataset_structure(extract_dir)
+        if not valid_structure:
+            self.logger.warning(f"⚠️ Struktur dataset tidak sesuai format YOLOv5")
+        
+        # Verifikasi hasil import
+        if not self._verify_dataset_structure(extract_dir):
+            self.logger.warning(f"⚠️ Dataset tidak lengkap setelah import")
+        else:
+            self.logger.success(f"✅ Dataset berhasil diimport ke {extract_dir}")
+        
+        # Copy ke data_dir jika berbeda
+        if extract_dir != self.data_dir:
+            self.logger.info(f"🔄 Menyalin dataset ke {self.data_dir}...")
+            self._copy_dataset_to_data_dir(extract_dir)
+            
+        return str(extract_dir)
+    
+    def _fix_dataset_structure(self, dataset_dir: Path) -> bool:
+        """
+        Memperbaiki struktur dataset jika tidak sesuai format YOLOv5.
+        
+        Args:
+            dataset_dir: Direktori dataset
+            
+        Returns:
+            Boolean yang menunjukkan apakah struktur sudah diperbaiki
+        """
+        # Deteksi struktur
+        has_splits = all([(dataset_dir / split).exists() for split in ['train', 'valid', 'test']])
+        has_images_labels = (dataset_dir / 'images').exists() and (dataset_dir / 'labels').exists()
+        
+        # Jika sudah ada struktur split, verifikasi sub-direktori
+        if has_splits:
+            fixed = True
+            for split in ['train', 'valid', 'test']:
+                split_dir = dataset_dir / split
+                if not (split_dir / 'images').exists():
+                    (split_dir / 'images').mkdir(parents=True, exist_ok=True)
+                if not (split_dir / 'labels').exists():
+                    (split_dir / 'labels').mkdir(parents=True, exist_ok=True)
+            return fixed
+            
+        # Jika ada struktur images/labels di root, buat struktur split
+        if has_images_labels:
+            self.logger.info("🔧 Mengkonversi struktur flat ke split...")
+            
+            # Buat direktori split
+            for split in ['train', 'valid', 'test']:
+                (dataset_dir / split / 'images').mkdir(parents=True, exist_ok=True)
+                (dataset_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
+            
+            # Pindahkan semua ke train untuk sementara
+            image_files = list((dataset_dir / 'images').glob('*'))
+            label_files = list((dataset_dir / 'labels').glob('*'))
+            
+            for img in image_files:
+                shutil.copy2(img, dataset_dir / 'train' / 'images' / img.name)
+            
+            for label in label_files:
+                shutil.copy2(label, dataset_dir / 'train' / 'labels' / label.name)
+                
+            self.logger.info(f"✅ Semua file dipindahkan ke train/ ({len(image_files)} gambar, {len(label_files)} label)")
+            return True
+            
+        # Cari subdirektori yang mengandung images dan labels
+        for subdir in dataset_dir.iterdir():
+            if subdir.is_dir():
+                if (subdir / 'images').exists() and (subdir / 'labels').exists():
+                    return True
+                    
+        # Jika sampai sini belum return, berarti struktur tidak terdeteksi
+        self.logger.warning("⚠️ Struktur dataset tidak terdeteksi, membuat struktur baru...")
+        for split in ['train', 'valid', 'test']:
+            (dataset_dir / split / 'images').mkdir(parents=True, exist_ok=True)
+            (dataset_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
+            
+        return False
+    
+    def _verify_dataset_structure(self, dataset_dir: Path) -> bool:
+        """
+        Verifikasi struktur dataset sesuai format YOLOv5.
+        
+        Args:
+            dataset_dir: Direktori dataset
+            
+        Returns:
+            Boolean yang menunjukkan apakah struktur valid
+        """
+        # Periksa struktur direktori
+        for split in ['train', 'valid', 'test']:
+            if not (dataset_dir / split).exists():
+                return False
+                
+            if not (dataset_dir / split / 'images').exists() or not (dataset_dir / split / 'labels').exists():
+                return False
+                
+        return True
+    
+    def _copy_dataset_to_data_dir(self, source_dir: Path) -> None:
+        """
+        Copy dataset ke direktori data utama.
+        
+        Args:
+            source_dir: Direktori sumber dataset
+        """
+        for split in ['train', 'valid', 'test']:
+            # Buat direktori tujuan
+            (self.data_dir / split / 'images').mkdir(parents=True, exist_ok=True)
+            (self.data_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
+            
+            # Copy file
+            for subdir in ['images', 'labels']:
+                src_dir = source_dir / split / subdir
+                dst_dir = self.data_dir / split / subdir
+                
+                if src_dir.exists():
+                    for file_path in src_dir.glob('*'):
+                        if file_path.is_file():
+                            dst_path = dst_dir / file_path.name
+                            if not dst_path.exists():
+                                shutil.copy2(file_path, dst_path)
     
     def get_dataset_info(self) -> Dict:
         """Mendapatkan informasi dataset dari konfigurasi dan status lokal."""
@@ -352,42 +584,29 @@ class DatasetDownloader:
             self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
             raise
     
-    def import_from_zip(self, zip_path: Union[str, Path], target_dir: Optional[Union[str, Path]] = None,
-                      format: str = "yolov5") -> str:
-        """Import dataset dari file zip."""
-        self.logger.info(f"📦 Importing dataset dari {zip_path}...")
+    def _is_dataset_available(self, verify_content: bool = False) -> bool:
+        """
+        Cek apakah dataset sudah tersedia di lokal.
         
-        # Extract zip
-        extract_dir = self.extract_zip(zip_path, target_dir, remove_zip=False)
-        
-        # Verify dataset structure
-        for split in ['train', 'valid', 'test']:
-            split_dir = Path(extract_dir) / split
-            for subdir in ['images', 'labels']:
-                os.makedirs(split_dir / subdir, exist_ok=True)
-        
-        self.logger.success(f"✅ Dataset berhasil diimport ke {extract_dir}")
-        return str(extract_dir)
-    
-    # ===== Helper methods =====
-    
-    def _count_files(self, dir_path: Path) -> Dict[str, int]:
-        """Hitung file pada setiap split dataset."""
-        counts = {}
-        for split in ['train', 'valid', 'test']:
-            images_dir = dir_path / split / 'images'
-            if images_dir.exists():
-                counts[split] = sum(1 for _ in images_dir.glob('*.jpg')) + sum(1 for _ in images_dir.glob('*.jpeg')) + sum(1 for _ in images_dir.glob('*.png'))
-        return counts
-    
-    def _is_dataset_available(self) -> bool:
-        """Cek apakah dataset sudah tersedia di lokal."""
+        Args:
+            verify_content: Verifikasi juga isi dari setiap split
+            
+        Returns:
+            Boolean yang menunjukkan apakah dataset tersedia
+        """
         for split in ['train', 'valid', 'test']:
             split_dir = self.data_dir / split
             if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
                 return False
-            if not list((split_dir / 'images').glob('*.*')):
-                return False
+                
+            # Verifikasi isi jika diminta
+            if verify_content:
+                img_count = sum(1 for _ in (split_dir / 'images').glob('*.[jJ][pP]*[gG]')) + sum(1 for _ in (split_dir / 'images').glob('*.png'))
+                label_count = sum(1 for _ in (split_dir / 'labels').glob('*.txt'))
+                
+                if img_count == 0 or label_count == 0:
+                    return False
+                    
         return True
     
     def _get_local_stats(self) -> Dict[str, int]:

@@ -46,7 +46,6 @@ try:
             'data': {
                 'preprocessing': {
                     'img_size': [640, 640],
-                    'cache_dir': '.cache/smartcash',
                     'num_workers': 4,
                     'normalize_enabled': True,
                     'cache_enabled': True

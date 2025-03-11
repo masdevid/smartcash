@@ -55,6 +55,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Handler untuk tombol preprocessing
     def on_preprocess_click(b):
+        # Expand logs accordion untuk menampilkan progress
+        if isinstance(preprocess_status.parent, widgets.Accordion):
+            preprocess_status.parent.selected_index = 0
+        
         with preprocess_status:
             clear_output()
             display(create_status_indicator("info", "🔄 Memulai preprocessing dataset..."))
@@ -91,10 +95,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         cache=cache,
                         workers=workers
                     )
-                
-                # Expand logs accordion
-                if isinstance(preprocess_status.parent, widgets.Accordion):
-                    preprocess_status.parent.selected_index = 0
                 
                 # Tampilkan progress bar
                 preprocess_progress.layout.visibility = 'visible'

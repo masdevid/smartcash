@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from smartcash.utils.logger import get_logger
 from smartcash.utils.observer import EventDispatcher, EventTopics
 from smartcash.utils.config_manager import ConfigManager
+from smartcash.utils.dataset.dataset_utils import DEFAULT_SPLITS
 
 
 class DatasetDownloader:
@@ -68,7 +69,7 @@ class DatasetDownloader:
         if not self.api_key:
             self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Fitur download mungkin tidak berfungsi.")
 
-    def download_roboflow(self, version_obj, format: str = "yolov5", output_dir: Optional[str] = None): 
+    def download_roboflow(self, version_obj, format: str = "yolov5pytorch", output_dir: Optional[str] = None): 
         dataset = version_obj.download(model_format=format, location=output_dir)
         self._verify_download(output_dir)
         
@@ -316,7 +317,7 @@ class DatasetDownloader:
         output_path = Path(output_dir)
         
         # Periksa struktur direktori
-        required_dirs = ['train', 'valid', 'test']
+        required_dirs = DEFAULT_SPLITS
         for subdir in required_dirs:
             subdir_path = output_path / subdir
             if not (subdir_path.exists() and 
@@ -390,7 +391,7 @@ class DatasetDownloader:
         self._verify_local_dataset()
             
         # Return paths
-        output_dirs = tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
+        output_dirs = tuple(str(self.data_dir / split) for split in DEFAULT_SPLITS)
         self.logger.success(f"✅ Dataset berhasil diexport: {total_files} file → {self.data_dir}")
         return output_dirs
     
@@ -425,7 +426,7 @@ class DatasetDownloader:
             
     def pull_dataset(
         self, 
-        format: str = "yolov5", 
+        format: str = "yolov5pytorch", 
         show_progress: bool = True,
         api_key: str = None, 
         workspace: str = None, 
@@ -445,7 +446,7 @@ class DatasetDownloader:
             # Jika dataset sudah ada dan lengkap, gunakan itu
             if self._is_dataset_available(verify_content=True):
                 self.logger.info("✅ Dataset sudah tersedia di lokal")
-                return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
+                return tuple(str(self.data_dir / split) for split in DEFAULT_SPLITS)
             
             # Download dari Roboflow dan export ke lokal
             self.logger.info("🔄 Dataset belum tersedia atau tidak lengkap, mendownload dari Roboflow...")
@@ -470,7 +471,7 @@ class DatasetDownloader:
         self, 
         zip_path: Union[str, Path], 
         target_dir: Optional[Union[str, Path]] = None,
-        format: str = "yolov5"
+        format: str = "yolov5pytorch"
     ) -> str:
         """Import dataset dari file zip."""
         self.logger.info(f"📦 Importing dataset dari {zip_path}...")
@@ -520,7 +521,7 @@ class DatasetDownloader:
             Boolean yang menunjukkan apakah struktur sudah diperbaiki
         """
         # Deteksi struktur
-        has_splits = all([(dataset_dir / split).exists() for split in ['train', 'valid', 'test']])
+        has_splits = all([(dataset_dir / split).exists() for split in DEFAULT_SPLITS])
         has_images_labels = (dataset_dir / 'images').exists() and (dataset_dir / 'labels').exists()
         
         # Jika sudah ada struktur split, verifikasi sub-direktori
@@ -564,7 +565,7 @@ class DatasetDownloader:
                     
         # Jika sampai sini belum return, berarti struktur tidak terdeteksi
         self.logger.warning("⚠️ Struktur dataset tidak terdeteksi, membuat struktur baru...")
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             (dataset_dir / split / 'images').mkdir(parents=True, exist_ok=True)
             (dataset_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
             
@@ -581,7 +582,7 @@ class DatasetDownloader:
             Boolean yang menunjukkan apakah struktur valid
         """
         # Periksa struktur direktori
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             if not (dataset_dir / split).exists():
                 return False
                 
@@ -597,7 +598,7 @@ class DatasetDownloader:
         Args:
             source_dir: Direktori sumber dataset
         """
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             # Buat direktori tujuan
             (self.data_dir / split / 'images').mkdir(parents=True, exist_ok=True)
             (self.data_dir / split / 'labels').mkdir(parents=True, exist_ok=True)
@@ -730,7 +731,7 @@ class DatasetDownloader:
         Returns:
             Boolean yang menunjukkan apakah dataset tersedia
         """
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_dir = self.data_dir / split
             if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
                 return False
@@ -748,5 +749,5 @@ class DatasetDownloader:
     def _get_local_stats(self) -> Dict[str, int]:
         """Hitung statistik dataset lokal."""
         return {split: sum(1 for _ in (self.data_dir / split / 'images').glob('*.*')) 
-                for split in ['train', 'valid', 'test'] 
+                for split in DEFAULT_SPLITS 
                 if (self.data_dir / split / 'images').exists()}

@@ -175,26 +175,39 @@ class DatasetDownloader:
         Download file dengan progress tracking.
         
         Args:
-            url: URL file yang akan didownload
+            url: URL file yang akan didownload (Roboflow API URL)
             output_path: Path untuk menyimpan file
         """
         try:
-            self.logger.info(f"📥 Downloading dari: {url}")
+            self.logger.info(f"📥 Mendapatkan link download dari: {url}")
             
-            # Request dengan stream=True untuk download chunk by chunk
-            response = requests.get(url, stream=True, timeout=self.timeout)
-            response.raise_for_status()
+            # Step 1: Get the export link from the Roboflow API
+            api_response = requests.get(url, timeout=self.timeout)
+            api_response.raise_for_status()  # Raise error if request fails
+            
+            # Extract the actual download URL from JSON
+            export_data = api_response.json()
+            export_link = export_data.get('export', {}).get('link')
+            
+            if not export_link:
+                raise ValueError("No export link found in API response")
+
+            self.logger.info(f"📥 Downloading dari: {export_link}")
+            
+            # Step 2: Download the file from the export_link with streaming
+            response = requests.get(export_link, stream=True, timeout=self.timeout)
+            response.raise_for_status()  # Raise error if download fails
             
             # Setup progress bar
             total_size = int(response.headers.get('content-length', 0))
             progress = tqdm(
-                total=total_size, 
-                unit='B', 
+                total=total_size,
+                unit='B',
                 unit_scale=True,
                 desc=f"Downloading {output_path.name}"
             )
             
-            # Download file chunks
+            # Download file in chunks
             with open(output_path, 'wb') as f:
                 downloaded = 0
                 for chunk in response.iter_content(chunk_size=self.chunk_size):
@@ -219,9 +232,18 @@ class DatasetDownloader:
                 
             self.logger.info(f"✅ Download selesai: {output_path}")
         
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             self.logger.error(f"❌ Download gagal: {str(e)}")
-            # Hapus file yang mungkin rusak
+            if output_path.exists():
+                output_path.unlink()
+            raise
+        except ValueError as e:
+            self.logger.error(f"❌ Error: {str(e)}")
+            if output_path.exists():
+                output_path.unlink()
+            raise
+        except Exception as e:
+            self.logger.error(f"❌ Unexpected error: {str(e)}")
             if output_path.exists():
                 output_path.unlink()
             raise

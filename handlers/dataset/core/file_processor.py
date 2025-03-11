@@ -68,13 +68,13 @@ class FileProcessor:
         copy_tasks = []
         for split in DEFAULT_SPLITS:
             src_split = source_path if not (source_path / split).exists() else source_path / split
-            src_img_dir = next((d for d in [src_split/'images', src_split/'train'] if d.exists()), src_split)
-            src_label_dir = next((d for d in [src_split/'labels', src_split/'train'] if d.exists()), src_split)
-            dst_img_dir, dst_label_dir = target_path/split/'images', target_path/split/'labels'
+            src_img_dir = next((d for d in [src_split / 'images', src_split / 'train'] if d.exists()), src_split)
+            src_label_dir = next((d for d in [src_split / 'labels', src_split / 'train'] if d.exists()), src_split)
+            dst_img_dir, dst_label_dir = target_path / split / 'images', target_path / split / 'labels'
             
             for img_path in src_img_dir.glob('*'):
-                if img_path.suffix.lower() in IMG_EXTENSIONS and (label_path := src_label_dir/f"{img_path.stem}.txt").exists():
-                    copy_tasks.append((img_path, label_path, dst_img_dir/img_path.name, dst_label_dir/label_path.name))
+                if img_path.suffix.lower() in IMG_EXTENSIONS and (label_path := src_label_dir / f"{img_path.stem}.txt").exists():
+                    copy_tasks.append((img_path, label_path, dst_img_dir / img_path.name, dst_label_dir / label_path.name))
         
         pbar = tqdm(total=len(copy_tasks), desc="Export Dataset") if show_progress else None
         

@@ -30,15 +30,15 @@ class DownloadValidator:
         Returns:
             Boolean yang menunjukkan apakah download valid
         """
-        output_path = Path(output_dir)
+        output_path = Path(output_dir)  # Convert to Path object
         
         # Periksa struktur dasar
         if not self._optimized_check(output_path): return False
         
         # Hitung file per split untuk validasi metadata
         split_counts = {
-            split: (sum(1 for f in (output_path/split/'images').iterdir() 
-                    if f.is_file() and f.suffix.lower() in self.img_suffixes))
+            split: sum(1 for f in (output_path / split / 'images').iterdir() 
+                       if f.is_file() and f.suffix.lower() in self.img_suffixes)
             for split in DEFAULT_SPLITS
         }
         
@@ -66,13 +66,13 @@ class DownloadValidator:
             Boolean yang menunjukkan validitas struktur
         """
         return all(
-            (output_path/split).is_dir() and
-            (output_path/split/'images').is_dir() and
-            (output_path/split/'labels').is_dir() and
+            (output_path / split).is_dir() and
+            (output_path / split / 'images').is_dir() and
+            (output_path / split / 'labels').is_dir() and
             any(f.is_file() and f.suffix.lower() in self.img_suffixes 
-               for f in (output_path/split/'images').iterdir()) and
+                for f in (output_path / split / 'images').iterdir()) and
             any(f.is_file() and f.suffix.lower() == '.txt' 
-               for f in (output_path/split/'labels').iterdir())
+                for f in (output_path / split / 'labels').iterdir())
             for split in DEFAULT_SPLITS
         )
     
@@ -87,7 +87,7 @@ class DownloadValidator:
         Returns:
             Boolean yang menunjukkan apakah dataset tersedia
         """
-        return self._optimized_check(Path(data_dir))
+        return self._optimized_check(Path(data_dir))  # Convert to Path object
     
     def get_local_stats(self, data_dir: Union[str, Path]) -> Dict[str, int]:
         """
@@ -99,10 +99,10 @@ class DownloadValidator:
         Returns:
             Dict dengan jumlah gambar per split
         """
-        data_path = Path(data_dir)
+        data_path = Path(data_dir)  # Convert to Path object
         stats = {
-            s: sum(1 for f in (data_path/s/'images').iterdir() 
-               if f.is_file() and f.suffix.lower() in self.img_suffixes)
+            s: sum(1 for f in (data_path / s / 'images').iterdir() 
+                   if f.is_file() and f.suffix.lower() in self.img_suffixes)
             for s in DEFAULT_SPLITS
         }
         if self.logger:
@@ -119,8 +119,9 @@ class DownloadValidator:
         Returns:
             Dict statistik dataset
         """
-        valid = self._optimized_check(Path(data_dir))
-        stats = self.get_local_stats(data_dir)
+        data_path = Path(data_dir)  # Convert to Path object
+        valid = self._optimized_check(data_path)
+        stats = self.get_local_stats(data_path)
         invalid_splits = [s for s, c in stats.items() if c == 0]
         return {
             'valid': valid and not invalid_splits,
@@ -144,5 +145,5 @@ class DownloadValidator:
         return {
             'total_images': sum(stats.values()),
             'splits': stats,
-            'structure_valid': self._optimized_check(Path(dataset_dir))
+            'structure_valid': self._optimized_check(Path(dataset_dir))  # Convert to Path object
         }

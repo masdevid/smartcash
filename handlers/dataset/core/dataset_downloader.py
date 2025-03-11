@@ -137,7 +137,7 @@ class DatasetDownloader:
                 self.logger.info(f"⏳ Downloading dataset dari Roboflow")
                 
                 # Implementasi download manual dengan progress tracking
-                download_url = version_obj._generate_download_url(format=format)
+                download_url = version_obj.download_url(format='zip')
                 
                 # Jika url tidak valid, gunakan implementasi default dari Roboflow
                 if not download_url or not download_url.startswith('http'):

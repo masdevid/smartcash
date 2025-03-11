@@ -1,12 +1,13 @@
 """
 File: smartcash/ui_components/preprocessing.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Komponen UI untuk preprocessing dataset SmartCash.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML
 from pathlib import Path
+from smartcash.utils.ui_utils import create_component_header, create_info_box
 
 def create_preprocessing_ui():
     """Buat komponen UI untuk preprocessing dataset."""
@@ -14,19 +15,18 @@ def create_preprocessing_ui():
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("""
-    <div style="background-color: #f0f8ff; padding: 15px; color: black; border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
-        <h2 style="color: inherit; margin-top: 0;">🔧 Dataset Preprocessing</h2>
-        <p style="color: inherit; margin-bottom: 0;">Preprocessing dataset untuk training model SmartCash</p>
-    </div>
-    """)
+    header = create_component_header(
+        "Dataset Preprocessing",
+        "Preprocessing dataset untuk training model SmartCash",
+        "🔧"
+    )
     
     # Preprocessing options
     preprocess_options = widgets.VBox([
         widgets.IntRangeSlider(
             value=[640, 640],
             min=320,
-            max=640,
+            max=1280,
             step=32,
             description='Image size:',
             style={'description_width': 'initial'},
@@ -85,18 +85,18 @@ def create_preprocessing_ui():
     )
     
     # Info box
-    info_box = widgets.HTML("""
-    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 10px 0; border-radius: 4px;">
-        <h4 style="margin-top: 0; color: inherit;">ℹ️ Tentang Preprocessing</h4>
+    info_box = create_info_box(
+        "Tentang Preprocessing",
+        """
         <p>Preprocessing meliputi:</p>
         <ul>
             <li><strong>Resize</strong>: Ubah ukuran gambar menjadi ukuran yang seragam</li>
             <li><strong>Normalization</strong>: Normalisasi pixel values untuk training yang lebih stabil</li>
             <li><strong>Caching</strong>: Simpan gambar yang sudah diproses untuk mempercepat loading</li>
         </ul>
-    </div>
-    """)
+        """,
+        'info'
+    )
     
     # Pasang semua komponen
     main_container.children = [

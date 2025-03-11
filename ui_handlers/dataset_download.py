@@ -5,30 +5,18 @@ Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi Obser
 """
 
 import os
-import time
 from pathlib import Path
-from IPython.display import display, HTML, clear_output
+from IPython.display import display, clear_output
 import ipywidgets as widgets
 
-def create_status_indicator(status, message):
-    """Buat indikator status dengan styling konsisten."""
-    status_styles = {
-        'success': {'icon': '✅', 'color': 'green'},
-        'warning': {'icon': '⚠️', 'color': 'orange'},
-        'error': {'icon': '❌', 'color': 'red'},
-        'info': {'icon': 'ℹ️', 'color': 'blue'}
-    }
-    
-    style = status_styles.get(status, status_styles['info'])
-    
-    return HTML(f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: #f8f9fa;">
-        <span style="color: {style['color']}; font-weight: bold;"> 
-            {style['icon']} {message}
-        </span>
-    </div>
-    """)
+from smartcash.utils.ui_utils import (
+    create_status_indicator, 
+    create_info_alert,
+    update_output_area,
+    register_observer_callback
+)
+from smartcash.utils.observer import EventTopics
+
 
 def setup_download_handlers(ui_components, config=None):
     """Setup handlers untuk UI download dataset."""
@@ -64,11 +52,10 @@ def setup_download_handlers(ui_components, config=None):
         print(f"Info: {str(e)}")
     
     # Tambahkan API key info widget
-    api_key_info = widgets.HTML(
-        """<div style="padding: 10px; border-left: 4px solid #856404; 
-                     color: #856404; margin: 5px 0; border-radius: 4px; background-color: #fff3cd">
-                <p><i>⚠️ API Key diperlukan untuk download dari Roboflow</i></p>
-            </div>"""
+    api_key_info = create_info_alert(
+        "API Key diperlukan untuk download dari Roboflow",
+        alert_type='warning',
+        icon='⚠️'
     )
     
     # Cek dan tambahkan API key dari Google Colab Secret
@@ -79,18 +66,16 @@ def setup_download_handlers(ui_components, config=None):
         if roboflow_api_key:
             ui_components['roboflow_settings'].children[0].value = roboflow_api_key
             has_api_key = True
-            api_key_info = widgets.HTML(
-                """<div style="padding: 10px; border-left: 4px solid #0c5460; 
-                     color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
-                    <p><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>
-                </div>"""
+            api_key_info = create_info_alert(
+                "API Key Roboflow tersedia dari Google Secret",
+                alert_type='info',
+                icon='ℹ️'
             )
     except:
         pass
     
     # Setup observer untuk download progress
     download_observers_group = "download_observers"
-    registered_observers = []
     
     if observer_manager:
         # Callback untuk update progress
@@ -98,20 +83,18 @@ def setup_download_handlers(ui_components, config=None):
             ui_components['download_progress'].value = int(progress * 100 / total) if total > 0 else 0
             ui_components['download_progress'].description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
             if message:
-                with ui_components['download_status']:
-                    display(create_status_indicator("info", message))
+                update_output_area(ui_components['download_status'], message, status="info")
         
         # Register observer
-        progress_observer = observer_manager.create_simple_observer(
+        observer_manager.create_simple_observer(
             event_type=EventTopics.DOWNLOAD_PROGRESS,
             callback=update_progress_callback,
             name="DownloadProgressObserver",
             group=download_observers_group
         )
-        registered_observers.append(progress_observer)
         
         # Observer untuk notifikasi download start/end
-        download_logger = observer_manager.create_logging_observer(
+        observer_manager.create_logging_observer(
             event_types=[
                 EventTopics.DOWNLOAD_START,
                 EventTopics.DOWNLOAD_END,
@@ -122,7 +105,14 @@ def setup_download_handlers(ui_components, config=None):
             name="DownloadLoggerObserver",
             group=download_observers_group
         )
-        registered_observers.append(download_logger)
+        
+        # Registrasi callback untuk update UI
+        register_observer_callback(
+            observer_manager, 
+            EventTopics.DOWNLOAD_COMPLETE, 
+            ui_components['download_status'],
+            group_name=download_observers_group
+        )
     
     # Handler untuk download dataset
     def on_download_click(b):
@@ -202,12 +192,12 @@ def setup_download_handlers(ui_components, config=None):
                         Path(data_dir).mkdir(parents=True, exist_ok=True)
                         config['data_dir'] = data_dir
                         
-                        # Download dataset
+                        # Download dataset - Gunakan format yolov5pytorch
                         try:
                             # Update with new config
                             dataset_manager.config = config
                             dataset_paths = dataset_manager.pull_dataset(
-                                format="yolov5",
+                                format="yolov5pytorch",  # Gunakan format yolov5pytorch
                                 api_key=api_key,
                                 workspace=workspace,
                                 project=project,
@@ -287,7 +277,7 @@ def setup_download_handlers(ui_components, config=None):
                             imported_dir = dataset_manager.import_from_zip(
                                 zip_path=temp_zip_path,
                                 target_dir=target_dir,
-                                format="yolov5"
+                                format="yolov5pytorch"  # Gunakan format yolov5pytorch
                             )
                             
                             ui_components['download_progress'].value = 100

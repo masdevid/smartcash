@@ -1,13 +1,14 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan implementasi ObserverManager yang dioptimalkan.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
-import os, sys
-from pathlib import Path
+import threading
+
+from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_preprocessing_handlers(ui_components, config=None):
     """Setup handlers untuk UI preprocessing dataset."""
@@ -69,6 +70,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Fungsi untuk cek apakah dataset sudah dipreprocess
     def check_preprocessed_dataset():
         """Cek apakah dataset sudah dipreprocess."""
+        from pathlib import Path
         data_dir = config.get('data_dir', 'data')
         splits = ['train', 'valid', 'test']
         
@@ -87,6 +89,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             display(create_status_indicator("warning", "🗑️ Membersihkan data preprocessing..."))
             
             try:
+                from pathlib import Path
                 data_dir = config.get('data_dir', 'data')
                 splits = ['train', 'valid', 'test']
                 
@@ -256,8 +259,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
                             </div>
                             """
                             
-                            # Tambahkan summary di bawah log accordion
-                            log_accordion.children[0].append_display(HTML(summary_html))
+                            # Tambahkan summary ke log area
+                            with preprocess_status:
+                                display(HTML(summary_html))
                             
                             # Tampilkan tombol cleanup
                             cleanup_button.layout.display = ''
@@ -273,6 +277,46 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 else:
                     # Pesan error jika PreprocessingManager tidak tersedia
                     display(create_status_indicator("error", "❌ PreprocessingManager tidak tersedia"))
+                    
+                    # Simulasi preprocessing jika PreprocessingManager tidak tersedia
+                    import time
+                    import random
+                    
+                    # Simulasi progress
+                    total_steps = 5
+                    for i in range(total_steps):
+                        preprocess_progress.value = int((i+1) * 100 / total_steps)
+                        preprocess_progress.description = f"{int((i+1) * 100 / total_steps)}%"
+                        
+                        # Tampilkan pesan progress
+                        if i == 0:
+                            display(create_status_indicator("info", "🔍 Validasi struktur dataset..."))
+                        elif i == 1:
+                            display(create_status_indicator("info", "🖼️ Resize gambar ke " + f"{img_size[0]}x{img_size[1]}..."))
+                        elif i == 2:
+                            display(create_status_indicator("info", "📊 Analisis distribusi kelas..."))
+                        elif i == 3:
+                            display(create_status_indicator("info", "⚖️ Normalisasi gambar..."))
+                        elif i == 4:
+                            display(create_status_indicator("info", "💾 Caching dataset..."))
+                        
+                        # Simulasi delay
+                        time.sleep(0.5)
+                    
+                    display(create_status_indicator("success", "✅ Preprocessing selesai (simulasi)"))
+                    
+                    # Tambahkan summary simulasi
+                    with preprocess_status:
+                        display(HTML(f"""
+                        <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
+                            <h4>📊 Preprocessing Summary (Simulated)</h4>
+                            <ul>
+                                <li><b>Total images:</b> {random.randint(800, 1000)}</li>
+                                <li><b>Valid images:</b> {random.randint(750, 950)}</li>
+                                <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
+                            </ul>
+                        </div>
+                        """))
             
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
@@ -282,9 +326,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 preprocess_progress.layout.visibility = 'hidden'
                 # Enable kembali tombol preprocessing
                 preprocess_button.disabled = False
-                # Pastikan observer dibersihkan
-                if observer_manager:
-                    observer_manager.unregister_group(preprocessing_observers_group)
     
     # Fungsi cleanup untuk unregister observer
     def cleanup():
@@ -329,25 +370,3 @@ def setup_preprocessing_handlers(ui_components, config=None):
         preprocess_options.children[3].value = preproc_config.get('num_workers', 4)
     
     return ui_components
-
-def create_status_indicator(status, message):
-    """Buat indikator status dengan styling konsisten."""
-    status_styles = {
-        'success': {'icon': '✅', 'color': 'green'},
-        'warning': {'icon': '⚠️', 'color': 'orange'},
-        'error': {'icon': '❌', 'color': 'red'},
-        'info': {'icon': 'ℹ️', 'color': 'blue'}
-    }
-    
-    style = status_styles.get(status, status_styles['info'])
-    
-    status_html = f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: #f8f9fa;">
-        <span style="color: {style['color']}; font-weight: bold;"> 
-            {style['icon']} {message}
-        </span>
-    </div>
-    """
-    
-    return HTML(status_html)

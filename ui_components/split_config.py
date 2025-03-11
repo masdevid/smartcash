@@ -1,12 +1,13 @@
 """
 File: smartcash/ui_components/split_config.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Komponen UI untuk konfigurasi split dataset SmartCash.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML
 from pathlib import Path
+from smartcash.utils.ui_utils import create_component_header, create_info_box
 
 def create_split_config_ui():
     """Buat komponen UI untuk konfigurasi split dataset."""
@@ -14,7 +15,11 @@ def create_split_config_ui():
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("<h2>✂️ Dataset Split Configuration</h2><p>Konfigurasi pembagian dataset untuk training, validation, dan testing</p>")
+    header = create_component_header(
+        "Dataset Split Configuration",
+        "Konfigurasi pembagian dataset untuk training, validation, dan testing",
+        "✂️"
+    )
     
     # Split options
     split_options = widgets.VBox([
@@ -84,19 +89,11 @@ def create_split_config_ui():
     
     # Dataset stats output
     stats_output = widgets.Output()
-    with stats_output:
-        display(HTML("""
-        <div style="padding: 10px; background-color: #f8f9fa; border-radius: 5px; margin-top: 10px;">
-            <h4>📊 Dataset Statistics</h4>
-            <p><i>Statistics will be shown after split is applied</i></p>
-        </div>
-        """))
     
     # Info box
-    info_box = widgets.HTML("""
-    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 10px 0; border-radius: 4px;">
-        <h4 style="margin-top: 0;">ℹ️ Tentang Split Dataset</h4>
+    info_box = create_info_box(
+        "Tentang Split Dataset",
+        """
         <p>Pembagian dataset menjadi 3 subset:</p>
         <ul>
             <li><strong>Train</strong>: Dataset untuk training model</li>
@@ -104,8 +101,9 @@ def create_split_config_ui():
             <li><strong>Test</strong>: Dataset untuk evaluasi final model</li>
         </ul>
         <p>Gunakan <strong>stratified split</strong> untuk memastikan distribusi kelas tetap seimbang di semua subset.</p>
-    </div>
-    """)
+        """,
+        'info'
+    )
     
     # Pasang semua komponen
     main_container.children = [

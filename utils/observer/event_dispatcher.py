@@ -176,13 +176,6 @@ class EventDispatcher:
         if not observers:
             return None if not async_mode else []
         
-        # Log notification
-        if cls._logging_enabled:
-            cls._logger.debug(
-                f"📢 Notifikasi event '{event_type}' ke {len(observers)} observer"
-                f"{' (async)' if async_mode else ''}"
-            )
-        
         if async_mode:
             return cls._notify_async(event_type, sender, observers, **kwargs)
         else:

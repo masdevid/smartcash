@@ -108,6 +108,7 @@ class DatasetDownloader:
         
         # Buat directory jika belum ada
         os.makedirs(output_dir, exist_ok=True)
+        output_path = Path(output_dir)
         
         # Notifikasi start download
         self.logger.info(f"🚀 Memulai download dataset {workspace}/{project} versi {version}")
@@ -133,29 +134,39 @@ class DatasetDownloader:
             
             # Gunakan tqdm untuk progress tracking jika diminta
             if show_progress:
-                self.logger.info(f"⏳ Downloading dataset dari Roboflow (tidak support resume)")
-            
-            # Download dataset - tidak support resume untuk Roboflow
-            dataset = version_obj.download(
-                model_format=format,
-                location=output_dir
-            )
+                self.logger.info(f"⏳ Downloading dataset dari Roboflow")
+                
+                # Implementasi download manual dengan progress tracking
+                download_url = version_obj._generate_download_url(format=format)
+                
+                # Jika url tidak valid, gunakan implementasi default dari Roboflow
+                if not download_url or not download_url.startswith('http'):
+                    self.logger.warning("⚠️ URL download tidak valid, menggunakan metode default Roboflow")
+                    dataset = version_obj.download(model_format=format, location=output_dir)
+                    self._verify_download(output_dir)
+                    
+                    self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
+                    self._notify_download_complete(workspace, project, version, output_dir)
+                    return output_dir
+                
+                # Download manual dengan progress tracking
+                zip_path = output_path / "dataset.zip"
+                self._download_with_progress(download_url, zip_path)
+                
+                # Ekstrak file zip
+                self.logger.info(f"📦 Mengekstrak dataset...")
+                self.extract_zip(zip_path, output_path, remove_zip=True, show_progress=True)
+            else:
+                # Download tanpa progress tracking menggunakan API Roboflow
+                dataset = version_obj.download(model_format=format, location=output_dir)
             
             # Verifikasi hasil download
-            if not self._verify_download(output_dir):
-                raise ValueError("❌ Download tidak lengkap atau rusak, silakan coba lagi")
+            self._verify_download(output_dir)
             
             self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}")
             
             # Notifikasi download selesai
-            EventDispatcher.notify(
-                event_type=EventTopics.DOWNLOAD_COMPLETE,
-                sender=self,
-                workspace=workspace,
-                project=project,
-                version=version,
-                output_dir=output_dir
-            )
+            self._notify_download_complete(workspace, project, version, output_dir)
             
             return output_dir
             
@@ -167,6 +178,117 @@ class DatasetDownloader:
                 error=str(e)
             )
             raise
+    
+    def _download_with_progress(self, url: str, output_path: Path) -> None:
+        """
+        Download file dengan progress tracking.
+        
+        Args:
+            url: URL file yang akan didownload
+            output_path: Path untuk menyimpan file
+        """
+        try:
+            self.logger.info(f"📥 Downloading dari: {url}")
+            
+            # Request dengan stream=True untuk download chunk by chunk
+            response = requests.get(url, stream=True, timeout=self.timeout)
+            response.raise_for_status()
+            
+            # Setup progress bar
+            total_size = int(response.headers.get('content-length', 0))
+            progress = tqdm(
+                total=total_size, 
+                unit='B', 
+                unit_scale=True,
+                desc=f"Downloading {output_path.name}"
+            )
+            
+            # Download file chunks
+            with open(output_path, 'wb') as f:
+                downloaded = 0
+                for chunk in response.iter_content(chunk_size=self.chunk_size):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        progress.update(len(chunk))
+                        
+                        # Notify progress
+                        EventDispatcher.notify(
+                            event_type=EventTopics.DOWNLOAD_PROGRESS,
+                            sender=self,
+                            progress=downloaded,
+                            total=total_size
+                        )
+            
+            progress.close()
+            
+            # Verifikasi file size
+            if os.path.getsize(output_path) == 0:
+                raise ValueError(f"❌ Download gagal: File size 0 bytes")
+                
+            self.logger.info(f"✅ Download selesai: {output_path}")
+        
+        except Exception as e:
+            self.logger.error(f"❌ Download gagal: {str(e)}")
+            # Hapus file yang mungkin rusak
+            if output_path.exists():
+                output_path.unlink()
+            raise
+    
+    def _notify_download_complete(self, workspace: str, project: str, version: str, output_dir: str) -> None:
+        """
+        Kirim notifikasi download selesai.
+        
+        Args:
+            workspace: Roboflow workspace
+            project: Roboflow project
+            version: Roboflow version
+            output_dir: Directory dataset
+        """
+        stats = self._get_dataset_stats(output_dir)
+        
+        EventDispatcher.notify(
+            event_type=EventTopics.DOWNLOAD_COMPLETE,
+            sender=self,
+            workspace=workspace,
+            project=project,
+            version=version,
+            output_dir=output_dir,
+            stats=stats
+        )
+    
+    def _get_dataset_stats(self, dataset_dir: str) -> Dict[str, int]:
+        """
+        Dapatkan statistik dataset.
+        
+        Args:
+            dataset_dir: Directory dataset
+            
+        Returns:
+            Dictionary berisi statistik jumlah file per split
+        """
+        dataset_path = Path(dataset_dir)
+        stats = {}
+        
+        for split in ['train', 'valid', 'test']:
+            split_path = dataset_path / split
+            if not split_path.exists():
+                stats[split] = 0
+                continue
+                
+            images_dir = split_path / 'images'
+            if not images_dir.exists():
+                stats[split] = 0
+                continue
+                
+            # Hitung jumlah file
+            img_count = sum(1 for _ in images_dir.glob('*.jpg')) + \
+                        sum(1 for _ in images_dir.glob('*.jpeg')) + \
+                        sum(1 for _ in images_dir.glob('*.png'))
+            
+            stats[split] = img_count
+        
+        return stats
     
     def _verify_download(self, output_dir: Union[str, Path]) -> bool:
         """
@@ -313,6 +435,7 @@ class DatasetDownloader:
                 return tuple(str(self.data_dir / split) for split in ['train', 'valid', 'test'])
             
             # Download dari Roboflow dan export ke lokal
+            self.logger.info("🔄 Dataset belum tersedia atau tidak lengkap, mendownload dari Roboflow...")
             roboflow_dir = self.download_dataset(
                 format=format, 
                 api_key=api_key, 

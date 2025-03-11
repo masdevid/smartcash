@@ -9,7 +9,8 @@ from pathlib import Path
 
 from smartcash.utils.logger import get_logger
 from smartcash.utils.dataset import EnhancedDatasetValidator
-from smartcash.utils.observer import EventDispatcher, EventTopics
+from smartcash.utils.observer import EventTopics
+from smartcash.utils.observer.observer_manager import ObserverManager
 from smartcash.utils.environment_manager import EnvironmentManager
 
 
@@ -21,6 +22,13 @@ class DatasetValidator:
         self.logger = logger or get_logger("DatasetValidator")
         self.env_manager = env_manager or EnvironmentManager(logger=self.logger)
         self._validator = None
+        
+        # Setup observer manager
+        self.observer_manager = ObserverManager(auto_register=True)
+        self.observer_manager.create_logging_observer(
+            event_types=[EventTopics.PREPROCESSING_START, EventTopics.PREPROCESSING_END, EventTopics.PREPROCESSING_ERROR],
+            log_level="debug"
+        )
     
     def _lazy_init_validator(self):
         """Lazy initialize validator."""
@@ -40,14 +48,17 @@ class DatasetValidator:
         self.logger.start(f"🔍 Memulai validasi: {split}")
         
         try:
-            EventDispatcher.notify(EventTopics.PREPROCESSING_START, self, split=split)
+            self.observer_manager.create_simple_observer(
+                event_type=EventTopics.PREPROCESSING_END,
+                callback=lambda *args, **kw: self.logger.success(
+                    f"✅ Validasi {split} selesai: "
+                    f"{kw.get('result', {}).get('valid_images', 0)}/{kw.get('result', {}).get('total_images', 0)} "
+                    f"gambar valid"
+                ),
+                name=f"ValidationEnd_{split}"
+            )
             
             results = self._validator.validate_dataset(split=split, **kwargs)
-            
-            EventDispatcher.notify(EventTopics.PREPROCESSING_END, self, split=split, result=results)
-            
-            valid_percent = (results['valid_images'] / results['total_images'] * 100) if results.get('total_images', 0) > 0 else 0
-            self.logger.success(f"✅ Validasi selesai: {results['valid_images']}/{results['total_images']} gambar valid ({valid_percent:.1f}%)")
             
             return {
                 'status': 'success', 
@@ -57,8 +68,6 @@ class DatasetValidator:
         
         except Exception as e:
             self.logger.error(f"❌ Validasi gagal: {str(e)}")
-            EventDispatcher.notify(EventTopics.PREPROCESSING_ERROR, self, error=str(e))
-            
             return {
                 'status': 'error', 
                 'error': str(e), 

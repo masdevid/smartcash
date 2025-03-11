@@ -76,6 +76,21 @@ class DatasetManager(PipelineFacade):
             format_string="🖼️ UI: {action}",
             group="dataset_ui"
         )
+        
+        # Observer untuk download events
+        self.observer_manager.create_logging_observer(
+            event_types=[
+                EventTopics.DOWNLOAD_START,
+                EventTopics.DOWNLOAD_END,
+                EventTopics.DOWNLOAD_PROGRESS,
+                EventTopics.DOWNLOAD_ERROR,
+                EventTopics.DOWNLOAD_COMPLETE
+            ],
+            log_level="info",
+            name="DownloadLogger",
+            format_string="📥 {event_type}: {message}",
+            group="dataset_download"
+        )
     
     def setup_progress_observer(self, total: int, desc: str = "Dataset Processing") -> None:
         """
@@ -93,9 +108,39 @@ class DatasetManager(PipelineFacade):
             group="dataset_progress"
         )
     
-    def unregister_observers(self) -> None:
-        """Membatalkan registrasi semua observer dataset."""
-        self.observer_manager.unregister_all()
+    def setup_download_progress_observer(self, total: int, desc: str = "Downloading Dataset") -> None:
+        """
+        Setup observer untuk monitoring progress download dengan tqdm.
+        
+        Args:
+            total: Total langkah untuk progress bar
+            desc: Deskripsi progress
+        """
+        self.observer_manager.create_progress_observer(
+            event_types=[EventTopics.DOWNLOAD_PROGRESS],
+            total=total,
+            desc=desc,
+            name="DownloadProgressObserver",
+            group="dataset_download"
+        )
+    
+    def unregister_observers(self, group: Optional[str] = None) -> int:
+        """
+        Membatalkan registrasi observer dataset.
+        
+        Args:
+            group: Nama grup observer yang akan dibersihkan, 
+                  jika None maka semua observer akan dibersihkan
+                  
+        Returns:
+            Jumlah observer yang dibersihkan
+        """
+        if group:
+            count = self.observer_manager.unregister_group(group)
+            return count
+        else:
+            count = self.observer_manager.unregister_all()
+            return count
     
     def get_observer_stats(self) -> Dict[str, Any]:
         """
@@ -106,9 +151,20 @@ class DatasetManager(PipelineFacade):
         """
         return self.observer_manager.get_stats()
     
+    def get_observer_groups(self) -> List[str]:
+        """
+        Mendapatkan daftar grup observer yang terdaftar.
+        
+        Returns:
+            List nama grup
+        """
+        stats = self.observer_manager.get_stats()
+        return list(stats.get('groups', {}).keys())
+    
     def __del__(self):
         """Cleanup saat instance dihapus."""
         try:
             self.unregister_observers()
-        except:
+        except Exception:
+            # Tidak perlu log di destructor untuk menghindari error saat Python shutdown
             pass

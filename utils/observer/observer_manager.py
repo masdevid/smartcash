@@ -1,7 +1,8 @@
 # File: smartcash/utils/observer/observer_manager.py
-# Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan dictionary storage
+# Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan memory leak dan resource management
 
 import inspect
+import weakref
 from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
 import threading
 
@@ -19,15 +20,16 @@ class ObserverManager:
     # Lock untuk thread-safety
     _lock = threading.RLock()
     
-    # Set untuk menyimpan semua observer yang dibuat (menggunakan set karena BaseObserver sudah bisa di-hash)
-    _observers: Set[BaseObserver] = set()
+    # Menyimpan observer dengan weakref untuk mencegah memory leak
+    _observers = weakref.WeakSet()
     
-    # Dictionary untuk menyimpan observer berdasarkan grupnya
-    _observer_groups: Dict[str, Set[BaseObserver]] = {}
+    # Dictionary untuk menyimpan observer berdasarkan grupnya dengan weakref
+    _observer_groups = {}
     
     def __init__(self, auto_register: bool = True):
         """Inisialisasi ObserverManager."""
         self.auto_register = auto_register
+        self._progress_bars = {}  # Untuk melacak progress bar yang dibuat
     
     def create_simple_observer(
         self, 
@@ -62,7 +64,7 @@ class ObserverManager:
             self._observers.add(observer)
             if group is not None:
                 if group not in self._observer_groups:
-                    self._observer_groups[group] = set()
+                    self._observer_groups[group] = weakref.WeakSet()
                 self._observer_groups[group].add(observer)
         
         # Daftarkan ke event dispatcher jika auto_register
@@ -109,7 +111,7 @@ class ObserverManager:
             self._observers.add(observer)
             if group is not None:
                 if group not in self._observer_groups:
-                    self._observer_groups[group] = set()
+                    self._observer_groups[group] = weakref.WeakSet()
                 self._observer_groups[group].add(observer)
         
         # Daftarkan ke event dispatcher jika auto_register
@@ -147,6 +149,8 @@ class ObserverManager:
                 self.progress = 0
                 self.total = total
                 self.pbar = tqdm(total=total, desc=desc) if use_tqdm else None
+                # Tambahkan referensi ke grup untuk pembersihan
+                self.group = group
             
             def update(self, event_type, sender, **kwargs):
                 # Update progres
@@ -170,13 +174,21 @@ class ObserverManager:
                 # Pastikan progress bar ditutup
                 if hasattr(self, 'pbar') and self.pbar is not None:
                     self.pbar.close()
+                    self.pbar = None
         
         # Gunakan nama default jika tidak disebutkan
         if name is None:
             name = f"ProgressObserver_{desc}"
         
         # Buat observer
-        return self.create_observer(ProgressObserver, event_types, name=name, group=group)
+        observer = self.create_observer(ProgressObserver, event_types, name=name, group=group)
+        
+        # Simpan referensi ke progress bar untuk pembersihan
+        if group not in self._progress_bars:
+            self._progress_bars[group] = []
+        self._progress_bars[group].append(weakref.ref(observer))
+        
+        return observer
     
     def create_logging_observer(
         self,
@@ -242,42 +254,71 @@ class ObserverManager:
         with self._lock:
             if group not in self._observer_groups:
                 return []
+            # Konversi ke list untuk mencegah perubahan saat iterasi
             return list(self._observer_groups[group])
     
     def unregister_group(self, group: str) -> int:
         """Membatalkan registrasi semua observer dalam grup tertentu."""
         observers = self.get_observers_by_group(group)
+        count = 0
         
         for observer in observers:
             EventDispatcher.unregister_from_all(observer)
+            count += 1
+        
+        # Bersihkan progress bar yang terkait dengan grup
+        self._cleanup_progress_bars(group)
         
         # Hapus grup
         with self._lock:
             if group in self._observer_groups:
+                self._observer_groups[group].clear()
                 del self._observer_groups[group]
+            
+            if group in self._progress_bars:
+                del self._progress_bars[group]
         
-        count = len(observers)
-        self._logger.debug(f"🔌 Membatalkan registrasi {count} observer dari grup '{group}'")
         return count
+    
+    def _cleanup_progress_bars(self, group: str) -> None:
+        """Membersihkan progress bar milik grup tertentu."""
+        if group not in self._progress_bars:
+            return
+            
+        for ref in self._progress_bars[group]:
+            observer = ref()
+            if observer is not None and hasattr(observer, 'pbar') and observer.pbar is not None:
+                try:
+                    observer.pbar.close()
+                    observer.pbar = None
+                except:
+                    pass
     
     def unregister_all(self) -> int:
         """Membatalkan registrasi semua observer yang dikelola."""
         with self._lock:
-            count = len(self._observers)
+            # Konversi ke list untuk mencegah perubahan saat iterasi
+            observers = list(self._observers)
+            count = len(observers)
             
-            for observer in self._observers:
+            for observer in observers:
                 EventDispatcher.unregister_from_all(observer)
+            
+            # Bersihkan semua progress bar
+            for group in list(self._progress_bars.keys()):
+                self._cleanup_progress_bars(group)
             
             # Bersihkan set dan grup
             self._observers.clear()
             self._observer_groups.clear()
+            self._progress_bars.clear()
         
-        self._logger.debug(f"🔌 Membatalkan registrasi {count} observer yang dikelola")
         return count
     
     def get_all_observers(self) -> List[BaseObserver]:
         """Mendapatkan semua observer yang dikelola."""
         with self._lock:
+            # Konversi ke list untuk mencegah perubahan saat iterasi
             return list(self._observers)
     
     def get_observer_count(self) -> int:
@@ -296,9 +337,17 @@ class ObserverManager:
             stats = {
                 'observer_count': len(self._observers),
                 'group_count': len(self._observer_groups),
-                'groups': {group: len(observers) for group, observers in self._observer_groups.items()}
+                'groups': {group: len(observers) for group, observers in self._observer_groups.items()},
+                'progress_bars': {group: len(bars) for group, bars in self._progress_bars.items()}
             }
         
         # Tambahkan statistik dari dispatcher
         stats.update(EventDispatcher.get_stats())
         return stats
+        
+    def __del__(self):
+        """Cleanup saat instance dihapus."""
+        try:
+            self.unregister_all()
+        except:
+            pass

@@ -205,37 +205,71 @@ def create_alert(message: str,
 
 def create_info_box(title: str, 
                    content: str, 
+                   style: str = 'info',
                    icon: Optional[str] = None,
-                   collapsed: bool = False) -> widgets.Accordion:
+                   collapsed: bool = False) -> Union[widgets.Accordion, widgets.HTML]:
     """
-    Buat box informasi yang dapat dilipat.
+    Buat box informasi dengan styling yang konsisten.
     
     Args:
         title: Judul box
         content: Konten dalam box (dapat berisi HTML)
+        style: Tipe styling ('info', 'success', 'warning', 'error')
         icon: Optional emoji icon
-        collapsed: True jika box dilipat secara default
+        collapsed: True jika box dilipat secara default (hanya untuk tipe Accordion)
         
     Returns:
-        Widget Accordion yang berisi konten
+        Widget box informasi
     """
-    # Tambahkan ikon jika disediakan
-    title_with_icon = f"{icon} {title}" if icon else title
+    style_configs = {
+        'info': {
+            'bg_color': '#d1ecf1',
+            'border_color': '#0c5460',
+            'text_color': '#0c5460',
+            'default_icon': 'ℹ️'
+        },
+        'warning': {
+            'bg_color': '#fff3cd',
+            'border_color': '#856404',
+            'text_color': '#856404',
+            'default_icon': '⚠️'
+        },
+        'success': {
+            'bg_color': '#d4edda',
+            'border_color': '#155724',
+            'text_color': '#155724',
+            'default_icon': '✅'
+        },
+        'error': {
+            'bg_color': '#f8d7da',
+            'border_color': '#721c24',
+            'text_color': '#721c24',
+            'default_icon': '❌'
+        }
+    }
     
-    # Buat konten dalam HTML widget
-    content_widget = widgets.HTML(value=content)
+    style_config = style_configs.get(style, style_configs['info'])
+    icon_to_use = icon if icon else style_config['default_icon']
+    title_with_icon = f"{icon_to_use} {title}"
     
-    # Buat accordion
-    accordion = widgets.Accordion([content_widget])
-    accordion.set_title(0, title_with_icon)
-    
-    # Set status dilipat atau tidak
     if collapsed:
-        accordion.selected_index = None
+        # Gunakan Accordion jika perlu collapsible
+        content_widget = widgets.HTML(value=content)
+        accordion = widgets.Accordion([content_widget])
+        accordion.set_title(0, title_with_icon)
+        accordion.selected_index = None if collapsed else 0
+        return accordion
     else:
-        accordion.selected_index = 0
-        
-    return accordion
+        # Gunakan HTML biasa jika tidak perlu collapsible
+        box_html = f"""
+        <div style="padding: 10px; background-color: {style_config['bg_color']}; 
+                 border-left: 4px solid {style_config['border_color']}; 
+                 color: {style_config['text_color']}; margin: 10px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: inherit;">{title_with_icon}</h4>
+            {content}
+        </div>
+        """
+        return widgets.HTML(value=box_html)
 
 def create_metric_display(label: str, 
                          value: Union[int, float, str],
@@ -280,6 +314,28 @@ def create_metric_display(label: str,
     """
     
     return widgets.HTML(value=metric_html)
+
+def create_component_header(title: str, description: str = "", icon: str = "🔧") -> widgets.HTML:
+    """
+    Buat header komponen UI dengan styling konsisten.
+    
+    Args:
+        title: Judul header
+        description: Deskripsi header (opsional)
+        icon: Emoji ikon untuk header
+        
+    Returns:
+        Widget HTML header
+    """
+    header_html = f"""
+    <div style="background-color: #f0f8ff; padding: 15px; color: black; 
+              border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+        <h2 style="color: inherit; margin-top: 0;">{icon} {title}</h2>
+        <p style="color: inherit; margin-bottom: 0;">{description}</p>
+    </div>
+    """
+    
+    return widgets.HTML(value=header_html)
 
 def create_section_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """
@@ -349,6 +405,47 @@ def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBo
         loading.layout.display = 'flex' if show else 'none'
     
     return loading, toggle_loading
+
+def update_output_area(output_widget: widgets.Output, message: str, status: str = 'info', clear: bool = False):
+    """
+    Update area output dengan pesan status.
+    
+    Args:
+        output_widget: Widget output untuk diupdate
+        message: Pesan yang akan ditampilkan
+        status: Jenis status ('success', 'warning', 'error', 'info')
+        clear: Flag untuk membersihkan output sebelum menampilkan
+    """
+    with output_widget:
+        if clear:
+            output_widget.clear_output()
+        display(create_status_indicator(status, message))
+
+def register_observer_callback(observer_manager, event_type, output_widget, 
+                            group_name="ui_observer_group"):
+    """
+    Daftarkan callback untuk observer yang menampilkan pesan ke widget output.
+    
+    Args:
+        observer_manager: Instance ObserverManager
+        event_type: Tipe event yang akan dimonitor
+        output_widget: Widget output untuk menampilkan notifikasi
+        group_name: Nama grup observer
+    """
+    if observer_manager:
+        def update_ui_callback(event_type, sender, message=None, **kwargs):
+            if message:
+                status = kwargs.get('status', 'info')
+                with output_widget:
+                    display(create_status_indicator(status, message))
+        
+        # Register observer
+        observer_manager.create_simple_observer(
+            event_type=event_type,
+            callback=update_ui_callback,
+            name=f"UI_{event_type}_Observer",
+            group=group_name
+        )
 
 def plot_statistics(
     data: pd.DataFrame, 

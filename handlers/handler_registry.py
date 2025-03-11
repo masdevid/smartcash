@@ -87,7 +87,6 @@ class HandlerRegistry:
         handler_class = cls._registry[handler_name]
         instance = handler_class(**kwargs)
         
-        cls._logger.debug(f"🔧 Instance handler '{handler_name}' berhasil dibuat")
         return instance
     
     @classmethod
@@ -126,6 +125,5 @@ class HandlerRegistry:
         """
         if handler_name in cls._registry:
             del cls._registry[handler_name]
-            cls._logger.debug(f"❌ Handler '{handler_name}' dihapus dari registry")
             return True
         return False

@@ -1,12 +1,24 @@
 # Cell 2.2 - Dataset Preprocessing
 # Preprocessing dataset untuk training model SmartCash
 import sys
+import gc
 from pathlib import Path
 from IPython.display import display
 
 # Pastikan smartcash ada di path
 if not any('smartcash' in p for p in sys.path):
     sys.path.append('.')
+
+# Force garbage collection untuk pembersihan memori
+gc.collect()
+
+# Pastikan observer dari sesi sebelumnya dibersihkan
+try:
+    from smartcash.utils.observer.observer_manager import ObserverManager
+    observer_manager = ObserverManager()
+    observer_manager.unregister_group("preprocessing_observers")
+except:
+    pass
 
 # Setup environment dan konfigurasi
 try:
@@ -79,3 +91,8 @@ ui_components = setup_preprocessing_handlers(ui_components, config)
 
 # Tampilkan UI
 display(ui_components['ui'])
+
+# Register cleanup untuk melepas observer
+if 'cleanup' in ui_components:
+    import atexit
+    atexit.register(ui_components['cleanup'])

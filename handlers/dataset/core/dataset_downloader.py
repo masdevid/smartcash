@@ -2,7 +2,7 @@
 File: smartcash/handlers/dataset/core/dataset_downloader.py
 Author: Alfrida Sabar
 Deskripsi: Downloader dataset terintegrasi dengan dukungan threading, progress tracking
-           dan verifikasi hasil download
+           dan verifikasi hasil download, serta cleanup observer yang tepat
 """
 
 import os, json, time, hashlib, threading, zipfile, dotenv
@@ -84,6 +84,18 @@ class DatasetDownloader:
             logger=self.logger,
             num_workers=self.num_workers
         )
+        
+        # Daftar observer events yang mungkin digunakan
+        self._observer_events = [
+            EventTopics.DOWNLOAD_START,
+            EventTopics.DOWNLOAD_END,
+            EventTopics.DOWNLOAD_PROGRESS,
+            EventTopics.DOWNLOAD_ERROR,
+            EventTopics.DOWNLOAD_COMPLETE
+        ]
+        
+        # Simpan instance observer yang didaftarkan
+        self._registered_observers = []
         
         if not self.api_key:
             self.logger.warning("⚠️ Roboflow API key tidak ditemukan. Fitur download mungkin tidak berfungsi.")
@@ -341,3 +353,16 @@ class DatasetDownloader:
             self.logger.info(f"🔍 Dataset (akan didownload): {info['name']} v{info['version']} dari {info['workspace']}")
         
         return info
+        
+    def unregister_observers(self) -> None:
+        """Batalkan registrasi semua observer untuk events download."""
+        for event_type in self._observer_events:
+            EventDispatcher.unregister_from_event(event_type, self)
+            
+    def __del__(self):
+        """Destructor untuk membersihkan observer saat objek dihapus."""
+        try:
+            self.unregister_observers()
+        except Exception as e:
+            # Jangan log di destructor untuk menghindari error di saat Python shutdown
+            pass

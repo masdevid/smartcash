@@ -1,5 +1,5 @@
 """
-File: smartcash/handlers/dataset/core/download_core/file_processor.py
+File: smartcash/handlers/dataset/core/file_processor.py
 Author: Alfrida Sabar
 Deskripsi: Komponen sederhana untuk memproses file dataset
 """
@@ -62,10 +62,11 @@ class FileProcessor:
             else:
                 zip_ref.extractall(output_dir)
 
-        try:
-            zip_path.unlink()
-        except Exception:
-            pass
+        if remove_zip:
+            try:
+                zip_path.unlink()
+            except Exception:
+                pass
         
         if self.logger:
             self.logger.success(f"✅ Ekstraksi selesai: {output_dir}")
@@ -74,7 +75,8 @@ class FileProcessor:
         self,
         source_dir: Union[str, Path],
         target_dir: Union[str, Path],
-        show_progress: bool = True
+        show_progress: bool = True,
+        num_workers: int = None
     ) -> Dict[str, int]:
         """Export dataset dari struktur Roboflow ke struktur lokal standar."""
         source_path = Path(source_dir)
@@ -82,6 +84,10 @@ class FileProcessor:
         
         if self.logger:
             self.logger.info(f"📤 Export dataset dari {source_path} ke {target_path}")
+            
+        # Gunakan num_workers instance jika tidak ada parameter
+        if num_workers is None:
+            num_workers = self.num_workers
             
         # Inisialisasi statistik
         stats = {'copied': 0, 'errors': 0}
@@ -124,7 +130,7 @@ class FileProcessor:
             except Exception:
                 return False
         
-        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+        with ThreadPoolExecutor(max_workers=num_workers) as executor:
             results = []
             for task in copy_tasks:
                 results.append(executor.submit(copy_file_pair, *task))
@@ -144,4 +150,114 @@ class FileProcessor:
         if self.logger:
             self.logger.success(f"✅ Export selesai: {stats['copied']} file berhasil disalin")
         
+        return stats
+    
+    def fix_dataset_structure(self, dataset_dir: Union[str, Path]) -> bool:
+        """Perbaiki struktur dataset jika tidak sesuai format YOLOv5."""
+        dataset_path = Path(dataset_dir)
+        
+        # Cek apakah sudah memiliki struktur yang benar
+        is_valid = True
+        for split in DEFAULT_SPLITS:
+            if not (dataset_path / split / 'images').exists() or not (dataset_path / split / 'labels').exists():
+                is_valid = False
+                break
+                
+        if is_valid:
+            return True
+            
+        # Coba perbaiki struktur
+        if self.logger:
+            self.logger.info(f"🔧 Memperbaiki struktur dataset di {dataset_path}")
+            
+        # Temukan struktur yang ada
+        if (dataset_path / 'train').exists() and (dataset_path / 'valid').exists():
+            # Ada direktori train/valid tapi mungkin tanpa subdir images/labels
+            for split in DEFAULT_SPLITS:
+                split_dir = dataset_path / split
+                if split_dir.exists():
+                    # Cek apakah ada direktori images/labels
+                    if not (split_dir / 'images').exists():
+                        os.makedirs(split_dir / 'images', exist_ok=True)
+                        # Pindahkan file gambar ke direktori images
+                        for ext in ['jpg', 'jpeg', 'png']:
+                            for img_file in split_dir.glob(f'*.{ext}'):
+                                shutil.move(img_file, split_dir / 'images' / img_file.name)
+                    
+                    if not (split_dir / 'labels').exists():
+                        os.makedirs(split_dir / 'labels', exist_ok=True)
+                        # Pindahkan file label ke direktori labels
+                        for label_file in split_dir.glob('*.txt'):
+                            shutil.move(label_file, split_dir / 'labels' / label_file.name)
+        elif (dataset_path / 'images').exists() and (dataset_path / 'labels').exists():
+            # Ada direktori root images/labels tanpa split
+            # Buat struktur split
+            train_dir = dataset_path / 'train'
+            valid_dir = dataset_path / 'valid'
+            test_dir = dataset_path / 'test'
+            
+            for split_dir in [train_dir, valid_dir, test_dir]:
+                os.makedirs(split_dir / 'images', exist_ok=True)
+                os.makedirs(split_dir / 'labels', exist_ok=True)
+            
+            # Pindahkan semua file ke train
+            for img_file in (dataset_path / 'images').glob('*.*'):
+                shutil.copy2(img_file, train_dir / 'images' / img_file.name)
+                
+            for label_file in (dataset_path / 'labels').glob('*.txt'):
+                shutil.copy2(label_file, train_dir / 'labels' / label_file.name)
+        else:
+            # Struktur tidak dikenal
+            if self.logger:
+                self.logger.warning(f"⚠️ Struktur dataset tidak dikenali")
+            return False
+            
+        if self.logger:
+            self.logger.success(f"✅ Struktur dataset diperbaiki")
+        return True
+        
+    def copy_dataset_to_data_dir(self, src_dir: Union[str, Path], dst_dir: Union[str, Path]) -> Dict[str, int]:
+        """Salin dataset ke direktori data utama."""
+        src_path = Path(src_dir)
+        dst_path = Path(dst_dir)
+        
+        if src_path == dst_path:
+            return {'copied': 0, 'errors': 0}
+            
+        if self.logger:
+            self.logger.info(f"🔄 Menyalin dataset dari {src_path} ke {dst_path}")
+            
+        stats = {'copied': 0, 'errors': 0}
+        
+        # Salin untuk setiap split
+        for split in DEFAULT_SPLITS:
+            src_split = src_path / split
+            dst_split = dst_path / split
+            
+            if not src_split.exists():
+                continue
+                
+            # Buat direktori target
+            os.makedirs(dst_split / 'images', exist_ok=True)
+            os.makedirs(dst_split / 'labels', exist_ok=True)
+            
+            # Salin gambar
+            for img_file in (src_split / 'images').glob('*.*'):
+                try:
+                    shutil.copy2(img_file, dst_split / 'images' / img_file.name)
+                    stats['copied'] += 1
+                except Exception:
+                    stats['errors'] += 1
+                    
+            # Salin label
+            for label_file in (src_split / 'labels').glob('*.txt'):
+                try:
+                    shutil.copy2(label_file, dst_split / 'labels' / label_file.name)
+                    stats['copied'] += 1
+                except Exception:
+                    stats['errors'] += 1
+                    
+        if self.logger:
+            self.logger.success(f"✅ Dataset disalin: {stats['copied']} file")
+            
         return stats

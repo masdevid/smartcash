@@ -50,9 +50,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
         
         logger = get_logger("preprocessing")
         dataset_manager = DatasetManager(config, logger=logger)
-        
-        if logger:
-            logger.info("✅ DatasetManager berhasil diinisialisasi")
     except ImportError as e:
         print(f"ℹ️ Beberapa modul tidak tersedia: {str(e)}")
     
@@ -146,7 +143,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                             if 'stats' in result:
                                 stats = result['stats']
                                 stats_html = f"""
-                                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                                <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
                                     <h4>📊 Preprocessing Stats</h4>
                                     <ul>
                                         <li><b>Images processed:</b> {stats.get('num_images', 'N/A')}</li>

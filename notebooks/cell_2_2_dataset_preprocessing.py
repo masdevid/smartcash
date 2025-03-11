@@ -28,20 +28,20 @@ try:
     config = None
     for file_path in config_files:
         try:
-            config = ConfigManager.load_config(
-                filename=file_path, 
-                fallback_to_pickle=True,
-                logger=logger
-            )
-            if config:
-                logger.info(f"✅ Konfigurasi berhasil dimuat dari {file_path}")
-                break
+            if Path(file_path).exists():
+                config = ConfigManager.load_config(
+                    filename=file_path, 
+                    fallback_to_pickle=True,
+                    logger=logger
+                )
+                if config:
+                    logger.info(f"✅ Konfigurasi berhasil dimuat dari {file_path}")
+                    break
         except Exception as e:
-            pass
+            logger.debug(f"Gagal load config dari {file_path}: {str(e)}")
     
     # Jika tidak ada file yang ditemukan, buat config default
-    if not config:
-        logger.warning("⚠️ Tidak ada file konfigurasi ditemukan, menggunakan default")
+    if not config or len(config) == 0:
         config = {
             'data': {
                 'preprocessing': {

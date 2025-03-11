@@ -15,7 +15,7 @@ def create_preprocessing_ui():
     
     # Header
     header = widgets.HTML("""
-    <div style="background-color: #f0f8ff; padding: 15px; border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+    <div style="background-color: #f0f8ff; padding: 15px; color: black; border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
         <h2 style="color: inherit; margin-top: 0;">🔧 Dataset Preprocessing</h2>
         <p style="color: inherit; margin-bottom: 0;">Preprocessing dataset untuk training model SmartCash</p>
     </div>

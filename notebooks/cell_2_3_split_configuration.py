@@ -1,6 +1,7 @@
 # Cell 2.3 - Dataset Split Configuration
 # Konfigurasi pembagian dataset untuk training, validation, dan testing
 import sys
+import atexit
 from pathlib import Path
 from IPython.display import display
 
@@ -13,10 +14,15 @@ try:
     from smartcash.utils.config_manager import ConfigManager
     from smartcash.utils.environment_manager import EnvironmentManager
     from smartcash.utils.logger import get_logger
+    from smartcash.utils.observer.observer_manager import ObserverManager
     
     # Setup logger dan environment
     logger = get_logger("dataset_split")
     env_manager = EnvironmentManager()
+    
+    # Pastikan semua observer dari sesi sebelumnya dibersihkan
+    observer_manager = ObserverManager()
+    observer_manager.unregister_group("split_observers")
     
     # Load konfigurasi
     config = ConfigManager.load_config(
@@ -49,6 +55,10 @@ except ImportError as e:
 # Buat dan setup komponen UI
 ui_components = create_split_config_ui()
 ui_components = setup_split_config_handlers(ui_components, config)
+
+# Register cleanup untuk melepas observer
+if 'cleanup' in ui_components:
+    atexit.register(ui_components['cleanup'])
 
 # Tampilkan UI
 display(ui_components['ui'])

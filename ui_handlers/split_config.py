@@ -1,13 +1,13 @@
 """
 File: smartcash/ui_handlers/split_config.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Handler untuk UI konfigurasi split dataset SmartCash.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
-import os, sys, time
-from pathlib import Path
+
+from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_split_config_handlers(ui_components, config=None):
     """Setup handlers untuk UI konfigurasi split dataset."""
@@ -17,7 +17,10 @@ def setup_split_config_handlers(ui_components, config=None):
             'data': {
                 'train_dir': 'data/train',
                 'valid_dir': 'data/valid',
-                'test_dir': 'data/test'
+                'test_dir': 'data/test',
+                'split_ratios': {'train': 0.7, 'valid': 0.15, 'test': 0.15},
+                'stratified_split': True,
+                'random_seed': 42
             },
             'data_dir': 'data'
         }
@@ -32,18 +35,28 @@ def setup_split_config_handlers(ui_components, config=None):
     # Setup logger dan DatasetManager jika tersedia
     dataset_manager = None
     logger = None
+    observer_manager = None
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.dataset import DatasetManager
         from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer.observer_manager import ObserverManager
         
         logger = get_logger("split_config")
         dataset_manager = DatasetManager(config, logger=logger)
+        observer_manager = ObserverManager(auto_register=True)
         
         if logger:
             logger.info("✅ DatasetManager berhasil diinisialisasi")
     except ImportError as e:
         print(f"ℹ️ Beberapa modul tidak tersedia: {str(e)}")
+    
+    # Kelompok observer untuk split
+    split_observers_group = "split_observers"
+    
+    # Pastikan semua observer dari grup ini dihapus untuk mencegah memory leak
+    if observer_manager:
+        observer_manager.unregister_group(split_observers_group)
     
     # Handler untuk tombol split
     def on_split_click(b):
@@ -87,7 +100,7 @@ def setup_split_config_handlers(ui_components, config=None):
                     config['data']['random_seed'] = random_seed
                 
                 # Notification event
-                if 'EventDispatcher' in locals():
+                if observer_manager:
                     EventDispatcher.notify(
                         event_type=EventTopics.DATASET_SPLIT_START,
                         sender="split_config_handler",
@@ -147,6 +160,7 @@ def setup_split_config_handlers(ui_components, config=None):
                     display(create_status_indicator("info", "ℹ️ DatasetManager tidak tersedia, melakukan simulasi split..."))
                     
                     # Simulasi delay
+                    import time
                     time.sleep(1.5)
                     
                     # Tampilkan sukses dengan persentase yang disesuaikan
@@ -163,6 +177,7 @@ def setup_split_config_handlers(ui_components, config=None):
                         ))
                     
                     # Update simulasi stats
+                    import random
                     update_stats_display({
                         'train_images': int(580 * train_pct / 70.0),
                         'valid_images': int(130 * val_pct / 15.0),
@@ -175,7 +190,7 @@ def setup_split_config_handlers(ui_components, config=None):
                     })
                 
                 # Notification event
-                if 'EventDispatcher' in locals():
+                if observer_manager:
                     EventDispatcher.notify(
                         event_type=EventTopics.DATASET_SPLIT_END,
                         sender="split_config_handler",
@@ -189,7 +204,7 @@ def setup_split_config_handlers(ui_components, config=None):
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
                 
                 # Notification event
-                if 'EventDispatcher' in locals():
+                if observer_manager:
                     EventDispatcher.notify(
                         event_type=EventTopics.DATASET_SPLIT_ERROR,
                         sender="split_config_handler",
@@ -272,8 +287,22 @@ def setup_split_config_handlers(ui_components, config=None):
             stats_html += "</div>"
             display(HTML(stats_html))
     
+    # Fungsi cleanup untuk unregister observer
+    def cleanup():
+        if observer_manager:
+            try:
+                observer_manager.unregister_group(split_observers_group)
+                if logger:
+                    logger.info("✅ Observer untuk split dataset telah dibersihkan")
+            except Exception as e:
+                if logger:
+                    logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
+    
     # Register handler
     split_button.on_click(on_split_click)
+    
+    # Tambahkan fungsi cleanup ke komponen UI
+    ui_components['cleanup'] = cleanup
     
     # Inisialisasi dari config
     if config and 'data' in config and 'split_ratios' in config['data']:
@@ -292,25 +321,3 @@ def setup_split_config_handlers(ui_components, config=None):
         advanced_options.children[0].value = config['data'].get('random_seed', 42)
     
     return ui_components
-
-def create_status_indicator(status, message):
-    """Buat indikator status dengan styling konsisten."""
-    status_styles = {
-        'success': {'icon': '✅', 'color': 'green'},
-        'warning': {'icon': '⚠️', 'color': 'orange'},
-        'error': {'icon': '❌', 'color': 'red'},
-        'info': {'icon': 'ℹ️', 'color': 'blue'}
-    }
-    
-    style = status_styles.get(status, status_styles['info'])
-    
-    status_html = f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: #f8f9fa;">
-        <span style="color: {style['color']}; font-weight: bold;"> 
-            {style['icon']} {message}
-        </span>
-    </div>
-    """
-    
-    return HTML(status_html)

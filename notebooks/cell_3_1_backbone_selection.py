@@ -1,9 +1,10 @@
 # Cell 3.1 - Backbone Selection
 # Pilih backbone untuk model SmartCash
 
-# Setup import paths (jika diperlukan)
-import sys, os
+# Setup import paths
+import sys, os, atexit
 from pathlib import Path
+from IPython.display import display
 
 # Tambahkan current directory ke path jika smartcash tidak ditemukan
 if not any('smartcash' in p for p in sys.path):
@@ -11,38 +12,47 @@ if not any('smartcash' in p for p in sys.path):
     if module_path not in sys.path:
         sys.path.append(module_path)
 
-# Fallback import (buat fungsi dummy jika modul tidak tersedia)
+# Setup environment dan konfigurasi
+try:
+    from smartcash.utils.config_manager import ConfigManager
+    from smartcash.utils.environment_manager import EnvironmentManager
+    from smartcash.utils.logger import get_logger
+    
+    # Setup logger dan environment
+    logger = get_logger("backbone_selection")
+    env_manager = EnvironmentManager()
+    
+    # Load konfigurasi
+    config = ConfigManager.load_config(
+        filename="configs/base_config.yaml", 
+        fallback_to_pickle=True,
+        logger=logger
+    )
+    
+    logger.info("✅ Environment dan konfigurasi berhasil dimuat")
+except Exception as e:
+    print(f"ℹ️ Fallback ke konfigurasi default: {str(e)}")
+    config = None
+
+# Import komponen UI dan handler
 try:
     from smartcash.ui_components.training_config import create_training_config_ui
     from smartcash.ui_handlers.training_config import setup_training_config_handlers
-except ImportError:
+except ImportError as e:
+    print(f"❌ Error: {str(e)}")
+    print("🔄 Memuat fallback UI...")
+    
+    # Fallback jika komponen tidak tersedia
     import ipywidgets as widgets
-    from IPython.display import display, HTML
+    def create_training_config_ui():
+        return {'ui': widgets.HTML("<h3>⚠️ Komponen UI tidak tersedia</h3><p>Pastikan semua modul terinstall dengan benar</p>")}
     
-    # Pesan fallback jika modul belum tersedia
-    def create_fallback_ui():
-        ui = widgets.VBox([
-            widgets.HTML("<h2>⚠️ SmartCash modules belum tersedia</h2>"),
-            widgets.HTML("<p>Anda perlu menyelesaikan setup project terlebih dahulu.</p>"),
-            widgets.Button(description="Setup Project", button_style="primary")
-        ])
-        return {'ui': ui}
-    
-    create_training_config_ui = create_fallback_ui
-    setup_training_config_handlers = lambda ui_components, config=None: ui_components
+    def setup_training_config_handlers(ui_components, config=None):
+        return ui_components
 
-# Baca konfigurasi jika tersedia
-try:
-    from smartcash.configs import get_config_manager
-    config_manager = get_config_manager("configs/base_config.yaml")
-    config = config_manager.get_config()
-except:
-    config = None  # Gunakan konfigurasi default dalam handler
-
-# Create dan setup UI components
+# Buat dan setup komponen UI
 ui_components = create_training_config_ui()
-setup_training_config_handlers(ui_components, config)
+ui_components = setup_training_config_handlers(ui_components, config)
 
 # Tampilkan UI
-from IPython.display import display
 display(ui_components['ui'])

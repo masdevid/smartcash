@@ -1,12 +1,13 @@
 """
 File: smartcash/ui_components/augmentation.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Komponen UI untuk augmentasi dataset SmartCash.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML
 from pathlib import Path
+from smartcash.utils.ui_utils import create_component_header, create_info_box
 
 def create_augmentation_ui():
     """Buat komponen UI untuk augmentasi dataset."""
@@ -14,7 +15,11 @@ def create_augmentation_ui():
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("<h2>🔄 Dataset Augmentation</h2><p>Augmentasi dataset untuk meningkatkan variasi dan jumlah data training</p>")
+    header = create_component_header(
+        "Dataset Augmentation",
+        "Augmentasi dataset untuk meningkatkan variasi dan jumlah data training",
+        "🔄"
+    )
     
     # Augmentation options
     augmentation_options = widgets.VBox([
@@ -98,11 +103,10 @@ def create_augmentation_ui():
         layout={'visibility': 'hidden'}
     )
     
-    # Info box with examples
-    info_box = widgets.HTML("""
-    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 10px 0; border-radius: 4px;">
-        <h4 style="margin-top: 0;">ℹ️ Tentang Augmentasi Dataset</h4>
+    # Info box
+    info_box = create_info_box(
+        "Tentang Augmentasi Dataset",
+        """
         <p>Augmentasi data adalah teknik untuk meningkatkan jumlah dan variasi data dengan menerapkan transformasi yang mempertahankan informasi label.</p>
         <p><strong>Jenis augmentasi:</strong></p>
         <ul>
@@ -111,8 +115,9 @@ def create_augmentation_ui():
             <li><strong>Lighting</strong>: Perubahan brightness, contrast, dan saturation</li>
             <li><strong>Extreme Rotation</strong>: Rotasi dengan sudut besar (untuk robustness)</li>
         </ul>
-    </div>
-    """)
+        """,
+        'info'
+    )
     
     examples_tab = widgets.Tab()
     examples_tab.children = [

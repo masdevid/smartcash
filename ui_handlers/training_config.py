@@ -1,6 +1,6 @@
 """
 File: smartcash/ui_handlers/training_config.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Handler untuk komponen UI konfigurasi training model SmartCash.
 """
 
@@ -63,6 +63,12 @@ def setup_training_config_handlers(ui_components, config=None):
             }
         }
     
+    # Data untuk handler
+    handler_data = {
+        'config': config,
+        'config_path': 'configs/training_config.yaml'
+    }
+    
     # Extract UI components
     backbone_options = ui_components['backbone_options']
     hyperparams_options = ui_components['hyperparams_options']
@@ -73,21 +79,26 @@ def setup_training_config_handlers(ui_components, config=None):
     reset_button = ui_components['reset_button']
     status_output = ui_components['status_output']
     
-    # Data untuk handler
-    handler_data = {
-        'config': config,
-        'config_path': 'configs/training_config.yaml'
-    }
+    # Setup logger dan ConfigManager jika tersedia
+    logger = None
+    config_manager = None
+    try:
+        from smartcash.utils.logger import get_logger
+        from smartcash.utils.config_manager import ConfigManager
+        
+        logger = get_logger("training_config")
+        config_manager = ConfigManager(logger=logger)
+    except ImportError as e:
+        if 'logger' in locals():
+            logger.warning(f"⚠️ Import error: {str(e)}")
+        else:
+            print(f"⚠️ Import error: {str(e)}")
     
     # Fungsi untuk mendapatkan backbone type dari UI selection
     def get_backbone_from_ui():
         selection = backbone_options.children[0].value
         if "EfficientNet-B4" in selection:
             return "efficientnet_b4"
-        elif "EfficientNet-B0" in selection:
-            return "efficientnet_b0"
-        elif "EfficientNet-B2" in selection:
-            return "efficientnet_b2"
         elif "CSPDarknet" in selection:
             return "cspdarknet"
         return "efficientnet_b4"  # Default
@@ -151,8 +162,6 @@ def setup_training_config_handlers(ui_components, config=None):
         # Backbone
         backbone_map = {
             'efficientnet_b4': 'EfficientNet-B4 (Recommended)',
-            'efficientnet_b0': 'EfficientNet-B0',
-            'efficientnet_b2': 'EfficientNet-B2',
             'cspdarknet': 'CSPDarknet'
         }
         backbone_options.children[0].value = backbone_map.get(
@@ -218,9 +227,16 @@ def setup_training_config_handlers(ui_components, config=None):
                 if not config_dir.exists():
                     config_dir.mkdir(parents=True, exist_ok=True)
                 
-                # Simulasi penyimpanan (dalam implementasi asli, simpan file)
-                # with open(handler_data['config_path'], 'w') as f:
-                #     yaml.dump(updated_config, f, default_flow_style=False)
+                # Save menggunakan ConfigManager jika tersedia
+                saved = False
+                if config_manager is not None:
+                    try:
+                        with open(handler_data['config_path'], 'w') as f:
+                            yaml.dump(updated_config, f, default_flow_style=False)
+                        saved = True
+                    except Exception as e:
+                        if logger:
+                            logger.error(f"❌ Gagal menyimpan konfigurasi: {str(e)}")
                 
                 # Output summary
                 summary = f"""
@@ -235,7 +251,11 @@ def setup_training_config_handlers(ui_components, config=None):
                 </div>
                 """
                 
-                display(create_status_indicator("success", "✅ Konfigurasi berhasil disimpan"))
+                if saved:
+                    display(create_status_indicator("success", f"✅ Konfigurasi berhasil disimpan ke {handler_data['config_path']}"))
+                else:
+                    display(create_status_indicator("success", "✅ Konfigurasi berhasil diperbarui (simulasi)"))
+                    
                 display(HTML(summary))
                 
             except Exception as e:

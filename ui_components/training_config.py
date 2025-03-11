@@ -1,6 +1,6 @@
 """
 File: smartcash/ui_components/training_config.py
-Author: Alfrida Sabar (refactored)
+Author: Alfrida Sabar
 Deskripsi: Komponen UI untuk konfigurasi training model SmartCash.
 """
 
@@ -27,7 +27,7 @@ def create_training_config_ui():
     
     backbone_options = widgets.VBox([
         widgets.RadioButtons(
-            options=['EfficientNet-B4 (Recommended)', 'CSPDarknet', 'EfficientNet-B0', 'EfficientNet-B2'],
+            options=['EfficientNet-B4 (Recommended)', 'CSPDarknet'],
             value='EfficientNet-B4 (Recommended)',
             description='Backbone:',
             style={'description_width': 'initial'},

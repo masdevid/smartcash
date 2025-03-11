@@ -56,8 +56,11 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Handler untuk tombol preprocessing
     def on_preprocess_click(b):
         # Expand logs accordion untuk menampilkan progress
-        if isinstance(preprocess_status.parent, widgets.Accordion):
-            preprocess_status.parent.selected_index = 0
+        for widget_id, widget in ui_components.items():
+            if widget_id == 'preprocess_status' and hasattr(widget, 'parent') and isinstance(widget.parent, widgets.Accordion):
+                widget.parent.selected_index = 0
+            elif widget_id == 'log_accordion' and isinstance(widget, widgets.Accordion):
+                widget.selected_index = 0
         
         with preprocess_status:
             clear_output()

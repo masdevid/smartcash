@@ -30,6 +30,16 @@ def setup_preprocessing_handlers(ui_components, config=None):
     preprocess_button = ui_components['preprocess_button']
     preprocess_progress = ui_components['preprocess_progress']
     preprocess_status = ui_components['preprocess_status']
+    log_accordion = ui_components['log_accordion']
+    
+    # Tambahkan tombol cleanup
+    cleanup_button = widgets.Button(
+        description='Clean Preprocessed Data',
+        button_style='danger',
+        icon='trash',
+        layout=widgets.Layout(display='none')
+    )
+    ui_components['cleanup_button'] = cleanup_button
     
     # Setup logger, PreprocessingManager, dan ObserverManager
     preprocessing_manager = None
@@ -51,6 +61,52 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Kelompok observer untuk preprocessing
     preprocessing_observers_group = "preprocessing_observers"
+    
+    # Fungsi untuk cek apakah dataset sudah dipreprocess
+    def check_preprocessed_dataset():
+        """Cek apakah dataset sudah dipreprocess."""
+        data_dir = config.get('data_dir', 'data')
+        splits = ['train', 'valid', 'test']
+        
+        # Cek apakah direktori train/valid/test memiliki gambar yang sudah dipreprocess
+        for split in splits:
+            split_path = Path(data_dir) / split
+            if not split_path.exists() or not any((split_path / 'images').glob('*')):
+                return False
+        
+        return True
+    
+    # Fungsi untuk membersihkan data preprocessed
+    def on_cleanup_click(b):
+        with preprocess_status:
+            clear_output()
+            display(create_status_indicator("warning", "🗑️ Membersihkan data preprocessing..."))
+            
+            try:
+                data_dir = config.get('data_dir', 'data')
+                splits = ['train', 'valid', 'test']
+                
+                # Hapus direktori gambar dan label untuk setiap split
+                for split in splits:
+                    split_path = Path(data_dir) / split
+                    if split_path.exists():
+                        for subdir in ['images', 'labels']:
+                            full_subdir = split_path / subdir
+                            if full_subdir.exists():
+                                # Hapus file dalam direktori
+                                for file_path in full_subdir.glob('*'):
+                                    file_path.unlink()
+                
+                display(create_status_indicator("success", "✅ Data preprocessing berhasil dibersihkan"))
+                
+                # Sembunyikan tombol cleanup
+                cleanup_button.layout.display = 'none'
+                
+            except Exception as e:
+                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+    
+    # Tambahkan handler ke tombol cleanup
+    cleanup_button.on_click(on_cleanup_click)
     
     # Fungsi untuk update progress UI
     def update_progress_callback(event_type, sender, progress=0, total=100, message=None, **kwargs):
@@ -89,16 +145,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 group=preprocessing_observers_group
             )
             
-            # Tambahkan observer khusus untuk end pipeline
-            end_pipeline_observer = observer_manager.create_simple_observer(
-                event_type=EventTopics.PREPROCESSING_END,
-                callback=lambda event_type, sender, results=None, **kwargs: 
-                    logger.success(f"✅ Pipeline preprocessing selesai dalam {results.get('elapsed', 0):.2f} detik") 
-                    if results else None,
-                name="PipelineEndObserver",
-                group=preprocessing_observers_group
-            )
-            
             if logger:
                 logger.info("✅ Observer untuk preprocessing telah dikonfigurasi")
             
@@ -108,9 +154,11 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Handler untuk tombol preprocessing
     def on_preprocess_click(b):
+        # Disable tombol preprocessing saat sedang berjalan
+        preprocess_button.disabled = True
+        
         # Expand logs accordion untuk menampilkan progress
-        if 'log_accordion' in ui_components:
-            ui_components['log_accordion'].selected_index = 0
+        log_accordion.selected_index = 0
         
         with preprocess_status:
             clear_output()
@@ -159,32 +207,37 @@ def setup_preprocessing_handlers(ui_components, config=None):
                             validation_stats = result.get('validation', {}).get('train', {}).get('validation_stats', {})
                             analysis_stats = result.get('analysis', {}).get('train', {}).get('analysis', {})
                             
-                            if validation_stats or analysis_stats:
-                                stats_html = f"""
-                                <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
-                                    <h4>📊 Preprocessing Stats</h4>
-                                    <ul>
+                            # Panel summary di bawah logs accordion
+                            summary_html = f"""
+                            <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
+                                <h4>📊 Preprocessing Summary</h4>
+                                <ul>
+                            """
+                            
+                            if validation_stats:
+                                valid_percent = (validation_stats.get('valid_images', 0) / validation_stats.get('total_images', 1) * 100) if validation_stats.get('total_images', 0) > 0 else 0
+                                summary_html += f"""
+                                    <li><b>Total images:</b> {validation_stats.get('total_images', 'N/A')}</li>
+                                    <li><b>Valid images:</b> {validation_stats.get('valid_images', 'N/A')} ({valid_percent:.1f}%)</li>
                                 """
-                                
-                                if validation_stats:
-                                    valid_percent = (validation_stats.get('valid_images', 0) / validation_stats.get('total_images', 1) * 100) if validation_stats.get('total_images', 0) > 0 else 0
-                                    stats_html += f"""
-                                        <li><b>Total images:</b> {validation_stats.get('total_images', 'N/A')}</li>
-                                        <li><b>Valid images:</b> {validation_stats.get('valid_images', 'N/A')} ({valid_percent:.1f}%)</li>
-                                    """
-                                
-                                if analysis_stats and 'class_balance' in analysis_stats:
-                                    imbalance = analysis_stats['class_balance'].get('imbalance_score', 0)
-                                    stats_html += f"""
-                                        <li><b>Class imbalance score:</b> {imbalance:.2f}/10</li>
-                                    """
-                                
-                                stats_html += f"""
-                                        <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
-                                    </ul>
-                                </div>
+                            
+                            if analysis_stats and 'class_balance' in analysis_stats:
+                                imbalance = analysis_stats['class_balance'].get('imbalance_score', 0)
+                                summary_html += f"""
+                                    <li><b>Class imbalance score:</b> {imbalance:.2f}/10</li>
                                 """
-                                display(HTML(stats_html))
+                            
+                            summary_html += f"""
+                                    <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
+                                </ul>
+                            </div>
+                            """
+                            
+                            # Tambahkan summary di bawah log accordion
+                            log_accordion.children[0].append_display(HTML(summary_html))
+                            
+                            # Tampilkan tombol cleanup
+                            cleanup_button.layout.display = ''
                         else:
                             display(create_status_indicator(
                                 "warning", 
@@ -204,6 +257,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
             finally:
                 # Sembunyikan progress bar
                 preprocess_progress.layout.visibility = 'hidden'
+                # Enable kembali tombol preprocessing
+                preprocess_button.disabled = False
     
     # Fungsi cleanup untuk unregister observer
     def cleanup():
@@ -221,6 +276,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Tambahkan fungsi cleanup ke komponen UI
     ui_components['cleanup'] = cleanup
+    
+    # Tambahkan tombol cleanup ke UI
+    main_container = ui_components['ui']
+    main_container.children = list(main_container.children) + [cleanup_button]
+    
+    # Inisialisasi UI
+    # Cek apakah dataset sudah dipreprocess
+    if check_preprocessed_dataset():
+        cleanup_button.layout.display = ''
     
     # Inisialisasi dari config
     if config and 'data' in config and 'preprocessing' in config['data']:

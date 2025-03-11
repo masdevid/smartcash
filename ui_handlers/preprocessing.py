@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash.
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash yang terintegrasi dengan PreprocessingManager.
 """
 
 import ipywidgets as widgets
@@ -40,16 +40,20 @@ def setup_preprocessing_handlers(ui_components, config=None):
     preprocess_progress = ui_components['preprocess_progress']
     preprocess_status = ui_components['preprocess_status']
     
-    # Setup logger dan DatasetManager jika tersedia
-    dataset_manager = None
+    # Setup logger dan PreprocessingManager jika tersedia
+    preprocessing_manager = None
     logger = None
+    
     try:
         from smartcash.utils.logger import get_logger
-        from smartcash.handlers.dataset import DatasetManager
+        from smartcash.handlers.preprocessing import PreprocessingManager
         from smartcash.utils.observer import EventDispatcher, EventTopics
         
         logger = get_logger("preprocessing")
-        dataset_manager = DatasetManager(config, logger=logger)
+        preprocessing_manager = PreprocessingManager(config=config, logger=logger)
+        
+        if logger:
+            logger.info("✅ PreprocessingManager berhasil diinisialisasi")
     except ImportError as e:
         print(f"ℹ️ Beberapa modul tidak tersedia: {str(e)}")
     
@@ -85,70 +89,72 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     config['data']['preprocessing']['cache']['ttl_hours'] = ttl_hours
                     config['data']['preprocessing']['cache']['auto_cleanup'] = auto_cleanup
                 
-                # Notification event
-                if 'EventDispatcher' in locals():
-                    EventDispatcher.notify(
-                        event_type=EventTopics.PREPROCESSING_START,
-                        sender="preprocessing_handler",
-                        img_size=img_size,
-                        normalize=normalize,
-                        cache=cache,
-                        workers=workers
-                    )
-                
                 # Tampilkan progress bar
                 preprocess_progress.layout.visibility = 'visible'
                 preprocess_progress.value = 0
                 
-                # Gunakan DatasetManager jika tersedia
-                if dataset_manager:
-                    display(create_status_indicator("info", "⚙️ Menggunakan DatasetManager untuk preprocessing..."))
+                # Setup observer untuk progress tracking
+                if 'EventDispatcher' in locals():
+                    def update_progress(sender, progress, total, message=None, **kwargs):
+                        preprocess_progress.max = total
+                        preprocess_progress.value = progress
+                        preprocess_progress.description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
+                        
+                        if message:
+                            display(create_status_indicator("info", message))
+                    
+                    EventDispatcher.register(EventTopics.PREPROCESSING_PROGRESS, update_progress)
+                
+                # Gunakan PreprocessingManager jika tersedia
+                if preprocessing_manager:
+                    display(create_status_indicator("info", "⚙️ Menggunakan PreprocessingManager untuk preprocessing..."))
                     
                     try:
-                        # Setup observer untuk tracking progress
-                        if 'EventDispatcher' in locals():
-                            def update_progress(sender, progress, total, message=None, **kwargs):
-                                preprocess_progress.max = total
-                                preprocess_progress.value = progress
-                                preprocess_progress.description = f"{int(progress * 100 / total)}%"
-                                
-                                if message:
-                                    display(create_status_indicator("info", message))
-                            
-                            EventDispatcher.register(EventTopics.PREPROCESSING_PROGRESS, update_progress)
-                        
-                        # Jalankan preprocessing
-                        result = dataset_manager.preprocess_dataset(
-                            img_size=img_size,
-                            normalize=normalize,
-                            cache=enable_cache,
-                            num_workers=workers,
-                            max_cache_size_gb=max_size_gb,
-                            cache_ttl_hours=ttl_hours,
-                            auto_cleanup=auto_cleanup
+                        # Jalankan preprocessing pipeline
+                        result = preprocessing_manager.run_full_pipeline(
+                            splits=['train', 'valid', 'test'],
+                            validate_dataset=True,
+                            fix_issues=False,
+                            augment_data=False,
+                            analyze_dataset=True
                         )
                         
-                        # Unregister observer
+                        # Unregister observer jika ada
                         if 'EventDispatcher' in locals():
                             EventDispatcher.unregister(EventTopics.PREPROCESSING_PROGRESS, update_progress)
                         
                         # Tampilkan hasil
-                        if result and result.get('success', False):
+                        if result and result.get('status') == 'success':
                             display(create_status_indicator(
                                 "success", 
-                                f"✅ Preprocessing selesai: {result.get('num_images', 0)} gambar"
+                                f"✅ Preprocessing pipeline selesai dalam {result.get('elapsed', 0):.2f} detik"
                             ))
                             
-                            # Tampilkan statistik preprocessing
-                            if 'stats' in result:
-                                stats = result['stats']
+                            # Tampilkan statistik preprocessing jika tersedia
+                            validation_stats = result.get('validation', {}).get('train', {}).get('validation_stats', {})
+                            analysis_stats = result.get('analysis', {}).get('train', {}).get('analysis', {})
+                            
+                            if validation_stats or analysis_stats:
                                 stats_html = f"""
                                 <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
                                     <h4>📊 Preprocessing Stats</h4>
                                     <ul>
-                                        <li><b>Images processed:</b> {stats.get('num_images', 'N/A')}</li>
-                                        <li><b>Average processing time:</b> {stats.get('avg_time_ms', 'N/A')} ms/image</li>
-                                        <li><b>Cache size:</b> {stats.get('cache_size_mb', 'N/A')} MB</li>
+                                """
+                                
+                                if validation_stats:
+                                    valid_percent = (validation_stats.get('valid_images', 0) / validation_stats.get('total_images', 1) * 100) if validation_stats.get('total_images', 0) > 0 else 0
+                                    stats_html += f"""
+                                        <li><b>Total images:</b> {validation_stats.get('total_images', 'N/A')}</li>
+                                        <li><b>Valid images:</b> {validation_stats.get('valid_images', 'N/A')} ({valid_percent:.1f}%)</li>
+                                    """
+                                
+                                if analysis_stats and 'class_balance' in analysis_stats:
+                                    imbalance = analysis_stats['class_balance'].get('imbalance_score', 0)
+                                    stats_html += f"""
+                                        <li><b>Class imbalance score:</b> {imbalance:.2f}/10</li>
+                                    """
+                                
+                                stats_html += f"""
                                         <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
                                     </ul>
                                 </div>
@@ -157,15 +163,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         else:
                             display(create_status_indicator(
                                 "warning", 
-                                f"⚠️ Preprocessing selesai dengan beberapa issues: {result.get('message', 'unknown error')}"
+                                f"⚠️ Preprocessing selesai dengan status: {result.get('status', 'unknown')}"
                             ))
                     
                     except Exception as e:
-                        display(create_status_indicator("error", f"❌ Error dari DatasetManager: {str(e)}"))
+                        display(create_status_indicator("error", f"❌ Error dari PreprocessingManager: {str(e)}"))
                 
                 else:
-                    # Simulasi preprocessing jika DatasetManager tidak tersedia
-                    display(create_status_indicator("info", "ℹ️ DatasetManager tidak tersedia, melakukan simulasi preprocessing..."))
+                    # Simulasi preprocessing jika PreprocessingManager tidak tersedia
+                    display(create_status_indicator("info", "ℹ️ PreprocessingManager tidak tersedia, melakukan simulasi preprocessing..."))
                     
                     # Simulasi progres
                     total_steps = 5
@@ -175,13 +181,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         
                         # Pesan berdasarkan tahap
                         if i == 1:
-                            display(create_status_indicator("info", "🔍 Scanning dataset..."))
+                            display(create_status_indicator("info", "🔍 Validasi dataset..."))
                         elif i == 2:
                             display(create_status_indicator("info", "📏 Resizing images..."))
                         elif i == 3:
                             display(create_status_indicator("info", "🧮 Normalizing pixel values..."))
                         elif i == 4:
-                            display(create_status_indicator("info", "💾 Setting up cache..."))
+                            display(create_status_indicator("info", "🔍 Analisis dataset..."))
                         
                         time.sleep(0.5)  # Simulasi delay
                     
@@ -190,17 +196,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         "success", 
                         f"✅ Preprocessing selesai dengan {workers} workers, img_size={img_size}"
                     ))
-                
-                # Notification event
-                if 'EventDispatcher' in locals():
-                    EventDispatcher.notify(
-                        event_type=EventTopics.PREPROCESSING_END,
-                        sender="preprocessing_handler",
-                        img_size=img_size,
-                        normalize=normalize,
-                        cache=cache,
-                        workers=workers
-                    )
                 
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
@@ -216,6 +211,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
             finally:
                 # Sembunyikan progress bar
                 preprocess_progress.layout.visibility = 'hidden'
+                
+                # Unregister observer jika ada
+                if 'EventDispatcher' in locals() and 'update_progress' in locals():
+                    try:
+                        EventDispatcher.unregister(EventTopics.PREPROCESSING_PROGRESS, update_progress)
+                    except:
+                        pass
     
     # Register handler
     preprocess_button.on_click(on_preprocess_click)

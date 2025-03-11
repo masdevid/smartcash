@@ -56,11 +56,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Handler untuk tombol preprocessing
     def on_preprocess_click(b):
         # Expand logs accordion untuk menampilkan progress
-        for widget_id, widget in ui_components.items():
-            if widget_id == 'preprocess_status' and hasattr(widget, 'parent') and isinstance(widget.parent, widgets.Accordion):
-                widget.parent.selected_index = 0
-            elif widget_id == 'log_accordion' and isinstance(widget, widgets.Accordion):
-                widget.selected_index = 0
+        if 'log_accordion' in ui_components:
+            ui_components['log_accordion'].selected_index = 0
         
         with preprocess_status:
             clear_output()
@@ -70,7 +67,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 # Ambil preprocessing options dari form
                 img_size = preprocess_options.children[0].value
                 normalize = preprocess_options.children[1].value
-                cache = preprocess_options.children[2].value
+                enable_cache = preprocess_options.children[2].value
                 workers = preprocess_options.children[3].value
                 
                 # Ambil cache settings
@@ -82,7 +79,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 if config and 'data' in config and 'preprocessing' in config['data']:
                     config['data']['preprocessing']['img_size'] = list(img_size)
                     config['data']['preprocessing']['normalize_enabled'] = normalize
-                    config['data']['preprocessing']['cache_enabled'] = cache
+                    config['data']['preprocessing']['cache_enabled'] = enable_cache
                     config['data']['preprocessing']['num_workers'] = workers
                     config['data']['preprocessing']['cache']['max_size_gb'] = max_size_gb
                     config['data']['preprocessing']['cache']['ttl_hours'] = ttl_hours
@@ -124,7 +121,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         result = dataset_manager.preprocess_dataset(
                             img_size=img_size,
                             normalize=normalize,
-                            cache=cache,
+                            cache=enable_cache,
                             num_workers=workers,
                             max_cache_size_gb=max_size_gb,
                             cache_ttl_hours=ttl_hours,

@@ -85,14 +85,17 @@ def create_preprocessing_ui():
         icon='cog'
     )
     
+    # Create output for logs
+    preprocess_status = widgets.Output(
+        layout=widgets.Layout(
+            max_height='300px', 
+            overflow='auto'
+        )
+    )
+    
     # Collapsible log output
     log_accordion = widgets.Accordion(
-        children=[widgets.Output(
-            layout=widgets.Layout(
-                max_height='300px', 
-                overflow='auto'
-            )
-        )],
+        children=[preprocess_status],
         selected_index=None
     )
     log_accordion.set_title(0, "📋 Preprocessing Logs")
@@ -143,7 +146,8 @@ def create_preprocessing_ui():
         'cache_settings': cache_settings,
         'preprocess_button': preprocess_button,
         'preprocess_progress': preprocess_progress,
-        'preprocess_status': log_accordion.children[0]
+        'preprocess_status': preprocess_status,
+        'log_accordion': log_accordion
     }
     
     return ui_components

@@ -6,7 +6,7 @@ Deskripsi: Handler untuk UI preprocessing dataset SmartCash yang terintegrasi de
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
-import os, sys, time
+import os, sys
 from pathlib import Path
 
 def setup_preprocessing_handlers(ui_components, config=None):
@@ -19,15 +19,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     'img_size': [640, 640],
                     'cache_dir': '.cache/smartcash',
                     'num_workers': 4,
-                    'augmentation_enabled': True,
                     'normalize_enabled': True,
-                    'cache_enabled': True,
-                    'cache': {
-                        'max_size_gb': 1.0,
-                        'ttl_hours': 24,
-                        'auto_cleanup': True,
-                        'cleanup_interval_mins': 30
-                    }
+                    'cache_enabled': True
                 }
             },
             'data_dir': 'data'
@@ -35,7 +28,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Setup akses ke komponen UI
     preprocess_options = ui_components['preprocess_options']
-    cache_settings = ui_components['cache_settings']
     preprocess_button = ui_components['preprocess_button']
     preprocess_progress = ui_components['preprocess_progress']
     preprocess_status = ui_components['preprocess_status']
@@ -74,20 +66,12 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 enable_cache = preprocess_options.children[2].value
                 workers = preprocess_options.children[3].value
                 
-                # Ambil cache settings
-                max_size_gb = cache_settings.children[0].value
-                ttl_hours = cache_settings.children[1].value
-                auto_cleanup = cache_settings.children[2].value
-                
                 # Update config
                 if config and 'data' in config and 'preprocessing' in config['data']:
                     config['data']['preprocessing']['img_size'] = list(img_size)
                     config['data']['preprocessing']['normalize_enabled'] = normalize
                     config['data']['preprocessing']['cache_enabled'] = enable_cache
                     config['data']['preprocessing']['num_workers'] = workers
-                    config['data']['preprocessing']['cache']['max_size_gb'] = max_size_gb
-                    config['data']['preprocessing']['cache']['ttl_hours'] = ttl_hours
-                    config['data']['preprocessing']['cache']['auto_cleanup'] = auto_cleanup
                 
                 # Tampilkan progress bar
                 preprocess_progress.layout.visibility = 'visible'
@@ -105,7 +89,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     
                     EventDispatcher.register(EventTopics.PREPROCESSING_PROGRESS, update_progress)
                 
-                # Gunakan PreprocessingManager jika tersedia
+                # Gunakan PreprocessingManager 
                 if preprocessing_manager:
                     display(create_status_indicator("info", "⚙️ Menggunakan PreprocessingManager untuk preprocessing..."))
                     
@@ -170,54 +154,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         display(create_status_indicator("error", f"❌ Error dari PreprocessingManager: {str(e)}"))
                 
                 else:
-                    # Simulasi preprocessing jika PreprocessingManager tidak tersedia
-                    display(create_status_indicator("info", "ℹ️ PreprocessingManager tidak tersedia, melakukan simulasi preprocessing..."))
-                    
-                    # Simulasi progres
-                    total_steps = 5
-                    for i in range(total_steps + 1):
-                        preprocess_progress.value = int(i * 100 / total_steps)
-                        preprocess_progress.description = f"{int(i * 100 / total_steps)}%"
-                        
-                        # Pesan berdasarkan tahap
-                        if i == 1:
-                            display(create_status_indicator("info", "🔍 Validasi dataset..."))
-                        elif i == 2:
-                            display(create_status_indicator("info", "📏 Resizing images..."))
-                        elif i == 3:
-                            display(create_status_indicator("info", "🧮 Normalizing pixel values..."))
-                        elif i == 4:
-                            display(create_status_indicator("info", "🔍 Analisis dataset..."))
-                        
-                        time.sleep(0.5)  # Simulasi delay
-                    
-                    # Tampilkan sukses
-                    display(create_status_indicator(
-                        "success", 
-                        f"✅ Preprocessing selesai dengan {workers} workers, img_size={img_size}"
-                    ))
-                
+                    # Pesan error jika PreprocessingManager tidak tersedia
+                    display(create_status_indicator("error", "❌ PreprocessingManager tidak tersedia"))
+            
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-                
-                # Notification event
-                if 'EventDispatcher' in locals():
-                    EventDispatcher.notify(
-                        event_type=EventTopics.PREPROCESSING_ERROR,
-                        sender="preprocessing_handler",
-                        error=str(e)
-                    )
             
             finally:
                 # Sembunyikan progress bar
                 preprocess_progress.layout.visibility = 'hidden'
-                
-                # Unregister observer jika ada
-                if 'EventDispatcher' in locals() and 'update_progress' in locals():
-                    try:
-                        EventDispatcher.unregister(EventTopics.PREPROCESSING_PROGRESS, update_progress)
-                    except:
-                        pass
     
     # Register handler
     preprocess_button.on_click(on_preprocess_click)
@@ -237,13 +182,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
         
         # Setup worker slider
         preprocess_options.children[3].value = preproc_config.get('num_workers', 4)
-        
-        # Setup cache settings
-        if 'cache' in preproc_config:
-            cache_config = preproc_config['cache']
-            cache_settings.children[0].value = cache_config.get('max_size_gb', 1.0)
-            cache_settings.children[1].value = cache_config.get('ttl_hours', 24)
-            cache_settings.children[2].value = cache_config.get('auto_cleanup', True)
     
     return ui_components
 

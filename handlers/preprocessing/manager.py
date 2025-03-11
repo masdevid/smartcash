@@ -42,8 +42,6 @@ class PreprocessingManager:
             log_level="debug"
         )
         
-        self.logger.start("🚀 PreprocessingManager diinisialisasi")
-    
     def run_full_pipeline(self, splits=None, validate_dataset=True, fix_issues=False, 
                          augment_data=False, analyze_dataset=True):
         """Jalankan pipeline preprocessing lengkap."""

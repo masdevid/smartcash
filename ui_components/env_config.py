@@ -30,7 +30,7 @@ def create_env_config_ui():
     # Colab info panel
     colab_panel = widgets.HTML("")
     
-    # Environment info panel
+    # Environment info panel (collapsed by default)
     info_panel = widgets.Output(
         layout=widgets.Layout(
             border='1px solid #ddd',
@@ -40,6 +40,10 @@ def create_env_config_ui():
             overflow='auto'
         )
     )
+    
+    # Wrap in accordion to make collapsible
+    info_accordion = widgets.Accordion(children=[info_panel], selected_index=None)
+    info_accordion.set_title(0, "🖥️ System Information")
     
     # Button container
     button_container = widgets.HBox(layout=widgets.Layout(
@@ -117,7 +121,7 @@ exports/
     main_container.children = [
         header,
         colab_panel,
-        info_panel,
+        info_accordion,
         button_container,
         status,
         info_box
@@ -128,6 +132,7 @@ exports/
         'ui': main_container,
         'colab_panel': colab_panel,
         'info_panel': info_panel,
+        'info_accordion': info_accordion,
         'drive_button': drive_button,
         'dir_button': dir_button,
         'status': status

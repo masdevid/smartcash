@@ -154,10 +154,27 @@ def setup_dependency_handlers(ui_components):
         except (ImportError, AttributeError):
             return "Not installed"
     
+    # Function to update UI state during operations
+    def set_ui_busy_state(busy=True):
+        """Set UI busy state - disable/enable buttons appropriately."""
+        ui_components['install_button'].disabled = busy
+        ui_components['check_button'].disabled = busy
+        ui_components['check_all_button'].disabled = busy
+        ui_components['uncheck_all_button'].disabled = busy
+        
+        # Show/hide progress as needed
+        if busy:
+            ui_components['install_progress'].layout.visibility = 'visible'
+        else:
+            ui_components['install_progress'].layout.visibility = 'hidden'
+    
     # Main handler function for installation
     def install_packages():
         nonlocal is_installing
         is_installing = True
+        
+        # Set UI to busy state
+        set_ui_busy_state(True)
         
         with ui_components['status']:
             clear_output()
@@ -196,10 +213,10 @@ def setup_dependency_handlers(ui_components):
                 is_installing = False
                 return
             
-            # Show progress bar
-            ui_components['install_progress'].layout.visibility = 'visible'
+            # Initialize progress bar
             ui_components['install_progress'].value = 0
             ui_components['install_progress'].max = len(packages_to_install)
+            ui_components['install_progress'].description = "0%"
             
             # Force reinstall flag
             force_reinstall = ui_components['force_reinstall'].value
@@ -212,7 +229,8 @@ def setup_dependency_handlers(ui_components):
                     break
                     
                 ui_components['install_progress'].value = i
-                ui_components['install_progress'].description = f"{i+1}/{len(packages_to_install)}"
+                progress_pct = int((i+1) * 100 / len(packages_to_install))
+                ui_components['install_progress'].description = f"{progress_pct}%"
                 
                 display(create_status_indicator("info", f"🔄 Menginstall {name}... ({i+1}/{len(packages_to_install)})"))
                 
@@ -249,9 +267,9 @@ def setup_dependency_handlers(ui_components):
             # Reset state
             is_installing = False
             
-            # Hide progress bar after completion (delay for visual effect)
+            # Restore UI state after brief delay (for visual effect)
             time.sleep(1)
-            ui_components['install_progress'].layout.visibility = 'hidden'
+            set_ui_busy_state(False)
     
     # Handler for install button
     def on_install(b):
@@ -268,6 +286,9 @@ def setup_dependency_handlers(ui_components):
     
     # Handler for check button
     def on_check(b):
+        # Set UI to busy state
+        set_ui_busy_state(True)
+        
         with ui_components['status']:
             clear_output()
             
@@ -313,6 +334,9 @@ def setup_dependency_handlers(ui_components):
                         display(create_status_indicator("success", f"✅ CUDA is available"))
                 else:
                     display(create_status_indicator("info", "ℹ️ CUDA is not available, using CPU only"))
+            
+            # Restore UI state
+            set_ui_busy_state(False)
     
     # Register handlers
     ui_components['install_button'].on_click(on_install)
@@ -324,6 +348,9 @@ def setup_dependency_handlers(ui_components):
     def cleanup():
         nonlocal is_installing
         is_installing = False
+        
+        # Restore UI state if needed
+        set_ui_busy_state(False)
         
         if observer_manager:
             try:

@@ -250,7 +250,9 @@ def setup_dependency_handlers(ui_components):
                 ('ipywidgets', 'ipywidgets'),
                 ('tqdm', 'tqdm'),
                 ('PyYAML', 'yaml'),
-                ('termcolor', 'termcolor')
+                ('termcolor', 'termcolor'),
+                ('Roboflow', 'roboflow'),
+                ('python-dotenv', 'python-dotenv'),
             ]
             
             # Check packages

@@ -1,50 +1,49 @@
 """
 File: smartcash/ui_handlers/env_config.py
-Author: Refactored
-Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan implementasi observer pattern.
+Author: Perbaikan untuk method get_directory_tree
+Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan fallback untuk method get_directory_tree
 """
 
+import threading
+import time
+import os
 from IPython.display import display, HTML, clear_output
+from pathlib import Path
+
+from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_env_config_handlers(ui_components, config=None):
-    """
-    Setup handlers untuk UI konfigurasi environment SmartCash.
+    """Setup handlers untuk UI konfigurasi environment SmartCash."""
+    # Inisialisasi dependencies
+    logger = None
+    env_manager = None
+    observer_manager = None
+    config_manager = None
     
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi yang akan digunakan (optional)
-        
-    Returns:
-        Dictionary UI components yang sudah diupdate dengan handler
-    """
-    # Import necessities
     try:
-        from smartcash.utils.environment_manager import EnvironmentManager
         from smartcash.utils.logger import get_logger
-        from smartcash.utils.ui_utils import create_status_indicator
-        from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.environment_manager import EnvironmentManager
         from smartcash.utils.observer.observer_manager import ObserverManager
+        from smartcash.utils.config_manager import get_config_manager
         
-        has_dependencies = True
         logger = get_logger("env_config")
         env_manager = EnvironmentManager(logger=logger)
-        config_manager = get_config_manager(logger=logger)
         observer_manager = ObserverManager(auto_register=True)
+        config_manager = get_config_manager(logger=logger)
+        
+        # Pastikan observer dari grup ini dihapus untuk mencegah memory leak
         observer_group = "env_config_observers"
-        
-        # Unregister any existing observers
         observer_manager.unregister_group(observer_group)
-        
     except ImportError as e:
-        has_dependencies = False
-        print(f"ℹ️ Basic fallback mode: {str(e)}")
+        with ui_components['status']:
+            display(HTML(f"<p style='color:red'>⚠️ Warning: Limited functionality - {str(e)}</p>"))
     
     # Deteksi environment
     def detect_environment():
         """Deteksi jenis environment dan update UI sesuai hasil deteksi"""
         is_colab = False
         
-        if has_dependencies:
+        if env_manager:
             is_colab = env_manager.is_colab
             
             # Display environment info
@@ -58,8 +57,8 @@ def setup_env_config_handlers(ui_components, config=None):
                         <h4 style="margin-top: 0; color: #212529;">📊 System Information</h4>
                         <ul style="color: #212529;">
                             <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
-                            <li><b>Base Directory:</b> {system_info.get('base_dir', 'Unknown')}</li>
-                            <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda_available', False) else 'No'}</li>
+                            <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
+                            <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
                         </ul>
                     </div>
                     """
@@ -110,12 +109,50 @@ def setup_env_config_handlers(ui_components, config=None):
         
         return is_colab
     
+    # Implementasi fallback untuk get_directory_tree jika method tidak ada
+    def fallback_get_directory_tree(root_dir, max_depth=2):
+        """Fallback implementation untuk get_directory_tree"""
+        root_dir = Path(root_dir)
+        
+        if not root_dir.exists():
+            return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
+        
+        result = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
+        result += f"<span style='color:#0366d6; font-weight:bold;'>{root_dir.name}/</span>\n"
+        
+        # Fungsi rekursi untuk mengiterasi directory
+        def traverse_dir(path, prefix="", depth=0):
+            if depth > max_depth:
+                return ""
+                
+            items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
+            tree = ""
+            
+            for i, item in enumerate(items):
+                is_last = i == len(items) - 1
+                connector = "└─ " if is_last else "├─ "
+                
+                if item.is_dir():
+                    tree += f"{prefix}{connector}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
+                    next_prefix = prefix + ("   " if is_last else "│  ")
+                    if depth < max_depth:
+                        tree += traverse_dir(item, next_prefix, depth + 1)
+                else:
+                    tree += f"{prefix}{connector}{item.name}\n"
+                    
+            return tree
+        
+        result += traverse_dir(root_dir)
+        result += "</pre>"
+        
+        return result
+    
     # Handler untuk Google Drive connection
     def on_drive_connect(b):
         with ui_components['status']:
             clear_output()
             
-            if has_dependencies:
+            if env_manager:
                 display(create_status_indicator("info", "🔄 Menghubungkan ke Google Drive..."))
                 success, message = env_manager.mount_drive()
                 
@@ -131,7 +168,14 @@ def setup_env_config_handlers(ui_components, config=None):
                     
                     # Display tree
                     display(HTML("<h4>📂 Struktur direktori:</h4>"))
-                    tree_html = env_manager.get_directory_tree(max_depth=2)
+                    
+                    # Cek apakah method get_directory_tree ada di env_manager
+                    if hasattr(env_manager, 'get_directory_tree'):
+                        tree_html = env_manager.get_directory_tree(max_depth=2)
+                    else:
+                        # Gunakan fallback jika method tidak ada
+                        tree_html = fallback_get_directory_tree(env_manager.base_dir, max_depth=2)
+                        
                     display(HTML(tree_html))
                     
                     # Update config dengan info environment
@@ -197,7 +241,7 @@ def setup_env_config_handlers(ui_components, config=None):
         with ui_components['status']:
             clear_output()
             
-            if has_dependencies:
+            if env_manager:
                 display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
                 
                 # Setup directories using EnvironmentManager
@@ -212,7 +256,14 @@ def setup_env_config_handlers(ui_components, config=None):
                 
                 # Display directory tree
                 display(HTML("<h4>📂 Struktur direktori yang dibuat:</h4>"))
-                tree_html = env_manager.get_directory_tree(max_depth=3)
+                
+                # Cek apakah method get_directory_tree ada di env_manager
+                if hasattr(env_manager, 'get_directory_tree'):
+                    tree_html = env_manager.get_directory_tree(max_depth=3)
+                else:
+                    # Gunakan fallback jika method tidak ada
+                    tree_html = fallback_get_directory_tree(env_manager.base_dir, max_depth=3)
+                
                 display(HTML(tree_html))
                 
                 # Save environment info to config
@@ -274,47 +325,25 @@ exports/</pre>
     ui_components['dir_button'].on_click(on_dir_setup)
     
     # Tambahkan observer untuk monitoring jika observer manager tersedia
-    if has_dependencies and observer_manager:
+    if observer_manager:
         # Observer untuk monitoring aktivitas environment
         observer_manager.create_logging_observer(
             event_types=["environment.drive.mount", "environment.directory.setup"],
             logger_name="env_config",
             name="EnvironmentLogObserver",
-            group=observer_group
+            group="env_config_observers"
         )
     
     # Cleanup function
     def cleanup():
         """Cleanup resources used by this handler"""
-        if has_dependencies and observer_manager:
-            observer_manager.unregister_group(observer_group)
+        if observer_manager:
+            observer_manager.unregister_group("env_config_observers")
     
     # Add cleanup to components
     ui_components['cleanup'] = cleanup
     
     # Run initial detection
     detect_environment()
-    
-    # Function to create status indicator (for fallback mode)
-    if not has_dependencies:
-        def create_status_indicator(status, message):
-            """Buat status indicator dengan styling konsisten."""
-            status_styles = {
-                'success': {'icon': '✅', 'color': 'green'},
-                'warning': {'icon': '⚠️', 'color': 'orange'},
-                'error': {'icon': '❌', 'color': 'red'},
-                'info': {'icon': 'ℹ️', 'color': 'blue'}
-            }
-            
-            style = status_styles.get(status, status_styles['info'])
-            
-            return HTML(f"""
-            <div style="margin: 5px 0; padding: 8px 12px; 
-                        border-radius: 4px; background-color: #f8f9fa;">
-                <span style="color: {style['color']}; font-weight: bold;"> 
-                    {style['icon']} {message}
-                </span>
-            </div>
-            """)
     
     return ui_components

@@ -238,7 +238,80 @@ class EnvironmentManager:
                     self._logger.warning(f"⚠️ Symlink creation error: {local_name} - {str(e)}")
         
         return stats
-    
+    def get_directory_tree(self, root_dir=None, max_depth=3, indent=0, _current_depth=0):
+        """
+        Dapatkan struktur direktori dalam format HTML.
+        
+        Args:
+            root_dir: Direktori awal untuk ditampilkan (default: base_dir)
+            max_depth: Kedalaman maksimum direktori yang ditampilkan
+            indent: Indentasi awal (untuk rekursi)
+            _current_depth: Kedalaman saat ini (untuk rekursi)
+            
+        Returns:
+            String HTML yang menampilkan struktur direktori
+        """
+        if root_dir is None:
+            root_dir = self._base_dir
+        
+        # Konversi ke Path jika string
+        root_dir = Path(root_dir) if isinstance(root_dir, str) else root_dir
+        
+        if not root_dir.exists():
+            return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
+        
+        if _current_depth > max_depth:
+            return "<span style='color:gray'>...</span>"
+        
+        # Mulai dengan ul atau pre tag
+        if indent == 0:
+            result = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
+        else:
+            result = ""
+        
+        # Tampilkan direktori current
+        if indent == 0:
+            result += f"<span style='color:#0366d6; font-weight:bold;'>{root_dir.name}/</span>\n"
+        
+        # Buat space indentasi
+        spaces = "│  " * indent
+        
+        # Dapatkan isi direktori, sortir direktori dulu
+        items = sorted(root_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name))
+        
+        for i, item in enumerate(items):
+            is_last = i == len(items) - 1
+            
+            # Pilih garis/karakter penghubung
+            prefix = "└─ " if is_last else "├─ "
+            
+            if item.is_dir():
+                # Gunakan warna biru untuk direktori
+                result += f"{spaces}{prefix}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
+                
+                # Tambah garis penghubung untuk level berikutnya
+                next_spaces = spaces + ("   " if is_last else "│  ")
+                if _current_depth < max_depth:
+                    # Rekursi untuk subdirektori
+                    subdirs = self.get_directory_tree(
+                        root_dir=item,
+                        max_depth=max_depth,
+                        indent=indent + 1,
+                        _current_depth=_current_depth + 1
+                    )
+                    # Hapus tag pre dari hasil rekursi
+                    subdirs = subdirs.replace("<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n", "")
+                    subdirs = subdirs.replace("</pre>", "")
+                    result += subdirs
+            else:
+                # Gunakan warna default untuk file
+                result += f"{spaces}{prefix}{item.name}\n"
+        
+        # Tutup tag jika pada level teratas
+        if indent == 0:
+            result += "</pre>"
+        
+        return result
     def get_system_info(self) -> Dict[str, Any]:
         """
         Get comprehensive system information.

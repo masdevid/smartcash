@@ -29,7 +29,7 @@ class EventTopics:
     TRAINING_EPOCH_START = "training.epoch.start"
     TRAINING_EPOCH_END = "training.epoch.end"
     TRAINING_BATCH_END = "training.batch.end"
-    
+    TRAINING_ERROR = "training.error"
     # Evaluation events
     EVALUATION_START = "evaluation.start"
     EVALUATION_END = "evaluation.end"

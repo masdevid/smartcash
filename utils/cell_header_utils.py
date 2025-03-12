@@ -91,7 +91,8 @@ def setup_notebook_environment(
             config = env['config_manager'].load_config(
                 filename=config_path,
                 fallback_to_pickle=True,
-                logger=env['logger']
+                logger=env['logger'],
+                singleton=True
             ) if env['config_manager'] else {}
     except Exception as e:
         if env['logger']:

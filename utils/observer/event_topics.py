@@ -22,6 +22,7 @@ class EventTopics:
     BATCH_START = "training.batch.start"
     BATCH_END = "training.batch.end"
     VALIDATION_START = "training.validation.start"
+    VALIDATION_PROGRESS = "training.validation.progress"
     VALIDATION_END = "training.validation.end"
     TRAINING_PROGRESS = "training.progress"
     TRAINING_EPOCH_START = "training.epoch.start"

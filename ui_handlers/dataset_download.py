@@ -7,7 +7,7 @@ Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi optim
 from IPython.display import display, clear_output, HTML
 from pathlib import Path
 import os
-
+from ipywidgets import widgets
 def setup_dataset_download_handlers(ui_components, config):
     """Setup handlers untuk UI download dataset."""
     if not config or not isinstance(config, dict) or 'data' not in config:

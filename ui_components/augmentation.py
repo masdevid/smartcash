@@ -1,16 +1,21 @@
 """
 File: smartcash/ui_components/augmentation.py
-Author: Alfrida Sabar
-Deskripsi: Komponen UI untuk augmentasi dataset SmartCash.
+Author: Refactored
+Deskripsi: Komponen UI untuk augmentasi dataset SmartCash dengan pendekatan DRY.
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML
-from pathlib import Path
-from smartcash.utils.ui_utils import create_component_header, create_info_box
+
+from smartcash.utils.ui_utils import (
+    create_component_header, 
+    create_info_box, 
+    create_section_title,
+    styled_html
+)
 
 def create_augmentation_ui():
-    """Buat komponen UI untuk augmentasi dataset."""
+    """Buat komponen UI untuk augmentasi dataset dengan pendekatan DRY."""
     # Container utama
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
@@ -18,15 +23,17 @@ def create_augmentation_ui():
     header = create_component_header(
         "Dataset Augmentation",
         "Augmentasi dataset untuk meningkatkan variasi dan jumlah data training",
-        "🔄"
+        "🎨"
     )
     
     # Augmentation options
+    augmentation_section = create_section_title("Augmentation Options", "🔄")
+    
     augmentation_options = widgets.VBox([
         widgets.SelectMultiple(
             options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
             value=['Combined (Recommended)'],
-            description='Augmentations:',
+            description='Types:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='70%', height='100px')
         ),
@@ -57,42 +64,113 @@ def create_augmentation_ui():
     ])
     
     # Advanced options for each augmentation type
+    augmentation_advanced = create_section_title("Advanced Settings", "⚙️")
+    
     position_options = widgets.VBox([
-        widgets.FloatSlider(value=0.5, min=0, max=1, step=0.05, description='Rotation prob:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.IntSlider(value=30, min=0, max=180, description='Max angle:', 
-                          style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.FloatSlider(value=0.5, min=0, max=1, step=0.05, description='Flip prob:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.FloatSlider(value=0.3, min=0, max=1, step=0.05, description='Scale ratio:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%'))
+        widgets.FloatSlider(
+            value=0.5, min=0, max=1, step=0.05, 
+            description='Rotation prob:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.IntSlider(
+            value=30, min=0, max=180, 
+            description='Max angle:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.FloatSlider(
+            value=0.5, min=0, max=1, step=0.05, 
+            description='Flip prob:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.FloatSlider(
+            value=0.3, min=0, max=1, step=0.05, 
+            description='Scale ratio:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        )
     ])
     
     lighting_options = widgets.VBox([
-        widgets.FloatSlider(value=0.5, min=0, max=1, step=0.05, description='Brightness prob:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.FloatSlider(value=0.3, min=0, max=1, step=0.05, description='Brightness limit:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.FloatSlider(value=0.5, min=0, max=1, step=0.05, description='Contrast prob:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%')),
-        widgets.FloatSlider(value=0.3, min=0, max=1, step=0.05, description='Contrast limit:', 
-                            style={'description_width': 'initial'}, layout=widgets.Layout(width='60%'))
+        widgets.FloatSlider(
+            value=0.5, min=0, max=1, step=0.05, 
+            description='Brightness prob:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.FloatSlider(
+            value=0.3, min=0, max=1, step=0.05, 
+            description='Brightness limit:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.FloatSlider(
+            value=0.5, min=0, max=1, step=0.05, 
+            description='Contrast prob:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        ),
+        widgets.FloatSlider(
+            value=0.3, min=0, max=1, step=0.05, 
+            description='Contrast limit:', 
+            style={'description_width': 'initial'}, 
+            layout=widgets.Layout(width='60%')
+        )
     ])
     
     # Advanced settings accordion
-    advanced_settings = widgets.Accordion(children=[position_options, lighting_options], 
-                                          selected_index=None)
-    advanced_settings.set_title(0, "🔄 Position Augmentation Parameters")
-    advanced_settings.set_title(1, "💡 Lighting Augmentation Parameters")
+    advanced_tabs = widgets.Tab(children=[position_options, lighting_options])
+    advanced_tabs.set_title(0, "Position Parameters")
+    advanced_tabs.set_title(1, "Lighting Parameters")
     
-    # Augmentation button and progress
+    # Action buttons
+    button_section = create_section_title("Actions", "▶️")
+    
     augmentation_button = widgets.Button(
         description='Run Augmentation',
         button_style='primary',
-        icon='random'
+        icon='random',
+        layout=widgets.Layout(width='auto')
     )
     
-    augmentation_status = widgets.Output()
+    reset_button = widgets.Button(
+        description='Reset Settings',
+        button_style='warning',
+        icon='refresh',
+        layout=widgets.Layout(width='auto')
+    )
+    
+    cleanup_button = widgets.Button(
+        description='Clean Augmented Data',
+        button_style='danger',
+        icon='trash',
+        layout=widgets.Layout(width='auto')
+    )
+    
+    restore_button = widgets.Button(
+        description='Restore from Backup',
+        button_style='info',
+        icon='undo',
+        layout=widgets.Layout(width='auto', display='none')  # Hidden for future development
+    )
+    
+    save_config_button = widgets.Button(
+        description='Save Configuration',
+        button_style='success',
+        icon='save',
+        layout=widgets.Layout(width='auto')
+    )
+    
+    buttons_container = widgets.HBox([
+        augmentation_button, 
+        reset_button, 
+        cleanup_button, 
+        save_config_button
+    ], layout=widgets.Layout(justify_content='space-between'))
+    
+    # Progress and status
     augmentation_progress = widgets.IntProgress(
         value=0,
         min=0,
@@ -100,10 +178,22 @@ def create_augmentation_ui():
         description='0%',
         bar_style='info',
         orientation='horizontal',
-        layout={'visibility': 'hidden'}
+        layout=widgets.Layout(visibility='hidden', width='100%')
     )
     
-    # Info box
+    augmentation_status = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            max_height='200px',
+            min_height='100px',
+            overflow='auto',
+            width='100%'
+        )
+    )
+    
+    # Info and examples sections
+    info_section = create_section_title("Information", "ℹ️")
+    
     info_box = create_info_box(
         "Tentang Augmentasi Dataset",
         """
@@ -162,16 +252,25 @@ def create_augmentation_ui():
     examples_tab.set_title(1, "Position")
     examples_tab.set_title(2, "Lighting")
     
+    # Results section (initially hidden)
+    results_section = create_section_title("Results", "📊")
+    results_display = widgets.Output(layout=widgets.Layout(display='none'))
+    
     # Pasang semua komponen
     main_container.children = [
         header,
-        info_box,
+        augmentation_section,
         augmentation_options,
-        advanced_settings,
-        examples_tab,
-        widgets.HBox([augmentation_button]),
+        augmentation_advanced,
+        advanced_tabs,
+        button_section,
+        buttons_container,
         augmentation_progress,
-        augmentation_status
+        augmentation_status,
+        results_display,
+        info_section,
+        info_box,
+        examples_tab
     ]
     
     # Dictionary untuk akses ke komponen dari luar
@@ -180,10 +279,16 @@ def create_augmentation_ui():
         'augmentation_options': augmentation_options,
         'position_options': position_options,
         'lighting_options': lighting_options,
+        'advanced_tabs': advanced_tabs,
         'augmentation_button': augmentation_button,
+        'reset_button': reset_button,
+        'cleanup_button': cleanup_button,
+        'restore_button': restore_button,
+        'save_config_button': save_config_button,
         'augmentation_progress': augmentation_progress,
         'augmentation_status': augmentation_status,
-        'examples_tab': examples_tab
+        'examples_tab': examples_tab,
+        'results_display': results_display
     }
     
     return ui_components

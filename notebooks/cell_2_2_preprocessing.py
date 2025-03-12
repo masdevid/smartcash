@@ -3,12 +3,14 @@
 
 from smartcash.utils.cell_header_utils import setup_notebook_environment, setup_ui_component, display_ui
 
-# Setup environment
+# Setup environment dengan config khusus preprocessing
 env, config = setup_notebook_environment(
     cell_name="preprocessing",
+    config_path="configs/preprocessing_config.yaml",
+    create_dirs=["data/preprocessed"]
 )
 
-# Setup UI component
+# Setup UI component dengan config
 ui_components = setup_ui_component(env, config, "preprocessing")
 
 # Tampilkan UI

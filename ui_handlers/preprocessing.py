@@ -1,13 +1,16 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
-Author: Refactored
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan kode minimal dan perbaikan bug.
+Author: Alfrida Sabar (revisi)
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan dukungan save/load konfigurasi dan cleanup.
 """
 
 import threading
 import time
+import os
+import shutil
 import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
+from pathlib import Path
 
 def setup_preprocessing_handlers(ui_components, config=None):
     """Setup handlers untuk UI preprocessing dataset."""
@@ -18,7 +21,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
         from smartcash.utils.observer import EventDispatcher, EventTopics
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.environment_manager import EnvironmentManager
-        from smartcash.utils.config_manager import ConfigManager
+        from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.ui_utils import create_status_indicator
         
         logger = get_logger("preprocessing")
         env_manager = EnvironmentManager(logger=logger)
@@ -29,9 +33,11 @@ def setup_preprocessing_handlers(ui_components, config=None):
         observer_manager.unregister_group(observer_group)
         
         # Make sure we have a valid config
+        config_manager = get_config_manager(logger=logger)
+        
+        # If config is empty, load from file or create default
         if not config or not isinstance(config, dict) or len(config) == 0:
-            config_manager = ConfigManager.get_instance(logger=logger)
-            config = config_manager.get_config()
+            config = config_manager.load_config("configs/preprocessing_config.yaml")
             
             # If still empty, create default config
             if not config or len(config) == 0:
@@ -46,18 +52,23 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     },
                     'data_dir': 'data'
                 }
-                config_manager.update_config(config, save=True)
-        
+                # Save default config
+                config_manager.save_config(config, "configs/preprocessing_config.yaml", sync_to_drive=True)
+                if logger:
+                    logger.info("📝 Default preprocessing config created and saved")
     except ImportError as e:
+        # Fallback to basic functionality
+        from smartcash.utils.ui_utils import create_status_indicator
+        
         ui_components['preprocess_status'].append_display_data(
-            HTML(f"<p style='color:red'>❌ Error: {str(e)}</p>")
+            HTML(f"<p style='color:red'>⚠️ Warning: Limited functionality - {str(e)}</p>")
         )
         return ui_components
     
     # Extract UI elements
     ui = {k: ui_components[k] for k in ['preprocess_options', 'validation_options', 'split_selector', 
                                       'preprocess_button', 'stop_button', 'progress_bar', 'current_progress', 
-                                      'preprocess_status', 'log_accordion', 'summary_container']}
+                                      'preprocess_status', 'log_accordion', 'summary_container', 'cleanup_button']}
     
     # State variables
     processing_active = False
@@ -81,6 +92,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
             for key, idx in [('normalize_enabled', 1), ('cache_enabled', 2), ('num_workers', 3)]:
                 if key in cfg:
                     ui['preprocess_options'].children[idx].value = cfg[key]
+                    
+            # Set validation options
+            if 'validation' in cfg:
+                for key, idx in [('enabled', 0), ('fix_issues', 1), ('move_invalid', 2)]:
+                    if key in cfg['validation']:
+                        ui['validation_options'].children[idx].value = cfg['validation'][key]
+                
+                if 'invalid_dir' in cfg['validation']:
+                    ui['validation_options'].children[3].value = cfg['validation']['invalid_dir']
     
     def update_ui_for_processing(is_processing):
         """Update UI based on processing state"""
@@ -88,29 +108,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
         ui['current_progress'].layout.visibility = 'visible' if is_processing else 'hidden'
         ui['preprocess_button'].disabled = is_processing
         ui['stop_button'].layout.display = 'inline-block' if is_processing else 'none'
+        ui['cleanup_button'].disabled = is_processing
         if is_processing:
             ui['log_accordion'].selected_index = 0
     
-    def create_status_indicator(status, message):
-        """Create a styled status indicator"""
-        status_styles = {
-            'success': {'icon': '✅', 'color': 'green'},
-            'warning': {'icon': '⚠️', 'color': 'orange'},
-            'error': {'icon': '❌', 'color': 'red'},
-            'info': {'icon': 'ℹ️', 'color': 'blue'}
-        }
-        
-        style = status_styles.get(status, status_styles['info'])
-        
-        return HTML(f"""
-        <div style="margin: 5px 0; padding: 8px 12px; 
-                    border-radius: 4px; background-color: #f8f9fa;">
-            <span style="color: {style['color']}; font-weight: bold;"> 
-                {style['icon']} {message}
-            </span>
-        </div>
-        """)
-            
     def update_progress(_, __, progress=0, total=100, message=None, **kwargs):
         """Update progress bar and display messages"""
         if stop_requested:
@@ -175,10 +176,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
             # Display execution info
             if 'elapsed' in result:
                 display(HTML(f"<p><b>⏱️ Execution time:</b> {result['elapsed']:.2f} seconds</p>"))
-            display(HTML(f"<p><b>📂 Output:</b> {config.get('data_dir', 'data')}</p>"))
+            display(HTML(f"<p><b>📂 Output:</b> {config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')}</p>"))
         
         ui['summary_container'].layout.display = 'block'
-        cleanup_button.layout.display = 'inline-block'
+        ui['cleanup_button'].layout.display = 'inline-block'
     
     # Setup observers
     for event, callback, name in [
@@ -199,22 +200,107 @@ def setup_preprocessing_handlers(ui_components, config=None):
         logger_name="preprocessing", name="LogObserver", group=observer_group
     )
     
-    # Handler functions
-    def run_preprocessing_thread():
+    # Check if preprocessed data already exists
+    def check_preprocessed_exists():
+        """Check if preprocessed data already exists and confirm overwrite if needed"""
+        preproc_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+        preproc_path = env_manager.get_path(preproc_dir) if env_manager else Path(preproc_dir)
+        
+        if preproc_path.exists() and any(preproc_path.iterdir()):
+            # Create confirmation dialog
+            confirm_box = widgets.VBox([
+                widgets.HTML(
+                    f"""<div style="padding: 10px; background-color: #fff3cd; color: #856404; 
+                    border-left: 4px solid #856404; border-radius: 4px; margin: 10px 0;">
+                    <h4 style="margin-top: 0;">⚠️ Preprocessed data already exists</h4>
+                    <p>Directory <code>{preproc_dir}</code> already contains preprocessed data.</p>
+                    <p>Continuing will overwrite existing data. Do you want to proceed?</p>
+                    </div>"""
+                ),
+                widgets.HBox([
+                    widgets.Button(description="Cancel", button_style="danger"),
+                    widgets.Button(description="Proceed", button_style="primary")
+                ])
+            ])
+            
+            # Show confirmation dialog
+            with ui['preprocess_status']:
+                clear_output()
+                display(confirm_box)
+            
+            # Setup confirmation buttons
+            def on_cancel(b):
+                with ui['preprocess_status']:
+                    clear_output()
+                    display(create_status_indicator("info", "Operation cancelled"))
+            
+            def on_proceed(b):
+                with ui['preprocess_status']:
+                    clear_output()
+                    display(create_status_indicator("info", "🔄 Proceeding with preprocessing..."))
+                start_preprocessing()
+            
+            confirm_box.children[1].children[0].on_click(on_cancel)
+            confirm_box.children[1].children[1].on_click(on_proceed)
+            
+            return True
+        return False
+    
+    def get_config_from_ui():
+        """Get preprocessing config from UI components"""
+        # Get preprocessing parameters
+        img_size = ui['preprocess_options'].children[0].value
+        normalize = ui['preprocess_options'].children[1].value
+        cache = ui['preprocess_options'].children[2].value
+        workers = ui['preprocess_options'].children[3].value
+        
+        # Get validation options
+        validate = ui['validation_options'].children[0].value
+        fix_issues = ui['validation_options'].children[1].value
+        move_invalid = ui['validation_options'].children[2].value
+        invalid_dir = ui['validation_options'].children[3].value
+        
+        # Update config
+        if 'data' not in config:
+            config['data'] = {}
+        if 'preprocessing' not in config['data']:
+            config['data']['preprocessing'] = {}
+        
+        config['data']['preprocessing'].update({
+            'img_size': list(img_size),
+            'normalize_enabled': normalize,
+            'cache_enabled': cache,
+            'num_workers': workers,
+            'validation': {
+                'enabled': validate,
+                'fix_issues': fix_issues,
+                'move_invalid': move_invalid,
+                'invalid_dir': invalid_dir
+            }
+        })
+        
+        return config
+    
+    def save_config():
+        """Save current preprocessing config to file"""
+        if config_manager:
+            get_config_from_ui()
+            config_manager.save_config(config, "configs/preprocessing_config.yaml", sync_to_drive=True)
+            with ui['preprocess_status']:
+                display(create_status_indicator("success", "✅ Configuration saved to configs/preprocessing_config.yaml"))
+    
+    def start_preprocessing():
         """Execute preprocessing in a separate thread"""
-        nonlocal processing_active, stop_requested
+        nonlocal processing_active, stop_requested, current_thread
+        
+        # Update config from UI
+        get_config_from_ui()
+        
+        # Save config
+        if config_manager:
+            config_manager.save_config(config, "configs/preprocessing_config.yaml", sync_to_drive=True)
         
         try:
-            # Get preprocessing parameters
-            img_size = ui['preprocess_options'].children[0].value
-            normalize = ui['preprocess_options'].children[1].value
-            cache = ui['preprocess_options'].children[2].value
-            workers = ui['preprocess_options'].children[3].value
-            
-            # Get validation options and splits
-            validate = ui['validation_options'].children[0].value
-            fix_issues = ui['validation_options'].children[1].value
-            
             # Determine splits to process
             split_map = {
                 'All Splits': ['train', 'valid', 'test'],
@@ -223,15 +309,6 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 'Test Only': ['test']
             }
             splits = split_map.get(ui['split_selector'].value, ['train', 'valid', 'test'])
-            
-            # Update config
-            config['data']['preprocessing'] = config.get('data', {}).get('preprocessing', {})
-            config['data']['preprocessing'].update({
-                'img_size': list(img_size),
-                'normalize_enabled': normalize,
-                'cache_enabled': cache,
-                'num_workers': workers
-            })
             
             # Notify start
             EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_START, 
@@ -244,8 +321,11 @@ def setup_preprocessing_handlers(ui_components, config=None):
             # Run pipeline
             if not stop_requested:
                 result = preprocessing_manager.run_full_pipeline(
-                    splits=splits, validate_dataset=validate,
-                    fix_issues=fix_issues, augment_data=False, analyze_dataset=True
+                    splits=splits, 
+                    validate_dataset=config['data']['preprocessing']['validation']['enabled'],
+                    fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
+                    augment_data=False, 
+                    analyze_dataset=True
                 )
                 
                 # Process result
@@ -277,10 +357,10 @@ def setup_preprocessing_handlers(ui_components, config=None):
             stop_requested = False
             update_ui_for_processing(False)
     
-    # Main handlers
-    def on_preprocess_click(b):
-        """Start preprocessing"""
-        nonlocal processing_active, stop_requested, current_thread
+    def run_preprocessing_thread():
+        """Start preprocessing in a thread"""
+        nonlocal processing_active, current_thread
+        
         if processing_active:
             return
         
@@ -293,12 +373,23 @@ def setup_preprocessing_handlers(ui_components, config=None):
         ui['progress_bar'].value = 0
         ui['current_progress'].value = 0
         ui['summary_container'].layout.display = 'none'
+        ui['cleanup_button'].layout.display = 'none'
         update_ui_for_processing(True)
         
         # Run in thread
-        current_thread = threading.Thread(target=run_preprocessing_thread)
+        current_thread = threading.Thread(target=start_preprocessing)
         current_thread.daemon = True
         current_thread.start()
+    
+    # Main handlers
+    def on_preprocess_click(b):
+        """Start preprocessing if no preprocessed data exists, otherwise confirm"""
+        if check_preprocessed_exists():
+            # Confirmation dialog will handle starting if user confirms
+            pass
+        else:
+            # No existing data, start directly
+            run_preprocessing_thread()
     
     def on_stop_click(b):
         """Stop processing"""
@@ -321,42 +412,103 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     def on_cleanup_click(b):
         """Clean preprocessed data"""
-        import shutil
-        from pathlib import Path
+        preproc_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+        preproc_path = env_manager.get_path(preproc_dir) if env_manager else Path(preproc_dir)
         
+        # Create confirmation dialog
+        confirm_box = widgets.VBox([
+            widgets.HTML(
+                f"""<div style="padding: 10px; background-color: #fff3cd; color: #856404; 
+                border-left: 4px solid #856404; border-radius: 4px; margin: 10px 0;">
+                <h4 style="margin-top: 0;">⚠️ Confirm Data Cleanup</h4>
+                <p>This will delete all preprocessed data in <code>{preproc_dir}</code>.</p>
+                <p>Original dataset will not be affected. Do you want to proceed?</p>
+                </div>"""
+            ),
+            widgets.HBox([
+                widgets.Button(description="Cancel", button_style="warning"),
+                widgets.Button(description="Delete Preprocessed Data", button_style="danger")
+            ])
+        ])
+        
+        # Show confirmation dialog
         with ui['preprocess_status']:
             clear_output()
-            display(create_status_indicator("info", "🗑️ Cleaning preprocessed data..."))
-            
-            try:
-                preproc_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
-                preproc_path = env_manager.get_path(preproc_dir) if env_manager else Path(preproc_dir)
+            display(confirm_box)
+        
+        # Setup confirmation buttons
+        def on_cancel(b):
+            with ui['preprocess_status']:
+                clear_output()
+                display(create_status_indicator("info", "Operation cancelled"))
+        
+        def on_confirm_delete(b):
+            with ui['preprocess_status']:
+                clear_output()
+                display(create_status_indicator("info", "🗑️ Cleaning preprocessed data..."))
                 
-                if preproc_path.exists():
-                    shutil.rmtree(preproc_path)
-                    display(create_status_indicator("success", f"✅ Removed: {preproc_dir}"))
-                else:
-                    display(create_status_indicator("info", f"ℹ️ Not found: {preproc_dir}"))
-                
-                cleanup_button.layout.display = 'none'
-                ui['summary_container'].layout.display = 'none'
-            except Exception as e:
-                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+                try:
+                    if preproc_path.exists():
+                        # Use dataset utils if available
+                        try:
+                            from smartcash.utils.dataset.dataset_utils import DatasetUtils
+                            utils = DatasetUtils(config, logger=logger)
+                            backup_path = utils.backup_directory(preproc_path, suffix="backup_before_delete")
+                            if backup_path:
+                                display(create_status_indicator("info", f"📦 Backup created: {backup_path}"))
+                            shutil.rmtree(preproc_path)
+                        except ImportError:
+                            # Fallback to direct deletion
+                            shutil.rmtree(preproc_path)
+                        
+                        display(create_status_indicator("success", f"✅ Removed: {preproc_dir}"))
+                    else:
+                        display(create_status_indicator("info", f"ℹ️ Not found: {preproc_dir}"))
+                    
+                    # Hide cleanup button and summary after cleanup
+                    ui['cleanup_button'].layout.display = 'none'
+                    ui['summary_container'].layout.display = 'none'
+                except Exception as e:
+                    display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+        
+        confirm_box.children[1].children[0].on_click(on_cancel)
+        confirm_box.children[1].children[1].on_click(on_confirm_delete)
     
-    # Add cleanup button
-    cleanup_button = widgets.Button(
-        description='Clean Preprocessed Data',
-        button_style='danger',
-        icon='trash',
-        layout=widgets.Layout(display='none')
+    # Add save config button
+    save_config_button = widgets.Button(
+        description='Save Config',
+        button_style='info',
+        icon='save'
     )
-    ui_components['ui'].children = list(ui_components['ui'].children) + [cleanup_button]
-    ui_components['cleanup_button'] = cleanup_button
+    save_config_button.on_click(lambda b: save_config())
+    
+    # Add buttons to UI
+    ui_components['save_config_button'] = save_config_button
+    
+    if isinstance(ui_components['ui'].children[-3], widgets.HBox):
+        # Update existing HBox for buttons
+        current_buttons = ui_components['ui'].children[-3].children
+        ui_components['ui'].children[-3].children = current_buttons + (save_config_button,)
+    else:
+        # Add buttons in new HBox
+        button_box = widgets.HBox([ui_components['preprocess_button'], ui_components['stop_button'], save_config_button])
+        
+        # Replace button container in UI
+        children_list = list(ui_components['ui'].children)
+        button_box_index = -1
+        for i, child in enumerate(children_list):
+            if isinstance(child, widgets.HBox) and any(c == ui_components['preprocess_button'] for c in child.children):
+                button_box_index = i
+                break
+        
+        if button_box_index >= 0:
+            children_list[button_box_index] = button_box
+            ui_components['ui'].children = tuple(children_list)
     
     # Register event handlers
     ui['preprocess_button'].on_click(on_preprocess_click)
     ui['stop_button'].on_click(on_stop_click)
-    cleanup_button.on_click(on_cleanup_click)
+    ui['cleanup_button'].on_click(on_cleanup_click)
     
     # Initialize UI
     init_ui()
@@ -373,7 +525,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
         # Reset UI
         update_ui_for_processing(False)
         
-        logger.info("✅ Preprocessing handlers cleaned up")
+        if logger:
+            logger.info("✅ Preprocessing handlers cleaned up")
     
     # Add cleanup function to UI components
     ui_components['cleanup'] = cleanup

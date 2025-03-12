@@ -1,14 +1,10 @@
 """
 File: smartcash/ui_handlers/dataset_download.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi ObserverManager.
+Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi observer pattern.
 """
 
-import os
-import time
-from pathlib import Path
-from IPython.display import display, HTML, clear_output
-import ipywidgets as widgets
+from IPython.display import clear_output
 from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_download_handlers(ui_components, config=None):
@@ -44,8 +40,8 @@ def setup_download_handlers(ui_components, config=None):
     except ImportError as e:
         print(f"Info: {str(e)}")
     
-    # Tambahkan API key info widget
-    api_key_info = widgets.HTML(
+    # Tambahkan API key info
+    api_key_info = EventDispatcher.HTML(
         """<div style="padding: 10px; border-left: 4px solid #856404; 
                      color: #856404; margin: 5px 0; border-radius: 4px; background-color: #fff3cd">
                 <p><i>⚠️ API Key diperlukan untuk download dari Roboflow</i></p>
@@ -60,7 +56,7 @@ def setup_download_handlers(ui_components, config=None):
         if roboflow_api_key:
             ui_components['roboflow_settings'].children[0].value = roboflow_api_key
             has_api_key = True
-            api_key_info = widgets.HTML(
+            api_key_info = EventDispatcher.HTML(
                 """<div style="padding: 10px; border-left: 4px solid #0c5460; 
                      color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
                     <p><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>
@@ -74,6 +70,9 @@ def setup_download_handlers(ui_components, config=None):
     registered_observers = []
     
     if observer_manager:
+        # Unregister observer sebelumnya untuk mencegah duplikasi
+        observer_manager.unregister_group(download_observers_group)
+        
         # Callback untuk update progress
         def update_progress_callback(event_type, sender, progress=0, total=100, message=None, **kwargs):
             ui_components['download_progress'].value = int(progress * 100 / total) if total > 0 else 0
@@ -180,6 +179,7 @@ def setup_download_handlers(ui_components, config=None):
                                 logger.warning(f"⚠️ Gagal menggunakan EnvironmentManager: {str(e)}")
                         
                         # Ensure data directory exists
+                        from pathlib import Path
                         Path(data_dir).mkdir(parents=True, exist_ok=True)
                         config['data_dir'] = data_dir
                         
@@ -255,6 +255,7 @@ def setup_download_handlers(ui_components, config=None):
                         
                         try:
                             # Save uploaded file
+                            import os
                             os.makedirs(os.path.dirname(os.path.join(target_dir, file_name)), exist_ok=True)
                             temp_zip_path = os.path.join(target_dir, file_name)
                             
@@ -283,15 +284,27 @@ def setup_download_handlers(ui_components, config=None):
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error: {str(e)}"))
     
-    # Register handlers
-    ui_components['download_button'].on_click(on_download_click)
-    
     # Update UI dengan nilai config
     if config and not has_api_key:
         api_settings = ui_components['roboflow_settings'].children
         api_settings[1].value = config['data']['roboflow'].get('workspace', 'smartcash-wo2us')
         api_settings[2].value = config['data']['roboflow'].get('project', 'rupiah-emisi-2022')
         api_settings[3].value = str(config['data']['roboflow'].get('version', '3'))
+    
+    # Update downloads option handler
+    def on_download_option_change(change):
+        if change['new'] == 'Roboflow (Online)':
+            ui_components['download_settings_container'].children = [ui_components['roboflow_settings'], api_key_info]
+        elif change['new'] == 'Local Data (Upload)':
+            ui_components['download_settings_container'].children = [ui_components['local_upload']]
+    
+    # Register handlers
+    ui_components['download_button'].on_click(on_download_click)
+    ui_components['download_options'].observe(on_download_option_change, names='value')
+    
+    # Add API key info to Roboflow settings container
+    if 'download_settings_container' in ui_components:
+        ui_components['download_settings_container'].children = [ui_components['roboflow_settings'], api_key_info]
     
     # Cleanup function
     def cleanup():
@@ -319,22 +332,5 @@ def setup_download_handlers(ui_components, config=None):
                     logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
     
     ui_components['cleanup'] = cleanup
-    
-    # Add API key info to Roboflow settings container
-    ui_components['download_settings_container'] = ui_components.get('download_settings_container')
-    if ui_components.get('download_settings_container') is None:
-        from ipywidgets import VBox
-        ui_components['download_settings_container'] = VBox([ui_components['roboflow_settings'], api_key_info])
-        
-        # Update downloads option handler
-        def on_download_option_change(change):
-            if change['new'] == 'Roboflow (Online)':
-                ui_components['download_settings_container'].children = [ui_components['roboflow_settings'], api_key_info]
-            elif change['new'] == 'Local Data (Upload)':
-                ui_components['download_settings_container'].children = [ui_components['local_upload']]
-            else:
-                ui_components['download_settings_container'].children = [ui_components['sample_data']]
-        
-        ui_components['download_options'].observe(on_download_option_change, names='value')
     
     return ui_components

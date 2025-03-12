@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/preprocessing.py
-Author: Refactored
-Deskripsi: Komponen UI untuk preprocessing dataset SmartCash dengan desain modular.
+Author: Alfrida Sabar (revisi)
+Deskripsi: Komponen UI untuk preprocessing dataset SmartCash dengan cleanup button dan config persistence.
 """
 
 import ipywidgets as widgets
@@ -103,6 +103,13 @@ def create_preprocessing_ui():
         layout=widgets.Layout(width='auto', display='none')
     )
     
+    cleanup_button = widgets.Button(
+        description='Clean Preprocessed Data',
+        button_style='danger',
+        icon='trash',
+        layout=widgets.Layout(display='none')
+    )
+    
     button_container.children = [preprocess_button, stop_button]
     
     # Progress tracking
@@ -167,46 +174,6 @@ def create_preprocessing_ui():
             <li><strong>Caching</strong>: Simpan gambar yang sudah diproses untuk mempercepat loading</li>
             <li><strong>Validation</strong>: Validasi integritas dataset, cek label dan gambar rusak</li>
         </ul>
+        <p><strong>📝 Konfigurasi</strong> akan otomatis disimpan ke <code>configs/preprocessing_config.yaml</code></p>
     </div>
     """)
-    
-    # Summary stats (akan ditampilkan setelah preprocessing)
-    summary_container = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd', 
-            padding='10px', 
-            margin='10px 0', 
-            display='none'
-        )
-    )
-    
-    # Pasang semua komponen
-    main_container.children = [
-        header,
-        info_box,
-        widgets.HTML("<h4>⚙️ Preprocessing Settings</h4>"),
-        preprocess_options,
-        split_selector,
-        advanced_accordion,
-        button_container,
-        progress_container,
-        log_accordion,
-        summary_container
-    ]
-    
-    # Dictionary untuk akses ke komponen dari luar
-    ui_components = {
-        'ui': main_container,
-        'preprocess_options': preprocess_options,
-        'validation_options': validation_options,
-        'split_selector': split_selector,
-        'preprocess_button': preprocess_button,
-        'stop_button': stop_button,
-        'progress_bar': progress_container.children[1],
-        'current_progress': progress_container.children[2],
-        'preprocess_status': preprocess_status,
-        'log_accordion': log_accordion,
-        'summary_container': summary_container
-    }
-    
-    return ui_components

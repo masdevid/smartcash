@@ -79,6 +79,11 @@ def setup_dependency_handlers(ui_components):
         cmd = f"{sys.executable} -m pip install {package} {force_flag}"
         
         try:
+            # Log command to detailed logs
+            if 'log_output' in ui_components:
+                with ui_components['log_output']:
+                    print(f"Running: {cmd}")
+            
             result = subprocess.run(
                 cmd, 
                 shell=True, 
@@ -128,13 +133,27 @@ def setup_dependency_handlers(ui_components):
     
     def install_smartcash_requirements(force_reinstall=False):
         """Install core requirements for SmartCash."""
-        force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install pyyaml termcolor tqdm roboflow python-dotenv ipywidgets {force_flag}"
-        try:
-            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-            return True, "SmartCash requirements installed successfully"
-        except subprocess.CalledProcessError as e:
-            return False, f"Error installing SmartCash requirements: {e.stderr}"
+        # Try to find smartcash/requirements.txt first
+        from pathlib import Path
+        req_path = Path("smartcash/requirements.txt")
+        
+        if req_path.exists():
+            force_flag = "--force-reinstall" if force_reinstall else ""
+            cmd = f"{sys.executable} -m pip install -r {req_path} {force_flag}"
+            try:
+                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                return True, "SmartCash requirements installed successfully"
+            except subprocess.CalledProcessError as e:
+                return False, f"Error installing SmartCash requirements: {e.stderr}"
+        else:
+            # Fallback to manual installation of core packages
+            force_flag = "--force-reinstall" if force_reinstall else ""
+            cmd = f"{sys.executable} -m pip install pyyaml termcolor tqdm roboflow python-dotenv ipywidgets {force_flag}"
+            try:
+                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                return True, "SmartCash requirements installed successfully (fallback method)"
+            except subprocess.CalledProcessError as e:
+                return False, f"Error installing SmartCash requirements: {e.stderr}"
     
     # Check if a package is installed
     def is_package_installed(package_name):
@@ -154,6 +173,64 @@ def setup_dependency_handlers(ui_components):
         except (ImportError, AttributeError):
             return "Not installed"
     
+    # Create collapsible log output
+    def setup_logs_accordion():
+        # Check if accordion already exists in UI components
+        if 'logs_accordion' not in ui_components:
+            # Create log area for install details
+            log_output = widgets.Output(
+                layout={'max_height': '200px', 'overflow': 'auto', 'border': '1px solid #ddd'}
+            )
+            
+            # Create accordion for logs
+            logs_accordion = widgets.Accordion(
+                children=[log_output],
+                selected_index=None,  # Collapsed by default
+                layout={'margin': '10px 0'}
+            )
+            logs_accordion.set_title(0, "📋 Installation Logs")
+            
+            # Add to UI
+            ui_components['logs_accordion'] = logs_accordion
+            ui_components['log_output'] = log_output
+            
+            # Add to main UI container after status output
+            ui_container = ui_components['ui']
+            children_list = list(ui_container.children)
+            insert_index = -1  # Default to end
+            
+            # Find status output to insert after it
+            for i, child in enumerate(children_list):
+                if child is ui_components['status']:
+                    insert_index = i + 1
+                    break
+                    
+            # Insert accordion
+            if insert_index >= 0 and insert_index <= len(children_list):
+                new_children = children_list[:insert_index] + [logs_accordion] + children_list[insert_index:]
+                ui_container.children = tuple(new_children)
+            else:
+                # Fallback: append to end
+                ui_container.children = tuple(list(ui_container.children) + [logs_accordion])
+    
+    # Create processing indicator
+    def setup_processing_indicator():
+        if 'processing_indicator' not in ui_components:
+            indicator = widgets.HTML(
+                value='<div style="display:none;"><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>',
+                layout={'margin': '5px 0'}
+            )
+            ui_components['processing_indicator'] = indicator
+            
+            # Add to UI next to install button
+            action_group = ui_components['install_button'].parent
+            if action_group is not None:
+                action_group.children = action_group.children + (indicator,)
+    
+    # Setup logs accordion and processing indicator
+    setup_logs_accordion()
+    setup_processing_indicator()
+    
     # Function to update UI state during operations
     def set_ui_busy_state(busy=True, clear_status=False):
         """Set UI busy state - disable/enable buttons appropriately."""
@@ -165,13 +242,24 @@ def setup_dependency_handlers(ui_components):
         # Show/hide progress as needed
         if busy:
             ui_components['install_progress'].layout.visibility = 'visible'
+            ui_components['processing_indicator'].value = '<div><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>'
+            
+            # Ensure logs are visible during installation
+            if 'logs_accordion' in ui_components:
+                ui_components['logs_accordion'].selected_index = 0  # Expanded
         else:
             ui_components['install_progress'].layout.visibility = 'hidden'
+            ui_components['processing_indicator'].value = '<div style="display:none;"><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>'
             
         # Clear status if requested
         if clear_status:
             with ui_components['status']:
                 clear_output()
+                
+            # Also clear logs
+            if 'log_output' in ui_components:
+                with ui_components['log_output']:
+                    clear_output()
     
     # Main handler function for installation
     def install_packages():

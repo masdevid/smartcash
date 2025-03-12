@@ -596,3 +596,87 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
         return widgets.HTML(value=html)
     else:
         return widgets.HTML(value=f"<p>⚠️ File not found: {file_path}</p>")
+
+def create_component_header(title, description="", icon="🔧"):
+    """
+    Buat header untuk komponen UI.
+    
+    Args:
+        title: Judul komponen
+        description: Deskripsi komponen
+        icon: Emoji icon
+        
+    Returns:
+        Widget HTML berisi header
+    """
+    return widgets.HTML(f"""
+    <div style="background-color: #f0f8ff; padding: 15px; color: black; 
+              border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+        <h2 style="color: inherit; margin-top: 0;">{icon} {title}</h2>
+        <p style="color: inherit; margin-bottom: 0;">{description}</p>
+    </div>
+    """)
+
+def create_info_box(title, content, style='info', icon=None, collapsed=False):
+    """
+    Buat box informasi dengan styling yang konsisten.
+    
+    Args:
+        title: Judul box
+        content: Konten box (html)
+        style: Tipe styling ('info', 'success', 'warning', 'error')
+        icon: Optional emoji icon
+        collapsed: True jika box dilipat secara default
+        
+    Returns:
+        Widget HTML untuk info box
+    """
+    style_configs = {
+        'info': {
+            'bg_color': '#d1ecf1',
+            'border_color': '#0c5460',
+            'text_color': '#0c5460',
+            'default_icon': 'ℹ️'
+        },
+        'warning': {
+            'bg_color': '#fff3cd',
+            'border_color': '#856404',
+            'text_color': '#856404',
+            'default_icon': '⚠️'
+        },
+        'success': {
+            'bg_color': '#d4edda',
+            'border_color': '#155724',
+            'text_color': '#155724',
+            'default_icon': '✅'
+        },
+        'error': {
+            'bg_color': '#f8d7da',
+            'border_color': '#721c24',
+            'text_color': '#721c24',
+            'default_icon': '❌'
+        }
+    }
+    
+    style_config = style_configs.get(style, style_configs['info'])
+    icon_to_use = icon if icon else style_config['default_icon']
+    title_with_icon = f"{icon_to_use} {title}"
+    
+    if collapsed:
+        # Gunakan Accordion jika perlu collapsible
+        content_widget = widgets.HTML(value=content)
+        accordion = widgets.Accordion([content_widget])
+        accordion.set_title(0, title_with_icon)
+        accordion.selected_index = None if collapsed else 0
+        return accordion
+    else:
+        # Gunakan HTML biasa jika tidak perlu collapsible
+        box_html = f"""
+        <div style="padding: 10px; background-color: {style_config['bg_color']}; 
+                 border-left: 4px solid {style_config['border_color']}; 
+                 color: {style_config['text_color']}; margin: 10px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: inherit;">{title_with_icon}</h4>
+            {content}
+        </div>
+        """
+        return widgets.HTML(value=box_html)

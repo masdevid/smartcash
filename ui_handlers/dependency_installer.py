@@ -1,347 +1,340 @@
 """
 File: smartcash/ui_handlers/dependency_installer.py
-Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI instalasi dependencies SmartCash dengan fitur uncheck all dan SmartCash requirements
+Author: Refactored
+Deskripsi: Handler untuk UI instalasi dependencies SmartCash dengan implementasi ObserverManager.
 """
 
-import os
 import sys
 import subprocess
-import pkg_resources
 import time
+import threading
+import importlib
 from IPython.display import display, HTML, clear_output
-import ipywidgets as widgets
-from pathlib import Path
 
-def setup_dependency_handlers(ui):
-    """Setup handler untuk UI instalasi dependencies dengan fitur check/uncheck all"""
+def setup_dependency_handlers(ui_components):
+    """Setup handler untuk komponen UI instalasi dependencies."""
+    # Inisialisasi dependencies jika tersedia
+    logger, observer_manager = None, None
+    
+    # Import utility functions
+    try:
+        from smartcash.utils.ui_utils import create_status_indicator
+        from smartcash.utils.logger import get_logger
+        from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        
+        logger = get_logger("dependency_installer")
+        observer_manager = ObserverManager(auto_register=True)
+        
+        # Unregister any existing observers to prevent duplication
+        observer_manager.unregister_group("dependency_observers")
+        has_utilities = True
+    except ImportError as e:
+        print(f"ℹ️ Menggunakan mode fallback: {str(e)}")
+        has_utilities = False
+        
+        # Fallback implementation for create_status_indicator
+        def create_status_indicator(status, message):
+            """Fallback implementation untuk status indicator."""
+            status_styles = {
+                'success': {'icon': '✅', 'color': 'green'},
+                'warning': {'icon': '⚠️', 'color': 'orange'},
+                'error': {'icon': '❌', 'color': 'red'},
+                'info': {'icon': 'ℹ️', 'color': 'blue'}
+            }
+            
+            style = status_styles.get(status, status_styles['info'])
+            
+            return HTML(f"""
+            <div style="margin: 5px 0; padding: 8px 12px; 
+                        border-radius: 4px; background-color: #f8f9fa;">
+                <span style="color: {style['color']}; font-weight: bold;"> 
+                    {style['icon']} {message}
+                </span>
+            </div>
+            """)
+    
+    # State variables
+    is_installing = False
+    installation_thread = None
     
     # Handler untuk check all button
     def on_check_all(b):
-        # Dapatkan semua checkbox dari grid
-        checkboxes = [child for child in ui['checkbox_grid'].children if isinstance(child, widgets.Checkbox)]
-        
-        # Set semua ke checked
+        checkboxes = [child for child in ui_components['checkbox_grid'].children 
+                     if isinstance(child, type(ui_components['yolov5_req']))]
         for checkbox in checkboxes:
             checkbox.value = True
     
     # Handler untuk uncheck all button
     def on_uncheck_all(b):
-        # Dapatkan semua checkbox dari grid
-        checkboxes = [child for child in ui['checkbox_grid'].children if isinstance(child, widgets.Checkbox)]
-        
-        # Set semua ke unchecked
+        checkboxes = [child for child in ui_components['checkbox_grid'].children 
+                     if isinstance(child, type(ui_components['yolov5_req']))]
         for checkbox in checkboxes:
             checkbox.value = False
     
-    # Handler untuk install packages
-    def on_install(b):
-        with ui['status']:
+    # Function to run pip install command
+    def run_pip_command(package, force_reinstall=False):
+        """Run pip install command and return result."""
+        force_flag = "--force-reinstall" if force_reinstall else ""
+        cmd = f"{sys.executable} -m pip install {package} {force_flag}"
+        
+        try:
+            result = subprocess.run(
+                cmd, 
+                shell=True, 
+                check=True,
+                capture_output=True, 
+                text=True
+            )
+            return True, result.stdout
+        except subprocess.CalledProcessError as e:
+            return False, e.stderr
+    
+    # Special handlers for different package types
+    def install_yolov5_requirements(force_reinstall=False):
+        """Install YOLOv5 requirements."""
+        from pathlib import Path
+        if Path("yolov5").exists() and Path("yolov5/requirements.txt").exists():
+            force_flag = "--force-reinstall" if force_reinstall else ""
+            cmd = f"{sys.executable} -m pip install -r yolov5/requirements.txt {force_flag}"
+            try:
+                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+                return True, "YOLOv5 requirements installed successfully"
+            except subprocess.CalledProcessError as e:
+                return False, f"Error installing YOLOv5 requirements: {e.stderr}"
+        else:
+            return False, "YOLOv5 directory not found. Please clone the repository first."
+    
+    def install_torch(force_reinstall=False):
+        """Install PyTorch."""
+        try:
+            # Check if running in Colab
+            import google.colab
+            is_colab = True
+        except ImportError:
+            is_colab = False
+        
+        if is_colab:
+            return True, "PyTorch is already installed in Google Colab"
+        
+        # Install PyTorch for local environment
+        force_flag = "--force-reinstall" if force_reinstall else ""
+        cmd = f"{sys.executable} -m pip install torch torchvision torchaudio {force_flag}"
+        try:
+            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+            return True, "PyTorch installed successfully"
+        except subprocess.CalledProcessError as e:
+            return False, f"Error installing PyTorch: {e.stderr}"
+    
+    def install_smartcash_requirements(force_reinstall=False):
+        """Install core requirements for SmartCash."""
+        force_flag = "--force-reinstall" if force_reinstall else ""
+        cmd = f"{sys.executable} -m pip install pyyaml termcolor tqdm roboflow python-dotenv ipywidgets {force_flag}"
+        try:
+            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
+            return True, "SmartCash requirements installed successfully"
+        except subprocess.CalledProcessError as e:
+            return False, f"Error installing SmartCash requirements: {e.stderr}"
+    
+    # Check if a package is installed
+    def is_package_installed(package_name):
+        """Check if package is installed."""
+        try:
+            importlib.import_module(package_name)
+            return True
+        except ImportError:
+            return False
+    
+    # Get installed package version
+    def get_package_version(package_name):
+        """Get package version."""
+        try:
+            module = importlib.import_module(package_name)
+            return getattr(module, "__version__", "Unknown")
+        except (ImportError, AttributeError):
+            return "Not installed"
+    
+    # Main handler function for installation
+    def install_packages():
+        nonlocal is_installing
+        is_installing = True
+        
+        with ui_components['status']:
             clear_output()
             
             # Collect selected packages
-            packages = []
+            packages_to_install = []
             
-            if ui['yolov5_req'].value:
-                display(HTML("<p>📋 YOLOv5 requirements ditambahkan ke daftar instalasi</p>"))
-                packages.append("yolov5_requirements")
+            # Check standard packages
+            package_checkers = [
+                (ui_components['yolov5_req'].value, "YOLOv5 requirements", install_yolov5_requirements),
+                (ui_components['torch_req'].value, "PyTorch", install_torch),
+                (ui_components['smartcash_req'].value, "SmartCash requirements", install_smartcash_requirements),
+                (ui_components['albumentations_req'].value, "albumentations", "albumentations"),
+                (ui_components['notebook_req'].value, "Notebook tools", "ipywidgets tqdm matplotlib"),
+                (ui_components['opencv_req'].value, "OpenCV", "opencv-python"),
+                (ui_components['matplotlib_req'].value, "Matplotlib", "matplotlib"),
+                (ui_components['pandas_req'].value, "Pandas", "pandas"),
+                (ui_components['seaborn_req'].value, "Seaborn", "seaborn")
+            ]
             
-            if ui['torch_req'].value:
-                display(HTML("<p>📋 PyTorch ditambahkan ke daftar instalasi</p>"))
-                packages.append("torch_requirements")
-            
-            if ui['albumentations_req'].value:
-                display(HTML("<p>📋 Albumentations ditambahkan ke daftar instalasi</p>"))
-                packages.append("albumentations")
-            
-            if ui['notebook_req'].value:
-                display(HTML("<p>📋 Notebook packages ditambahkan ke daftar instalasi</p>"))
-                packages.append("notebook_requirements")
-            
-            if ui['smartcash_req'].value:
-                display(HTML("<p>📋 SmartCash requirements ditambahkan ke daftar instalasi</p>"))
-                packages.append("smartcash_requirements")
-            
-            if ui['opencv_req'].value:
-                display(HTML("<p>📋 OpenCV ditambahkan ke daftar instalasi</p>"))
-                packages.append("opencv-python")
-            
-            if ui['matplotlib_req'].value:
-                display(HTML("<p>📋 Matplotlib ditambahkan ke daftar instalasi</p>"))
-                packages.append("matplotlib")
-            
-            if ui['pandas_req'].value:
-                display(HTML("<p>📋 Pandas ditambahkan ke daftar instalasi</p>"))
-                packages.append("pandas")
-            
-            if ui['seaborn_req'].value:
-                display(HTML("<p>📋 Seaborn ditambahkan ke daftar instalasi</p>"))
-                packages.append("seaborn")
+            for selected, name, pkg in package_checkers:
+                if selected:
+                    packages_to_install.append((name, pkg))
+                    display(create_status_indicator("info", f"📋 {name} ditambahkan ke daftar instalasi"))
             
             # Add custom packages
-            custom = ui['custom_packages'].value.strip()
+            custom = ui_components['custom_packages'].value.strip()
             if custom:
                 custom_packages = [pkg.strip() for pkg in custom.split('\n') if pkg.strip()]
                 for pkg in custom_packages:
-                    display(HTML(f"<p>📋 Custom package <code>{pkg}</code> ditambahkan ke daftar instalasi</p>"))
-                packages.extend(custom_packages)
+                    packages_to_install.append((f"Custom: {pkg}", pkg))
+                    display(create_status_indicator("info", f"📋 Custom package {pkg} ditambahkan ke daftar instalasi"))
             
-            if not packages:
-                display(HTML(
-                    """<div style="padding: 10px; background: #fff3cd; color: #856404; border-left: 4px solid #ffc107;">
-                        <p><b>⚠️ Warning:</b> Tidak ada package yang dipilih untuk diinstall.</p>
-                    </div>"""
-                ))
+            if not packages_to_install:
+                display(create_status_indicator("warning", "⚠️ Tidak ada package yang dipilih untuk diinstall"))
+                is_installing = False
                 return
             
             # Show progress bar
-            ui['install_progress'].layout.visibility = 'visible'
-            ui['install_progress'].value = 0
-            ui['install_progress'].max = len(packages)
+            ui_components['install_progress'].layout.visibility = 'visible'
+            ui_components['install_progress'].value = 0
+            ui_components['install_progress'].max = len(packages_to_install)
             
             # Force reinstall flag
-            force_reinstall = ui['force_reinstall'].value
-            force_flag = "--force-reinstall" if force_reinstall else ""
+            force_reinstall = ui_components['force_reinstall'].value
             
             # Install packages
             display(HTML("<h3>🚀 Memulai instalasi package</h3>"))
             
-            for i, package in enumerate(packages):
-                ui['install_progress'].value = i
+            for i, (name, pkg) in enumerate(packages_to_install):
+                if not is_installing:
+                    break
+                    
+                ui_components['install_progress'].value = i
+                ui_components['install_progress'].description = f"{i+1}/{len(packages_to_install)}"
                 
-                if package == "yolov5_requirements":
-                    display(HTML(f"<p>🔄 Menginstall YOLOv5 requirements... (package {i+1}/{len(packages)})</p>"))
-                    
-                    try:
-                        # Check if yolov5 folder exists
-                        if Path("yolov5").exists() and Path("yolov5/requirements.txt").exists():
-                            cmd = f"{sys.executable} -m pip install -r yolov5/requirements.txt {force_flag}"
-                            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                            if result.returncode == 0:
-                                display(HTML("<p>✅ YOLOv5 requirements berhasil diinstall</p>"))
-                            else:
-                                display(HTML(f"<p>❌ Error saat install YOLOv5 requirements:</p><pre>{result.stderr}</pre>"))
-                        else:
-                            display(HTML("<p>❌ Folder YOLOv5 tidak ditemukan. Pastikan repository YOLOv5 sudah di-clone.</p>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install YOLOv5 requirements: {str(e)}</p>"))
+                display(create_status_indicator("info", f"🔄 Menginstall {name}... ({i+1}/{len(packages_to_install)})"))
                 
-                elif package == "torch_requirements":
-                    display(HTML(f"<p>🔄 Menginstall PyTorch... (package {i+1}/{len(packages)})</p>"))
+                # Install package
+                try:
+                    if callable(pkg):
+                        # Custom function for special packages
+                        success, message = pkg(force_reinstall)
+                    else:
+                        # Standard pip install
+                        success, message = run_pip_command(pkg, force_reinstall)
                     
-                    try:
-                        # Install PyTorch (CPU or CUDA version based on environment)
-                        try:
-                            import google.colab
-                            is_colab = True
-                        except ImportError:
-                            is_colab = False
-                        
-                        if is_colab:
-                            # Colab already has PyTorch
-                            display(HTML("<p>✅ PyTorch sudah terinstall di Google Colab</p>"))
-                        else:
-                            # Install PyTorch for local environment
-                            cmd = f"{sys.executable} -m pip install torch torchvision torchaudio {force_flag}"
-                            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                            if result.returncode == 0:
-                                display(HTML("<p>✅ PyTorch berhasil diinstall</p>"))
-                            else:
-                                display(HTML(f"<p>❌ Error saat install PyTorch:</p><pre>{result.stderr}</pre>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install PyTorch: {str(e)}</p>"))
-                
-                elif package == "albumentations":
-                    display(HTML(f"<p>🔄 Menginstall Albumentations... (package {i+1}/{len(packages)})</p>"))
-                    
-                    try:
-                        cmd = f"{sys.executable} -m pip install albumentations {force_flag}"
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                        if result.returncode == 0:
-                            display(HTML("<p>✅ Albumentations berhasil diinstall</p>"))
-                        else:
-                            display(HTML(f"<p>❌ Error saat install Albumentations:</p><pre>{result.stderr}</pre>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install Albumentations: {str(e)}</p>"))
-                
-                elif package == "notebook_requirements":
-                    display(HTML(f"<p>🔄 Menginstall Notebook packages... (package {i+1}/{len(packages)})</p>"))
-                    
-                    try:
-                        cmd = f"{sys.executable} -m pip install ipywidgets tqdm matplotlib {force_flag}"
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                        if result.returncode == 0:
-                            display(HTML("<p>✅ Notebook packages berhasil diinstall</p>"))
-                        else:
-                            display(HTML(f"<p>❌ Error saat install Notebook packages:</p><pre>{result.stderr}</pre>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install Notebook packages: {str(e)}</p>"))
-
-                elif package == "smartcash_requirements":
-                    display(HTML(f"<p>🔄 Menginstall SmartCash requirements... (package {i+1}/{len(packages)})</p>"))
-                    
-                    try:
-                        # SmartCash core requirements
-                        cmd = f"{sys.executable} -m pip install pyyaml termcolor python-dotenv roboflow {force_flag}"
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                        if result.returncode == 0:
-                            display(HTML("<p>✅ SmartCash requirements berhasil diinstall</p>"))
-                        else:
-                            display(HTML(f"<p>❌ Error saat install SmartCash requirements:</p><pre>{result.stderr}</pre>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install SmartCash requirements: {str(e)}</p>"))
-                
-                else:
-                    # Custom package
-                    display(HTML(f"<p>🔄 Menginstall {package}... (package {i+1}/{len(packages)})</p>"))
-                    
-                    try:
-                        cmd = f"{sys.executable} -m pip install {package} {force_flag}"
-                        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-                        if result.returncode == 0:
-                            display(HTML(f"<p>✅ Package <code>{package}</code> berhasil diinstall</p>"))
-                        else:
-                            display(HTML(f"<p>❌ Error saat install {package}:</p><pre>{result.stderr}</pre>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❌ Exception saat install {package}: {str(e)}</p>"))
+                    if success:
+                        display(create_status_indicator("success", f"✅ {name} berhasil diinstall"))
+                    else:
+                        display(create_status_indicator("error", f"❌ Error saat install {name}: {message}"))
+                except Exception as e:
+                    display(create_status_indicator("error", f"❌ Exception saat install {name}: {str(e)}"))
             
-            # Complete installation
-            ui['install_progress'].value = len(packages)
+            # Installation complete
+            if is_installing:
+                ui_components['install_progress'].value = len(packages_to_install)
+                
+                # Show completion message
+                display(HTML(
+                    """<div style="padding: 10px; background: #d4edda; color: #155724; border-left: 4px solid #28a745; margin-top: 20px;">
+                        <h3 style="margin-top: 0;">✅ Instalasi Selesai</h3>
+                        <p>Semua package telah diproses. Gunakan tombol 'Check Installations' untuk memeriksa hasil instalasi.</p>
+                    </div>"""
+                ))
+            else:
+                display(create_status_indicator("warning", "⚠️ Instalasi dihentikan oleh pengguna"))
             
-            # Show summary
-            display(HTML(
-                """<div style="padding: 10px; background: #d4edda; color: #155724; border-left: 4px solid #28a745; margin-top: 20px;">
-                    <h3 style="margin-top: 0;">✅ Instalasi Selesai</h3>
-                    <p>Semua package telah diproses. Gunakan tombol 'Check Installations' untuk memeriksa hasil instalasi.</p>
-                </div>"""
-            ))
+            # Reset state
+            is_installing = False
             
-            # Hide progress bar after completion (delay for effect)
+            # Hide progress bar after completion (delay for visual effect)
             time.sleep(1)
-            ui['install_progress'].layout.visibility = 'hidden'
+            ui_components['install_progress'].layout.visibility = 'hidden'
     
-    # Handler untuk check installations
+    # Handler for install button
+    def on_install(b):
+        nonlocal installation_thread
+        
+        # Don't start if already installing
+        if is_installing:
+            return
+        
+        # Start installation in separate thread
+        installation_thread = threading.Thread(target=install_packages)
+        installation_thread.daemon = True
+        installation_thread.start()
+    
+    # Handler for check button
     def on_check(b):
-        with ui['status']:
+        with ui_components['status']:
             clear_output()
             
             display(HTML("<h3>🔍 Checking installed packages</h3>"))
             
-            # Check PyTorch
-            try:
-                import torch
-                import torchvision
-                display(HTML(f"<p>✅ PyTorch: v{torch.__version__}, CUDA available: {torch.cuda.is_available()}</p>"))
-                display(HTML(f"<p>✅ TorchVision: v{torchvision.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ PyTorch: Not installed</p>"))
+            # List of packages to check
+            packages_to_check = [
+                ('PyTorch', 'torch'),
+                ('TorchVision', 'torchvision'),
+                ('OpenCV', 'cv2'),
+                ('Albumentations', 'albumentations'),
+                ('NumPy', 'numpy'),
+                ('Pandas', 'pandas'),
+                ('Matplotlib', 'matplotlib'),
+                ('Seaborn', 'seaborn'),
+                ('ipywidgets', 'ipywidgets'),
+                ('tqdm', 'tqdm'),
+                ('PyYAML', 'yaml'),
+                ('termcolor', 'termcolor'),
+                ('python-dotenv', 'dotenv'),
+                ('Roboflow', 'roboflow')
+            ]
             
-            # Check OpenCV
-            try:
-                import cv2
-                display(HTML(f"<p>✅ OpenCV: v{cv2.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ OpenCV: Not installed</p>"))
-            
-            # Check Albumentations
-            try:
-                import albumentations as A
-                display(HTML(f"<p>✅ Albumentations: v{A.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ Albumentations: Not installed</p>"))
-            
-            # Check Notebook requirements
-            try:
-                import ipywidgets
-                display(HTML(f"<p>✅ ipywidgets: v{ipywidgets.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ ipywidgets: Not installed</p>"))
-            
-            try:
-                import tqdm
-                display(HTML(f"<p>✅ tqdm: v{tqdm.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ tqdm: Not installed</p>"))
-            
-            try:
-                import matplotlib
-                display(HTML(f"<p>✅ matplotlib: v{matplotlib.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ matplotlib: Not installed</p>"))
-            
-            # Check SmartCash Requirements
-            try:
-                import yaml
-                display(HTML(f"<p>✅ PyYAML: v{yaml.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ PyYAML: Not installed</p>"))
-            
-            try:
-                import termcolor
-                display(HTML("<p>✅ termcolor: installed</p>"))
-            except ImportError:
-                display(HTML("<p>❌ termcolor: Not installed</p>"))
-            
-            try:
-                import dotenv
-                display(HTML(f"<p>✅ python-dotenv:installed</p>"))
-            except ImportError:
-                display(HTML("<p>❌ python-dotenv: Not installed</p>"))
-
-            try:
-                import roboflow
-                display(HTML("<p>✅ roboflow: installed</p>"))
-            except ImportError:
-                display(HTML("<p>❌ roboflow: Not installed</p>"))
-            
-            # Check YOLOv5 requirements (numpy, scipy, etc)
-            try:
-                import numpy as np
-                display(HTML(f"<p>✅ NumPy: v{np.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ NumPy: Not installed</p>"))
-            
-            try:
-                import pandas as pd
-                display(HTML(f"<p>✅ Pandas: v{pd.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ Pandas: Not installed</p>"))
-            
-            try:
-                import scipy
-                display(HTML(f"<p>✅ SciPy: v{scipy.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ SciPy: Not installed</p>"))
-            
-            try:
-                import seaborn as sns
-                display(HTML(f"<p>✅ Seaborn: v{sns.__version__}</p>"))
-            except ImportError:
-                display(HTML("<p>❌ Seaborn: Not installed</p>"))
-            
-            # Check for custom packages
-            custom = ui['custom_packages'].value.strip()
-            if custom:
-                display(HTML("<h4>Custom Packages:</h4>"))
-                custom_packages = [pkg.strip() for pkg in custom.split('\n') if pkg.strip()]
+            # Check packages
+            for name, pkg in packages_to_check:
+                installed = is_package_installed(pkg)
+                version = get_package_version(pkg) if installed else "Not installed"
                 
-                for pkg in custom_packages:
+                if installed:
+                    display(create_status_indicator("success", f"✅ {name}: v{version}"))
+                else:
+                    display(create_status_indicator("warning", f"⚠️ {name}: Not installed"))
+            
+            # Check CUDA if PyTorch is installed
+            if is_package_installed('torch'):
+                import torch
+                cuda_available = torch.cuda.is_available()
+                if cuda_available:
                     try:
-                        # Extract package name (without version)
-                        pkg_name = pkg.split('==')[0].split('>=')[0].split('<=')[0].strip()
-                        
-                        # Try to get distribution
-                        dist = pkg_resources.get_distribution(pkg_name)
-                        display(HTML(f"<p>✅ {pkg_name}: v{dist.version}</p>"))
-                    except pkg_resources.DistributionNotFound:
-                        display(HTML(f"<p>❌ {pkg_name}: Not installed</p>"))
-                    except Exception as e:
-                        display(HTML(f"<p>❓ {pkg_name}: Error checking - {str(e)}</p>"))
+                        device_name = torch.cuda.get_device_name(0)
+                        display(create_status_indicator("success", f"✅ CUDA available: {device_name}"))
+                    except:
+                        display(create_status_indicator("success", f"✅ CUDA is available"))
+                else:
+                    display(create_status_indicator("info", "ℹ️ CUDA is not available, using CPU only"))
     
     # Register handlers
-    ui['install_button'].on_click(on_install)
-    ui['check_button'].on_click(on_check)
-    ui['check_all_button'].on_click(on_check_all)
-    ui['uncheck_all_button'].on_click(on_uncheck_all)
+    ui_components['install_button'].on_click(on_install)
+    ui_components['check_button'].on_click(on_check)
+    ui_components['check_all_button'].on_click(on_check_all)
+    ui_components['uncheck_all_button'].on_click(on_uncheck_all)
     
-    return ui
+    # Cleanup function
+    def cleanup():
+        nonlocal is_installing
+        is_installing = False
+        
+        if observer_manager:
+            try:
+                observer_manager.unregister_group("dependency_observers")
+                if logger:
+                    logger.info("✅ Observer untuk dependency installer telah dibersihkan")
+            except Exception as e:
+                if logger:
+                    logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
+    
+    # Add cleanup function to ui_components
+    ui_components['cleanup'] = cleanup
+    
+    return ui_components

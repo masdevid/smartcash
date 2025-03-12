@@ -45,9 +45,9 @@ def setup_env_handlers(ui):
                     system_info = env_manager.get_system_info()
                     
                     info_html = f"""
-                    <div style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                        <h4 style="margin-top: 0;">📊 System Information</h4>
-                        <ul>
+                    <div style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px; color: #212529;">
+                        <h4 style="margin-top: 0; color: #212529;">📊 System Information</h4>
+                        <ul style="color: #212529;">
                             <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
                             <li><b>Base Directory:</b> {system_info.get('base_dir', 'Unknown')}</li>
                             <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda_available', False) else 'No'}</li>
@@ -71,9 +71,9 @@ def setup_env_handlers(ui):
                 import sys, platform
                 from pathlib import Path
                 display(HTML(f"""
-                <div style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                    <h4 style="margin-top: 0;">📊 System Information</h4>
-                    <ul>
+                <div style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 5px; color: #212529;">
+                    <h4 style="margin-top: 0; color: #212529;">📊 System Information</h4>
+                    <ul style="color: #212529;">
                         <li><b>Python:</b> {platform.python_version()}</li>
                         <li><b>OS:</b> {platform.system()} {platform.release()}</li>
                         <li><b>Base Directory:</b> {Path.cwd()}</li>

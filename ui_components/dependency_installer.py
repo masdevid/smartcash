@@ -1,19 +1,23 @@
 """
 File: smartcash/ui_components/dependency_installer.py
-Author: Alfrida Sabar (refactored)
-Deskripsi: Komponen UI untuk instalasi dependencies SmartCash dengan grid layout dan uncheck all button
+Author: Refactored
+Deskripsi: Komponen UI untuk instalasi dependencies SmartCash dengan grid layout yang lebih fleksibel.
 """
 
 import ipywidgets as widgets
-from IPython.display import HTML
-from pathlib import Path
+from smartcash.utils.ui_utils import create_component_header, create_info_box
 
 def create_dependency_ui():
-    """Buat UI untuk instalasi dependencies dengan grid layout dan uncheck all button"""
+    """Buat UI untuk instalasi dependencies dengan grid layout yang fleksibel"""
+    # Container utama
     main = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("<h1>📦 Package Installation</h1><p>Instalasi package yang diperlukan untuk SmartCash</p>")
+    header = create_component_header(
+        "Package Installation",
+        "Instalasi package yang diperlukan untuk SmartCash",
+        "📦"
+    )
     
     # Package card
     package_card = widgets.VBox(layout=widgets.Layout(
@@ -27,97 +31,43 @@ def create_dependency_ui():
     # Package list - checkboxes
     package_list_header = widgets.HTML("<h3>🛠️ Package List</h3>")
     
-    # Checkbox group with grid layout
+    # Checkbox grid dengan layout yang lebih fleksibel
     checkbox_grid = widgets.GridBox(
         layout=widgets.Layout(
-            grid_template_columns='repeat(3, 1fr)',
+            grid_template_columns='repeat(auto-fill, minmax(200px, 1fr))',
             grid_gap='10px',
             width='100%',
             padding='10px 0'
         )
     )
     
-    # Create checkboxes for packages
-    yolov5_req = widgets.Checkbox(
-        value=True,
-        description='YOLOv5 requirements',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    torch_req = widgets.Checkbox(
-        value=True,
-        description='PyTorch',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    albumentations_req = widgets.Checkbox(
-        value=True,
-        description='Albumentations',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    notebook_req = widgets.Checkbox(
-        value=True,
-        description='Notebook tools',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    smartcash_req = widgets.Checkbox(
-        value=True,
-        description='SmartCash requirements',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    opencv_req = widgets.Checkbox(
-        value=True,
-        description='OpenCV',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    matplotlib_req = widgets.Checkbox(
-        value=True,
-        description='Matplotlib',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    pandas_req = widgets.Checkbox(
-        value=True,
-        description='Pandas',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    seaborn_req = widgets.Checkbox(
-        value=True,
-        description='Seaborn',
-        disabled=False,
-        indent=False,
-        layout=widgets.Layout(margin='5px 0')
-    )
-    
-    # Add checkboxes to grid
-    checkbox_grid.children = [
-        yolov5_req, torch_req, albumentations_req, 
-        notebook_req, smartcash_req, opencv_req,
-        matplotlib_req, pandas_req, seaborn_req
+    # Buat checkboxes untuk packages
+    packages = [
+        ('yolov5_req', 'YOLOv5 requirements'),
+        ('torch_req', 'PyTorch'),
+        ('albumentations_req', 'Albumentations'),
+        ('notebook_req', 'Notebook tools'),
+        ('smartcash_req', 'SmartCash requirements'),
+        ('opencv_req', 'OpenCV'),
+        ('matplotlib_req', 'Matplotlib'),
+        ('pandas_req', 'Pandas'),
+        ('seaborn_req', 'Seaborn')
     ]
     
-    # Button to check/uncheck all
+    checkbox_widgets = {}
+    for name, desc in packages:
+        checkbox_widgets[name] = widgets.Checkbox(
+            value=True,
+            description=desc,
+            disabled=False,
+            indent=False,
+            layout=widgets.Layout(margin='5px 0')
+        )
+    
+    # Tambahkan checkboxes ke grid
+    checkbox_grid.children = list(checkbox_widgets.values())
+    
+    # Button untuk check/uncheck all
     button_container = widgets.HBox(layout=widgets.Layout(
         justify_content='space-between',
         width='100%',
@@ -146,10 +96,16 @@ def create_dependency_ui():
         placeholder='Tambahkan package tambahan (satu per baris)',
         description='Custom:',
         disabled=False,
-        layout=widgets.Layout(width='60%', height='100px', margin='10px 0')
+        layout=widgets.Layout(width='100%', height='100px', margin='10px 0')
     )
     
     # Install button and options
+    action_container = widgets.HBox(layout=widgets.Layout(
+        justify_content='space-between',
+        width='100%',
+        margin='15px 0'
+    ))
+    
     action_button_group = widgets.HBox(layout=widgets.Layout(display='flex', flex_flow='row wrap'))
     
     install_button = widgets.Button(
@@ -157,7 +113,7 @@ def create_dependency_ui():
         button_style='primary',
         icon='download',
         tooltip='Install all selected packages',
-        layout=widgets.Layout(margin='10px 5px 10px 0')
+        layout=widgets.Layout(margin='0 5px 0 0')
     )
     
     check_button = widgets.Button(
@@ -165,7 +121,7 @@ def create_dependency_ui():
         button_style='info',
         icon='check',
         tooltip='Check installed packages',
-        layout=widgets.Layout(margin='10px 0 10px 5px')
+        layout=widgets.Layout(margin='0 0 0 5px')
     )
     
     # Add buttons to group
@@ -179,6 +135,8 @@ def create_dependency_ui():
         indent=False,
         layout=widgets.Layout(margin='5px 0')
     )
+    
+    action_container.children = [action_button_group, force_reinstall]
     
     # Progress bar
     install_progress = widgets.IntProgress(
@@ -194,65 +152,56 @@ def create_dependency_ui():
     # Status output
     status = widgets.Output(layout={'width': '100%', 'border': '1px solid #ddd', 'min_height': '150px', 'margin': '10px 0'})
     
+    # Info box
+    info_box = create_info_box(
+        "Tentang Package Installation",
+        """
+        <p><b>Package yang tersedia:</b></p>
+        <ul>
+            <li><b>YOLOv5 requirements:</b> Package dasar untuk YOLOv5 (numpy, opencv, scipy)</li>
+            <li><b>SmartCash requirements:</b> Package khusus untuk SmartCash (pyyaml, termcolor, tqdm)</li>
+            <li><b>Notebook tools:</b> ipywidgets, tqdm, dan tools lain untuk notebook</li>
+        </ul>
+        <p><i>Gunakan <b>Force reinstall</b> untuk instalasi ulang package yang sudah ada.</i></p>
+        """,
+        'info'
+    )
+    
     # Assemble package card
     package_card.children = [
         package_list_header,
         button_container,
         checkbox_grid,
+        widgets.HTML("<h3>📝 Additional Packages</h3>"),
         custom_packages,
-        force_reinstall,
-        action_button_group,
+        action_container,
         install_progress
     ]
-    
-    # Help accordion
-    help_info = widgets.Accordion(children=[widgets.HTML("""
-        <div style="padding: 10px;">
-            <h4>Installation Guide</h4>
-            <ol>
-                <li><b>Select Packages:</b> Pilih package yang akan diinstall</li>
-                <li><b>Custom Packages:</b> Tambahkan package khusus (satu per baris)</li>
-                <li><b>Force Reinstall:</b> Paksa reinstall package meskipun sudah terinstall</li>
-                <li><b>Check Installations:</b> Periksa versi package yang terinstall</li>
-            </ol>
-            <p><b>Catatan Package:</b></p>
-            <ul>
-                <li><b>YOLOv5 requirements:</b> Package dasar untuk YOLOv5 (numpy, opencv, scipy, dll)</li>
-                <li><b>SmartCash requirements:</b> Package khusus untuk SmartCash (pyyaml, termcolor, tqdm)</li>
-                <li><b>Notebook tools:</b> ipywidgets, tqdm, dan tools lain untuk notebook</li>
-            </ul>
-        </div>
-    """)], selected_index=None)
-    
-    help_info.set_title(0, "ℹ️ Bantuan")
     
     # Assemble UI
     main.children = [
         header,
+        info_box,
         package_card,
-        status,
-        help_info
+        status
     ]
     
-    # Return components
-    return {
+    # Return dictionary of components
+    result = {
         'ui': main,
-        'yolov5_req': yolov5_req,
-        'torch_req': torch_req,
-        'albumentations_req': albumentations_req,
-        'notebook_req': notebook_req,
-        'smartcash_req': smartcash_req,
-        'opencv_req': opencv_req,
-        'matplotlib_req': matplotlib_req,
-        'pandas_req': pandas_req,
-        'seaborn_req': seaborn_req,
-        'custom_packages': custom_packages,
-        'force_reinstall': force_reinstall,
+        'status': status,
+        'install_progress': install_progress,
         'install_button': install_button,
         'check_button': check_button,
         'check_all_button': check_all_button,
         'uncheck_all_button': uncheck_all_button,
-        'install_progress': install_progress,
-        'status': status,
+        'custom_packages': custom_packages,
+        'force_reinstall': force_reinstall,
         'checkbox_grid': checkbox_grid
     }
+    
+    # Add individual checkboxes to result
+    for name, widget in checkbox_widgets.items():
+        result[name] = widget
+    
+    return result

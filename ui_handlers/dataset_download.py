@@ -47,21 +47,24 @@ def setup_dataset_download_handlers(ui_components, config):
             display(create_status_indicator("warning", f"⚠️ Limited functionality available: {str(e)}"))
     
     # Check for API key from Google Colab Secret
-    api_key_info = HTML(
-        """<div style="padding:10px;border-left:4px solid #856404;color:#856404;
-                      border-radius:4px;background-color:#fff3cd">
+    api_key_info = widgets.HTML(
+        """<div style="padding: 10px; border-left: 4px solid #856404; 
+                     color: #856404; margin: 5px 0; border-radius: 4px; background-color: #fff3cd">
                 <p><i>⚠️ API Key diperlukan untuk download dari Roboflow</i></p>
             </div>"""
     )
     
+    # Cek dan tambahkan API key dari Google Colab Secret
+    has_api_key = False
     try:
         from google.colab import userdata
         roboflow_api_key = userdata.get('ROBOFLOW_API_KEY')
-        if roboflow_api_key and 'roboflow_settings' in ui_components:
+        if roboflow_api_key:
             ui_components['roboflow_settings'].children[0].value = roboflow_api_key
-            api_key_info = HTML(
-                """<div style="padding:10px;border-left:4px solid #0c5460;color:#0c5460;
-                              border-radius:4px;background-color:#d1ecf1">
+            has_api_key = True
+            api_key_info = widgets.HTML(
+                """<div style="padding: 10px; border-left: 4px solid #0c5460; 
+                     color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
                     <p><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>
                 </div>"""
             )

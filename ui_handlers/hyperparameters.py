@@ -30,7 +30,6 @@ def setup_hyperparameters_handlers(ui_components, config=None):
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.environment_manager import EnvironmentManager
         from smartcash.utils.early_stopping import EarlyStopping
-        from smartcash.utils.ui_utils import create_status_indicator
         
         # Setup dependencies
         deps['logger'] = get_logger("hyperparameters")
@@ -39,11 +38,16 @@ def setup_hyperparameters_handlers(ui_components, config=None):
         deps['env_manager'] = EnvironmentManager(logger=deps['logger'])
         deps['observer_manager'].unregister_group("hyperparameters_ui")
         
+        # Try importing ModelManager silently - don't log warnings
         try:
             from smartcash.handlers.model import ModelManager
-            if config: deps['model_manager'] = ModelManager(config, logger=deps['logger'])
+            if config: 
+                deps['model_manager'] = ModelManager(config, logger=None)
+                if deps['logger']:
+                    deps['logger'].info("✅ ModelManager tersedia")
         except ImportError:
-            deps['logger'].warning("⚠️ ModelManager tidak tersedia")
+            # ModelManager is optional, so we don't need to log this
+            pass
             
     except ImportError as e:
         if 'status_output' in ui_components:

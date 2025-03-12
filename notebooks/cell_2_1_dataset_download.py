@@ -10,9 +10,6 @@ env, config = setup_notebook_environment(
     create_dirs=["data"]
 )
 
-if not config or 'data' not in config:
-    raise ValueError("Config tidak valid! Pastikan configs/dataset_config.yaml berisi konfigurasi dataset.")
-
 # Setup UI component
 ui_components = setup_ui_component(env, config, "dataset_download")
 

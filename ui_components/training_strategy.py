@@ -1,15 +1,14 @@
 """
 File: smartcash/ui_components/training_strategy.py
 Author: Refactor
-Deskripsi: Komponen UI untuk konfigurasi strategi training model SmartCash (optimized).
+Deskripsi: Komponen UI untuk konfigurasi strategi training model SmartCash.
 """
 
 import ipywidgets as widgets
 from smartcash.utils.ui_utils import (
     create_component_header, 
     create_section_title,
-    create_info_alert,
-    styled_html
+    create_info_box
 )
 
 def create_training_strategy_ui():
@@ -67,39 +66,6 @@ def create_training_strategy_ui():
         )
     ])
     
-    augmentation_details = widgets.HTML("""
-    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; color: #2c3e50">
-        <h4 style="margin-top: 0; color: #2c3e50">📝 Augmentation Parameter Details</h4>
-        <table style="width: 100%; border-collapse: collapse">
-            <tr style="background-color: #f1f1f1">
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Parameter</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Description</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Impact</th>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mosaic</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Combines 4 training images into one</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Improves small object detection</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Flip</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Horizontal image flipping</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Adds orientation variation</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Scale</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Random scaling of images</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Improves scale invariance</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mixup</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Blends two images together</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Helps with boundary regularization</td>
-            </tr>
-        </table>
-    </div>
-    """)
-    
     # Optimization strategy section
     optimization_section = create_section_title("Optimization Strategy", "⚙️")
     
@@ -135,40 +101,119 @@ def create_training_strategy_ui():
         )
     ])
     
-    optimization_details = widgets.HTML("""
-    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; color: #2c3e50">
-        <h4 style="margin-top: 0; color: #2c3e50">📝 Optimization Technique Details</h4>
-        <table style="width: 100%; border-collapse: collapse">
-            <tr style="background-color: #f1f1f1">
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Technique</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Description</th>
-                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Effect</th>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mixed Precision</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Uses FP16 for speedup</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">2-3x faster training with lower memory</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>EMA</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Maintains moving average of weights</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Stabilizes training, better generalization</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>SWA</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Averages weights from multiple checkpoints</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Higher test accuracy, better generalization</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Cosine LR</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Gradual learning rate decay</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Smooth convergence to optimum</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Weight Decay</b></td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">L2 regularization technique</td>
-                <td style="padding: 8px; border-bottom: 1px solid #ddd">Prevents overfitting by limiting weights</td>
-            </tr>
-        </table>
-    </div>
-    """)
+    # Training policy section
+    policy_section = create_section_title("Training Policy", "📋")
+    
+    policy_options = widgets.VBox([
+        widgets.Checkbox(
+            value=True,
+            description='Save best model only',
+            style={'description_width': 'initial'}
+        ),
+        widgets.IntSlider(
+            value=5,
+            min=1,
+            max=10,
+            description='Save every N epochs:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%')
+        ),
+        widgets.IntSlider(
+            value=15,
+            min=5,
+            max=30,
+            description='Early stopping patience:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%')
+        ),
+        widgets.Checkbox(
+            value=True,
+            description='Validate every epoch',
+            style={'description_width': 'initial'}
+        ),
+        widgets.Checkbox(
+            value=True,
+            description='Log to TensorBoard',
+            style={'description_width': 'initial'}
+        )
+    ])
+    
+    # Strategy summary
+    strategy_summary = widgets.Output(
+        layout=widgets.Layout(
+            margin='20px 0',
+            border='1px solid #ddd',
+            padding='10px'
+        )
+    )
+    
+    # Buttons container
+    buttons_container = widgets.HBox([
+        widgets.Button(
+            description='Save Strategy',
+            button_style='primary',
+            icon='save',
+            layout=widgets.Layout(margin='0 10px 0 0')
+        ),
+        widgets.Button(
+            description='Reset to Default',
+            button_style='warning',
+            icon='refresh'
+        )
+    ], layout=widgets.Layout(margin='15px 0'))
+    
+    # Status output
+    status_output = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            max_height='300px',
+            margin='10px 0',
+            overflow='auto'
+        )
+    )
+    
+    # Info box with additional details
+    info_box = create_info_box(
+        "About Training Strategies",
+        """
+        <p>Strategi training yang tepat dapat meningkatkan performa model secara signifikan:</p>
+        <ul>
+            <li><strong>Data Augmentation</strong> - Memperbanyak variasi data training dengan transformasi</li>
+            <li><strong>Optimization</strong> - Teknik untuk mempercepat training dan mencapai konvergensi lebih baik</li>
+            <li><strong>Training Policy</strong> - Pengaturan untuk proses dan monitoring training</li>
+        </ul>
+        <p><strong>Rekomendasi:</strong> Gunakan kombinasi mosaic augmentation (0.5-0.8), EMA, dan cosine scheduler untuk kasus SmartCash.</p>
+        """,
+        'info',
+        collapsed=True
+    )
+    
+    # Assemble all components
+    main_container.children = [
+        header,
+        augmentation_section,
+        augmentation_options,
+        optimization_section,
+        optimization_options,
+        policy_section,
+        policy_options,
+        strategy_summary,
+        buttons_container,
+        status_output,
+        info_box
+    ]
+    
+    # Create dictionary of components for handlers
+    ui_components = {
+        'ui': main_container,
+        'augmentation_options': augmentation_options,
+        'optimization_options': optimization_options,
+        'policy_options': policy_options,
+        'strategy_summary': strategy_summary,
+        'save_button': buttons_container.children[0],
+        'reset_button': buttons_container.children[1],
+        'status_output': status_output
+    }
+    
+    return ui_components

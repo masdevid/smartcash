@@ -8,7 +8,6 @@ env, config = setup_notebook_environment(
     cell_name="dependency_installer",
     config_path="configs/preprocessing_config.yaml"
 )
-print(config)
 
 # Setup UI component
 ui_components = setup_ui_component(env, config, "dependency_installer")

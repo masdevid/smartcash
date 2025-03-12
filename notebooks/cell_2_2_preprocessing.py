@@ -7,7 +7,7 @@ from smartcash.utils.cell_header_utils import setup_notebook_environment, setup_
 env, config = setup_notebook_environment(
     cell_name="preprocessing",
     config_path="configs/preprocessing_config.yaml",
-    create_dirs=["data/preprocessed"]
+    create_dirs=["data/preprocessed", "data/invalid"]
 )
 
 # Setup UI component dengan config

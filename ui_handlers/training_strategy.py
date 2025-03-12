@@ -1,12 +1,10 @@
 """
 File: smartcash/ui_handlers/training_strategy.py
 Author: Refactor
-Deskripsi: Handler untuk UI konfigurasi strategi training model SmartCash (optimized).
+Deskripsi: Handler untuk UI konfigurasi strategi training model SmartCash.
 """
 
 from IPython.display import display, HTML, clear_output
-
-from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_training_strategy_handlers(ui_components, config=None):
     """Setup handlers untuk UI konfigurasi strategi training model."""
@@ -15,6 +13,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
         from smartcash.utils.logger import get_logger
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.ui_utils import create_status_indicator
         
         logger = get_logger("training_strategy")
         observer_manager = ObserverManager(auto_register=True)
@@ -35,80 +34,61 @@ def setup_training_strategy_handlers(ui_components, config=None):
     if config is None:
         config = {}
     
-    # Add missing keys to config if needed
-    if 'training' not in config:
-        config['training'] = {}
-    
-    # Defensive checks for UI components
-    # Create a helper to safely get components
-    def get_component(name):
-        return ui_components.get(name)
-    
-    # Update config from UI
+    # Fungsi untuk update config dari UI
     def update_config_from_ui():
         """Ambil nilai dari UI dan update config."""
         # Get augmentation config
-        aug_opts = get_component('augmentation_options')
-        if aug_opts is not None and hasattr(aug_opts, 'children') and len(aug_opts.children) >= 5:
-            aug_enabled = aug_opts.children[0].value
-            mosaic_prob = aug_opts.children[1].value
-            flip_prob = aug_opts.children[2].value
-            scale_jitter = aug_opts.children[3].value
-            mixup_enabled = aug_opts.children[4].value
-            
-            # Update augmentation config
-            if 'augmentation' not in config['training']:
-                config['training']['augmentation'] = {}
-            
-            config['training']['augmentation'].update({
-                'enabled': aug_enabled,
-                'mosaic': mosaic_prob,
-                'fliplr': flip_prob,
-                'scale': scale_jitter,
-                'mixup': 1.0 if mixup_enabled else 0.0
-            })
+        aug_opts = ui_components['augmentation_options']
+        aug_enabled = aug_opts.children[0].value
+        mosaic_prob = aug_opts.children[1].value
+        flip_prob = aug_opts.children[2].value
+        scale_jitter = aug_opts.children[3].value
+        mixup_enabled = aug_opts.children[4].value
         
         # Get optimization config
-        opt_opts = get_component('optimization_options')
-        if opt_opts is not None and hasattr(opt_opts, 'children') and len(opt_opts.children) >= 5:
-            mixed_precision = opt_opts.children[0].value
-            use_ema = opt_opts.children[1].value
-            use_swa = opt_opts.children[2].value
-            lr_schedule = opt_opts.children[3].value
-            weight_decay = opt_opts.children[4].value
-            
-            # Update optimization config
-            if 'optimization' not in config['training']:
-                config['training']['optimization'] = {}
-            
-            config['training']['optimization'].update({
-                'mixed_precision': mixed_precision,
-                'ema': use_ema,
-                'swa': use_swa,
-                'lr_schedule': lr_schedule,
-                'weight_decay': weight_decay
-            })
+        opt_opts = ui_components['optimization_options']
+        mixed_precision = opt_opts.children[0].value
+        use_ema = opt_opts.children[1].value
+        use_swa = opt_opts.children[2].value
+        lr_schedule = opt_opts.children[3].value
+        weight_decay = opt_opts.children[4].value
         
         # Get policy config
-        policy_opts = get_component('policy_options')
-        if policy_opts is not None and hasattr(policy_opts, 'children') and len(policy_opts.children) >= 5:
-            save_best = policy_opts.children[0].value
-            save_period = policy_opts.children[1].value
-            early_stopping = policy_opts.children[2].value
-            validate_every_epoch = policy_opts.children[3].value
-            log_tensorboard = policy_opts.children[4].value
+        policy_opts = ui_components['policy_options']
+        save_best = policy_opts.children[0].value
+        save_period = policy_opts.children[1].value
+        early_stopping = policy_opts.children[2].value
+        validate_every_epoch = policy_opts.children[3].value
+        log_tensorboard = policy_opts.children[4].value
+        
+        # Ensure training config exists
+        if 'training' not in config:
+            config['training'] = {}
             
-            # Update policy config
-            if 'policy' not in config['training']:
-                config['training']['policy'] = {}
-            
-            config['training']['policy'].update({
-                'save_best': save_best,
-                'save_period': save_period,
-                'early_stopping_patience': early_stopping,
-                'validate_every_epoch': validate_every_epoch,
-                'log_tensorboard': log_tensorboard
-            })
+        # Update config dictionary
+        config['training']['augmentation'] = {
+            'enabled': aug_enabled,
+            'mosaic': mosaic_prob,
+            'fliplr': flip_prob,
+            'scale': scale_jitter,
+            'mixup': 1.0 if mixup_enabled else 0.0
+        }
+        
+        config['training']['optimization'] = {
+            'mixed_precision': mixed_precision,
+            'ema': use_ema,
+            'swa': use_swa,
+            'lr_schedule': lr_schedule,
+            'weight_decay': weight_decay
+        }
+        
+        config['training']['policy'] = {
+            'save_best': save_best,
+            'save_period': save_period,
+            'early_stopping_patience': early_stopping,
+            'validate_every_epoch': validate_every_epoch,
+            'log_tensorboard': log_tensorboard
+        }
         
         # Update strategy summary
         update_strategy_summary()
@@ -133,10 +113,11 @@ def setup_training_strategy_handlers(ui_components, config=None):
             try:
                 widget.value = value
             except Exception as e:
-                logger.debug(f"⚠️ Tidak dapat mengupdate widget: {e}")
+                if logger:
+                    logger.debug(f"⚠️ Tidak dapat mengupdate widget: {e}")
         
         # Update augmentation UI safely
-        aug_opts = get_component('augmentation_options')
+        aug_opts = ui_components['augmentation_options']
         if aug_opts is not None and hasattr(aug_opts, 'children') and len(aug_opts.children) >= 5:
             safe_update_value(aug_opts.children[0], aug_config.get('enabled', True))
             safe_update_value(aug_opts.children[1], aug_config.get('mosaic', 0.5))
@@ -145,7 +126,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
             safe_update_value(aug_opts.children[4], aug_config.get('mixup', 0) > 0)
             
         # Update optimization UI safely
-        opt_opts = get_component('optimization_options')
+        opt_opts = ui_components['optimization_options']
         if opt_opts is not None and hasattr(opt_opts, 'children') and len(opt_opts.children) >= 5:
             safe_update_value(opt_opts.children[0], opt_config.get('mixed_precision', True))
             safe_update_value(opt_opts.children[1], opt_config.get('ema', True))
@@ -154,7 +135,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
             safe_update_value(opt_opts.children[4], opt_config.get('weight_decay', 0.01))
             
         # Update policy UI safely
-        policy_opts = get_component('policy_options')
+        policy_opts = ui_components['policy_options']
         if policy_opts is not None and hasattr(policy_opts, 'children') and len(policy_opts.children) >= 5:
             safe_update_value(policy_opts.children[0], policy_config.get('save_best', True))
             safe_update_value(policy_opts.children[1], policy_config.get('save_period', 5))
@@ -167,12 +148,11 @@ def setup_training_strategy_handlers(ui_components, config=None):
     
     # Update strategy summary
     def update_strategy_summary():
-        """Create a summary of the current training strategy settings."""
-        strategy_summary = get_component('strategy_summary')
-        if strategy_summary is None:
+        """Create a summary of the current strategy settings."""
+        if 'strategy_summary' not in ui_components or ui_components['strategy_summary'] is None:
             return
             
-        with strategy_summary:
+        with ui_components['strategy_summary']:
             clear_output(wait=True)
             
             try:
@@ -224,17 +204,13 @@ def setup_training_strategy_handlers(ui_components, config=None):
                 display(HTML(html))
                 
             except Exception as e:
-                logger.error(f"❌ Error updating strategy summary: {str(e)}")
+                if logger:
+                    logger.error(f"❌ Error updating strategy summary: {str(e)}")
                 display(HTML(f"<p style='color:red'>❌ Error updating summary: {str(e)}</p>"))
     
     # Handler untuk save button
     def on_save_click(b):
-        status_output = get_component('status_output')
-        if status_output is None:
-            logger.error("❌ Komponen status_output tidak tersedia")
-            return
-            
-        with status_output:
+        with ui_components['status_output']:
             clear_output()
             display(create_status_indicator("info", "🔄 Menyimpan konfigurasi strategi training..."))
             
@@ -272,12 +248,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
     
     # Handler untuk reset button
     def on_reset_click(b):
-        status_output = get_component('status_output')
-        if status_output is None:
-            logger.error("❌ Komponen status_output tidak tersedia")
-            return
-            
-        with status_output:
+        with ui_components['status_output']:
             clear_output()
             display(create_status_indicator("info", "🔄 Reset konfigurasi ke default..."))
             
@@ -322,30 +293,21 @@ def setup_training_strategy_handlers(ui_components, config=None):
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error saat reset konfigurasi: {str(e)}"))
     
-    # Listen for changes
+    # Register change listeners for all components
     def on_component_change(change):
         if change['name'] != 'value':
             return
         update_config_from_ui()
     
-    # Register callbacks safely
-    save_button = get_component('save_button')
-    if save_button is not None:
-        save_button.on_click(on_save_click)
+    # Register callbacks
+    ui_components['save_button'].on_click(on_save_click)
+    ui_components['reset_button'].on_click(on_reset_click)
     
-    reset_button = get_component('reset_button')
-    if reset_button is not None:
-        reset_button.on_click(on_reset_click)
-    
-    # Register change listeners for all components safely
+    # Register change listeners for all components
     for section in ['augmentation_options', 'optimization_options', 'policy_options']:
-        component = get_component(section)
-        if component is not None and hasattr(component, 'children'):
-            for child in component.children:
-                try:
-                    child.observe(on_component_change, names='value')
-                except Exception as e:
-                    logger.debug(f"⚠️ Tidak dapat menambahkan observer: {e}")
+        component = ui_components[section]
+        for child in component.children:
+            child.observe(on_component_change, names='value')
     
     # Initialize UI from config
     update_ui_from_config()
@@ -355,7 +317,8 @@ def setup_training_strategy_handlers(ui_components, config=None):
         """Clean up resources."""
         if observer_manager:
             observer_manager.unregister_group("training_strategy_observers")
-        logger.info("✅ Training strategy handlers cleaned up")
+        if logger:
+            logger.info("✅ Training strategy handlers cleaned up")
     
     # Add cleanup to UI components
     ui_components['cleanup'] = cleanup

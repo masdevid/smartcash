@@ -3,11 +3,14 @@ File: smartcash/ui_handlers/dependency_installer.py
 Deskripsi: Handler yang dioptimalkan untuk instalasi dependencies di lingkungan Colab.
 """
 
+import os
 import sys
 import subprocess
 import threading
 import importlib
 from typing import List, Tuple, Optional, Dict, Any
+
+# IPython imports
 from IPython.display import display, clear_output, HTML
 
 def setup_dependency_handlers(ui_components):
@@ -78,7 +81,11 @@ def setup_dependency_handlers(ui_components):
             Tuple (berhasil, pesan)
         """
         force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install {' '.join(packages)} {force_flag}"
+        
+        # Tambahkan opsi untuk menghindari konfllik torch
+        extra_flags = "--no-deps" if any('torch' in pkg.lower() for pkg in packages) else ""
+        
+        cmd = f"{sys.executable} -m pip install {' '.join(packages)} {force_flag} {extra_flags}"
         
         try:
             result = subprocess.run(
@@ -174,7 +181,10 @@ def setup_dependency_handlers(ui_components):
         package_map = {
             'yolov5_req': (install_yolov5_requirements, 'YOLOv5 requirements'),
             'torch_req': (
-                lambda force: run_pip_install(['torch', 'torchvision', 'torchaudio'], force), 
+                lambda force: run_pip_install([
+                    'torch', 'torchvision', 'torchaudio', 
+                    '--index-url', 'https://download.pytorch.org/whl/cu118'
+                ], force), 
                 'PyTorch'
             ),
             'smartcash_req': (

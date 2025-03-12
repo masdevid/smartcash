@@ -1,5 +1,5 @@
 """
-File: smartcash/ui_components/training_execution.py
+File: smartcash/ui_components/model_training.py
 Author: Alfrida Sabar (refactored)
 Deskripsi: Komponen UI untuk eksekusi training model SmartCash.
 """

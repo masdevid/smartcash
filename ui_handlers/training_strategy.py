@@ -1,25 +1,16 @@
 """
 File: smartcash/ui_handlers/training_strategy.py
-Author: Refactored
-Deskripsi: Handler untuk UI konfigurasi strategi training model SmartCash.
+Author: Refactor
+Deskripsi: Handler untuk UI konfigurasi strategi training model SmartCash (optimized).
 """
 
-import matplotlib.pyplot as plt
-import numpy as np
-from IPython.display import display, clear_output, HTML
-import yaml
-import json
-from pathlib import Path
+from IPython.display import display, HTML, clear_output
 
 from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_training_strategy_handlers(ui_components, config=None):
     """Setup handlers untuk UI konfigurasi strategi training model."""
-    # Inisialisasi dependencies
-    logger = None
-    observer_manager = None
-    config_manager = None
-    
+    # Import necessities
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.utils.observer.observer_manager import ObserverManager
@@ -29,53 +20,14 @@ def setup_training_strategy_handlers(ui_components, config=None):
         observer_manager = ObserverManager(auto_register=True)
         config_manager = get_config_manager(logger=logger)
         
-        # Load config jika belum ada
-        if not config or not isinstance(config, dict):
-            config = config_manager.load_config(
-                filename="configs/training_config.yaml",
-                fallback_to_pickle=True
-            ) or {
-                'training': {
-                    'augmentation': {
-                        'enabled': True,
-                        'mosaic': 0.5,
-                        'fliplr': 0.5,
-                        'scale': 0.3,
-                        'mixup': 0.0
-                    },
-                    'optimization': {
-                        'mixed_precision': True,
-                        'ema': True,
-                        'swa': False,
-                        'lr_schedule': 'cosine',
-                        'weight_decay': 0.01
-                    },
-                    'policy': {
-                        'save_best': True,
-                        'save_period': 5,
-                        'early_stopping_patience': 15,
-                        'validate_every_epoch': True,
-                        'log_tensorboard': True
-                    }
-                }
-            }
-            
-            # Simpan config baru jika belum ada
-            if config_manager:
-                config_manager.save_config(config, "configs/training_config.yaml")
+        # Ensure observer cleanup from previous sessions
+        observer_group = "training_strategy_observers"
+        observer_manager.unregister_group(observer_group)
         
     except ImportError as e:
-        if logger:
-            logger.warning(f"⚠️ Beberapa modul tidak tersedia: {str(e)}")
-        else:
-            print(f"⚠️ Beberapa modul tidak tersedia: {str(e)}")
-    
-    # Kelompok observer
-    observer_group = "training_strategy_observers"
-    
-    # Reset observer group
-    if observer_manager:
-        observer_manager.unregister_group(observer_group)
+        with ui_components['status_output']:
+            display(create_status_indicator("warning", f"⚠️ Beberapa modul tidak tersedia: {str(e)}"))
+        return ui_components
     
     # Fungsi untuk update config dari UI
     def update_config_from_ui():
@@ -104,7 +56,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
         validate_every_epoch = policy_opts.children[3].value
         log_tensorboard = policy_opts.children[4].value
         
-        # Update config
+        # Update config dictionary
         if 'training' not in config:
             config['training'] = {}
             
@@ -131,6 +83,9 @@ def setup_training_strategy_handlers(ui_components, config=None):
             'validate_every_epoch': validate_every_epoch,
             'log_tensorboard': log_tensorboard
         }
+        
+        # Update strategy summary
+        update_strategy_summary()
         
         return config
     
@@ -183,6 +138,67 @@ def setup_training_strategy_handlers(ui_components, config=None):
             policy_opts.children[3].value = policy_config['validate_every_epoch']
         if 'log_tensorboard' in policy_config:
             policy_opts.children[4].value = policy_config['log_tensorboard']
+            
+        # Update strategy summary
+        update_strategy_summary()
+    
+    # Update strategy summary
+    def update_strategy_summary():
+        """Create a summary of the current strategy settings."""
+        with ui_components['strategy_summary']:
+            clear_output(wait=True)
+            
+            try:
+                if 'training' not in config:
+                    config['training'] = {}
+                    
+                aug_config = config['training'].get('augmentation', {})
+                opt_config = config['training'].get('optimization', {})
+                policy_config = config['training'].get('policy', {})
+                
+                # Create summary HTML
+                html = f"""
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; color: #2c3e50">
+                    <h4 style="margin-top: 0; color: #2c3e50">📊 Training Strategy Overview</h4>
+                    
+                    <div style="display: flex; flex-wrap: wrap; gap: 15px;">
+                        <div style="flex: 1; min-width: 200px; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                            <h5 style="margin-top: 0; color: #2c3e50">🔄 Augmentation</h5>
+                            <p><b>Status:</b> {'Enabled' if aug_config.get('enabled', True) else 'Disabled'}</p>
+                            <p><b>Mosaic:</b> {aug_config.get('mosaic', 0.5) * 100:.0f}%</p>
+                            <p><b>Flip Rate:</b> {aug_config.get('fliplr', 0.5) * 100:.0f}%</p>
+                            <p><b>Mixup:</b> {'Enabled' if aug_config.get('mixup', 0) > 0 else 'Disabled'}</p>
+                        </div>
+                        
+                        <div style="flex: 1; min-width: 200px; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                            <h5 style="margin-top: 0; color: #2c3e50">⚙️ Optimization</h5>
+                            <p><b>Precision:</b> {'Mixed (FP16)' if opt_config.get('mixed_precision', True) else 'Full (FP32)'}</p>
+                            <p><b>Scheduler:</b> {opt_config.get('lr_schedule', 'cosine').capitalize()}</p>
+                            <p><b>EMA:</b> {'Enabled' if opt_config.get('ema', True) else 'Disabled'}</p>
+                            <p><b>SWA:</b> {'Enabled' if opt_config.get('swa', False) else 'Disabled'}</p>
+                        </div>
+                        
+                        <div style="flex: 1; min-width: 200px; border: 1px solid #ddd; border-radius: 5px; padding: 10px;">
+                            <h5 style="margin-top: 0; color: #2c3e50">📋 Training Policy</h5>
+                            <p><b>Save Best:</b> {'Yes' if policy_config.get('save_best', True) else 'No'}</p>
+                            <p><b>Save Every:</b> {policy_config.get('save_period', 5)} epochs</p>
+                            <p><b>Early Stop After:</b> {policy_config.get('early_stopping_patience', 15)} epochs</p>
+                            <p><b>TensorBoard:</b> {'Enabled' if policy_config.get('log_tensorboard', True) else 'Disabled'}</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background-color: #d1ecf1; border-radius: 5px; color: #0c5460;">
+                        <p style="margin: 0;"><b>💡 Tip:</b> Cosine scheduler dengan EMA dan mixed precision adalah kombinasi optimal untuk sebagian besar kasus.</p>
+                    </div>
+                </div>
+                """
+                
+                display(HTML(html))
+                
+            except Exception as e:
+                if logger:
+                    logger.error(f"❌ Error updating strategy summary: {str(e)}")
+                display(HTML(f"<p style='color:red'>❌ Error updating summary: {str(e)}</p>"))
     
     # Handler untuk save button
     def on_save_click(b):
@@ -219,8 +235,6 @@ def setup_training_strategy_handlers(ui_components, config=None):
                         "✅ Konfigurasi strategi training diupdate dalam memori"
                     ))
                 
-                # Visualize strategy
-                visualize_strategy()
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error saat menyimpan konfigurasi: {str(e)}"))
     
@@ -258,7 +272,7 @@ def setup_training_strategy_handlers(ui_components, config=None):
                     }
                 }
                 
-                # Update UI from default
+                # Update global config and UI
                 if 'training' in config:
                     config['training'] = default_config['training']
                 else:
@@ -268,167 +282,34 @@ def setup_training_strategy_handlers(ui_components, config=None):
                 
                 display(create_status_indicator("success", "✅ Konfigurasi berhasil direset ke default"))
                 
-                # Visualize default strategy
-                visualize_strategy()
-                
             except Exception as e:
                 display(create_status_indicator("error", f"❌ Error saat reset konfigurasi: {str(e)}"))
     
-    # Visualize training strategy
-    def visualize_strategy():
-        """Visualisasi strategi training untuk membantu pemahaman."""
-        try:
-            with ui_components['visualization_output']:
-                clear_output(wait=True)
-                
-                # Get updated config from UI
-                cfg = update_config_from_ui()
-                if not cfg or 'training' not in cfg:
-                    return
-                
-                # Creating a 2x2 visualization layout
-                fig, axs = plt.subplots(2, 2, figsize=(14, 10))
-                
-                # 1. Learning Rate Schedule
-                ax1 = axs[0, 0]
-                epochs = np.arange(0, 50)
-                initial_lr = 0.01
-                
-                lr_schedule = cfg['training']['optimization']['lr_schedule']
-                if lr_schedule == 'cosine':
-                    lrs = initial_lr * (1 + np.cos(np.pi * epochs / 50)) / 2
-                elif lr_schedule == 'step':
-                    lrs = np.array([initial_lr * (0.1 ** (e // 15)) for e in epochs])
-                elif lr_schedule == 'linear':
-                    lrs = initial_lr * (1 - epochs / 50)
-                else:  # constant
-                    lrs = np.ones_like(epochs) * initial_lr
-                
-                ax1.plot(epochs, lrs)
-                ax1.set_title('Learning Rate Schedule')
-                ax1.set_xlabel('Epoch')
-                ax1.set_ylabel('Learning Rate')
-                ax1.grid(True, linestyle='--', alpha=0.7)
-                
-                # 2. Augmentation Stats
-                ax2 = axs[0, 1]
-                aug_cfg = cfg['training']['augmentation']
-                aug_types = ['Mosaic', 'Flip', 'Scale', 'Mixup']
-                aug_values = [
-                    aug_cfg['mosaic'] if aug_cfg['enabled'] else 0,
-                    aug_cfg['fliplr'] if aug_cfg['enabled'] else 0,
-                    aug_cfg['scale'] if aug_cfg['enabled'] else 0,
-                    aug_cfg['mixup'] if aug_cfg['enabled'] else 0
-                ]
-                bars = ax2.bar(aug_types, aug_values, color='skyblue')
-                
-                # Add values on top of bars
-                for bar in bars:
-                    height = bar.get_height()
-                    ax2.annotate(f'{height:.2f}',
-                                xy=(bar.get_x() + bar.get_width() / 2, height),
-                                xytext=(0, 3),
-                                textcoords="offset points",
-                                ha='center', va='bottom')
-                
-                ax2.set_title('Augmentation Strategies')
-                ax2.set_ylim(0, 1.1)
-                ax2.grid(True, axis='y', linestyle='--', alpha=0.7)
-                
-                # 3. Optimization Techniques
-                ax3 = axs[1, 0]
-                opt_cfg = cfg['training']['optimization']
-                tech_names = ['Mixed Precision', 'EMA', 'SWA']
-                tech_values = [
-                    1 if opt_cfg['mixed_precision'] else 0,
-                    1 if opt_cfg['ema'] else 0,
-                    1 if opt_cfg['swa'] else 0
-                ]
-                tech_colors = ['green' if v else 'red' for v in tech_values]
-                
-                bars = ax3.bar(tech_names, tech_values, color=tech_colors)
-                ax3.set_title('Optimization Techniques')
-                ax3.set_ylim(0, 1.1)
-                ax3.set_yticks([0, 1])
-                ax3.set_yticklabels(['Disabled', 'Enabled'])
-                
-                # Add text on top of bars
-                for bar in bars:
-                    height = bar.get_height()
-                    text = "Enabled" if height > 0.5 else "Disabled"
-                    ax3.annotate(text,
-                                xy=(bar.get_x() + bar.get_width() / 2, height),
-                                xytext=(0, 3),
-                                textcoords="offset points",
-                                ha='center', va='bottom')
-                
-                # 4. Training Policy
-                ax4 = axs[1, 1]
-                policy_cfg = cfg['training']['policy']
-                
-                # Create text summary instead of chart
-                policy_text = "\n".join([
-                    f"Save Best Model: {'✅' if policy_cfg['save_best'] else '❌'}",
-                    f"Save Every: {policy_cfg['save_period']} epochs",
-                    f"Early Stopping: {policy_cfg['early_stopping_patience']} epochs",
-                    f"Validation: {'Every epoch' if policy_cfg['validate_every_epoch'] else 'Periodic'}",
-                    f"TensorBoard: {'✅' if policy_cfg['log_tensorboard'] else '❌'}"
-                ])
-                
-                # Remove all axes elements
-                ax4.axis('off')
-                # Add text box
-                ax4.text(0.5, 0.5, policy_text, 
-                        ha='center', va='center', 
-                        bbox=dict(boxstyle='round', facecolor='lightyellow', alpha=0.5),
-                        fontsize=12)
-                ax4.set_title('Training Policy')
-                
-                plt.tight_layout()
-                display(plt.gcf())
-                plt.close()
-                
-                # Display overall summary
-                aug_enabled = aug_cfg['enabled']
-                opt_summary = ", ".join([tech for tech, enabled in zip(
-                    ["Mixed Precision", "EMA", "SWA"], 
-                    [opt_cfg['mixed_precision'], opt_cfg['ema'], opt_cfg['swa']]
-                ) if enabled])
-                
-                summary_html = f"""
-                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                    <h4>📊 Training Strategy Summary</h4>
-                    <ul>
-                        <li><b>Augmentation:</b> {"Enabled" if aug_enabled else "Disabled"}</li>
-                        <li><b>Optimizer Enhancements:</b> {opt_summary}</li>
-                        <li><b>Learning Rate Schedule:</b> {lr_schedule.capitalize()}</li>
-                        <li><b>Early Stopping Patience:</b> {policy_cfg['early_stopping_patience']} epochs</li>
-                        <li><b>Weight Decay:</b> {opt_cfg['weight_decay']}</li>
-                    </ul>
-                </div>
-                """
-                display(HTML(summary_html))
-                
-        except Exception as e:
-            if logger:
-                logger.error(f"❌ Error saat visualisasi strategi: {str(e)}")
-            display(HTML(f"<p style='color:red'>❌ Error saat visualisasi: {str(e)}</p>"))
+    # Listen for changes
+    def on_component_change(change):
+        if change['name'] != 'value':
+            return
+        update_config_from_ui()
     
     # Register callbacks
     ui_components['save_button'].on_click(on_save_click)
     ui_components['reset_button'].on_click(on_reset_click)
     
-    # Update UI from config on init
+    # Register change listeners for all components
+    for section in ['augmentation_options', 'optimization_options', 'policy_options']:
+        for child in ui_components[section].children:
+            child.observe(on_component_change, names='value')
+    
+    # Initialize UI from config
     update_ui_from_config()
     
-    # Initial visualization
-    visualize_strategy()
-    
-    # Cleanup function
+    # Define cleanup function
     def cleanup():
-        """Bersihkan resources saat keluar dari scope."""
+        """Clean up resources."""
         if observer_manager:
             observer_manager.unregister_group(observer_group)
+        if logger:
+            logger.info("✅ Training strategy handlers cleaned up")
     
     # Add cleanup to UI components
     ui_components['cleanup'] = cleanup

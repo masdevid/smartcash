@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/training_strategy.py
-Author: Refactored
-Deskripsi: Komponen UI untuk konfigurasi strategi training model SmartCash.
+Author: Refactor
+Deskripsi: Komponen UI untuk konfigurasi strategi training model SmartCash (optimized).
 """
 
 import ipywidgets as widgets
@@ -9,16 +9,11 @@ from smartcash.utils.ui_utils import (
     create_component_header, 
     create_section_title,
     create_info_alert,
-    create_info_box
+    styled_html
 )
 
 def create_training_strategy_ui():
-    """
-    Buat komponen UI untuk konfigurasi strategi training model.
-    
-    Returns:
-        Dict berisi widget UI dan referensi ke komponen utama
-    """
+    """Buat komponen UI untuk konfigurasi strategi training model."""
     # Container utama
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
@@ -30,7 +25,7 @@ def create_training_strategy_ui():
     )
     
     # Augmentation strategy section
-    augmentation_section = create_section_title("3.3.1 - Data Augmentation Strategy", "🔄")
+    augmentation_section = create_section_title("Data Augmentation Strategy", "🔄")
     
     augmentation_options = widgets.VBox([
         widgets.Checkbox(
@@ -72,13 +67,41 @@ def create_training_strategy_ui():
         )
     ])
     
-    augmentation_info = create_info_alert(
-        "Augmentasi on-the-fly selama training untuk meningkatkan variasi data dan mencegah overfitting.",
-        "info", "ℹ️"
-    )
+    augmentation_details = widgets.HTML("""
+    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; color: #2c3e50">
+        <h4 style="margin-top: 0; color: #2c3e50">📝 Augmentation Parameter Details</h4>
+        <table style="width: 100%; border-collapse: collapse">
+            <tr style="background-color: #f1f1f1">
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Parameter</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Description</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Impact</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mosaic</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Combines 4 training images into one</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Improves small object detection</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Flip</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Horizontal image flipping</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Adds orientation variation</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Scale</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Random scaling of images</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Improves scale invariance</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mixup</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Blends two images together</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Helps with boundary regularization</td>
+            </tr>
+        </table>
+    </div>
+    """)
     
     # Optimization strategy section
-    optimization_section = create_section_title("3.3.2 - Optimization Strategy", "⚙️")
+    optimization_section = create_section_title("Optimization Strategy", "⚙️")
     
     optimization_options = widgets.VBox([
         widgets.Checkbox(
@@ -112,136 +135,40 @@ def create_training_strategy_ui():
         )
     ])
     
-    # Training policy section
-    policy_section = create_section_title("3.3.3 - Training Policy", "📋")
-    
-    policy_options = widgets.VBox([
-        widgets.Checkbox(
-            value=True,
-            description='Save best model by mAP',
-            style={'description_width': 'initial'}
-        ),
-        widgets.IntText(
-            value=5,
-            description='Save checkpoint every:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='50%')
-        ),
-        widgets.IntText(
-            value=15,
-            description='Early stopping patience:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='50%')
-        ),
-        widgets.Checkbox(
-            value=True,
-            description='Validate every epoch',
-            style={'description_width': 'initial'}
-        ),
-        widgets.Checkbox(
-            value=True,
-            description='Log metrics to TensorBoard',
-            style={'description_width': 'initial'}
-        )
-    ])
-    
-    # Buttons container
-    buttons_container = widgets.HBox([
-        widgets.Button(
-            description='Save Strategy',
-            button_style='primary',
-            icon='save',
-            layout=widgets.Layout(margin='0 10px 0 0')
-        ),
-        widgets.Button(
-            description='Reset to Default',
-            button_style='warning',
-            icon='refresh',
-            layout=widgets.Layout(margin='0')
-        )
-    ])
-    
-    # Status output
-    status_output = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd',
-            min_height='100px',
-            max_height='300px',
-            margin='10px 0',
-            overflow='auto'
-        )
-    )
-    
-    # Visualization area for comparison
-    visualization_output = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd',
-            min_height='200px',
-            margin='10px 0',
-            overflow='auto'
-        )
-    )
-    
-    # Info box with additional details
-    info_box = create_info_box(
-        "Training Strategy Details",
-        """
-        <p><strong>Data Augmentation</strong></p>
-        <ul>
-            <li><strong>Mosaic</strong>: Menggabungkan 4 gambar training menjadi 1 untuk variasi konteks</li>
-            <li><strong>Flip</strong>: Refleksi horizontal untuk variasi orientasi</li>
-            <li><strong>Scale jitter</strong>: Variasi skala untuk mencegah model sensitif terhadap ukuran</li>
-            <li><strong>Mixup</strong>: Mencampur 2 gambar dengan alpha blending untuk variasi lebih kompleks</li>
-        </ul>
-        
-        <p><strong>Optimization Techniques</strong></p>
-        <ul>
-            <li><strong>Mixed Precision</strong>: Training dengan FP16 untuk mempercepat training & mengurangi memory usage</li>
-            <li><strong>EMA</strong>: Menyimpan rata-rata parameter model untuk mengurangi noise & meningkatkan stabilitas</li>
-            <li><strong>SWA</strong>: Mencari optimal weight space dengan rat-rata beberapa checkpoint</li>
-            <li><strong>LR Schedule</strong>: Cosine decay mengurangi learning rate secara gradual & optimal</li>
-        </ul>
-        
-        <p><strong>Training Policy</strong></p>
-        <ul>
-            <li><strong>Early stopping</strong>: Berhenti training jika tidak ada improvement setelah n epochs</li>
-            <li><strong>Checkpoint</strong>: Menyimpan model & bobot pada interval tertentu</li>
-            <li><strong>Validation</strong>: Evaluasi model pada dataset validasi secara berkala</li>
-        </ul>
-        """,
-        'info',
-        collapsed=True
-    )
-    
-    # Pasang semua komponen
-    main_container.children = [
-        header,
-        augmentation_section,
-        augmentation_options,
-        augmentation_info,
-        widgets.HTML("<hr style='margin: 20px 0px;'>"),
-        optimization_section,
-        optimization_options,
-        widgets.HTML("<hr style='margin: 20px 0px;'>"),
-        policy_section,
-        policy_options,
-        widgets.HTML("<hr style='margin: 20px 0px;'>"),
-        buttons_container,
-        status_output,
-        visualization_output,
-        info_box
-    ]
-    
-    # Dictionary untuk akses ke komponen dari luar
-    ui_components = {
-        'ui': main_container,
-        'augmentation_options': augmentation_options,
-        'optimization_options': optimization_options,
-        'policy_options': policy_options,
-        'save_button': buttons_container.children[0],
-        'reset_button': buttons_container.children[1],
-        'status_output': status_output,
-        'visualization_output': visualization_output
-    }
-    
-    return ui_components
+    optimization_details = widgets.HTML("""
+    <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin: 10px 0; color: #2c3e50">
+        <h4 style="margin-top: 0; color: #2c3e50">📝 Optimization Technique Details</h4>
+        <table style="width: 100%; border-collapse: collapse">
+            <tr style="background-color: #f1f1f1">
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Technique</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Description</th>
+                <th style="text-align: left; padding: 8px; border-bottom: 1px solid #ddd">Effect</th>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Mixed Precision</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Uses FP16 for speedup</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">2-3x faster training with lower memory</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>EMA</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Maintains moving average of weights</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Stabilizes training, better generalization</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>SWA</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Averages weights from multiple checkpoints</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Higher test accuracy, better generalization</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Cosine LR</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Gradual learning rate decay</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Smooth convergence to optimum</td>
+            </tr>
+            <tr>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd"><b>Weight Decay</b></td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">L2 regularization technique</td>
+                <td style="padding: 8px; border-bottom: 1px solid #ddd">Prevents overfitting by limiting weights</td>
+            </tr>
+        </table>
+    </div>
+    """)

@@ -88,7 +88,6 @@ def setup_notebook_environment(
             def cleanup():
                 try:
                     observer_manager.unregister_all()
-                    env['logger'].info("✅ Cell resources cleaned up")
                 except Exception as e:
                     env['logger'].error(f"❌ Cleanup error: {str(e)}")
             
@@ -139,8 +138,6 @@ def setup_ui_component(
             atexit.register(ui_components['cleanup'])
         
         # Log success
-        if env.get('logger'):
-            env['logger'].info(f"✅ {component_name.capitalize()} UI setup complete")
         
         return ui_components
     

@@ -8,298 +8,343 @@ from IPython.display import display, clear_output, HTML
 import threading
 import numpy as np
 import matplotlib.pyplot as plt
-from pathlib import Path
 from datetime import datetime
 
 from smartcash.utils.ui_utils import create_status_indicator
-from smartcash.utils.early_stopping import EarlyStopping
 
 def setup_hyperparameters_handlers(ui_components, config=None):
-    """
-    Setup handlers untuk komponen UI konfigurasi hyperparameter.
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi yang akan digunakan (optional)
-        
-    Returns:
-        Dictionary UI components yang sudah diupdate dengan handler
-    """
-    # Inisialisasi dependencies dengan penanganan error yang baik
-    logger = None
-    config_manager = None
-    observer_manager = None
-    env_manager = None
-    model_manager = None
+    """Setup handlers untuk komponen UI konfigurasi hyperparameter."""
+    # Inisialisasi dependencies
+    deps = {}
     
     try:
-        from smartcash.utils.logging_factory import LoggingFactory
+        # Import needed modules
+        from smartcash.utils.logger import get_logger
         from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.observer import EventTopics, EventDispatcher
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.environment_manager import EnvironmentManager
-        from smartcash.handlers.model import ModelManager
-        from smartcash.utils.observer import EventTopics, EventDispatcher
+        from smartcash.utils.early_stopping import EarlyStopping
         
-        logger = LoggingFactory.get_logger("hyperparameters")
-        config_manager = get_config_manager(logger=logger)
-        observer_manager = ObserverManager(auto_register=True)
-        env_manager = EnvironmentManager(logger=logger)
+        # Setup dependencies
+        deps['logger'] = get_logger("hyperparameters")
+        deps['config_manager'] = get_config_manager(logger=deps['logger'])
+        deps['observer_manager'] = ObserverManager(auto_register=True)
+        deps['env_manager'] = EnvironmentManager(logger=deps['logger'])
+        deps['observer_manager'].unregister_group("hyperparameters_ui")
         
-        # Cleanup existing observers
-        observer_manager.unregister_group("hyperparameters_ui")
-        
+        try:
+            from smartcash.handlers.model import ModelManager
+            if config: deps['model_manager'] = ModelManager(config, logger=deps['logger'])
+        except ImportError:
+            deps['logger'].warning("⚠️ ModelManager tidak tersedia")
+            
     except ImportError as e:
-        with ui_components['status_output']:
-            display(create_status_indicator(
-                "warning", f"⚠️ Beberapa modul tidak tersedia - fallback ke mode dasar: {str(e)}"
-            ))
+        print(f"⚠️ Error saat import dependencies: {e}")
     
     # Load config jika belum ada
-    if not config or not isinstance(config, dict):
-        try:
-            if config_manager:
-                config = config_manager.load_config("configs/training_config.yaml")
+    if not config or 'training' not in config:
+        if deps.get('config_manager'):
+            try:
+                config = deps['config_manager'].load_config("configs/training_config.yaml")
+            except:
+                pass
                 
-                if not config or 'training' not in config:
-                    # Buat default config jika tidak ada
-                    config = {
-                        'training': {
-                            'epochs': 50,
-                            'batch_size': 16,
-                            'lr0': 0.01,
-                            'lrf': 0.01,
-                            'optimizer': 'Adam',
-                            'scheduler': 'cosine',
-                            'momentum': 0.937,
-                            'weight_decay': 0.0005,
-                            'early_stopping_patience': 10,
-                            'early_stopping_enabled': True,
-                            'early_stopping_monitor': 'val_mAP',
-                            'save_best_only': True,
-                            'save_period': 5,
-                            'box_loss_weight': 0.05,
-                            'obj_loss_weight': 0.5,
-                            'cls_loss_weight': 0.5,
-                            'use_ema': False,
-                            'use_swa': False,
-                            'mixed_precision': True
-                        }
-                    }
-            else:
-                # Fallback config
-                config = {
-                    'training': {
-                        'epochs': 50,
-                        'batch_size': 16,
-                        'lr0': 0.01
-                    }
-                }
-        except Exception as e:
-            with ui_components['status_output']:
-                display(create_status_indicator(
-                    "error", f"❌ Error saat memuat konfigurasi: {str(e)}"
-                ))
-    
-    # Fungsi untuk update UI berdasarkan config
-    def update_ui_from_config():
-        """Update semua komponen UI dari konfigurasi yang ada."""
         if not config or 'training' not in config:
-            return
-        
-        training_config = config['training']
-        basic_params = ui_components['basic_params'].children
-        scheduler_params = ui_components['scheduler_params'].children
-        early_stop_params = ui_components['early_stopping_params'].children
-        advanced_params = ui_components['advanced_params'].children
-        loss_params = ui_components['loss_params'].children
-        
-        # Update basic params
-        try:
-            # Epochs
-            if 'epochs' in training_config:
-                basic_params[0].value = min(max(training_config['epochs'], basic_params[0].min), basic_params[0].max)
-            
-            # Batch size
-            if 'batch_size' in training_config:
-                basic_params[1].value = min(max(training_config['batch_size'], basic_params[1].min), basic_params[1].max)
-            
-            # Learning rate
-            if 'lr0' in training_config:
-                lr = training_config['lr0']
-                # Convert to log slider value
-                basic_params[2].value = lr
-            
-            # Optimizer
-            if 'optimizer' in training_config and training_config['optimizer'] in basic_params[3].options:
-                basic_params[3].value = training_config['optimizer']
-            
-            # Scheduler
-            if 'scheduler' in training_config and training_config['scheduler'] in scheduler_params[0].options:
-                scheduler_params[0].value = training_config['scheduler']
-            
-            # Final LR
-            if 'lrf' in training_config:
-                scheduler_params[1].value = min(max(training_config['lrf'], scheduler_params[1].min), scheduler_params[1].max)
-            
-            # Early stopping
-            if 'early_stopping_enabled' in training_config:
-                early_stop_params[0].value = training_config['early_stopping_enabled']
-            
-            if 'early_stopping_patience' in training_config:
-                early_stop_params[1].value = min(max(training_config['early_stopping_patience'], 
-                                                  early_stop_params[1].min), early_stop_params[1].max)
-            
-            if 'early_stopping_monitor' in training_config and training_config['early_stopping_monitor'] in early_stop_params[2].options:
-                early_stop_params[2].value = training_config['early_stopping_monitor']
-            
-            if 'save_best_only' in training_config:
-                early_stop_params[3].value = training_config['save_best_only']
-            
-            if 'save_period' in training_config:
-                early_stop_params[4].value = min(max(training_config['save_period'], 
-                                                early_stop_params[4].min), early_stop_params[4].max)
-            
-            # Advanced params
-            if 'momentum' in training_config:
-                advanced_params[0].value = min(max(training_config['momentum'], 
-                                            advanced_params[0].min), advanced_params[0].max)
-            
-            if 'weight_decay' in training_config:
-                advanced_params[1].value = training_config['weight_decay']
-            
-            if 'use_ema' in training_config:
-                advanced_params[2].value = training_config['use_ema']
-            
-            if 'use_swa' in training_config:
-                advanced_params[3].value = training_config['use_swa']
-            
-            if 'mixed_precision' in training_config:
-                advanced_params[4].value = training_config['mixed_precision']
-            
-            # Loss weights
-            if 'box_loss_weight' in training_config:
-                loss_params[0].value = min(max(training_config['box_loss_weight'], 
-                                         loss_params[0].min), loss_params[0].max)
-            
-            if 'obj_loss_weight' in training_config:
-                loss_params[1].value = min(max(training_config['obj_loss_weight'], 
-                                         loss_params[1].min), loss_params[1].max)
-            
-            if 'cls_loss_weight' in training_config:
-                loss_params[2].value = min(max(training_config['cls_loss_weight'], 
-                                         loss_params[2].min), loss_params[2].max)
-            
-        except Exception as e:
-            if logger:
-                logger.error(f"❌ Error saat update UI: {str(e)}")
-            else:
-                print(f"❌ Error saat update UI: {str(e)}")
+            config = {'training': {
+                'epochs': 50, 'batch_size': 16, 'lr0': 0.01, 'lrf': 0.01,
+                'optimizer': 'Adam', 'scheduler': 'cosine', 'momentum': 0.937,
+                'weight_decay': 0.0005, 'early_stopping_patience': 10,
+                'early_stopping_enabled': True, 'early_stopping_monitor': 'val_mAP',
+                'save_best_only': True, 'save_period': 5,
+                'box_loss_weight': 0.05, 'obj_loss_weight': 0.5, 'cls_loss_weight': 0.5,
+                'use_ema': False, 'use_swa': False, 'mixed_precision': True
+            }}
     
-    # Handler untuk toggle komponen scheduler berdasarkan pilihan
+    # Handler helper untuk safely get components
+    def get_component(name, default=None): 
+        return ui_components.get(name, default)
+    
+    def get_widget_children(name):
+        widget = get_component(name)
+        return widget.children if widget and hasattr(widget, 'children') else []
+    
+    # Handler untuk scheduler changes
     def on_scheduler_change(change):
-        """Toggle komponen scheduler berdasarkan tipe yang dipilih."""
-        if change['name'] != 'value':
-            return
-            
+        if change['name'] != 'value': return
+        
         scheduler_type = change['new']
-        scheduler_params = ui_components['scheduler_params'].children
+        children = get_widget_children('scheduler_params')
+        if len(children) < 4: return
         
         # Enable/disable komponen berdasarkan jenis scheduler
-        if scheduler_type == 'step':
-            scheduler_params[2].disabled = False  # Patience
-            scheduler_params[3].disabled = False  # Factor
-        else:
-            scheduler_params[2].disabled = True
-            scheduler_params[3].disabled = True
-            
+        children[2].disabled = scheduler_type != 'step'
+        children[3].disabled = scheduler_type != 'step'
+        
         # Update visualization
         update_lr_visualization()
     
-    # Handler untuk toggle early stopping komponen
+    # Handler untuk early stopping changes
     def on_early_stopping_change(change):
-        """Toggle early stopping komponen."""
-        if change['name'] != 'value':
-            return
-            
+        if change['name'] != 'value': return
+        
         enabled = change['new']
-        early_stop_params = ui_components['early_stopping_params'].children
+        children = get_widget_children('early_stopping_params')
+        if len(children) < 3: return
         
-        # Enable/disable komponen berdasarkan checkbox
-        for i in range(1, 3):  # Patience dan monitor
-            early_stop_params[i].disabled = not enabled
+        # Enable/disable komponen
+        children[1].disabled = not enabled
+        children[2].disabled = not enabled
     
-    # Fungsi untuk update config dari UI
+    # Update config dari UI
     def update_config_from_ui():
-        """Update konfigurasi dari nilai komponen UI."""
-        if not config:
-            return {}
-            
-        if 'training' not in config:
-            config['training'] = {}
-            
-        # Extract parameter values from UI components
-        basic_params = ui_components['basic_params'].children
-        scheduler_params = ui_components['scheduler_params'].children
-        early_stop_params = ui_components['early_stopping_params'].children
-        advanced_params = ui_components['advanced_params'].children
-        loss_params = ui_components['loss_params'].children
+        if not config or 'training' not in config: 
+            config.update({'training': {}})
         
-        # Update training config from UI
-        training_config = {
-            # Basic params
-            'epochs': int(basic_params[0].value),
-            'batch_size': int(basic_params[1].value),
-            'lr0': float(basic_params[2].value),
-            'optimizer': basic_params[3].value,
+        # Get widgets
+        basic = get_widget_children('basic_params')
+        scheduler = get_widget_children('scheduler_params')
+        early_stop = get_widget_children('early_stopping_params')
+        advanced = get_widget_children('advanced_params')
+        loss = get_widget_children('loss_params')
+        
+        # Update training config with safe access
+        training = {}
+        
+        # Helper to safely get widget value with default
+        def get_value(widgets, idx, default, attr='value'):
+            try:
+                return getattr(widgets[idx], attr, default) if 0 <= idx < len(widgets) else default
+            except:
+                return default
+        
+        # Basic params
+        if basic:
+            training.update({
+                'epochs': int(get_value(basic, 0, 50)),
+                'batch_size': int(get_value(basic, 1, 16)),
+                'lr0': float(get_value(basic, 2, 0.01)),
+                'optimizer': get_value(basic, 3, 'Adam')
+            })
+        
+        # Scheduler params
+        if scheduler:
+            training.update({
+                'scheduler': get_value(scheduler, 0, 'cosine'),
+                'lrf': float(get_value(scheduler, 1, 0.01))
+            })
             
-            # Scheduler params
-            'scheduler': scheduler_params[0].value,
-            'lrf': float(scheduler_params[1].value),
-            'scheduler_patience': int(scheduler_params[2].value) if not scheduler_params[2].disabled else 5,
-            'scheduler_factor': float(scheduler_params[3].value) if not scheduler_params[3].disabled else 0.1,
-            
-            # Early stopping params
-            'early_stopping_enabled': early_stop_params[0].value,
-            'early_stopping_patience': int(early_stop_params[1].value),
-            'early_stopping_monitor': early_stop_params[2].value,
-            'save_best_only': early_stop_params[3].value,
-            'save_period': int(early_stop_params[4].value),
-            
-            # Advanced params
-            'momentum': float(advanced_params[0].value),
-            'weight_decay': float(advanced_params[1].value),
-            'use_ema': advanced_params[2].value,
-            'use_swa': advanced_params[3].value, 
-            'mixed_precision': advanced_params[4].value,
-            
-            # Loss weights
-            'box_loss_weight': float(loss_params[0].value),
-            'obj_loss_weight': float(loss_params[1].value),
-            'cls_loss_weight': float(loss_params[2].value)
-        }
+            if get_value(scheduler, 2, True, 'disabled') == False:
+                training.update({
+                    'scheduler_patience': int(get_value(scheduler, 2, 5)),
+                    'scheduler_factor': float(get_value(scheduler, 3, 0.1))
+                })
+        
+        # Early stopping params
+        if early_stop:
+            training.update({
+                'early_stopping_enabled': get_value(early_stop, 0, True),
+                'early_stopping_patience': int(get_value(early_stop, 1, 10)),
+                'early_stopping_monitor': get_value(early_stop, 2, 'val_mAP'),
+                'save_best_only': get_value(early_stop, 3, True),
+                'save_period': int(get_value(early_stop, 4, 5))
+            })
+        
+        # Advanced params
+        if advanced:
+            training.update({
+                'momentum': float(get_value(advanced, 0, 0.937)),
+                'weight_decay': float(get_value(advanced, 1, 0.0005)),
+                'use_ema': get_value(advanced, 2, False),
+                'use_swa': get_value(advanced, 3, False),
+                'mixed_precision': get_value(advanced, 4, True)
+            })
+        
+        # Loss weights
+        if loss:
+            training.update({
+                'box_loss_weight': float(get_value(loss, 0, 0.05)),
+                'obj_loss_weight': float(get_value(loss, 1, 0.5)),
+                'cls_loss_weight': float(get_value(loss, 2, 0.5))
+            })
         
         # Update config
-        config['training'].update(training_config)
+        config['training'].update(training)
         
-        # Notify about config update if observer manager available
+        # Notify if observer available
+        observer_manager = deps.get('observer_manager')
         if observer_manager:
             try:
+                from smartcash.utils.observer import EventTopics, EventDispatcher
                 EventDispatcher.notify(
                     event_type=EventTopics.CONFIG_UPDATED,
                     sender="hyperparameters_handler",
                     config_type="training",
-                    update_time=str(datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                    update_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
-            except Exception as e:
-                if logger:
-                    logger.debug(f"Event notification error: {str(e)}")
+            except: pass
                     
         return config
     
-    # Simpan konfigurasi
-    def save_configuration():
-        """Simpan konfigurasi hyperparameter ke file."""
-        with ui_components['status_output']:
+    # Update UI dari config
+    def update_ui_from_config():
+        if not config or 'training' not in config: return
+        training = config['training']
+        
+        # Helper untuk update widget dengan aman
+        def set_value(widgets, idx, attr, value, min_val=None, max_val=None, options=None):
+            try:
+                if idx < 0 or idx >= len(widgets): return
+                widget = widgets[idx]
+                
+                if options and value not in options: return
+                if min_val is not None and max_val is not None:
+                    value = min(max(value, min_val), max_val)
+                
+                setattr(widget, attr, value)
+            except Exception:
+                pass
+        
+        # Update widgets
+        basic = get_widget_children('basic_params')
+        scheduler = get_widget_children('scheduler_params')
+        early_stop = get_widget_children('early_stopping_params')
+        advanced = get_widget_children('advanced_params')
+        loss = get_widget_children('loss_params')
+        
+        # Update basic params
+        if basic:
+            set_value(basic, 0, 'value', training.get('epochs', 50), 
+                    min_val=getattr(basic[0], 'min', 10), max_val=getattr(basic[0], 'max', 200))
+            set_value(basic, 1, 'value', training.get('batch_size', 16), 
+                    min_val=getattr(basic[1], 'min', 4), max_val=getattr(basic[1], 'max', 64))
+            set_value(basic, 2, 'value', training.get('lr0', 0.01))
+            set_value(basic, 3, 'value', training.get('optimizer', 'Adam'), options=getattr(basic[3], 'options', None))
+        
+        # Update scheduler params
+        if scheduler:
+            set_value(scheduler, 0, 'value', training.get('scheduler', 'cosine'), options=getattr(scheduler[0], 'options', None))
+            set_value(scheduler, 1, 'value', training.get('lrf', 0.01), 
+                    min_val=getattr(scheduler[1], 'min', 0.001), max_val=getattr(scheduler[1], 'max', 0.1))
+            set_value(scheduler, 2, 'value', training.get('scheduler_patience', 5),
+                    min_val=getattr(scheduler[2], 'min', 1), max_val=getattr(scheduler[2], 'max', 10))
+            set_value(scheduler, 3, 'value', training.get('scheduler_factor', 0.1),
+                    min_val=getattr(scheduler[3], 'min', 0.01), max_val=getattr(scheduler[3], 'max', 0.5))
+        
+        # Update early stopping params
+        if early_stop:
+            set_value(early_stop, 0, 'value', training.get('early_stopping_enabled', True))
+            set_value(early_stop, 1, 'value', training.get('early_stopping_patience', 10),
+                    min_val=getattr(early_stop[1], 'min', 1), max_val=getattr(early_stop[1], 'max', 50))
+            set_value(early_stop, 2, 'value', training.get('early_stopping_monitor', 'val_mAP'), 
+                    options=getattr(early_stop[2], 'options', None))
+            set_value(early_stop, 3, 'value', training.get('save_best_only', True))
+            set_value(early_stop, 4, 'value', training.get('save_period', 5),
+                    min_val=getattr(early_stop[4], 'min', 1), max_val=getattr(early_stop[4], 'max', 10))
+        
+        # Update advanced params
+        if advanced:
+            set_value(advanced, 0, 'value', training.get('momentum', 0.937),
+                    min_val=getattr(advanced[0], 'min', 0.8), max_val=getattr(advanced[0], 'max', 0.999))
+            set_value(advanced, 1, 'value', training.get('weight_decay', 0.0005))
+            set_value(advanced, 2, 'value', training.get('use_ema', False))
+            set_value(advanced, 3, 'value', training.get('use_swa', False))
+            set_value(advanced, 4, 'value', training.get('mixed_precision', True))
+        
+        # Update loss params
+        if loss:
+            set_value(loss, 0, 'value', training.get('box_loss_weight', 0.05),
+                    min_val=getattr(loss[0], 'min', 0.01), max_val=getattr(loss[0], 'max', 0.2))
+            set_value(loss, 1, 'value', training.get('obj_loss_weight', 0.5),
+                    min_val=getattr(loss[1], 'min', 0.1), max_val=getattr(loss[1], 'max', 1.0))
+            set_value(loss, 2, 'value', training.get('cls_loss_weight', 0.5),
+                    min_val=getattr(loss[2], 'min', 0.1), max_val=getattr(loss[2], 'max', 1.0))
+    
+    # Visualisasi learning rate
+    def update_lr_visualization():
+        visualization = get_component('visualization_output')
+        if not visualization: return
+        
+        # Get widget values safely
+        basic = get_widget_children('basic_params')
+        scheduler = get_widget_children('scheduler_params')
+        
+        try:
+            # Extract params
+            epochs = int(basic[0].value) if len(basic) > 0 else 50
+            initial_lr = float(basic[2].value) if len(basic) > 2 else 0.01
+            final_lr = float(scheduler[1].value) if len(scheduler) > 1 else 0.01
+            scheduler_type = scheduler[0].value if len(scheduler) > 0 else 'cosine'
+            
+            with visualization:
+                clear_output()
+                
+                plt.figure(figsize=(10, 6))
+                xs = np.linspace(0, epochs-1, epochs)
+                
+                # Calculate learning rates based on scheduler
+                try:
+                    if scheduler_type == 'cosine':
+                        lrs = [initial_lr * (1 + np.cos(np.pi * x / epochs)) / 2 for x in xs]
+                    elif scheduler_type == 'linear':
+                        lrs = [initial_lr - (initial_lr - final_lr) * (x / (epochs-1)) for x in xs]
+                    elif scheduler_type == 'step':
+                        patience = int(scheduler[2].value) if len(scheduler) > 2 and not scheduler[2].disabled else 5
+                        factor = float(scheduler[3].value) if len(scheduler) > 3 and not scheduler[3].disabled else 0.1
+                        lrs = []
+                        current_lr = initial_lr
+                        for i in range(epochs):
+                            if i > 0 and i % patience == 0:
+                                current_lr *= factor
+                            lrs.append(current_lr)
+                    elif scheduler_type == 'exp':
+                        gamma = np.exp(np.log(final_lr / initial_lr) / epochs)
+                        lrs = [initial_lr * (gamma ** x) for x in xs]
+                    elif scheduler_type == 'OneCycleLR':
+                        half_epochs = epochs // 2
+                        first_half = [initial_lr + (10*initial_lr - initial_lr) * (x / half_epochs) for x in range(half_epochs)]
+                        second_half = [10*initial_lr * (1 - x / half_epochs) ** 1.5 for x in range(half_epochs + epochs % 2)]
+                        lrs = first_half + second_half
+                    else:
+                        lrs = [initial_lr] * epochs
+                except Exception:
+                    lrs = [initial_lr] * epochs
+                
+                # Plot
+                plt.plot(xs, lrs, 'b-', linewidth=2)
+                plt.xlabel('Epoch')
+                plt.ylabel('Learning Rate')
+                plt.title(f'Learning Rate Schedule: {scheduler_type}')
+                plt.grid(True, linestyle='--', alpha=0.6)
+                plt.tight_layout()
+                plt.show()
+                
+                # Display info
+                html = f"""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px;">
+                    <h4>📝 Learning Rate Schedule Analysis</h4>
+                    <ul>
+                        <li><b>Initial LR:</b> {initial_lr}</li>
+                        <li><b>Final LR:</b> {final_lr}</li>
+                        <li><b>Scheduler:</b> {scheduler_type}</li>
+                        <li><b>Epochs:</b> {epochs}</li>
+                    </ul>
+                </div>
+                """
+                display(HTML(html))
+            
+            # Show visualization area
+            visualization.layout.display = 'block'
+        except Exception as e:
+            logger = deps.get('logger')
+            if logger: logger.warning(f"⚠️ Error visualisasi: {e}")
+    
+    # Handler untuk save config
+    def on_save_configuration(b):
+        output = get_component('status_output') or get_component('visualization_output')
+        if not output: return
+        
+        with output:
             clear_output()
             display(create_status_indicator("info", "🔄 Menyimpan konfigurasi..."))
             
@@ -307,180 +352,143 @@ def setup_hyperparameters_handlers(ui_components, config=None):
                 # Update config dari UI
                 update_config_from_ui()
                 
-                # Simpan config
-                if config_manager:
-                    success = config_manager.save_config(
+                # Simpan config dengan config_manager
+                success = False
+                if deps.get('config_manager'):
+                    env_manager = deps.get('env_manager')
+                    is_drive_mounted = env_manager and getattr(env_manager, 'is_drive_mounted', False)
+                    
+                    success = deps['config_manager'].save_config(
                         config, 
                         "configs/training_config.yaml",
                         backup=True,
-                        sync_to_drive=(env_manager and env_manager.is_drive_mounted)
+                        sync_to_drive=is_drive_mounted
                     )
                     
-                    if success:
-                        display(create_status_indicator(
-                            "success", "✅ Konfigurasi berhasil disimpan ke configs/training_config.yaml"
-                        ))
+                    msg = "✅ Konfigurasi berhasil disimpan ke configs/training_config.yaml"
+                    if success and is_drive_mounted:
+                        msg += "\n☁️ Konfigurasi telah disync ke Google Drive"
+                    
+                    display(create_status_indicator("success", msg))
+                    
+                    # Demonstrasi EarlyStopping
+                    early_stop = get_widget_children('early_stopping_params')
+                    if 'EarlyStopping' in globals() and len(early_stop) > 2:
+                        monitor = early_stop[2].value
+                        patience = int(early_stop[1].value)
+                        logger = deps.get('logger')
                         
-                        if env_manager and env_manager.is_drive_mounted:
-                            display(create_status_indicator(
-                                "info", "☁️ Konfigurasi telah disync ke Google Drive"
-                            ))
-                    else:
-                        display(create_status_indicator(
-                            "error", "❌ Gagal menyimpan konfigurasi"
-                        ))
-                else:
-                    # Fallback manual save
+                        # Inisialisasi EarlyStopping
+                        early_stopping = EarlyStopping(
+                            monitor=monitor,
+                            patience=patience,
+                            mode='max' if monitor != 'val_loss' else 'min',
+                            logger=logger
+                        )
+                        
+                        if logger:
+                            logger.info(f"🔧 EarlyStopping diinisialisasi: monitor={monitor}, patience={patience}")
+                
+                # Fallback dengan yaml manual
+                if not success:
                     try:
                         import yaml
                         from pathlib import Path
-                        
-                        # Create configs directory if not exists
                         Path("configs").mkdir(exist_ok=True)
-                        
                         with open("configs/training_config.yaml", "w") as f:
                             yaml.dump(config, f, default_flow_style=False)
-                        
-                        display(create_status_indicator(
-                            "success", "✅ Konfigurasi berhasil disimpan manual ke configs/training_config.yaml"
-                        ))
+                        display(create_status_indicator("success", "✅ Konfigurasi berhasil disimpan"))
                     except Exception as e:
-                        display(create_status_indicator(
-                            "error", f"❌ Gagal menyimpan konfigurasi manual: {str(e)}"
-                        ))
-            
+                        display(create_status_indicator("error", f"❌ Gagal menyimpan konfigurasi: {e}"))
             except Exception as e:
-                display(create_status_indicator(
-                    "error", f"❌ Error: {str(e)}"
-                ))
+                display(create_status_indicator("error", f"❌ Error: {e}"))
     
-    # Reset ke default
-    def reset_to_default():
-        """Reset semua parameter ke nilai default."""
-        with ui_components['status_output']:
+    # Handler untuk reset config
+    def on_reset_configuration(b):
+        output = get_component('status_output') or get_component('visualization_output')
+        if not output: return
+        
+        with output:
             clear_output()
             display(create_status_indicator("info", "🔄 Mereset hyperparameter ke default..."))
             
             try:
-                # Default config
-                default_config = {
-                    'training': {
-                        'epochs': 50,
-                        'batch_size': 16,
-                        'lr0': 0.01,
-                        'lrf': 0.01,
-                        'optimizer': 'Adam',
-                        'scheduler': 'cosine',
-                        'momentum': 0.937,
-                        'weight_decay': 0.0005,
-                        'early_stopping_patience': 10,
-                        'early_stopping_enabled': True,
-                        'early_stopping_monitor': 'val_mAP',
-                        'save_best_only': True,
-                        'save_period': 5,
-                        'box_loss_weight': 0.05,
-                        'obj_loss_weight': 0.5,
-                        'cls_loss_weight': 0.5,
-                        'use_ema': False,
-                        'use_swa': False,
-                        'mixed_precision': True
-                    }
+                # Default values
+                default_training = {
+                    'epochs': 50, 'batch_size': 16, 'lr0': 0.01, 'lrf': 0.01,
+                    'optimizer': 'Adam', 'scheduler': 'cosine', 'momentum': 0.937,
+                    'weight_decay': 0.0005, 'early_stopping_patience': 10,
+                    'early_stopping_enabled': True, 'early_stopping_monitor': 'val_mAP',
+                    'save_best_only': True, 'save_period': 5,
+                    'box_loss_weight': 0.05, 'obj_loss_weight': 0.5, 'cls_loss_weight': 0.5,
+                    'use_ema': False, 'use_swa': False, 'mixed_precision': True
                 }
                 
                 # Update config
-                if config and 'training' in config:
-                    config['training'] = default_config['training']
-                else:
-                    config = default_config
+                if config: config['training'] = default_training
+                else: config = {'training': default_training}
                 
                 # Update UI
                 update_ui_from_config()
-                
-                # Visualize
                 update_lr_visualization()
                 
-                display(create_status_indicator(
-                    "success", "✅ Hyperparameter berhasil direset ke default"
-                ))
-            
+                display(create_status_indicator("success", "✅ Hyperparameter berhasil direset ke default"))
             except Exception as e:
-                display(create_status_indicator(
-                    "error", f"❌ Error: {str(e)}"
-                ))
+                display(create_status_indicator("error", f"❌ Error: {e}"))
     
-    # Visualisasi learning rate
-    def update_lr_visualization():
-        """Visualisasikan learning rate schedule."""
-        basic_params = ui_components['basic_params'].children
-        scheduler_params = ui_components['scheduler_params'].children
+    # Setup event handlers
+    try:
+        # Scheduler changes
+        scheduler = get_component('scheduler_params')
+        if scheduler and len(scheduler.children) > 0:
+            scheduler.children[0].observe(on_scheduler_change, names='value')
         
-        # Extract params
-        epochs = int(basic_params[0].value)
-        initial_lr = float(basic_params[2].value)
-        final_lr = float(scheduler_params[1].value)
-        scheduler_type = scheduler_params[0].value
+        # Early stopping changes
+        early_stop = get_component('early_stopping_params')
+        if early_stop and len(early_stop.children) > 0:
+            early_stop.children[0].observe(on_early_stopping_change, names='value')
         
-        with ui_components['visualization_output']:
-            clear_output()
+        # Button handlers
+        save_button = get_component('save_button')
+        if save_button: save_button.on_click(on_save_configuration)
+        
+        reset_button = get_component('reset_button')
+        if reset_button: reset_button.on_click(on_reset_configuration)
+    except Exception as e:
+        logger = deps.get('logger')
+        if logger: logger.warning(f"⚠️ Error setup handlers: {e}")
+    
+    # Initialize UI
+    try:
+        update_ui_from_config()
+        update_lr_visualization()
+    except Exception as e:
+        logger = deps.get('logger')
+        if logger: logger.warning(f"⚠️ Error initialize UI: {e}")
+    
+    # Cleanup function
+    def cleanup():
+        """Cleanup resources."""
+        observer_manager = deps.get('observer_manager')
+        if observer_manager:
+            observer_manager.unregister_group("hyperparameters_ui")
             
-            plt.figure(figsize=(10, 6))
-            xs = np.linspace(0, epochs-1, epochs)
-            
-            if scheduler_type == 'cosine':
-                # Cosine annealing
-                lrs = [initial_lr * (1 + np.cos(np.pi * x / epochs)) / 2 for x in xs]
-            elif scheduler_type == 'linear':
-                # Linear decay
-                lrs = [initial_lr - (initial_lr - final_lr) * (x / (epochs-1)) for x in xs]
-            elif scheduler_type == 'step':
-                # Step decay
-                patience = int(scheduler_params[2].value)
-                factor = float(scheduler_params[3].value)
-                lrs = []
-                current_lr = initial_lr
+            # Unobserve handlers
+            try:
+                scheduler = get_component('scheduler_params')
+                if scheduler and len(scheduler.children) > 0:
+                    scheduler.children[0].unobserve(on_scheduler_change, names='value')
                 
-                for i in range(epochs):
-                    if i > 0 and i % patience == 0:
-                        current_lr *= factor
-                    lrs.append(current_lr)
-            elif scheduler_type == 'exp':
-                # Exponential decay
-                gamma = np.exp(np.log(final_lr / initial_lr) / epochs)
-                lrs = [initial_lr * (gamma ** x) for x in xs]
-            elif scheduler_type == 'OneCycleLR':
-                # One Cycle LR
-                half_epochs = epochs // 2
-                # First half: increase LR
-                first_half = [initial_lr + (10*initial_lr - initial_lr) * (x / half_epochs) for x in range(half_epochs)]
-                # Second half: decrease LR to very low
-                second_half = [10*initial_lr * (1 - x / half_epochs) ** 1.5 for x in range(half_epochs + epochs % 2)]
-                lrs = first_half + second_half
-            else:
-                # Constant LR
-                lrs = [initial_lr] * epochs
+                early_stop = get_component('early_stopping_params')
+                if early_stop and len(early_stop.children) > 0:
+                    early_stop.children[0].unobserve(on_early_stopping_change, names='value')
+            except:
+                pass
             
-            plt.plot(xs, lrs, 'b-', linewidth=2)
-            plt.xlabel('Epoch')
-            plt.ylabel('Learning Rate')
-            plt.title(f'Learning Rate Schedule: {scheduler_type}')
-            plt.grid(True, linestyle='--', alpha=0.6)
-            plt.tight_layout()
-            plt.show()
-            
-            html = f"""
-            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-top: 10px;">
-                <h4>📝 Learning Rate Schedule Analysis</h4>
-                <ul>
-                    <li><b>Initial LR:</b> {initial_lr}</li>
-                    <li><b>Final LR:</b> {final_lr}</li>
-                    <li><b>Scheduler:</b> {scheduler_type}</li>
-                    <li><b>Epochs:</b> {epochs}</li>
-                </ul>
-                <p><em>Grafik menunjukkan perubahan learning rate selama training untuk membantu
-                model konvergen ke minimum global.</em></p>
-            </div>
-            """
-            display(HTML(html))
-        
-        # Show visualization area
-        ui_
+            logger = deps.get('logger')
+            if logger: logger.info("✅ Hyperparameters handler resources cleaned up")
+    
+    # Add cleanup
+    ui_components['cleanup'] = cleanup
+    
+    return ui_components

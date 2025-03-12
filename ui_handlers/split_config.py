@@ -1,226 +1,96 @@
 """
 File: smartcash/ui_handlers/split_config.py
-Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk UI konfigurasi split dataset SmartCash dengan visualisasi dan observer pattern.
+Author: Refactor
+Deskripsi: Handler untuk UI konfigurasi split dataset SmartCash (optimized).
 """
 
 import threading
-import time
-import matplotlib.pyplot as plt
-import numpy as np
 from IPython.display import display, HTML, clear_output
 from pathlib import Path
 
 from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_split_config_handlers(ui_components, config=None):
-    """
-    Setup handlers untuk UI konfigurasi split dataset dengan observer pattern.
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi dataset (optional)
+    """Setup handlers untuk UI konfigurasi split dataset."""
+    # Import dependencies yang diperlukan
+    try:
+        from smartcash.utils.logger import get_logger
+        from smartcash.handlers.dataset import DatasetManager
+        from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.dataset.dataset_utils import DatasetUtils
         
-    Returns:
-        Dictionary UI components yang sudah diupdate dengan handler
-    """
-    # Inisialisasi dependencies menggunakan lazy import
-    from smartcash.utils.logger import get_logger
-    from smartcash.handlers.dataset import DatasetManager
-    from smartcash.utils.observer import EventDispatcher, EventTopics
-    from smartcash.utils.observer.observer_manager import ObserverManager
-    from smartcash.utils.config_manager import get_config_manager
-    from smartcash.utils.dataset.dataset_utils import DatasetUtils
-    
-    # Setup logger dan manager
-    logger = get_logger("split_config")
-    dataset_manager = DatasetManager(config, logger=logger)
-    observer_manager = ObserverManager(auto_register=True)
-    config_manager = get_config_manager(logger=logger)
-    dataset_utils = DatasetUtils(config=config, logger=logger)
-    
-    # Pastikan observer dari grup ini dihapus untuk mencegah memory leak
-    observer_group = "split_observers"
-    observer_manager.unregister_group(observer_group)
+        logger = get_logger("split_config")
+        dataset_manager = DatasetManager(config, logger=logger)
+        observer_manager = ObserverManager(auto_register=True)
+        config_manager = get_config_manager(logger=logger)
+        dataset_utils = DatasetUtils(config=config, logger=logger)
+        
+        # Bersihkan observer grup
+        observer_group = "split_observers"
+        observer_manager.unregister_group(observer_group)
+    except ImportError as e:
+        from smartcash.utils.ui_utils import create_status_indicator
+        with ui_components['split_status']:
+            display(create_status_indicator("warning", f"Beberapa modul tidak tersedia: {str(e)}"))
+        return ui_components
     
     # Fungsi untuk mendapatkan statistik dataset saat ini
-    def get_current_dataset_stats():
-        """Dapatkan statistik dataset saat ini dari direktori data."""
-        try:
-            # Gunakan DatasetUtils untuk mendapatkan statistik
-            return dataset_utils.get_split_statistics(['train', 'valid', 'test'])
-        except Exception as e:
-            logger.error(f"❌ Error saat mendapatkan statistik dataset: {str(e)}")
-            return {
-                'train': {'images': 0, 'labels': 0, 'status': 'error'},
-                'valid': {'images': 0, 'labels': 0, 'status': 'error'},
-                'test': {'images': 0, 'labels': 0, 'status': 'error'}
-            }
-    
-    # Fungsi untuk memvisualisasikan statistik dataset
-    def visualize_dataset_stats(stats, tab_idx=0):
-        """
-        Buat visualisasi statistik dataset pada tab yang sesuai.
-        
-        Args:
-            stats: Statistik dataset
-            tab_idx: Index tab untuk visualisasi (0: split, 1: class)
-        """
-        # Pilih tab yang sesuai
-        output = ui_components['visualization_tab'].children[tab_idx]
-        
-        with output:
-            clear_output(wait=True)
-            
-            if tab_idx == 0:  # Split distribution
-                # Extract data for splits
-                splits = []
-                counts = []
-                
-                for split, data in stats.items():
-                    if isinstance(data, dict) and 'images' in data:
-                        splits.append(split.capitalize())
-                        counts.append(data.get('images', 0))
-                
-                if not splits:
-                    display(HTML("<p>Tidak ada data untuk divisualisasikan</p>"))
-                    return
-                
-                # Calculate percentages
-                total = sum(counts)
-                percentages = [count/total*100 if total > 0 else 0 for count in counts]
-                
-                # Plot
-                fig, ax = plt.subplots(figsize=(10, 5))
-                
-                # Bar chart with counts
-                bars = ax.bar(splits, counts, color=['#3498db', '#2ecc71', '#e74c3c'])
-                
-                # Add count and percentage labels
-                for i, (bar, count, percentage) in enumerate(zip(bars, counts, percentages)):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + 5,
-                            f'{count}\n({percentage:.1f}%)',
-                            ha='center', va='bottom', fontweight='bold')
-                
-                ax.set_title('Dataset Split Distribution')
-                ax.set_ylabel('Number of Images')
-                ax.set_ylim(0, max(counts) * 1.2 if counts else 100)  # Add space for labels
-                ax.grid(axis='y', linestyle='--', alpha=0.7)
-                
-                plt.tight_layout()
-                display(plt.gcf())
-                plt.close()
-                
-            elif tab_idx == 1:  # Class distribution
-                if not isinstance(stats, dict) or not stats:
-                    display(HTML("<p>Data distribusi kelas tidak tersedia</p>"))
-                    return
-                
-                # Check if we have class distribution data
-                has_class_distribution = False
-                for split_data in stats.values():
-                    if isinstance(split_data, dict) and 'class_distribution' in split_data:
-                        has_class_distribution = True
-                        break
-                
-                if not has_class_distribution:
-                    display(HTML("<p>Distribusi kelas tidak tersedia. Jalankan analisis dataset terlebih dahulu.</p>"))
-                    return
-                
-                # Prepare data
-                class_counts = {}
-                for split, split_data in stats.items():
-                    if isinstance(split_data, dict) and 'class_distribution' in split_data:
-                        for cls, count in split_data['class_distribution'].items():
-                            if cls not in class_counts:
-                                class_counts[cls] = {}
-                            class_counts[cls][split] = count
-                
-                # Plot class distribution
-                if class_counts:
-                    class_names = list(class_counts.keys())
-                    splits = ['train', 'valid', 'test']
-                    
-                    # Prepare data for grouped bar chart
-                    data = []
-                    for split in splits:
-                        data.append([class_counts.get(cls, {}).get(split, 0) for cls in class_names])
-                    
-                    # Create plot
-                    fig, ax = plt.subplots(figsize=(12, 6))
-                    
-                    x = np.arange(len(class_names))
-                    width = 0.25
-                    
-                    # Plot bars
-                    bars1 = ax.bar(x - width, data[0], width, label='Train', color='#3498db')
-                    bars2 = ax.bar(x, data[1], width, label='Valid', color='#2ecc71')
-                    bars3 = ax.bar(x + width, data[2], width, label='Test', color='#e74c3c')
-                    
-                    ax.set_title('Class Distribution Across Splits')
-                    ax.set_xlabel('Class')
-                    ax.set_ylabel('Count')
-                    ax.set_xticks(x)
-                    ax.set_xticklabels(class_names, rotation=45, ha='right')
-                    ax.legend()
-                    ax.grid(axis='y', linestyle='--', alpha=0.7)
-                    
-                    plt.tight_layout()
-                    display(plt.gcf())
-                    plt.close()
-                else:
-                    display(HTML("<p>Tidak ada data distribusi kelas untuk divisualisasikan</p>"))
-    
-    # Function untuk update current stats display
     def update_current_stats_display():
         """Update tampilan statistik dataset saat ini."""
-        stats = get_current_dataset_stats()
-        
         with ui_components['current_stats']:
             clear_output(wait=True)
             
-            # Hitung total dan persentase
-            total_images = sum(split.get('images', 0) for split in stats.values())
-            
-            # Create stats HTML
-            html = """
-            <h3 style="margin-top:0">📊 Current Dataset Statistics</h3>
-            <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px">
-            """
-            
-            for split, data in stats.items():
-                images = data.get('images', 0)
-                labels = data.get('labels', 0)
-                status = data.get('status', 'valid')
-                percentage = (images / total_images * 100) if total_images > 0 else 0
+            try:
+                # Gunakan DatasetUtils untuk mendapatkan statistik
+                stats = dataset_utils.get_split_statistics(['train', 'valid', 'test'])
                 
-                # Pick color based on status
-                color = "#3498db" if status == 'valid' else "#e74c3c"
+                # Hitung total dan persentase
+                total_images = sum(split.get('images', 0) for split in stats.values())
                 
-                html += f"""
-                <div style="flex:1; min-width:150px; border:1px solid {color}; border-radius:5px; padding:10px; background-color:#f8f9fa">
-                    <h4 style="margin-top:0; color:{color}">{split.capitalize()}</h4>
-                    <p style="margin:5px 0"><strong>Images:</strong> {images}</p>
-                    <p style="margin:5px 0"><strong>Labels:</strong> {labels}</p>
-                    <p style="margin:5px 0"><strong>Percentage:</strong> {percentage:.1f}%</p>
-                </div>
+                # Create stats HTML
+                html = """
+                <h3 style="margin-top:0; color:#2c3e50">📊 Current Dataset Statistics</h3>
+                <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:10px">
                 """
-            
-            html += "</div>"
-            
-            if total_images == 0:
-                html += """
-                <div style="padding:10px; background-color:#fff3cd; border-left:4px solid #856404; color:#856404">
-                    <p style="margin:0">⚠️ Dataset tidak ditemukan atau kosong. Silakan download dataset terlebih dahulu.</p>
-                </div>
-                """
-            
-            display(HTML(html))
-            
-            # Update visualization jika ada data
-            if total_images > 0:
-                visualize_dataset_stats(stats, 0)
+                
+                for split, data in stats.items():
+                    images = data.get('images', 0)
+                    labels = data.get('labels', 0)
+                    status = data.get('status', 'valid')
+                    percentage = (images / total_images * 100) if total_images > 0 else 0
+                    
+                    # Pick color based on status
+                    color = "#3498db" if status == 'valid' else "#e74c3c"
+                    
+                    html += f"""
+                    <div style="flex:1; min-width:150px; border:1px solid {color}; border-radius:5px; padding:10px; background-color:#f8f9fa">
+                        <h4 style="margin-top:0; color:{color}">{split.capitalize()}</h4>
+                        <p style="margin:5px 0; color:#2c3e50"><strong>Images:</strong> {images}</p>
+                        <p style="margin:5px 0; color:#2c3e50"><strong>Labels:</strong> {labels}</p>
+                        <p style="margin:5px 0; color:#2c3e50"><strong>Percentage:</strong> {percentage:.1f}%</p>
+                    </div>
+                    """
+                
+                html += "</div>"
+                
+                if total_images == 0:
+                    html += """
+                    <div style="padding:10px; background-color:#fff3cd; border-left:4px solid #856404; color:#856404">
+                        <p style="margin:0">⚠️ Dataset tidak ditemukan atau kosong. Silakan download dataset terlebih dahulu.</p>
+                    </div>
+                    """
+                
+                display(HTML(html))
+                
+            except Exception as e:
+                logger.error(f"❌ Error saat mendapatkan statistik dataset: {str(e)}")
+                display(HTML(f"""
+                    <div style="padding:10px; background-color:#f8d7da; border-left:4px solid #721c24; color:#721c24">
+                        <p style="margin:0">❌ Error saat mendapatkan statistik dataset: {str(e)}</p>
+                    </div>
+                """))
     
     # Function untuk update UI dari config
     def update_ui_from_config():
@@ -241,7 +111,7 @@ def setup_split_config_handlers(ui_components, config=None):
                 ui_components['advanced_options'].children[0].value = config['data']['random_seed']
     
     # Function to display split results
-    def display_split_results(stats, result_stats):
+    def display_split_results(stats, result_stats=None):
         """Display the results after splitting."""
         with ui_components['stats_output']:
             clear_output()
@@ -251,7 +121,7 @@ def setup_split_config_handlers(ui_components, config=None):
             
             # Create HTML summary
             html = f"""
-            <h3 style="margin-top:0">✅ Split Results</h3>
+            <h3 style="margin-top:0; color:#2c3e50">✅ Split Results</h3>
             <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px">
             """
             
@@ -266,8 +136,8 @@ def setup_split_config_handlers(ui_components, config=None):
                 html += f"""
                 <div style="flex:1; min-width:150px; border:1px solid {color}; border-radius:5px; padding:10px; background-color:#f8f9fa">
                     <h4 style="margin-top:0; color:{color}">{split.capitalize()}</h4>
-                    <p style="margin:5px 0"><strong>Images:</strong> {images}</p>
-                    <p style="margin:5px 0"><strong>Labels:</strong> {labels}</p>
+                    <p style="margin:5px 0; color:#2c3e50"><strong>Images:</strong> {images}</p>
+                    <p style="margin:5px 0; color:#2c3e50"><strong>Labels:</strong> {labels}</p>
                 </div>
                 """
             
@@ -290,11 +160,6 @@ def setup_split_config_handlers(ui_components, config=None):
                     """
             
             display(HTML(html))
-            
-            # Update visualizations
-            visualize_dataset_stats(stats, 0)
-            if result_stats and 'class_distribution' in result_stats:
-                visualize_dataset_stats({'result': {'class_distribution': result_stats['class_distribution']}}, 1)
     
     # Function for applying split configuration
     def on_apply_split(b):
@@ -365,7 +230,7 @@ def setup_split_config_handlers(ui_components, config=None):
                         try:
                             dataset_utils.backup_directory(
                                 config['data'].get('dir', 'data'),
-                                suffix=f"presplit_{time.strftime('%Y%m%d_%H%M%S')}"
+                                suffix=f"presplit_{threading._thread.get_ident()}"
                             )
                         except Exception as e:
                             display(create_status_indicator("warning", f"⚠️ Gagal backup dataset: {str(e)}"))
@@ -387,9 +252,13 @@ def setup_split_config_handlers(ui_components, config=None):
                             f"✅ Split berhasil dengan rasio: Train {norm_train:.1f}%, Valid {norm_val:.1f}%, Test {norm_test:.1f}%"
                         ))
                         
-                        # Display stats after split
-                        new_stats = get_current_dataset_stats()
-                        display_split_results(new_stats, result.get('stats', {}))
+                        # Update stats after split
+                        try:
+                            new_stats = dataset_utils.get_split_statistics(['train', 'valid', 'test'])
+                            display_split_results(new_stats, result.get('stats', {}))
+                        except Exception as e:
+                            logger.error(f"Error getting stats: {str(e)}")
+                            display_split_results({'train': {}, 'valid': {}, 'test': {}})
                         
                         # Save config after successful split
                         config_manager.save_config(config)

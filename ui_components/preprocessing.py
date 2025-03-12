@@ -86,9 +86,16 @@ def create_preprocessing_ui():
     advanced_accordion = widgets.Accordion(children=[validation_options])
     advanced_accordion.set_title(0, "🔍 Validation Options")
     
-    # Preprocess button and status
-    button_container = widgets.HBox(layout=widgets.Layout(margin='10px 0'))
+    # Split selection for preprocessing
+    split_selector = widgets.RadioButtons(
+        options=['All Splits', 'Train Only', 'Validation Only', 'Test Only'],
+        value='All Splits',
+        description='Process:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(margin='10px 0')
+    )
     
+    # Preprocess button and status
     preprocess_button = widgets.Button(
         description='Run Preprocessing',
         button_style='primary',
@@ -110,29 +117,34 @@ def create_preprocessing_ui():
         layout=widgets.Layout(display='none')
     )
     
-    button_container.children = [preprocess_button, stop_button]
+    button_container = widgets.HBox([preprocess_button, stop_button], 
+                                   layout=widgets.Layout(margin='10px 0'))
     
     # Progress tracking
+    progress_bar = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=100,
+        description='Overall:',
+        bar_style='info',
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    current_progress = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=100,
+        description='Current:',
+        bar_style='info',
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
     progress_container = widgets.VBox([
         widgets.HTML("<h4>📊 Progress</h4>"),
-        widgets.IntProgress(
-            value=0,
-            min=0,
-            max=100,
-            description='Overall:',
-            bar_style='info',
-            orientation='horizontal',
-            layout={'visibility': 'hidden'}
-        ),
-        widgets.IntProgress(
-            value=0,
-            min=0,
-            max=100,
-            description='Current:',
-            bar_style='info',
-            orientation='horizontal',
-            layout={'visibility': 'hidden'}
-        )
+        progress_bar,
+        current_progress
     ])
     
     # Create output for logs
@@ -153,13 +165,14 @@ def create_preprocessing_ui():
     )
     log_accordion.set_title(0, "📋 Preprocessing Logs")
     
-    # Split selection for preprocessing
-    split_selector = widgets.RadioButtons(
-        options=['All Splits', 'Train Only', 'Validation Only', 'Test Only'],
-        value='All Splits',
-        description='Process:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(margin='10px 0')
+    # Summary stats (akan ditampilkan setelah preprocessing)
+    summary_container = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd', 
+            padding='10px', 
+            margin='10px 0', 
+            display='none'
+        )
     )
     
     # Info box
@@ -177,3 +190,39 @@ def create_preprocessing_ui():
         <p><strong>📝 Konfigurasi</strong> akan otomatis disimpan ke <code>configs/preprocessing_config.yaml</code></p>
     </div>
     """)
+    
+    # Cleanup container
+    cleanup_container = widgets.HBox([cleanup_button], layout=widgets.Layout(margin='10px 0'))
+    
+    # Pasang semua komponen
+    main_container.children = [
+        header,
+        info_box,
+        widgets.HTML("<h4>⚙️ Preprocessing Settings</h4>"),
+        preprocess_options,
+        split_selector,
+        advanced_accordion,
+        button_container,
+        progress_container,
+        log_accordion,
+        summary_container,
+        cleanup_container
+    ]
+    
+    # Dictionary untuk akses ke komponen dari luar
+    ui_components = {
+        'ui': main_container,
+        'preprocess_options': preprocess_options,
+        'validation_options': validation_options,
+        'split_selector': split_selector,
+        'preprocess_button': preprocess_button,
+        'stop_button': stop_button,
+        'cleanup_button': cleanup_button,
+        'progress_bar': progress_bar,
+        'current_progress': current_progress,
+        'preprocess_status': preprocess_status,
+        'log_accordion': log_accordion,
+        'summary_container': summary_container
+    }
+    
+    return ui_components

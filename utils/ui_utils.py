@@ -32,71 +32,39 @@ def create_header(title: str, description: Optional[str] = None) -> widgets.HTML
     
     return widgets.HTML(value=header)
 
-def create_section_title(title: str, icon: Optional[str] = None) -> widgets.HTML:
-    """
-    Buat judul section dengan styling yang konsisten.
-    
-    Args:
-        title: Judul section
-        icon: Icon emoji opsional
-        
-    Returns:
-        Widget HTML yang berisi judul section
-    """
-    title_with_icon = f"{icon} {title}" if icon else title
-    return widgets.HTML(f'<h3 style="color: #2980b9; margin-top: 15px; margin-bottom: 10px;">{title_with_icon}</h3>')
+def create_section_title(title, icon=""):
+    """Buat judul section dengan styling konsisten."""
+    return widgets.HTML(f"""
+    <h3 style="color: #2c3e50; margin-top: 15px; margin-bottom: 10px;">
+        {icon} {title}
+    </h3>
+    """)
 
-def create_info_alert(message: str, 
-                     alert_type: str = 'info',
-                     icon: Optional[str] = None) -> widgets.HTML:
-    """
-    Buat alert informasi dengan styling yang konsisten.
-    
-    Args:
-        message: Pesan alert
-        alert_type: Tipe alert ('info', 'success', 'warning', 'danger')
-        icon: Icon emoji opsional
-        
-    Returns:
-        Widget HTML yang berisi alert
-    """
-    # Tentukan warna dan ikon berdasarkan tipe alert
-    alert_styles = {
-        'info': {'color': '#0c5460', 'bg': '#d1ecf1', 'border': '#bee5eb', 'default_icon': 'ℹ️'},
-        'success': {'color': '#155724', 'bg': '#d4edda', 'border': '#c3e6cb', 'default_icon': '✅'},
-        'warning': {'color': '#856404', 'bg': '#fff3cd', 'border': '#ffeeba', 'default_icon': '⚠️'},
-        'danger': {'color': '#721c24', 'bg': '#f8d7da', 'border': '#f5c6cb', 'default_icon': '❌'}
+def create_info_alert(message, alert_type='info', icon=None):
+    """Buat alert box dengan styling konsisten."""
+    styles = {
+        'info': {'bg_color': '#d1ecf1', 'text_color': '#0c5460', 'default_icon': 'ℹ️'},
+        'success': {'bg_color': '#d4edda', 'text_color': '#155724', 'default_icon': '✅'},
+        'warning': {'bg_color': '#fff3cd', 'text_color': '#856404', 'default_icon': '⚠️'},
+        'error': {'bg_color': '#f8d7da', 'text_color': '#721c24', 'default_icon': '❌'}
     }
     
-    style = alert_styles.get(alert_type, alert_styles['info'])
-    icon_to_use = icon if icon else style['default_icon']
+    style = styles.get(alert_type, styles['info'])
+    icon_str = icon if icon else style['default_icon']
     
-    alert_html = f"""
-    <div style="padding: 12px 15px; margin: 10px 0; 
-               background-color: {style['bg']}; 
-               color: {style['color']}; 
-               border-left: 4px solid {style['border']};
-               border-radius: 4px;">
+    return widgets.HTML(f"""
+    <div style="padding: 10px; background-color: {style['bg_color']}; 
+               color: {style['text_color']}; border-left: 4px solid {style['text_color']}; 
+               border-radius: 4px; margin: 10px 0;">
         <div style="display: flex; align-items: flex-start;">
-            <div style="margin-right: 10px; font-size: 1.2em;">{icon_to_use}</div>
+            <div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>
             <div>{message}</div>
         </div>
     </div>
-    """
-    
-    return widgets.HTML(value=alert_html)
+    """)
 
-def create_status_indicator(status: str, message: str) -> widgets.HTML:
-    """
-    Buat indikator status dengan styling yang konsisten.
-    
-    Args:
-        status: Tipe status ('success', 'warning', 'error', 'info')
-        message: Pesan status
-        
-    Returns:
-        Widget HTML yang berisi indikator status
-    """
+def create_status_indicator(status, message):
+    """Buat indikator status dengan styling konsisten."""
     status_styles = {
         'success': {'icon': '✅', 'color': 'green'},
         'warning': {'icon': '⚠️', 'color': 'orange'},
@@ -106,38 +74,24 @@ def create_status_indicator(status: str, message: str) -> widgets.HTML:
     
     style = status_styles.get(status, status_styles['info'])
     
-    status_html = f"""
+    return HTML(f"""
     <div style="margin: 5px 0; padding: 8px 12px; 
                 border-radius: 4px; background-color: #f8f9fa;">
         <span style="color: {style['color']}; font-weight: bold;"> 
             {style['icon']} {message}
         </span>
     </div>
-    """
-    
-    return widgets.HTML(value=status_html)
-
-def styled_html(content: str, style: Optional[Dict[str, str]] = None) -> widgets.HTML:
-    """
-    Buat widget HTML dengan styling yang konsisten.
-    
-    Args:
-        content: Konten HTML
-        style: Optional dictionary berisi CSS styling
-        
-    Returns:
-        Widget HTML yang sudah di-styling
-    """
-    if not style:
-        return widgets.HTML(value=content)
-    
-    # Bentuk string CSS dari dictionary
-    style_str = '; '.join([f"{k}: {v}" for k, v in style.items()])
-    
-    # Wrap konten dengan div yang memiliki styling
-    styled_content = f'<div style="{style_str}">{content}</div>'
-    
-    return widgets.HTML(value=styled_content)
+    """)
+def styled_html(content, bg_color="#f8f9fa", text_color="#2c3e50", border_color=None, padding=10, margin=10):
+    """Buat HTML dengan styling konsisten."""
+    border_style = f"border-left: 4px solid {border_color}; " if border_color else ""
+    return widgets.HTML(f"""
+    <div style="background-color: {bg_color}; color: {text_color}; 
+                {border_style}padding: {padding}px; margin: {margin}px 0; 
+                border-radius: 4px;">
+        {content}
+    </div>
+    """)
 
 def create_alert(message: str, 
                 alert_type: str = 'info',
@@ -203,24 +157,8 @@ def create_alert(message: str,
     
     return widgets.HTML(value=alert_html)
 
-def create_info_box(title: str, 
-                   content: str, 
-                   style: str = 'info',
-                   icon: Optional[str] = None,
-                   collapsed: bool = False) -> Union[widgets.Accordion, widgets.HTML]:
-    """
-    Buat box informasi dengan styling yang konsisten.
-    
-    Args:
-        title: Judul box
-        content: Konten dalam box (dapat berisi HTML)
-        style: Tipe styling ('info', 'success', 'warning', 'error')
-        icon: Optional emoji icon
-        collapsed: True jika box dilipat secara default (hanya untuk tipe Accordion)
-        
-    Returns:
-        Widget box informasi
-    """
+def create_info_box(title, content, style='info', icon=None, collapsed=False):
+    """Buat box informasi dengan styling konsisten."""
     style_configs = {
         'info': {
             'bg_color': '#d1ecf1',
@@ -315,27 +253,15 @@ def create_metric_display(label: str,
     
     return widgets.HTML(value=metric_html)
 
-def create_component_header(title: str, description: str = "", icon: str = "🔧") -> widgets.HTML:
-    """
-    Buat header komponen UI dengan styling konsisten.
-    
-    Args:
-        title: Judul header
-        description: Deskripsi header (opsional)
-        icon: Emoji ikon untuk header
-        
-    Returns:
-        Widget HTML header
-    """
-    header_html = f"""
+def create_component_header(title, description="", icon="🔧"):
+    """Buat header komponen dengan styling konsisten."""
+    return widgets.HTML(f"""
     <div style="background-color: #f0f8ff; padding: 15px; color: black; 
               border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
-        <h2 style="color: inherit; margin-top: 0;">{icon} {title}</h2>
-        <p style="color: inherit; margin-bottom: 0;">{description}</p>
+        <h2 style="color: #2c3e50; margin-top: 0;">{icon} {title}</h2>
+        <p style="color: #34495e; margin-bottom: 0;">{description}</p>
     </div>
-    """
-    
-    return widgets.HTML(value=header_html)
+    """)
 
 def create_section_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """

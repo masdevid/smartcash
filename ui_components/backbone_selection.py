@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/backbone_selection.py
-Author: Alfrida Sabar (refactored)
-Deskripsi: Komponen UI untuk pemilihan backbone dan layer model dengan pendekatan DRY.
+Author: Refactor
+Deskripsi: Komponen UI untuk pemilihan backbone dan layer model (optimized).
 """
 
 import ipywidgets as widgets
@@ -13,12 +13,7 @@ from smartcash.utils.ui_utils import (
 )
 
 def create_backbone_selection_ui():
-    """
-    Buat komponen UI untuk pemilihan backbone dan konfigurasi layer model.
-    
-    Returns:
-        Dict berisi widget UI dan referensi ke komponen utama
-    """
+    """Buat komponen UI untuk pemilihan backbone dan konfigurasi layer model."""
     # Container utama
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
@@ -30,7 +25,7 @@ def create_backbone_selection_ui():
     )
     
     # Backbone selection section
-    backbone_section = create_section_title("3.1.1 - Backbone Selection", "🧠")
+    backbone_section = create_section_title("Backbone Selection", "🧠")
     
     backbone_options = widgets.VBox([
         widgets.RadioButtons(
@@ -57,7 +52,7 @@ def create_backbone_selection_ui():
     )
     
     # Layer configuration section
-    layer_section = create_section_title("3.1.2 - Layer Configuration", "🔍")
+    layer_section = create_section_title("Layer Configuration", "🔍")
     
     layer_config = widgets.VBox([
         # Banknote layer
@@ -74,7 +69,8 @@ def create_backbone_selection_ui():
                 style={'description_width': 'initial'},
                 layout=widgets.Layout(width='200px')
             ),
-            widgets.Label('Classes: 001, 002, 005, 010, 020, 050, 100')
+            widgets.Label('Classes: 001, 002, 005, 010, 020, 050, 100', 
+                         style={'description_width': 'initial'})
         ]),
         
         # Nominal layer
@@ -91,7 +87,8 @@ def create_backbone_selection_ui():
                 style={'description_width': 'initial'},
                 layout=widgets.Layout(width='200px')
             ),
-            widgets.Label('Classes: l2_001, l2_002, l2_005, l2_010, l2_020, l2_050, l2_100')
+            widgets.Label('Classes: l2_001, l2_002, l2_005, l2_010, l2_020, l2_050, l2_100', 
+                         style={'description_width': 'initial'})
         ]),
         
         # Security layer
@@ -108,7 +105,8 @@ def create_backbone_selection_ui():
                 style={'description_width': 'initial'},
                 layout=widgets.Layout(width='200px')
             ),
-            widgets.Label('Classes: l3_sign, l3_text, l3_thread')
+            widgets.Label('Classes: l3_sign, l3_text, l3_thread', 
+                         style={'description_width': 'initial'})
         ])
     ])
     
@@ -117,12 +115,13 @@ def create_backbone_selection_ui():
         "info", "ℹ️"
     )
     
-    # Layer distribution visualization (placeholder)
-    layer_viz = widgets.Output(
+    # Layer configuration summary
+    layer_summary = widgets.Output(
         layout=widgets.Layout(
             border='1px solid #ddd',
-            min_height='200px',
+            min_height='100px',
             margin='10px 0',
+            padding='10px',    
             overflow='auto'
         )
     )
@@ -158,20 +157,20 @@ def create_backbone_selection_ui():
     info_box = create_info_box(
         "Model Architecture Details",
         """
-        <p><strong>EfficientNet-B4</strong> adalah model arsitektur CNN yang menggunakan:</p>
-        <ul>
+        <p style="color: #0c5460"><strong>EfficientNet-B4</strong> adalah model arsitektur CNN yang menggunakan:</p>
+        <ul style="color: #0c5460">
             <li>Compound Scaling untuk optimasi ukuran dan akurasi</li>
             <li>Mobile Inverted Bottleneck Convolution (MBConv) blocks</li>
             <li>Squeeze-and-Excitation blocks untuk attention</li>
         </ul>
-        <p><strong>CSPDarknet</strong> adalah backbone original dari YOLOv5 dengan fitur:</p>
-        <ul>
+        <p style="color: #0c5460"><strong>CSPDarknet</strong> adalah backbone original dari YOLOv5 dengan fitur:</p>
+        <ul style="color: #0c5460">
             <li>Cross Stage Partial Networks (CSP) untuk mengurangi bottlenecks</li>
             <li>Fast processing untuk real-time detection</li>
             <li>Memory efficient dengan parameter yang lebih sedikit</li>
         </ul>
-        <p><strong>Layer Configuration</strong> memungkinkan model mendeteksi:</p>
-        <ul>
+        <p style="color: #0c5460"><strong>Layer Configuration</strong> memungkinkan model mendeteksi:</p>
+        <ul style="color: #0c5460">
             <li>Banknote: Deteksi uang kertas utuh</li>
             <li>Nominal: Deteksi area nominal pada uang</li>
             <li>Security: Deteksi fitur keamanan uang</li>
@@ -191,7 +190,7 @@ def create_backbone_selection_ui():
         layer_section,
         layer_config,
         layer_info,
-        layer_viz,
+        layer_summary,
         widgets.HTML("<hr style='margin: 20px 0px;'>"),
         buttons_container,
         status_output,
@@ -206,7 +205,7 @@ def create_backbone_selection_ui():
         'save_button': buttons_container.children[0],
         'reset_button': buttons_container.children[1],
         'status_output': status_output,
-        'layer_viz': layer_viz
+        'layer_summary': layer_summary
     }
     
     return ui_components

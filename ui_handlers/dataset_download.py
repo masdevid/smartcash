@@ -7,38 +7,25 @@ Deskripsi: Handler untuk UI download dataset SmartCash dengan implementasi obser
 from IPython.display import clear_output
 from smartcash.utils.ui_utils import create_status_indicator
 
-def setup_download_handlers(ui_components, config=None):
+def setup_dataset_download_handlers(ui_components, config):
     """Setup handlers untuk UI download dataset."""
-    if config is None:
-        config = {
-            'data': {
-                'source': 'roboflow',
-                'roboflow': {'api_key': '', 'workspace': 'smartcash-wo2us', 
-                            'project': 'rupiah-emisi-2022', 'version': '3'},
-            },
-            'data_dir': 'data'
-        }
+    if not config:
+        raise ValueError("Config tidak boleh kosong! Pastikan config dikonfigurasi dengan benar.")
     
-    # Coba import DatasetManager dan utilitas
-    dataset_manager = None
-    logger = None
-    observer_manager = None
-    try:
-        from smartcash.handlers.dataset import DatasetManager
-        from smartcash.utils.logger import get_logger
-        from smartcash.utils.observer.observer_manager import ObserverManager
-        from smartcash.utils.observer import EventTopics, EventDispatcher
-        
-        logger = get_logger("dataset_download")
-        dataset_manager = DatasetManager(config, logger=logger)
-        observer_manager = ObserverManager(auto_register=True)
-        
-        # Simpan ke ui_components untuk cleanup
-        ui_components['dataset_manager'] = dataset_manager
-        ui_components['observer_manager'] = observer_manager
-        
-    except ImportError as e:
-        print(f"Info: {str(e)}")
+    # Import DatasetManager dan utils yang diperlukan
+    from smartcash.handlers.dataset import DatasetManager
+    from smartcash.utils.logger import get_logger
+    from smartcash.utils.observer.observer_manager import ObserverManager
+    from smartcash.utils.observer import EventTopics, EventDispatcher
+    from smartcash.utils.dataset.dataset_utils import DEFAULT_SPLITS
+    
+    logger = get_logger("dataset_download")
+    dataset_manager = DatasetManager(config, logger=logger)
+    observer_manager = ObserverManager(auto_register=True)
+    
+    # Simpan ke ui_components untuk cleanup
+    ui_components['dataset_manager'] = dataset_manager
+    ui_components['observer_manager'] = observer_manager
     
     # Tambahkan API key info
     api_key_info = EventDispatcher.HTML(
@@ -188,7 +175,7 @@ def setup_download_handlers(ui_components, config=None):
                             # Update with new config
                             dataset_manager.config = config
                             dataset_paths = dataset_manager.pull_dataset(
-                                format="yolov5pytorch",
+                                format="yolov5",
                                 api_key=api_key,
                                 workspace=workspace,
                                 project=project,
@@ -201,7 +188,7 @@ def setup_download_handlers(ui_components, config=None):
                             
                             # Verify dataset structure
                             valid_structure = True
-                            for split in ['train', 'valid', 'test']:
+                            for split in DEFAULT_SPLITS:
                                 split_dir = Path(data_dir) / split
                                 if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
                                     valid_structure = False

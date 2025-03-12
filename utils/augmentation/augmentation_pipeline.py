@@ -33,32 +33,36 @@ class AugmentationPipeline:
         # Ambil konfigurasi augmentasi
         aug_config = self.config.get('augmentation', {})
         
+        # Cek apakah ada bbox yang perlu diproses
+        has_bbox = aug_config.get('process_bboxes', True)
+        
         # Transformasi posisi
-        self.transforms['position'] = self.build_position_transforms(aug_config)
+        self.transforms['position'] = self.build_position_transforms(aug_config, has_bbox)
         
         # Transformasi pencahayaan
-        self.transforms['lighting'] = self.build_lighting_transforms(aug_config)
+        self.transforms['lighting'] = self.build_lighting_transforms(aug_config, has_bbox)
         
         # Transformasi kombinasi
-        self.transforms['combined'] = self.build_combined_transforms(aug_config)
+        self.transforms['combined'] = self.build_combined_transforms(aug_config, has_bbox)
         
         # Transformasi ekstrim
-        self.transforms['extreme_rotation'] = self.build_extreme_transforms(aug_config)
+        self.transforms['extreme_rotation'] = self.build_extreme_transforms(aug_config, has_bbox)
     
-    def build_position_transforms(self, aug_config: Dict) -> A.Compose:
+    def build_position_transforms(self, aug_config: Dict, has_bbox: bool = True) -> A.Compose:
         """
         Build transformasi posisi.
         
         Args:
             aug_config: Konfigurasi augmentasi
+            has_bbox: Apakah perlu memproses bboxes
             
         Returns:
             Transformasi untuk posisi
         """
         position_cfg = aug_config.get('position', {})
         
-        # Gunakan Affine daripada ShiftScaleRotate
-        return A.Compose([
+        # Transformasi dasar
+        transforms = [
             A.HorizontalFlip(p=position_cfg.get('fliplr', 0.5)),
             A.Affine(
                 scale={"x": (1 - position_cfg.get('scale', 0.1), 1 + position_cfg.get('scale', 0.1)),
@@ -68,21 +72,29 @@ class AugmentationPipeline:
                 rotate=(-position_cfg.get('degrees', 10), position_cfg.get('degrees', 10)),
                 p=position_cfg.get('rotation_prob', 0.5)
             ),
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ]
+        
+        # Tambahkan bbox_params hanya jika diperlukan
+        if has_bbox:
+            return A.Compose(transforms, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        else:
+            return A.Compose(transforms)
     
-    def build_lighting_transforms(self, aug_config: Dict) -> A.Compose:
+    def build_lighting_transforms(self, aug_config: Dict, has_bbox: bool = True) -> A.Compose:
         """
         Build transformasi pencahayaan.
         
         Args:
             aug_config: Konfigurasi augmentasi
+            has_bbox: Apakah perlu memproses bboxes
             
         Returns:
             Transformasi untuk pencahayaan
         """
         lighting_cfg = aug_config.get('lighting', {})
         
-        return A.Compose([
+        # Transformasi dasar
+        transforms = [
             A.HueSaturationValue(
                 hue_shift_limit=lighting_cfg.get('hsv_h', 0.015) * 360,
                 sat_shift_limit=lighting_cfg.get('hsv_s', 0.7) * 100,
@@ -94,20 +106,27 @@ class AugmentationPipeline:
                 contrast_limit=lighting_cfg.get('contrast', 0.3),
                 p=lighting_cfg.get('brightness_prob', 0.5)
             ),
-            # Fix untuk ImageCompression warning
-            A.ImageCompression(
+            # Fix untuk ImageCompression warning - gunakan JpegCompression
+            A.JpegCompression(
                 quality_lower=80,
                 quality_upper=100,
                 p=lighting_cfg.get('compress', 0.2)
             ),
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ]
+        
+        # Tambahkan bbox_params hanya jika diperlukan
+        if has_bbox:
+            return A.Compose(transforms, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        else:
+            return A.Compose(transforms)
     
-    def build_combined_transforms(self, aug_config: Dict) -> A.Compose:
+    def build_combined_transforms(self, aug_config: Dict, has_bbox: bool = True) -> A.Compose:
         """
         Build transformasi kombinasi.
         
         Args:
             aug_config: Konfigurasi augmentasi
+            has_bbox: Apakah perlu memproses bboxes
             
         Returns:
             Transformasi kombinasi
@@ -115,7 +134,8 @@ class AugmentationPipeline:
         position_cfg = aug_config.get('position', {})
         lighting_cfg = aug_config.get('lighting', {})
         
-        return A.Compose([
+        # Transformasi dasar
+        transforms = [
             # Kombinasi posisi
             A.HorizontalFlip(p=position_cfg.get('fliplr', 0.5)),
             A.Affine(
@@ -139,14 +159,21 @@ class AugmentationPipeline:
                 contrast_limit=lighting_cfg.get('contrast', 0.3),
                 p=0.3
             ),
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ]
+        
+        # Tambahkan bbox_params hanya jika diperlukan
+        if has_bbox:
+            return A.Compose(transforms, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        else:
+            return A.Compose(transforms)
     
-    def build_extreme_transforms(self, aug_config: Dict) -> A.Compose:
+    def build_extreme_transforms(self, aug_config: Dict, has_bbox: bool = True) -> A.Compose:
         """
         Build transformasi ekstrim untuk dataset lebih robust.
         
         Args:
             aug_config: Konfigurasi augmentasi
+            has_bbox: Apakah perlu memproses bboxes
             
         Returns:
             Transformasi ekstrim
@@ -156,7 +183,8 @@ class AugmentationPipeline:
         max_angle = extreme_cfg.get('rotation_max', 90)
         prob = extreme_cfg.get('probability', 0.3)
         
-        return A.Compose([
+        # Transformasi dasar
+        transforms = [
             A.Affine(
                 rotate=(-max_angle, max_angle),
                 scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
@@ -167,7 +195,13 @@ class AugmentationPipeline:
                 contrast_limit=0.4,
                 p=prob
             ),
-        ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        ]
+        
+        # Tambahkan bbox_params hanya jika diperlukan
+        if has_bbox:
+            return A.Compose(transforms, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
+        else:
+            return A.Compose(transforms)
     
     def get_transform(self, aug_type: str) -> A.Compose:
         """

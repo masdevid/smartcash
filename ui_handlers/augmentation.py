@@ -13,7 +13,6 @@ from pathlib import Path
 from IPython.display import display, clear_output, HTML
 
 from smartcash.utils.ui_utils import create_status_indicator
-from smartcash.utils.observer import EventTopics
 
 def setup_augmentation_handlers(ui_components, config=None):
     """Setup handlers untuk UI augmentasi dataset dengan pendekatan DRY."""

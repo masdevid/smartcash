@@ -8,6 +8,8 @@ import sys
 import subprocess
 import threading
 import importlib
+import queue
+import time
 from typing import List, Tuple, Optional, Dict, Any
 
 # IPython imports
@@ -23,20 +25,12 @@ def setup_dependency_handlers(ui_components):
     Returns:
         Dictionary UI components yang sudah diupdate dengan handler
     """
-    # State variables untuk kontrol proses instalasi
-    installation_state = {
-        'is_installing': False,
-        'installation_thread': None
-    }
+    # Thread-safe queue untuk komunikasi
+    status_queue = queue.Queue()
     
-    # Logger minimal untuk pesan status
     def log_status(message: str, status_type: str = 'info'):
         """
         Log status dengan styling konsisten.
-        
-        Args:
-            message: Pesan status
-            status_type: Tipe status ('info', 'success', 'warning', 'error')
         """
         status_styles = {
             'info': {'icon': 'ℹ️', 'color': 'blue'},
@@ -56,204 +50,102 @@ def setup_dependency_handlers(ui_components):
             </div>
             """))
     
-    def set_ui_state(busy: bool = False):
+    def update_ui():
         """
-        Atur status UI selama proses instalasi.
-        
-        Args:
-            busy: Status sibuk atau tidak
+        Thread untuk memperbarui UI secara berkala.
         """
-        ui_components['install_button'].disabled = busy
-        ui_components['check_button'].disabled = busy
-        ui_components['check_all_button'].disabled = busy
-        ui_components['uncheck_all_button'].disabled = busy
-        ui_components['install_progress'].layout.visibility = 'visible' if busy else 'hidden'
+        while True:
+            try:
+                # Coba ambil status dari queue dengan timeout
+                status = status_queue.get(timeout=1)
+                
+                # Update UI berdasarkan status
+                if status['type'] == 'progress':
+                    ui_components['install_progress'].value = status['value']
+                    ui_components['install_progress'].description = status['description']
+                elif status['type'] == 'status':
+                    log_status(status['message'], status['status_type'])
+                elif status['type'] == 'complete':
+                    # Reset UI state
+                    ui_components['install_button'].disabled = False
+                    ui_components['check_button'].disabled = False
+                    ui_components['check_all_button'].disabled = False
+                    ui_components['uncheck_all_button'].disabled = False
+                    ui_components['install_progress'].layout.visibility = 'hidden'
+                    break
+            except queue.Empty:
+                # Cek apakah thread utama masih berjalan
+                if not threading.main_thread().is_alive():
+                    break
     
     def run_pip_install(packages: List[str], force_reinstall: bool = False) -> Tuple[bool, str]:
         """
         Jalankan pip install untuk package tertentu.
-        
-        Args:
-            packages: Daftar package untuk diinstall
-            force_reinstall: Flag untuk force reinstall
-        
-        Returns:
-            Tuple (berhasil, pesan)
         """
         force_flag = "--force-reinstall" if force_reinstall else ""
-        
-        # Tambahkan opsi untuk menghindari konfllik torch
         extra_flags = "--no-deps" if any('torch' in pkg.lower() for pkg in packages) else ""
         
-        cmd = f"{sys.executable} -m pip install {' '.join(packages)} {force_flag} {extra_flags}"
+        # Khusus untuk requirements.txt
+        if len(packages) == 1 and packages[0].endswith('.txt'):
+            cmd = f"{sys.executable} -m pip install -r {packages[0]} {force_flag} -v"
+        else:
+            cmd = f"{sys.executable} -m pip install {' '.join(packages)} {force_flag} {extra_flags} -v"
         
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd, 
                 shell=True, 
-                check=True, 
-                capture_output=True, 
-                text=True, 
-                stderr=subprocess.STDOUT
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True
             )
-            return True, result.stdout
-        except subprocess.CalledProcessError as e:
-            return False, e.output
-    
-    def install_yolov5_requirements(force_reinstall: bool = False) -> Tuple[bool, str]:
-        """
-        Install requirements untuk YOLOv5.
-        
-        Args:
-            force_reinstall: Flag untuk force reinstall
-        
-        Returns:
-            Tuple (berhasil, pesan)
-        """
-        from pathlib import Path
-        
-        # Cek keberadaan file requirements
-        requirements_path = Path("yolov5/requirements.txt")
-        if not requirements_path.exists():
-            return False, "File requirements.txt untuk YOLOv5 tidak ditemukan."
-        
-        force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install -r {requirements_path} {force_flag}"
-        
-        try:
-            result = subprocess.run(
-                cmd, 
-                shell=True, 
-                check=True, 
-                capture_output=True, 
-                text=True, 
-                stderr=subprocess.STDOUT
-            )
-            return True, result.stdout
-        except subprocess.CalledProcessError as e:
-            return False, e.output
-    
-    def check_package_installation(packages: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
-        """
-        Periksa status instalasi package.
-        
-        Args:
-            packages: List tuple (nama_display, nama_import)
-        
-        Returns:
-            List status instalasi package
-        """
-        results = []
-        for display_name, import_name in packages:
-            try:
-                module = importlib.import_module(import_name)
-                version = getattr(module, '__version__', 'Unknown')
-                results.append({
-                    'name': display_name,
-                    'status': 'installed',
-                    'version': version
-                })
-            except ImportError:
-                results.append({
-                    'name': display_name,
-                    'status': 'not_installed',
-                    'version': None
-                })
-        return results
+            
+            # Streaming output
+            output_lines = []
+            for line in process.stdout:
+                output_lines.append(line)
+            
+            # Tunggu proses selesai
+            return_code = process.wait()
+            
+            # Gabungkan output
+            full_output = ''.join(output_lines)
+            
+            return return_code == 0, full_output
+        except Exception as e:
+            return False, str(e)
     
     def install_packages():
         """
         Proses instalasi package yang dipilih.
         """
-        # Pastikan tidak ada proses instalasi yang sedang berjalan
-        def finalize_installation(success=True):
-            """Finalisasi proses instalasi."""
-            try:
-                with ui_components['status']:
-                    progress_bar = ui_components['install_progress']
-                    progress_bar.value = progress_bar.max
-                    progress_bar.description = "Selesai"
-                    
-                    if success:
-                        log_status("🏁 Instalasi package selesai", 'success')
-                    
-                # Reset UI state di main thread
-                import IPython.display
-                IPython.display.display(IPython.display.HTML("""
-                <script>
-                document.querySelector('.jupyter-widgets[data-comm-id="' + 
-                    document.querySelector('.jupyter-widgets[title="Install Packages"]').getAttribute('data-comm-id') + 
-                    '"]').disabled = false;
-                </script>
-                """))
-            except Exception as e:
-                print(f"Error in finalization: {e}")
-            finally:
-                # Pastikan state direset
-                installation_state['is_installing'] = False
-                set_ui_state(busy=False)
-        
         try:
-            # Cegah proses berulang
-            if installation_state['is_installing']:
-                return
-            
-            # Set state instalasi
-            installation_state['is_installing'] = True
-            
-            # Gunakan main thread untuk update UI
-            import IPython.display
-            IPython.display.display(IPython.display.HTML("""
-            <script>
-            document.querySelector('.jupyter-widgets[title="Install Packages"]').disabled = true;
-            </script>
-            """))
-            
-            # Bersihkan status sebelumnya
-            with ui_components['status']:
-                clear_output()
+            # Reset progress bar
+            status_queue.put({
+                'type': 'progress', 
+                'value': 0, 
+                'description': 'Memulai instalasi...'
+            })
             
             # Mapping checkbox ke package
             package_map = {
-                'yolov5_req': (install_yolov5_requirements, 'YOLOv5 requirements'),
-                'torch_req': (
-                    lambda force: run_pip_install([
-                        'torch', 'torchvision', 'torchaudio', 
-                        '--index-url', 'https://download.pytorch.org/whl/cu118'
-                    ], force), 
-                    'PyTorch'
-                ),
-                'smartcash_req': (
-                    lambda force: run_pip_install([
-                        'pyyaml', 'termcolor', 'tqdm', 'roboflow', 
-                        'python-dotenv', 'ipywidgets'
-                    ], force), 
-                    'SmartCash requirements'
-                ),
-                'albumentations_req': (
-                    lambda force: run_pip_install(['albumentations'], force), 
-                    'Albumentations'
-                ),
-                'notebook_req': (
-                    lambda force: run_pip_install(['ipywidgets', 'tqdm', 'matplotlib'], force), 
-                    'Notebook tools'
-                ),
-                'opencv_req': (
-                    lambda force: run_pip_install(['opencv-python'], force), 
-                    'OpenCV'
-                ),
-                'matplotlib_req': (
-                    lambda force: run_pip_install(['matplotlib'], force), 
-                    'Matplotlib'
-                ),
-                'pandas_req': (
-                    lambda force: run_pip_install(['pandas'], force), 
-                    'Pandas'
-                ),
-                'seaborn_req': (
-                    lambda force: run_pip_install(['seaborn'], force), 
-                    'Seaborn'
-                )
+                'yolov5_req': (['yolov5/requirements.txt'], 'YOLOv5 requirements'),
+                'torch_req': ([
+                    'torch', 'torchvision', 'torchaudio', 
+                    '--index-url', 'https://download.pytorch.org/whl/cu118'
+                ], 'PyTorch'),
+                'smartcash_req': ([
+                    'pyyaml', 'termcolor', 'tqdm', 'roboflow', 
+                    'python-dotenv', 'ipywidgets'
+                ], 'SmartCash requirements'),
+                'albumentations_req': (['albumentations'], 'Albumentations'),
+                'notebook_req': (['ipywidgets', 'tqdm', 'matplotlib'], 'Notebook tools'),
+                'opencv_req': (['opencv-python'], 'OpenCV'),
+                'matplotlib_req': (['matplotlib'], 'Matplotlib'),
+                'pandas_req': (['pandas'], 'Pandas'),
+                'seaborn_req': (['seaborn'], 'Seaborn')
             }
             
             # Daftar package untuk diinstall
@@ -261,65 +153,107 @@ def setup_dependency_handlers(ui_components):
             force_reinstall = ui_components['force_reinstall'].value
             
             # Cek package yang dipilih
-            for key, (install_func, display_name) in package_map.items():
+            for key, (packages, display_name) in package_map.items():
                 if ui_components[key].value:
-                    packages_to_install.append((install_func, display_name))
+                    packages_to_install.append((packages, display_name))
             
             # Tambahkan package kustom
             custom_packages = ui_components['custom_packages'].value.strip().split('\n')
             custom_packages = [pkg.strip() for pkg in custom_packages if pkg.strip()]
             if custom_packages:
-                custom_install_func = lambda force: run_pip_install(custom_packages, force)
-                packages_to_install.append((custom_install_func, 'Custom Packages'))
+                packages_to_install.append((custom_packages, 'Custom Packages'))
             
             # Cek apakah ada package yang akan diinstall
             if not packages_to_install:
-                log_status("⚠️ Tidak ada package yang dipilih untuk diinstall", 'warning')
-                finalize_installation(False)
+                status_queue.put({
+                    'type': 'status', 
+                    'message': '⚠️ Tidak ada package yang dipilih untuk diinstall', 
+                    'status_type': 'warning'
+                })
+                status_queue.put({'type': 'complete'})
                 return
             
-            # Setup progress bar
-            progress_bar = ui_components['install_progress']
-            progress_bar.value = 0
-            progress_bar.max = len(packages_to_install)
-            progress_bar.layout.visibility = 'visible'
-            
             # Proses instalasi
-            install_success = True
-            for i, (install_func, display_name) in enumerate(packages_to_install):
-                log_status(f"🔄 Instalasi {display_name}...", 'info')
+            total_packages = len(packages_to_install)
+            for i, (packages, display_name) in enumerate(packages_to_install):
+                # Update progress
+                status_queue.put({
+                    'type': 'progress', 
+                    'value': int((i / total_packages) * 100), 
+                    'description': f'Instalasi {display_name}'
+                })
+                
+                # Kirim status memulai instalasi
+                status_queue.put({
+                    'type': 'status', 
+                    'message': f'🔄 Menginstall {display_name}...', 
+                    'status_type': 'info'
+                })
                 
                 # Jalankan instalasi
-                success, output = install_func(force_reinstall)
+                success, output = run_pip_install(packages, force_reinstall)
                 
-                # Update progress
-                progress_bar.value = i + 1
-                progress_bar.description = f"{display_name}"
-                
-                # Tampilkan hasil
+                # Kirim status hasil
                 if success:
-                    log_status(f"✅ {display_name} berhasil diinstall", 'success')
+                    status_queue.put({
+                        'type': 'status', 
+                        'message': f'✅ {display_name} berhasil diinstall', 
+                        'status_type': 'success'
+                    })
                 else:
-                    log_status(f"❌ Gagal instalasi {display_name}: {output}", 'error')
-                    install_success = False
+                    status_queue.put({
+                        'type': 'status', 
+                        'message': f'❌ Gagal instalasi {display_name}: {output}', 
+                        'status_type': 'error'
+                    })
             
-            # Finalisasi
-            finalize_installation(install_success)
+            # Selesai
+            status_queue.put({
+                'type': 'progress', 
+                'value': 100, 
+                'description': 'Instalasi selesai'
+            })
+            status_queue.put({
+                'type': 'status', 
+                'message': '🏁 Instalasi package selesai', 
+                'status_type': 'success'
+            })
+            status_queue.put({'type': 'complete'})
         
         except Exception as e:
-            log_status(f"❌ Error fatal: {str(e)}", 'error')
-            finalize_installation(False)
+            # Tangani error yang tidak terduga
+            status_queue.put({
+                'type': 'status', 
+                'message': f'❌ Error tidak terduga: {str(e)}', 
+                'status_type': 'error'
+            })
+            status_queue.put({'type': 'complete'})
     
     def on_install_click(b):
         """
         Handler untuk tombol install.
         """
-        # Hindari multiple thread
-        if not installation_state['is_installing']:
-            thread = threading.Thread(target=install_packages)
-            thread.daemon = True
-            thread.start()
-            installation_state['installation_thread'] = thread
+        # Reset UI
+        ui_components['install_button'].disabled = True
+        ui_components['check_button'].disabled = True
+        ui_components['check_all_button'].disabled = True
+        ui_components['uncheck_all_button'].disabled = True
+        ui_components['install_progress'].layout.visibility = 'visible'
+        ui_components['install_progress'].value = 0
+        
+        # Bersihkan queue
+        while not status_queue.empty():
+            status_queue.get()
+        
+        # Mulai thread update UI
+        ui_update_thread = threading.Thread(target=update_ui)
+        ui_update_thread.daemon = True
+        ui_update_thread.start()
+        
+        # Mulai thread instalasi
+        install_thread = threading.Thread(target=install_packages)
+        install_thread.daemon = True
+        install_thread.start()
     
     def on_check_click(b):
         """
@@ -368,6 +302,28 @@ def setup_dependency_handlers(ui_components):
         except ImportError:
             pass
     
+    def check_package_installation(packages: List[Tuple[str, str]]) -> List[Dict[str, Any]]:
+        """
+        Periksa status instalasi package.
+        """
+        results = []
+        for display_name, import_name in packages:
+            try:
+                module = importlib.import_module(import_name)
+                version = getattr(module, '__version__', 'Unknown')
+                results.append({
+                    'name': display_name,
+                    'status': 'installed',
+                    'version': version
+                })
+            except ImportError:
+                results.append({
+                    'name': display_name,
+                    'status': 'not_installed',
+                    'version': None
+                })
+        return results
+    
     def on_check_all(b):
         """
         Handler untuk mencentang semua checkbox.
@@ -405,10 +361,9 @@ def setup_dependency_handlers(ui_components):
         """
         Membersihkan sumber daya yang digunakan.
         """
-        # Pastikan tidak ada thread yang masih berjalan
-        if installation_state['installation_thread'] and installation_state['installation_thread'].is_alive():
-            installation_state['is_installing'] = False
-            installation_state['installation_thread'].join(timeout=1)
+        # Kosongkan queue
+        while not status_queue.empty():
+            status_queue.get()
     
     ui_components['cleanup'] = cleanup
     

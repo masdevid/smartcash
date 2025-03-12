@@ -1,12 +1,12 @@
 """
 File: smartcash/ui_components/env_config.py
 Author: Refactored
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan desain modular.
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan styling konsisten.
 """
 
 import ipywidgets as widgets
 from IPython.display import HTML
-from pathlib import Path
+from smartcash.utils.ui_utils import create_component_header, create_info_box
 
 def create_env_config_ui():
     """
@@ -19,13 +19,11 @@ def create_env_config_ui():
     main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("""
-    <div style="background-color: #f0f8ff; padding: 15px; color: black; 
-              border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
-        <h2 style="color: inherit; margin-top: 0;">⚙️ Environment Configuration</h2>
-        <p style="color: inherit; margin-bottom: 0;">Konfigurasi lingkungan kerja SmartCash</p>
-    </div>
-    """)
+    header = create_component_header(
+        "Environment Configuration",
+        "Konfigurasi lingkungan kerja SmartCash",
+        "⚙️"
+    )
     
     # Colab info panel
     colab_panel = widgets.HTML("")
@@ -87,11 +85,10 @@ def create_env_config_ui():
         )
     )
     
-    # Info box in accordion (collapsed by default)
-    info_content = widgets.HTML("""
-    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 0; border-radius: 4px;">
-        <h4 style="margin-top: 0; color: inherit;">ℹ️ Environment Setup</h4>
+    # Help info box
+    help_info = create_info_box(
+        "Tentang Environment Setup",
+        """
         <p>SmartCash mendukung dua environment kerja:</p>
         <ul>
             <li><strong>Google Colab</strong>: Dengan integrasi Google Drive untuk penyimpanan</li>
@@ -114,17 +111,15 @@ runs/train/weights/
 logs/
 exports/
         </pre>
-    </div>
-    """)
-    
-    info_accordion = widgets.Accordion(children=[info_content], selected_index=None)
-    info_accordion.set_title(0, "ℹ️ Environment Setup")
+        """,
+        'info'
+    )
     
     # Assemble UI
     main_container.children = [
         header,
         colab_panel,
-        info_accordion,
+        help_info,
         button_container,
         status,
         info_accordion
@@ -136,7 +131,6 @@ exports/
         'colab_panel': colab_panel,
         'info_panel': info_panel,
         'info_accordion': info_accordion,
-        'info_content': info_content,
         'drive_button': drive_button,
         'dir_button': dir_button,
         'status': status

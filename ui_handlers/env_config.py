@@ -1,17 +1,18 @@
 """
 File: smartcash/ui_handlers/env_config.py
 Author: Refactored
-Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan reusable utilities.
+Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan implementasi observer pattern.
 """
 
 from IPython.display import display, HTML, clear_output
 
-def setup_env_handlers(ui):
+def setup_env_handlers(ui_components, config=None):
     """
-    Setup handler untuk UI konfigurasi environment SmartCash.
+    Setup handlers untuk UI konfigurasi environment SmartCash.
     
     Args:
-        ui: Dictionary berisi komponen UI
+        ui_components: Dictionary berisi komponen UI
+        config: Konfigurasi yang akan digunakan (optional)
         
     Returns:
         Dictionary UI components yang sudah diupdate dengan handler
@@ -22,10 +23,18 @@ def setup_env_handlers(ui):
         from smartcash.utils.logger import get_logger
         from smartcash.utils.ui_utils import create_status_indicator
         from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        
         has_dependencies = True
         logger = get_logger("env_config")
         env_manager = EnvironmentManager(logger=logger)
         config_manager = get_config_manager(logger=logger)
+        observer_manager = ObserverManager(auto_register=True)
+        observer_group = "env_config_observers"
+        
+        # Unregister any existing observers
+        observer_manager.unregister_group(observer_group)
+        
     except ImportError as e:
         has_dependencies = False
         print(f"ℹ️ Basic fallback mode: {str(e)}")
@@ -39,7 +48,7 @@ def setup_env_handlers(ui):
             is_colab = env_manager.is_colab
             
             # Display environment info
-            with ui['info_panel']:
+            with ui_components['info_panel']:
                 clear_output()
                 try:
                     system_info = env_manager.get_system_info()
@@ -66,7 +75,7 @@ def setup_env_handlers(ui):
                 is_colab = False
                 
             # Display basic info
-            with ui['info_panel']:
+            with ui_components['info_panel']:
                 clear_output()
                 import sys, platform
                 from pathlib import Path
@@ -83,27 +92,27 @@ def setup_env_handlers(ui):
         
         # Update UI based on environment
         if is_colab:
-            ui['colab_panel'].value = """
+            ui_components['colab_panel'].value = """
                 <div style="padding: 10px; background: #d1ecf1; border-left: 4px solid #0c5460; color: #0c5460; margin: 10px 0;">
                     <h3 style="margin-top: 0; color: #0c5460;">☁️ Google Colab Terdeteksi</h3>
                     <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan untuk penyimpanan data.</p>
                 </div>
             """
-            ui['drive_button'].layout.display = ''
+            ui_components['drive_button'].layout.display = ''
         else:
-            ui['colab_panel'].value = """
+            ui_components['colab_panel'].value = """
                 <div style="padding: 10px; background: #d4edda; border-left: 4px solid #155724; color: #155724; margin: 10px 0;">
                     <h3 style="margin-top: 0; color: #155724;">💻 Environment Lokal Terdeteksi</h3>
                     <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
                 </div>
             """
-            ui['drive_button'].layout.display = 'none'
+            ui_components['drive_button'].layout.display = 'none'
         
         return is_colab
     
     # Handler untuk Google Drive connection
     def on_drive_connect(b):
-        with ui['status']:
+        with ui_components['status']:
             clear_output()
             
             if has_dependencies:
@@ -124,6 +133,15 @@ def setup_env_handlers(ui):
                     display(HTML("<h4>📂 Struktur direktori:</h4>"))
                     tree_html = env_manager.get_directory_tree(max_depth=2)
                     display(HTML(tree_html))
+                    
+                    # Update config dengan info environment
+                    if config and config_manager:
+                        config_manager.update_config({
+                            'environment': {
+                                'drive_mounted': True,
+                                'drive_path': str(env_manager.drive_path)
+                            }
+                        })
                     
                 else:
                     display(create_status_indicator("error", f"❌ Gagal terhubung ke Google Drive: {message}"))
@@ -176,7 +194,7 @@ def setup_env_handlers(ui):
     
     # Handler untuk directory structure setup
     def on_dir_setup(b):
-        with ui['status']:
+        with ui_components['status']:
             clear_output()
             
             if has_dependencies:
@@ -198,12 +216,13 @@ def setup_env_handlers(ui):
                 display(HTML(tree_html))
                 
                 # Save environment info to config
-                if hasattr(config_manager, 'update_config'):
+                if config_manager:
                     env_config = {
                         'environment': {
                             'is_colab': env_manager.is_colab,
                             'drive_mounted': env_manager.is_drive_mounted,
-                            'base_dir': str(env_manager.base_dir)
+                            'base_dir': str(env_manager.base_dir),
+                            'setup_complete': True
                         }
                     }
                     config_manager.update_config(env_config)
@@ -251,31 +270,29 @@ exports/</pre>
                 ))
     
     # Register event handlers
-    ui['drive_button'].on_click(on_drive_connect)
-    ui['dir_button'].on_click(on_dir_setup)
+    ui_components['drive_button'].on_click(on_drive_connect)
+    ui_components['dir_button'].on_click(on_dir_setup)
+    
+    # Tambahkan observer untuk monitoring jika observer manager tersedia
+    if has_dependencies and observer_manager:
+        # Observer untuk monitoring aktivitas environment
+        observer_manager.create_logging_observer(
+            event_types=["environment.drive.mount", "environment.directory.setup"],
+            logger_name="env_config",
+            name="EnvironmentLogObserver",
+            group=observer_group
+        )
+    
+    # Cleanup function
+    def cleanup():
+        """Cleanup resources used by this handler"""
+        if has_dependencies and observer_manager:
+            observer_manager.unregister_group(observer_group)
+    
+    # Add cleanup to components
+    ui_components['cleanup'] = cleanup
     
     # Run initial detection
     detect_environment()
     
-    # Function to create status indicator (for fallback mode)
-    def create_status_indicator(status, message):
-        """Buat status indicator dengan styling konsisten."""
-        status_styles = {
-            'success': {'icon': '✅', 'color': 'green'},
-            'warning': {'icon': '⚠️', 'color': 'orange'},
-            'error': {'icon': '❌', 'color': 'red'},
-            'info': {'icon': 'ℹ️', 'color': 'blue'}
-        }
-        
-        style = status_styles.get(status, status_styles['info'])
-        
-        return HTML(f"""
-        <div style="margin: 5px 0; padding: 8px 12px; 
-                    border-radius: 4px; background-color: #f8f9fa;">
-            <span style="color: {style['color']}; font-weight: bold;"> 
-                {style['icon']} {message}
-            </span>
-        </div>
-        """)
-    
-    return ui
+    return ui_components

@@ -32,7 +32,7 @@ def create_preprocessing_ui():
         widgets.IntRangeSlider(
             value=[640, 640],
             min=320,
-            max=1280,
+            max=640,
             step=32,
             description='Image size:',
             style={'description_width': 'initial'},

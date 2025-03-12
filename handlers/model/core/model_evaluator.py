@@ -11,9 +11,8 @@ from tqdm import tqdm
 from smartcash.utils.logger import get_logger
 from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError, EvaluationError
-from smartcash.utils.observer import ObserverSubject
 
-class ModelEvaluator(ModelComponent, ObserverSubject):
+class ModelEvaluator(ModelComponent):
     """Komponen untuk evaluasi model pada dataset test."""
     
     def _initialize(self):
@@ -25,24 +24,12 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
         }
         self.output_dir = Path(self.config.get('output_dir', 'runs/eval'))
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.in_colab = self._is_colab()
         
-        # Inisialisasi ObserverSubject
-        self._init_subject()
-    
-    def _is_colab(self):
-        """Deteksi Google Colab."""
-        try:
-            import google.colab
-            return True
-        except ImportError:
-            return False
-    
     def process(self, test_loader, model=None, **kwargs):
         """Alias untuk evaluate()."""
         return self.evaluate(test_loader, model, **kwargs)
     
-    def evaluate(self, test_loader, model=None, checkpoint_path=None, observers=None, **kwargs):
+    def evaluate(self, test_loader, model=None, checkpoint_path=None, **kwargs):
         """
         Evaluasi model pada test dataset.
         
@@ -50,7 +37,6 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
             test_loader: DataLoader untuk testing
             model: Model untuk evaluasi (opsional)
             checkpoint_path: Path ke checkpoint (opsional)
-            observers: List observer untuk monitoring evaluasi
             **kwargs: Parameter tambahan
             
         Returns:
@@ -59,11 +45,6 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
         start_time = time.time()
         
         try:
-            # Tambahkan observer jika ada
-            if observers:
-                for observer in observers:
-                    self.attach(observer)
-            
             # Load model jika perlu
             model = self._prepare_model(model, checkpoint_path)
             
@@ -78,9 +59,6 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
             
             # Log info evaluasi
             self.logger.info(f"🔍 Evaluasi model ({len(test_loader)} batch): device={device}, conf={conf_threshold:.2f}")
-            
-            # Notifikasi observer bahwa evaluasi dimulai
-            self.notify_observers('evaluation_start', {'model': model, 'num_batches': len(test_loader)})
             
             # Setup progress bar
             pbar = self._create_progress_bar(test_loader)
@@ -118,9 +96,6 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
                 'iou_threshold': iou_threshold
             })
             
-            # Notifikasi observer bahwa evaluasi selesai
-            self.notify_observers('evaluation_end', {'metrics': metrics})
-            
             # Log result
             self.logger.success(f"✅ Evaluasi selesai: mAP={metrics.get('mAP', 0):.4f}, F1={metrics.get('f1', 0):.4f}")
             
@@ -129,9 +104,6 @@ class ModelEvaluator(ModelComponent, ObserverSubject):
         except Exception as e:
             self.logger.error(f"❌ Error evaluasi: {str(e)}")
             raise EvaluationError(f"Gagal evaluasi: {str(e)}")
-        finally:
-            # Clean up: detach semua observer
-            self.detach_all()
     
     def _prepare_model(self, model, checkpoint_path):
         """Persiapkan model untuk evaluasi."""

@@ -15,7 +15,6 @@ from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.utils.visualization import ExperimentVisualizer
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.exceptions.base import ModelError, TrainingError
-from smartcash.handlers.model.observers.metrics_observer import MetricsObserver
 
 class ExperimentManager:
     """
@@ -336,10 +335,6 @@ class ExperimentManager:
             visualize=True
         )
         
-        # Setup observer list
-        observers = kwargs.get('observers', [])
-        observers.append(metrics_observer)
-        
         # Init early stopper
         early_stopper = None
         if early_stopping:
@@ -372,7 +367,6 @@ class ExperimentManager:
             early_stopping_patience=early_stopping_patience,
             early_stopping_metric=early_stopping_metric,
             save_path=str(experiment_dir / "weights") if experiment_dir else None,
-            observers=observers,
             **kwargs
         )
         

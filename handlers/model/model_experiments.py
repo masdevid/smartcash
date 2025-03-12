@@ -10,9 +10,8 @@ import time
 from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.exceptions.base import ModelError
 from smartcash.utils.visualization import ExperimentVisualizer
-from smartcash.utils.observer import ObserverSubject
 
-class ModelExperiments(ObserverSubject):
+class ModelExperiments():
     """
     Kelas untuk melakukan eksperimen model di SmartCash.
     Menyediakan antarmuka untuk membandingkan backbone dan parameter training.
@@ -26,9 +25,6 @@ class ModelExperiments(ObserverSubject):
         """Inisialisasi model experiments."""
         self.config = config
         self.logger = logger or get_logger("model_experiments")
-        
-        # Inisialisasi ObserverSubject
-        self._init_subject()
         
         # Lazy-loaded managers
         self._experiment_manager = None
@@ -60,7 +56,6 @@ class ModelExperiments(ObserverSubject):
         test_loader = None,
         parallel: bool = False,
         visualize: bool = True,
-        observers: List = None,
         **kwargs
     ) -> Dict[str, Any]:
         """
@@ -73,23 +68,10 @@ class ModelExperiments(ObserverSubject):
             test_loader: DataLoader untuk testing (opsional)
             parallel: Jalankan perbandingan secara paralel
             visualize: Buat visualisasi hasil
-            observers: List observer untuk monitoring
-            **kwargs: Parameter tambahan
             
         Returns:
             Dict hasil perbandingan
         """
-        # Notifikasi observer
-        self.notify_observers('experiment_start', {
-            'type': 'backbone_comparison',
-            'backbones': backbones
-        })
-        
-        # Tambahkan observers jika ada
-        if observers:
-            for observer in observers:
-                self.attach(observer)
-        
         try:
             # Jalankan eksperimen perbandingan backbone
             results = self.experiment_manager.compare_backbones(
@@ -117,20 +99,11 @@ class ModelExperiments(ObserverSubject):
                 
                 self.logger.info(f"📊 Visualisasi perbandingan backbone dibuat")
             
-            # Notifikasi observer
-            self.notify_observers('experiment_end', {
-                'results': results
-            })
-            
             return results
             
         except Exception as e:
             self.logger.error(f"❌ Gagal membandingkan backbone: {str(e)}")
-            self.notify_observers('experiment_error', {'error': str(e)})
             raise ModelError(f"Gagal membandingkan backbone: {str(e)}")
-        finally:
-            # Clean up observer
-            self.detach_all()
     
     def analyze_results(
         self,

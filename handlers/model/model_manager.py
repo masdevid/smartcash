@@ -106,21 +106,10 @@ class ModelManager:
     
     def train(self, train_loader, val_loader, model=None, **kwargs) -> Dict:
         """Train model dengan dataset yang diberikan."""
-        # Setup observers
-        observers = kwargs.pop('observers', []) or []
-        
-        # Tambahkan ColabObserver jika di Colab
-        if self.colab_mode:
-            from smartcash.handlers.model.observers import ColabObserver
-            has_colab_observer = any(isinstance(obs, ColabObserver) for obs in observers)
-            if not has_colab_observer:
-                observers.append(ColabObserver(self.logger))
-        
         return self.trainer.train(
             train_loader=train_loader, 
             val_loader=val_loader, 
             model=model, 
-            observers=observers,
             **kwargs
         )
     
@@ -129,14 +118,10 @@ class ModelManager:
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
-        # Setup observers
-        observers = kwargs.pop('observers', []) or []
-        
         return self.evaluator.evaluate(
             test_loader=test_loader, 
             model=model, 
             checkpoint_path=checkpoint_path, 
-            observers=observers,
             **kwargs
         )
     

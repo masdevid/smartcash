@@ -166,109 +166,149 @@ def setup_dependency_handlers(ui_components):
         Proses instalasi package yang dipilih.
         """
         # Pastikan tidak ada proses instalasi yang sedang berjalan
-        if installation_state['is_installing']:
-            return
+        def finalize_installation(success=True):
+            """Finalisasi proses instalasi."""
+            try:
+                with ui_components['status']:
+                    progress_bar = ui_components['install_progress']
+                    progress_bar.value = progress_bar.max
+                    progress_bar.description = "Selesai"
+                    
+                    if success:
+                        log_status("🏁 Instalasi package selesai", 'success')
+                    
+                # Reset UI state di main thread
+                import IPython.display
+                IPython.display.display(IPython.display.HTML("""
+                <script>
+                document.querySelector('.jupyter-widgets[data-comm-id="' + 
+                    document.querySelector('.jupyter-widgets[title="Install Packages"]').getAttribute('data-comm-id') + 
+                    '"]').disabled = false;
+                </script>
+                """))
+            except Exception as e:
+                print(f"Error in finalization: {e}")
+            finally:
+                # Pastikan state direset
+                installation_state['is_installing'] = False
+                set_ui_state(busy=False)
         
-        # Set state instalasi
-        installation_state['is_installing'] = True
-        set_ui_state(busy=True)
-        
-        # Bersihkan status sebelumnya
-        with ui_components['status']:
-            clear_output()
-        
-        # Mapping checkbox ke package
-        package_map = {
-            'yolov5_req': (install_yolov5_requirements, 'YOLOv5 requirements'),
-            'torch_req': (
-                lambda force: run_pip_install([
-                    'torch', 'torchvision', 'torchaudio', 
-                    '--index-url', 'https://download.pytorch.org/whl/cu118'
-                ], force), 
-                'PyTorch'
-            ),
-            'smartcash_req': (
-                lambda force: run_pip_install([
-                    'pyyaml', 'termcolor', 'tqdm', 'roboflow', 
-                    'python-dotenv', 'ipywidgets'
-                ], force), 
-                'SmartCash requirements'
-            ),
-            'albumentations_req': (
-                lambda force: run_pip_install(['albumentations'], force), 
-                'Albumentations'
-            ),
-            'notebook_req': (
-                lambda force: run_pip_install(['ipywidgets', 'tqdm', 'matplotlib'], force), 
-                'Notebook tools'
-            ),
-            'opencv_req': (
-                lambda force: run_pip_install(['opencv-python'], force), 
-                'OpenCV'
-            ),
-            'matplotlib_req': (
-                lambda force: run_pip_install(['matplotlib'], force), 
-                'Matplotlib'
-            ),
-            'pandas_req': (
-                lambda force: run_pip_install(['pandas'], force), 
-                'Pandas'
-            ),
-            'seaborn_req': (
-                lambda force: run_pip_install(['seaborn'], force), 
-                'Seaborn'
-            )
-        }
-        
-        # Daftar package untuk diinstall
-        packages_to_install = []
-        force_reinstall = ui_components['force_reinstall'].value
-        
-        # Cek package yang dipilih
-        for key, (install_func, display_name) in package_map.items():
-            if ui_components[key].value:
-                packages_to_install.append((install_func, display_name))
-        
-        # Tambahkan package kustom
-        custom_packages = ui_components['custom_packages'].value.strip().split('\n')
-        custom_packages = [pkg.strip() for pkg in custom_packages if pkg.strip()]
-        if custom_packages:
-            custom_install_func = lambda force: run_pip_install(custom_packages, force)
-            packages_to_install.append((custom_install_func, 'Custom Packages'))
-        
-        # Cek apakah ada package yang akan diinstall
-        if not packages_to_install:
-            log_status("⚠️ Tidak ada package yang dipilih untuk diinstall", 'warning')
-            set_ui_state(busy=False)
-            installation_state['is_installing'] = False
-            return
-        
-        # Setup progress bar
-        progress_bar = ui_components['install_progress']
-        progress_bar.value = 0
-        progress_bar.max = len(packages_to_install)
-        
-        # Proses instalasi
-        for i, (install_func, display_name) in enumerate(packages_to_install):
-            log_status(f"🔄 Instalasi {display_name}...", 'info')
+        try:
+            # Cegah proses berulang
+            if installation_state['is_installing']:
+                return
             
-            # Jalankan instalasi
-            success, output = install_func(force_reinstall)
+            # Set state instalasi
+            installation_state['is_installing'] = True
             
-            # Update progress
-            progress_bar.value = i + 1
-            progress_bar.description = f"{display_name}"
+            # Gunakan main thread untuk update UI
+            import IPython.display
+            IPython.display.display(IPython.display.HTML("""
+            <script>
+            document.querySelector('.jupyter-widgets[title="Install Packages"]').disabled = true;
+            </script>
+            """))
             
-            # Tampilkan hasil
-            if success:
-                log_status(f"✅ {display_name} berhasil diinstall", 'success')
-            else:
-                log_status(f"❌ Gagal instalasi {display_name}: {output}", 'error')
+            # Bersihkan status sebelumnya
+            with ui_components['status']:
+                clear_output()
+            
+            # Mapping checkbox ke package
+            package_map = {
+                'yolov5_req': (install_yolov5_requirements, 'YOLOv5 requirements'),
+                'torch_req': (
+                    lambda force: run_pip_install([
+                        'torch', 'torchvision', 'torchaudio', 
+                        '--index-url', 'https://download.pytorch.org/whl/cu118'
+                    ], force), 
+                    'PyTorch'
+                ),
+                'smartcash_req': (
+                    lambda force: run_pip_install([
+                        'pyyaml', 'termcolor', 'tqdm', 'roboflow', 
+                        'python-dotenv', 'ipywidgets'
+                    ], force), 
+                    'SmartCash requirements'
+                ),
+                'albumentations_req': (
+                    lambda force: run_pip_install(['albumentations'], force), 
+                    'Albumentations'
+                ),
+                'notebook_req': (
+                    lambda force: run_pip_install(['ipywidgets', 'tqdm', 'matplotlib'], force), 
+                    'Notebook tools'
+                ),
+                'opencv_req': (
+                    lambda force: run_pip_install(['opencv-python'], force), 
+                    'OpenCV'
+                ),
+                'matplotlib_req': (
+                    lambda force: run_pip_install(['matplotlib'], force), 
+                    'Matplotlib'
+                ),
+                'pandas_req': (
+                    lambda force: run_pip_install(['pandas'], force), 
+                    'Pandas'
+                ),
+                'seaborn_req': (
+                    lambda force: run_pip_install(['seaborn'], force), 
+                    'Seaborn'
+                )
+            }
+            
+            # Daftar package untuk diinstall
+            packages_to_install = []
+            force_reinstall = ui_components['force_reinstall'].value
+            
+            # Cek package yang dipilih
+            for key, (install_func, display_name) in package_map.items():
+                if ui_components[key].value:
+                    packages_to_install.append((install_func, display_name))
+            
+            # Tambahkan package kustom
+            custom_packages = ui_components['custom_packages'].value.strip().split('\n')
+            custom_packages = [pkg.strip() for pkg in custom_packages if pkg.strip()]
+            if custom_packages:
+                custom_install_func = lambda force: run_pip_install(custom_packages, force)
+                packages_to_install.append((custom_install_func, 'Custom Packages'))
+            
+            # Cek apakah ada package yang akan diinstall
+            if not packages_to_install:
+                log_status("⚠️ Tidak ada package yang dipilih untuk diinstall", 'warning')
+                finalize_installation(False)
+                return
+            
+            # Setup progress bar
+            progress_bar = ui_components['install_progress']
+            progress_bar.value = 0
+            progress_bar.max = len(packages_to_install)
+            progress_bar.layout.visibility = 'visible'
+            
+            # Proses instalasi
+            install_success = True
+            for i, (install_func, display_name) in enumerate(packages_to_install):
+                log_status(f"🔄 Instalasi {display_name}...", 'info')
+                
+                # Jalankan instalasi
+                success, output = install_func(force_reinstall)
+                
+                # Update progress
+                progress_bar.value = i + 1
+                progress_bar.description = f"{display_name}"
+                
+                # Tampilkan hasil
+                if success:
+                    log_status(f"✅ {display_name} berhasil diinstall", 'success')
+                else:
+                    log_status(f"❌ Gagal instalasi {display_name}: {output}", 'error')
+                    install_success = False
+            
+            # Finalisasi
+            finalize_installation(install_success)
         
-        # Selesaikan proses
-        log_status("🏁 Instalasi package selesai", 'success')
-        set_ui_state(busy=False)
-        installation_state['is_installing'] = False
+        except Exception as e:
+            log_status(f"❌ Error fatal: {str(e)}", 'error')
+            finalize_installation(False)
     
     def on_install_click(b):
         """

@@ -228,21 +228,60 @@ class AugmentationPipeline:
         Returns:
             Dict hasil transformasi
         """
-        transform = self.get_transform(aug_type)
-        if transform is None:
-            if self.logger:
-                self.logger.warning(f"⚠️ Transformasi '{aug_type}' tidak ditemukan, menggunakan default")
-            transform = self.transforms.get('combined')
+        # Check if there are bboxes to process
+        has_bboxes = bboxes is not None and len(bboxes) > 0 and class_labels is not None and len(class_labels) > 0
         
-        # Setup data untuk transformasi
-        if bboxes is None:
-            bboxes = []
-        if class_labels is None:
-            class_labels = [0] * len(bboxes)
+        # Get appropriate transform based on has_bboxes
+        if has_bboxes:
+            # Reinitialize transforms with bbox support if needed
+            if aug_type not in self.transforms or not hasattr(self.transforms[aug_type], 'processors'):
+                # Rebuild transforms with bbox support
+                aug_config = self.config.get('augmentation', {})
+                
+                if aug_type == 'position':
+                    transform = self.build_position_transforms(aug_config, True)
+                elif aug_type == 'lighting':
+                    transform = self.build_lighting_transforms(aug_config, True)
+                elif aug_type == 'extreme_rotation':
+                    transform = self.build_extreme_transforms(aug_config, True)
+                else:  # Default to combined
+                    transform = self.build_combined_transforms(aug_config, True)
+                
+                self.transforms[aug_type] = transform
+        else:
+            # Get transform without bbox support
+            transform = self.get_transform(aug_type)
             
-        # Eksekusi transformasi
+            # If transform doesn't exist, create it without bbox support
+            if transform is None:
+                aug_config = self.config.get('augmentation', {})
+                
+                if aug_type == 'position':
+                    transform = self.build_position_transforms(aug_config, False)
+                elif aug_type == 'lighting':
+                    transform = self.build_lighting_transforms(aug_config, False)
+                elif aug_type == 'extreme_rotation':
+                    transform = self.build_extreme_transforms(aug_config, False)
+                else:  # Default to combined
+                    transform = self.build_combined_transforms(aug_config, False)
+                
+                self.transforms[aug_type] = transform
+            
+            # Initialize empty bboxes and class_labels if needed
+            if bboxes is None:
+                bboxes = []
+            if class_labels is None:
+                class_labels = []
+            
+        # Execute transformation
         try:
-            transformed = transform(image=image, bboxes=bboxes, class_labels=class_labels)
+            if has_bboxes:
+                transformed = self.transforms[aug_type](image=image, bboxes=bboxes, class_labels=class_labels)
+            else:
+                transformed = self.transforms[aug_type](image=image)
+                transformed['bboxes'] = bboxes
+                transformed['class_labels'] = class_labels
+                
             return transformed
         except Exception as e:
             if self.logger:

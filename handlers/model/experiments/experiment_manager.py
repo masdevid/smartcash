@@ -16,7 +16,6 @@ from smartcash.utils.visualization import ExperimentVisualizer
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.exceptions.base import ModelError, TrainingError
 from smartcash.handlers.model.observers.metrics_observer import MetricsObserver
-from smartcash.utils.observer import ObserverSubject
 
 class ExperimentManager:
     """

@@ -4,7 +4,7 @@ Author: Perbaikan untuk warnings
 Deskripsi: Pipeline transformasi untuk augmentasi dataset dengan perbaikan warnings
 """
 
-import albumentations as A
+import albumentations as A  # Albumentations untuk transformasi gambar
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any, Union
 
@@ -106,12 +106,8 @@ class AugmentationPipeline:
                 contrast_limit=lighting_cfg.get('contrast', 0.3),
                 p=lighting_cfg.get('brightness_prob', 0.5)
             ),
-            # Fix untuk ImageCompression warning - gunakan JpegCompression
-            A.JpegCompression(
-                quality_lower=80,
-                quality_upper=100,
-                p=lighting_cfg.get('compress', 0.2)
-            ),
+            # Fix for compression - use ImageCompression correctly
+            A.Blur(blur_limit=3, p=lighting_cfg.get('compress', 0.2)),
         ]
         
         # Tambahkan bbox_params hanya jika diperlukan

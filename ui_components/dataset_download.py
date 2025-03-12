@@ -74,7 +74,7 @@ def create_dataset_download_ui():
         )
     ])
     
-    # Conditionally show settings based on selection
+    # Download settings container (NEW!)
     download_settings_container = widgets.VBox([roboflow_settings])
     
     # Download button
@@ -108,54 +108,15 @@ def create_dataset_download_ui():
                 <li><b>Roboflow:</b> Masukkan API key Roboflow dan konfigurasi workspace/project</li>
                 <li><b>Local:</b> Upload file ZIP yang berisi dataset dalam format YOLOv5</li>
             </ol>
-            <h4>Setup API Key Roboflow</h4>
-            <p>Anda memiliki beberapa cara untuk menyediakan API key Roboflow:</p>
-            <ol>
-                <li><b>Google Secret (untuk Colab):</b>
-                    <ul>
-                        <li>Klik ikon kunci 🔑 di sidebar kiri</li>
-                        <li>Tambahkan secret baru dengan nama <code>ROBOFLOW_API_KEY</code></li>
-                        <li>Masukkan API key Roboflow Anda sebagai nilai</li>
-                        <li>Klik "Save". API key akan diambil otomatis</li>
-                    </ul>
-                </li>
-                <li><b>Input Manual:</b> Masukkan API key secara langsung pada field yang tersedia</li>
-                <li><b>Config File:</b> Tambahkan ke <code>configs/base_config.yaml</code></li>
-            </ol>
-            <p>Untuk mendapatkan API key, login ke <a href="https://app.roboflow.com" target="_blank">dashboard Roboflow</a> dan buka menu 'Settings'.</p>
-            <h4>Struktur Dataset YOLOv5</h4>
-            <pre>
-data/
-  ├── train/
-  │   ├── images/
-  │   └── labels/
-  ├── valid/
-  │   ├── images/
-  │   └── labels/
-  └── test/
-      ├── images/
-      └── labels/
-            </pre>
-            <p>Masing-masing folder images berisi gambar (.jpg, .png), sedangkan folder labels berisi anotasi (.txt) dalam format YOLOv5.</p>
         </div>
     """)], selected_index=None)
-    
     help_info.set_title(0, "ℹ️ Bantuan")
-    
-    # Observer untuk source selection
-    def update_download_options(change):
-        if change['new'] == 'Roboflow (Online)':
-            download_settings_container.children = [roboflow_settings]
-        else:  # Local Data (Upload)
-            download_settings_container.children = [local_upload]
-    
-    download_options.observe(update_download_options, names='value')
     
     # Assemble UI
     main_container.children = [
         header,
         download_options,
-        download_settings_container,
+        download_settings_container,  # Make sure this key exists
         download_button,
         download_progress,
         download_status,
@@ -171,6 +132,7 @@ data/
         'download_button': download_button,
         'download_progress': download_progress,
         'download_status': download_status,
+        'download_settings_container': download_settings_container  # Add this key
     }
     
     return ui_components

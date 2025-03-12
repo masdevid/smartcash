@@ -15,99 +15,92 @@ from typing import Dict, Tuple, Optional, Any, List, Union
 from IPython.display import display, HTML
 
 def setup_notebook_environment(
-    cell_name: str, 
-    config_path: Optional[str] = None,
+    cell_name: str,
+    config_path: str = "configs/base_config.yaml",
     create_dirs: Optional[List[str]] = None,
-    import_utils: bool = True,
-    force_gc: bool = True
+    register_cleanup: bool = True
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Setup environment dengan fallback dan error handling.
+    Setup environment standar untuk cell notebook:
+    - Menambahkan smartcash ke path
+    - Membuat direktori yang diperlukan
+    - Setting up logger
+    - Loading dan sinkronisasi konfigurasi
+    - Setup dan cleanup observer manager
     
     Args:
-        cell_name: Nama unik cell untuk logging
+        cell_name: Nama unik untuk cell (untuk logging dan observer group)
         config_path: Path ke file konfigurasi
-        create_dirs: Direktori yang perlu dibuat
-        import_utils: Import utility classes
-        force_gc: Force garbage collection
+        create_dirs: List direktori yang perlu dibuat
+        register_cleanup: Register cleanup handler otomatis
     
     Returns:
-        Tuple (env, config) dengan informasi environment
+        Tuple (environment components, config)
     """
-    # Tambahkan direktori project ke path jika belum ada
+    # Pastikan smartcash ada di path
     if not any('smartcash' in p for p in sys.path):
-        module_path = str(Path().absolute())
-        if module_path not in sys.path:
-            sys.path.append(module_path)
+        sys.path.append('.')
     
-    # Force garbage collection
-    if force_gc:
-        gc.collect()
+    # Buat direktori standar
+    os.makedirs("configs", exist_ok=True)
+    os.makedirs("smartcash/ui_components", exist_ok=True)
+    os.makedirs("smartcash/ui_handlers", exist_ok=True)
     
-    # Inisialisasi environment default
-    env = {
-        'cell_name': cell_name,
-        'logger': None,
-        'env_manager': None,
-        'observer_manager': None,
-        'config_manager': None,
-        'status': 'initializing'
-    }
-    
-    # Buat direktori yang diperlukan
+    # Buat direktori tambahan jika diperlukan
     if create_dirs:
-        for dir_path in create_dirs:
-            Path(dir_path).mkdir(parents=True, exist_ok=True)
+        for directory in create_dirs:
+            os.makedirs(directory, exist_ok=True)
     
-    # Daftar modul yang akan di-import
-    modules_to_import = [
-        ('config_manager', 'ConfigManager'),
-        ('environment_manager', 'EnvironmentManager'),
-        ('logger', 'get_logger'),
-        ('observer.observer_manager', 'ObserverManager')
-    ]
-    
-    # Import dengan error handling
-    for module_name, class_name in modules_to_import:
-        try:
-            module = importlib.import_module(f'smartcash.utils.{module_name}')
-            
-            if module_name == 'config_manager':
-                env['config_manager'] = getattr(module, class_name)
-            elif module_name == 'environment_manager':
-                env['env_manager'] = getattr(module, class_name)(logger=None)
-            elif module_name == 'logger':
-                env['logger'] = getattr(module, class_name)(cell_name)
-            elif module_name == 'observer.observer_manager':
-                env['observer_manager'] = getattr(module, class_name)(auto_register=True)
-        except ImportError as e:
-            if env['logger']:
-                env['logger'].warning(f"⚠️ Gagal import {module_name}: {str(e)}")
-    
-    # Load konfigurasi dengan fallback
+    # Setup komponen
+    env = {}
     config = {}
+    
+    # Setup logging, config dan observer
     try:
-        if config_path and Path(config_path).exists():
-            config = env['config_manager'].load_config(
-                filename=config_path,
-                fallback_to_pickle=True,
-                logger=env['logger'],
-                use_singleton=True
-            ) if env['config_manager'] else {}
-    except Exception as e:
-        if env['logger']:
-            env['logger'].warning(f"⚠️ Gagal load config: {str(e)}")
-    
-    # Update status
-    env['status'] = 'ready' if all(env.values()) else 'partial'
-    
-    # Tambahkan info cadangan jika modul utama gagal
-    if not all(env.values()):
-        env.update({
-            'fallback_mode': True,
-            'base_dir': str(Path.cwd()),
-            'python_version': sys.version
-        })
+        from smartcash.utils.logger import get_logger
+        from smartcash.utils.config_manager import get_config_manager
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        
+        # Setup logger
+        logger = get_logger(cell_name)
+        env['logger'] = logger
+        
+        # Setup config manager
+        config_manager = get_config_manager(logger)
+        env['config_manager'] = config_manager
+        
+        # Coba muat config dari Google Drive jika di Colab
+        if config_manager.is_colab and config_manager.drive_mounted:
+            config = config_manager.load_from_drive()
+        
+        # Jika belum ada konfigurasi, muat dari file lokal
+        if not config:
+            config = config_manager.load_config(config_path, logger=logger)
+        
+        # Setup observer manager
+        observer_manager = ObserverManager(auto_register=True)
+        env['observer_manager'] = observer_manager
+        
+        # Buat observer group berdasarkan nama cell
+        observer_group = f"{cell_name}_observers"
+        
+        # Bersihkan observer dari sesi sebelumnya
+        observer_manager.unregister_group(observer_group)
+        
+        # Setup cleanup
+        if register_cleanup:
+            def cleanup():
+                try:
+                    observer_manager.unregister_group(observer_group)
+                    logger.info(f"✅ Observer {observer_group} berhasil dibersihkan")
+                except Exception as e:
+                    logger.error(f"❌ Error saat cleanup: {str(e)}")
+            
+            atexit.register(cleanup)
+            env['cleanup'] = cleanup
+        
+    except ImportError as e:
+        print(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}")
     
     return env, config
 

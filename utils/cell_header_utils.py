@@ -15,7 +15,7 @@ def setup_notebook_environment(
     config_path: Optional[str] = None,
     create_dirs: Optional[List[str]] = None,
     register_cleanup: bool = True,
-    logging_config: Optional[Dict[str, Any]] = None
+    log_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Setup standard notebook environment with configuration and logging.
@@ -25,7 +25,7 @@ def setup_notebook_environment(
         config_path: Path to configuration file
         create_dirs: Additional directories to create
         register_cleanup: Auto-register cleanup handler
-        logging_config: Custom logging configuration
+        log_config: Custom logging configuration
     
     Returns:
         Tuple of (environment components, configuration)
@@ -54,8 +54,16 @@ def setup_notebook_environment(
         from smartcash.utils.config_manager import get_config_manager
         from smartcash.utils.observer.observer_manager import ObserverManager
         
+        # Configure LoggingFactory
+        default_logging_config = {
+            'logs_dir': 'logs',
+            'log_level': 'INFO',
+            'use_emojis': True,
+            'log_to_file': True,
+            'log_to_console': False
+        }
         # Merge default config with provided config
-        logging_config = logging_config or {}
+        logging_config = {**default_logging_config, **(log_config or {})}
         LoggingFactory.configure(logging_config)
 
         # Setup logger using LoggingFactory
@@ -68,7 +76,7 @@ def setup_notebook_environment(
         # Load configuration
         config = config_manager.load_config(
             filename=config_path, 
-            logger=LoggingFactory.get_logger('config')
+            logger=env['logger']
         )
         
         # Setup observer manager

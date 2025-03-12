@@ -1,82 +1,72 @@
 """
 File: smartcash/ui_handlers/dependency_installer.py
 Author: Refactored
-Deskripsi: Handler untuk UI instalasi dependencies SmartCash dengan implementasi ObserverManager.
+Deskripsi: Handler yang dioptimalkan untuk UI instalasi dependencies SmartCash.
 """
 
 import sys
 import subprocess
-import time
 import threading
 import importlib
-from IPython.display import display, HTML, clear_output
-from ipywidgets import widgets
+from IPython.display import display, clear_output, HTML
+
 def setup_dependency_handlers(ui_components):
     """Setup handler untuk komponen UI instalasi dependencies."""
-    # Inisialisasi dependencies jika tersedia
-    logger, observer_manager = None, None
-    
-    # Import utility functions
-    try:
-        from smartcash.utils.ui_utils import create_status_indicator
-        from smartcash.utils.logger import get_logger
-        from smartcash.utils.observer import EventDispatcher, EventTopics
-        from smartcash.utils.observer.observer_manager import ObserverManager
-        
-        logger = get_logger("dependency_installer")
-        observer_manager = ObserverManager(auto_register=True)
-        
-        # Unregister any existing observers to prevent duplication
-        observer_manager.unregister_group("dependency_observers")
-        has_utilities = True
-    except ImportError as e:
-        print(f"ℹ️ Menggunakan mode fallback: {str(e)}")
-        has_utilities = False
-    
     # State variables
     is_installing = False
     installation_thread = None
     
+    # Import utilities jika tersedia
+    try:
+        from smartcash.utils.ui_utils import create_status_indicator
+        from smartcash.utils.logger import get_logger
+        logger = get_logger("dependency_installer")
+        has_utils = True
+    except ImportError:
+        has_utils = False
+        
+        # Fallback untuk create_status_indicator jika utils tidak tersedia
+        def create_status_indicator(status, message):
+            status_styles = {
+                'success': {'icon': '✅', 'color': 'green'},
+                'warning': {'icon': '⚠️', 'color': 'orange'},
+                'error': {'icon': '❌', 'color': 'red'},
+                'info': {'icon': 'ℹ️', 'color': 'blue'}
+            }
+            style = status_styles.get(status, status_styles['info'])
+            return HTML(f"""
+            <div style="margin:5px 0;padding:8px 12px;border-radius:4px;background-color:#f8f9fa;">
+                <span style="color:{style['color']};font-weight:bold;">{style['icon']} {message}</span>
+            </div>
+            """)
+    
     # Handler untuk check all button
     def on_check_all(b):
         checkboxes = [child for child in ui_components['checkbox_grid'].children 
-                     if isinstance(child, type(ui_components['yolov5_req']))]
+                     if hasattr(child, 'value')]
         for checkbox in checkboxes:
             checkbox.value = True
     
     # Handler untuk uncheck all button
     def on_uncheck_all(b):
         checkboxes = [child for child in ui_components['checkbox_grid'].children 
-                     if isinstance(child, type(ui_components['yolov5_req']))]
+                     if hasattr(child, 'value')]
         for checkbox in checkboxes:
             checkbox.value = False
     
-    # Function to run pip install command
+    # Function untuk menjalankan pip install
     def run_pip_command(package, force_reinstall=False):
-        """Run pip install command and return result."""
         force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install {package} {force_flag}"
+        cmd = f"{sys.executable} -m pip install {package} {force_flag} -q"
         
         try:
-            # Log command to detailed logs
-            if 'log_output' in ui_components:
-                with ui_components['log_output']:
-                    print(f"Running: {cmd}")
-            
-            result = subprocess.run(
-                cmd, 
-                shell=True, 
-                check=True,
-                capture_output=True, 
-                text=True
-            )
+            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
             return True, result.stdout
         except subprocess.CalledProcessError as e:
             return False, e.stderr
     
-    # Special handlers for different package types
+    # Special handlers for package types
     def install_yolov5_requirements(force_reinstall=False):
-        """Install YOLOv5 requirements."""
         from pathlib import Path
         if Path("yolov5").exists() and Path("yolov5/requirements.txt").exists():
             force_flag = "--force-reinstall" if force_reinstall else ""
@@ -89,54 +79,8 @@ def setup_dependency_handlers(ui_components):
         else:
             return False, "YOLOv5 directory not found. Please clone the repository first."
     
-    def install_torch(force_reinstall=False):
-        """Install PyTorch."""
-        try:
-            # Check if running in Colab
-            import google.colab
-            is_colab = True
-        except ImportError:
-            is_colab = False
-        
-        if is_colab:
-            return True, "PyTorch is already installed in Google Colab"
-        
-        # Install PyTorch for local environment
-        force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install torch torchvision torchaudio {force_flag}"
-        try:
-            result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-            return True, "PyTorch installed successfully"
-        except subprocess.CalledProcessError as e:
-            return False, f"Error installing PyTorch: {e.stderr}"
-    
-    def install_smartcash_requirements(force_reinstall=False):
-        """Install core requirements for SmartCash."""
-        # Try to find smartcash/requirements.txt first
-        from pathlib import Path
-        req_path = Path("smartcash/requirements.txt")
-        
-        if req_path.exists():
-            force_flag = "--force-reinstall" if force_reinstall else ""
-            cmd = f"{sys.executable} -m pip install -r {req_path} {force_flag}"
-            try:
-                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                return True, "SmartCash requirements installed successfully"
-            except subprocess.CalledProcessError as e:
-                return False, f"Error installing SmartCash requirements: {e.stderr}"
-        else:
-            # Fallback to manual installation of core packages
-            force_flag = "--force-reinstall" if force_reinstall else ""
-            cmd = f"{sys.executable} -m pip install pyyaml termcolor tqdm roboflow python-dotenv ipywidgets {force_flag}"
-            try:
-                result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
-                return True, "SmartCash requirements installed successfully (fallback method)"
-            except subprocess.CalledProcessError as e:
-                return False, f"Error installing SmartCash requirements: {e.stderr}"
-    
-    # Check if a package is installed
+    # Check if package is installed
     def is_package_installed(package_name):
-        """Check if package is installed."""
         try:
             importlib.import_module(package_name)
             return True
@@ -145,137 +89,55 @@ def setup_dependency_handlers(ui_components):
     
     # Get installed package version
     def get_package_version(package_name):
-        """Get package version."""
         try:
             module = importlib.import_module(package_name)
             return getattr(module, "__version__", "Unknown")
         except (ImportError, AttributeError):
             return "Not installed"
     
-    # Create collapsible log output
-    def setup_logs_accordion():
-        # Check if accordion already exists in UI components
-        if 'logs_accordion' not in ui_components:
-            # Create log area for install details
-            log_output = widgets.Output(
-                layout={'max_height': '200px', 'overflow': 'auto', 'border': '1px solid #ddd'}
-            )
-            
-            # Create accordion for logs
-            logs_accordion = widgets.Accordion(
-                children=[log_output],
-                selected_index=None,  # Collapsed by default
-                layout={'margin': '10px 0'}
-            )
-            logs_accordion.set_title(0, "📋 Installation Logs")
-            
-            # Add to UI
-            ui_components['logs_accordion'] = logs_accordion
-            ui_components['log_output'] = log_output
-            
-            # Add to main UI container after status output
-            ui_container = ui_components['ui']
-            children_list = list(ui_container.children)
-            insert_index = -1  # Default to end
-            
-            # Find status output to insert after it
-            for i, child in enumerate(children_list):
-                if child is ui_components['status']:
-                    insert_index = i + 1
-                    break
-                    
-            # Insert accordion
-            if insert_index >= 0 and insert_index <= len(children_list):
-                new_children = children_list[:insert_index] + [logs_accordion] + children_list[insert_index:]
-                ui_container.children = tuple(new_children)
-            else:
-                # Fallback: append to end
-                ui_container.children = tuple(list(ui_container.children) + [logs_accordion])
-    
-    # Create processing indicator
-    def setup_processing_indicator():
-        if 'processing_indicator' not in ui_components:
-            indicator = widgets.HTML(
-                value='<div style="display:none;"><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>',
-                layout={'margin': '5px 0'}
-            )
-            ui_components['processing_indicator'] = indicator
-            
-            # Add to UI near the buttons
-            # First find the action container which should contain the install button
-            for key, widget in ui_components.items():
-                if isinstance(widget, widgets.HBox) and hasattr(widget, 'children'):
-                    if any(child is ui_components['install_button'] for child in widget.children):
-                        # This is the container with our buttons
-                        action_group = widget
-                        # Add the indicator
-                        children_list = list(action_group.children)
-                        action_group.children = tuple(children_list + [indicator])
-                        break
-    
-    # Setup logs accordion and processing indicator
-    setup_logs_accordion()
-    setup_processing_indicator()
-    
-    # Function to update UI state during operations
+    # Toggle UI state during installation
     def set_ui_busy_state(busy=True, clear_status=False):
-        """Set UI busy state - disable/enable buttons appropriately."""
         ui_components['install_button'].disabled = busy
         ui_components['check_button'].disabled = busy
         ui_components['check_all_button'].disabled = busy
         ui_components['uncheck_all_button'].disabled = busy
         
-        # Show/hide progress as needed
-        if busy:
-            ui_components['install_progress'].layout.visibility = 'visible'
-            ui_components['processing_indicator'].value = '<div><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>'
-            
-            # Ensure logs are visible during installation
-            if 'logs_accordion' in ui_components:
-                ui_components['logs_accordion'].selected_index = 0  # Expanded
-        else:
-            ui_components['install_progress'].layout.visibility = 'hidden'
-            ui_components['processing_indicator'].value = '<div style="display:none;"><span style="color:#e74c3c;"><i class="fa fa-circle-o-notch fa-spin"></i> Installation in progress...</span></div>'
-            
+        # Show/hide progress
+        ui_components['install_progress'].layout.visibility = 'visible' if busy else 'hidden'
+        
         # Clear status if requested
-        if clear_status:
+        if clear_status and busy:
             with ui_components['status']:
                 clear_output()
-                
-            # Also clear logs
-            if 'log_output' in ui_components:
-                with ui_components['log_output']:
-                    clear_output()
     
-    # Main handler function for installation
+    # Main installation function
     def install_packages():
         nonlocal is_installing
         is_installing = True
         
-        # Set UI to busy state and clear previous output
+        # Set UI to busy state
         set_ui_busy_state(True, clear_status=True)
         
         with ui_components['status']:
-            clear_output()
-            
             # Collect selected packages
             packages_to_install = []
             
-            # Check standard packages
-            package_checkers = [
-                (ui_components['yolov5_req'].value, "YOLOv5 requirements", install_yolov5_requirements),
-                (ui_components['torch_req'].value, "PyTorch", install_torch),
-                (ui_components['smartcash_req'].value, "SmartCash requirements", install_smartcash_requirements),
-                (ui_components['albumentations_req'].value, "albumentations", "albumentations"),
-                (ui_components['notebook_req'].value, "Notebook tools", "ipywidgets tqdm matplotlib"),
-                (ui_components['opencv_req'].value, "OpenCV", "opencv-python"),
-                (ui_components['matplotlib_req'].value, "Matplotlib", "matplotlib"),
-                (ui_components['pandas_req'].value, "Pandas", "pandas"),
-                (ui_components['seaborn_req'].value, "Seaborn", "seaborn")
-            ]
+            # Checkbox mappings
+            checkbox_map = {
+                'yolov5_req': ("YOLOv5 requirements", install_yolov5_requirements),
+                'torch_req': ("PyTorch", "torch torchvision torchaudio"),
+                'smartcash_req': ("SmartCash requirements", "pyyaml termcolor tqdm roboflow python-dotenv ipywidgets"),
+                'albumentations_req': ("Albumentations", "albumentations"),
+                'notebook_req': ("Notebook tools", "ipywidgets tqdm matplotlib"),
+                'opencv_req': ("OpenCV", "opencv-python"),
+                'matplotlib_req': ("Matplotlib", "matplotlib"),
+                'pandas_req': ("Pandas", "pandas"),
+                'seaborn_req': ("Seaborn", "seaborn")
+            }
             
-            for selected, name, pkg in package_checkers:
-                if selected:
+            # Add selected packages
+            for key, (name, pkg) in checkbox_map.items():
+                if key in ui_components and ui_components[key].value:
                     packages_to_install.append((name, pkg))
                     display(create_status_indicator("info", f"📋 {name} ditambahkan ke daftar instalasi"))
             
@@ -290,12 +152,12 @@ def setup_dependency_handlers(ui_components):
             if not packages_to_install:
                 display(create_status_indicator("warning", "⚠️ Tidak ada package yang dipilih untuk diinstall"))
                 is_installing = False
+                set_ui_busy_state(False)
                 return
             
-            # Initialize progress bar
+            # Setup progress bar
             ui_components['install_progress'].value = 0
             ui_components['install_progress'].max = len(packages_to_install)
-            ui_components['install_progress'].description = "0%"
             
             # Force reinstall flag
             force_reinstall = ui_components['force_reinstall'].value
@@ -304,9 +166,6 @@ def setup_dependency_handlers(ui_components):
             display(HTML("<h3>🚀 Memulai instalasi package</h3>"))
             
             for i, (name, pkg) in enumerate(packages_to_install):
-                if not is_installing:
-                    break
-                    
                 ui_components['install_progress'].value = i
                 progress_pct = int((i+1) * 100 / len(packages_to_install))
                 ui_components['install_progress'].description = f"{progress_pct}%"
@@ -316,7 +175,7 @@ def setup_dependency_handlers(ui_components):
                 # Install package
                 try:
                     if callable(pkg):
-                        # Custom function for special packages
+                        # Custom install function
                         success, message = pkg(force_reinstall)
                     else:
                         # Standard pip install
@@ -330,24 +189,16 @@ def setup_dependency_handlers(ui_components):
                     display(create_status_indicator("error", f"❌ Exception saat install {name}: {str(e)}"))
             
             # Installation complete
-            if is_installing:
-                ui_components['install_progress'].value = len(packages_to_install)
-                
-                # Show completion message
-                display(HTML(
-                    """<div style="padding: 10px; background: #d4edda; color: #155724; border-left: 4px solid #28a745; margin-top: 20px;">
-                        <h3 style="margin-top: 0;">✅ Instalasi Selesai</h3>
-                        <p>Semua package telah diproses. Gunakan tombol 'Check Installations' untuk memeriksa hasil instalasi.</p>
-                    </div>"""
-                ))
-            else:
-                display(create_status_indicator("warning", "⚠️ Instalasi dihentikan oleh pengguna"))
+            ui_components['install_progress'].value = len(packages_to_install)
+            display(HTML(
+                """<div style="padding:10px;background:#d4edda;color:#155724;border-left:4px solid #28a745;margin-top:20px;">
+                    <h3 style="margin-top:0;">✅ Instalasi Selesai</h3>
+                    <p>Semua package telah diproses. Gunakan tombol 'Check Installations' untuk memeriksa hasil instalasi.</p>
+                </div>"""
+            ))
             
             # Reset state
             is_installing = False
-            
-            # Restore UI state after brief delay (for visual effect)
-            time.sleep(1)
             set_ui_busy_state(False)
     
     # Handler for install button
@@ -365,9 +216,6 @@ def setup_dependency_handlers(ui_components):
     
     # Handler for check button
     def on_check(b):
-        # Set UI to busy state and clear previous output
-        set_ui_busy_state(True, clear_status=True)
-        
         with ui_components['status']:
             clear_output()
             
@@ -386,9 +234,7 @@ def setup_dependency_handlers(ui_components):
                 ('ipywidgets', 'ipywidgets'),
                 ('tqdm', 'tqdm'),
                 ('PyYAML', 'yaml'),
-                ('termcolor', 'termcolor'),
-                ('python-dotenv', 'dotenv'),
-                ('Roboflow', 'roboflow')
+                ('termcolor', 'termcolor')
             ]
             
             # Check packages
@@ -413,9 +259,6 @@ def setup_dependency_handlers(ui_components):
                         display(create_status_indicator("success", f"✅ CUDA is available"))
                 else:
                     display(create_status_indicator("info", "ℹ️ CUDA is not available, using CPU only"))
-            
-            # Restore UI state
-            set_ui_busy_state(False)
     
     # Register handlers
     ui_components['install_button'].on_click(on_install)
@@ -423,24 +266,12 @@ def setup_dependency_handlers(ui_components):
     ui_components['check_all_button'].on_click(on_check_all)
     ui_components['uncheck_all_button'].on_click(on_uncheck_all)
     
-    # Cleanup function
+    # Add cleanup function
     def cleanup():
         nonlocal is_installing
         is_installing = False
-        
-        # Restore UI state if needed
         set_ui_busy_state(False)
-        
-        if observer_manager:
-            try:
-                observer_manager.unregister_group("dependency_observers")
-                if logger:
-                    logger.info("✅ Observer untuk dependency installer telah dibersihkan")
-            except Exception as e:
-                if logger:
-                    logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
     
-    # Add cleanup function to ui_components
     ui_components['cleanup'] = cleanup
     
     return ui_components

@@ -6,7 +6,7 @@ Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan implementas
 
 from IPython.display import display, HTML, clear_output
 
-def setup_env_handlers(ui_components, config=None):
+def setup_env_config_handlers(ui_components, config=None):
     """
     Setup handlers untuk UI konfigurasi environment SmartCash.
     
@@ -294,5 +294,27 @@ exports/</pre>
     
     # Run initial detection
     detect_environment()
+    
+    # Function to create status indicator (for fallback mode)
+    if not has_dependencies:
+        def create_status_indicator(status, message):
+            """Buat status indicator dengan styling konsisten."""
+            status_styles = {
+                'success': {'icon': '✅', 'color': 'green'},
+                'warning': {'icon': '⚠️', 'color': 'orange'},
+                'error': {'icon': '❌', 'color': 'red'},
+                'info': {'icon': 'ℹ️', 'color': 'blue'}
+            }
+            
+            style = status_styles.get(status, status_styles['info'])
+            
+            return HTML(f"""
+            <div style="margin: 5px 0; padding: 8px 12px; 
+                        border-radius: 4px; background-color: #f8f9fa;">
+                <span style="color: {style['color']}; font-weight: bold;"> 
+                    {style['icon']} {message}
+                </span>
+            </div>
+            """)
     
     return ui_components

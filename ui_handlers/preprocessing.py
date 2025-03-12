@@ -6,6 +6,7 @@ Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan kode minimal 
 
 import threading
 import time
+import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
 
 def setup_preprocessing_handlers(ui_components, config=None):

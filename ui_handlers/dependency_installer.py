@@ -1,119 +1,78 @@
 """
 File: smartcash/ui_handlers/dependency_installer.py
-Author: Refactored
-Deskripsi: Handler untuk instalasi dependencies SmartCash dengan progress tracking dan pengurutan paket.
+Author: Alfrida Sabar (refactored)
+Deskripsi: Handler untuk instalasi dependencies SmartCash dengan pendekatan modular
 """
 
 import sys
 import subprocess
 import threading
-import importlib
 import queue
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict
 from IPython.display import display, clear_output, HTML
+from pathlib import Path
 
 def setup_dependency_installer_handlers(ui_components, config=None):
-    """
-    Setup handler untuk instalasi dependencies SmartCash.
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI untuk instalasi
-        config: Dictionary konfigurasi (opsional)
-    
-    Returns:
-        Dictionary UI components yang sudah diupdate dengan handler
-    """
-    # Thread-safe queue untuk komunikasi antar thread
+    """Setup handler untuk instalasi dependencies SmartCash."""
+    # Queue thread-safe untuk komunikasi
     status_queue = queue.Queue()
     
-    def create_status_indicator(status, message):
-        """Helper function untuk membuat indikator status dengan styling konsisten."""
-        status_styles = {
-            'success': {'icon': '✅', 'color': 'green'},
-            'warning': {'icon': '⚠️', 'color': 'orange'},
-            'error': {'icon': '❌', 'color': 'red'},
-            'info': {'icon': 'ℹ️', 'color': 'blue'}
+    # Mapping package groups
+    PACKAGE_GROUPS = {
+        'yolov5_req': {
+            'name': 'YOLOv5 Requirements',
+            'command': f"{sys.executable} -m pip install -r yolov5/requirements.txt"
+        },
+        'torch_req': {
+            'name': 'PyTorch',
+            'command': f"{sys.executable} -m pip install torch torchvision torchaudio"
+        },
+        'albumentations_req': {
+            'name': 'Albumentations',
+            'command': f"{sys.executable} -m pip install albumentations"
+        },
+        'notebook_req': {
+            'name': 'Notebook Packages',
+            'command': f"{sys.executable} -m pip install ipywidgets tqdm matplotlib"
+        },
+        'smartcash_req': {
+            'name': 'SmartCash Requirements',
+            'command': f"{sys.executable} -m pip install pyyaml termcolor python-dotenv roboflow"
+        },
+        'opencv_req': {
+            'name': 'OpenCV',
+            'command': f"{sys.executable} -m pip install opencv-python"
+        },
+        'matplotlib_req': {
+            'name': 'Matplotlib',
+            'command': f"{sys.executable} -m pip install matplotlib"
+        },
+        'pandas_req': {
+            'name': 'Pandas',
+            'command': f"{sys.executable} -m pip install pandas"
+        },
+        'seaborn_req': {
+            'name': 'Seaborn',
+            'command': f"{sys.executable} -m pip install seaborn"
         }
-        
-        style = status_styles.get(status, status_styles['info'])
-        
-        return HTML(f"""
-        <div style="margin: 5px 0; padding: 8px 12px; 
-                    border-radius: 4px; background-color: #f8f9fa;">
-            <span style="color: {style['color']}; font-weight: bold;"> 
-                {style['icon']} {message}
-            </span>
-        </div>
-        """)
+    }
     
-    def run_pip_install(packages, force_reinstall=False):
-        """Eksekusi pip install command dengan streaming output."""
-        cmd = [sys.executable, "-m", "pip", "install"]
-        
-        # Tambahkan flag force reinstall jika diperlukan
-        if force_reinstall:
-            cmd.append("--force-reinstall")
-        
-        # Handle requirements.txt secara khusus
-        if len(packages) == 1 and packages[0].endswith('.txt'):
-            cmd.extend(["-r", packages[0]])
-        else:
-            cmd.extend(packages)
-        
+    def run_pip_install(cmd: str, package_name: str) -> Tuple[bool, str]:
+        """Eksekusi perintah pip install."""
         try:
-            process = subprocess.Popen(
+            result = subprocess.run(
                 cmd, 
-                stdout=subprocess.PIPE, 
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                universal_newlines=True
+                shell=True, 
+                capture_output=True, 
+                text=True, 
+                check=True
             )
-            
-            # Collect output
-            output_lines = []
-            for line in process.stdout:
-                output_lines.append(line)
-            
-            # Wait for process to complete
-            return_code = process.wait()
-            
-            return return_code == 0, ''.join(output_lines)
-        except Exception as e:
-            return False, str(e)
-    
-    def update_ui_thread():
-        """Thread untuk memperbarui UI dari queue."""
-        while True:
-            try:
-                # Get status from queue with timeout
-                status = status_queue.get(timeout=1)
-                
-                # Update UI based on status type
-                if status['type'] == 'progress':
-                    ui_components['install_progress'].value = status['value']
-                    ui_components['install_progress'].description = status['description']
-                elif status['type'] == 'status':
-                    with ui_components['status']:
-                        display(create_status_indicator(
-                            status['status_type'], 
-                            status['message']
-                        ))
-                elif status['type'] == 'complete':
-                    # Reset UI state
-                    ui_components['install_button'].disabled = False
-                    ui_components['check_button'].disabled = False
-                    ui_components['check_all_button'].disabled = False
-                    ui_components['uncheck_all_button'].disabled = False
-                    ui_components['install_progress'].layout.visibility = 'hidden'
-                    break
-            except queue.Empty:
-                # Check if main thread is still alive
-                if not threading.main_thread().is_alive():
-                    break
+            return True, f"✅ {package_name} berhasil diinstall"
+        except subprocess.CalledProcessError as e:
+            return False, f"❌ Gagal install {package_name}: {e.stderr}"
     
     def install_packages_thread():
-        """Thread utama untuk proses instalasi."""
+        """Thread untuk instalasi packages."""
         try:
             # Reset progress
             status_queue.put({
@@ -122,35 +81,22 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 'description': 'Memulai instalasi...'
             })
             
-            # Package mapping dari kecil ke besar dengan metadata
-            package_map = {
-                'notebook_req': (['tqdm', 'ipywidgets'], 'Notebook tools'),
-                'smartcash_req': (['termcolor', 'pyyaml', 'python-dotenv'], 'SmartCash utils'),
-                'matplotlib_req': (['matplotlib'], 'Matplotlib'),
-                'pandas_req': (['pandas'], 'Pandas'), 
-                'seaborn_req': (['seaborn'], 'Seaborn'),
-                'opencv_req': (['opencv-python'], 'OpenCV'),
-                'albumentations_req': (['albumentations'], 'Albumentations'),
-                'torch_req': ([
-                    'torch', 'torchvision', 'torchaudio', 
-                    '--index-url', 'https://download.pytorch.org/whl/cu118'
-                ], 'PyTorch'),
-                'yolov5_req': (['yolov5/requirements.txt'], 'YOLOv5 requirements')
-            }
-            
             # Collect selected packages
             selected_packages = []
-            for key, (packages, name) in package_map.items():
+            for key, pkg_info in PACKAGE_GROUPS.items():
                 if ui_components[key].value:
-                    selected_packages.append((packages, name))
+                    selected_packages.append((pkg_info['command'], pkg_info['name']))
             
-            # Add custom packages
+            # Tambahkan custom packages
             custom_pkgs = ui_components['custom_packages'].value.strip().split('\n')
             custom_pkgs = [pkg.strip() for pkg in custom_pkgs if pkg.strip()]
-            if custom_pkgs:
-                selected_packages.append((custom_pkgs, 'Custom packages'))
+            for pkg in custom_pkgs:
+                selected_packages.append((
+                    f"{sys.executable} -m pip install {pkg}", 
+                    f"Custom package: {pkg}"
+                ))
             
-            # Check if anything to install
+            # Cek apakah ada package yang dipilih
             if not selected_packages:
                 status_queue.put({
                     'type': 'status',
@@ -160,9 +106,13 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 status_queue.put({'type': 'complete'})
                 return
             
-            # Install packages one by one
+            # Flag force reinstall
+            force_flag = "--force-reinstall" if ui_components['force_reinstall'].value else ""
+            
+            # Install packages
             total = len(selected_packages)
-            for i, (packages, name) in enumerate(selected_packages):
+            for i, (cmd, name) in enumerate(selected_packages):
+                # Update progress
                 progress = int((i / total) * 100)
                 status_queue.put({
                     'type': 'progress',
@@ -170,28 +120,23 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                     'description': f'Installing {name}...'
                 })
                 
+                # Pesan info
                 status_queue.put({
                     'type': 'status',
                     'status_type': 'info',
                     'message': f'🔄 Menginstall {name}...'
                 })
                 
-                # Run pip install
-                force = ui_components['force_reinstall'].value
-                success, output = run_pip_install(packages, force)
+                # Jalankan instalasi
+                full_cmd = f"{cmd} {force_flag}"
+                success, msg = run_pip_install(full_cmd, name)
                 
-                if success:
-                    status_queue.put({
-                        'type': 'status',
-                        'status_type': 'success',
-                        'message': f'{name} berhasil diinstall'
-                    })
-                else:
-                    status_queue.put({
-                        'type': 'status',
-                        'status_type': 'error',
-                        'message': f'Gagal install {name}: {output[:100]}...'
-                    })
+                # Update status
+                status_queue.put({
+                    'type': 'status',
+                    'status_type': 'success' if success else 'error',
+                    'message': msg
+                })
             
             # Complete
             status_queue.put({
@@ -215,6 +160,56 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 'message': f'Error: {str(e)}'
             })
             status_queue.put({'type': 'complete'})
+    
+    def update_ui_thread():
+        """Thread untuk update UI dari queue."""
+        while True:
+            try:
+                # Get status from queue
+                status = status_queue.get(timeout=1)
+                
+                # Update UI berdasarkan tipe status
+                if status['type'] == 'progress':
+                    ui_components['install_progress'].value = status['value']
+                    ui_components['install_progress'].description = status['description']
+                elif status['type'] == 'status':
+                    with ui_components['status']:
+                        display(create_status_indicator(
+                            status['status_type'], 
+                            status['message']
+                        ))
+                elif status['type'] == 'complete':
+                    # Reset UI state
+                    ui_components['install_button'].disabled = False
+                    ui_components['check_button'].disabled = False
+                    ui_components['check_all_button'].disabled = False
+                    ui_components['uncheck_all_button'].disabled = False
+                    ui_components['install_progress'].layout.visibility = 'hidden'
+                    break
+            except queue.Empty:
+                # Check if main thread is still alive
+                if not threading.main_thread().is_alive():
+                    break
+    
+    def create_status_indicator(status, message):
+        """Buat indikator status dengan styling konsisten."""
+        status_styles = {
+            'success': {'icon': '✅', 'color': 'green'},
+            'warning': {'icon': '⚠️', 'color': 'orange'},
+            'error': {'icon': '❌', 'color': 'red'},
+            'info': {'icon': 'ℹ️', 'color': 'blue'}
+        }
+        
+        style = status_styles.get(status, status_styles['info'])
+        
+        return HTML(f"""
+        <div style="margin: 5px 0; padding: 8px 12px; 
+                    border-radius: 4px; background-color: #f8f9fa;">
+            <span style="color: {style['color']}; font-weight: bold;"> 
+                {style['icon']} {message}
+            </span>
+        </div>
+        """)
     
     def on_install_click(b):
         """Handler untuk tombol install."""
@@ -244,29 +239,32 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     
     def on_check_click(b):
         """Handler untuk tombol cek instalasi."""
-        packages_to_check = [
-            ('PyTorch', 'torch'),
-            ('TorchVision', 'torchvision'),
-            ('OpenCV', 'cv2'),
-            ('Albumentations', 'albumentations'),
-            ('NumPy', 'numpy'),
-            ('Pandas', 'pandas'),
-            ('Matplotlib', 'matplotlib'),
-            ('Seaborn', 'seaborn'),
-            ('ipywidgets', 'ipywidgets'),
-            ('tqdm', 'tqdm'),
-            ('PyYAML', 'yaml'),
-            ('termcolor', 'termcolor')
-        ]
-        
         with ui_components['status']:
             clear_output()
-            display(create_status_indicator('info', '🔍 Memeriksa instalasi package...'))
+            display(HTML("<h3>🔍 Checking installed packages</h3>"))
+            
+            # List of packages to check
+            package_checks = [
+                ('PyTorch', 'torch'),
+                ('TorchVision', 'torchvision'),
+                ('OpenCV', 'cv2'),
+                ('Albumentations', 'albumentations'),
+                ('NumPy', 'numpy'),
+                ('Pandas', 'pandas'),
+                ('Matplotlib', 'matplotlib'),
+                ('Seaborn', 'seaborn'),
+                ('ipywidgets', 'ipywidgets'),
+                ('tqdm', 'tqdm'),
+                ('PyYAML', 'yaml'),
+                ('termcolor', 'termcolor'),
+                ('python-dotenv', 'dotenv'),
+                ('roboflow', 'roboflow')
+            ]
             
             # Check each package
-            for display_name, import_name in packages_to_check:
+            for display_name, import_name in package_checks:
                 try:
-                    module = importlib.import_module(import_name)
+                    module = __import__(import_name)
                     version = getattr(module, '__version__', 'Unknown')
                     display(create_status_indicator(
                         'success', 
@@ -297,20 +295,12 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     
     def on_check_all(b):
         """Handler untuk tombol check all."""
-        for key in [
-            'yolov5_req', 'torch_req', 'smartcash_req', 
-            'albumentations_req', 'notebook_req', 'opencv_req',
-            'matplotlib_req', 'pandas_req', 'seaborn_req'
-        ]:
+        for key in PACKAGE_GROUPS.keys():
             ui_components[key].value = True
     
     def on_uncheck_all(b):
         """Handler untuk tombol uncheck all."""
-        for key in [
-            'yolov5_req', 'torch_req', 'smartcash_req', 
-            'albumentations_req', 'notebook_req', 'opencv_req',
-            'matplotlib_req', 'pandas_req', 'seaborn_req'
-        ]:
+        for key in PACKAGE_GROUPS.keys():
             ui_components[key].value = False
     
     # Register handlers
@@ -319,10 +309,9 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     ui_components['check_all_button'].on_click(on_check_all)
     ui_components['uncheck_all_button'].on_click(on_uncheck_all)
     
-    # Add cleanup function
+    # Cleanup function
     def cleanup():
-        """Clean up any resources."""
-        # Empty queue
+        """Bersihkan resources."""
         while not status_queue.empty():
             status_queue.get()
     

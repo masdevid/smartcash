@@ -7,7 +7,7 @@ import sys
 import subprocess
 import threading
 import importlib
-from typing import List, Tuple, Optional, Dict
+from typing import List, Tuple, Optional, Dict, Any
 from IPython.display import display, clear_output, HTML
 
 def setup_dependency_handlers(ui_components):

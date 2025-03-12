@@ -38,7 +38,6 @@ class DatasetUtils:
                     if i < len(layer_config['classes']):
                         self.class_to_name[cls_id] = layer_config['classes'][i]
         
-        self.logger.info(f"🔧 DatasetUtils diinisialisasi untuk: {self.data_dir}")
     
     def get_split_path(self, split: str) -> Path:
         """Dapatkan path untuk split dataset tertentu."""
@@ -160,7 +159,7 @@ class DatasetUtils:
     
     def get_split_statistics(self, splits: List[str] = DEFAULT_SPLITS) -> Dict[str, Dict[str, int]]:
         """Dapatkan statistik dasar untuk semua split dataset."""
-        self.logger.info("📊 Mengumpulkan statistik dataset")
+        # self.logger.info("📊 Mengumpulkan statistik dataset")
         
         stats = {}
         for split in splits:
@@ -180,12 +179,6 @@ class DatasetUtils:
                 'status': 'valid' if image_count > 0 and label_count > 0 else 'empty'
             }
         
-        log_lines = ["📊 Ringkasan dataset:"] + [
-            f"   • {split.capitalize()}: {s.get('images', 0)} gambar, {s.get('labels', 0)} label"
-            for split, s in stats.items()
-        ]
-        
-        self.logger.info("\n".join(log_lines))
         return stats
     
     def backup_directory(self, source_dir: Union[str, Path], suffix: Optional[str] = None) -> Optional[Path]:

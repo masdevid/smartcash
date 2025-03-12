@@ -111,9 +111,7 @@ class ConfigManager:
                 if os.path.exists(file_path):
                     with open(file_path, 'r') as f:
                         config = yaml.safe_load(f)
-                    if logger:
-                        logger.info(f"📝 Configuration loaded from {file_path}")
-                    
+                      
                     # Save to singleton if using
                     if use_singleton:
                         cm.config = config
@@ -134,9 +132,6 @@ class ConfigManager:
                     try:
                         with open(pickle_path, 'rb') as f:
                             config = pickle.load(f)
-                        if logger:
-                            logger.info(f"📝 Configuration loaded from {pickle_path}")
-                        
                         # Save to singleton if using
                         if use_singleton:
                             cm.config = config

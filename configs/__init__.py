@@ -2,6 +2,6 @@
 # Author: Alfrida Sabar
 # Deskripsi: Package untuk konfigurasi SmartCash
 
-from smartcash.configs.config_manager import ConfigManager, get_config_manager
+from smartcash.utils.config_manager import ConfigManager, get_config_manager
 
 __all__ = ['ConfigManager', 'get_config_manager']

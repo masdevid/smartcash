@@ -1,5 +1,5 @@
 """
-File: smartcash/smartcash/ui_handlers/training_execution_handlers.py
+File: smartcash/smartcash/ui_handlers/model_training_handlers.py
 Author: Alfrida Sabar
 Deskripsi: Handler untuk komponen UI eksekusi training model, menangani proses training,
           visualisasi progress, dan callbacks.

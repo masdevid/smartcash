@@ -251,7 +251,7 @@ smartcash/
 │   ├── model_playground_handlers.py
 │   ├── evaluation_handlers.py
 │   ├── research_handlers.py
-│   ├── training_execution_handlers.py
+│   ├── model_training_handlers.py
 │   ├── training_pipeline_handlers.py
 │   ├── training_config_handlers.py
 │   └── repository_handlers.py

@@ -13,7 +13,7 @@ from smartcash.utils.ui_utils import (
     styled_html
 )
 
-def create_training_execution_ui():
+def create_model_training_ui():
     """
     Buat komponen UI untuk eksekusi training model.
     

@@ -14,7 +14,7 @@ from pathlib import Path
 
 from smartcash.utils.ui_utils import create_status_indicator, create_metric_display
 
-def setup_training_execution_handlers(ui_components, config=None):
+def setup_model_training_handlers(ui_components, config=None):
     """Setup handlers untuk komponen UI eksekusi training model."""
     # Inisialisasi dependencies
     logger = None
@@ -31,9 +31,9 @@ def setup_training_execution_handlers(ui_components, config=None):
         from smartcash.handlers.checkpoint import CheckpointManager
         from smartcash.utils.observer import EventTopics, EventDispatcher
         
-        logger = get_logger("training_execution")
+        logger = get_logger("model_training")
         observer_manager = ObserverManager(auto_register=True)
-        observer_group = "training_execution_observers"
+        observer_group = "model_training_observers"
         
         # Clean up any existing observers from previous runs
         observer_manager.unregister_group(observer_group)

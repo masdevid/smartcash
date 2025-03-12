@@ -10,7 +10,7 @@ from pathlib import Path
 import copy
 import re
 
-from smartcash.utils.logger import get_logger
+from smartcash.utils.logger import global_logger
 from smartcash.exceptions.base import ConfigError
 
 class ConfigManager:
@@ -33,7 +33,7 @@ class ConfigManager:
             defaults: Konfigurasi default (opsional)
             env_prefix: Prefix untuk variabel lingkungan
         """
-        self.logger = get_logger("config_manager")
+        self.logger = global_logger("config_manager")
         self.env_prefix = env_prefix
         
         # Konfigurasi default minimal

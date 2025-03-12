@@ -1,31 +1,29 @@
 """
 File: smartcash/utils/environment_manager.py
-Author: Alfrida Sabar
-Deskripsi: Centralized environment manager yang mendeteksi dan menghandle environment runtime (Colab/local)
-          serta integrasi dengan Google Drive.
+Refactored environment manager with improved singleton and drive integration
 """
 
 import os
 import sys
 import shutil
 from pathlib import Path
-from typing import Tuple, Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, Tuple
 
 class EnvironmentManager:
     """
-    Singleton manager untuk environment detection dan setup.
+    Centralized singleton manager for environment detection and setup.
     
-    Menangani:
-    - Deteksi Google Colab
-    - Mount Google Drive
-    - Path resolution untuk different environments
-    - Setup directories untuk project
+    Handles:
+    - Google Colab detection
+    - Google Drive mounting
+    - Path resolution for different environments
+    - Project directory setup
     """
     
     _instance = None
     
     def __new__(cls, *args, **kwargs):
-        """Implement singleton pattern."""
+        """Singleton pattern implementation."""
         if cls._instance is None:
             cls._instance = super(EnvironmentManager, cls).__new__(cls)
             cls._instance._initialized = False
@@ -36,10 +34,10 @@ class EnvironmentManager:
         Initialize EnvironmentManager.
         
         Args:
-            base_dir: Base directory for the project (optional)
-            logger: Logger to use for logging
+            base_dir: Base project directory
+            logger: Logging instance
         """
-        # Only initialize once
+        # Prevent re-initialization
         if self._initialized:
             return
             
@@ -49,12 +47,15 @@ class EnvironmentManager:
         self._drive_path = None
         
         # Set base directory
-        if base_dir:
-            self._base_dir = Path(base_dir)
-        elif self._in_colab:
-            self._base_dir = Path('/content')
-        else:
-            self._base_dir = Path(os.getcwd())
+        self._base_dir = (
+            Path(base_dir) if base_dir 
+            else Path('/content') if self._in_colab 
+            else Path(os.getcwd())
+        )
+        
+        # Auto-mount drive if in Colab
+        if self._in_colab:
+            self._check_drive_mounted()
             
         self._initialized = True
     
@@ -78,6 +79,60 @@ class EnvironmentManager:
         """Check if Google Drive is mounted."""
         return self._drive_mounted
     
+    def _check_drive_mounted(self) -> bool:
+        """Check and mount Google Drive if possible."""
+        drive_path = Path('/content/drive/MyDrive/SmartCash')
+        if os.path.exists('/content/drive/MyDrive'):
+            os.makedirs(drive_path, exist_ok=True)
+            self._drive_mounted = True
+            self._drive_path = drive_path
+            return True
+        return False
+    
+    def mount_drive(self, mount_path: Optional[str] = None) -> Tuple[bool, str]:
+        """
+        Mount Google Drive if in Colab.
+        
+        Args:
+            mount_path: Custom mount path (optional)
+            
+        Returns:
+            Tuple of (success, message)
+        """
+        if not self._in_colab:
+            msg = "⚠️ Google Drive can only be mounted in Google Colab"
+            if self._logger:
+                self._logger.warning(msg)
+            return False, msg
+        
+        try:
+            # Already mounted
+            if self._drive_mounted:
+                return True, "✅ Google Drive already mounted"
+            
+            # Import and mount
+            from google.colab import drive
+            drive.mount('/content/drive')
+            
+            # Set drive path
+            mount_path = mount_path or '/content/drive/MyDrive/SmartCash'
+            self._drive_path = Path(mount_path)
+            os.makedirs(self._drive_path, exist_ok=True)
+            
+            self._drive_mounted = True
+            
+            msg = f"✅ Google Drive mounted at {self._drive_path}"
+            if self._logger:
+                self._logger.info(msg)
+            
+            return True, msg
+        
+        except Exception as e:
+            msg = f"❌ Drive mount error: {str(e)}"
+            if self._logger:
+                self._logger.error(msg)
+            return False, msg
+    
     def get_path(self, relative_path: str) -> Path:
         """
         Get absolute path based on environment.
@@ -86,87 +141,33 @@ class EnvironmentManager:
             relative_path: Relative path from base directory
             
         Returns:
-            Path object for the requested path
+            Absolute path
         """
         return self._base_dir / relative_path
-    
-    def mount_drive(self, mount_path: str = '/content/drive/MyDrive/SmartCash') -> Tuple[bool, str]:
-        """
-        Mount Google Drive if in Colab.
-        
-        Args:
-            mount_path: Path to mount drive to
-            
-        Returns:
-            Tuple (success, message)
-        """
-        if not self._in_colab:
-            msg = "⚠️ Google Drive hanya dapat di-mount di Google Colab"
-            if self._logger:
-                self._logger.warning(msg)
-            return False, msg
-        
-        try:
-            # Check if drive already mounted
-            if os.path.exists('/content/drive/MyDrive'):
-                self._drive_mounted = True
-                self._drive_path = Path(mount_path)
-                os.makedirs(self._drive_path, exist_ok=True)
-                msg = "✅ Google Drive sudah di-mount"
-                if self._logger:
-                    self._logger.info(msg)
-                return True, msg
-            
-            # Mount drive
-            from google.colab import drive
-            drive.mount('/content/drive')
-            
-            # Create project directory
-            self._drive_path = Path(mount_path)
-            os.makedirs(self._drive_path, exist_ok=True)
-            
-            self._drive_mounted = True
-            msg = f"✅ Google Drive berhasil di-mount di {mount_path}"
-            if self._logger:
-                self._logger.success(msg)
-            return True, msg
-            
-        except Exception as e:
-            msg = f"❌ Error saat mount Google Drive: {str(e)}"
-            if self._logger:
-                self._logger.error(msg)
-            return False, msg
     
     def setup_directories(self, use_drive: bool = False) -> Dict[str, int]:
         """
         Create project directory structure.
         
         Args:
-            use_drive: Whether to use Google Drive for storage
+            use_drive: Use Google Drive for storage if available
             
         Returns:
-            Dictionary with statistics about created directories
+            Directory creation statistics
         """
-        # Standard directories to create
+        # Standard project directories
         directories = [
-            "data/train/images",
-            "data/train/labels",
-            "data/valid/images",
-            "data/valid/labels",
-            "data/test/images",
-            "data/test/labels",
-            "configs",
-            "runs/train/weights",
-            "logs",
-            "exports"
+            "data/train/images", "data/train/labels",
+            "data/valid/images", "data/valid/labels", 
+            "data/test/images", "data/test/labels",
+            "configs", "runs/train/weights", 
+            "logs", "exports"
         ]
         
-        # Determine base directory for creating structure
-        if use_drive and self._drive_mounted:
-            base = self._drive_path
-        else:
-            base = self._base_dir
-            
+        # Determine base directory
+        base = (self._drive_path if use_drive and self._drive_mounted 
+                else self._base_dir)
+        
         # Create directories
         stats = {
             'created': 0,
@@ -174,23 +175,19 @@ class EnvironmentManager:
             'error': 0
         }
         
-        for d in directories:
+        for dir_path in directories:
+            full_path = base / dir_path
             try:
-                dir_path = base / d
-                if not dir_path.exists():
-                    os.makedirs(dir_path, exist_ok=True)
-                    stats['created'] += 1
-                else:
-                    stats['existing'] += 1
+                full_path.mkdir(parents=True, exist_ok=True)
+                stats['created' if full_path.exists() else 'error'] += 1
             except Exception as e:
                 stats['error'] += 1
                 if self._logger:
-                    self._logger.warning(f"⚠️ Error creating directory {d}: {str(e)}")
+                    self._logger.warning(f"⚠️ Directory creation error: {dir_path} - {str(e)}")
         
-        # Log results
         if self._logger:
-            self._logger.info(f"📁 Directory setup statistics: {stats['created']} created, {stats['existing']} existing")
-            
+            self._logger.info(f"📁 Directory setup: {stats['created']} created, {stats['existing']} existing")
+        
         return stats
     
     def create_symlinks(self) -> Dict[str, int]:
@@ -198,15 +195,15 @@ class EnvironmentManager:
         Create symlinks from local to Google Drive directories.
         
         Returns:
-            Dictionary with statistics about created symlinks
+            Symlink creation statistics
         """
         if not self._drive_mounted:
-            msg = "⚠️ Google Drive tidak di-mount, tidak dapat membuat symlinks"
+            msg = "⚠️ Google Drive not mounted, cannot create symlinks"
             if self._logger:
                 self._logger.warning(msg)
             return {'created': 0, 'existing': 0, 'error': 0}
         
-        # Define symlinks to create (local -> drive)
+        # Symlink mappings
         symlinks = {
             'data': self._drive_path / 'data',
             'configs': self._drive_path / 'configs', 
@@ -220,123 +217,77 @@ class EnvironmentManager:
             'error': 0
         }
         
-        for local_path, target_path in symlinks.items():
+        for local_name, target_path in symlinks.items():
             try:
-                # Ensure target directory exists
-                os.makedirs(target_path, exist_ok=True)
+                local_path = self._base_dir / local_name
                 
-                # Create symlink if it doesn't exist
-                local_path_obj = self._base_dir / local_path
-                if not local_path_obj.exists():
-                    os.symlink(target_path, local_path_obj)
+                # Ensure target directory exists
+                target_path.mkdir(parents=True, exist_ok=True)
+                
+                # Create symlink if not exists
+                if not local_path.exists():
+                    local_path.symlink_to(target_path)
                     stats['created'] += 1
                     if self._logger:
-                        self._logger.info(f"🔗 Created symlink: {local_path} -> {target_path}")
+                        self._logger.info(f"🔗 Symlink created: {local_name} -> {target_path}")
                 else:
                     stats['existing'] += 1
             except Exception as e:
                 stats['error'] += 1
                 if self._logger:
-                    self._logger.warning(f"⚠️ Error creating symlink {local_path}: {str(e)}")
+                    self._logger.warning(f"⚠️ Symlink creation error: {local_name} - {str(e)}")
         
         return stats
     
-    def get_directory_tree(self, max_depth: int = 3) -> str:
-        """
-        Generate directory tree structure as HTML.
-        
-        Args:
-            max_depth: Maximum depth to display
-            
-        Returns:
-            HTML string representing directory tree
-        """
-        def _get_tree(directory, prefix='', is_last=True, depth=0):
-            if depth > max_depth:
-                return ""
-                
-            base_name = os.path.basename(directory)
-            result = ""
-            
-            if depth > 0:
-                # Add connector line and directory name
-                result += f"{prefix}{'└── ' if is_last else '├── '}<span style='color: #3498db;'>{base_name}</span><br/>"
-            else:
-                # Root directory
-                result += f"<span style='color: #2980b9; font-weight: bold;'>{base_name}</span><br/>"
-                
-            # Update prefix for children
-            if depth > 0:
-                prefix += '    ' if is_last else '│   '
-                
-            # List directory contents
-            try:
-                items = list(sorted([x for x in Path(directory).iterdir()]))
-                
-                # Only show a subset of items if there are too many
-                if len(items) > 10 and depth > 0:
-                    items = items[:10]
-                    show_ellipsis = True
-                else:
-                    show_ellipsis = False
-                    
-                for i, item in enumerate(items):
-                    if item.is_dir():
-                        # Recursively process subdirectories
-                        result += _get_tree(str(item), prefix, i == len(items) - 1 and not show_ellipsis, depth + 1)
-                    elif depth < max_depth:
-                        # Add file name
-                        result += f"{prefix}{'└── ' if i == len(items) - 1 and not show_ellipsis else '├── '}{item.name}<br/>"
-                        
-                if show_ellipsis:
-                    result += f"{prefix}└── <i>... dan item lainnya</i><br/>"
-            except Exception:
-                result += f"{prefix}└── <i>Error saat membaca direktori</i><br/>"
-                
-            return result
-        
-        base_dir = self._drive_path if self._drive_mounted else self._base_dir
-        html = "<div style='font-family: monospace;'>"
-        html += _get_tree(base_dir)
-        html += "</div>"
-        
-        return html
-    
     def get_system_info(self) -> Dict[str, Any]:
         """
-        Get system information.
+        Get comprehensive system information.
         
         Returns:
-            Dictionary with system information
+            System details dictionary
         """
         info = {
-            'in_colab': self._in_colab,
+            'environment': 'Colab' if self._in_colab else 'Local',
+            'base_directory': str(self._base_dir),
             'drive_mounted': self._drive_mounted,
-            'base_dir': str(self._base_dir),
-            'python_version': sys.version,
+            'python_version': sys.version
         }
         
-        # Check if GPU is available (using torch if available)
+        # GPU detection
         try:
             import torch
-            info['cuda_available'] = torch.cuda.is_available()
-            if info['cuda_available']:
-                info['cuda_device'] = torch.cuda.get_device_name(0)
-                info['cuda_memory'] = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            info['cuda'] = {
+                'available': torch.cuda.is_available(),
+                'device_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+                'memory_gb': torch.cuda.get_device_properties(0).total_memory / (1024**3) if torch.cuda.is_available() else None
+            }
         except ImportError:
-            info['cuda_available'] = False
+            info['cuda'] = {'available': False}
         
         return info
     
     def _detect_colab(self) -> bool:
         """
-        Detect if running in Google Colab.
+        Detect Google Colab environment.
         
         Returns:
-            Boolean indicating if running in Colab
+            Whether running in Colab
         """
         try:
             import google.colab
             return True
         except ImportError:
             return False
+
+def get_environment_manager(base_dir: Optional[str] = None, logger = None) -> EnvironmentManager:
+    """
+    Get singleton EnvironmentManager instance.
+    
+    Args:
+        base_dir: Base project directory
+        logger: Logging instance
+    
+    Returns:
+        EnvironmentManager singleton
+    """
+    return EnvironmentManager(base_dir, logger)

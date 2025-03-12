@@ -1,109 +1,97 @@
 """
 File: smartcash/utils/cell_header_utils.py
-Author: Refactored
-Deskripsi: Utility functions untuk setup Jupyter/Colab notebook cells secara konsisten
+Utility functions for consistent Jupyter/Colab notebook cell setup
 """
 
 import sys
-import gc
 import os
-import atexit
 import importlib
-import time
+import atexit
 from pathlib import Path
-from typing import Dict, Tuple, Optional, Any, List, Union
-from IPython.display import display, HTML
+from typing import Dict, Tuple, Optional, Any, List
 
 def setup_notebook_environment(
     cell_name: str,
-    config_path: str = "configs/base_config.yaml",
+    config_path: Optional[str] = None,
     create_dirs: Optional[List[str]] = None,
-    register_cleanup: bool = True
+    register_cleanup: bool = True,
+    log_level: str = 'INFO'
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Setup environment standar untuk cell notebook:
-    - Menambahkan smartcash ke path
-    - Membuat direktori yang diperlukan
-    - Setting up logger
-    - Loading dan sinkronisasi konfigurasi
-    - Setup dan cleanup observer manager
+    Setup standard notebook environment with configuration and logging.
     
     Args:
-        cell_name: Nama unik untuk cell (untuk logging dan observer group)
-        config_path: Path ke file konfigurasi
-        create_dirs: List direktori yang perlu dibuat
-        register_cleanup: Register cleanup handler otomatis
+        cell_name: Unique cell identifier
+        config_path: Path to configuration file
+        create_dirs: Additional directories to create
+        register_cleanup: Auto-register cleanup handler
+        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
     
     Returns:
-        Tuple (environment components, config)
+        Tuple of (environment components, configuration)
     """
-    # Pastikan smartcash ada di path
+    # Ensure smartcash is in path
     if not any('smartcash' in p for p in sys.path):
         sys.path.append('.')
     
-    # Buat direktori standar
+    # Create standard directories
     os.makedirs("configs", exist_ok=True)
     os.makedirs("smartcash/ui_components", exist_ok=True)
     os.makedirs("smartcash/ui_handlers", exist_ok=True)
     
-    # Buat direktori tambahan jika diperlukan
+    # Create additional directories
     if create_dirs:
         for directory in create_dirs:
             os.makedirs(directory, exist_ok=True)
     
-    # Setup komponen
+    # Initialize components
     env = {}
     config = {}
     
-    # Setup logging, config dan observer
     try:
-        from smartcash.utils.logger import get_logger
+        # Dynamic imports to prevent early dependency loading
+        from smartcash.utils.logging_factory import LoggingFactory
         from smartcash.utils.config_manager import get_config_manager
         from smartcash.utils.observer.observer_manager import ObserverManager
         
-        # Setup logger
-        logger = get_logger(cell_name)
-        env['logger'] = logger
+        # Setup logger using LoggingFactory
+        env['logger'] = LoggingFactory.get_logger(
+            name=cell_name,
+            log_level=log_level,
+            log_to_file=True,
+            log_to_console=True
+        )
         
         # Setup config manager
-        config_manager = get_config_manager(logger)
+        config_manager = get_config_manager(env['logger'])
         env['config_manager'] = config_manager
         
-        # Coba muat config dari Google Drive jika di Colab
-        if config_manager.is_colab and config_manager.drive_mounted:
-            config = config_manager.load_from_drive()
-        
-        # Jika belum ada konfigurasi, muat dari file lokal
-        if not config:
-            config = config_manager.load_config(config_path, logger=logger)
+        # Load configuration
+        config = config_manager.load_config(
+            filename=config_path, 
+            logger=env['logger']
+        )
         
         # Setup observer manager
         observer_manager = ObserverManager(auto_register=True)
         env['observer_manager'] = observer_manager
         
-        # Buat observer group berdasarkan nama cell
-        observer_group = f"{cell_name}_observers"
-        
-        # Bersihkan observer dari sesi sebelumnya
-        observer_manager.unregister_group(observer_group)
-        
-        # Setup cleanup
+        # Create cleanup function
         if register_cleanup:
             def cleanup():
                 try:
-                    observer_manager.unregister_group(observer_group)
-                    logger.info(f"✅ Observer {observer_group} berhasil dibersihkan")
+                    observer_manager.unregister_all()
+                    env['logger'].info("✅ Cell resources cleaned up")
                 except Exception as e:
-                    logger.error(f"❌ Error saat cleanup: {str(e)}")
+                    env['logger'].error(f"❌ Cleanup error: {str(e)}")
             
             atexit.register(cleanup)
             env['cleanup'] = cleanup
         
     except ImportError as e:
-        print(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}")
+        print(f"⚠️ Some components unavailable: {str(e)}")
     
     return env, config
-
 
 def setup_ui_component(
     env: Dict[str, Any], 
@@ -111,111 +99,102 @@ def setup_ui_component(
     component_name: str
 ) -> Dict[str, Any]:
     """
-    Setup UI component dan handler-nya dengan penanganan exception.
+    Setup UI component and its handler.
     
     Args:
-        env: Environment dictionary dari setup_notebook_environment
-        config: Konfigurasi yang akan digunakan
-        component_name: Nama komponen yang akan dimuat
-        
+        env: Environment dictionary from setup_notebook_environment
+        config: Configuration dictionary
+        component_name: Name of UI component to load
+    
     Returns:
-        Dictionary UI components
+        Dictionary of UI components
     """
-    # Default empty UI
-    fallback_ui = {'ui': HTML("<h3>⚠️ Komponen UI tidak tersedia</h3><p>Pastikan semua modul terinstall dengan benar</p>")}
+    # Fallback UI for import errors
+    fallback_ui = {
+        'ui': f'<h3>⚠️ {component_name.capitalize()} UI Unavailable</h3>'
+    }
     
     try:
-        # Dinamis import UI component dan handler
-        ui_module_name = f"smartcash.ui_components.{component_name}"
-        handler_module_name = f"smartcash.ui_handlers.{component_name}"
+        # Dynamically import UI component and handler
+        ui_module = importlib.import_module(f"smartcash.ui_components.{component_name}")
+        handler_module = importlib.import_module(f"smartcash.ui_handlers.{component_name}")
         
-        # Import UI component module
-        ui_module = importlib.import_module(ui_module_name)
+        # Get creation and setup functions
         ui_create_func = getattr(ui_module, f"create_{component_name}_ui")
-        
-        # Import handler module
-        handler_module = importlib.import_module(handler_module_name)
         handler_setup_func = getattr(handler_module, f"setup_{component_name}_handlers")
         
-        # Buat dan setup UI component
+        # Create and setup UI
         ui_components = ui_create_func()
         ui_components = handler_setup_func(ui_components, config)
         
-        # Register cleanup jika belum ada
+        # Add cleanup to atexit if available
         if 'cleanup' in ui_components and callable(ui_components['cleanup']):
-            if env.get('observer_manager') and hasattr(env['observer_manager'], 'unregister_group'):
-                # Tambahkan ke daftar cleanup bersama observer manager
-                old_cleanup = ui_components['cleanup']
-                
-                def combined_cleanup():
-                    old_cleanup()
-                    env['observer_manager'].unregister_group(f"{env['cell_name']}_observers")
-                
-                ui_components['cleanup'] = combined_cleanup
-                atexit.register(ui_components['cleanup'])
-            else:
-                # Register ke atexit langsung
-                atexit.register(ui_components['cleanup'])
+            atexit.register(ui_components['cleanup'])
         
         # Log success
         if env.get('logger'):
-            env['logger'].info(f"✅ UI Component {component_name} berhasil disetup")
+            env['logger'].info(f"✅ {component_name.capitalize()} UI setup complete")
         
         return ui_components
     
     except Exception as e:
-        # Log error
+        # Log and return fallback
         if env.get('logger'):
-            env['logger'].error(f"❌ Error saat setup UI component {component_name}: {str(e)}")
-        else:
-            print(f"❌ Error saat setup UI component {component_name}: {str(e)}")
-        
-        # Return fallback UI
+            env['logger'].error(f"❌ {component_name.capitalize()} UI setup failed: {str(e)}")
         return fallback_ui
 
 def display_ui(ui_components: Dict[str, Any]) -> None:
     """
-    Display UI component dengan penanganan error.
+    Display UI component safely.
     
     Args:
-        ui_components: Dictionary UI components dari setup_ui_component
+        ui_components: Dictionary of UI components
     """
     try:
+        from IPython.display import display, HTML
+        
         if 'ui' in ui_components:
             display(ui_components['ui'])
         else:
-            display(HTML("<h3>⚠️ Komponen UI tidak valid</h3><p>Tidak ditemukan key 'ui' dalam ui_components</p>"))
+            display(HTML("<h3>⚠️ Invalid UI Components</h3>"))
+    
+    except ImportError:
+        print("❌ IPython display not available")
     except Exception as e:
-        display(HTML(f"<h3>❌ Error saat menampilkan UI</h3><p>{str(e)}</p>"))
+        print(f"❌ UI Display Error: {str(e)}")
 
-
-def create_minimal_cell(component_name: str, config_path: Optional[str] = None) -> str:
+def create_minimal_cell(
+    component_name: str, 
+    config_path: Optional[str] = None,
+    log_level: str = 'INFO'
+) -> str:
     """
-    Buat kode minimal untuk cell notebook.
+    Generate minimal notebook cell code.
     
     Args:
-        component_name: Nama komponen UI
-        config_path: Path ke file konfigurasi
-        
-    Returns:
-        String kode cell
-    """
-    config_import = f"config_path=\"{config_path}\"" if config_path else "config_path=None"
+        component_name: UI component name
+        config_path: Optional configuration file path
+        log_level: Logging level for environment setup
     
-    return f"""# Cell - {component_name.capitalize()}
-# Deskripsi: Komponen UI untuk {component_name}
-
+    Returns:
+        Minimal cell setup code
+    """
+    config_line = f'config_path="{config_path}"' if config_path else 'config_path=None'
+    log_level_line = f'log_level="{log_level}"'
+    
+    return f"""# Cell: {component_name.capitalize()}
 from smartcash.utils.cell_header_utils import setup_notebook_environment, setup_ui_component, display_ui
 
 # Setup environment
 env, config = setup_notebook_environment(
     cell_name="{component_name}",
-    {config_import}
+    {config_line},
+    {log_level_line}
 )
 
 # Setup UI component
 ui_components = setup_ui_component(env, config, "{component_name}")
 
-# Tampilkan UI
+# Display UI
 display_ui(ui_components)
 """

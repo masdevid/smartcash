@@ -22,33 +22,36 @@ def setup_notebook_environment(
     force_gc: bool = True
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Setup standar untuk cell notebook, dengan penanganan path, config, dan logger.
+    Setup environment dengan fallback dan error handling.
     
     Args:
-        cell_name: Nama unik cell untuk logger
-        config_path: Path ke file konfigurasi untuk dimuat
-        create_dirs: List direktori yang perlu dibuat
-        import_utils: Otomatis import utility classes
+        cell_name: Nama unik cell untuk logging
+        config_path: Path ke file konfigurasi
+        create_dirs: Direktori yang perlu dibuat
+        import_utils: Import utility classes
         force_gc: Force garbage collection
-        
-    Returns:
-        Tuple (env, config) berisi environment dan konfigurasi
-    """
-    # Pastikan smartcash ada di path
-    if not any('smartcash' in p for p in sys.path):
-        sys.path.append('.')
     
-    # Force garbage collection jika diperlukan
+    Returns:
+        Tuple (env, config) dengan informasi environment
+    """
+    # Tambahkan direktori project ke path jika belum ada
+    if not any('smartcash' in p for p in sys.path):
+        module_path = str(Path().absolute())
+        if module_path not in sys.path:
+            sys.path.append(module_path)
+    
+    # Force garbage collection
     if force_gc:
         gc.collect()
     
-    # Setup environment dict
+    # Inisialisasi environment default
     env = {
         'cell_name': cell_name,
         'logger': None,
         'env_manager': None,
         'observer_manager': None,
-        'start_time': time.time()
+        'config_manager': None,
+        'status': 'initializing'
     }
     
     # Buat direktori yang diperlukan
@@ -56,51 +59,56 @@ def setup_notebook_environment(
         for dir_path in create_dirs:
             Path(dir_path).mkdir(parents=True, exist_ok=True)
     
-    # Import utils dan setup environment components
+    # Daftar modul yang akan di-import
+    modules_to_import = [
+        ('config_manager', 'ConfigManager'),
+        ('environment_manager', 'EnvironmentManager'),
+        ('logger', 'get_logger'),
+        ('observer.observer_manager', 'ObserverManager')
+    ]
+    
+    # Import dengan error handling
+    for module_name, class_name in modules_to_import:
+        try:
+            module = importlib.import_module(f'smartcash.utils.{module_name}')
+            
+            if module_name == 'config_manager':
+                env['config_manager'] = getattr(module, class_name)
+            elif module_name == 'environment_manager':
+                env['env_manager'] = getattr(module, class_name)(logger=None)
+            elif module_name == 'logger':
+                env['logger'] = getattr(module, class_name)(cell_name)
+            elif module_name == 'observer.observer_manager':
+                env['observer_manager'] = getattr(module, class_name)(auto_register=True)
+        except ImportError as e:
+            if env['logger']:
+                env['logger'].warning(f"⚠️ Gagal import {module_name}: {str(e)}")
+    
+    # Load konfigurasi dengan fallback
+    config = {}
     try:
-        if import_utils:
-            from smartcash.utils.config_manager import ConfigManager, get_config_manager
-            from smartcash.utils.environment_manager import EnvironmentManager
-            from smartcash.utils.logger import get_logger
-            from smartcash.utils.observer.observer_manager import ObserverManager
-            from smartcash.utils.observer.cleanup_utils import register_notebook_cleanup
-            
-            # Setup logger
-            env['logger'] = get_logger(cell_name)
-            
-            # Setup environment manager
-            env['env_manager'] = EnvironmentManager(logger=env['logger'])
-            
-            # Setup observer manager dan cleanup otomatis
-            env['observer_manager'] = ObserverManager(auto_register=True)
-            env['observer_manager'].unregister_group(f"{cell_name}_observers")
-            
-            # Setup cleanup otomatis
-            cleanup_func = register_notebook_cleanup(
-                observer_managers=[env['observer_manager']],
-                auto_execute=True
-            )
-            env['cleanup'] = cleanup_func
-            
-            # Load konfigurasi
-            config_manager = get_config_manager(logger=env['logger'])
-            config = config_manager.load_config(
+        if config_path and Path(config_path).exists():
+            config = env['config_manager'].load_config(
                 filename=config_path,
                 fallback_to_pickle=True,
                 logger=env['logger']
-            )
-            
-            # Log success
-            env['logger'].info(f"✅ Notebook environment berhasil disetup untuk {cell_name}")
-            
-            return env, config
-        
-        # Return minimal environment jika import_utils=False
-        return env, {}
-    
+            ) if env['config_manager'] else {}
     except Exception as e:
-        print(f"⚠️ Error saat setup environment: {str(e)}")
-        return env, {}
+        if env['logger']:
+            env['logger'].warning(f"⚠️ Gagal load config: {str(e)}")
+    
+    # Update status
+    env['status'] = 'ready' if all(env.values()) else 'partial'
+    
+    # Tambahkan info cadangan jika modul utama gagal
+    if not all(env.values()):
+        env.update({
+            'fallback_mode': True,
+            'base_dir': str(Path.cwd()),
+            'python_version': sys.version
+        })
+    
+    return env, config
 
 
 def setup_ui_component(

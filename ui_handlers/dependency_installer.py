@@ -57,7 +57,12 @@ def setup_dependency_handlers(ui_components):
     # Function untuk menjalankan pip install
     def run_pip_command(package, force_reinstall=False):
         force_flag = "--force-reinstall" if force_reinstall else ""
-        cmd = f"{sys.executable} -m pip install {package} {force_flag} -q"
+        # Use --quiet for less verbose output but still show errors
+        cmd = f"{sys.executable} -m pip install {package} {force_flag}"
+        
+        # Log the command being executed
+        with ui_components['status']:
+            display(HTML(f"<p><code>{cmd}</code></p>"))
         
         try:
             result = subprocess.run(cmd, shell=True, check=True, capture_output=True, text=True)
@@ -102,11 +107,11 @@ def setup_dependency_handlers(ui_components):
         ui_components['check_all_button'].disabled = busy
         ui_components['uncheck_all_button'].disabled = busy
         
-        # Show/hide progress
+        # Always set visibility explicitly
         ui_components['install_progress'].layout.visibility = 'visible' if busy else 'hidden'
         
         # Clear status if requested
-        if clear_status and busy:
+        if clear_status:
             with ui_components['status']:
                 clear_output()
     
@@ -115,6 +120,8 @@ def setup_dependency_handlers(ui_components):
         nonlocal is_installing
         is_installing = True
         
+        # Show progress bar and disable buttons
+        ui_components['install_progress'].layout.visibility = 'visible'
         # Set UI to busy state
         set_ui_busy_state(True, clear_status=True)
         
@@ -136,24 +143,33 @@ def setup_dependency_handlers(ui_components):
             }
             
             # Add selected packages
+            any_checkbox_selected = False
             for key, (name, pkg) in checkbox_map.items():
                 if key in ui_components and ui_components[key].value:
+                    any_checkbox_selected = True
                     packages_to_install.append((name, pkg))
                     display(create_status_indicator("info", f"📋 {name} ditambahkan ke daftar instalasi"))
             
             # Add custom packages
             custom = ui_components['custom_packages'].value.strip()
+            has_custom_packages = False
             if custom:
                 custom_packages = [pkg.strip() for pkg in custom.split('\n') if pkg.strip()]
+                has_custom_packages = len(custom_packages) > 0
                 for pkg in custom_packages:
                     packages_to_install.append((f"Custom: {pkg}", pkg))
                     display(create_status_indicator("info", f"📋 Custom package {pkg} ditambahkan ke daftar instalasi"))
             
+            # Only proceed if we have packages to install
             if not packages_to_install:
                 display(create_status_indicator("warning", "⚠️ Tidak ada package yang dipilih untuk diinstall"))
                 is_installing = False
                 set_ui_busy_state(False)
                 return
+                
+            # Warn if nothing is checked but custom packages exist
+            if not any_checkbox_selected and has_custom_packages:
+                display(create_status_indicator("info", "ℹ️ Hanya menginstall custom packages karena tidak ada package standard yang dipilih"))
             
             # Setup progress bar
             ui_components['install_progress'].value = 0

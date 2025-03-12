@@ -1,10 +1,11 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
 Author: Refactored
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan kode minimal.
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan kode minimal dan perbaikan bug.
 """
 
 import threading
+import time
 from IPython.display import display, clear_output, HTML
 
 def setup_preprocessing_handlers(ui_components, config=None):
@@ -16,26 +17,41 @@ def setup_preprocessing_handlers(ui_components, config=None):
         from smartcash.utils.observer import EventDispatcher, EventTopics
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.environment_manager import EnvironmentManager
-        from smartcash.utils.ui_utils import create_status_indicator, update_output_area
-        import ipywidgets as widgets
+        from smartcash.utils.config_manager import ConfigManager
         
         logger = get_logger("preprocessing")
         env_manager = EnvironmentManager(logger=logger)
+        
+        # Ensure observer cleanup from previous sessions
         observer_manager = ObserverManager(auto_register=True)
         observer_group = "preprocessing_observers"
         observer_manager.unregister_group(observer_group)
+        
+        # Make sure we have a valid config
+        if not config or not isinstance(config, dict) or len(config) == 0:
+            config_manager = ConfigManager.get_instance(logger=logger)
+            config = config_manager.get_config()
+            
+            # If still empty, create default config
+            if not config or len(config) == 0:
+                config = {
+                    'data': {
+                        'preprocessing': {
+                            'img_size': [640, 640],
+                            'num_workers': 4,
+                            'normalize_enabled': True,
+                            'cache_enabled': True
+                        }
+                    },
+                    'data_dir': 'data'
+                }
+                config_manager.update_config(config, save=True)
         
     except ImportError as e:
         ui_components['preprocess_status'].append_display_data(
             HTML(f"<p style='color:red'>❌ Error: {str(e)}</p>")
         )
         return ui_components
-    
-    # Default config
-    if config is None:
-        config = {'data': {'preprocessing': {'img_size': [640, 640], 'num_workers': 4, 
-                                          'normalize_enabled': True, 'cache_enabled': True}},
-                 'data_dir': 'data'}
     
     # Extract UI elements
     ui = {k: ui_components[k] for k in ['preprocess_options', 'validation_options', 'split_selector', 
@@ -44,6 +60,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # State variables
     processing_active = False
+    stop_requested = False
+    current_thread = None
     
     # Setup PreprocessingManager
     data_dir = env_manager.get_path(config.get('data_dir', 'data')) if env_manager else config.get('data_dir', 'data')
@@ -71,14 +89,38 @@ def setup_preprocessing_handlers(ui_components, config=None):
         ui['stop_button'].layout.display = 'inline-block' if is_processing else 'none'
         if is_processing:
             ui['log_accordion'].selected_index = 0
+    
+    def create_status_indicator(status, message):
+        """Create a styled status indicator"""
+        status_styles = {
+            'success': {'icon': '✅', 'color': 'green'},
+            'warning': {'icon': '⚠️', 'color': 'orange'},
+            'error': {'icon': '❌', 'color': 'red'},
+            'info': {'icon': 'ℹ️', 'color': 'blue'}
+        }
+        
+        style = status_styles.get(status, status_styles['info'])
+        
+        return HTML(f"""
+        <div style="margin: 5px 0; padding: 8px 12px; 
+                    border-radius: 4px; background-color: #f8f9fa;">
+            <span style="color: {style['color']}; font-weight: bold;"> 
+                {style['icon']} {message}
+            </span>
+        </div>
+        """)
             
     def update_progress(_, __, progress=0, total=100, message=None, **kwargs):
         """Update progress bar and display messages"""
+        if stop_requested:
+            return
+            
         bar = ui['progress_bar']
         bar.value = int(progress * 100 / total) if total > 0 else 0
         bar.description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
         if message:
-            update_output_area(ui['preprocess_status'], message, "info")
+            with ui['preprocess_status']:
+                display(create_status_indicator("info", message))
     
     def update_summary(result):
         """Display preprocessing results summary"""
@@ -159,7 +201,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Handler functions
     def run_preprocessing_thread():
         """Execute preprocessing in a separate thread"""
-        nonlocal processing_active
+        nonlocal processing_active, stop_requested
         
         try:
             # Get preprocessing parameters
@@ -182,6 +224,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             splits = split_map.get(ui['split_selector'].value, ['train', 'valid', 'test'])
             
             # Update config
+            config['data']['preprocessing'] = config.get('data', {}).get('preprocessing', {})
             config['data']['preprocessing'].update({
                 'img_size': list(img_size),
                 'normalize_enabled': normalize,
@@ -194,47 +237,54 @@ def setup_preprocessing_handlers(ui_components, config=None):
                                   sender="preprocessing_handler",
                                   message="Starting preprocessing pipeline")
             
-            # Run pipeline
-            result = preprocessing_manager.run_full_pipeline(
-                splits=splits, validate_dataset=validate,
-                fix_issues=fix_issues, augment_data=False, analyze_dataset=True
-            )
+            # Check for stop request periodically
+            start_time = time.time()
             
-            # Process result
-            if result['status'] == 'success':
-                ui['preprocess_status'].append_display_data(
-                    create_status_indicator("success", 
-                                           f"✅ Preprocessing completed in {result.get('elapsed', 0):.2f} seconds")
+            # Run pipeline
+            if not stop_requested:
+                result = preprocessing_manager.run_full_pipeline(
+                    splits=splits, validate_dataset=validate,
+                    fix_issues=fix_issues, augment_data=False, analyze_dataset=True
                 )
-                update_summary(result)
-                EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_END, 
-                                      sender="preprocessing_handler",
-                                      result=result)
-            else:
-                ui['preprocess_status'].append_display_data(
-                    create_status_indicator("error", 
-                                           f"❌ Preprocessing failed: {result.get('error', 'Unknown error')}")
-                )
-                EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_ERROR, 
-                                      sender="preprocessing_handler",
-                                      error=result.get('error', 'Unknown error'))
+                
+                # Process result
+                if result['status'] == 'success':
+                    ui['preprocess_status'].append_display_data(
+                        create_status_indicator("success", 
+                                             f"✅ Preprocessing completed in {result.get('elapsed', 0):.2f} seconds")
+                    )
+                    update_summary(result)
+                    EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_END, 
+                                        sender="preprocessing_handler",
+                                        result=result)
+                else:
+                    ui['preprocess_status'].append_display_data(
+                        create_status_indicator("error", 
+                                             f"❌ Preprocessing failed: {result.get('error', 'Unknown error')}")
+                    )
+                    EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_ERROR, 
+                                        sender="preprocessing_handler",
+                                        error=result.get('error', 'Unknown error'))
         except Exception as e:
             ui['preprocess_status'].append_display_data(
                 create_status_indicator("error", f"❌ Error: {str(e)}")
             )
             EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_ERROR, 
-                                  sender="preprocessing_handler", error=str(e))
+                                 sender="preprocessing_handler", error=str(e))
         finally:
             processing_active = False
+            stop_requested = False
             update_ui_for_processing(False)
     
     # Main handlers
     def on_preprocess_click(b):
         """Start preprocessing"""
-        nonlocal processing_active
-        if processing_active: return
+        nonlocal processing_active, stop_requested, current_thread
+        if processing_active:
+            return
         
         processing_active = True
+        stop_requested = False
         with ui['preprocess_status']:
             clear_output()
             display(create_status_indicator("info", "🔄 Starting preprocessing..."))
@@ -245,19 +295,28 @@ def setup_preprocessing_handlers(ui_components, config=None):
         update_ui_for_processing(True)
         
         # Run in thread
-        thread = threading.Thread(target=run_preprocessing_thread)
-        thread.daemon = True
-        thread.start()
+        current_thread = threading.Thread(target=run_preprocessing_thread)
+        current_thread.daemon = True
+        current_thread.start()
     
     def on_stop_click(b):
         """Stop processing"""
-        nonlocal processing_active
-        processing_active = False
+        nonlocal processing_active, stop_requested
+        stop_requested = True
         with ui['preprocess_status']:
             display(create_status_indicator("warning", "⚠️ Stopping preprocessing..."))
+        
+        # Force update UI after a short delay
+        def delayed_ui_update():
+            time.sleep(0.5)  # Short delay to allow observer notification
+            processing_active = False
+            update_ui_for_processing(False)
+            
+        threading.Thread(target=delayed_ui_update, daemon=True).start()
+        
         EventDispatcher.notify(event_type=EventTopics.PREPROCESSING_END, 
-                              sender="preprocessing_handler",
-                              message="Preprocessing stopped by user")
+                             sender="preprocessing_handler",
+                             message="Preprocessing stopped by user")
     
     def on_cleanup_click(b):
         """Clean preprocessed data"""
@@ -301,7 +360,21 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Initialize UI
     init_ui()
     
-    # Add cleanup function
-    ui_components['cleanup'] = lambda: observer_manager.unregister_group(observer_group)
+    # Define proper cleanup function
+    def cleanup():
+        """Clean up observer registrations and resources"""
+        nonlocal stop_requested
+        stop_requested = True
+        
+        # Unregister observers
+        observer_manager.unregister_group(observer_group)
+        
+        # Reset UI
+        update_ui_for_processing(False)
+        
+        logger.info("✅ Preprocessing handlers cleaned up")
+    
+    # Add cleanup function to UI components
+    ui_components['cleanup'] = cleanup
     
     return ui_components

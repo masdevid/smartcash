@@ -9,26 +9,7 @@ import time
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
-
-def create_status_indicator(status, message):
-    """Buat indikator status dengan styling konsisten."""
-    status_styles = {
-        'success': {'icon': '✅', 'color': 'green'},
-        'warning': {'icon': '⚠️', 'color': 'orange'},
-        'error': {'icon': '❌', 'color': 'red'},
-        'info': {'icon': 'ℹ️', 'color': 'blue'}
-    }
-    
-    style = status_styles.get(status, status_styles['info'])
-    
-    return HTML(f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: #f8f9fa;">
-        <span style="color: {style['color']}; font-weight: bold;"> 
-            {style['icon']} {message}
-        </span>
-    </div>
-    """)
+from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_download_handlers(ui_components, config=None):
     """Setup handlers untuk UI download dataset."""

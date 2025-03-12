@@ -7,8 +7,11 @@ import subprocess
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
-from google.colab import drive
-drive.mount('/content/drive')
+import os
+
+if not os.path.exists('/content/drive/MyDrive'):
+  from google.colab import drive
+  drive.mount('/content/drive')
 
 def create_status_alert(msg, alert_type='info', icon=None):
     colors = {'info': ('#0c5460', '#d1ecf1', 'ℹ️'), 'success': ('#155724', '#d4edda', '✅'),

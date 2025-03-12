@@ -17,18 +17,18 @@ try:
     from smartcash.utils.config_manager import ConfigManager
     from smartcash.utils.environment_manager import EnvironmentManager
     from smartcash.utils.logger import get_logger
-    
+
     # Setup logger dan environment
     logger = get_logger("backbone_selection")
     env_manager = EnvironmentManager()
-    
+
     # Load konfigurasi
     config = ConfigManager.load_config(
-        filename="configs/base_config.yaml", 
+        filename="configs/base_config.yaml",
         fallback_to_pickle=True,
         logger=logger
     )
-    
+
     logger.info("✅ Environment dan konfigurasi berhasil dimuat")
 except Exception as e:
     print(f"ℹ️ Fallback ke konfigurasi default: {str(e)}")
@@ -41,12 +41,12 @@ try:
 except ImportError as e:
     print(f"❌ Error: {str(e)}")
     print("🔄 Memuat fallback UI...")
-    
+
     # Fallback jika komponen tidak tersedia
     import ipywidgets as widgets
     def create_training_config_ui():
         return {'ui': widgets.HTML("<h3>⚠️ Komponen UI tidak tersedia</h3><p>Pastikan semua modul terinstall dengan benar</p>")}
-    
+
     def setup_training_config_handlers(ui_components, config=None):
         return ui_components
 

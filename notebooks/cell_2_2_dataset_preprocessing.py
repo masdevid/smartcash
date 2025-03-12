@@ -1,98 +1,16 @@
 # Cell 2.2 - Dataset Preprocessing
 # Preprocessing dataset untuk training model SmartCash
-import sys
-import gc
-from pathlib import Path
-from IPython.display import display
 
-# Pastikan smartcash ada di path
-if not any('smartcash' in p for p in sys.path):
-    sys.path.append('.')
+from smartcash.utils.cell_header_utils import setup_notebook_environment, setup_ui_component, display_ui
 
-# Force garbage collection untuk pembersihan memori
-gc.collect()
+# Setup environment
+env, config = setup_notebook_environment(
+    cell_name="preprocessing",
+    config_path="configs/base_config.yaml"
+)
 
-# Pastikan observer dari sesi sebelumnya dibersihkan
-try:
-    from smartcash.utils.observer.observer_manager import ObserverManager
-    observer_manager = ObserverManager()
-    observer_manager.unregister_group("preprocessing_observers")
-except:
-    pass
-
-# Setup environment dan konfigurasi
-try:
-    from smartcash.utils.config_manager import ConfigManager
-    from smartcash.utils.environment_manager import EnvironmentManager
-    from smartcash.utils.logger import get_logger
-    
-    # Setup logger dan environment
-    logger = get_logger("dataset_preprocessing")
-    env_manager = EnvironmentManager()
-    
-    # Load konfigurasi, cari file di beberapa lokasi standar
-    config_files = [
-        "configs/base_config.yaml",
-        "configs/dataset_config.yaml",
-        "config.yaml"
-    ]
-    
-    config = None
-    for file_path in config_files:
-        try:
-            if Path(file_path).exists():
-                config = ConfigManager.load_config(
-                    filename=file_path, 
-                    fallback_to_pickle=True,
-                    logger=logger
-                )
-                if config:
-                    logger.info(f"✅ Konfigurasi berhasil dimuat dari {file_path}")
-                    break
-        except Exception as e:
-            logger.debug(f"Gagal load config dari {file_path}: {str(e)}")
-    
-    # Jika tidak ada file yang ditemukan, buat config default
-    if not config or len(config) == 0:
-        config = {
-            'data': {
-                'preprocessing': {
-                    'img_size': [640, 640],
-                    'num_workers': 4,
-                    'normalize_enabled': True,
-                    'cache_enabled': True
-                }
-            },
-            'data_dir': 'data'
-        }
-except Exception as e:
-    print(f"⚠️ Fallback ke konfigurasi default: {str(e)}")
-    config = {}
-
-# Import komponen UI dan handler
-try:
-    from smartcash.ui_components.preprocessing import create_preprocessing_ui
-    from smartcash.ui_handlers.preprocessing import setup_preprocessing_handlers
-except ImportError as e:
-    print(f"❌ Error: {str(e)}")
-    print("🔄 Memuat fallback UI...")
-    
-    # Fallback jika komponen tidak tersedia
-    import ipywidgets as widgets
-    def create_preprocessing_ui():
-        return {'ui': widgets.HTML("<h3>⚠️ Komponen UI tidak tersedia</h3><p>Pastikan semua modul terinstall dengan benar</p>")}
-    
-    def setup_preprocessing_handlers(ui_components, config=None):
-        return ui_components
-
-# Buat dan setup komponen UI
-ui_components = create_preprocessing_ui()
-ui_components = setup_preprocessing_handlers(ui_components, config)
+# Setup UI component
+ui_components = setup_ui_component(env, config, "preprocessing")
 
 # Tampilkan UI
-display(ui_components['ui'])
-
-# Register cleanup untuk melepas observer
-if 'cleanup' in ui_components:
-    import atexit
-    atexit.register(ui_components['cleanup'])
+display_ui(ui_components)

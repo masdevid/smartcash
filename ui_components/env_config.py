@@ -87,10 +87,10 @@ def create_env_config_ui():
         )
     )
     
-    # Info box
-    info_box = widgets.HTML("""
+    # Info box in accordion (collapsed by default)
+    info_content = widgets.HTML("""
     <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 10px 0; border-radius: 4px;">
+             color: #0c5460; margin: 0; border-radius: 4px;">
         <h4 style="margin-top: 0; color: inherit;">ℹ️ Environment Setup</h4>
         <p>SmartCash mendukung dua environment kerja:</p>
         <ul>
@@ -117,6 +117,9 @@ exports/
     </div>
     """)
     
+    info_accordion = widgets.Accordion(children=[info_content], selected_index=None)
+    info_accordion.set_title(0, "ℹ️ Environment Setup")
+    
     # Assemble UI
     main_container.children = [
         header,
@@ -124,7 +127,7 @@ exports/
         info_accordion,
         button_container,
         status,
-        info_box
+        info_accordion
     ]
     
     # Dictionary untuk akses komponen dari luar
@@ -133,6 +136,7 @@ exports/
         'colab_panel': colab_panel,
         'info_panel': info_panel,
         'info_accordion': info_accordion,
+        'info_content': info_content,
         'drive_button': drive_button,
         'dir_button': dir_button,
         'status': status

@@ -155,7 +155,7 @@ def setup_dependency_handlers(ui_components):
             return "Not installed"
     
     # Function to update UI state during operations
-    def set_ui_busy_state(busy=True):
+    def set_ui_busy_state(busy=True, clear_status=False):
         """Set UI busy state - disable/enable buttons appropriately."""
         ui_components['install_button'].disabled = busy
         ui_components['check_button'].disabled = busy
@@ -167,14 +167,19 @@ def setup_dependency_handlers(ui_components):
             ui_components['install_progress'].layout.visibility = 'visible'
         else:
             ui_components['install_progress'].layout.visibility = 'hidden'
+            
+        # Clear status if requested
+        if clear_status:
+            with ui_components['status']:
+                clear_output()
     
     # Main handler function for installation
     def install_packages():
         nonlocal is_installing
         is_installing = True
         
-        # Set UI to busy state
-        set_ui_busy_state(True)
+        # Set UI to busy state and clear previous output
+        set_ui_busy_state(True, clear_status=True)
         
         with ui_components['status']:
             clear_output()
@@ -286,8 +291,8 @@ def setup_dependency_handlers(ui_components):
     
     # Handler for check button
     def on_check(b):
-        # Set UI to busy state
-        set_ui_busy_state(True)
+        # Set UI to busy state and clear previous output
+        set_ui_busy_state(True, clear_status=True)
         
         with ui_components['status']:
             clear_output()

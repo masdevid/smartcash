@@ -10,6 +10,7 @@ import time
 import threading
 import importlib
 from IPython.display import display, HTML, clear_output
+from ipywidgets import widgets
 
 def setup_dependency_handlers(ui_components):
     """Setup handler untuk komponen UI instalasi dependencies."""

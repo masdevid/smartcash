@@ -1,17 +1,52 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
-Author: Alfrida Sabar
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan implementasi ObserverManager yang dioptimalkan.
+Author: Refactored
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash yang terintegrasi dengan 
+           ui_utils dan menggunakan existing utils lain yang relevan.
 """
 
-import ipywidgets as widgets
-from IPython.display import display, HTML, clear_output
 import threading
-
-from smartcash.utils.ui_utils import create_status_indicator
+from IPython.display import display, clear_output
 
 def setup_preprocessing_handlers(ui_components, config=None):
-    """Setup handlers untuk UI preprocessing dataset."""
+    """
+    Setup handlers untuk UI preprocessing dataset.
+    
+    Args:
+        ui_components: Dict berisi komponen UI
+        config: Dict konfigurasi (opsional)
+        
+    Returns:
+        Dict komponen UI yang sudah disetup dengan handlers
+    """
+    # Import library yang dibutuhkan
+    try:
+        from smartcash.utils.logger import get_logger
+        from smartcash.handlers.preprocessing import PreprocessingManager
+        from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer.observer_manager import ObserverManager
+        from smartcash.utils.environment_manager import EnvironmentManager
+        from smartcash.utils.ui_utils import (
+            create_info_alert, create_status_indicator, 
+            create_metric_display, update_output_area
+        )
+        
+        logger = get_logger("preprocessing")
+        env_manager = EnvironmentManager(logger=logger)
+        
+        observer_manager = ObserverManager(auto_register=True)
+        observer_group = "preprocessing_observers"
+        
+        # Bersihkan observer lama untuk menghindari memory leak
+        observer_manager.unregister_group(observer_group)
+        
+    except ImportError as e:
+        import ipywidgets as widgets
+        ui_components['preprocess_status'].append_display_data(
+            widgets.HTML(f"<p style='color:red'>❌ Error: {str(e)}</p>")
+        )
+        return ui_components
+    
     # Default config jika tidak disediakan
     if config is None:
         config = {
@@ -26,347 +61,380 @@ def setup_preprocessing_handlers(ui_components, config=None):
             'data_dir': 'data'
         }
     
-    # Setup akses ke komponen UI
+    # Ekstrak komponen UI
     preprocess_options = ui_components['preprocess_options']
+    validation_options = ui_components['validation_options']
+    split_selector = ui_components['split_selector']
     preprocess_button = ui_components['preprocess_button']
-    preprocess_progress = ui_components['preprocess_progress']
+    stop_button = ui_components['stop_button']
+    progress_bar = ui_components['progress_bar']
+    current_progress = ui_components['current_progress']
     preprocess_status = ui_components['preprocess_status']
     log_accordion = ui_components['log_accordion']
+    summary_container = ui_components['summary_container']
     
-    # Tambahkan tombol cleanup
+    # Status flags dan threading
+    processing_active = False
+    processing_thread = None
+    
+    # Setup PreprocessingManager
+    data_dir = config.get('data_dir', 'data')
+    
+    # Gunakan environment manager untuk resolve path
+    if env_manager:
+        data_dir = env_manager.get_path(data_dir)
+        
+    preprocessing_manager = PreprocessingManager(
+        config=config, 
+        logger=logger, 
+        base_dir=data_dir
+    )
+    
+    # Inisialisasi UI dari config
+    def initialize_ui_from_config():
+        """Inisialisasi UI dari config."""
+        if 'data' in config and 'preprocessing' in config['data']:
+            preproc_config = config['data']['preprocessing']
+            
+            # Update image size
+            if 'img_size' in preproc_config:
+                try:
+                    img_size = preproc_config['img_size']
+                    if isinstance(img_size, list) and len(img_size) == 2:
+                        preprocess_options.children[0].value = img_size
+                except Exception:
+                    pass
+            
+            # Update checkboxes
+            for key, idx in [('normalize_enabled', 1), ('cache_enabled', 2)]:
+                if key in preproc_config:
+                    preprocess_options.children[idx].value = preproc_config[key]
+            
+            # Update workers
+            if 'num_workers' in preproc_config:
+                preprocess_options.children[3].value = preproc_config['num_workers']
+    
+    # Setup observers untuk monitoring
+    def setup_observers():
+        observer_manager.create_simple_observer(
+            event_type=EventTopics.PREPROCESSING_PROGRESS,
+            callback=lambda _, __, progress=0, total=100, message=None, **kwargs: update_progress(progress, total, message),
+            name="PreprocessingProgressObserver",
+            group=observer_group
+        )
+        
+        observer_manager.create_simple_observer(
+            event_type=EventTopics.VALIDATION_PROGRESS,
+            callback=lambda _, __, progress=0, total=100, message=None, **kwargs: update_current_progress(progress, total, message),
+            name="ValidationProgressObserver",
+            group=observer_group
+        )
+        
+        observer_manager.create_logging_observer(
+            event_types=[
+                EventTopics.PREPROCESSING_START,
+                EventTopics.PREPROCESSING_END,
+                EventTopics.PREPROCESSING_ERROR,
+                EventTopics.VALIDATION_EVENT,
+                EventTopics.DATASET_VALIDATE
+            ],
+            logger_name="preprocessing",
+            name="PreprocessingLogObserver",
+            group=observer_group
+        )
+    
+    # Update progress helpers
+    def update_progress(progress, total, message=None):
+        progress_bar.value = int(progress * 100 / total) if total > 0 else 0
+        progress_bar.description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
+        if message:
+            update_output_area(preprocess_status, message, "info")
+    
+    def update_current_progress(progress, total, message=None):
+        current_progress.value = int(progress * 100 / total) if total > 0 else 0
+        current_progress.description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
+    
+    # Fungsi untuk update UI pada hasil preprocessing
+    def update_summary(result):
+        from IPython.display import HTML
+        
+        with summary_container:
+            clear_output()
+            
+            # Heading
+            display(HTML("<h3>📊 Preprocessing Summary</h3>"))
+            
+            # Extract stats
+            validation_stats = {}
+            analysis_stats = {}
+            
+            for split in ['train', 'valid', 'test']:
+                if split in result.get('validation', {}):
+                    validation_stats[split] = result['validation'][split].get('validation_stats', {})
+                
+                if split in result.get('analysis', {}):
+                    analysis_stats[split] = result['analysis'][split].get('analysis', {})
+            
+            # Validation stats
+            if validation_stats:
+                display(HTML("<h4>🔍 Validation Results</h4>"))
+                
+                stat_table = "<table style='width:100%; border-collapse:collapse; margin:10px 0'>"
+                stat_table += "<tr style='background:#f2f2f2'><th>Split</th><th>Total</th><th>Valid</th><th>Invalid</th><th>Rate</th></tr>"
+                
+                for split, stats in validation_stats.items():
+                    total = stats.get('total_images', 0)
+                    valid = stats.get('valid_images', 0)
+                    invalid = total - valid
+                    rate = (valid / total * 100) if total > 0 else 0
+                    
+                    stat_table += f"<tr><td>{split}</td><td>{total}</td><td>{valid}</td><td>{invalid}</td><td>{rate:.1f}%</td></tr>"
+                
+                stat_table += "</table>"
+                display(HTML(stat_table))
+            
+            # Class distribution
+            if analysis_stats:
+                display(HTML("<h4>📊 Class Distribution</h4>"))
+                
+                for split, stats in analysis_stats.items():
+                    if 'class_distribution' in stats:
+                        class_dist = stats['class_distribution']
+                        display(HTML(f"<h5>{split.capitalize()}</h5>"))
+                        
+                        dist_table = "<table style='width:100%; border-collapse:collapse; margin:10px 0'>"
+                        dist_table += "<tr style='background:#f2f2f2'><th>Class</th><th>Count</th><th>Percentage</th></tr>"
+                        
+                        total = sum(class_dist.values())
+                        for cls, count in class_dist.items():
+                            percentage = (count / total * 100) if total > 0 else 0
+                            dist_table += f"<tr><td>{cls}</td><td>{count}</td><td>{percentage:.1f}%</td></tr>"
+                        
+                        dist_table += "</table>"
+                        display(HTML(dist_table))
+            
+            # Execution time
+            if 'elapsed' in result:
+                display(HTML(f"<p><b>⏱️ Execution time:</b> {result['elapsed']:.2f} seconds</p>"))
+                
+            # Output directory
+            display(HTML(f"<p><b>📂 Output:</b> {config.get('data_dir', 'data')}</p>"))
+        
+        # Show summary
+        summary_container.layout.display = 'block'
+    
+    # Handler untuk tombol preprocessing
+    def on_preprocess_click(b):
+        nonlocal processing_active, processing_thread
+        
+        if processing_active:
+            return
+        
+        processing_active = True
+        with preprocess_status:
+            clear_output()
+            display(create_status_indicator("info", "🔄 Starting preprocessing..."))
+        
+        # Set UI untuk processing
+        progress_bar.value = 0
+        current_progress.value = 0
+        progress_bar.layout.visibility = 'visible'
+        current_progress.layout.visibility = 'visible'
+        preprocess_button.disabled = True
+        stop_button.layout.display = 'inline-block'
+        log_accordion.selected_index = 0
+        
+        # Get preprocessing parameters
+        img_size = preprocess_options.children[0].value
+        normalize = preprocess_options.children[1].value
+        cache = preprocess_options.children[2].value
+        workers = preprocess_options.children[3].value
+        
+        # Update config
+        config['data']['preprocessing'] = {
+            'img_size': list(img_size),
+            'normalize_enabled': normalize,
+            'cache_enabled': cache,
+            'num_workers': workers
+        }
+        
+        # Get validation options
+        validate = validation_options.children[0].value
+        fix_issues = validation_options.children[1].value
+        
+        # Get splits to process
+        split_option = split_selector.value
+        if split_option == 'All Splits':
+            splits_to_process = ['train', 'valid', 'test']
+        elif split_option == 'Train Only':
+            splits_to_process = ['train']
+        elif split_option == 'Validation Only':
+            splits_to_process = ['valid']
+        else:  # Test Only
+            splits_to_process = ['test']
+        
+        # Define preprocessing function
+        def run_preprocessing_thread():
+            nonlocal processing_active
+            
+            try:
+                # Notify start
+                EventDispatcher.notify(
+                    event_type=EventTopics.PREPROCESSING_START,
+                    sender="preprocessing_handler",
+                    message="Starting preprocessing pipeline"
+                )
+                
+                # Run preprocessing pipeline
+                result = preprocessing_manager.run_full_pipeline(
+                    splits=splits_to_process,
+                    validate_dataset=validate,
+                    fix_issues=fix_issues,
+                    augment_data=False,
+                    analyze_dataset=True
+                )
+                
+                # Process result
+                if result['status'] == 'success':
+                    # Update UI in main thread
+                    import ipywidgets as widgets
+                    preprocess_status.append_display_data(
+                        create_status_indicator("success", f"✅ Preprocessing completed in {result.get('elapsed', 0):.2f} seconds")
+                    )
+                    
+                    # Update summary
+                    update_summary(result)
+                    
+                    # Show cleanup button
+                    cleanup_button.layout.display = 'inline-block'
+                    
+                    # Notify completion
+                    EventDispatcher.notify(
+                        event_type=EventTopics.PREPROCESSING_END,
+                        sender="preprocessing_handler",
+                        result=result,
+                        message="Preprocessing completed successfully"
+                    )
+                else:
+                    # Show error
+                    preprocess_status.append_display_data(
+                        create_status_indicator("error", f"❌ Preprocessing failed: {result.get('error', 'Unknown error')}")
+                    )
+                    
+                    # Notify error
+                    EventDispatcher.notify(
+                        event_type=EventTopics.PREPROCESSING_ERROR,
+                        sender="preprocessing_handler",
+                        error=result.get('error', 'Unknown error')
+                    )
+            except Exception as e:
+                # Show error
+                preprocess_status.append_display_data(
+                    create_status_indicator("error", f"❌ Error: {str(e)}")
+                )
+                
+                # Notify error
+                EventDispatcher.notify(
+                    event_type=EventTopics.PREPROCESSING_ERROR,
+                    sender="preprocessing_handler",
+                    error=str(e)
+                )
+            finally:
+                # Reset UI
+                processing_active = False
+                preprocess_button.disabled = False
+                stop_button.layout.display = 'none'
+                progress_bar.layout.visibility = 'hidden'
+                current_progress.layout.visibility = 'hidden'
+        
+        # Start preprocessing in thread
+        processing_thread = threading.Thread(target=run_preprocessing_thread)
+        processing_thread.daemon = True
+        processing_thread.start()
+    
+    # Stop handler
+    def on_stop_click(b):
+        nonlocal processing_active
+        processing_active = False
+        
+        with preprocess_status:
+            display(create_status_indicator("warning", "⚠️ Stopping preprocessing..."))
+        
+        # Notify
+        EventDispatcher.notify(
+            event_type=EventTopics.PREPROCESSING_END,
+            sender="preprocessing_handler",
+            message="Preprocessing stopped by user"
+        )
+    
+    # Clean preprocessed data handler
+    def on_cleanup_click(b):
+        import shutil
+        from pathlib import Path
+        
+        with preprocess_status:
+            clear_output()
+            display(create_status_indicator("info", "🗑️ Cleaning preprocessed data..."))
+            
+            try:
+                # Get preprocessed directory
+                preprocessed_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+                
+                # Use environment manager if available
+                if env_manager:
+                    preprocessed_dir = env_manager.get_path(preprocessed_dir)
+                
+                preprocessed_path = Path(preprocessed_dir)
+                
+                # Check if directory exists
+                if preprocessed_path.exists():
+                    # Remove directory
+                    shutil.rmtree(preprocessed_path)
+                    display(create_status_indicator("success", f"✅ Removed preprocessed data: {preprocessed_dir}"))
+                else:
+                    display(create_status_indicator("info", f"ℹ️ No preprocessed data found at: {preprocessed_dir}"))
+                
+                # Hide cleanup button
+                cleanup_button.layout.display = 'none'
+                
+                # Hide summary
+                summary_container.layout.display = 'none'
+                
+            except Exception as e:
+                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+    
+    # Setup cleanup handler
+    def cleanup():
+        """Fungsi cleanup untuk unregister observer."""
+        if observer_manager:
+            observer_manager.unregister_group(observer_group)
+            logger.info(f"✅ Observer group {observer_group} dibersihkan")
+    
+    # Register handlers
+    preprocess_button.on_click(on_preprocess_click)
+    stop_button.on_click(on_stop_click)
+    
+    # Add cleanup button
+    import ipywidgets as widgets
     cleanup_button = widgets.Button(
         description='Clean Preprocessed Data',
         button_style='danger',
         icon='trash',
         layout=widgets.Layout(display='none')
     )
-    ui_components['cleanup_button'] = cleanup_button
-    
-    # Setup logger, PreprocessingManager, dan ObserverManager
-    preprocessing_manager = None
-    logger = None
-    observer_manager = None
-    
-    try:
-        from smartcash.utils.logger import get_logger
-        from smartcash.handlers.preprocessing import PreprocessingManager
-        from smartcash.utils.observer import EventDispatcher, EventTopics
-        from smartcash.utils.observer.observer_manager import ObserverManager
-        
-        logger = get_logger("preprocessing")
-        preprocessing_manager = PreprocessingManager(config=config, logger=logger)
-        observer_manager = ObserverManager(auto_register=True)
-        
-    except ImportError as e:
-        print(f"ℹ️ Beberapa modul tidak tersedia: {str(e)}")
-    
-    # Kelompok observer untuk preprocessing
-    preprocessing_observers_group = "preprocessing_observers"
-    
-    # Pastikan semua observer dari grup ini dihapus untuk mencegah memory leak
-    if observer_manager:
-        observer_manager.unregister_group(preprocessing_observers_group)
-    
-    # Fungsi untuk cek apakah dataset sudah dipreprocess
-    def check_preprocessed_dataset():
-        """Cek apakah dataset sudah dipreprocess."""
-        from pathlib import Path
-        data_dir = config.get('data_dir', 'data')
-        splits = ['train', 'valid', 'test']
-        
-        # Cek apakah direktori train/valid/test memiliki gambar yang sudah dipreprocess
-        for split in splits:
-            split_path = Path(data_dir) / split
-            if not split_path.exists() or not any((split_path / 'images').glob('*')):
-                return False
-        
-        return True
-    
-    # Fungsi untuk membersihkan data preprocessed
-    def on_cleanup_click(b):
-        with preprocess_status:
-            clear_output()
-            display(create_status_indicator("warning", "🗑️ Membersihkan data preprocessing..."))
-            
-            try:
-                from pathlib import Path
-                data_dir = config.get('data_dir', 'data')
-                splits = ['train', 'valid', 'test']
-                
-                # Hapus direktori gambar dan label untuk setiap split
-                for split in splits:
-                    split_path = Path(data_dir) / split
-                    if split_path.exists():
-                        for subdir in ['images', 'labels']:
-                            full_subdir = split_path / subdir
-                            if full_subdir.exists():
-                                # Hapus file dalam direktori
-                                for file_path in full_subdir.glob('*'):
-                                    try:
-                                        file_path.unlink()
-                                    except:
-                                        pass
-                
-                display(create_status_indicator("success", "✅ Data preprocessing berhasil dibersihkan"))
-                
-                # Sembunyikan tombol cleanup
-                cleanup_button.layout.display = 'none'
-                
-            except Exception as e:
-                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-    
-    # Tambahkan handler ke tombol cleanup
     cleanup_button.on_click(on_cleanup_click)
     
-    # Fungsi untuk update progress UI
-    def update_progress_callback(event_type, sender, progress=0, total=100, message=None, **kwargs):
-        # Update progress bar jika masih ada
-        if preprocess_progress:
-            preprocess_progress.value = int(progress * 100 / total) if total > 0 else 0
-            preprocess_progress.description = f"{int(progress * 100 / total)}%" if total > 0 else "0%"
-        
-        # Display message jika ada
-        if message and preprocess_status:
-            with preprocess_status:
-                display(create_status_indicator("info", message))
+    # Add to container
+    ui_components['ui'].children = list(ui_components['ui'].children) + [cleanup_button]
+    ui_components['cleanup_button'] = cleanup_button
     
-    # Setup observer untuk progress jika observer_manager tersedia
-    if observer_manager:
-        try:
-            # Unregister any existing observers in this group first
-            observer_manager.unregister_group(preprocessing_observers_group)
-            
-            # Buat progress observer
-            progress_observer = observer_manager.create_simple_observer(
-                event_type=EventTopics.PREPROCESSING_PROGRESS,
-                callback=update_progress_callback,
-                name="PreprocessingProgressObserver",
-                group=preprocessing_observers_group
-            )
-            
-            # Buat logger observer untuk event preprocessing
-            logger_observer = observer_manager.create_logging_observer(
-                event_types=[
-                    EventTopics.PREPROCESSING_START,
-                    EventTopics.PREPROCESSING_END,
-                    EventTopics.PREPROCESSING_ERROR
-                ],
-                log_level="info",
-                name="PreprocessingLoggerObserver",
-                format_string="{event_type}: {message}",
-                include_timestamp=True,
-                logger_name="preprocessing",
-                group=preprocessing_observers_group
-            )
-            
-            if logger:
-                logger.info("✅ Observer untuk preprocessing telah dikonfigurasi")
-            
-        except Exception as e:
-            if logger:
-                logger.error(f"❌ Error saat setup observer: {str(e)}")
+    # Initialize UI
+    initialize_ui_from_config()
     
-    # Handler untuk tombol preprocessing
-    def on_preprocess_click(b):
-        # Pastikan semua observer dari grup ini dihapus untuk mencegah memory leak
-        if observer_manager:
-            observer_manager.unregister_group(preprocessing_observers_group)
-            
-            # Buat ulang observer untuk progress
-            progress_observer = observer_manager.create_simple_observer(
-                event_type=EventTopics.PREPROCESSING_PROGRESS,
-                callback=update_progress_callback,
-                name="PreprocessingProgressObserver",
-                group=preprocessing_observers_group
-            )
-        
-        # Disable tombol preprocessing saat sedang berjalan
-        preprocess_button.disabled = True
-        
-        # Expand logs accordion untuk menampilkan progress
-        log_accordion.selected_index = 0
-        
-        with preprocess_status:
-            clear_output()
-            display(create_status_indicator("info", "🔄 Memulai preprocessing dataset..."))
-            
-            try:
-                # Ambil preprocessing options dari form
-                img_size = preprocess_options.children[0].value
-                normalize = preprocess_options.children[1].value
-                enable_cache = preprocess_options.children[2].value
-                workers = preprocess_options.children[3].value
-                
-                # Update config
-                if config and 'data' in config and 'preprocessing' in config['data']:
-                    config['data']['preprocessing']['img_size'] = list(img_size)
-                    config['data']['preprocessing']['normalize_enabled'] = normalize
-                    config['data']['preprocessing']['cache_enabled'] = enable_cache
-                    config['data']['preprocessing']['num_workers'] = workers
-                
-                # Tampilkan progress bar
-                preprocess_progress.layout.visibility = 'visible'
-                preprocess_progress.value = 0
-                
-                # Gunakan PreprocessingManager 
-                if preprocessing_manager:
-                    display(create_status_indicator("info", "⚙️ Menggunakan PreprocessingManager untuk preprocessing..."))
-                    
-                    try:
-                        # Jalankan preprocessing pipeline
-                        result = preprocessing_manager.run_full_pipeline(
-                            splits=['train', 'valid', 'test'],
-                            validate_dataset=True,
-                            fix_issues=False,
-                            augment_data=False,
-                            analyze_dataset=True
-                        )
-                        
-                        # Tampilkan hasil
-                        if result and result.get('status') == 'success':
-                            display(create_status_indicator(
-                                "success", 
-                                f"✅ Preprocessing pipeline selesai dalam {result.get('elapsed', 0):.2f} detik"
-                            ))
-                            
-                            # Tampilkan statistik preprocessing jika tersedia
-                            validation_stats = result.get('validation', {}).get('train', {}).get('validation_stats', {})
-                            analysis_stats = result.get('analysis', {}).get('train', {}).get('analysis', {})
-                            
-                            # Panel summary di bawah logs accordion
-                            summary_html = f"""
-                            <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
-                                <h4>📊 Preprocessing Summary</h4>
-                                <ul>
-                            """
-                            
-                            if validation_stats:
-                                valid_percent = (validation_stats.get('valid_images', 0) / validation_stats.get('total_images', 1) * 100) if validation_stats.get('total_images', 0) > 0 else 0
-                                summary_html += f"""
-                                    <li><b>Total images:</b> {validation_stats.get('total_images', 'N/A')}</li>
-                                    <li><b>Valid images:</b> {validation_stats.get('valid_images', 'N/A')} ({valid_percent:.1f}%)</li>
-                                """
-                            
-                            if analysis_stats and 'class_balance' in analysis_stats:
-                                imbalance = analysis_stats['class_balance'].get('imbalance_score', 0)
-                                summary_html += f"""
-                                    <li><b>Class imbalance score:</b> {imbalance:.2f}/10</li>
-                                """
-                            
-                            summary_html += f"""
-                                    <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
-                                </ul>
-                            </div>
-                            """
-                            
-                            # Tambahkan summary ke log area
-                            with preprocess_status:
-                                display(HTML(summary_html))
-                            
-                            # Tampilkan tombol cleanup
-                            cleanup_button.layout.display = ''
-                        else:
-                            display(create_status_indicator(
-                                "warning", 
-                                f"⚠️ Preprocessing selesai dengan status: {result.get('status', 'unknown')}"
-                            ))
-                    
-                    except Exception as e:
-                        display(create_status_indicator("error", f"❌ Error dari PreprocessingManager: {str(e)}"))
-                
-                else:
-                    # Pesan error jika PreprocessingManager tidak tersedia
-                    display(create_status_indicator("error", "❌ PreprocessingManager tidak tersedia"))
-                    
-                    # Simulasi preprocessing jika PreprocessingManager tidak tersedia
-                    import time
-                    import random
-                    
-                    # Simulasi progress
-                    total_steps = 5
-                    for i in range(total_steps):
-                        preprocess_progress.value = int((i+1) * 100 / total_steps)
-                        preprocess_progress.description = f"{int((i+1) * 100 / total_steps)}%"
-                        
-                        # Tampilkan pesan progress
-                        if i == 0:
-                            display(create_status_indicator("info", "🔍 Validasi struktur dataset..."))
-                        elif i == 1:
-                            display(create_status_indicator("info", "🖼️ Resize gambar ke " + f"{img_size[0]}x{img_size[1]}..."))
-                        elif i == 2:
-                            display(create_status_indicator("info", "📊 Analisis distribusi kelas..."))
-                        elif i == 3:
-                            display(create_status_indicator("info", "⚖️ Normalisasi gambar..."))
-                        elif i == 4:
-                            display(create_status_indicator("info", "💾 Caching dataset..."))
-                        
-                        # Simulasi delay
-                        time.sleep(0.5)
-                    
-                    display(create_status_indicator("success", "✅ Preprocessing selesai (simulasi)"))
-                    
-                    # Tambahkan summary simulasi
-                    with preprocess_status:
-                        display(HTML(f"""
-                        <div style="background-color: #f8f9fa; padding: 10px; color: black; border-radius: 5px; margin-top: 10px;">
-                            <h4>📊 Preprocessing Summary (Simulated)</h4>
-                            <ul>
-                                <li><b>Total images:</b> {random.randint(800, 1000)}</li>
-                                <li><b>Valid images:</b> {random.randint(750, 950)}</li>
-                                <li><b>Image size:</b> {img_size[0]}x{img_size[1]}</li>
-                            </ul>
-                        </div>
-                        """))
-            
-            except Exception as e:
-                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-            
-            finally:
-                # Sembunyikan progress bar
-                preprocess_progress.layout.visibility = 'hidden'
-                # Enable kembali tombol preprocessing
-                preprocess_button.disabled = False
+    # Setup observers
+    setup_observers()
     
-    # Fungsi cleanup untuk unregister observer
-    def cleanup():
-        if observer_manager:
-            try:
-                observer_manager.unregister_group(preprocessing_observers_group)
-                if logger:
-                    logger.info("✅ Observer untuk preprocessing telah dibersihkan")
-            except Exception as e:
-                if logger:
-                    logger.error(f"❌ Error saat membersihkan observer: {str(e)}")
-    
-    # Register handler
-    preprocess_button.on_click(on_preprocess_click)
-    
-    # Tambahkan fungsi cleanup ke komponen UI
+    # Add cleanup function
     ui_components['cleanup'] = cleanup
-    
-    # Tambahkan tombol cleanup ke UI
-    main_container = ui_components['ui']
-    main_container.children = list(main_container.children) + [cleanup_button]
-    
-    # Inisialisasi UI
-    # Cek apakah dataset sudah dipreprocess
-    if check_preprocessed_dataset():
-        cleanup_button.layout.display = ''
-    
-    # Inisialisasi dari config
-    if config and 'data' in config and 'preprocessing' in config['data']:
-        # Update input fields dari config
-        preproc_config = config['data']['preprocessing']
-        
-        # Setup image size slider
-        if 'img_size' in preproc_config and isinstance(preproc_config['img_size'], list) and len(preproc_config['img_size']) == 2:
-            preprocess_options.children[0].value = preproc_config['img_size']
-        
-        # Setup checkboxes
-        preprocess_options.children[1].value = preproc_config.get('normalize_enabled', True)
-        preprocess_options.children[2].value = preproc_config.get('cache_enabled', True)
-        
-        # Setup worker slider
-        preprocess_options.children[3].value = preproc_config.get('num_workers', 4)
     
     return ui_components

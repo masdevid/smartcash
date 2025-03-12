@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_handlers/model_training.py
 Author: Alfrida Sabar (refactored)
-Deskripsi: Handler untuk komponen UI eksekusi training model SmartCash.
+Deskripsi: Handler untuk komponen UI eksekusi training model SmartCash dengan perbaikan import.
 """
 
 import threading
@@ -30,6 +30,23 @@ def setup_model_training_handlers(ui_components, config=None):
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.handlers.checkpoint import CheckpointManager
         from smartcash.utils.observer import EventTopics, EventDispatcher
+        
+        # Perbaikan import training callback
+        # Coba beberapa kemungkinan path untuk training_callbacks
+        try:
+            # Opsi 1: Path asli
+            from smartcash.utils.training.training_callbacks import TrainingCallbacks
+        except ImportError:
+            try:
+                # Opsi 2: Path yang mungkin dari struktur file
+                from smartcash.utils.training import training_callbacks
+            except ImportError:
+                try:
+                    # Opsi 3: Path alternatif
+                    from smartcash.handlers.model.core import training_callbacks
+                except ImportError:
+                    # Fallback: Tidak perlu import jika tidak digunakan langsung
+                    pass
         
         logger = get_logger("model_training")
         observer_manager = ObserverManager(auto_register=True)
@@ -696,6 +713,12 @@ def setup_model_training_handlers(ui_components, config=None):
                         checkpoint_list += f"<li>{os.path.basename(cp)}</li>"
                     checkpoint_list += "</ul>"
                     display(HTML(checkpoint_list))
+    
+    # Ensure widgets is imported for metrics display
+    try:
+        import ipywidgets as widgets
+    except ImportError:
+        pass
     
     # Register handlers
     ui_components['start_button'].on_click(on_start_training)

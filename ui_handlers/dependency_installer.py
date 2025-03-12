@@ -11,7 +11,6 @@ import threading
 import importlib
 from IPython.display import display, HTML, clear_output
 from ipywidgets import widgets
-
 def setup_dependency_handlers(ui_components):
     """Setup handler untuk komponen UI instalasi dependencies."""
     # Inisialisasi dependencies jika tersedia
@@ -33,27 +32,6 @@ def setup_dependency_handlers(ui_components):
     except ImportError as e:
         print(f"ℹ️ Menggunakan mode fallback: {str(e)}")
         has_utilities = False
-        
-        # Fallback implementation for create_status_indicator
-        def create_status_indicator(status, message):
-            """Fallback implementation untuk status indicator."""
-            status_styles = {
-                'success': {'icon': '✅', 'color': 'green'},
-                'warning': {'icon': '⚠️', 'color': 'orange'},
-                'error': {'icon': '❌', 'color': 'red'},
-                'info': {'icon': 'ℹ️', 'color': 'blue'}
-            }
-            
-            style = status_styles.get(status, status_styles['info'])
-            
-            return HTML(f"""
-            <div style="margin: 5px 0; padding: 8px 12px; 
-                        border-radius: 4px; background-color: #f8f9fa;">
-                <span style="color: {style['color']}; font-weight: bold;"> 
-                    {style['icon']} {message}
-                </span>
-            </div>
-            """)
     
     # State variables
     is_installing = False
@@ -223,10 +201,17 @@ def setup_dependency_handlers(ui_components):
             )
             ui_components['processing_indicator'] = indicator
             
-            # Add to UI next to install button
-            action_group = ui_components['install_button'].parent
-            if action_group is not None:
-                action_group.children = action_group.children + (indicator,)
+            # Add to UI near the buttons
+            # First find the action container which should contain the install button
+            for key, widget in ui_components.items():
+                if isinstance(widget, widgets.HBox) and hasattr(widget, 'children'):
+                    if any(child is ui_components['install_button'] for child in widget.children):
+                        # This is the container with our buttons
+                        action_group = widget
+                        # Add the indicator
+                        children_list = list(action_group.children)
+                        action_group.children = tuple(children_list + [indicator])
+                        break
     
     # Setup logs accordion and processing indicator
     setup_logs_accordion()

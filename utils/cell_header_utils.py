@@ -54,16 +54,8 @@ def setup_notebook_environment(
         from smartcash.utils.config_manager import get_config_manager
         from smartcash.utils.observer.observer_manager import ObserverManager
         
-        # Configure LoggingFactory
-        default_logging_config = {
-            'logs_dir': 'logs',
-            'log_level': 'INFO',
-            'use_emojis': True,
-            'log_to_file': True,
-            'log_to_console': True
-        }
         # Merge default config with provided config
-        logging_config = {**default_logging_config, **(logging_config or {})}
+        logging_config = {**(logging_config or {})}
         LoggingFactory.configure(logging_config)
 
         # Setup logger using LoggingFactory

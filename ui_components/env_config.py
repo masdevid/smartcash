@@ -1,7 +1,7 @@
 """
 File: smartcash/ui_components/env_config.py
-Author: Alfrida Sabar (refactored)
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash
+Author: Refactored
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan desain modular.
 """
 
 import ipywidgets as widgets
@@ -9,78 +9,128 @@ from IPython.display import HTML
 from pathlib import Path
 
 def create_env_config_ui():
-    """Buat UI konfigurasi environment SmartCash"""
-    main = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
+    """
+    Buat komponen UI untuk konfigurasi environment SmartCash.
+    
+    Returns:
+        Dict berisi widget UI dan referensi ke komponen utama
+    """
+    # Container utama
+    main_container = widgets.VBox(layout=widgets.Layout(width='100%', padding='10px'))
     
     # Header
-    header = widgets.HTML("<h1>⚙️ Setup Environment</h1><p>Konfigurasi lingkungan kerja SmartCash</p>")
+    header = widgets.HTML("""
+    <div style="background-color: #f0f8ff; padding: 15px; color: black; 
+              border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+        <h2 style="color: inherit; margin-top: 0;">⚙️ Environment Configuration</h2>
+        <p style="color: inherit; margin-bottom: 0;">Konfigurasi lingkungan kerja SmartCash</p>
+    </div>
+    """)
     
     # Colab info panel
     colab_panel = widgets.HTML("")
     
-    # Button group (horizontal layout)
-    button_group = widgets.HBox(layout=widgets.Layout(display='flex', flex_flow='row wrap'))
+    # Environment info panel
+    info_panel = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            padding='10px',
+            margin='10px 0',
+            max_height='200px',
+            overflow='auto'
+        )
+    )
     
-    # Google Drive button
-    drive_btn = widgets.Button(
+    # Button container
+    button_container = widgets.HBox(layout=widgets.Layout(
+        display='flex',
+        flex_flow='row wrap',
+        margin='10px 0'
+    ))
+    
+    # Drive connection button
+    drive_button = widgets.Button(
         description='Connect Google Drive',
         button_style='info',
         icon='link',
-        tooltip='Connect to Google Drive',
-        layout={'margin': '10px 10px 10px 0', 'display': 'none'}
+        tooltip='Mount and connect to Google Drive',
+        layout=widgets.Layout(
+            margin='0 10px 0 0',
+            display='none'  # Hidden by default
+        )
     )
     
-    # Directory structure button
-    dir_btn = widgets.Button(
+    # Directory setup button
+    dir_button = widgets.Button(
         description='Setup Directory Structure',
         button_style='primary',
         icon='folder-plus',
-        tooltip='Create necessary directories',
-        layout={'margin': '10px 0'}
+        tooltip='Create project directory structure',
+        layout=widgets.Layout(margin='0')
     )
     
-    # Add buttons to horizontal group
-    button_group.children = [drive_btn, dir_btn]
+    # Add buttons to container
+    button_container.children = [drive_button, dir_button]
     
     # Status output
-    status = widgets.Output(layout={'width': '100%', 'border': '1px solid #ddd', 'min_height': '100px', 'margin': '10px 0'})
+    status = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            max_height='300px',
+            margin='10px 0',
+            overflow='auto'
+        )
+    )
     
-    # Help accordion
-    help_info = widgets.Accordion(children=[widgets.HTML("""
-        <div style="padding: 10px;">
-            <h4>Environment Setup</h4>
-            <ol>
-                <li><b>Colab:</b> Klik tombol "Connect Google Drive" untuk menghubungkan ke Google Drive</li>
-                <li><b>Directory:</b> Klik "Setup Directory Structure" untuk membuat struktur direktori project</li>
-            </ol>
-            <p>Struktur direktori yang akan dibuat:</p>
-            <ul>
-                <li><code>data/</code> - Dataset training, validasi, dan testing</li>
-                <li><code>models/</code> - Model yang diexport</li>
-                <li><code>runs/</code> - Hasil training dan deteksi</li>
-                <li><code>configs/</code> - File konfigurasi</li>
-                <li><code>logs/</code> - Log proses</li>
-                <li><code>results/</code> - Hasil evaluasi dan visualisasi</li>
-            </ul>
-        </div>
-    """)], selected_index=None)
-    
-    help_info.set_title(0, "ℹ️ Bantuan")
+    # Info box
+    info_box = widgets.HTML("""
+    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
+             color: #0c5460; margin: 10px 0; border-radius: 4px;">
+        <h4 style="margin-top: 0; color: inherit;">ℹ️ Environment Setup</h4>
+        <p>SmartCash mendukung dua environment kerja:</p>
+        <ul>
+            <li><strong>Google Colab</strong>: Dengan integrasi Google Drive untuk penyimpanan</li>
+            <li><strong>Local</strong>: Untuk pengembangan dan evaluasi di mesin lokal</li>
+        </ul>
+        <p>Struktur direktori yang akan dibuat:</p>
+        <pre style="margin: 0 0 0 10px; color: #0c5460; background: transparent; border: none;">
+data/
+  ├── train/
+  │   ├── images/
+  │   └── labels/
+  ├── valid/
+  │   ├── images/
+  │   └── labels/
+  └── test/
+      ├── images/
+      └── labels/
+configs/
+runs/train/weights/
+logs/
+exports/
+        </pre>
+    </div>
+    """)
     
     # Assemble UI
-    main.children = [
+    main_container.children = [
         header,
         colab_panel,
-        button_group,
+        info_panel,
+        button_container,
         status,
-        help_info
+        info_box
     ]
     
-    # Return components
-    return {
-        'ui': main,
+    # Dictionary untuk akses komponen dari luar
+    ui_components = {
+        'ui': main_container,
         'colab_panel': colab_panel,
-        'drive_button': drive_btn,
-        'dir_button': dir_btn,
+        'info_panel': info_panel,
+        'drive_button': drive_button,
+        'dir_button': dir_button,
         'status': status
     }
+    
+    return ui_components

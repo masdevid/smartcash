@@ -15,7 +15,7 @@ def setup_notebook_environment(
     config_path: Optional[str] = None,
     create_dirs: Optional[List[str]] = None,
     register_cleanup: bool = True,
-    log_level: str = 'INFO'
+    logging_config: Optional[Dict[str, Any]] = None
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Setup standard notebook environment with configuration and logging.
@@ -25,7 +25,7 @@ def setup_notebook_environment(
         config_path: Path to configuration file
         create_dirs: Additional directories to create
         register_cleanup: Auto-register cleanup handler
-        log_level: Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+        logging_config: Custom logging configuration
     
     Returns:
         Tuple of (environment components, configuration)

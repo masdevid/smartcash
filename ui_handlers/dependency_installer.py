@@ -129,24 +129,45 @@ def setup_dependency_handlers(ui_components):
                 'description': 'Memulai instalasi...'
             })
             
-            # Mapping checkbox ke package
+            # Mapping checkbox ke package, diurutkan dari paket terkecil
             package_map = {
-                'yolov5_req': (['yolov5/requirements.txt'], 'YOLOv5 requirements'),
+                'notebook_req': (['tqdm', 'ipywidgets'], 'Notebook tools'),  # Paket terkecil dan ringan
+                'smartcash_req': ([
+                    'termcolor', 'pyyaml', 'python-dotenv'
+                ], 'SmartCash utils'),
+                'matplotlib_req': (['matplotlib'], 'Matplotlib'),
+                'pandas_req': (['pandas'], 'Pandas'),
+                'seaborn_req': (['seaborn'], 'Seaborn'),
+                'opencv_req': (['opencv-python'], 'OpenCV'),
+                'albumentations_req': (['albumentations'], 'Albumentations'),
                 'torch_req': ([
                     'torch', 'torchvision', 'torchaudio', 
                     '--index-url', 'https://download.pytorch.org/whl/cu118'
-                ], 'PyTorch'),
-                'smartcash_req': ([
-                    'pyyaml', 'termcolor', 'tqdm', 'roboflow', 
-                    'python-dotenv', 'ipywidgets'
-                ], 'SmartCash requirements'),
-                'albumentations_req': (['albumentations'], 'Albumentations'),
-                'notebook_req': (['ipywidgets', 'tqdm', 'matplotlib'], 'Notebook tools'),
-                'opencv_req': (['opencv-python'], 'OpenCV'),
-                'matplotlib_req': (['matplotlib'], 'Matplotlib'),
-                'pandas_req': (['pandas'], 'Pandas'),
-                'seaborn_req': (['seaborn'], 'Seaborn')
+                ], 'PyTorch'),  # Paket paling besar dipindah ke akhir
+                'yolov5_req': (['yolov5/requirements.txt'], 'YOLOv5 requirements')
             }
+            
+            # Fungsi untuk mengurutkan paket berdasarkan ukuran dan kompleksitas
+            def sort_packages(packages_to_install):
+                """
+                Urutkan paket dari yang paling ringan ke yang paling berat.
+                """
+                package_weight = {
+                    'Notebook tools': 1,
+                    'SmartCash utils': 2,
+                    'Matplotlib': 3,
+                    'Pandas': 4,
+                    'Seaborn': 5,
+                    'OpenCV': 6,
+                    'Albumentations': 7,
+                    'PyTorch': 9,
+                    'YOLOv5 requirements': 10
+                }
+                
+                return sorted(
+                    packages_to_install, 
+                    key=lambda x: package_weight.get(x[1], 8)
+                )
             
             # Daftar package untuk diinstall
             packages_to_install = []
@@ -172,6 +193,9 @@ def setup_dependency_handlers(ui_components):
                 })
                 status_queue.put({'type': 'complete'})
                 return
+            
+            # Urutkan paket
+            packages_to_install = sort_packages(packages_to_install)
             
             # Proses instalasi
             total_packages = len(packages_to_install)

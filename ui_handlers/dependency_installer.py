@@ -98,6 +98,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 text=True, 
                 check=True
             )
+            print(result.stdout)
             return True, f"✅ {package_name} berhasil diinstall"
         except subprocess.CalledProcessError as e:
             return False, f"❌ Gagal install {package_name}: {e.stderr}"

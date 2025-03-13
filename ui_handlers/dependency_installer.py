@@ -18,7 +18,6 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     """Setup handler untuk instalasi dependencies SmartCash."""
     # Queue thread-safe untuk komunikasi
     status_queue = queue.Queue()
-    
     # Import create_status_indicator from ui_utils
     try:
         from smartcash.utils.ui_utils import create_status_indicator
@@ -32,7 +31,26 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 f"{message}"
                 "</div>"
             )
-    
+    # Check for already installed packages
+    PACKAGE_CHECKS = [
+        ('PyTorch', 'torch'),
+        ('TorchVision', 'torchvision'),
+        ('OpenCV', 'cv2'),
+        ('Albumentations', 'albumentations'),
+        ('NumPy', 'numpy'),
+        ('Pandas', 'pandas'),
+        ('Matplotlib', 'matplotlib'),
+        ('Seaborn', 'seaborn'),
+        ('ipywidgets', 'ipywidgets'),
+        ('tqdm', 'tqdm'),
+        ('PyYAML', 'yaml'),
+        ('termcolor', 'termcolor'),
+        ('python-dotenv', 'dotenv'),
+        ('roboflow', 'roboflow')
+    ]
+
+    installed_packages = _check_installed(PACKAGE_CHECKS)
+
     # Mapping package groups
     PACKAGE_GROUPS = {
         'yolov5_req': {
@@ -124,65 +142,44 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             return process.returncode == 0, f"✅ {package_name} berhasil diinstall"
         except Exception as e:
             return False, f"❌ Gagal install {package_name}: {str(e)}"
-    
+
+    def get_selected_packages():
+        # Track unique packages
+        unique_packages = set()
+        selected_packages = []
+        
+        # Collect selected packages, skipping already installed ones
+        for key, pkg_info in PACKAGE_GROUPS.items():
+            if not ui_components[key].value:
+                continue
+                
+            if key in ['yolov5_req', 'smartcash_req']:
+                # Handle multi-package requirements
+                for req in get_package_requirements(key):
+                    if req not in unique_packages and req not in installed_packages:
+                        unique_packages.add(req)
+                        selected_packages.append((
+                            f"{sys.executable} -m pip install {req}", 
+                            f"{pkg_info['name']}: {req}"
+                        ))
+            elif pkg_info['command'] not in unique_packages:
+                unique_packages.add(pkg_info['command'])
+                selected_packages.append((pkg_info['command'], pkg_info['name']))
+        
+        # Add custom packages, skipping already installed ones
+        for pkg in [p.strip() for p in ui_components['custom_packages'].value.strip().split('\n') if p.strip()]:
+            cmd = f"{sys.executable} -m pip install {pkg}"
+            if cmd not in unique_packages and pkg not in installed_packages:
+                unique_packages.add(cmd)
+                selected_packages.append((cmd, f"Custom: {pkg}"))
+        return selected_packages
+        
     def install_packages_thread():
         """Thread untuk instalasi packages."""
         try:
             # Reset progress
             status_queue.put({'type': 'progress', 'value': 0, 'description': 'Memulai instalasi...'})
-            
-            # Track unique packages
-            unique_packages = set()
-            selected_packages = []
-            
-            # Check for already installed packages
-            package_checks = [
-                ('PyTorch', 'torch'),
-                ('TorchVision', 'torchvision'),
-                ('OpenCV', 'cv2'),
-                ('Albumentations', 'albumentations'),
-                ('NumPy', 'numpy'),
-                ('Pandas', 'pandas'),
-                ('Matplotlib', 'matplotlib'),
-                ('Seaborn', 'seaborn'),
-                ('ipywidgets', 'ipywidgets'),
-                ('tqdm', 'tqdm'),
-                ('PyYAML', 'yaml'),
-                ('termcolor', 'termcolor'),
-                ('python-dotenv', 'dotenv'),
-                ('roboflow', 'roboflow')
-            ]
-            
-            installed_packages = _check_installed(package_checks)
-            display(create_status_indicator(
-                        'success',
-                        f'Paket terinstall: {len(installed_packages)}'
-                    ))
-            # Collect selected packages, skipping already installed ones
-            for key, pkg_info in PACKAGE_GROUPS.items():
-                if not ui_components[key].value:
-                    continue
-                    
-                if key in ['yolov5_req', 'smartcash_req']:
-                    # Handle multi-package requirements
-                    for req in get_package_requirements(key):
-                        if req not in unique_packages and req not in installed_packages:
-                            unique_packages.add(req)
-                            selected_packages.append((
-                                f"{sys.executable} -m pip install {req}", 
-                                f"{pkg_info['name']}: {req}"
-                            ))
-                elif pkg_info['command'] not in unique_packages:
-                    unique_packages.add(pkg_info['command'])
-                    selected_packages.append((pkg_info['command'], pkg_info['name']))
-            
-            # Add custom packages, skipping already installed ones
-            for pkg in [p.strip() for p in ui_components['custom_packages'].value.strip().split('\n') if p.strip()]:
-                cmd = f"{sys.executable} -m pip install {pkg}"
-                if cmd not in unique_packages and pkg not in installed_packages:
-                    unique_packages.add(cmd)
-                    selected_packages.append((cmd, f"Custom: {pkg}"))
-            
+            selected_packages = get_selected_packages()
             # Cek apakah ada package yang dipilih
             if not selected_packages:
                 status_queue.put({
@@ -280,19 +277,20 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 'message': f'❌ Error: {str(e)}'
             })
             status_queue.put({'type': 'complete'})
-    def _check_installed(package_checks: List[Tuple[str, str]]) -> List[str]:
+
+    def _check_installed(checked_packages: List[Tuple[str, str]]) -> List[str]:
         """
         Check if packages are already installed and return a list of packages to skip.
         
         Args:
-            package_checks: List of tuples containing (display_name, import_name) for packages to check.
+            checked_packages: List of tuples containing (display_name, import_name) for packages to check.
         
         Returns:
             List of packages that are already installed.
         """
         installed_packages = []
         
-        for display_name, import_name in package_checks:
+        for display_name, import_name in checked_packages:
             try:
                 module = __import__(import_name)
                 version = getattr(module, '__version__', 'Unknown')
@@ -308,6 +306,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 ))
         
         return installed_packages
+        
     def update_ui_thread():
         """Thread for updating UI from queue."""
         while True:
@@ -365,7 +364,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         # Clear queue
         while not status_queue.empty():
             status_queue.get()
-        
+            
         # Start UI update thread
         ui_thread = threading.Thread(target=update_ui_thread)
         ui_thread.daemon = True
@@ -382,26 +381,8 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             clear_output()
             display(create_status_indicator('info', '🔍 Memeriksa paket terinstall...'))
             
-            # List of packages to check
-            package_checks = [
-                ('PyTorch', 'torch'),
-                ('TorchVision', 'torchvision'),
-                ('OpenCV', 'cv2'),
-                ('Albumentations', 'albumentations'),
-                ('NumPy', 'numpy'),
-                ('Pandas', 'pandas'),
-                ('Matplotlib', 'matplotlib'),
-                ('Seaborn', 'seaborn'),
-                ('ipywidgets', 'ipywidgets'),
-                ('tqdm', 'tqdm'),
-                ('PyYAML', 'yaml'),
-                ('termcolor', 'termcolor'),
-                ('python-dotenv', 'dotenv'),
-                ('roboflow', 'roboflow')
-            ]
-            
             # Check each package
-            _check_installed(package_checks)
+            _check_installed(PACKAGE_CHECKS)
             
             # Check CUDA
             try:

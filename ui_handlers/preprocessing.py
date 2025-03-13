@@ -217,65 +217,65 @@ def setup_preprocessing_handlers(ui_components, config=None):
             clear_output()
             display(create_status_indicator("info", f"🚀 Memulai preprocessing untuk splits: {', '.join(splits)}"))
         
-        # Register observers directly - match with those in manager.py
-        if observer_manager:
-            # Setup logging observer exactly like in manager.py
-            observer_manager.create_logging_observer(
-                event_types=[EventTopics.PREPROCESSING_START, EventTopics.PREPROCESSING_END, EventTopics.PREPROCESSING_ERROR],
-                log_level="debug",
-                name="PreprocessingLogObserver",
-                group="preprocessing_observers"
-            )
-            
-            # Progress observer
-            observer_manager.create_simple_observer(
-                event_type=EventTopics.PREPROCESSING_PROGRESS,
-                callback=lambda _, __, progress=0, total=100, **kwargs: update_progress_ui(progress, total),
-                name="PreprocessingProgressObserver",
-                group="preprocessing_observers"
-            )
-        
-        try:
-            # Run preprocessing directly
-            if preprocessing_manager:
-                validate = True
-                fix_issues = True
-                
-                if 'validation_options' in ui_components and len(ui_components['validation_options'].children) >= 2:
-                    validate = ui_components['validation_options'].children[0].value
-                    fix_issues = ui_components['validation_options'].children[1].value
-                
-                # Run full pipeline directly without thread
-                result = preprocessing_manager.run_full_pipeline(
-                    splits=splits,
-                    validate_dataset=validate,
-                    fix_issues=fix_issues,
-                    augment_data=False,  # No augmentation as per requirement
-                    analyze_dataset=True
+            # Register observers directly - match with those in manager.py
+            if observer_manager:
+                # Setup logging observer exactly like in manager.py
+                observer_manager.create_logging_observer(
+                    event_types=[EventTopics.PREPROCESSING_START, EventTopics.PREPROCESSING_END, EventTopics.PREPROCESSING_ERROR],
+                    log_level="debug",
+                    name="PreprocessingLogObserver",
+                    group="preprocessing_observers"
                 )
                 
-                # Process result
-                if result['status'] == 'success':
-                    # Update progress to 100%
-                    ui_components['progress_bar'].value = 100
+                # Progress observer
+                observer_manager.create_simple_observer(
+                    event_type=EventTopics.PREPROCESSING_PROGRESS,
+                    callback=lambda _, __, progress=0, total=100, **kwargs: update_progress_ui(progress, total),
+                    name="PreprocessingProgressObserver",
+                    group="preprocessing_observers"
+                )
+            
+            try:
+                # Run preprocessing directly
+                if preprocessing_manager:
+                    validate = True
+                    fix_issues = True
                     
-                    with ui_components['preprocess_status']:
-                        display(create_status_indicator("success", f"✅ Preprocessing selesai dalam {result['elapsed']:.2f} detik"))
+                    if 'validation_options' in ui_components and len(ui_components['validation_options'].children) >= 2:
+                        validate = ui_components['validation_options'].children[0].value
+                        fix_issues = ui_components['validation_options'].children[1].value
                     
-                    # Show summary
-                    update_summary(result)
+                    # Run full pipeline directly without thread
+                    result = preprocessing_manager.run_full_pipeline(
+                        splits=splits,
+                        validate_dataset=validate,
+                        fix_issues=fix_issues,
+                        augment_data=False,  # No augmentation as per requirement
+                        analyze_dataset=True
+                    )
+                    
+                    # Process result
+                    if result['status'] == 'success':
+                        # Update progress to 100%
+                        ui_components['progress_bar'].value = 100
+                        
+                        with ui_components['preprocess_status']:
+                            display(create_status_indicator("success", f"✅ Preprocessing selesai dalam {result['elapsed']:.2f} detik"))
+                        
+                        # Show summary
+                        update_summary(result)
+                    else:
+                        with ui_components['preprocess_status']:
+                            display(create_status_indicator("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}"))
                 else:
                     with ui_components['preprocess_status']:
-                        display(create_status_indicator("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}"))
-            else:
+                        display(create_status_indicator("error", "❌ PreprocessingManager tidak tersedia"))
+            except Exception as e:
                 with ui_components['preprocess_status']:
-                    display(create_status_indicator("error", "❌ PreprocessingManager tidak tersedia"))
-        except Exception as e:
-            with ui_components['preprocess_status']:
-                display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-        finally:
-            # Reset UI state
-            update_ui_state(False)
+                    display(create_status_indicator("error", f"❌ Error: {str(e)}"))
+            finally:
+                # Reset UI state
+                update_ui_state(False)
     
     # Helper function for progress updates
     def update_progress_ui(progress, total):

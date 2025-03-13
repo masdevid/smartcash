@@ -288,24 +288,27 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         Returns:
             List of packages that are already installed.
         """
-        installed_packages = []
-        
-        for display_name, import_name in checked_packages:
-            try:
-                module = __import__(import_name)
-                version = getattr(module, '__version__', 'Unknown')
-                installed_packages.append(import_name)
-                display(create_status_indicator(
-                    'success', 
-                    f'{display_name}: v{version} (sudah terinstall)'
-                ))
-            except ImportError:
-                display(create_status_indicator(
-                    'warning',
-                    f'{display_name}: Tidak terinstall'
-                ))
-        
-        return installed_packages
+        with ui_components['status']:
+            clear_output()
+            display(create_status_indicator('info', 'Memeriksa paket terinstall...'))
+            installed_packages = []
+            
+            for display_name, import_name in checked_packages:
+                try:
+                    module = __import__(import_name)
+                    version = getattr(module, '__version__', 'Unknown')
+                    installed_packages.append(import_name)
+                    display(create_status_indicator(
+                        'success', 
+                        f'{display_name}: v{version} (sudah terinstall)'
+                    ))
+                except ImportError:
+                    display(create_status_indicator(
+                        'warning',
+                        f'{display_name}: Tidak terinstall'
+                    ))
+            
+            return installed_packages
         
     def update_ui_thread():
         """Thread for updating UI from queue."""
@@ -364,7 +367,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         # Clear queue
         while not status_queue.empty():
             status_queue.get()
-            
+
         # Start UI update thread
         ui_thread = threading.Thread(target=update_ui_thread)
         ui_thread.daemon = True

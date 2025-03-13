@@ -118,10 +118,7 @@ def create_dependency_installer_ui():
     )
     
     # Info box
-    info_box = create_info_box("""
-    <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
-             color: #0c5460; margin: 10px 0; border-radius: 4px;">
-        <h4 style="margin-top: 0; color: inherit;">ℹ️ Package Installation</h4>
+    info_box = create_info_box("Tentang Package Installation", """
         <p>Package diurutkan instalasi dari kecil ke besar untuk efisiensi:</p>
         <ol>
             <li><strong>Notebook tools</strong>: ipywidgets, tqdm (kecil, diperlukan UI)</li>
@@ -130,7 +127,6 @@ def create_dependency_installer_ui():
             <li><strong>Computer vision</strong>: OpenCV, Albumentations (besar)</li>
             <li><strong>Machine learning</strong>: PyTorch (paling besar)</li>
         </ol>
-    </div>
     """, 'info',collapsed=True)
     
     # Assemble UI

@@ -1,22 +1,19 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
-Author: Optimasi async progress tracking
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan async progress tracking.
+Author: Optimasi dengan expanded logging
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan logging yang lebih verbose dan event tracking.
 """
 
-import asyncio
-import threading
-import time
-import shutil
+import threading, time, shutil, asyncio
 from pathlib import Path
 from IPython.display import display, clear_output, HTML
 
 def setup_preprocessing_handlers(ui_components, config=None):
-    """Setup handlers untuk UI preprocessing dataset."""
+    """Setup handlers untuk UI preprocessing dataset dengan logging yang lebih detail."""
     if not ui_components:
         return {}
 
-    # Import dependencies dengan minimal error handling
+    # Import dependencies dengan fallback siap pakai
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.preprocessing import PreprocessingManager
@@ -29,6 +26,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
         logger = get_logger("preprocessing")
         config_manager = get_config_manager(logger=logger)
         observer_manager = ObserverManager(auto_register=True)
+        
+        # Clean up existing observers
         observer_group = "preprocessing_observers"
         observer_manager.unregister_group(observer_group)
         
@@ -53,6 +52,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 'data_dir': 'data'
             }
             config_manager.save_config(config, "configs/preprocessing_config.yaml")
+            log_event("info", "📝 Konfigurasi default dibuat untuk preprocessing")
     except ImportError as e:
         # Fallback minimal function
         def create_status_indicator(status, message):
@@ -61,7 +61,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
         
         if 'preprocess_status' in ui_components:
             with ui_components['preprocess_status']:
-                display(HTML(f"<p style='color:red'>⚠️ Limited functionality: {str(e)}</p>"))
+                display(HTML(f"<p style='color:red'>⚠️ Fungsi terbatas - package tidak lengkap: {str(e)}</p>"))
         return ui_components
     
     # Shared state variables
@@ -69,26 +69,36 @@ def setup_preprocessing_handlers(ui_components, config=None):
         'processing': False,
         'stop_requested': False,
         'preprocessing_manager': None,
-        'current_split': None
+        'current_split': None,
+        'start_time': 0,
+        'last_log_time': 0,
+        'progress_updates': 0
     }
     
-    # Initialize PreprocessingManager secara lazy untuk efisiensi
+    # Helper untuk logging ke output UI
+    def log_event(status, message):
+        """Log pesan ke status output dengan format konsisten."""
+        if 'preprocess_status' in ui_components:
+            timestamp = time.strftime("%H:%M:%S")
+            with ui_components['preprocess_status']:
+                display(HTML(
+                    f"<div style='padding:5px; margin:3px 0; border-left:3px solid "
+                    f"{'#28a745' if status == 'success' else '#dc3545' if status == 'error' else '#ffc107' if status == 'warning' else '#17a2b8'}'>"
+                    f"<span style='color:#6c757d; font-size:0.8em'>[{timestamp}]</span> {message}"
+                    f"</div>"
+                ))
+    
+    # Initialize PreprocessingManager secara lazy
     def get_preprocessing_manager():
         if not state['preprocessing_manager']:
-            # Get paths for display
+            # Get paths
             data_dir = config.get('data_dir', 'data')
             output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
             
-            # Update data directory info in UI
-            with ui_components['preprocess_status']:
-                display(HTML(
-                    f"""<div style="padding:8px;margin:5px 0;background:#f8f9fa;border-left:3px solid #007bff;color:#333">
-                    <p style="margin:0">📁 <b>Data directory:</b> {data_dir}</p>
-                    <p style="margin:0">📂 <b>Preprocessing directory:</b> {output_dir}</p>
-                    </div>"""
-                ))
+            log_event("info", f"📂 Inisialisasi preprocessing dari: <b>{data_dir}</b> ke <b>{output_dir}</b>")
             
             state['preprocessing_manager'] = PreprocessingManager(config=config, logger=logger)
+            log_event("success", "✅ PreprocessingManager berhasil diinisialisasi")
         return state['preprocessing_manager']
     
     # Update UI untuk kondisi processing
@@ -110,13 +120,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
         if 'log_accordion' in ui_components and is_processing:
             ui_components['log_accordion'].selected_index = 0
     
-    # Consolidated progress tracking function
+    # Progress tracking function with better verbosity
     def update_progress(event_type, sender, progress=0, total=100, message=None, split=None, **kwargs):
-        """Unified progress handler untuk semua jenis progress."""
+        """Enhanced progress handler dengan verbose logging."""
         if state['stop_requested']:
             return
-        
-        # Tentukan bar yang akan diupdate berdasarkan jenis event
+            
+        current_time = time.time()
         if event_type == EventTopics.PREPROCESSING_PROGRESS:
             # Overall progress bar
             progress_bar = ui_components.get('progress_bar')
@@ -124,6 +134,12 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 progress_pct = int(progress * 100 / total) if total > 0 else 0
                 progress_bar.value = progress_pct
                 progress_bar.description = f"{progress_pct}%"
+                
+                # Log periodic updates (not too frequent)
+                if current_time - state['last_log_time'] > 2.0 or progress_pct % 20 == 0:
+                    elapsed = current_time - state['start_time']
+                    log_event("info", f"⏱️ Progress: <b>{progress_pct}%</b> ({progress}/{total}) setelah {elapsed:.1f}s")
+                    state['last_log_time'] = current_time
         elif event_type in [EventTopics.VALIDATION_PROGRESS, EventTopics.AUGMENTATION_PROGRESS]:
             # Current operation progress bar
             current_bar = ui_components.get('current_progress')
@@ -132,26 +148,32 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 current_bar.value = progress_pct
                 current_bar.description = f"{progress_pct}%"
                 
-                # Increment overall progress slightly with each update
+                # Log more detailed updates for current operations
+                state['progress_updates'] += 1
+                if state['progress_updates'] % 5 == 0 or progress_pct % 25 == 0:
+                    split_info = f"({split})" if split else ""
+                    task_type = "validasi" if event_type == EventTopics.VALIDATION_PROGRESS else "augmentasi"
+                    log_event("info", f"🔄 {task_type.capitalize()} {split_info}: <b>{progress_pct}%</b> ({progress}/{total})")
+                
+                # Increment overall progress
                 overall_bar = ui_components.get('progress_bar')
                 if overall_bar:
                     # Use a slower increment for overall progress
                     increment = min(5, (100 - overall_bar.value) / 10)
                     overall_bar.value = min(95, overall_bar.value + increment)
         
-        # Display message jika ada
-        if message and 'preprocess_status' in ui_components:
+        # Always display specific operation messages
+        if message and message.strip():
             with ui_components['preprocess_status']:
-                # Add split info if available
                 split_info = f" ({split})" if split else ""
                 display(create_status_indicator("info", f"{message}{split_info}"))
     
-    # Setup observers untuk progress tracking
+    # Setup observers untuk enhanced progress tracking
     if observer_manager:
-        # Consolidated progress observer
+        # Setup detailed progress observer
         for event_type in [EventTopics.PREPROCESSING_PROGRESS, 
-                           EventTopics.VALIDATION_PROGRESS, 
-                           EventTopics.AUGMENTATION_PROGRESS]:
+                          EventTopics.VALIDATION_PROGRESS, 
+                          EventTopics.AUGMENTATION_PROGRESS]:
             observer_manager.create_simple_observer(
                 event_type=event_type,
                 callback=update_progress,
@@ -159,29 +181,29 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 group=observer_group
             )
         
-        # Logging observer for main events
-        observer_manager.create_logging_observer(
-            event_types=[
-                EventTopics.PREPROCESSING_START, 
-                EventTopics.PREPROCESSING_END, 
-                EventTopics.PREPROCESSING_ERROR, 
-                EventTopics.VALIDATION_EVENT,
-                EventTopics.VALIDATION_START,
-                EventTopics.VALIDATION_END
-            ],
-            logger_name="preprocessing", 
-            name="LogObserver", 
-            group=observer_group
-        )
-    
-    # Status display helper
-    def display_status(status_type, message):
-        if 'preprocess_status' in ui_components:
-            with ui_components['preprocess_status']:
-                display(create_status_indicator(status_type, message))
+        # Setup specific event observers
+        for event_type, icon, desc in [
+            (EventTopics.PREPROCESSING_START, "🚀", "Preprocessing dimulai"),
+            (EventTopics.PREPROCESSING_END, "✅", "Preprocessing selesai"),
+            (EventTopics.PREPROCESSING_ERROR, "❌", "Error preprocessing"),
+            (EventTopics.VALIDATION_START, "🔍", "Validasi dimulai"),
+            (EventTopics.VALIDATION_END, "✓", "Validasi selesai")
+        ]:
+            observer_manager.create_simple_observer(
+                event_type=event_type,
+                callback=lambda event_type, sender, message=None, **kwargs: 
+                    log_event(
+                        "success" if "END" in str(event_type) else
+                        "error" if "ERROR" in str(event_type) else "info", 
+                        f"{icon} {message or desc}"
+                    ),
+                name=f"EventObserver_{event_type}",
+                group=observer_group
+            )
     
     # Get preprocessing config from UI
     def get_config_from_ui():
+        """Baca parameter dari UI dan update config."""
         # Baca parameter dari UI
         opts = ui_components['preprocess_options'].children
         img_size = opts[0].value if len(opts) > 0 else [640, 640]
@@ -219,6 +241,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
         # Save config
         if config_manager:
             config_manager.save_config(config, "configs/preprocessing_config.yaml")
+            log_event("info", "📝 Konfigurasi preprocessing diperbarui dan disimpan")
         
         return config
     
@@ -245,7 +268,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             
             # Validation stats table
             if validation_stats:
-                display(HTML("<h3>📊 Preprocessing Results</h3><h4>🔍 Validation</h4>"))
+                display(HTML("<h3>📊 Hasil Preprocessing</h3><h4>🔍 Validation</h4>"))
                 
                 stat_table = "<table style='width:100%; border-collapse:collapse'><tr style='background:#f2f2f2'>"
                 stat_table += "<th>Split</th><th>Total</th><th>Valid</th><th>Invalid</th><th>Rate</th></tr>"
@@ -262,7 +285,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             
             # Class distribution
             if analysis_stats:
-                display(HTML("<h4>📊 Class Distribution</h4>"))
+                display(HTML("<h4>📊 Distribusi Kelas</h4>"))
                 
                 for split, stats in analysis_stats.items():
                     if 'class_distribution' in stats:
@@ -281,18 +304,43 @@ def setup_preprocessing_handlers(ui_components, config=None):
             
             # Execution info
             if 'elapsed' in result:
-                display(HTML(f"<p><b>⏱️ Execution time:</b> {result['elapsed']:.2f} seconds</p>"))
+                display(HTML(f"<p><b>⏱️ Waktu eksekusi:</b> {result['elapsed']:.2f} detik</p>"))
             
             output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
             display(HTML(f"<p><b>📂 Output:</b> {output_dir}</p>"))
+            
+            # Log summary completion
+            log_event("success", f"✅ Preprocessing selesai dengan {sum(len(stats.get('class_distribution', {})) for split, stats in analysis_stats.items() if 'class_distribution' in stats)} kelas")
         
         # Show summary & cleanup button
         ui_components['summary_container'].layout.display = 'block'
         ui_components['cleanup_button'].layout.display = 'inline-block'
     
+    # Heartbeat untuk progress updates
+    async def progress_heartbeat():
+        """Send periodic progress updates ketika tidak ada event dari observers."""
+        while state['processing'] and not state['stop_requested']:
+            current_time = time.time()
+            elapsed = current_time - state['start_time']
+            
+            # Tambahkan log tiap 5 detik jika tidak ada update dari progress observer
+            if current_time - state['last_log_time'] > 5.0:
+                split = state['current_split'] or 'current'
+                progress_bar = ui_components.get('progress_bar')
+                progress_pct = progress_bar.value if progress_bar else 0
+                
+                log_event("info", f"⏱️ Masih memproses {split}: {progress_pct}% setelah {elapsed:.1f}s")
+                state['last_log_time'] = current_time
+                
+                # Increment progress bar sedikit untuk menunjukkan masih berjalan
+                if progress_bar and progress_pct < 95:
+                    progress_bar.value += 1
+                
+            await asyncio.sleep(5.0)
+    
     # Main preprocessing function
     async def process_dataset(splits=None):
-        """Async function to run preprocessing on selected splits."""
+        """Async function untuk run preprocessing dengan monitoring yang lebih baik."""
         if splits is None:
             # Parse splits from UI
             split_map = {
@@ -303,53 +351,59 @@ def setup_preprocessing_handlers(ui_components, config=None):
             }
             splits = split_map.get(ui_components['split_selector'].value, DEFAULT_SPLITS)
         
-        ui_components['progress_bar'].value = 5  # Show initial progress
+        state['start_time'] = time.time()
+        state['last_log_time'] = state['start_time']
+        state['progress_updates'] = 0
         
-        # Setup progress updater
-        async def update_overall_progress():
-            """Periodically update the overall progress while processing runs"""
-            progress = 5
-            while state['processing'] and not state['stop_requested']:
-                # Only increment if not already at max
-                if progress < 90:
-                    progress += 2
-                    ui_components['progress_bar'].value = progress
-                await asyncio.sleep(0.5)
+        # Print the splits that will be processed
+        log_event("info", f"🔧 Memproses split: <b>{', '.join(splits)}</b>")
+        
+        # Init progress
+        ui_components['progress_bar'].value = 5
+        
+        # Start heartbeat task for continuous progress updates
+        heartbeat_task = asyncio.create_task(progress_heartbeat())
         
         try:
             # Get preprocessor manager
             manager = get_preprocessing_manager()
             
-            # Start progress updater
-            progress_task = asyncio.create_task(update_overall_progress())
-            
             # Notifikasi start
             notify(
                 event_type=EventTopics.PREPROCESSING_START,
                 sender="preprocessing_handler",
-                message="Memulai preprocessing dataset"
+                message=f"Memulai preprocessing untuk {len(splits)} split"
             )
             
-            # Create a thread for the actual processing since it's blocking
+            # Create a thread for the actual processing
             result_event = threading.Event()
             result_container = {}
             
             def run_preprocessing():
                 try:
+                    for i, split in enumerate(splits):
+                        state['current_split'] = split
+                        log_event("info", f"🔄 Memproses split: <b>{split}</b> ({i+1}/{len(splits)})")
+                    
+                    validate = config['data']['preprocessing']['validation']['enabled']
+                    fix_issues = config['data']['preprocessing']['validation']['fix_issues']
+                    
                     result = manager.run_full_pipeline(
                         splits=splits,
-                        validate_dataset=config['data']['preprocessing']['validation']['enabled'],
-                        fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
+                        validate_dataset=validate,
+                        fix_issues=fix_issues, 
                         augment_data=False,
                         analyze_dataset=True
                     )
                     result_container['result'] = result
                 except Exception as e:
                     result_container['error'] = str(e)
+                    log_event("error", f"❌ Error: {str(e)}")
                 finally:
                     result_event.set()
             
             # Start processing thread
+            log_event("info", "🚀 Menjalankan preprocessing pipeline...")
             processing_thread = threading.Thread(target=run_preprocessing)
             processing_thread.daemon = True
             processing_thread.start()
@@ -358,17 +412,17 @@ def setup_preprocessing_handlers(ui_components, config=None):
             while not result_event.is_set() and not state['stop_requested']:
                 await asyncio.sleep(0.1)
             
-            # Cancel progress updater
-            progress_task.cancel()
+            # Cancel heartbeat
+            heartbeat_task.cancel()
             
             if state['stop_requested']:
-                display_status("warning", "⚠️ Processing was stopped by user")
+                log_event("warning", "⚠️ Preprocessing dihentikan oleh user")
                 ui_components['progress_bar'].value = 0
                 return {'status': 'stopped'}
             
             # Process result
             if 'error' in result_container:
-                display_status("error", f"❌ Preprocessing failed: {result_container['error']}")
+                log_event("error", f"❌ Preprocessing gagal: {result_container['error']}")
                 notify(
                     event_type=EventTopics.PREPROCESSING_ERROR,
                     sender="preprocessing_handler",
@@ -378,8 +432,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
             
             result = result_container['result']
             if result['status'] == 'success':
-                ui_components['progress_bar'].value = 100  # Complete progress
-                display_status("success", f"✅ Preprocessing selesai dalam {result.get('elapsed', 0):.2f} detik")
+                ui_components['progress_bar'].value = 100
+                elapsed = time.time() - state['start_time']
+                log_event("success", f"✅ Preprocessing selesai dalam {elapsed:.2f} detik")
                 update_summary(result)
                 
                 # Notify completion
@@ -389,7 +444,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     result=result
                 )
             else:
-                display_status("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}")
+                log_event("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}")
                 notify(
                     event_type=EventTopics.PREPROCESSING_ERROR,
                     sender="preprocessing_handler",
@@ -399,7 +454,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             return result
             
         except Exception as e:
-            display_status("error", f"❌ Error: {str(e)}")
+            log_event("error", f"❌ Unexpected error: {str(e)}")
             notify(
                 event_type=EventTopics.PREPROCESSING_ERROR,
                 sender="preprocessing_handler",
@@ -420,7 +475,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             await process_dataset()
             
         except Exception as e:
-            display_status("error", f"❌ Unexpected error: {str(e)}")
+            log_event("error", f"❌ Unexpected error: {str(e)}")
         finally:
             state['processing'] = False
             state['stop_requested'] = False
@@ -453,13 +508,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     f"""<div style="padding:10px; background-color:#fff3cd; color:#856404; 
                     border-left:4px solid #856404; border-radius:4px; margin:10px 0;">
                     <h4 style="margin-top:0;">⚠️ Preprocessed data already exists</h4>
-                    <p>Directory <code>{preproc_dir}</code> already contains preprocessed data.</p>
-                    <p>Continuing will overwrite existing data. Do you want to proceed?</p>
+                    <p>Directory <code>{preproc_dir}</code> sudah berisi data.</p>
+                    <p>Melanjutkan akan menimpa data yang ada. Lanjutkan?</p>
                     </div>"""
                 ),
                 widgets.HBox([
-                    widgets.Button(description="Cancel", button_style="danger"),
-                    widgets.Button(description="Proceed", button_style="primary")
+                    widgets.Button(description="Batal", button_style="danger"),
+                    widgets.Button(description="Lanjutkan", button_style="primary")
                 ])
             ])
             
@@ -471,12 +526,12 @@ def setup_preprocessing_handlers(ui_components, config=None):
             def on_cancel(b):
                 with ui_components['preprocess_status']:
                     clear_output()
-                    display(create_status_indicator("info", "Operation cancelled"))
+                    log_event("info", "Operasi dibatalkan")
                     
             def on_proceed(b):
                 with ui_components['preprocess_status']:
                     clear_output()
-                    display(create_status_indicator("info", "🔄 Proceeding with preprocessing..."))
+                    log_event("info", "🔄 Memulai preprocessing...")
                 
                 # Reset UI elements
                 ui_components['progress_bar'].value = 0
@@ -486,7 +541,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 update_ui_for_processing(True)
                 
                 # Start preprocessing thread
-                threading.Thread(target=run_async_preprocessing).start()
+                threading.Thread(target=run_async_preprocessing, daemon=True).start()
             
             confirm_box.children[1].children[0].on_click(on_cancel)
             confirm_box.children[1].children[1].on_click(on_proceed)
@@ -498,13 +553,17 @@ def setup_preprocessing_handlers(ui_components, config=None):
             ui_components['cleanup_button'].layout.display = 'none'
             update_ui_for_processing(True)
             
+            with ui_components['preprocess_status']:
+                clear_output()
+                log_event("info", "🚀 Memulai preprocessing dataset...")
+            
             # Start preprocessing thread
-            threading.Thread(target=run_async_preprocessing).start()
+            threading.Thread(target=run_async_preprocessing, daemon=True).start()
     
     # Handler for stop button
     def on_stop_click(b):
         state['stop_requested'] = True
-        display_status("warning", "⚠️ Stopping preprocessing...")
+        log_event("warning", "⚠️ Menghentikan preprocessing...")
         
         # Update UI after short delay
         def delayed_ui_update():
@@ -518,7 +577,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
         notify(
             event_type=EventTopics.PREPROCESSING_END,
             sender="preprocessing_handler",
-            message="Preprocessing stopped by user"
+            message="Preprocessing dihentikan oleh user"
         )
     
     # Handler for cleanup button
@@ -531,14 +590,14 @@ def setup_preprocessing_handlers(ui_components, config=None):
             widgets.HTML(
                 f"""<div style="padding:10px; background-color:#fff3cd; color:#856404; 
                 border-left:4px solid #856404; border-radius:4px; margin:10px 0;">
-                <h4 style="margin-top:0;">⚠️ Confirm Data Cleanup</h4>
-                <p>This will delete all preprocessed data in <code>{preproc_dir}</code>.</p>
-                <p>Original dataset will not be affected. Do you want to proceed?</p>
+                <h4 style="margin-top:0;">⚠️ Konfirmasi Pembersihan Data</h4>
+                <p>Menghapus semua data preprocessed di <code>{preproc_dir}</code>.</p>
+                <p>Dataset asli tidak akan terpengaruh. Lanjutkan?</p>
                 </div>"""
             ),
             widgets.HBox([
-                widgets.Button(description="Cancel", button_style="warning"),
-                widgets.Button(description="Delete Preprocessed Data", button_style="danger")
+                widgets.Button(description="Batal", button_style="warning"),
+                widgets.Button(description="Hapus Data", button_style="danger")
             ])
         ])
         
@@ -549,13 +608,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
         # Button handlers
         def on_cancel(b):
             with ui_components['preprocess_status']:
-                clear_output() 
-                display(create_status_indicator("info", "Operation cancelled"))
+                clear_output()
+                log_event("info", "Operasi dibatalkan")
         
         def on_confirm_delete(b):
             with ui_components['preprocess_status']:
                 clear_output()
-                display(create_status_indicator("info", "🗑️ Cleaning preprocessed data..."))
+                log_event("info", "🗑️ Membersihkan data preprocessed...")
             
             try:
                 if preproc_path.exists():
@@ -565,21 +624,21 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         utils = DatasetUtils(config, logger=logger)
                         backup_path = utils.backup_directory(preproc_path, suffix="backup_before_delete")
                         if backup_path:
-                            display_status("info", f"📦 Backup created: {backup_path}")
+                            log_event("info", f"📦 Backup dibuat: {backup_path}")
                     except ImportError:
                         pass
                     
                     # Delete preprocessing directory
                     shutil.rmtree(preproc_path)
-                    display_status("success", f"✅ Removed: {preproc_dir}")
+                    log_event("success", f"✅ Dihapus: {preproc_dir}")
                     
                     # Hide cleanup button and summary
                     ui_components['cleanup_button'].layout.display = 'none'
                     ui_components['summary_container'].layout.display = 'none'
                 else:
-                    display_status("info", f"ℹ️ Not found: {preproc_dir}")
+                    log_event("info", f"ℹ️ Direktori tidak ditemukan: {preproc_dir}")
             except Exception as e:
-                display_status("error", f"❌ Error: {str(e)}")
+                log_event("error", f"❌ Error: {str(e)}")
         
         # Register button handlers
         confirm_box.children[1].children[0].on_click(on_cancel)
@@ -588,7 +647,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Handler for Save Config button
     def on_save_config_click(b):
         get_config_from_ui()  # Updates and saves config
-        display_status("success", "✅ Configuration saved")
+        log_event("success", "✅ Konfigurasi tersimpan")
     
     # Setup UI from config
     def init_ui():
@@ -619,67 +678,16 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     if 'invalid_dir' in val_cfg:
                         v_opts[3].value = val_cfg['invalid_dir']
         
-        # Display data and preprocessing directories
+        # Display directories
         data_dir = config.get('data_dir', 'data')
         output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
         with ui_components['preprocess_status']:
-            display(HTML(
-                f"""<div style="padding:8px;margin:5px 0;background:#f8f9fa;border-left:3px solid #007bff;color:#333">
-                <p style="margin:0">📁 <b>Data directory:</b> {data_dir}</p>
-                <p style="margin:0">📂 <b>Preprocessing directory:</b> {output_dir}</p>
-                </div>"""
-            ))
-    
-    # Add Save Config button
-    try:
-        import ipywidgets as widgets
-        save_config_button = widgets.Button(
-            description='Save Config',
-            button_style='info',
-            icon='save'
-        )
-        save_config_button.on_click(on_save_config_click)
-        
-        # Add to UI components
-        ui_components['save_config_button'] = save_config_button
-        
-        # Find suitable button container or create one
-        button_container = None
-        for child in ui_components['ui'].children:
-            if isinstance(child, widgets.HBox) and hasattr(child, 'children'):
-                if any(btn is ui_components['preprocess_button'] for btn in child.children):
-                    button_container = child
-                    break
-        
-        if button_container:
-            # Add to existing container
-            new_buttons = list(button_container.children) + [save_config_button]
-            button_container.children = tuple(new_buttons)
-    except ImportError:
-        pass  # Can't add the button without ipywidgets
-    
-    # Register event handlers
-    ui_components['preprocess_button'].on_click(on_preprocess_click)
-    ui_components['stop_button'].on_click(on_stop_click)
-    ui_components['cleanup_button'].on_click(on_cleanup_click)
-    
-    # Initialize UI from config
-    init_ui()
-    
-    # Cleanup function
-    def cleanup():
-        """Clean up resources when cell is rerun or notebook is closed."""
-        state['stop_requested'] = True
-        
-        if observer_manager:
-            observer_manager.unregister_group(observer_group)
-        
-        update_ui_for_processing(False)
-        
-        if logger:
-            logger.info("✅ Preprocessing handlers cleaned up")
-    
-    # Add cleanup to UI components
-    ui_components['cleanup'] = cleanup
-    
-    return ui_components
+            log_event("info", f"📁 Data: <b>{data_dir}</b> → Preprocessing: <b>{output_dir}</b>")
+            
+        # Check if preprocessed directory already exists
+        preproc_path = Path(output_dir)
+        if preproc_path.exists() and any(preproc_path.iterdir()):
+            ui_components['cleanup_button'].layout.display = 'inline-block'
+            log_event("info", f"💡 Preprocessed data terdeteksi: {output_dir}")
+        else:
+            ui_components['cleanup_button'].layout.display = 'none'

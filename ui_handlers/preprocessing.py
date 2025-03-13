@@ -4,7 +4,7 @@ Author: Alfrida Sabar (optimized)
 Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan pendekatan robust dan modular.
 """
 
-import asyncio  # Added for async support
+import threading
 import time
 from pathlib import Path
 import ipywidgets as widgets
@@ -20,7 +20,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.preprocessing import PreprocessingManager
-        from smartcash.utils.observer import EventTopics, EventDispatcher
+        from smartcash.utils.observer import EventTopics, notify
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.environment_manager import EnvironmentManager
         from smartcash.utils.config_manager import get_config_manager
@@ -313,8 +313,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
             config_manager.save_config(updated_config, "configs/preprocessing_config.yaml", sync_to_drive=True)
             display_status("success", "✅ Configuration saved to configs/preprocessing_config.yaml")
     
-    async def start_preprocessing():
-        nonlocal processing_active, stop_requested  # Ensure these variables are accessible
+    # Main preprocessing function
+    def start_preprocessing():
+        nonlocal processing_active, stop_requested
         
         # Update config from UI
         get_config_from_ui()
@@ -334,17 +335,16 @@ def setup_preprocessing_handlers(ui_components, config=None):
             splits = split_map.get(ui_components['split_selector'].value, ['train', 'valid', 'test'])
             
             # Notify start
-            if 'EventDispatcher' in globals():
-                EventDispatcher.notify(
+            if 'notify' in globals():
+                notify(
                     event_type=EventTopics.PREPROCESSING_START, 
                     sender="preprocessing_handler",
                     message="Starting preprocessing pipeline"
                 )
             
             if not stop_requested:
-                # Run pipeline asynchronously
-                result = await asyncio.to_thread(
-                    preprocessing_manager.run_full_pipeline,
+                # Run pipeline
+                result = preprocessing_manager.run_full_pipeline(
                     splits=splits, 
                     validate_dataset=config['data']['preprocessing']['validation']['enabled'],
                     fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
@@ -356,50 +356,59 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 if result['status'] == 'success':
                     display_status("success", f"✅ Preprocessing completed in {result.get('elapsed', 0):.2f} seconds")
                     update_summary(result)
-                    if 'EventDispatcher' in globals():
-                        EventDispatcher.notify(
+                    if 'notify' in globals():
+                        notify(
                             event_type=EventTopics.PREPROCESSING_END, 
                             sender="preprocessing_handler",
                             result=result
                         )
                 else:
                     display_status("error", f"❌ Preprocessing failed: {result.get('error', 'Unknown error')}")
-                    if 'EventDispatcher' in globals():
-                        EventDispatcher.notify(
+                    if 'notify' in globals():
+                        notify(
                             event_type=EventTopics.PREPROCESSING_ERROR, 
                             sender="preprocessing_handler",
                             error=result.get('error', 'Unknown error')
                         )
         except Exception as e:
             display_status("error", f"❌ Error: {str(e)}")
-            if 'EventDispatcher' in globals():
-                EventDispatcher.notify(
+            if 'notify' in globals():
+                notify(
                     event_type=EventTopics.PREPROCESSING_ERROR, 
                     sender="preprocessing_handler", 
                     error=str(e)
                 )
         finally:
-            processing_active = False  # Ensure this is always set
+            processing_active = False
             stop_requested = False
             update_ui_for_processing(False)
-
-    async def on_preprocess_click(b):
-        nonlocal processing_active  # Ensure this variable is accessible
+    
+    # Thread handler for preprocessing
+    def run_preprocessing_thread():
+        nonlocal processing_active
         
+        if processing_active:
+            return
+        
+        processing_active = True
+        ui_components['progress_bar'].value = 0
+        ui_components['current_progress'].value = 0
+        ui_components['summary_container'].layout.display = 'none'
+        ui_components['cleanup_button'].layout.display = 'none'
+        update_ui_for_processing(True)
+        display_status("info", "🔄 Starting preprocessing...")
+        
+        # Run in thread
+        thread = threading.Thread(target=start_preprocessing)
+        thread.daemon = True
+        thread.start()
+    
+    # Handler for preprocess button
+    def on_preprocess_click(b):
         if check_preprocessed_exists():
             pass  # Confirmation dialog will handle starting if confirmed
         else:
-            if processing_active:
-                return
-            
-            processing_active = True  # Initialize the variable
-            ui_components['progress_bar'].value = 0
-            ui_components['current_progress'].value = 0
-            ui_components['summary_container'].layout.display = 'none'
-            ui_components['cleanup_button'].layout.display = 'none'
-            update_ui_for_processing(True)
-            display_status("info", "🔄 Starting preprocessing...")
-            await start_preprocessing()
+            run_preprocessing_thread()
     
     # Handler for stop button
     def on_stop_click(b):
@@ -407,12 +416,15 @@ def setup_preprocessing_handlers(ui_components, config=None):
         stop_requested = True
         display_status("warning", "⚠️ Stopping preprocessing...")
         
-        # Immediate UI update
-        processing_active = False
-        update_ui_for_processing(False)
+        # Update UI after short delay
+        def delayed_ui_update():
+            time.sleep(0.5)
+            processing_active = False
+            update_ui_for_processing(False)
+        threading.Thread(target=delayed_ui_update, daemon=True).start()
         
-        if 'EventDispatcher' in globals():
-            EventDispatcher.notify(
+        if 'notify' in globals():
+            notify(
                 event_type=EventTopics.PREPROCESSING_END, 
                 sender="preprocessing_handler",
                 message="Preprocessing stopped by user"
@@ -519,7 +531,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 break
     
     # Register event handlers
-    ui_components['preprocess_button'].on_click(lambda b: asyncio.create_task(on_preprocess_click(b)))
+    ui_components['preprocess_button'].on_click(on_preprocess_click)
     ui_components['stop_button'].on_click(on_stop_click)
     ui_components['cleanup_button'].on_click(on_cleanup_click)
     

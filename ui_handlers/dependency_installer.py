@@ -95,6 +95,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         return []
 
     def run_pip_install(cmd: str, package_name: str) -> Tuple[bool, str]:
+        
         """Eksekusi perintah pip install."""
         try:
             process = subprocess.Popen(
@@ -111,7 +112,6 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 if output == '' and process.poll() is not None:
                     break
                 if output:
-                    print(output.strip())
                     # Update progress description
                     ui_components['install_progress'].description = f'Installing {package_name}...'
                     ui_components['install_progress'].value += 1  # Pulsing animation
@@ -164,75 +164,75 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         with ui_components['status']:
             clear_output()
 
-        # Check for already installed packages
-        installed_packages = _check_installed(PACKAGE_CHECKS)
+            # Check for already installed packages
+            installed_packages = _check_installed(PACKAGE_CHECKS)
 
-        # Collect selected packages, skipping already installed ones
-        selected_packages = []
-        for key, pkg_info in PACKAGE_GROUPS.items():
-            if not ui_components[key].value:
-                continue
+            # Collect selected packages, skipping already installed ones
+            selected_packages = []
+            for key, pkg_info in PACKAGE_GROUPS.items():
+                if not ui_components[key].value:
+                    continue
 
-            if key in ['yolov5_req', 'smartcash_req']:
-                # Handle multi-package requirements
-                for req in get_package_requirements(key):
-                    if req not in installed_packages:
-                        selected_packages.append((
-                            f"{sys.executable} -m pip install {req}",
-                            f"{pkg_info['name']}: {req}"
-                        ))
-            elif pkg_info['command'] not in installed_packages:
-                selected_packages.append((pkg_info['command'], pkg_info['name']))
+                if key in ['yolov5_req', 'smartcash_req']:
+                    # Handle multi-package requirements
+                    for req in get_package_requirements(key):
+                        if req not in installed_packages:
+                            selected_packages.append((
+                                f"{sys.executable} -m pip install {req}",
+                                f"{pkg_info['name']}: {req}"
+                            ))
+                elif pkg_info['command'] not in installed_packages:
+                    selected_packages.append((pkg_info['command'], pkg_info['name']))
 
-        # Add custom packages, skipping already installed ones
-        for pkg in [p.strip() for p in ui_components['custom_packages'].value.strip().split('\n') if p.strip()]:
-            if pkg not in installed_packages:
-                selected_packages.append((
-                    f"{sys.executable} -m pip install {pkg}",
-                    f"Custom: {pkg}"
+            # Add custom packages, skipping already installed ones
+            for pkg in [p.strip() for p in ui_components['custom_packages'].value.strip().split('\n') if p.strip()]:
+                if pkg not in installed_packages:
+                    selected_packages.append((
+                        f"{sys.executable} -m pip install {pkg}",
+                        f"Custom: {pkg}"
+                    ))
+
+            # Cek apakah ada package yang dipilih
+            if not selected_packages:
+                display(HTML(
+                    "<div style='padding: 5px; margin: 2px 0; border-left: 3px solid orange;'>"
+                    "⚠️ Tidak ada package yang dipilih untuk diinstall"
+                    "</div>"
+                ))
+                ui_components['install_button'].disabled = False
+                ui_components['check_button'].disabled = False
+                ui_components['check_all_button'].disabled = False
+                ui_components['uncheck_all_button'].disabled = False
+                return
+
+            # Install packages
+            total = len(selected_packages)
+            start_time = time.time()
+
+            for i, (cmd, name) in enumerate(selected_packages):
+                # Update progress
+                progress = int((i / total) * 100)
+                ui_components['install_progress'].value = progress
+                ui_components['install_progress'].description = f'Installing {name}...'
+
+                # Run installation
+                success, msg = run_pip_install(cmd, name)
+                display(HTML(
+                    f"<div style='padding: 5px; margin: 2px 0; border-left: 3px solid {'green' if success else 'red'};'>"
+                    f"{msg}"
+                    "</div>"
                 ))
 
-        # Cek apakah ada package yang dipilih
-        if not selected_packages:
+            # Complete
+            total_time = time.time() - start_time
+            ui_components['install_progress'].value = 100
+            ui_components['install_progress'].description = 'Instalasi selesai'
+
             display(HTML(
-                "<div style='padding: 5px; margin: 2px 0; border-left: 3px solid orange;'>"
-                "⚠️ Tidak ada package yang dipilih untuk diinstall"
+                f"<div style='padding: 5px; margin: 2px 0; border-left: 3px solid green;'>"
+                f"✅ Instalasi selesai dalam {total_time:.1f} detik"
                 "</div>"
             ))
-            ui_components['install_button'].disabled = False
-            ui_components['check_button'].disabled = False
-            ui_components['check_all_button'].disabled = False
-            ui_components['uncheck_all_button'].disabled = False
-            return
-
-        # Install packages
-        total = len(selected_packages)
-        start_time = time.time()
-
-        for i, (cmd, name) in enumerate(selected_packages):
-            # Update progress
-            progress = int((i / total) * 100)
-            ui_components['install_progress'].value = progress
-            ui_components['install_progress'].description = f'Installing {name}...'
-
-            # Run installation
-            success, msg = run_pip_install(cmd, name)
-            display(HTML(
-                f"<div style='padding: 5px; margin: 2px 0; border-left: 3px solid {'green' if success else 'red'};'>"
-                f"{msg}"
-                "</div>"
-            ))
-
-        # Complete
-        total_time = time.time() - start_time
-        ui_components['install_progress'].value = 100
-        ui_components['install_progress'].description = 'Instalasi selesai'
-
-        display(HTML(
-            f"<div style='padding: 5px; margin: 2px 0; border-left: 3px solid green;'>"
-            f"✅ Instalasi selesai dalam {total_time:.1f} detik"
-            "</div>"
-        ))
 
         # Reset UI state
         ui_components['install_button'].disabled = False

@@ -112,7 +112,8 @@ logs/
 exports/
         </pre>
         """,
-        'info'
+        'info',
+        collapsed=True
     )
     
     # Assemble UI

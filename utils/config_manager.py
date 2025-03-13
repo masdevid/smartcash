@@ -194,8 +194,6 @@ class ConfigManager:
             backup_path = f"{filename}.bak"
             try:
                 Path(backup_path).write_bytes(Path(filename).read_bytes())
-                if self.logger:
-                    self.logger.info(f"📝 Configuration backup created: {backup_path}")
             except Exception as e:
                 if self.logger:
                     self.logger.warning(f"⚠️ Failed to create backup: {str(e)}")

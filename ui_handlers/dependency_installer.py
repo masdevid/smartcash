@@ -24,6 +24,14 @@ def setup_dependency_installer_handlers(ui_components, config=None):
         from smartcash.utils.ui_utils import create_status_indicator
     except ImportError:
         from IPython.display import HTML
+        # Fallback function if not available
+        def create_status_indicator(status_type, message):
+            colors = {'info': 'blue', 'success': 'green', 'warning': 'orange', 'error': 'red'}
+            return HTML(
+                f"<div style='padding: 5px; margin: 2px 0; border-left: 3px solid {colors[status_type]};'>"
+                f"{message}"
+                "</div>"
+            )
     
     # Mapping package groups
     PACKAGE_GROUPS = {
@@ -88,20 +96,34 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             return ["pyyaml", "termcolor", "python-dotenv", "roboflow", "ipywidgets", "tqdm"]
         return []
     
+    # Replace run_pip_install() with this version
     def run_pip_install(cmd: str, package_name: str) -> Tuple[bool, str]:
-        """Eksekusi perintah pip install."""
+        """Eksekusi perintah pip install dengan progress streaming."""
         try:
-            result = subprocess.run(
+            process = subprocess.Popen(
                 cmd, 
                 shell=True, 
-                capture_output=True, 
-                text=True, 
-                check=True
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT, 
+                text=True
             )
-            print(result.stdout)
-            return True, f"✅ {package_name} berhasil diinstall"
-        except subprocess.CalledProcessError as e:
-            return False, f"❌ Gagal install {package_name}: {e.stderr}"
+            
+            # Stream output in real-time
+            while True:
+                output = process.stdout.readline()
+                if output == '' and process.poll() is not None:
+                    break
+                if output:
+                    print(output.strip())
+                    # Send heartbeat to UI
+                    status_queue.put({
+                        'type': 'heartbeat',
+                        'package': package_name
+                    })
+            
+            return process.returncode == 0, f"✅ {package_name} berhasil diinstall"
+        except Exception as e:
+            return False, f"❌ Gagal install {package_name}: {str(e)}"
     
     def install_packages_thread():
         """Thread untuk instalasi packages."""
@@ -247,6 +269,10 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 if status['type'] == 'progress':
                     ui_components['install_progress'].value = status['value']
                     ui_components['install_progress'].description = status['description']
+                elif status['type'] == 'heartbeat':
+                    # Update progress description only
+                    ui_components['install_progress'].description = f'Installing {status["package"]}...'
+                    ui_components['install_progress'].value += 1  # Pulsing animation effect
                 elif status['type'] == 'status':
                     with ui_components['status']:
                         display(create_status_indicator(

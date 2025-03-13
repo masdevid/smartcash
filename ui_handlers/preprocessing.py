@@ -1,9 +1,10 @@
 """
 File: smartcash/ui_handlers/preprocessing.py
-Author: Optimasi dan konsolidasi progress tracking
-Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan progress tracking yang lebih baik.
+Author: Optimasi async progress tracking
+Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan async progress tracking.
 """
 
+import asyncio
 import threading
 import time
 import shutil
@@ -71,9 +72,22 @@ def setup_preprocessing_handlers(ui_components, config=None):
         'current_split': None
     }
     
-    # Inisialisasi PreprocessingManager secara lazy untuk efisiensi
+    # Initialize PreprocessingManager secara lazy untuk efisiensi
     def get_preprocessing_manager():
         if not state['preprocessing_manager']:
+            # Get paths for display
+            data_dir = config.get('data_dir', 'data')
+            output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+            
+            # Update data directory info in UI
+            with ui_components['preprocess_status']:
+                display(HTML(
+                    f"""<div style="padding:8px;margin:5px 0;background:#f8f9fa;border-left:3px solid #007bff;color:#333">
+                    <p style="margin:0">📁 <b>Data directory:</b> {data_dir}</p>
+                    <p style="margin:0">📂 <b>Preprocessing directory:</b> {output_dir}</p>
+                    </div>"""
+                ))
+            
             state['preprocessing_manager'] = PreprocessingManager(config=config, logger=logger)
         return state['preprocessing_manager']
     
@@ -276,9 +290,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
         ui_components['summary_container'].layout.display = 'block'
         ui_components['cleanup_button'].layout.display = 'inline-block'
     
-    # Fungsi preprocessing utama
-    def process_dataset(splits=None):
-        """Function to run preprocessing on selected splits."""
+    # Main preprocessing function
+    async def process_dataset(splits=None):
+        """Async function to run preprocessing on selected splits."""
         if splits is None:
             # Parse splits from UI
             split_map = {
@@ -291,9 +305,23 @@ def setup_preprocessing_handlers(ui_components, config=None):
         
         ui_components['progress_bar'].value = 5  # Show initial progress
         
+        # Setup progress updater
+        async def update_overall_progress():
+            """Periodically update the overall progress while processing runs"""
+            progress = 5
+            while state['processing'] and not state['stop_requested']:
+                # Only increment if not already at max
+                if progress < 90:
+                    progress += 2
+                    ui_components['progress_bar'].value = progress
+                await asyncio.sleep(0.5)
+        
         try:
             # Get preprocessor manager
             manager = get_preprocessing_manager()
+            
+            # Start progress updater
+            progress_task = asyncio.create_task(update_overall_progress())
             
             # Notifikasi start
             notify(
@@ -302,29 +330,71 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 message="Memulai preprocessing dataset"
             )
             
-            # Run preprocessing
-            result = manager.run_full_pipeline(
-                splits=splits,
-                validate_dataset=config['data']['preprocessing']['validation']['enabled'],
-                fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
-                augment_data=False,  # Tidak perlu augmentasi di preprocessing stage
-                analyze_dataset=True
-            )
+            # Create a thread for the actual processing since it's blocking
+            result_event = threading.Event()
+            result_container = {}
+            
+            def run_preprocessing():
+                try:
+                    result = manager.run_full_pipeline(
+                        splits=splits,
+                        validate_dataset=config['data']['preprocessing']['validation']['enabled'],
+                        fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
+                        augment_data=False,
+                        analyze_dataset=True
+                    )
+                    result_container['result'] = result
+                except Exception as e:
+                    result_container['error'] = str(e)
+                finally:
+                    result_event.set()
+            
+            # Start processing thread
+            processing_thread = threading.Thread(target=run_preprocessing)
+            processing_thread.daemon = True
+            processing_thread.start()
+            
+            # Wait for processing to complete
+            while not result_event.is_set() and not state['stop_requested']:
+                await asyncio.sleep(0.1)
+            
+            # Cancel progress updater
+            progress_task.cancel()
+            
+            if state['stop_requested']:
+                display_status("warning", "⚠️ Processing was stopped by user")
+                ui_components['progress_bar'].value = 0
+                return {'status': 'stopped'}
             
             # Process result
+            if 'error' in result_container:
+                display_status("error", f"❌ Preprocessing failed: {result_container['error']}")
+                notify(
+                    event_type=EventTopics.PREPROCESSING_ERROR,
+                    sender="preprocessing_handler",
+                    error=result_container['error']
+                )
+                return {'status': 'error', 'error': result_container['error']}
+            
+            result = result_container['result']
             if result['status'] == 'success':
                 ui_components['progress_bar'].value = 100  # Complete progress
                 display_status("success", f"✅ Preprocessing selesai dalam {result.get('elapsed', 0):.2f} detik")
                 update_summary(result)
+                
+                # Notify completion
+                notify(
+                    event_type=EventTopics.PREPROCESSING_END,
+                    sender="preprocessing_handler",
+                    result=result
+                )
             else:
                 display_status("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}")
-                
-            # Notify completion
-            notify(
-                event_type=EventTopics.PREPROCESSING_END,
-                sender="preprocessing_handler",
-                result=result
-            )
+                notify(
+                    event_type=EventTopics.PREPROCESSING_ERROR,
+                    sender="preprocessing_handler",
+                    error=result.get('error', 'Unknown error')
+                )
             
             return result
             
@@ -338,7 +408,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             return {'status': 'error', 'error': str(e)}
     
     # Main preprocessing thread
-    def preprocessing_thread():
+    async def preprocessing_thread():
         try:
             state['processing'] = True
             state['stop_requested'] = False
@@ -347,7 +417,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             get_config_from_ui()
             
             # Execute preprocessing
-            process_dataset()
+            await process_dataset()
             
         except Exception as e:
             display_status("error", f"❌ Unexpected error: {str(e)}")
@@ -355,6 +425,16 @@ def setup_preprocessing_handlers(ui_components, config=None):
             state['processing'] = False
             state['stop_requested'] = False
             update_ui_for_processing(False)
+
+    # Run async function in thread to avoid blocking
+    def run_async_preprocessing():
+        """Wrapper to run async preprocessing in a thread"""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(preprocessing_thread())
+        finally:
+            loop.close()
     
     # Handler for preprocess button
     def on_preprocess_click(b):
@@ -406,9 +486,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 update_ui_for_processing(True)
                 
                 # Start preprocessing thread
-                thread = threading.Thread(target=preprocessing_thread)
-                thread.daemon = True
-                thread.start()
+                threading.Thread(target=run_async_preprocessing).start()
             
             confirm_box.children[1].children[0].on_click(on_cancel)
             confirm_box.children[1].children[1].on_click(on_proceed)
@@ -421,9 +499,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             update_ui_for_processing(True)
             
             # Start preprocessing thread
-            thread = threading.Thread(target=preprocessing_thread)
-            thread.daemon = True
-            thread.start()
+            threading.Thread(target=run_async_preprocessing).start()
     
     # Handler for stop button
     def on_stop_click(b):
@@ -542,6 +618,17 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     
                     if 'invalid_dir' in val_cfg:
                         v_opts[3].value = val_cfg['invalid_dir']
+        
+        # Display data and preprocessing directories
+        data_dir = config.get('data_dir', 'data')
+        output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+        with ui_components['preprocess_status']:
+            display(HTML(
+                f"""<div style="padding:8px;margin:5px 0;background:#f8f9fa;border-left:3px solid #007bff;color:#333">
+                <p style="margin:0">📁 <b>Data directory:</b> {data_dir}</p>
+                <p style="margin:0">📂 <b>Preprocessing directory:</b> {output_dir}</p>
+                </div>"""
+            ))
     
     # Add Save Config button
     try:

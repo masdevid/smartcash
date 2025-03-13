@@ -7,7 +7,7 @@ Deskripsi: Komponen UI untuk instalasi dependencies SmartCash dengan layout sede
 import ipywidgets as widgets
 from IPython.display import HTML
 
-from utils.ui_utils import create_info_box
+from smartcash.utils.ui_utils import create_info_box
 
 def create_dependency_installer_ui():
     """

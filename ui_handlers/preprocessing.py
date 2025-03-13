@@ -72,8 +72,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Initialize PreprocessingManager
     data_dir = env_manager.get_path(config.get('data_dir', 'data')) if env_manager else config.get('data_dir', 'data')
+    output_dir = env_manager.get_path(config.get('output_dir', 'data/preprocessed')) if env_manager else config.get('output_dir', 'data/preprocessed')
     preprocessing_manager = PreprocessingManager(config=config, logger=logger, base_dir=data_dir)
-    
     
     # Setup UI from config
     def init_ui():
@@ -98,7 +98,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         v_opts[3].value = cfg['validation']['invalid_dir']
             
             display_status("info", f"Data directory: {data_dir}")
-    
+            display_status("info", f"Output directory: {output_dir}")
+            ui_components['log_accordion'].selected_index = 0
+            
     # Update UI for processing state
     def update_ui_for_processing(is_processing):
         # Update progress visibility

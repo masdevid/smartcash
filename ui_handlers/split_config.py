@@ -8,7 +8,6 @@ import threading
 from IPython.display import display, HTML, clear_output
 from pathlib import Path
 
-from smartcash.utils.ui_utils import create_status_indicator
 
 def setup_split_config_handlers(ui_components, config=None):
     """Setup handlers untuk UI konfigurasi split dataset."""
@@ -16,10 +15,11 @@ def setup_split_config_handlers(ui_components, config=None):
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.dataset import DatasetManager
-        from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer import notify
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.config_manager import get_config_manager
-        from smartcash.utils.dataset.dataset_utils import DatasetUtils
+        from smartcash.utils.dataset.dataset_utils import DatasetUtils, DEFAULT_SPLITS
+        from smartcash.utils.ui_utils import create_status_indicator
         
         logger = get_logger("split_config")
         dataset_manager = DatasetManager(config, logger=logger)
@@ -44,7 +44,7 @@ def setup_split_config_handlers(ui_components, config=None):
             
             try:
                 # Gunakan DatasetUtils untuk mendapatkan statistik
-                stats = dataset_utils.get_split_statistics(['train', 'valid', 'test'])
+                stats = dataset_utils.get_split_statistics(DEFAULT_SPLITS)
                 
                 # Hitung total dan persentase
                 total_images = sum(split.get('images', 0) for split in stats.values())
@@ -213,7 +213,7 @@ def setup_split_config_handlers(ui_components, config=None):
                 config['data']['random_seed'] = random_seed
                 
                 # Notify of split start
-                EventDispatcher.notify(
+                notify(
                     event_type="dataset.split.start",
                     sender="split_config_handler",
                     train_pct=norm_train,
@@ -254,7 +254,7 @@ def setup_split_config_handlers(ui_components, config=None):
                         
                         # Update stats after split
                         try:
-                            new_stats = dataset_utils.get_split_statistics(['train', 'valid', 'test'])
+                            new_stats = dataset_utils.get_split_statistics(DEFAULT_SPLITS)
                             display_split_results(new_stats, result.get('stats', {}))
                         except Exception as e:
                             logger.error(f"Error getting stats: {str(e)}")
@@ -264,7 +264,7 @@ def setup_split_config_handlers(ui_components, config=None):
                         config_manager.save_config(config)
                         
                         # Notification event
-                        EventDispatcher.notify(
+                        notify(
                             event_type="dataset.split.end",
                             sender="split_config_handler",
                             success=True,
@@ -277,7 +277,7 @@ def setup_split_config_handlers(ui_components, config=None):
                         ))
                         
                         # Notification event
-                        EventDispatcher.notify(
+                        notify(
                             event_type="dataset.split.end",
                             sender="split_config_handler",
                             success=False,
@@ -288,7 +288,7 @@ def setup_split_config_handlers(ui_components, config=None):
                     display(create_status_indicator("error", f"❌ Error: {str(e)}"))
                 
                 # Notification event
-                EventDispatcher.notify(
+                notify(
                     event_type="dataset.split.error",
                     sender="split_config_handler",
                     error=str(e)

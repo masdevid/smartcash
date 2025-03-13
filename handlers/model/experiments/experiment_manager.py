@@ -1,12 +1,12 @@
 # File: smartcash/handlers/model/experiments/experiment_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager untuk eksperimen model dengan perbandingan backbone (diperbarui)
+# Deskripsi: Manager untuk eksperimen model yang direfaktor untuk konsistensi dan DRY
 
 import torch
 import time
 import json
 import numpy as np
-from typing import Dict, Optional, Any, List, Union, Tuple
+from typing import Dict, Optional, Any, List, Union, Tuple, Callable
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
@@ -15,20 +15,19 @@ from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.utils.visualization import ExperimentVisualizer
 from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.exceptions.base import ModelError, TrainingError
+from smartcash.handlers.model.core.model_component import ModelComponent
+from smartcash.handlers.model.integration.metrics_observer_adapter import MetricsObserverAdapter
 
-class ExperimentManager:
+class ExperimentManager(ModelComponent):
     """
     Manager untuk eksperimen model, fokus pada perbandingan backbone.
+    Direfaktor untuk menggunakan ModelComponent base class.
     """
     
     def __init__(
         self,
         config: Dict,
-        logger: Optional[SmartCashLogger] = None,
-        model_factory = None,
-        optimizer_factory = None,
-        checkpoint_adapter = None,
-        metrics_adapter = None
+        logger: Optional[SmartCashLogger] = None
     ):
         """
         Inisialisasi experiment manager.
@@ -36,72 +35,64 @@ class ExperimentManager:
         Args:
             config: Konfigurasi model dan training
             logger: Custom logger (opsional)
-            model_factory: Factory untuk model (opsional, lazy-loaded)
-            optimizer_factory: Factory untuk optimizer (opsional, lazy-loaded)
-            checkpoint_adapter: Adapter untuk checkpoint (opsional, lazy-loaded)
-            metrics_adapter: Adapter untuk metrics (opsional, lazy-loaded)
         """
-        self.config = config
-        self.logger = logger or get_logger("experiment_manager")
-        
-        # Simpan factories dan adapters
-        self._model_factory = model_factory
-        self._optimizer_factory = optimizer_factory
-        self._checkpoint_adapter = checkpoint_adapter
-        self._metrics_adapter = metrics_adapter
-        
+        super().__init__(config, logger, "experiment_manager")
+    
+    def _initialize(self) -> None:
+        """Inisialisasi parameter eksperimen."""
         # Setup output dir dan konfigurasi
-        self.output_dir = Path(config.get('output_dir', 'runs/train')) / "experiments"
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.experiment_config = config.get('experiment', {})
+        self.output_dir = self.create_output_dir("experiments")
+        self.experiment_config = self.config.get('experiment', {})
         
         # Inisialisasi visualizer
         self.visualizer = ExperimentVisualizer(
             output_dir=str(self.output_dir / "visualizations")
         )
-        
-        # Cek apakah di Google Colab
-        self.in_colab = self._is_running_in_colab()
-    
-    def _is_running_in_colab(self) -> bool:
-        """Deteksi apakah kode berjalan di Google Colab."""
-        try:
-            import google.colab
-            return True
-        except ImportError:
-            return False
     
     @property
     def model_factory(self):
         """Lazy-loaded model factory."""
-        if self._model_factory is None:
-            from smartcash.handlers.model.core.model_factory import ModelFactory
-            self._model_factory = ModelFactory(self.config, self.logger)
-        return self._model_factory
+        # Gunakan method dari ModelComponent
+        factory_func = lambda: self._create_model_factory() 
+        return self.get_component('model_factory', factory_func)
+    
+    def _create_model_factory(self):
+        from smartcash.handlers.model.core.model_factory import ModelFactory
+        return ModelFactory(self.config, self.logger)
     
     @property
     def optimizer_factory(self):
         """Lazy-loaded optimizer factory."""
-        if self._optimizer_factory is None:
-            from smartcash.handlers.model.core.optimizer_factory import OptimizerFactory
-            self._optimizer_factory = OptimizerFactory(self.config, self.logger)
-        return self._optimizer_factory
+        factory_func = lambda: self._create_optimizer_factory()
+        return self.get_component('optimizer_factory', factory_func)
+    
+    def _create_optimizer_factory(self):
+        from smartcash.handlers.model.core.optimizer_factory import OptimizerFactory
+        return OptimizerFactory(self.config, self.logger)
     
     @property
     def checkpoint_adapter(self):
         """Lazy-loaded checkpoint adapter."""
-        if self._checkpoint_adapter is None:
-            from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
-            self._checkpoint_adapter = CheckpointAdapter(self.config, self.logger)
-        return self._checkpoint_adapter
+        factory_func = lambda: self._create_checkpoint_adapter()
+        return self.get_component('checkpoint_adapter', factory_func)
+    
+    def _create_checkpoint_adapter(self):
+        from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
+        return CheckpointAdapter(self.config, self.logger)
     
     @property
     def metrics_adapter(self):
         """Lazy-loaded metrics adapter."""
-        if self._metrics_adapter is None:
-            from smartcash.handlers.model.integration.metrics_adapter import MetricsAdapter
-            self._metrics_adapter = MetricsAdapter(self.logger, self.config)
-        return self._metrics_adapter
+        factory_func = lambda: self._create_metrics_adapter()
+        return self.get_component('metrics_adapter', factory_func)
+    
+    def _create_metrics_adapter(self):
+        from smartcash.handlers.model.integration.metrics_adapter import MetricsAdapter
+        return MetricsAdapter(self.logger, self.config)
+    
+    def process(self, *args, **kwargs) -> Any:
+        """Alias untuk compare_backbones()."""
+        return self.compare_backbones(*args, **kwargs)
     
     def compare_backbones(
         self,
@@ -136,6 +127,37 @@ class ExperimentManager:
         Returns:
             Dict hasil perbandingan
         """
+        return self.safe_execute(
+            self._compare_backbones_internal,
+            "Gagal membandingkan backbone",
+            backbones=backbones,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            test_loader=test_loader,
+            epochs=epochs,
+            batch_size=batch_size,
+            early_stopping=early_stopping,
+            early_stopping_patience=early_stopping_patience,
+            early_stopping_metric=early_stopping_metric,
+            parallel=parallel,
+            **kwargs
+        )
+    
+    def _compare_backbones_internal(
+        self,
+        backbones: List[str],
+        train_loader: torch.utils.data.DataLoader,
+        val_loader: torch.utils.data.DataLoader,
+        test_loader: Optional[torch.utils.data.DataLoader] = None,
+        epochs: Optional[int] = None,
+        batch_size: Optional[int] = None,
+        early_stopping: bool = True,
+        early_stopping_patience: Optional[int] = None,
+        early_stopping_metric: str = 'val_loss',
+        parallel: bool = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """Implementasi internal untuk perbandingan backbone."""
         # Setup parameter eksperimen
         epochs = epochs or self.config.get('training', {}).get('epochs', 30)
         batch_size = batch_size or self.config.get('training', {}).get('batch_size', 16)
@@ -327,7 +349,7 @@ class ExperimentManager:
             experiment_dir.mkdir(parents=True, exist_ok=True)
             
         # Setup metrics observer
-        metrics_observer = MetricsObserver(
+        metrics_observer = MetricsObserverAdapter(
             output_dir=str(experiment_dir) if experiment_dir else None,
             logger=self.logger,
             experiment_name=backbone_type,

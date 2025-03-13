@@ -1,8 +1,7 @@
 # File: smartcash/handlers/model/core/backbone_factory.py
 # Author: Alfrida Sabar
-# Deskripsi: Factory untuk pembuatan backbone dengan berbagai arsitektur
+# Deskripsi: Factory untuk pembuatan backbone, direfaktor untuk konsistensi dan kejelasan
 
-import os
 import torch
 import torch.nn as nn
 from typing import Dict, Optional, Union, Any
@@ -11,11 +10,12 @@ from torchvision.models import efficientnet_b4, EfficientNet_B4_Weights
 
 from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.exceptions.base import ModelError
+from smartcash.handlers.model.core.model_component import ModelComponent
 
-class BackboneFactory:
+class BackboneFactory(ModelComponent):
     """
     Factory untuk pembuatan backbone dengan berbagai arsitektur.
-    Implementasi ulang dari BackboneHandler sebagai factory yang lebih modular.
+    Direfaktor untuk menggunakan ModelComponent base class.
     """
     
     def __init__(
@@ -30,8 +30,26 @@ class BackboneFactory:
             config: Konfigurasi model dan backbone
             logger: Custom logger (opsional)
         """
-        self.config = config
-        self.logger = logger or get_logger("backbone_factory")
+        super().__init__(config, logger, "backbone_factory")
+    
+    def process(
+        self, 
+        backbone_type: str = 'efficientnet',
+        pretrained: bool = True,
+        weights_path: Optional[str] = None
+    ) -> nn.Module:
+        """
+        Alias untuk create_backbone().
+        
+        Args:
+            backbone_type: Tipe backbone
+            pretrained: Flag untuk pretrained weights
+            weights_path: Path ke custom weights
+            
+        Returns:
+            Backbone yang dibuat
+        """
+        return self.create_backbone(backbone_type, pretrained, weights_path)
     
     def create_backbone(
         self, 
@@ -54,24 +72,48 @@ class BackboneFactory:
         
         backbone_type = backbone_type.lower()
         
-        try:
-            if backbone_type == 'efficientnet':
-                backbone = self._create_efficientnet(pretrained)
-            elif backbone_type == 'cspdarknet':
-                backbone = self._create_cspdarknet(pretrained)
-            else:
-                raise ModelError(f"Tipe backbone {backbone_type} tidak didukung")
+        return self.safe_execute(
+            self._create_backbone_internal,
+            f"Gagal membuat backbone {backbone_type}",
+            backbone_type=backbone_type,
+            pretrained=pretrained,
+            weights_path=weights_path
+        )
+    
+    def _create_backbone_internal(
+        self,
+        backbone_type: str,
+        pretrained: bool,
+        weights_path: Optional[str]
+    ) -> nn.Module:
+        """
+        Implementasi internal untuk membuat backbone.
         
-            # Load weights kustom jika diberikan
-            if weights_path:
-                self._load_weights(backbone, weights_path)
-                
-            self.logger.success(f"✅ Backbone {backbone_type} berhasil dibuat")
-            return backbone
+        Args:
+            backbone_type: Tipe backbone
+            pretrained: Load pretrained weights
+            weights_path: Custom weights path
             
-        except Exception as e:
-            self.logger.error(f"❌ Gagal membuat backbone {backbone_type}: {str(e)}")
-            raise ModelError(f"Gagal membuat backbone: {str(e)}")
+        Returns:
+            Backbone yang diinisialisasi
+            
+        Raises:
+            ModelError: Jika tipe backbone tidak didukung
+        """
+        # Buat backbone berdasarkan tipe
+        if backbone_type == 'efficientnet':
+            backbone = self._create_efficientnet(pretrained)
+        elif backbone_type == 'cspdarknet':
+            backbone = self._create_cspdarknet(pretrained)
+        else:
+            raise ModelError(f"Tipe backbone {backbone_type} tidak didukung")
+    
+        # Load weights kustom jika diberikan
+        if weights_path:
+            self._load_weights(backbone, weights_path)
+            
+        self.logger.success(f"✅ Backbone {backbone_type} berhasil dibuat")
+        return backbone
     
     def _create_efficientnet(self, pretrained: bool = True) -> nn.Module:
         """
@@ -100,6 +142,9 @@ class BackboneFactory:
             
         Returns:
             CSPDarknet backbone
+            
+        Raises:
+            ModelError: Jika komponennya tidak tersedia
         """
         try:
             # Import CSPDarknet dari YOLOv5
@@ -151,6 +196,9 @@ class BackboneFactory:
             
         Returns:
             Dimensi fitur output
+            
+        Raises:
+            ModelError: Jika tipe backbone tidak didukung
         """
         backbone_type = backbone_type.lower()
         

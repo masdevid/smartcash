@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/integration/metrics_observer_adapter.py
 # Author: Alfrida Sabar
-# Deskripsi: Adapter untuk integrasi dengan MetricsObserver
+# Deskripsi: Adapter untuk pemantauan dan visualisasi metrik, direfaktor untuk konsistensi
 
 from typing import Dict, Optional, Any, List, Union
 from pathlib import Path
@@ -8,12 +8,11 @@ import json
 
 from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.utils.visualization import ExperimentVisualizer
-from smartcash.handlers.model.integration.experiment_adapter import ExperimentAdapter
+from smartcash.handlers.model.integration.base_adapter import BaseAdapter
 
-class MetricsObserverAdapter:
+class MetricsObserverAdapter(BaseAdapter):
     """
-    Adapter untuk integrasi dengan MetricsObserver.
-    Memantau dan menyimpan metrik selama training dan eksperimen.
+    Adapter untuk memantau dan menyimpan metrik selama training dan eksperimen.
     """
     
     def __init__(
@@ -22,7 +21,8 @@ class MetricsObserverAdapter:
         logger: Optional[SmartCashLogger] = None,
         experiment_name: str = "default",
         save_metrics: bool = True,
-        visualize: bool = True
+        visualize: bool = True,
+        config: Optional[Dict] = None
     ):
         """
         Inisialisasi metrics observer adapter.
@@ -33,16 +33,24 @@ class MetricsObserverAdapter:
             experiment_name: Nama eksperimen untuk identifikasi
             save_metrics: Flag untuk menyimpan metrik ke file
             visualize: Flag untuk visualisasi metrik
+            config: Konfigurasi tambahan (opsional)
         """
-        self.logger = logger or get_logger("metrics_observer")
+        # Buat config minimal jika tidak diberikan
+        self.config = config or {'output_dir': output_dir or 'runs/train/metrics'}
+        super().__init__(self.config, logger, "metrics_observer_adapter")
+        
+        # Setup parameter khusus
         self.experiment_name = experiment_name
         self.save_metrics = save_metrics
-        self.visualize = visualize
+        self.visualize_metrics = visualize
         
-        # Setup output directory
-        self.output_dir = Path(output_dir) if output_dir else Path("runs/train/metrics")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        # Override output directory yang diberikan secara langsung
+        if output_dir:
+            self.output_dir = Path(output_dir)
+            self.output_dir.mkdir(parents=True, exist_ok=True)
         
+    def _initialize(self) -> None:
+        """Inisialisasi metric observer internal."""
         # Storage untuk metrics history
         self.metrics_history = {
             'train_loss': [],
@@ -53,12 +61,21 @@ class MetricsObserverAdapter:
         }
         
         # Setup visualizer
-        if visualize:
+        if self.visualize_metrics:
             self.visualizer = ExperimentVisualizer(
                 output_dir=str(self.output_dir / "visualizations")
             )
         
-        self.logger.info(f"📊 MetricsObserverAdapter diinisialisasi untuk '{experiment_name}'")
+        self.logger.info(f"📊 MetricsObserverAdapter diinisialisasi untuk '{self.experiment_name}'")
+    
+    def process(self, *args, **kwargs) -> Dict[str, Any]:
+        """
+        Proses utama komponen - mengembalikan metrics history.
+        
+        Returns:
+            Dict metrics history
+        """
+        return self.get_metrics()
     
     def update(
         self,
@@ -95,8 +112,8 @@ class MetricsObserverAdapter:
         if self.save_metrics:
             self._save_metrics()
         
-        # Visualisasi jika diminta
-        if self.visualize and epoch > 0 and epoch % 5 == 0:
+        # Visualisasi jika diminta (hanya setiap 5 epoch untuk efisiensi)
+        if self.visualize_metrics and epoch > 0 and epoch % 5 == 0:
             self._visualize_metrics()
     
     def get_metrics(self) -> Dict[str, Any]:
@@ -119,6 +136,7 @@ class MetricsObserverAdapter:
         Returns:
             Dictionary dengan metrik terbaik dan indeksnya
         """
+        # Jika tidak ada data untuk metrik yang diminta
         if metric == 'val_loss':
             values = self.metrics_history['val_loss']
         elif metric == 'train_loss':

@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/model_manager.py
 # Author: Alfrida Sabar
-# Deskripsi: Manager utama model sebagai facade untuk semua komponen model (diringkas)
+# Deskripsi: Manager utama model sebagai facade, direfaktor untuk konsistensi dan DRY
 
 import torch
 from typing import Dict, Optional, Any, List, Union, Tuple
@@ -8,11 +8,13 @@ from pathlib import Path
 
 from smartcash.utils.logger import get_logger, SmartCashLogger
 from smartcash.exceptions.base import ModelError
+from smartcash.handlers.model.core.model_component import ModelComponent
 
-class ModelManager:
+class ModelManager(ModelComponent):
     """
     Manager utama model sebagai facade.
     Menyembunyikan kompleksitas implementasi dan meningkatkan usability.
+    Direfaktor untuk menggunakan ModelComponent base class.
     """
     
     def __init__(
@@ -21,87 +23,105 @@ class ModelManager:
         logger: Optional[SmartCashLogger] = None,
         colab_mode: Optional[bool] = None
     ):
-        """Inisialisasi model manager."""
-        self.config = config
-        self.logger = logger or get_logger("model_manager")
-        self.colab_mode = self._detect_colab() if colab_mode is None else colab_mode
+        """
+        Inisialisasi model manager.
         
-        # Dictionary untuk lazy-loaded components
-        self._components = {}
+        Args:
+            config: Konfigurasi aplikasi
+            logger: Logger kustom (opsional)
+            colab_mode: Flag untuk mode Colab (opsional, auto-detect jika None)
+        """
+        super().__init__(config, logger, "model_manager")
+        self.colab_mode = self._is_running_in_colab() if colab_mode is None else colab_mode
+    
+    def process(self, *args, **kwargs) -> Any:
+        """
+        Proses default adalah create_model.
         
-    def _detect_colab(self) -> bool:
-        """Deteksi apakah running di Google Colab."""
-        try:
-            import google.colab
-            return True
-        except ImportError:
-            return False
+        Returns:
+            Model yang dibuat
+        """
+        return self.create_model(*args, **kwargs)
     
-    def _get_component(self, component_id: str, factory_func) -> Any:
-        """Dapatkan komponen dengan lazy initialization."""
-        if component_id not in self._components:
-            self._components[component_id] = factory_func()
-        return self._components[component_id]
-    
-    # ===== Component Properties =====
+    # ===== Lazy-loaded Component Properties =====
     
     @property
     def model_factory(self):
         """Lazy-loaded model factory."""
-        return self._get_component('model_factory', lambda: self._create_model_factory())
-    
-    def _create_model_factory(self):
         from smartcash.handlers.model.core.model_factory import ModelFactory
-        return ModelFactory(self.config, self.logger)
+        return self.get_component('model_factory', lambda: ModelFactory(self.config, self.logger))
     
     @property
     def trainer(self):
         """Lazy-loaded model trainer."""
-        return self._get_component('trainer', lambda: self._create_trainer())
-    
-    def _create_trainer(self):
         from smartcash.handlers.model.core.model_trainer import ModelTrainer
-        return ModelTrainer(self.config, self.logger)
+        return self.get_component('trainer', lambda: ModelTrainer(self.config, self.logger))
     
     @property
     def evaluator(self):
         """Lazy-loaded model evaluator."""
-        return self._get_component('evaluator', lambda: self._create_evaluator())
-    
-    def _create_evaluator(self):
         from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
-        return ModelEvaluator(self.config, self.logger)
+        return self.get_component('evaluator', lambda: ModelEvaluator(self.config, self.logger))
     
     @property
     def predictor(self):
         """Lazy-loaded model predictor."""
-        return self._get_component('predictor', lambda: self._create_predictor())
-    
-    def _create_predictor(self):
         from smartcash.handlers.model.core.model_predictor import ModelPredictor
-        return ModelPredictor(self.config, self.logger)
+        return self.get_component('predictor', lambda: ModelPredictor(self.config, self.logger))
     
     @property
     def checkpoint_adapter(self):
         """Lazy-loaded checkpoint adapter."""
-        return self._get_component('checkpoint_adapter', lambda: self._create_checkpoint_adapter())
-    
-    def _create_checkpoint_adapter(self):
         from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
-        return CheckpointAdapter(self.config, self.logger)
+        return self.get_component('checkpoint_adapter', lambda: CheckpointAdapter(self.config, self.logger))
+    
+    @property
+    def experiment_manager(self):
+        """Lazy-loaded experiment manager."""
+        from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
+        return self.get_component('experiment_manager', lambda: ExperimentManager(self.config, self.logger))
     
     # ===== Core Functionality =====
     
     def create_model(self, backbone_type=None, **kwargs) -> torch.nn.Module:
-        """Buat model baru dengan konfigurasi tertentu."""
+        """
+        Buat model baru dengan konfigurasi tertentu.
+        
+        Args:
+            backbone_type: Tipe backbone (optional)
+            **kwargs: Parameter tambahan untuk model
+            
+        Returns:
+            Model yang siap digunakan
+        """
         return self.model_factory.create_model(backbone_type=backbone_type, **kwargs)
     
     def load_model(self, checkpoint_path, **kwargs) -> Tuple[torch.nn.Module, Dict]:
-        """Load model dari checkpoint."""
+        """
+        Load model dari checkpoint.
+        
+        Args:
+            checkpoint_path: Path ke checkpoint
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Tuple (Model yang dimuat, Metadata checkpoint)
+        """
         return self.model_factory.load_model(checkpoint_path, **kwargs)
     
     def train(self, train_loader, val_loader, model=None, **kwargs) -> Dict:
-        """Train model dengan dataset yang diberikan."""
+        """
+        Train model dengan dataset yang diberikan.
+        
+        Args:
+            train_loader: DataLoader untuk training
+            val_loader: DataLoader untuk validasi
+            model: Model untuk dilatih (opsional, akan dibuat jika None)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Dict hasil training
+        """
         return self.trainer.train(
             train_loader=train_loader, 
             val_loader=val_loader, 
@@ -110,7 +130,18 @@ class ModelManager:
         )
     
     def evaluate(self, test_loader, model=None, checkpoint_path=None, **kwargs) -> Dict:
-        """Evaluasi model pada test dataset."""
+        """
+        Evaluasi model pada test dataset.
+        
+        Args:
+            test_loader: DataLoader untuk testing
+            model: Model untuk evaluasi (opsional)
+            checkpoint_path: Path ke checkpoint (opsional)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Dict hasil evaluasi
+        """
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
@@ -122,7 +153,18 @@ class ModelManager:
         )
     
     def predict(self, images, model=None, checkpoint_path=None, **kwargs) -> Dict:
-        """Prediksi dengan model."""
+        """
+        Prediksi dengan model.
+        
+        Args:
+            images: Input gambar untuk prediksi
+            model: Model untuk prediksi (opsional)
+            checkpoint_path: Path ke checkpoint (opsional)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Dict hasil prediksi
+        """
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
@@ -134,7 +176,18 @@ class ModelManager:
         )
     
     def predict_on_video(self, video_path, model=None, checkpoint_path=None, **kwargs) -> str:
-        """Prediksi pada video dengan visualisasi hasil."""
+        """
+        Prediksi pada video dengan visualisasi hasil.
+        
+        Args:
+            video_path: Path ke file video
+            model: Model untuk prediksi (opsional)
+            checkpoint_path: Path ke checkpoint (opsional)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Path ke video hasil
+        """
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
@@ -145,11 +198,20 @@ class ModelManager:
         )
     
     def compare_backbones(self, backbones, train_loader, val_loader, test_loader=None, **kwargs) -> Dict:
-        """Bandingkan beberapa backbone dengan kondisi yang sama."""
-        from smartcash.handlers.model.model_experiments import ModelExperiments
+        """
+        Bandingkan beberapa backbone dengan kondisi yang sama.
         
-        experiments = ModelExperiments(self.config, self.logger)
-        return experiments.compare_backbones(
+        Args:
+            backbones: List backbone untuk dibandingkan
+            train_loader: DataLoader untuk training
+            val_loader: DataLoader untuk validasi
+            test_loader: DataLoader untuk testing (opsional)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Dict hasil perbandingan
+        """
+        return self.experiment_manager.compare_backbones(
             backbones=backbones,
             train_loader=train_loader,
             val_loader=val_loader,
@@ -158,7 +220,18 @@ class ModelManager:
         )
     
     def export_model(self, model=None, checkpoint_path=None, format='torchscript', **kwargs) -> Optional[str]:
-        """Export model ke format untuk deployment."""
+        """
+        Export model ke format untuk deployment.
+        
+        Args:
+            model: Model untuk export (opsional)
+            checkpoint_path: Path ke checkpoint (opsional)
+            format: Format export ('torchscript', 'onnx')
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Path ke model yang diexport
+        """
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
@@ -176,7 +249,19 @@ class ModelManager:
             return None
     
     def _ensure_model_or_checkpoint(self, model, checkpoint_path):
-        """Pastikan ada model atau checkpoint path."""
+        """
+        Pastikan ada model atau checkpoint path.
+        
+        Args:
+            model: Model yang sudah ada (opsional)
+            checkpoint_path: Path ke checkpoint (opsional)
+            
+        Returns:
+            Tuple (model, checkpoint_path)
+            
+        Raises:
+            ModelError: Jika tidak ada model dan tidak ada checkpoint
+        """
         if model is None and checkpoint_path is None:
             checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
             if checkpoint_path is None:

@@ -4,7 +4,8 @@ Author: Alfrida Sabar (optimized)
 Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan pendekatan robust dan modular.
 """
 
-import time  # Removed threading import
+import asyncio  # Added for async support
+import time
 from pathlib import Path
 import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
@@ -312,8 +313,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
             config_manager.save_config(updated_config, "configs/preprocessing_config.yaml", sync_to_drive=True)
             display_status("success", "✅ Configuration saved to configs/preprocessing_config.yaml")
     
-    # Main preprocessing function
-    def start_preprocessing():
+    # Main preprocessing function (async)
+    async def start_preprocessing():
         nonlocal processing_active, stop_requested
         
         # Update config from UI
@@ -342,8 +343,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 )
             
             if not stop_requested:
-                # Run pipeline directly in main thread
-                result = preprocessing_manager.run_full_pipeline(
+                # Run pipeline asynchronously
+                result = await asyncio.to_thread(
+                    preprocessing_manager.run_full_pipeline,
                     splits=splits, 
                     validate_dataset=config['data']['preprocessing']['validation']['enabled'],
                     fix_issues=config['data']['preprocessing']['validation']['fix_issues'], 
@@ -382,12 +384,11 @@ def setup_preprocessing_handlers(ui_components, config=None):
             stop_requested = False
             update_ui_for_processing(False)
     
-    # Handler for preprocess button
-    def on_preprocess_click(b):
+    # Handler for preprocess button (async)
+    async def on_preprocess_click(b):
         if check_preprocessed_exists():
             pass  # Confirmation dialog will handle starting if confirmed
         else:
-            # Directly start preprocessing in main thread
             if processing_active:
                 return
             
@@ -398,7 +399,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             ui_components['cleanup_button'].layout.display = 'none'
             update_ui_for_processing(True)
             display_status("info", "🔄 Starting preprocessing...")
-            start_preprocessing()
+            await start_preprocessing()
     
     # Handler for stop button
     def on_stop_click(b):
@@ -518,7 +519,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 break
     
     # Register event handlers
-    ui_components['preprocess_button'].on_click(on_preprocess_click)
+    ui_components['preprocess_button'].on_click(lambda b: asyncio.create_task(on_preprocess_click(b)))
     ui_components['stop_button'].on_click(on_stop_click)
     ui_components['cleanup_button'].on_click(on_cleanup_click)
     

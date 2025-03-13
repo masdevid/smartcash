@@ -1,20 +1,16 @@
 # File: smartcash/handlers/model/core/model_factory.py
-# Author: Alfrida Sabar
-# Deskripsi: Factory untuk membuat model dengan backbone yang berbeda, direfaktor untuk konsistensi
+# Deskripsi: Factory untuk pembuatan model dengan dependency injection
 
 import torch
-from typing import Dict, Optional, Union, List, Tuple
+from typing import Dict, Optional, List, Tuple, Any, Union
+from pathlib import Path
 
 from smartcash.utils.logger import SmartCashLogger
-from smartcash.handlers.model.core.backbone_factory import BackboneFactory 
 from smartcash.exceptions.base import ModelError
-from smartcash.handlers.model.core.model_component import ModelComponent
+from smartcash.handlers.model.core.component_base import ComponentBase
 
-class ModelFactory(ModelComponent):
-    """
-    Factory untuk membuat model dengan backbone yang berbeda.
-    Direfaktor untuk menggunakan lazy-loading dari ModelComponent.
-    """
+class ModelFactory(ComponentBase):
+    """Factory untuk membuat model dengan berbagai backbone."""
     
     def __init__(
         self,
@@ -31,47 +27,15 @@ class ModelFactory(ModelComponent):
         super().__init__(config, logger, "model_factory")
         
     def _initialize(self) -> None:
-        """Inisialisasi internal komponen factory."""
+        """Inisialisasi parameter model dari config."""
         # Setup konfigurasi model dari config
         model_config = self.config.get('model', {})
-        self.num_classes = model_config.get('num_classes', 7)
+        self.num_classes = model_config.get('num_classes', 7)  # default 7 denominasi
+        self.default_backbone = model_config.get('backbone', 'efficientnet')
+        self.pretrained = model_config.get('pretrained', True)
         
         # Dapatkan informasi layer dari config
         self.detection_layers = self.config.get('layers', {})
-    
-    @property
-    def backbone_factory(self):
-        """Lazy-loaded backbone factory."""
-        return self.get_component('backbone_factory', lambda: BackboneFactory(self.config, self.logger))
-    
-    def process(
-        self, 
-        backbone_type: Optional[str] = None,
-        pretrained: Optional[bool] = None,
-        num_classes: Optional[int] = None,
-        detection_layers: Optional[List[str]] = None,
-        **kwargs
-    ) -> torch.nn.Module:
-        """
-        Membuat model dengan backbone dan konfigurasi yang ditentukan.
-        Alias untuk create_model().
-        
-        Args:
-            backbone_type: Tipe backbone ('efficientnet', 'cspdarknet', dll)
-            pretrained: Gunakan pretrained weights pada backbone
-            num_classes: Jumlah kelas untuk deteksi
-            detection_layers: Layer deteksi yang diaktifkan
-            
-        Returns:
-            Model yang siap digunakan
-        """
-        return self.create_model(
-            backbone_type=backbone_type,
-            pretrained=pretrained,
-            num_classes=num_classes,
-            detection_layers=detection_layers,
-            **kwargs
-        )
     
     def create_model(
         self, 
@@ -94,17 +58,15 @@ class ModelFactory(ModelComponent):
             Model yang siap digunakan
         """
         # Prioritaskan parameter yang diberikan, atau gunakan dari config
-        backbone_type = backbone_type or self.config.get('model', {}).get('backbone', 'efficientnet')
-        pretrained = pretrained if pretrained is not None else self.config.get('model', {}).get('pretrained', True)
+        backbone_type = backbone_type or self.default_backbone
+        pretrained = pretrained if pretrained is not None else self.pretrained
         num_classes = num_classes or self.num_classes
         detection_layers = detection_layers or list(self.detection_layers.keys())
         
         # Log informasi model
         self.logger.info(
             f"🔄 Membuat model dengan backbone: {backbone_type}\n"
-            f"   • Pretrained: {pretrained}\n"
-            f"   • Detection layers: {detection_layers}\n"
-            f"   • Num classes: {num_classes}"
+            f"   • Classes: {num_classes} • Layers: {detection_layers}"
         )
         
         return self.safe_execute(
@@ -138,12 +100,9 @@ class ModelFactory(ModelComponent):
             Model yang dikonfigurasi
         """
         # Buat backbone
-        backbone = self.backbone_factory.create_backbone(
-            backbone_type=backbone_type,
-            pretrained=pretrained
-        )
+        backbone = self._create_backbone(backbone_type, pretrained)
         
-        # Impor model untuk menghindari circular import
+        # Impor model
         from smartcash.models.yolov5_model import YOLOv5Model
         
         # Buat model lengkap
@@ -157,6 +116,26 @@ class ModelFactory(ModelComponent):
         
         self.logger.success(f"✅ Model berhasil dibuat dengan backbone {backbone_type}")
         return model
+    
+    def _create_backbone(self, backbone_type: str, pretrained: bool) -> torch.nn.Module:
+        """
+        Buat backbone sesuai tipe yang diminta.
+        
+        Args:
+            backbone_type: Tipe backbone ('efficientnet', 'cspdarknet', dll)
+            pretrained: Gunakan pretrained weights
+            
+        Returns:
+            Backbone module
+        """
+        if backbone_type == 'efficientnet':
+            from smartcash.models.backbones.efficientnet import EfficientNetBackbone
+            return EfficientNetBackbone(pretrained=pretrained, logger=self.logger)
+        elif backbone_type == 'cspdarknet':
+            from smartcash.models.backbones.cspdarknet import CSPDarknet
+            return CSPDarknet(pretrained=pretrained, logger=self.logger)
+        else:
+            raise ModelError(f"Backbone {backbone_type} tidak didukung")
             
     def load_model(
         self, 
@@ -197,19 +176,12 @@ class ModelFactory(ModelComponent):
         Returns:
             Tuple (Model, Checkpoint metadata)
         """
-        # Import lazy untuk menghindari circular import
-        from smartcash.handlers.checkpoint import CheckpointManager
-        
-        # Buat checkpoint manager
-        checkpoint_manager = CheckpointManager(logger=self.logger)
-        
         # Muat checkpoint
-        checkpoint = checkpoint_manager.load_checkpoint(checkpoint_path)
+        checkpoint = torch.load(checkpoint_path, map_location=device)
         checkpoint_config = checkpoint.get('config', {})
         
         # Dapatkan informasi backbone dari checkpoint
-        backbone = checkpoint_config.get('model', {}).get('backbone', 
-                self.config.get('model', {}).get('backbone', 'efficientnet'))
+        backbone = checkpoint_config.get('model', {}).get('backbone', self.default_backbone)
         
         # Buat model baru dengan konfigurasi yang sama dengan checkpoint
         model = self.create_model(backbone_type=backbone)
@@ -220,13 +192,7 @@ class ModelFactory(ModelComponent):
         # Pindahkan model ke device
         model = model.to(device)
         
-        # Log informasi
-        self.logger.success(
-            f"✅ Model berhasil dimuat dari checkpoint:\n"
-            f"   • Path: {checkpoint_path}\n"
-            f"   • Epoch: {checkpoint.get('epoch', 'unknown')}\n"
-            f"   • Backbone: {backbone}"
-        )
+        self.logger.success(f"✅ Model dimuat: {checkpoint_path}")
         
         return model, checkpoint
     
@@ -240,7 +206,6 @@ class ModelFactory(ModelComponent):
         Returns:
             Model dengan backbone yang dibekukan
         """
-        # Import YOLOv5Model untuk cek instance
         from smartcash.models.yolov5_model import YOLOv5Model
         
         if isinstance(model, YOLOv5Model) and hasattr(model, 'backbone'):
@@ -248,11 +213,9 @@ class ModelFactory(ModelComponent):
             for param in model.backbone.parameters():
                 param.requires_grad = False
                 
-            self.logger.info("🧊 Backbone telah dibekukan untuk fine-tuning")
-            return model
-        else:
-            self.logger.warning("⚠️ Tipe model tidak dikenal, tidak dapat membekukan backbone")
-            return model
+            self.logger.info("🧊 Backbone dibekukan untuk fine-tuning")
+        
+        return model
     
     def unfreeze_backbone(self, model: torch.nn.Module) -> torch.nn.Module:
         """
@@ -264,7 +227,6 @@ class ModelFactory(ModelComponent):
         Returns:
             Model dengan backbone yang dilepas pembekuannya
         """
-        # Import YOLOv5Model untuk cek instance
         from smartcash.models.yolov5_model import YOLOv5Model
         
         if isinstance(model, YOLOv5Model) and hasattr(model, 'backbone'):
@@ -272,8 +234,6 @@ class ModelFactory(ModelComponent):
             for param in model.backbone.parameters():
                 param.requires_grad = True
                 
-            self.logger.info("🔥 Backbone telah dilepas pembekuannya")
-            return model
-        else:
-            self.logger.warning("⚠️ Tipe model tidak dikenal, tidak dapat melepas pembekuan backbone")
-            return model
+            self.logger.info("🔥 Backbone dilepas pembekuannya")
+        
+        return model

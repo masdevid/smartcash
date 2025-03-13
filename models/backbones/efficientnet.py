@@ -1,6 +1,6 @@
 # File: smartcash/models/backbones/efficientnet.py
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi EfficientNet backbone untuk YOLOv5 dengan validasi dimensi output
+# Deskripsi: EfficientNet backbone untuk YOLOv5 dengan channel adaptation
 
 import torch
 import torch.nn as nn

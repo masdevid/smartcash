@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/experiments/backbone_comparator.py
 # Author: Alfrida Sabar
-# Deskripsi: Komponen khusus untuk perbandingan backbone dengan parameter yang berbeda (diringkas)
+# Deskripsi: Komponen untuk perbandingan backbone dengan berbagai parameter
 
 import torch
 import time
@@ -8,8 +8,7 @@ from typing import Dict, Optional, Any, List, Union, Tuple
 from pathlib import Path
 import numpy as np
 
-from smartcash.utils.logger import get_logger, SmartCashLogger
-from smartcash.exceptions.base import ModelError, TrainingError
+from smartcash.utils.logger import SmartCashLogger
 from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
 
 class BackboneComparator:
@@ -22,7 +21,7 @@ class BackboneComparator:
         self,
         config: Dict,
         logger: Optional[SmartCashLogger] = None,
-        experiment_manager = None
+        experiment_manager: Optional[ExperimentManager] = None
     ):
         """
         Inisialisasi backbone comparator.
@@ -33,7 +32,7 @@ class BackboneComparator:
             experiment_manager: ExperimentManager (opsional, dibuat baru jika None)
         """
         self.config = config
-        self.logger = logger or get_logger("backbone_comparator")
+        self.logger = logger or SmartCashLogger("backbone_comparator")
         
         # Gunakan experiment_manager yang diberikan atau buat baru
         self._experiment_manager = experiment_manager

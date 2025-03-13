@@ -1,6 +1,6 @@
 # File: smartcash/handlers/model/model_experiments.py
 # Author: Alfrida Sabar
-# Deskripsi: Kelas untuk melakukan eksperimen model di SmartCash - versi ringkas dengan fokus fungsionalitas kritis
+# Deskripsi: Kelas untuk menjalankan dan menganalisis eksperimen model di SmartCash
 
 from typing import Dict, Optional, Any, List, Union
 from pathlib import Path

@@ -1,6 +1,6 @@
 # File: smartcash/utils/logging_factory.py
 # Author: Alfrida Sabar
-# Deskripsi: Factory untuk pembuatan dan konfigurasi sistem logging
+# Deskripsi: Factory untuk pembuatan dan konfigurasi sistem logging terpusat
 
 import logging
 import os

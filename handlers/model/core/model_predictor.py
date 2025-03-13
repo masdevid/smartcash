@@ -1,6 +1,5 @@
 # File: smartcash/handlers/model/core/model_predictor.py
-# Author: Alfrida Sabar
-# Deskripsi: Komponen untuk prediksi menggunakan model yang sudah dilatih (diperbarui)
+# Deskripsi: Komponen untuk prediksi menggunakan model dengan dependency injection
 
 import torch
 import time
@@ -9,13 +8,34 @@ import cv2
 from typing import Dict, Optional, Any, List, Union
 from pathlib import Path
 
-from smartcash.utils.logger import get_logger
-from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError
+from smartcash.handlers.model.core.component_base import ComponentBase
 from smartcash.utils.visualization.detection import DetectionVisualizer
 
-class ModelPredictor(ModelComponent):
-    """Komponen untuk prediksi menggunakan model yang sudah dilatih."""
+class ModelPredictor(ComponentBase):
+    """Komponen untuk prediksi dengan dependency injection."""
+    
+    def __init__(
+        self,
+        config: Dict,
+        logger: Optional = None,
+        model_factory = None,
+        visualizer = None
+    ):
+        """
+        Inisialisasi model predictor.
+        
+        Args:
+            config: Konfigurasi model dan prediksi
+            logger: Logger kustom (opsional)
+            model_factory: ModelFactory instance (opsional)
+            visualizer: DetectionVisualizer instance (opsional)
+        """
+        super().__init__(config, logger, "model_predictor")
+        
+        # Dependencies
+        self.model_factory = model_factory
+        self.visualizer = visualizer
     
     def _initialize(self):
         """Inisialisasi parameter prediksi."""
@@ -27,14 +47,15 @@ class ModelPredictor(ModelComponent):
             'img_size': self.config.get('model', {}).get('img_size', [640, 640])
         }
         
-        # Setup visualizer
-        output_dir = inf_cfg.get('output_dir', str(Path(self.config.get('output_dir', 'runs/predict')) / "results"))
-        self.detection_visualizer = DetectionVisualizer(output_dir=output_dir, logger=self.logger)
+        # Setup output directory
+        self.output_dir = self.create_output_dir("predict")
         
-    
-    def process(self, images, model=None, **kwargs):
-        """Alias untuk predict()."""
-        return self.predict(images, model, **kwargs)
+        # Buat visualizer jika tidak diberikan
+        if self.visualizer is None:
+            self.visualizer = DetectionVisualizer(
+                output_dir=str(self.output_dir / "results"),
+                logger=self.logger
+            )
     
     def predict(
         self,
@@ -59,11 +80,7 @@ class ModelPredictor(ModelComponent):
         
         try:
             # Load model jika perlu
-            if model is None and checkpoint_path is not None:
-                model, _ = self.model_factory.load_model(checkpoint_path)
-                
-            if model is None:
-                raise ModelError("Model atau checkpoint_path harus diberikan")
+            model = self._prepare_model(model, checkpoint_path)
                 
             # Setup parameter
             device = kwargs.get('device') or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -72,19 +89,11 @@ class ModelPredictor(ModelComponent):
             iou_threshold = kwargs.get('iou_threshold', self.params['iou_threshold'])
             visualize = kwargs.get('visualize', self.params['visualize'])
             
-            # Setup output directory untuk visualisasi
-            output_dir = kwargs.get('output_dir')
-            if visualize and output_dir:
-                Path(output_dir).mkdir(parents=True, exist_ok=True)
-                self.detection_visualizer = DetectionVisualizer(output_dir=output_dir, logger=self.logger)
-            
             # Preprocess gambar
             input_tensors, original_images, image_sizes = self._preprocess_images(images, device)
             
             # Log info prediksi
-            self.logger.info(
-                f"🔎 Prediksi pada {len(input_tensors)} gambar (conf: {conf_threshold:.2f}, iou: {iou_threshold:.2f})"
-            )
+            self.logger.info(f"🔎 Prediksi pada {len(input_tensors)} gambar")
             
             # Prediksi
             predictions = []
@@ -109,7 +118,7 @@ class ModelPredictor(ModelComponent):
             # Visualisasi jika diminta
             if visualize:
                 results['visualization_paths'] = self._visualize_predictions(
-                    original_images, results, output_dir or self.detection_visualizer.output_dir
+                    original_images, results, self.visualizer.output_dir
                 )
                 
             # Hitung waktu dan FPS
@@ -128,7 +137,7 @@ class ModelPredictor(ModelComponent):
         except Exception as e:
             self.logger.error(f"❌ Error prediksi: {str(e)}")
             raise ModelError(f"Gagal prediksi: {str(e)}")
-      
+    
     def predict_on_video(
         self,
         video_path,
@@ -166,7 +175,7 @@ class ModelPredictor(ModelComponent):
             
             # Setup output video
             if output_path is None:
-                output_path = str(Path(self.detection_visualizer.output_dir) / f"output_{Path(video_path).stem}.mp4")
+                output_path = str(self.output_dir / f"output_{Path(video_path).stem}.mp4")
                 
             # Codec untuk output
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -210,7 +219,7 @@ class ModelPredictor(ModelComponent):
                 
                 # Visualisasi deteksi
                 detection = results['detections'][0]
-                vis_frame = self.detection_visualizer.visualize_detection(
+                vis_frame = self.visualizer.visualize_detection(
                     image=frame,
                     detections=detection['detections'],
                     conf_threshold=conf_threshold,
@@ -249,6 +258,19 @@ class ModelPredictor(ModelComponent):
         except Exception as e:
             self.logger.error(f"❌ Error video: {str(e)}")
             raise ModelError(f"Gagal proses video: {str(e)}")
+    
+    def _prepare_model(self, model, checkpoint_path):
+        """Persiapkan model untuk prediksi."""
+        if model is None and checkpoint_path is None:
+            raise ModelError("Model atau checkpoint_path harus diberikan")
+            
+        if model is None and checkpoint_path is not None:
+            if not self.model_factory:
+                raise ModelError("Model factory diperlukan untuk load checkpoint")
+                
+            model, _ = self.model_factory.load_model(checkpoint_path)
+            
+        return model
     
     def _preprocess_images(self, images, device):
         """
@@ -379,7 +401,7 @@ class ModelPredictor(ModelComponent):
             output_filename = f"detection_{i}.jpg"
             
             # Visualisasi
-            vis_img = self.detection_visualizer.visualize_detection(
+            vis_img = self.visualizer.visualize_detection(
                 image=img,
                 detections=det_result['detections'],
                 filename=output_filename,

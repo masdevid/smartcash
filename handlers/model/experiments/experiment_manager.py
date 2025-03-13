@@ -1,98 +1,49 @@
 # File: smartcash/handlers/model/experiments/experiment_manager.py
-# Author: Alfrida Sabar
-# Deskripsi: Manager untuk eksperimen model yang direfaktor untuk konsistensi dan DRY
+# Deskripsi: Manager untuk eksperimen model dengan dependency injection langsung
 
 import torch
 import time
 import json
 import numpy as np
-from typing import Dict, Optional, Any, List, Union, Tuple, Callable
+from typing import Dict, Optional, Any, List, Union, Tuple
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 
-from smartcash.utils.logger import get_logger, SmartCashLogger
-from smartcash.utils.visualization import ExperimentVisualizer
-from smartcash.utils.early_stopping import EarlyStopping
 from smartcash.exceptions.base import ModelError, TrainingError
-from smartcash.handlers.model.core.model_component import ModelComponent
-from smartcash.handlers.model.integration.metrics_observer_adapter import MetricsObserverAdapter
+from smartcash.utils.early_stopping import EarlyStopping
+from smartcash.handlers.model.core.component_base import ComponentBase
 
-class ExperimentManager(ModelComponent):
-    """
-    Manager untuk eksperimen model, fokus pada perbandingan backbone.
-    Direfaktor untuk menggunakan ModelComponent base class.
-    """
+class ExperimentManager(ComponentBase):
+    """Manager untuk eksperimen model dengan dependency injection langsung."""
     
     def __init__(
         self,
         config: Dict,
-        logger: Optional[SmartCashLogger] = None
+        logger: Optional = None,
+        model_factory = None,
+        visualizer = None
     ):
         """
         Inisialisasi experiment manager.
         
         Args:
-            config: Konfigurasi model dan training
-            logger: Custom logger (opsional)
+            config: Konfigurasi model dan eksperimen
+            logger: Logger kustom (opsional)
+            model_factory: ModelFactory instance (opsional)
+            visualizer: ExperimentVisualizer instance (opsional)
         """
         super().__init__(config, logger, "experiment_manager")
+        
+        # Dependencies
+        self.model_factory = model_factory
+        self.visualizer = visualizer
     
     def _initialize(self) -> None:
         """Inisialisasi parameter eksperimen."""
         # Setup output dir dan konfigurasi
         self.output_dir = self.create_output_dir("experiments")
         self.experiment_config = self.config.get('experiment', {})
-        
-        # Inisialisasi visualizer
-        self.visualizer = ExperimentVisualizer(
-            output_dir=str(self.output_dir / "visualizations")
-        )
-    
-    @property
-    def model_factory(self):
-        """Lazy-loaded model factory."""
-        # Gunakan method dari ModelComponent
-        factory_func = lambda: self._create_model_factory() 
-        return self.get_component('model_factory', factory_func)
-    
-    def _create_model_factory(self):
-        from smartcash.handlers.model.core.model_factory import ModelFactory
-        return ModelFactory(self.config, self.logger)
-    
-    @property
-    def optimizer_factory(self):
-        """Lazy-loaded optimizer factory."""
-        factory_func = lambda: self._create_optimizer_factory()
-        return self.get_component('optimizer_factory', factory_func)
-    
-    def _create_optimizer_factory(self):
-        from smartcash.handlers.model.core.optimizer_factory import OptimizerFactory
-        return OptimizerFactory(self.config, self.logger)
-    
-    @property
-    def checkpoint_adapter(self):
-        """Lazy-loaded checkpoint adapter."""
-        factory_func = lambda: self._create_checkpoint_adapter()
-        return self.get_component('checkpoint_adapter', factory_func)
-    
-    def _create_checkpoint_adapter(self):
-        from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
-        return CheckpointAdapter(self.config, self.logger)
-    
-    @property
-    def metrics_adapter(self):
-        """Lazy-loaded metrics adapter."""
-        factory_func = lambda: self._create_metrics_adapter()
-        return self.get_component('metrics_adapter', factory_func)
-    
-    def _create_metrics_adapter(self):
-        from smartcash.handlers.model.integration.metrics_adapter import MetricsAdapter
-        return MetricsAdapter(self.logger, self.config)
-    
-    def process(self, *args, **kwargs) -> Any:
-        """Alias untuk compare_backbones()."""
-        return self.compare_backbones(*args, **kwargs)
     
     def compare_backbones(
         self,
@@ -198,7 +149,7 @@ class ExperimentManager(ModelComponent):
         
         # Visualisasi hasil jika semua eksperimen berhasil
         visualization_paths = {}
-        if all('error' not in result for result in results.values()):
+        if all('error' not in result for result in results.values()) and self.visualizer:
             visualization_paths = self.visualizer.visualize_backbone_comparison(
                 results=results,
                 title=f"Perbandingan Backbone - {experiment_name}",
@@ -327,7 +278,6 @@ class ExperimentManager(ModelComponent):
     ) -> Dict[str, Any]:
         """
         Train dan evaluasi model dengan backbone tertentu.
-        Menggunakan EarlyStopping utils untuk monitoring.
         
         Args:
             backbone_type: Tipe backbone
@@ -348,14 +298,13 @@ class ExperimentManager(ModelComponent):
         if experiment_dir:
             experiment_dir.mkdir(parents=True, exist_ok=True)
             
-        # Setup metrics observer
-        metrics_observer = MetricsObserverAdapter(
-            output_dir=str(experiment_dir) if experiment_dir else None,
-            logger=self.logger,
-            experiment_name=backbone_type,
-            save_metrics=True,
-            visualize=True
-        )
+        # Setup metrics tracking
+        metrics_history = {
+            'train_loss': [],
+            'val_loss': [],
+            'epochs': [],
+            'learning_rate': []
+        }
         
         # Init early stopper
         early_stopper = None
@@ -369,12 +318,18 @@ class ExperimentManager(ModelComponent):
                 logger=self.logger
             )
             
-        # Siapkan model dan trainer
+        # Siapkan model
+        if not self.model_factory:
+            raise ModelError("Model factory diperlukan untuk eksperimen")
+            
         model = self.model_factory.create_model(backbone_type=backbone_type)
+        
+        # Siapkan trainer
         from smartcash.handlers.model.core.model_trainer import ModelTrainer
         trainer = ModelTrainer(
-            self.config, self.logger, self.model_factory, 
-            self.optimizer_factory, self.checkpoint_adapter, self.metrics_adapter
+            self.config, 
+            self.logger,
+            self.model_factory
         )
         
         # Train model
@@ -388,17 +343,35 @@ class ExperimentManager(ModelComponent):
             early_stopping=early_stopping,
             early_stopping_patience=early_stopping_patience,
             early_stopping_metric=early_stopping_metric,
-            save_path=str(experiment_dir / "weights") if experiment_dir else None,
+            save_dir=str(experiment_dir / "weights") if experiment_dir else None,
             **kwargs
         )
+        
+        # Simpan metrics history
+        if 'metrics_history' in training_results:
+            metrics_history = training_results['metrics_history']
         
         # Evaluasi jika ada test_loader
         eval_results = {}
         if test_loader is not None:
             self.logger.info(f"🔍 Evaluasi model dengan backbone {backbone_type}")
+            
+            # Siapkan evaluator
             from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
+            
+            # Buat metrics calculator jika diperlukan
+            metrics_calculator = None
+            try:
+                from smartcash.utils.metrics import MetricsCalculator
+                metrics_calculator = MetricsCalculator()
+            except ImportError:
+                self.logger.warning("⚠️ MetricsCalculator tidak tersedia")
+                
             evaluator = ModelEvaluator(
-                self.config, self.logger, self.model_factory, self.metrics_adapter
+                self.config, 
+                self.logger,
+                self.model_factory,
+                metrics_calculator
             )
             
             # Load model terbaik atau gunakan model terakhir
@@ -424,7 +397,7 @@ class ExperimentManager(ModelComponent):
             'epochs_completed': training_results.get('epoch', 0),
             'early_stopped': training_results.get('early_stopped', False),
             'best_val_loss': training_results.get('best_val_loss', float('inf')),
-            'metrics_history': metrics_observer.metrics_history,
+            'metrics_history': metrics_history,
         }
     
     def _create_summary(self, results: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
@@ -516,7 +489,18 @@ class ExperimentManager(ModelComponent):
                 json.dump(serializable_results, f, indent=2)
             
             # Buat ringkasan Markdown
-            summary_path = output_dir / "experiment_summary.md"
+            self._create_markdown_summary(results, output_dir)
+                
+            self.logger.info(f"💾 Hasil eksperimen disimpan: {results_path}")
+                
+        except Exception as e:
+            self.logger.error(f"❌ Gagal menyimpan hasil: {str(e)}")
+            
+    def _create_markdown_summary(self, results: Dict[str, Any], output_dir: Path) -> None:
+        """Buat ringkasan eksperimen dalam format Markdown."""
+        summary_path = output_dir / "experiment_summary.md"
+        
+        try:
             with open(summary_path, 'w') as f:
                 f.write(f"# Ringkasan Eksperimen Perbandingan Backbone\n\n")
                 
@@ -540,7 +524,5 @@ class ExperimentManager(ModelComponent):
                         rel_path = Path(path).relative_to(output_dir) if Path(path).is_absolute() else Path(path)
                         f.write(f"- [{name.replace('_', ' ').title()}]({rel_path})\n")
                         
-            self.logger.info(f"💾 Hasil eksperimen disimpan: JSON dan Markdown")
-                
         except Exception as e:
-            self.logger.error(f"❌ Gagal menyimpan hasil: {str(e)}")
+            self.logger.error(f"❌ Gagal membuat ringkasan Markdown: {str(e)}")

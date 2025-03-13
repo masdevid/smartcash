@@ -1,27 +1,29 @@
 # File: smartcash/handlers/model/model_manager.py
-# Author: Alfrida Sabar
-# Deskripsi: Manager utama model sebagai facade, direfaktor untuk konsistensi dan DRY
+# Deskripsi: Manager utama model sebagai facade dengan dependency injection
 
 import torch
 from typing import Dict, Optional, Any, List, Union, Tuple
 from pathlib import Path
 
-from smartcash.utils.logger import get_logger, SmartCashLogger
+from smartcash.utils.logger import SmartCashLogger
 from smartcash.exceptions.base import ModelError
-from smartcash.handlers.model.core.model_component import ModelComponent
+from smartcash.handlers.model.core.component_base import ComponentBase
 
-class ModelManager(ModelComponent):
+class ModelManager(ComponentBase):
     """
     Manager utama model sebagai facade.
-    Menyembunyikan kompleksitas implementasi dan meningkatkan usability.
-    Direfaktor untuk menggunakan ModelComponent base class.
+    Menggunakan dependency injection langsung untuk komponen-komponen.
     """
     
     def __init__(
         self,
         config: Dict,
         logger: Optional[SmartCashLogger] = None,
-        colab_mode: Optional[bool] = None
+        model_factory = None,
+        trainer = None,
+        evaluator = None,
+        predictor = None,
+        experiment_manager = None
     ):
         """
         Inisialisasi model manager.
@@ -29,57 +31,121 @@ class ModelManager(ModelComponent):
         Args:
             config: Konfigurasi aplikasi
             logger: Logger kustom (opsional)
-            colab_mode: Flag untuk mode Colab (opsional, auto-detect jika None)
+            model_factory: ModelFactory instance (opsional)
+            trainer: ModelTrainer instance (opsional)
+            evaluator: ModelEvaluator instance (opsional)
+            predictor: ModelPredictor instance (opsional)
+            experiment_manager: ExperimentManager instance (opsional)
         """
         super().__init__(config, logger, "model_manager")
-        self.colab_mode = self._is_running_in_colab() if colab_mode is None else colab_mode
-    
-    def process(self, *args, **kwargs) -> Any:
-        """
-        Proses default adalah create_model.
         
-        Returns:
-            Model yang dibuat
-        """
-        return self.create_model(*args, **kwargs)
+        # Dependency components
+        self._model_factory = model_factory
+        self._trainer = trainer
+        self._evaluator = evaluator
+        self._predictor = predictor
+        self._experiment_manager = experiment_manager
+        
+    def _initialize(self) -> None:
+        """Inisialisasi parameter manager."""
+        # Deteksi environment
+        self.in_colab = self._is_colab()
+        
+        # Output directory
+        self.output_dir = self.create_output_dir()
     
-    # ===== Lazy-loaded Component Properties =====
+    # ===== Lazy-loaded Properties =====
     
     @property
     def model_factory(self):
         """Lazy-loaded model factory."""
-        from smartcash.handlers.model.core.model_factory import ModelFactory
-        return self.get_component('model_factory', lambda: ModelFactory(self.config, self.logger))
+        if self._model_factory is None:
+            from smartcash.handlers.model.core.model_factory import ModelFactory
+            self._model_factory = ModelFactory(self.config, self.logger)
+        return self._model_factory
     
     @property
     def trainer(self):
         """Lazy-loaded model trainer."""
-        from smartcash.handlers.model.core.model_trainer import ModelTrainer
-        return self.get_component('trainer', lambda: ModelTrainer(self.config, self.logger))
+        if self._trainer is None:
+            from smartcash.handlers.model.core.model_trainer import ModelTrainer
+            self._trainer = ModelTrainer(
+                self.config, 
+                self.logger,
+                self.model_factory
+            )
+        return self._trainer
     
     @property
     def evaluator(self):
         """Lazy-loaded model evaluator."""
-        from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
-        return self.get_component('evaluator', lambda: ModelEvaluator(self.config, self.logger))
+        if self._evaluator is None:
+            from smartcash.handlers.model.core.model_evaluator import ModelEvaluator
+            
+            # Create metrics calculator if needed
+            metrics_calculator = None
+            try:
+                from smartcash.utils.metrics import MetricsCalculator
+                metrics_calculator = MetricsCalculator()
+            except ImportError:
+                self.logger.warning("⚠️ MetricsCalculator tidak tersedia")
+                
+            self._evaluator = ModelEvaluator(
+                self.config, 
+                self.logger,
+                self.model_factory,
+                metrics_calculator
+            )
+        return self._evaluator
     
     @property
     def predictor(self):
         """Lazy-loaded model predictor."""
-        from smartcash.handlers.model.core.model_predictor import ModelPredictor
-        return self.get_component('predictor', lambda: ModelPredictor(self.config, self.logger))
-    
-    @property
-    def checkpoint_adapter(self):
-        """Lazy-loaded checkpoint adapter."""
-        from smartcash.handlers.model.integration.checkpoint_adapter import CheckpointAdapter
-        return self.get_component('checkpoint_adapter', lambda: CheckpointAdapter(self.config, self.logger))
+        if self._predictor is None:
+            from smartcash.handlers.model.core.model_predictor import ModelPredictor
+            
+            # Create visualizer if needed
+            visualizer = None
+            try:
+                from smartcash.utils.visualization.detection import DetectionVisualizer
+                visualizer = DetectionVisualizer(
+                    output_dir=str(self.output_dir / "results"),
+                    logger=self.logger
+                )
+            except ImportError:
+                self.logger.warning("⚠️ DetectionVisualizer tidak tersedia")
+                
+            self._predictor = ModelPredictor(
+                self.config, 
+                self.logger,
+                self.model_factory,
+                visualizer
+            )
+        return self._predictor
     
     @property
     def experiment_manager(self):
         """Lazy-loaded experiment manager."""
-        from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
-        return self.get_component('experiment_manager', lambda: ExperimentManager(self.config, self.logger))
+        if self._experiment_manager is None:
+            from smartcash.handlers.model.experiments.experiment_manager import ExperimentManager
+            
+            # Buat visualizer jika diperlukan
+            visualizer = None
+            try:
+                from smartcash.utils.visualization import ExperimentVisualizer
+                visualizer = ExperimentVisualizer(
+                    output_dir=str(self.output_dir / "experiments" / "visualizations")
+                )
+            except ImportError:
+                self.logger.warning("⚠️ ExperimentVisualizer tidak tersedia")
+                
+            self._experiment_manager = ExperimentManager(
+                self.config, 
+                self.logger, 
+                self.model_factory,
+                visualizer
+            )
+        return self._experiment_manager
     
     # ===== Core Functionality =====
     
@@ -116,7 +182,7 @@ class ModelManager(ModelComponent):
         Args:
             train_loader: DataLoader untuk training
             val_loader: DataLoader untuk validasi
-            model: Model untuk dilatih (opsional, akan dibuat jika None)
+            model: Model untuk dilatih (opsional)
             **kwargs: Parameter tambahan
             
         Returns:
@@ -235,17 +301,65 @@ class ModelManager(ModelComponent):
         # Pastikan ada model atau checkpoint
         model, checkpoint_path = self._ensure_model_or_checkpoint(model, checkpoint_path)
         
-        # Import ExporterAdapter secara lazy
-        from smartcash.handlers.model.integration.exporter_adapter import ExporterAdapter
-        exporter = ExporterAdapter(self.config, self.logger)
-        
-        # Export model sesuai format
+        # Export berdasarkan format
         if format.lower() == 'torchscript':
-            return exporter.export_to_torchscript(model=model, **kwargs)
+            return self._export_to_torchscript(model, **kwargs)
         elif format.lower() == 'onnx':
-            return exporter.export_to_onnx(model=model, **kwargs)
+            return self._export_to_onnx(model, **kwargs)
         else:
             self.logger.error(f"❌ Format export '{format}' tidak didukung")
+            return None
+            
+    def _export_to_torchscript(self, model, **kwargs):
+        """Export model ke TorchScript format."""
+        try:
+            output_dir = Path(kwargs.get('output_dir', self.output_dir / 'exports'))
+            output_dir.mkdir(exist_ok=True, parents=True)
+            
+            # Simpan ke TorchScript
+            dummy_input = torch.zeros(1, 3, 640, 640)
+            script_model = torch.jit.trace(model, dummy_input)
+            
+            output_path = output_dir / f"model_torchscript.pt"
+            script_model.save(str(output_path))
+            
+            self.logger.success(f"✅ Model berhasil diekspor ke: {output_path}")
+            return str(output_path)
+        except Exception as e:
+            self.logger.error(f"❌ Gagal mengekspor ke TorchScript: {e}")
+            return None
+            
+    def _export_to_onnx(self, model, **kwargs):
+        """Export model ke ONNX format."""
+        try:
+            import onnx
+            import onnxruntime
+            
+            output_dir = Path(kwargs.get('output_dir', self.output_dir / 'exports'))
+            output_dir.mkdir(exist_ok=True, parents=True)
+            
+            # Siapkan input
+            dummy_input = torch.zeros(1, 3, 640, 640)
+            output_path = output_dir / "model.onnx"
+            
+            # Export ke ONNX
+            torch.onnx.export(
+                model,
+                dummy_input,
+                output_path,
+                export_params=True,
+                opset_version=12,
+                input_names=['input'],
+                output_names=['output']
+            )
+            
+            self.logger.success(f"✅ Model berhasil diekspor ke: {output_path}")
+            return str(output_path)
+        except ImportError:
+            self.logger.error("❌ ONNX atau ONNXRuntime tidak tersedia")
+            return None
+        except Exception as e:
+            self.logger.error(f"❌ Gagal mengekspor ke ONNX: {e}")
             return None
     
     def _ensure_model_or_checkpoint(self, model, checkpoint_path):
@@ -263,7 +377,7 @@ class ModelManager(ModelComponent):
             ModelError: Jika tidak ada model dan tidak ada checkpoint
         """
         if model is None and checkpoint_path is None:
-            checkpoint_path = self.checkpoint_adapter.find_best_checkpoint()
+            checkpoint_path = self._find_best_checkpoint()
             if checkpoint_path is None:
                 raise ModelError("Tidak ada model yang diberikan, dan tidak ada checkpoint yang ditemukan")
         
@@ -272,3 +386,27 @@ class ModelManager(ModelComponent):
             checkpoint_path = None  # Sudah di-load, tidak perlu lagi
         
         return model, checkpoint_path
+        
+    def _find_best_checkpoint(self):
+        """Cari checkpoint terbaik di direktori output."""
+        try:
+            weights_dir = self.output_dir / "weights"
+            if not weights_dir.exists():
+                return None
+                
+            # Cari semua file checkpoint
+            checkpoints = list(weights_dir.glob("*.pt"))
+            if not checkpoints:
+                return None
+                
+            # Coba cari yang memiliki 'best' di namanya
+            best_checkpoints = [cp for cp in checkpoints if "best" in cp.name]
+            if best_checkpoints:
+                return str(sorted(best_checkpoints)[-1])  # Ambil yang terbaru
+                
+            # Jika tidak ada, ambil checkpoint terakhir
+            return str(sorted(checkpoints)[-1])
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal mencari checkpoint: {e}")
+            return None

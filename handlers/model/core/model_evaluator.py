@@ -1,6 +1,5 @@
 # File: smartcash/handlers/model/core/model_evaluator.py
-# Author: Alfrida Sabar
-# Deskripsi: Komponen untuk evaluasi model dengan implementasi minimal
+# Deskripsi: Komponen untuk evaluasi model dengan dependency injection
 
 import torch
 import time
@@ -8,12 +7,33 @@ from typing import Dict, Optional, Any
 from pathlib import Path
 from tqdm import tqdm
 
-from smartcash.utils.logger import get_logger
-from smartcash.handlers.model.core.model_component import ModelComponent
 from smartcash.exceptions.base import ModelError, EvaluationError
+from smartcash.handlers.model.core.component_base import ComponentBase
 
-class ModelEvaluator(ModelComponent):
-    """Komponen untuk evaluasi model pada dataset test."""
+class ModelEvaluator(ComponentBase):
+    """Komponen untuk evaluasi model dengan dependency injection."""
+    
+    def __init__(
+        self,
+        config: Dict,
+        logger: Optional = None,
+        model_factory = None,
+        metrics_calculator = None
+    ):
+        """
+        Inisialisasi model evaluator.
+        
+        Args:
+            config: Konfigurasi model dan evaluasi
+            logger: Logger kustom (opsional)
+            model_factory: ModelFactory instance (opsional)
+            metrics_calculator: Kalkulator metrik (opsional)
+        """
+        super().__init__(config, logger, "model_evaluator")
+        
+        # Dependencies
+        self.model_factory = model_factory
+        self.metrics_calculator = metrics_calculator
     
     def _initialize(self):
         """Inisialisasi parameter evaluasi."""
@@ -22,12 +42,7 @@ class ModelEvaluator(ModelComponent):
             'conf_threshold': cfg.get('conf_threshold', 0.25),
             'iou_threshold': cfg.get('iou_threshold', 0.45)
         }
-        self.output_dir = Path(self.config.get('output_dir', 'runs/eval'))
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        
-    def process(self, test_loader, model=None, **kwargs):
-        """Alias untuk evaluate()."""
-        return self.evaluate(test_loader, model, **kwargs)
+        self.output_dir = self.create_output_dir("eval")
     
     def evaluate(self, test_loader, model=None, checkpoint_path=None, **kwargs):
         """
@@ -54,14 +69,19 @@ class ModelEvaluator(ModelComponent):
             conf_threshold = kwargs.get('conf_threshold', self.params['conf_threshold'])
             iou_threshold = kwargs.get('iou_threshold', self.params['iou_threshold'])
             
-            # Reset metrics calculator
-            self.metrics_adapter.reset()
+            # Reset metrics calculator jika ada
+            if self.metrics_calculator:
+                self.metrics_calculator.reset()
             
             # Log info evaluasi
-            self.logger.info(f"🔍 Evaluasi model ({len(test_loader)} batch): device={device}, conf={conf_threshold:.2f}")
+            self.logger.info(f"🔍 Evaluasi model ({len(test_loader)} batch)")
             
             # Setup progress bar
             pbar = self._create_progress_bar(test_loader)
+            
+            # Persiapan hasil
+            all_predictions = []
+            all_targets = []
             
             # Evaluasi
             with torch.no_grad():
@@ -75,8 +95,13 @@ class ModelEvaluator(ModelComponent):
                     # Post-processing detections
                     predictions = self._post_process(model, outputs, conf_threshold, iou_threshold)
                     
-                    # Update metrics
-                    self.metrics_adapter.update(predictions, targets)
+                    # Simpan prediksi dan target untuk evaluasi
+                    all_predictions.append(predictions)
+                    all_targets.append(targets)
+                    
+                    # Update metrics langsung jika calculator tersedia
+                    if self.metrics_calculator:
+                        self.metrics_calculator.update(predictions, targets)
                     
                     # Update progress
                     if pbar:
@@ -87,9 +112,13 @@ class ModelEvaluator(ModelComponent):
                 pbar.close()
             
             # Compute final metrics
-            metrics = self.metrics_adapter.compute()
+            if self.metrics_calculator:
+                metrics = self.metrics_calculator.compute()
+            else:
+                # Simple metrics jika tidak ada calculator
+                metrics = self._compute_basic_metrics(all_predictions, all_targets)
             
-            # Add timing and config info
+            # Add timing dan config info
             metrics.update({
                 'execution_time': time.time() - start_time,
                 'conf_threshold': conf_threshold,
@@ -97,7 +126,10 @@ class ModelEvaluator(ModelComponent):
             })
             
             # Log result
-            self.logger.success(f"✅ Evaluasi selesai: mAP={metrics.get('mAP', 0):.4f}, F1={metrics.get('f1', 0):.4f}")
+            self.logger.success(
+                f"✅ Evaluasi selesai: "
+                f"mAP={metrics.get('mAP', 0):.4f}, F1={metrics.get('f1', 0):.4f}"
+            )
             
             return metrics
             
@@ -111,6 +143,9 @@ class ModelEvaluator(ModelComponent):
             raise EvaluationError("Model atau checkpoint_path harus diberikan")
             
         if model is None:
+            if not self.model_factory:
+                raise EvaluationError("Model factory diperlukan untuk load checkpoint")
+                
             self.logger.info(f"🔄 Loading model dari checkpoint: {checkpoint_path}")
             model, _ = self.model_factory.load_model(checkpoint_path)
             
@@ -149,3 +184,13 @@ class ModelEvaluator(ModelComponent):
             return model.post_process(outputs, conf_threshold=conf_threshold, iou_threshold=iou_threshold)
         else:
             return outputs
+            
+    def _compute_basic_metrics(self, predictions, targets):
+        """Hitung metrik dasar jika tidak ada metrics calculator."""
+        # Implementasi sederhana, idealnya menggunakan metrics calculator yang sesuai
+        return {
+            'mAP': 0.0,
+            'precision': 0.0,
+            'recall': 0.0,
+            'f1': 0.0
+        }

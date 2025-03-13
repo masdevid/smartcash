@@ -1,6 +1,6 @@
 # File: smartcash/models/backbones/cspdarknet.py
 # Author: Alfrida Sabar
-# Deskripsi: Implementasi CSPDarknet backbone yang lebih robust dengan fallback ke local weights
+# Deskripsi: CSPDarknet backbone dengan auto-download dan validasi struktur
 
 import torch
 import torch.nn as nn

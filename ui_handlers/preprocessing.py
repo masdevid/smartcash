@@ -4,8 +4,7 @@ Author: Alfrida Sabar (optimized)
 Deskripsi: Handler untuk UI preprocessing dataset SmartCash dengan pendekatan robust dan modular.
 """
 
-import threading
-import time
+import time  # Removed threading import
 from pathlib import Path
 import ipywidgets as widgets
 from IPython.display import display, clear_output, HTML
@@ -343,7 +342,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 )
             
             if not stop_requested:
-                # Run pipeline
+                # Run pipeline directly in main thread
                 result = preprocessing_manager.run_full_pipeline(
                     splits=splits, 
                     validate_dataset=config['data']['preprocessing']['validation']['enabled'],
@@ -383,32 +382,23 @@ def setup_preprocessing_handlers(ui_components, config=None):
             stop_requested = False
             update_ui_for_processing(False)
     
-    # Thread handler for preprocessing
-    def run_preprocessing_thread():
-        nonlocal processing_active
-        
-        if processing_active:
-            return
-        
-        processing_active = True
-        ui_components['progress_bar'].value = 0
-        ui_components['current_progress'].value = 0
-        ui_components['summary_container'].layout.display = 'none'
-        ui_components['cleanup_button'].layout.display = 'none'
-        update_ui_for_processing(True)
-        display_status("info", "🔄 Starting preprocessing...")
-        
-        # Run in thread
-        thread = threading.Thread(target=start_preprocessing)
-        thread.daemon = True
-        thread.start()
-    
     # Handler for preprocess button
     def on_preprocess_click(b):
         if check_preprocessed_exists():
             pass  # Confirmation dialog will handle starting if confirmed
         else:
-            run_preprocessing_thread()
+            # Directly start preprocessing in main thread
+            if processing_active:
+                return
+            
+            processing_active = True
+            ui_components['progress_bar'].value = 0
+            ui_components['current_progress'].value = 0
+            ui_components['summary_container'].layout.display = 'none'
+            ui_components['cleanup_button'].layout.display = 'none'
+            update_ui_for_processing(True)
+            display_status("info", "🔄 Starting preprocessing...")
+            start_preprocessing()
     
     # Handler for stop button
     def on_stop_click(b):
@@ -416,12 +406,9 @@ def setup_preprocessing_handlers(ui_components, config=None):
         stop_requested = True
         display_status("warning", "⚠️ Stopping preprocessing...")
         
-        # Update UI after short delay
-        def delayed_ui_update():
-            time.sleep(0.5)
-            processing_active = False
-            update_ui_for_processing(False)
-        threading.Thread(target=delayed_ui_update, daemon=True).start()
+        # Immediate UI update
+        processing_active = False
+        update_ui_for_processing(False)
         
         if 'EventDispatcher' in globals():
             EventDispatcher.notify(

@@ -75,12 +75,12 @@ def setup_env_config_handlers(ui_components, config=None):
         
         ui_components['colab_panel'].value = """
             <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
-                <h3 style="margin-top:0">☁️ Google Colab Terdeteksi</h3>
+                <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
                 <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
             </div>
         """ if is_colab else """
             <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-                <h3 style="margin-top:0">💻 Environment Lokal Terdeteksi</h3>
+                <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
                 <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
             </div>
         """
@@ -88,19 +88,33 @@ def setup_env_config_handlers(ui_components, config=None):
         return is_colab
     
     def fallback_get_directory_tree(root_dir, max_depth=2):
-        """Fallback untuk directory tree view"""
+        """Fallback untuk directory tree view dengan filter khusus untuk Drive"""
         root_dir = Path(root_dir)
         if not root_dir.exists():
             return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
+        
+        # Khusus untuk drive, tampilkan hanya folder SmartCash
+        if '/content/drive' in str(root_dir):
+            root_dir = Path('/content/drive/MyDrive/SmartCash')
+            if not root_dir.exists():
+                return f"<span style='color:orange'>⚠️ SmartCash folder tidak ditemukan di Google Drive</span>"
         
         result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
         result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
         
         def traverse_dir(path, prefix="", depth=0):
             if depth > max_depth: return ""
+            # Skip jika bukan SmartCash directory di drive
+            if '/content/drive' in str(path) and '/MyDrive/SmartCash' not in str(path):
+                return ""
+                
             items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
             tree = ""
             for i, item in enumerate(items):
+                # Skip directory lain di drive yang bukan bagian SmartCash
+                if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
+                    continue
+                    
                 is_last = i == len(items) - 1
                 connector = "└─ " if is_last else "├─ "
                 if item.is_dir():

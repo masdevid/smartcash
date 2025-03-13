@@ -154,7 +154,10 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             ]
             
             installed_packages = _check_installed(package_checks)
-            
+            display(create_status_indicator(
+                        'success',
+                        f'Paket terinstall: {len(installed_packages)}'
+                    ))
             # Collect selected packages, skipping already installed ones
             for key, pkg_info in PACKAGE_GROUPS.items():
                 if not ui_components[key].value:

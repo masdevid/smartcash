@@ -25,6 +25,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
         from smartcash.utils.environment_manager import EnvironmentManager
         from smartcash.utils.config_manager import get_config_manager
         from smartcash.utils.ui_utils import create_status_indicator
+        from smartcash.utils.dataset.dataset_utils import DEFAULT_SPLITS
         
         logger = get_logger("preprocessing")
         env_manager = EnvironmentManager(logger=logger)
@@ -73,6 +74,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     data_dir = env_manager.get_path(config.get('data_dir', 'data')) if env_manager else config.get('data_dir', 'data')
     preprocessing_manager = PreprocessingManager(config=config, logger=logger, base_dir=data_dir)
     
+    
     # Setup UI from config
     def init_ui():
         if 'data' in config and 'preprocessing' in config['data']:
@@ -94,6 +96,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
                         if key in cfg['validation']: v_opts[idx].value = cfg['validation'][key]
                     if 'invalid_dir' in cfg['validation']:
                         v_opts[3].value = cfg['validation']['invalid_dir']
+            
+            display_status("info", f"Data directory: {data_dir}")
     
     # Update UI for processing state
     def update_ui_for_processing(is_processing):
@@ -140,13 +144,13 @@ def setup_preprocessing_handlers(ui_components, config=None):
             # Extract stats
             validation_stats = {
                 split: result['validation'].get(split, {}).get('validation_stats', {}) 
-                for split in ['train', 'valid', 'test'] 
+                for split in DEFAULT_SPLITS 
                 if split in result.get('validation', {})
             }
             
             analysis_stats = {
                 split: result['analysis'].get(split, {}).get('analysis', {}) 
-                for split in ['train', 'valid', 'test'] 
+                for split in DEFAULT_SPLITS 
                 if split in result.get('analysis', {})
             }
             
@@ -327,12 +331,12 @@ def setup_preprocessing_handlers(ui_components, config=None):
         try:
             # Determine splits to process
             split_map = {
-                'All Splits': ['train', 'valid', 'test'],
-                'Train Only': ['train'],
-                'Validation Only': ['valid'],
-                'Test Only': ['test']
+                'All Splits': DEFAULT_SPLITS,
+                'Train Only': [DEFAULT_SPLITS[0]],
+                'Validation Only': [DEFAULT_SPLITS[1]],
+                'Test Only': [DEFAULT_SPLITS[2]]
             }
-            splits = split_map.get(ui_components['split_selector'].value, ['train', 'valid', 'test'])
+            splits = split_map.get(ui_components['split_selector'].value, DEFAULT_SPLITS)
             
             # Notify start
             if 'notify' in globals():

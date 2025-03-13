@@ -27,15 +27,15 @@ def setup_augmentation_handlers(ui_components, config=None):
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.dataset import DatasetManager
-        from smartcash.utils.observer import EventDispatcher, EventTopics
+        from smartcash.utils.observer import EventTopics, notify
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.augmentation import AugmentationManager
         from smartcash.utils.environment_manager import EnvironmentManager
-        from smartcash.utils.config_manager import ConfigManager
+        from smartcash.utils.config_manager import get_config_manager
         
         logger = get_logger("augmentation")
         env_manager = EnvironmentManager()
-        config_manager = ConfigManager.get_instance(logger=logger)
+        config_manager = get_config_manager(logger=logger)
         
         # Load config jika belum ada
         if not config or not isinstance(config, dict) or 'augmentation' not in config:
@@ -191,7 +191,7 @@ def setup_augmentation_handlers(ui_components, config=None):
             try:
                 # Notify start if observer available
                 if observer_manager:
-                    EventDispatcher.notify(
+                    notify(
                         event_type=EventTopics.AUGMENTATION_START,
                         sender="augmentation_handler",
                         message="Memulai augmentasi dataset",
@@ -271,7 +271,7 @@ def setup_augmentation_handlers(ui_components, config=None):
                 
                 # Notify completion if observer available
                 if observer_manager:
-                    EventDispatcher.notify(
+                    notify(
                         event_type=EventTopics.AUGMENTATION_END,
                         sender="augmentation_handler",
                         message="Augmentasi dataset selesai",
@@ -285,7 +285,7 @@ def setup_augmentation_handlers(ui_components, config=None):
                 
                 # Notify error if observer available
                 if observer_manager:
-                    EventDispatcher.notify(
+                    notify(
                         event_type=EventTopics.AUGMENTATION_ERROR,
                         sender="augmentation_handler",
                         message=f"Error saat augmentasi: {str(e)}",

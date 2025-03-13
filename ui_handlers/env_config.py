@@ -1,10 +1,10 @@
 """
 File: smartcash/ui_handlers/env_config.py
 Author: Perbaikan untuk sinkronisasi config
-Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan fitur cek sync config YAML
+Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan filter direktori Drive
 """
 
-import threading, time, os, shutil, glob
+import threading, time, os, shutil
 from IPython.display import display, HTML, clear_output
 from pathlib import Path
 
@@ -29,6 +29,86 @@ def setup_env_config_handlers(ui_components, config=None):
     except ImportError as e:
         with ui_components['status']:
             display(HTML(f"<p style='color:red'>⚠️ Limited functionality - {str(e)}</p>"))
+    
+    def filter_drive_tree(tree_html):
+        """Filter directory tree untuk hanya menampilkan struktur SmartCash di Google Drive"""
+        if not tree_html or '/content/drive' not in tree_html:
+            return tree_html
+            
+        try:
+            pre_start = tree_html.find("<pre")
+            pre_end = tree_html.find("</pre>")
+            
+            if pre_start == -1 or pre_end == -1:
+                return tree_html
+                
+            header = tree_html[:pre_start + tree_html[pre_start:].find(">") + 1]
+            content = tree_html[pre_start + tree_html[pre_start:].find(">") + 1:pre_end]
+            
+            lines = content.split("\n")
+            filtered_lines = []
+            inside_drive = False
+            
+            for line in lines:
+                if '/content/drive' in line and 'MyDrive/SmartCash' not in line and not inside_drive:
+                    continue
+                    
+                if 'SmartCash/' in line:
+                    inside_drive = True
+                    filtered_lines.append(line)
+                elif inside_drive and ('│' not in line and '├' not in line and '└' not in line):
+                    inside_drive = False
+                elif inside_drive:
+                    filtered_lines.append(line)
+                elif '/content/drive' not in line:
+                    filtered_lines.append(line)
+            
+            return header + "\n".join(filtered_lines) + "</pre>"
+        except Exception:
+            return tree_html
+    
+    def fallback_get_directory_tree(root_dir, max_depth=2):
+        """Fallback untuk directory tree view dengan filter khusus untuk Drive"""
+        root_dir = Path(root_dir)
+        if not root_dir.exists():
+            return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
+        
+        # Khusus untuk drive, tampilkan hanya folder SmartCash
+        if '/content/drive' in str(root_dir):
+            root_dir = Path('/content/drive/MyDrive/SmartCash')
+            if not root_dir.exists():
+                return f"<span style='color:orange'>⚠️ SmartCash folder tidak ditemukan di Google Drive</span>"
+        
+        result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
+        result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
+        
+        def traverse_dir(path, prefix="", depth=0):
+            if depth > max_depth: return ""
+            # Skip jika bukan SmartCash directory di drive
+            if '/content/drive' in str(path) and '/MyDrive/SmartCash' not in str(path):
+                return ""
+                
+            items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
+            tree = ""
+            for i, item in enumerate(items):
+                # Skip directory lain di drive yang bukan bagian SmartCash
+                if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
+                    continue
+                    
+                is_last = i == len(items) - 1
+                connector = "└─ " if is_last else "├─ "
+                if item.is_dir():
+                    tree += f"{prefix}{connector}<span style='color:#0366d6;font-weight:bold'>{item.name}/</span>\n"
+                    next_prefix = prefix + ("   " if is_last else "│  ")
+                    if depth < max_depth:
+                        tree += traverse_dir(item, next_prefix, depth + 1)
+                else:
+                    tree += f"{prefix}{connector}{item.name}\n"
+            return tree
+        
+        result += traverse_dir(root_dir)
+        result += "</pre>"
+        return result
     
     def detect_environment():
         """Deteksi environment dan update UI"""
@@ -87,49 +167,6 @@ def setup_env_config_handlers(ui_components, config=None):
         ui_components['drive_button'].layout.display = '' if is_colab else 'none'
         return is_colab
     
-    def fallback_get_directory_tree(root_dir, max_depth=2):
-        """Fallback untuk directory tree view dengan filter khusus untuk Drive"""
-        root_dir = Path(root_dir)
-        if not root_dir.exists():
-            return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
-        
-        # Khusus untuk drive, tampilkan hanya folder SmartCash
-        if '/content/drive' in str(root_dir):
-            root_dir = Path('/content/drive/MyDrive/SmartCash')
-            if not root_dir.exists():
-                return f"<span style='color:orange'>⚠️ SmartCash folder tidak ditemukan di Google Drive</span>"
-        
-        result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
-        result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
-        
-        def traverse_dir(path, prefix="", depth=0):
-            if depth > max_depth: return ""
-            # Skip jika bukan SmartCash directory di drive
-            if '/content/drive' in str(path) and '/MyDrive/SmartCash' not in str(path):
-                return ""
-                
-            items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
-            tree = ""
-            for i, item in enumerate(items):
-                # Skip directory lain di drive yang bukan bagian SmartCash
-                if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
-                    continue
-                    
-                is_last = i == len(items) - 1
-                connector = "└─ " if is_last else "├─ "
-                if item.is_dir():
-                    tree += f"{prefix}{connector}<span style='color:#0366d6;font-weight:bold'>{item.name}/</span>\n"
-                    next_prefix = prefix + ("   " if is_last else "│  ")
-                    if depth < max_depth:
-                        tree += traverse_dir(item, next_prefix, depth + 1)
-                else:
-                    tree += f"{prefix}{connector}{item.name}\n"
-            return tree
-        
-        result += traverse_dir(root_dir)
-        result += "</pre>"
-        return result
-        
     def sync_missing_configs(drive_configs_dir=None):
         """Cek dan salin config yang hilang"""
         if not env_manager or not env_manager.is_drive_mounted:
@@ -141,10 +178,8 @@ def setup_env_config_handlers(ui_components, config=None):
             local_configs_dir = Path('configs')
             local_configs_dir.mkdir(parents=True, exist_ok=True)
             
-            # Cari configs dari berbagai sumber
             source_files = []
             try:
-                # Coba mencari di package
                 import importlib
                 try:
                     from importlib.resources import files
@@ -152,7 +187,6 @@ def setup_env_config_handlers(ui_components, config=None):
                     if source_module.is_dir():
                         source_files = [p for p in source_module.iterdir() if p.name.endswith(('.yaml', '.yml'))]
                 except Exception:
-                    # Fallback ke path manual
                     smartcash_path = Path(__file__).parent.parent.parent
                     configs_path = smartcash_path / 'smartcash' / 'configs'
                     if configs_path.exists() and configs_path.is_dir():
@@ -160,11 +194,9 @@ def setup_env_config_handlers(ui_components, config=None):
             except ImportError:
                 pass
                 
-            # Gunakan configs lokal jika tidak ada
             if not source_files:
                 source_files = list(local_configs_dir.glob('*.y*ml'))
                 
-            # Scan dengan pencarian luas
             if not source_files:
                 for root_dir in ['', '.', '..', 'smartcash']:
                     yaml_files = list(Path(root_dir).glob('**/*.y*ml'))
@@ -173,29 +205,23 @@ def setup_env_config_handlers(ui_components, config=None):
                         source_files = config_files
                         break
             
-            # Sync files
-            missing_configs = []
-            copied_configs = []
+            missing_configs, copied_configs = [], []
             
             for config_file in source_files:
                 filename = config_file.name
                 drive_file = drive_configs_dir / filename
                 local_file = local_configs_dir / filename
                 
-                # Jika tidak ada di drive, copy
                 if not drive_file.exists():
                     missing_configs.append(filename)
                     try:
-                        # Pastikan ada di local
                         if not local_file.exists():
                             shutil.copy2(config_file, local_file)
-                        # Copy ke drive
                         shutil.copy2(local_file, drive_file)
                         copied_configs.append(filename)
                     except Exception as e:
                         if logger: logger.warning(f"⚠️ Gagal copy {filename}: {e}")
                 
-                # Copy dari drive ke local jika tidak ada
                 elif not local_file.exists():
                     try:
                         shutil.copy2(drive_file, local_file)
@@ -223,7 +249,6 @@ def setup_env_config_handlers(ui_components, config=None):
                         f"✅ Drive terhubung: {env_manager.drive_path} ({symlink_stats['created']} symlinks baru)"
                     ))
                     
-                    # Sync configs
                     display(create_status_indicator("info", "🔄 Memeriksa file konfigurasi..."))
                     drive_configs_dir = env_manager.drive_path / 'configs'
                     missing, copied = sync_missing_configs(drive_configs_dir)
@@ -235,9 +260,11 @@ def setup_env_config_handlers(ui_components, config=None):
                     else:
                         display(create_status_indicator("info", "ℹ️ Semua config sudah ada di Drive"))
                     
-                    # Display tree
-                    display(HTML("<h4>📂 Struktur direktori:</h4>"))
-                    tree_html = env_manager.get_directory_tree(max_depth=2) if hasattr(env_manager, 'get_directory_tree') else fallback_get_directory_tree(env_manager.base_dir, max_depth=2)
+                    # Display tree - fokus ke SmartCash di Drive
+                    display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
+                    drive_path = env_manager.drive_path if hasattr(env_manager, 'drive_path') else Path('/content/drive/MyDrive/SmartCash')
+                    raw_tree_html = env_manager.get_directory_tree(drive_path, max_depth=2) if hasattr(env_manager, 'get_directory_tree') else fallback_get_directory_tree(drive_path, max_depth=2)
+                    tree_html = filter_drive_tree(raw_tree_html)
                     display(HTML(tree_html))
                     
                     # Update config
@@ -318,9 +345,15 @@ def setup_env_config_handlers(ui_components, config=None):
                     f"✅ Direktori dibuat: {stats['created']} baru, {stats['existing']} sudah ada"
                 ))
                 
-                # Display tree
-                display(HTML("<h4>📂 Struktur direktori:</h4>"))
-                tree_html = env_manager.get_directory_tree(max_depth=3) if hasattr(env_manager, 'get_directory_tree') else fallback_get_directory_tree(env_manager.base_dir, max_depth=3)
+                # Display tree - tampilkan struktur project
+                display(HTML("<h4>📂 Struktur direktori project:</h4>"))
+                tree_path = env_manager.base_dir
+                # Jika Drive terhubung, fokus ke direktori SmartCash
+                if use_drive and env_manager.is_drive_mounted and hasattr(env_manager, 'drive_path'):
+                    tree_path = env_manager.drive_path
+                
+                raw_tree_html = env_manager.get_directory_tree(tree_path, max_depth=3) if hasattr(env_manager, 'get_directory_tree') else fallback_get_directory_tree(tree_path, max_depth=3)
+                tree_html = filter_drive_tree(raw_tree_html)
                 display(HTML(tree_html))
                 
                 # Update config

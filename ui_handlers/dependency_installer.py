@@ -307,7 +307,22 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                         'warning',
                         f'{display_name}: Tidak terinstall'
                     ))
-            
+            # Check CUDA
+            try:
+                import torch
+                if torch.cuda.is_available():
+                    device_name = torch.cuda.get_device_name(0)
+                    display(create_status_indicator(
+                        'success',
+                        f'CUDA tersedia: {device_name}'
+                    ))
+                else:
+                    display(create_status_indicator(
+                        'info',
+                        'CUDA tidak tersedia, menggunakan CPU'
+                    ))
+            except ImportError:
+                pass
             return installed_packages
         
     def update_ui_thread():
@@ -380,29 +395,11 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     
     def on_check_click(b):
         """Handler untuk tombol cek instalasi."""
-        with ui_components['status']:
-            clear_output()
-            display(create_status_indicator('info', '🔍 Memeriksa paket terinstall...'))
+        display(create_status_indicator('info', '🔍 Memeriksa paket terinstall...'))
+        
+        # Check each package
+        _check_installed(PACKAGE_CHECKS)
             
-            # Check each package
-            _check_installed(PACKAGE_CHECKS)
-            
-            # Check CUDA
-            try:
-                import torch
-                if torch.cuda.is_available():
-                    device_name = torch.cuda.get_device_name(0)
-                    display(create_status_indicator(
-                        'success',
-                        f'CUDA tersedia: {device_name}'
-                    ))
-                else:
-                    display(create_status_indicator(
-                        'info',
-                        'CUDA tidak tersedia, menggunakan CPU'
-                    ))
-            except ImportError:
-                pass
     
     def on_check_all(b):
         """Handler untuk tombol check all."""

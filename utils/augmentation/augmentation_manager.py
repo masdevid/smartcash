@@ -154,6 +154,7 @@ class AugmentationManager(AugmentationBase):
             completion_rate = (total_augmented / max(1, expected_augmented)) * 100
             
             self.logger.success(
+                f"\n"
                 f"✨ Augmentasi {split} selesai dalam {self.stats['duration']:.1f} detik\n"
                 f"   Gambar asli: {total_images}\n"
                 f"   Total augmentasi: {total_augmented}\n"

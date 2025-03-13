@@ -185,6 +185,7 @@ class EnhancedDatasetValidator:
         }
         
         self.logger.success(
+            f"\n"
             f"✅ Pemindahan file tidak valid selesai:\n"
             f"   • Gambar dipindahkan: {stats['moved_images']}\n"
             f"   • Label dipindahkan: {stats['moved_labels']}\n"
@@ -196,6 +197,7 @@ class EnhancedDatasetValidator:
     def _log_validation_summary(self, split: str, validation_stats: Dict) -> None:
         """Log ringkasan hasil validasi."""
         self.logger.info(
+            f"\n"
             f"✅ Ringkasan Validasi Dataset {split} ({validation_stats['duration']:.1f} detik):\n"
             f"📸 Total Gambar: {validation_stats['total_images']}\n"
             f"   • Valid: {validation_stats['valid_images']}\n"
@@ -246,6 +248,7 @@ class EnhancedDatasetValidator:
         
         # Log hasil
         self.logger.info(
+            f"\n"
             f"📊 Analisis Dataset {split}:\n"
             f"   • Ketidakseimbangan kelas: {analysis['class_balance']['imbalance_score']:.2f}/10\n"
             f"   • Ketidakseimbangan layer: {analysis['layer_balance']['imbalance_score']:.2f}/10\n"

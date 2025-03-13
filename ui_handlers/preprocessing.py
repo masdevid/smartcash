@@ -11,7 +11,18 @@ from IPython.display import display, clear_output, HTML
 def setup_preprocessing_handlers(ui_components, config=None):
     """Setup handlers untuk UI preprocessing dataset dengan logging yang lebih detail."""
     if not ui_components:
+        print("Error: ui_components is None")
         return {}
+        
+    # Verify critical components exist
+    missing_components = []
+    for key in ['preprocess_button', 'stop_button', 'preprocess_status']:
+        if key not in ui_components or ui_components[key] is None:
+            missing_components.append(key)
+    
+    if missing_components:
+        print(f"Error: Missing UI components: {', '.join(missing_components)}")
+        return ui_components  # Return unchanged
 
     # Import dependencies dengan fallback siap pakai
     try:
@@ -78,15 +89,19 @@ def setup_preprocessing_handlers(ui_components, config=None):
     # Helper untuk logging ke output UI
     def log_event(status, message):
         """Log pesan ke status output dengan format konsisten."""
-        if 'preprocess_status' in ui_components:
-            timestamp = time.strftime("%H:%M:%S")
-            with ui_components['preprocess_status']:
-                display(HTML(
-                    f"<div style='padding:5px; margin:3px 0; border-left:3px solid "
-                    f"{'#28a745' if status == 'success' else '#dc3545' if status == 'error' else '#ffc107' if status == 'warning' else '#17a2b8'}'>"
-                    f"<span style='color:#6c757d; font-size:0.8em'>[{timestamp}]</span> {message}"
-                    f"</div>"
-                ))
+        try:
+            if 'preprocess_status' in ui_components and ui_components['preprocess_status'] is not None:
+                timestamp = time.strftime("%H:%M:%S")
+                with ui_components['preprocess_status']:
+                    display(HTML(
+                        f"<div style='padding:5px; margin:3px 0; border-left:3px solid "
+                        f"{'#28a745' if status == 'success' else '#dc3545' if status == 'error' else '#ffc107' if status == 'warning' else '#17a2b8'}'>"
+                        f"<span style='color:#6c757d; font-size:0.8em'>[{timestamp}]</span> {message}"
+                        f"</div>"
+                    ))
+        except Exception as e:
+            # Fallback to console if widget display fails
+            print(f"[{status.upper()}] {message} (Log error: {str(e)})")
     
     # Initialize PreprocessingManager secara lazy
     def get_preprocessing_manager():
@@ -103,70 +118,83 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Update UI untuk kondisi processing
     def update_ui_for_processing(is_processing):
-        # Update progress visibility
-        for component in ['progress_bar', 'current_progress']:
-            if component in ui_components:
-                ui_components[component].layout.visibility = 'visible' if is_processing else 'hidden'
-        
-        # Update button states
-        if 'preprocess_button' in ui_components:
-            ui_components['preprocess_button'].disabled = is_processing
-        if 'stop_button' in ui_components:
-            ui_components['stop_button'].layout.display = 'inline-block' if is_processing else 'none'
-        if 'cleanup_button' in ui_components:
-            ui_components['cleanup_button'].disabled = is_processing
-        
-        # Show logs during processing
-        if 'log_accordion' in ui_components and is_processing:
-            ui_components['log_accordion'].selected_index = 0
+        """Update UI untuk status processing dengan safety checks."""
+        try:
+            # Update progress visibility
+            for component in ['progress_bar', 'current_progress']:
+                if component in ui_components and ui_components[component] is not None and hasattr(ui_components[component], 'layout'):
+                    ui_components[component].layout.visibility = 'visible' if is_processing else 'hidden'
+            
+            # Update button states
+            if 'preprocess_button' in ui_components and ui_components['preprocess_button'] is not None:
+                ui_components['preprocess_button'].disabled = is_processing
+                
+            if 'stop_button' in ui_components and ui_components['stop_button'] is not None and hasattr(ui_components['stop_button'], 'layout'):
+                ui_components['stop_button'].layout.display = 'inline-block' if is_processing else 'none'
+                
+            if 'cleanup_button' in ui_components and ui_components['cleanup_button'] is not None:
+                ui_components['cleanup_button'].disabled = is_processing
+            
+            # Show logs during processing
+            if 'log_accordion' in ui_components and ui_components['log_accordion'] is not None and is_processing:
+                ui_components['log_accordion'].selected_index = 0
+        except Exception as e:
+            # Log error but continue
+            print(f"Error updating UI state: {str(e)}")
+
     
     # Progress tracking function with better verbosity
     def update_progress(event_type, sender, progress=0, total=100, message=None, split=None, **kwargs):
-        """Enhanced progress handler dengan verbose logging."""
-        if state['stop_requested']:
-            return
+        """Enhanced progress handler dengan verbose logging dan safety checks."""
+        try:
+            if state['stop_requested']:
+                return
+                
+            current_time = time.time()
+            if event_type == EventTopics.PREPROCESSING_PROGRESS:
+                # Overall progress bar
+                progress_bar = ui_components.get('progress_bar')
+                if progress_bar is not None:
+                    progress_pct = int(progress * 100 / total) if total > 0 else 0
+                    progress_bar.value = progress_pct
+                    progress_bar.description = f"{progress_pct}%"
+                    
+                    # Log periodic updates (not too frequent)
+                    if current_time - state['last_log_time'] > 2.0 or progress_pct % 20 == 0:
+                        elapsed = current_time - state['start_time']
+                        log_event("info", f"⏱️ Progress: <b>{progress_pct}%</b> ({progress}/{total}) setelah {elapsed:.1f}s")
+                        state['last_log_time'] = current_time
+            elif event_type in [EventTopics.VALIDATION_PROGRESS, EventTopics.AUGMENTATION_PROGRESS]:
+                # Current operation progress bar
+                current_bar = ui_components.get('current_progress')
+                if current_bar is not None:
+                    progress_pct = int(progress * 100 / total) if total > 0 else 0
+                    current_bar.value = progress_pct
+                    current_bar.description = f"{progress_pct}%"
+                    
+                    # Log more detailed updates for current operations
+                    state['progress_updates'] += 1
+                    if state['progress_updates'] % 5 == 0 or progress_pct % 25 == 0:
+                        split_info = f"({split})" if split else ""
+                        task_type = "validasi" if event_type == EventTopics.VALIDATION_PROGRESS else "augmentasi"
+                        log_event("info", f"🔄 {task_type.capitalize()} {split_info}: <b>{progress_pct}%</b> ({progress}/{total})")
+                    
+                    # Increment overall progress
+                    overall_bar = ui_components.get('progress_bar')
+                    if overall_bar is not None:
+                        # Use a slower increment for overall progress
+                        increment = min(5, (100 - overall_bar.value) / 10)
+                        overall_bar.value = min(95, overall_bar.value + increment)
             
-        current_time = time.time()
-        if event_type == EventTopics.PREPROCESSING_PROGRESS:
-            # Overall progress bar
-            progress_bar = ui_components.get('progress_bar')
-            if progress_bar:
-                progress_pct = int(progress * 100 / total) if total > 0 else 0
-                progress_bar.value = progress_pct
-                progress_bar.description = f"{progress_pct}%"
-                
-                # Log periodic updates (not too frequent)
-                if current_time - state['last_log_time'] > 2.0 or progress_pct % 20 == 0:
-                    elapsed = current_time - state['start_time']
-                    log_event("info", f"⏱️ Progress: <b>{progress_pct}%</b> ({progress}/{total}) setelah {elapsed:.1f}s")
-                    state['last_log_time'] = current_time
-        elif event_type in [EventTopics.VALIDATION_PROGRESS, EventTopics.AUGMENTATION_PROGRESS]:
-            # Current operation progress bar
-            current_bar = ui_components.get('current_progress')
-            if current_bar:
-                progress_pct = int(progress * 100 / total) if total > 0 else 0
-                current_bar.value = progress_pct
-                current_bar.description = f"{progress_pct}%"
-                
-                # Log more detailed updates for current operations
-                state['progress_updates'] += 1
-                if state['progress_updates'] % 5 == 0 or progress_pct % 25 == 0:
-                    split_info = f"({split})" if split else ""
-                    task_type = "validasi" if event_type == EventTopics.VALIDATION_PROGRESS else "augmentasi"
-                    log_event("info", f"🔄 {task_type.capitalize()} {split_info}: <b>{progress_pct}%</b> ({progress}/{total})")
-                
-                # Increment overall progress
-                overall_bar = ui_components.get('progress_bar')
-                if overall_bar:
-                    # Use a slower increment for overall progress
-                    increment = min(5, (100 - overall_bar.value) / 10)
-                    overall_bar.value = min(95, overall_bar.value + increment)
-        
-        # Always display specific operation messages
-        if message and message.strip():
-            with ui_components['preprocess_status']:
-                split_info = f" ({split})" if split else ""
-                display(create_status_indicator("info", f"{message}{split_info}"))
+            # Always display specific operation messages
+            if message and message.strip():
+                with ui_components['preprocess_status']:
+                    split_info = f" ({split})" if split else ""
+                    display(create_status_indicator("info", f"{message}{split_info}"))
+        except Exception as e:
+            # Fallback to console
+            print(f"Error updating progress: {str(e)}")
+
     
     # Setup observers untuk enhanced progress tracking
     if observer_manager:
@@ -651,43 +679,58 @@ def setup_preprocessing_handlers(ui_components, config=None):
     
     # Setup UI from config
     def init_ui():
-        """Initialize UI elements from config."""
-        if 'data' in config and 'preprocessing' in config['data']:
-            cfg = config['data']['preprocessing']
-            
-            # Update preprocess options
-            opts = ui_components['preprocess_options'].children
-            if len(opts) >= 4:
-                if 'img_size' in cfg and isinstance(cfg['img_size'], list) and len(cfg['img_size']) == 2:
-                    opts[0].value = cfg['img_size']
+        """Initialize UI elements from config with robust error handling."""
+        try:
+            if 'data' in config and 'preprocessing' in config['data']:
+                cfg = config['data']['preprocessing']
+                
+                # Update preprocess options with safety checks
+                if 'preprocess_options' in ui_components and ui_components['preprocess_options'] is not None:
+                    opts = ui_components['preprocess_options'].children if hasattr(ui_components['preprocess_options'], 'children') else []
                     
-                # Update normalize, cache, workers
-                for key, idx in [('normalize_enabled', 1), ('cache_enabled', 2), ('num_workers', 3)]:
-                    if key in cfg:
-                        opts[idx].value = cfg[key]
-            
-            # Update validation options
-            if 'validation' in cfg:
-                v_opts = ui_components['validation_options'].children
-                if len(v_opts) >= 4:
-                    val_cfg = cfg['validation']
-                    for key, idx in [('enabled', 0), ('fix_issues', 1), ('move_invalid', 2)]:
-                        if key in val_cfg:
-                            v_opts[idx].value = val_cfg[key]
+                    if len(opts) >= 4:
+                        if 'img_size' in cfg and isinstance(cfg['img_size'], list) and len(cfg['img_size']) == 2:
+                            opts[0].value = cfg['img_size']
+                            
+                        # Update normalize, cache, workers
+                        for key, idx in [('normalize_enabled', 1), ('cache_enabled', 2), ('num_workers', 3)]:
+                            if key in cfg and idx < len(opts):
+                                opts[idx].value = cfg[key]
+                
+                # Update validation options with safety checks
+                if 'validation' in cfg and 'validation_options' in ui_components and ui_components['validation_options'] is not None:
+                    v_opts = ui_components['validation_options'].children if hasattr(ui_components['validation_options'], 'children') else []
                     
-                    if 'invalid_dir' in val_cfg:
-                        v_opts[3].value = val_cfg['invalid_dir']
-        
-        # Display directories
-        data_dir = config.get('data_dir', 'data')
-        output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
-        with ui_components['preprocess_status']:
-            log_event("info", f"📁 Data: <b>{data_dir}</b> → Preprocessing: <b>{output_dir}</b>")
+                    if len(v_opts) >= 4:
+                        val_cfg = cfg['validation']
+                        for key, idx in [('enabled', 0), ('fix_issues', 1), ('move_invalid', 2)]:
+                            if key in val_cfg and idx < len(v_opts):
+                                v_opts[idx].value = val_cfg[key]
+                        
+                        if 'invalid_dir' in val_cfg and 3 < len(v_opts):
+                            v_opts[3].value = val_cfg['invalid_dir']
             
-        # Check if preprocessed directory already exists
-        preproc_path = Path(output_dir)
-        if preproc_path.exists() and any(preproc_path.iterdir()):
-            ui_components['cleanup_button'].layout.display = 'inline-block'
-            log_event("info", f"💡 Preprocessed data terdeteksi: {output_dir}")
-        else:
-            ui_components['cleanup_button'].layout.display = 'none'
+            # Display directories
+            data_dir = config.get('data_dir', 'data')
+            output_dir = config.get('data', {}).get('preprocessing', {}).get('output_dir', 'data/preprocessed')
+            
+            if 'preprocess_status' in ui_components and ui_components['preprocess_status'] is not None:
+                with ui_components['preprocess_status']:
+                    log_event("info", f"📁 Data: <b>{data_dir}</b> → Preprocessing: <b>{output_dir}</b>")
+                
+            # Check if preprocessed directory already exists
+            preproc_path = Path(output_dir)
+            if preproc_path.exists() and any(preproc_path.iterdir()):
+                if 'cleanup_button' in ui_components and ui_components['cleanup_button'] is not None:
+                    ui_components['cleanup_button'].layout.display = 'inline-block'
+                if 'preprocess_status' in ui_components and ui_components['preprocess_status'] is not None:
+                    with ui_components['preprocess_status']:
+                        log_event("info", f"💡 Preprocessed data terdeteksi: {output_dir}")
+            elif 'cleanup_button' in ui_components and ui_components['cleanup_button'] is not None:
+                ui_components['cleanup_button'].layout.display = 'none'
+        except Exception as e:
+            # Log error but continue
+            if 'preprocess_status' in ui_components and ui_components['preprocess_status'] is not None:
+                with ui_components['preprocess_status']:
+                    log_event("error", f"❌ Error initializing UI: {str(e)}")
+            print(f"Error in init_ui: {str(e)}")  # Fallback console log

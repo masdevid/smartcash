@@ -162,13 +162,13 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             status_queue.put({'type': 'complete'})
     
     def update_ui_thread():
-        """Thread untuk update UI dari queue."""
+        """Thread for updating UI from queue."""
         while True:
             try:
-                # Get status from queue
-                status = status_queue.get(timeout=1)
+                # Get status from queue with shorter timeout
+                status = status_queue.get(timeout=0.1)
                 
-                # Update UI berdasarkan tipe status
+                # Update UI based on status type
                 if status['type'] == 'progress':
                     ui_components['install_progress'].value = status['value']
                     ui_components['install_progress'].description = status['description']
@@ -186,10 +186,18 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                     ui_components['uncheck_all_button'].disabled = False
                     ui_components['install_progress'].layout.visibility = 'hidden'
                     break
+                    
+                # Process next item immediately
+                status_queue.task_done()
+                
             except queue.Empty:
                 # Check if main thread is still alive
                 if not threading.main_thread().is_alive():
                     break
+            except Exception as e:
+                # Log error but continue processing
+                print(f"UI update error: {str(e)}")
+                continue
     
     def create_status_indicator(status, message):
         """Buat indikator status dengan styling konsisten."""

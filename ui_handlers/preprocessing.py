@@ -19,7 +19,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
     try:
         from smartcash.utils.logger import get_logger
         from smartcash.handlers.preprocessing import PreprocessingManager
-        from smartcash.utils.observer import EventTopics, EventDispatcher
+        from smartcash.utils.observer import EventTopics, notify
         from smartcash.utils.observer.observer_manager import ObserverManager
         from smartcash.utils.config_manager import get_config_manager
         from smartcash.utils.ui_utils import create_status_indicator
@@ -141,7 +141,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             observer_manager.create_simple_observer(
                 event_type=event_type,
                 callback=update_progress,
-                name=f"{event_type.name}Observer",
+                name=f"ProgressObserver_{event_type}",
                 group=observer_group
             )
         
@@ -296,7 +296,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             manager = get_preprocessing_manager()
             
             # Notifikasi start
-            EventDispatcher.notify(
+            notify(
                 event_type=EventTopics.PREPROCESSING_START,
                 sender="preprocessing_handler",
                 message="Memulai preprocessing dataset"
@@ -320,7 +320,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
                 display_status("error", f"❌ Preprocessing gagal: {result.get('error', 'Unknown error')}")
                 
             # Notify completion
-            EventDispatcher.notify(
+            notify(
                 event_type=EventTopics.PREPROCESSING_END,
                 sender="preprocessing_handler",
                 result=result
@@ -330,7 +330,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
             
         except Exception as e:
             display_status("error", f"❌ Error: {str(e)}")
-            EventDispatcher.notify(
+            notify(
                 event_type=EventTopics.PREPROCESSING_ERROR,
                 sender="preprocessing_handler",
                 error=str(e)
@@ -439,7 +439,7 @@ def setup_preprocessing_handlers(ui_components, config=None):
         threading.Thread(target=delayed_ui_update, daemon=True).start()
         
         # Notify stop
-        EventDispatcher.notify(
+        notify(
             event_type=EventTopics.PREPROCESSING_END,
             sender="preprocessing_handler",
             message="Preprocessing stopped by user"

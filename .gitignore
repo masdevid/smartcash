@@ -119,6 +119,7 @@ pretrained/
 
 # Config Files
 *.yaml
+!configs/*.yaml
 
 # Model Metadata
 *.index

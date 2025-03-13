@@ -274,7 +274,8 @@ def create_hyperparameters_ui():
         </ul>
         <p><em>Tip: Parameter default biasanya bekerja dengan baik, sesuaikan dengan hati-hati!</em></p>
         """,
-        'info'
+        'info',
+        collapsed=True
     )
     
     # Visualization placeholder

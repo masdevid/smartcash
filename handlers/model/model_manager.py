@@ -29,10 +29,6 @@ class ModelManager:
         # Dictionary untuk lazy-loaded components
         self._components = {}
         
-        self.logger.info(
-            f"🔧 ModelManager diinisialisasi (Colab: {self.colab_mode})"
-        )
-    
     def _detect_colab(self) -> bool:
         """Deteksi apakah running di Google Colab."""
         try:

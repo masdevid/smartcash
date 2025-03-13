@@ -1,0 +1,42 @@
+# Dataset Configuration
+data:
+  # Source configuration
+  source: "roboflow"  # 'local' or 'roboflow'
+  
+  # Directory paths
+  train_dir: "data/train"
+  valid_dir: "data/valid"
+  test_dir: "data/test"
+  
+  # Roboflow config
+  roboflow:
+    api_key: ""  # API key would go here
+    workspace: "smartcash-wo2us"
+    project: "rupiah-emisi-2022"
+    version: "3"
+  
+  # Preprocessing settings
+  preprocessing:
+    img_size: [640, 640]
+    cache_dir: ".cache/smartcash"
+    num_workers: 4
+    augmentation_enabled: true
+    normalize_enabled: true
+    cache_enabled: true
+    
+    # Cache settings
+    cache:
+      max_size_gb: 1.0
+      ttl_hours: 24
+      auto_cleanup: true
+      cleanup_interval_mins: 30
+
+  # Split ratios
+  split_ratios:
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  
+  # Split settings
+  stratified_split: true
+  random_seed: 42

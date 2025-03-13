@@ -8,6 +8,8 @@ import ipywidgets as widgets
 from IPython.display import display, HTML
 from pathlib import Path
 
+from utils.ui_utils import create_info_box
+
 def create_preprocessing_ui():
     """
     Buat komponen UI untuk preprocessing dataset.
@@ -176,7 +178,7 @@ def create_preprocessing_ui():
     )
     
     # Info box
-    info_box = widgets.HTML("""
+    info_box = create_info_box("""
     <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
              color: #0c5460; margin: 10px 0; border-radius: 4px;">
         <h4 style="margin-top: 0; color: inherit;">ℹ️ Tentang Preprocessing</h4>
@@ -189,7 +191,7 @@ def create_preprocessing_ui():
         </ul>
         <p><strong>📝 Konfigurasi</strong> akan otomatis disimpan ke <code>configs/preprocessing_config.yaml</code></p>
     </div>
-    """)
+    """, 'info', collapsed=True)
     
     # Cleanup container
     cleanup_container = widgets.HBox([cleanup_button], layout=widgets.Layout(margin='10px 0'))

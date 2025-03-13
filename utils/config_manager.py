@@ -208,9 +208,6 @@ class ConfigManager:
             with open(pickle_path, 'wb') as f:
                 pickle.dump(config, f)
             
-            if self.logger:
-                self.logger.info(f"💾 Configuration saved to {filename}")
-            
             # Sync to Drive if needed
             if sync_to_drive and self.env_manager.is_colab and self.env_manager.is_drive_mounted:
                 drive_config_dir = self.env_manager.drive_path / 'configs'
@@ -226,9 +223,6 @@ class ConfigManager:
                 with open(drive_pickle_path, 'wb') as f:
                     pickle.dump(config, f)
                 
-                if self.logger:
-                    self.logger.info(f"☁️ Configuration synced to Drive: {drive_yaml_path}")
-            
             return True
         
         except Exception as e:

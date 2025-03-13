@@ -7,6 +7,8 @@ Deskripsi: Komponen UI untuk instalasi dependencies SmartCash dengan layout sede
 import ipywidgets as widgets
 from IPython.display import HTML
 
+from utils.ui_utils import create_info_box
+
 def create_dependency_installer_ui():
     """
     Buat komponen UI untuk instalasi dependencies.
@@ -116,7 +118,7 @@ def create_dependency_installer_ui():
     )
     
     # Info box
-    info_box = widgets.HTML("""
+    info_box = create_info_box("""
     <div style="padding: 10px; background-color: #d1ecf1; border-left: 4px solid #0c5460; 
              color: #0c5460; margin: 10px 0; border-radius: 4px;">
         <h4 style="margin-top: 0; color: inherit;">ℹ️ Package Installation</h4>
@@ -129,7 +131,7 @@ def create_dependency_installer_ui():
             <li><strong>Machine learning</strong>: PyTorch (paling besar)</li>
         </ol>
     </div>
-    """)
+    """, 'info',collapsed=True)
     
     # Assemble UI
     main.children = [

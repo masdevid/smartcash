@@ -43,10 +43,7 @@ def setup_hyperparameters_handlers(ui_components, config=None):
             from smartcash.handlers.model import ModelManager
             if config: 
                 deps['model_manager'] = ModelManager(config, logger=None)
-                if deps['logger']:
-                    deps['logger'].info("✅ ModelManager tersedia")
         except ImportError:
-            # ModelManager is optional, so we don't need to log this
             pass
             
     except ImportError as e:

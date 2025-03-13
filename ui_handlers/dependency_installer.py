@@ -135,7 +135,27 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             unique_packages = set()
             selected_packages = []
             
-            # Collect selected packages
+            # Check for already installed packages
+            package_checks = [
+                ('PyTorch', 'torch'),
+                ('TorchVision', 'torchvision'),
+                ('OpenCV', 'cv2'),
+                ('Albumentations', 'albumentations'),
+                ('NumPy', 'numpy'),
+                ('Pandas', 'pandas'),
+                ('Matplotlib', 'matplotlib'),
+                ('Seaborn', 'seaborn'),
+                ('ipywidgets', 'ipywidgets'),
+                ('tqdm', 'tqdm'),
+                ('PyYAML', 'yaml'),
+                ('termcolor', 'termcolor'),
+                ('python-dotenv', 'dotenv'),
+                ('roboflow', 'roboflow')
+            ]
+            
+            installed_packages = _check_installed(package_checks)
+            
+            # Collect selected packages, skipping already installed ones
             for key, pkg_info in PACKAGE_GROUPS.items():
                 if not ui_components[key].value:
                     continue
@@ -143,7 +163,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 if key in ['yolov5_req', 'smartcash_req']:
                     # Handle multi-package requirements
                     for req in get_package_requirements(key):
-                        if req not in unique_packages:
+                        if req not in unique_packages and req not in installed_packages:
                             unique_packages.add(req)
                             selected_packages.append((
                                 f"{sys.executable} -m pip install {req}", 
@@ -153,10 +173,10 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                     unique_packages.add(pkg_info['command'])
                     selected_packages.append((pkg_info['command'], pkg_info['name']))
             
-            # Add custom packages
+            # Add custom packages, skipping already installed ones
             for pkg in [p.strip() for p in ui_components['custom_packages'].value.strip().split('\n') if p.strip()]:
                 cmd = f"{sys.executable} -m pip install {pkg}"
-                if cmd not in unique_packages:
+                if cmd not in unique_packages and pkg not in installed_packages:
                     unique_packages.add(cmd)
                     selected_packages.append((cmd, f"Custom: {pkg}"))
             
@@ -257,7 +277,34 @@ def setup_dependency_installer_handlers(ui_components, config=None):
                 'message': f'❌ Error: {str(e)}'
             })
             status_queue.put({'type': 'complete'})
-    
+    def _check_installed(package_checks: List[Tuple[str, str]]) -> List[str]:
+        """
+        Check if packages are already installed and return a list of packages to skip.
+        
+        Args:
+            package_checks: List of tuples containing (display_name, import_name) for packages to check.
+        
+        Returns:
+            List of packages that are already installed.
+        """
+        installed_packages = []
+        
+        for display_name, import_name in package_checks:
+            try:
+                module = __import__(import_name)
+                version = getattr(module, '__version__', 'Unknown')
+                installed_packages.append(import_name)
+                display(create_status_indicator(
+                    'success', 
+                    f'{display_name}: v{version} (sudah terinstall)'
+                ))
+            except ImportError:
+                display(create_status_indicator(
+                    'warning',
+                    f'{display_name}: Tidak terinstall'
+                ))
+        
+        return installed_packages
     def update_ui_thread():
         """Thread for updating UI from queue."""
         while True:
@@ -351,19 +398,7 @@ def setup_dependency_installer_handlers(ui_components, config=None):
             ]
             
             # Check each package
-            for display_name, import_name in package_checks:
-                try:
-                    module = __import__(import_name)
-                    version = getattr(module, '__version__', 'Unknown')
-                    display(create_status_indicator(
-                        'success', 
-                        f'{display_name}: v{version}'
-                    ))
-                except ImportError:
-                    display(create_status_indicator(
-                        'warning',
-                        f'{display_name}: Tidak terinstall'
-                    ))
+            _check_installed(package_checks)
             
             # Check CUDA
             try:

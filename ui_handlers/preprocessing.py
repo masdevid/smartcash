@@ -313,9 +313,8 @@ def setup_preprocessing_handlers(ui_components, config=None):
             config_manager.save_config(updated_config, "configs/preprocessing_config.yaml", sync_to_drive=True)
             display_status("success", "✅ Configuration saved to configs/preprocessing_config.yaml")
     
-    # Main preprocessing function (async)
     async def start_preprocessing():
-        nonlocal processing_active, stop_requested
+        nonlocal processing_active, stop_requested  # Ensure these variables are accessible
         
         # Update config from UI
         get_config_from_ui()
@@ -380,19 +379,20 @@ def setup_preprocessing_handlers(ui_components, config=None):
                     error=str(e)
                 )
         finally:
-            processing_active = False
+            processing_active = False  # Ensure this is always set
             stop_requested = False
             update_ui_for_processing(False)
-    
-    # Handler for preprocess button (async)
+
     async def on_preprocess_click(b):
+        nonlocal processing_active  # Ensure this variable is accessible
+        
         if check_preprocessed_exists():
             pass  # Confirmation dialog will handle starting if confirmed
         else:
             if processing_active:
                 return
             
-            processing_active = True
+            processing_active = True  # Initialize the variable
             ui_components['progress_bar'].value = 0
             ui_components['current_progress'].value = 0
             ui_components['summary_container'].layout.display = 'none'

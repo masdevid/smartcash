@@ -1,6 +1,7 @@
 """
 File: smartcash/model/manager.py
 Deskripsi: Manajer model yang mengkoordinasikan berbagai arsitektur dan layanan model
+           dengan dukungan untuk model teroptimasi menggunakan FeatureAdapter dan CIoU
 """
 
 import torch
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import ModelError, ModelConfigurationError
+from smartcash.common.layer_config import get_layer_config
 
 # Imports dari architectures
 from smartcash.model.architectures.backbones import (
@@ -23,6 +25,12 @@ from smartcash.model.architectures.heads import DetectionHead
 # Imports dari components
 from smartcash.model.components import YOLOLoss
 
+# Import model
+from smartcash.model.models.yolov5_model import YOLOv5Model
+
+# Definisi layer deteksi untuk digunakan di seluruh aplikasi
+DETECTION_LAYERS = ['banknote', 'nominal', 'security']
+
 class ModelManager:
     """
     Model Manager yang mengkoordinasikan berbagai arsitektur dan layanan model.
@@ -32,6 +40,7 @@ class ModelManager:
     - Integrasi dengan layanan checkpoint, training, dan inference
     - Validasi kompatibilitas antar komponen
     - Manajemen konfigurasi model
+    - Dukungan untuk model teroptimasi (FeatureAdapter, ResidualAdapter, CIoU)
     """
     
     # Enum untuk backbone yang didukung
@@ -47,29 +56,49 @@ class ModelManager:
         'cspdarknet_l': {'type': 'cspdarknet', 'variant': 'yolov5l'},
     }
     
-    # Konfigurasi deteksi layers
-    DETECTION_LAYERS = {
-        'banknote': {
-            'num_classes': 7,  # 7 denominasi ('001', '002', '005', '010', '020', '050', '100')
-            'description': 'Deteksi uang kertas utuh'
+    # Konfigurasi untuk model teroptimasi
+    OPTIMIZED_MODELS = {
+        'yolov5s': {
+            'description': 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)',
+            'backbone': 'cspdarknet_s',
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False
         },
-        'nominal': {
-            'num_classes': 7,  # 7 area nominal ('l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100')
-            'description': 'Deteksi area nominal'
+        'efficient_basic': {
+            'description': 'Model dasar tanpa optimasi khusus',
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False
         },
-        'security': {
-            'num_classes': 3,  # 3 fitur keamanan ('l3_sign', 'l3_text', 'l3_thread')
-            'description': 'Deteksi fitur keamanan'
+        'efficient_optimized': {
+            'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+            'backbone': 'efficientnet_b4',
+            'use_attention': True,
+            'use_residual': False,
+            'use_ciou': False
         },
-        'all': {
-            'num_classes': 17,  # semua kelas (7+7+3)
-            'description': 'Semua layer deteksi'
+        'efficient_advanced': {
+            'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
+            'backbone': 'efficientnet_b4',
+            'use_attention': True,
+            'use_residual': True,
+            'use_ciou': True
+        },
+        'efficient_experiment': {
+            'description': 'Model penelitian dengan konfigurasi khusus',
+            'backbone': 'efficientnet_b4',
+            'use_attention': True,
+            'use_residual': True,
+            'use_ciou': True,
+            'num_repeats': 3  # Jumlah residual blocks
         }
     }
     
     def __init__(
         self,
         config: Optional[Dict] = None,
+        model_type: str = 'basic',
         logger: Optional[SmartCashLogger] = None
     ):
         """
@@ -77,6 +106,7 @@ class ModelManager:
         
         Args:
             config: Konfigurasi model (opsional)
+            model_type: Tipe model ('basic', 'efficient', 'optimized', 'research') 
             logger: Logger untuk mencatat proses (opsional)
             
         Raises:
@@ -95,8 +125,27 @@ class ModelManager:
             'checkpoint_dir': 'checkpoints',
             'batch_size': 16,
             'dropout': 0.0,
-            'anchors': None  # Use default
+            'anchors': None,  # Use default
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False
         }
+        
+        # Verifikasi tipe model
+        if model_type not in self.OPTIMIZED_MODELS:
+            self.logger.warning(
+                f"⚠️ Tipe model '{model_type}' tidak dikenal, menggunakan 'basic'. "
+                f"Tipe yang tersedia: {list(self.OPTIMIZED_MODELS.keys())}"
+            )
+            model_type = 'basic'
+            
+        self.model_type = model_type
+        
+        # Update default config dengan konfigurasi tipe model
+        model_config = self.OPTIMIZED_MODELS[model_type]
+        for key, value in model_config.items():
+            if key != 'description':  # Skip deskripsi
+                self.default_config[key] = value
         
         # Merge konfigurasi
         self.config = self.default_config.copy()
@@ -118,7 +167,8 @@ class ModelManager:
         self.training_service = None
         self.evaluation_service = None
         
-        self.logger.info(f"✅ ModelManager diinisialisasi dengan konfigurasi:")
+        self.logger.info(f"✅ ModelManager diinisialisasi dengan model {model_type}:")
+        self.logger.info(f"   • {model_config['description']}")
         for key, value in self.config.items():
             self.logger.info(f"   • {key}: {value}")
             
@@ -137,10 +187,14 @@ class ModelManager:
                 f"Backbone yang didukung: {supported}"
             )
             
+        # Dapatkan layer_config
+        layer_config = get_layer_config()
+        all_layers = layer_config.get_layer_names()
+            
         # Validasi detection layers
         for layer in self.config['detection_layers']:
-            if layer not in self.DETECTION_LAYERS and layer != 'all':
-                supported = list(self.DETECTION_LAYERS.keys())
+            if layer not in all_layers and layer != 'all':
+                supported = list(all_layers)
                 raise ModelConfigurationError(
                     f"❌ Detection layer '{layer}' tidak didukung. "
                     f"Layer yang didukung: {supported}"
@@ -148,11 +202,14 @@ class ModelManager:
                 
         # Jika layer 'all', ganti dengan semua layer individual
         if 'all' in self.config['detection_layers']:
-            self.config['detection_layers'] = [l for l in self.DETECTION_LAYERS.keys() if l != 'all']
+            self.config['detection_layers'] = all_layers
             
         # Validasi num_classes berdasarkan detection layers
-        total_classes = sum(self.DETECTION_LAYERS[layer]['num_classes'] 
-                           for layer in self.config['detection_layers'])
+        total_classes = 0
+        for layer in self.config['detection_layers']:
+            layer_config_data = layer_config.get_layer_config(layer)
+            total_classes += len(layer_config_data.get('class_ids', []))
+            
         if self.config['num_classes'] != total_classes:
             self.logger.warning(
                 f"⚠️ Jumlah kelas ({self.config['num_classes']}) tidak sesuai dengan "
@@ -166,7 +223,7 @@ class ModelManager:
             raise ModelConfigurationError(
                 f"❌ Format img_size tidak valid. Harus berupa tuple (width, height)."
             )
-                
+    
     def build_model(self) -> nn.Module:
         """
         Buat dan inisialisasi model berdasarkan konfigurasi.
@@ -202,8 +259,10 @@ class ModelManager:
             device = torch.device(self.config['device'])
             self.model.to(device)
             
+            model_desc = self.OPTIMIZED_MODELS[self.model_type]['description']
             self.logger.success(
-                f"✅ Model berhasil dibangun dan dipindahkan ke device {self.config['device']}"
+                f"✅ Model {self.model_type} ({model_desc}) berhasil dibangun "
+                f"dan dipindahkan ke device {self.config['device']}"
             )
             
             return self.model
@@ -226,6 +285,7 @@ class ModelManager:
                 self.backbone = EfficientNetBackbone(
                     pretrained=self.config['pretrained'],
                     model_name=backbone_config['variant'],
+                    use_attention=self.config.get('use_attention', False),
                     logger=self.logger
                 )
             elif backbone_config['type'] == 'cspdarknet':
@@ -260,13 +320,18 @@ class ModelManager:
             # Standard output channels untuk YOLOv5
             out_channels = [128, 256, 512]
             
+            # Konfigurasi tambahan untuk residual blocks
+            num_repeats = self.config.get('num_repeats', 3) if self.config.get('use_residual', False) else 1
+            
             self.neck = FeatureProcessingNeck(
                 in_channels=in_channels,
                 out_channels=out_channels,
+                num_repeats=num_repeats,
                 logger=self.logger
             )
             
-            self.logger.info(f"✓ Feature Neck berhasil diinisialisasi")
+            feature_type = "dengan ResidualAdapter" if self.config.get('use_residual', False) else "standar"
+            self.logger.info(f"✓ Feature Neck {feature_type} berhasil diinisialisasi")
             
         except Exception as e:
             self.logger.error(f"❌ Gagal membangun neck: {str(e)}")
@@ -308,19 +373,49 @@ class ModelManager:
         try:
             # Buat loss function untuk setiap detection layer
             self.loss_fn = {}
+            layer_config = get_layer_config()
+            
             for layer in self.config['detection_layers']:
-                num_classes = self.DETECTION_LAYERS[layer]['num_classes']
+                layer_data = layer_config.get_layer_config(layer)
+                num_classes = len(layer_data.get('class_ids', []))
                 self.loss_fn[layer] = YOLOLoss(
                     num_classes=num_classes,
                     anchors=self.config['anchors'],
+                    use_ciou=self.config.get('use_ciou', False),
                     logger=self.logger
                 )
                 
-            self.logger.info(f"✓ Loss functions berhasil diinisialisasi")
+            loss_type = "CIoU" if self.config.get('use_ciou', False) else "IoU"
+            self.logger.info(f"✓ Loss functions ({loss_type}) berhasil diinisialisasi")
             
         except Exception as e:
             self.logger.error(f"❌ Gagal membangun loss function: {str(e)}")
             raise ModelError(f"Gagal membangun loss function: {str(e)}")
+    
+    @classmethod
+    def create_model(cls, model_type: str, **kwargs) -> 'ModelManager':
+        """
+        Factory method untuk membuat model berdasarkan tipe.
+        
+        Args:
+            model_type: Tipe model ('basic', 'efficient', 'optimized', 'research')
+            **kwargs: Parameter tambahan untuk konfigurasi
+            
+        Returns:
+            ModelManager: Instance ModelManager dengan konfigurasi sesuai tipe
+            
+        Raises:
+            ModelConfigurationError: Jika tipe model tidak valid
+        """
+        if model_type not in cls.OPTIMIZED_MODELS:
+            available_types = list(cls.OPTIMIZED_MODELS.keys())
+            raise ModelConfigurationError(
+                f"❌ Tipe model '{model_type}' tidak dikenal. "
+                f"Tipe yang tersedia: {available_types}"
+            )
+            
+        # Buat instance manager dengan tipe model yang dipilih
+        return cls(model_type=model_type, **kwargs)
             
     def get_config(self) -> Dict:
         """
@@ -522,81 +617,3 @@ class ModelManager:
         except Exception as e:
             self.logger.error(f"❌ Gagal melakukan prediksi: {str(e)}")
             raise ModelError(f"Gagal melakukan prediksi: {str(e)}")
-
-
-class YOLOv5Model(nn.Module):
-    """
-    Model YOLOv5 terintegrasi yang menggabungkan backbone, neck, dan head.
-    """
-    
-    def __init__(
-        self,
-        backbone,
-        neck,
-        head,
-        config: Dict
-    ):
-        """
-        Inisialisasi YOLOv5Model.
-        
-        Args:
-            backbone: Backbone network
-            neck: Feature processing neck
-            head: Detection head
-            config: Konfigurasi model
-        """
-        super().__init__()
-        self.backbone = backbone
-        self.neck = neck
-        self.head = head
-        self.config = config
-        
-    def forward(self, x: torch.Tensor) -> Dict[str, List[torch.Tensor]]:
-        """
-        Forward pass model.
-        
-        Args:
-            x: Input tensor [B, 3, H, W]
-            
-        Returns:
-            Dict berisi prediksi untuk setiap layer deteksi
-        """
-        # Get features from backbone
-        features = self.backbone(x)
-        
-        # Process features through neck
-        processed_features = self.neck(features)
-        
-        # Get predictions from head
-        predictions = self.head(processed_features)
-        
-        return predictions
-    
-    def predict(
-        self,
-        x: torch.Tensor,
-        conf_threshold: float = 0.25,
-        nms_threshold: float = 0.45
-    ) -> Dict[str, List[Dict]]:
-        """
-        Lakukan prediksi dengan post-processing.
-        
-        Args:
-            x: Input tensor
-            conf_threshold: Threshold confidence
-            nms_threshold: Threshold IoU untuk NMS
-            
-        Returns:
-            Dict berisi hasil deteksi untuk setiap layer
-        """
-        # Get raw predictions
-        predictions = self(x)
-        
-        # Process predictions for each layer
-        results = {}
-        
-        for layer_name, layer_preds in predictions.items():
-            # TODO: Implement proper NMS and post-processing
-            results[layer_name] = [{"raw_predictions": p} for p in layer_preds]
-            
-        return results

@@ -1,21 +1,109 @@
 """
 File: smartcash/model/components/losses.py
-Deskripsi: Implementasi YOLOv5 loss function dengan perbaikan stabilitas numerik dan penanganan error
+Deskripsi: Implementasi YOLOv5 loss function dengan CIoU loss, label smoothing dan penanganan error yang lebih baik
 """
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple, Dict, Optional, Union
+import math
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import ModelError
+from smartcash.model.utils.metrics import box_iou
+
+def bbox_ciou(box1, box2, format="xyxy", eps=1e-7):
+    """
+    Complete-IoU (CIoU) untuk bounding box regression.
+    CIoU = IoU - distance/c^2 - alpha*v
+    
+    Args:
+        box1: Tensor boxes pertama [N, 4]
+        box2: Tensor boxes kedua [N, 4]
+        format: Format box ('xyxy' atau 'xywh')
+        eps: Epsilon untuk stabilitas numerik
+        
+    Returns:
+        CIoU: Tensor [N]
+    """
+    # Konversi ke format xyxy jika perlu
+    if format == "xywh":
+        box1_x1 = box1[:, 0] - box1[:, 2] / 2
+        box1_y1 = box1[:, 1] - box1[:, 3] / 2
+        box1_x2 = box1[:, 0] + box1[:, 2] / 2
+        box1_y2 = box1[:, 1] + box1[:, 3] / 2
+        box2_x1 = box2[:, 0] - box2[:, 2] / 2
+        box2_y1 = box2[:, 1] - box2[:, 3] / 2
+        box2_x2 = box2[:, 0] + box2[:, 2] / 2
+        box2_y2 = box2[:, 1] + box2[:, 3] / 2
+    else:  # xyxy format
+        box1_x1, box1_y1, box1_x2, box1_y2 = box1[:, 0], box1[:, 1], box1[:, 2], box1[:, 3]
+        box2_x1, box2_y1, box2_x2, box2_y2 = box2[:, 0], box2[:, 1], box2[:, 2], box2[:, 3]
+    
+    # Intersection
+    inter_x1 = torch.max(box1_x1, box2_x1)
+    inter_y1 = torch.max(box1_y1, box2_y1)
+    inter_x2 = torch.min(box1_x2, box2_x2)
+    inter_y2 = torch.min(box1_y2, box2_y2)
+    
+    # Width and height of intersection
+    inter_w = (inter_x2 - inter_x1).clamp(min=0)
+    inter_h = (inter_y2 - inter_y1).clamp(min=0)
+    
+    # Intersection area
+    inter_area = inter_w * inter_h
+    
+    # Box areas
+    box1_area = (box1_x2 - box1_x1) * (box1_y2 - box1_y1)
+    box2_area = (box2_x2 - box2_x1) * (box2_y2 - box2_y1)
+    
+    # Union area
+    union_area = box1_area + box2_area - inter_area + eps
+    
+    # IoU
+    iou = inter_area / union_area
+    
+    # Box center distance
+    box1_cx = (box1_x1 + box1_x2) / 2
+    box1_cy = (box1_y1 + box1_y2) / 2
+    box2_cx = (box2_x1 + box2_x2) / 2
+    box2_cy = (box2_y1 + box2_y2) / 2
+    
+    # Distance between centers
+    center_distance = ((box1_cx - box2_cx) ** 2 + (box1_cy - box2_cy) ** 2)
+    
+    # Diagonal length of the smallest enclosing box
+    c_x1 = torch.min(box1_x1, box2_x1)
+    c_y1 = torch.min(box1_y1, box2_y1)
+    c_x2 = torch.max(box1_x2, box2_x2)
+    c_y2 = torch.max(box1_y2, box2_y2)
+    c_diag = ((c_x2 - c_x1) ** 2 + (c_y2 - c_y1) ** 2) + eps
+    
+    # Aspect ratio consistency
+    box1_wh = box1_x2 - box1_x1, box1_y2 - box1_y1
+    box2_wh = box2_x2 - box2_x1, box2_y2 - box2_y1
+    
+    # Compute aspect ratio consistency term
+    v = (4 / (math.pi ** 2)) * torch.pow(
+        torch.atan(box1_wh[0] / (box1_wh[1] + eps)) - torch.atan(box2_wh[0] / (box2_wh[1] + eps)), 2
+    )
+    
+    # CIoU
+    with torch.no_grad():
+        alpha = v / (1 - iou + v + eps)
+        
+    # Final CIoU
+    ciou = iou - (center_distance / c_diag + alpha * v)
+    
+    return ciou
+
 
 class YOLOLoss(nn.Module):
     """
     YOLOv5 Loss Function dengan perbaikan struktur untuk stabilitas training.
     
-    Menghitung box loss (IoU), objectness loss, dan classification loss
+    Menghitung box loss (CIoU), objectness loss, dan classification loss
     dengan penanganan error yang robust untuk mencegah NaN gradient.
     """
     
@@ -30,6 +118,7 @@ class YOLOLoss(nn.Module):
         obj_weight: float = 1.0,
         label_smoothing: float = 0.0,
         eps: float = 1e-16,  # Epsilon untuk stabilitas numerik
+        use_ciou: bool = True,  # Gunakan CIoU loss alih-alih IoU loss
         logger: Optional[SmartCashLogger] = None
     ):
         """
@@ -45,6 +134,7 @@ class YOLOLoss(nn.Module):
             obj_weight: Bobot untuk objectness loss
             label_smoothing: Nilai label smoothing (0.0-1.0)
             eps: Epsilon untuk stabilitas numerik
+            use_ciou: Gunakan CIoU loss untuk box loss (lebih akurat)
             logger: Logger untuk mencatat proses (opsional)
         """
         super().__init__()
@@ -65,6 +155,7 @@ class YOLOLoss(nn.Module):
         self.obj_weight = obj_weight
         self.label_smoothing = label_smoothing
         self.eps = eps
+        self.use_ciou = use_ciou
         
         # Convert anchors to tensor
         self.register_buffer('anchors', torch.tensor(anchors).float().view(len(anchors), -1, 2))
@@ -77,7 +168,7 @@ class YOLOLoss(nn.Module):
         self.BCEcls = nn.BCEWithLogitsLoss(reduction='none')
         self.BCEobj = nn.BCEWithLogitsLoss(reduction='none')
         
-        self.logger.info(f"✅ YOLOLoss diinisialisasi untuk {num_classes} kelas")
+        self.logger.info(f"✅ YOLOLoss diinisialisasi untuk {num_classes} kelas dengan {'CIoU' if use_ciou else 'IoU'} loss")
     
     def forward(
         self,
@@ -137,11 +228,20 @@ class YOLOLoss(nn.Module):
                 # Build targets for this scale
                 t = self._build_targets(pred, targets, i)
                 
-                # Box loss (IoU loss)
+                # Box loss (CIoU loss atau IoU loss)
                 if t['box_target'].shape[0] > 0:
                     pbox = pred[t['batch_idx'], t['anchor_idx'], t['grid_y'], t['grid_x']][:, :4]
-                    iou = self._box_iou(pbox, t['box_target'])
-                    box_loss = (1.0 - iou).mean()
+                    tbox = t['box_target']
+                    
+                    if self.use_ciou:
+                        # Gunakan CIoU loss
+                        iou = bbox_ciou(pbox, tbox)
+                        box_loss = (1.0 - iou).mean()
+                    else:
+                        # Gunakan IoU loss sederhana
+                        iou = box_iou(pbox, tbox)
+                        box_loss = (1.0 - iou.diagonal()).mean()
+                        
                     batch_box_loss.append(box_loss)
                 
                 # Class loss (BCE loss with optional label smoothing)
@@ -373,42 +473,37 @@ class YOLOLoss(nn.Module):
             result['cls_target'] = torch.cat(cls_targets)
         
         return result
+
+# Function untuk menghitung gabungan loss dari multiple components
+def compute_loss(predictions, targets, model, active_layers):
+    """
+    Menghitung loss untuk semua layer aktif.
     
-    @staticmethod
-    def _box_iou(box1: torch.Tensor, box2: torch.Tensor) -> torch.Tensor:
-        """
-        Calculate IoU between two sets of boxes.
+    Args:
+        predictions: Output model
+        targets: Target labels
+        model: Model yang digunakan
+        active_layers: List nama layer yang aktif
         
-        Args:
-            box1: [n, 4] Format: cx, cy, w, h
-            box2: [n, 4] Format: cx, cy, w, h
-            
-        Returns:
-            torch.Tensor: IoU tensor
-        """
-        # Convert center-x, center-y, width, height to xyxy format
-        b1_x1 = box1[:, 0] - box1[:, 2] / 2
-        b1_y1 = box1[:, 1] - box1[:, 3] / 2
-        b1_x2 = box1[:, 0] + box1[:, 2] / 2
-        b1_y2 = box1[:, 1] + box1[:, 3] / 2
-        
-        b2_x1 = box2[:, 0] - box2[:, 2] / 2
-        b2_y1 = box2[:, 1] - box2[:, 3] / 2
-        b2_x2 = box2[:, 0] + box2[:, 2] / 2
-        b2_y2 = box2[:, 1] + box2[:, 3] / 2
-        
-        # Get intersection area
-        x1 = torch.max(b1_x1, b2_x1)
-        y1 = torch.max(b1_y1, b2_y1)
-        x2 = torch.min(b1_x2, b2_x2)
-        y2 = torch.min(b1_y2, b2_y2)
-        
-        intersection = torch.clamp(x2 - x1, min=0) * torch.clamp(y2 - y1, min=0)
-        
-        # Get box areas
-        b1_area = (b1_x2 - b1_x1) * (b1_y2 - b1_y1)
-        b2_area = (b2_x2 - b2_x1) * (b2_y2 - b2_y1)
-        
-        # Calculate IoU
-        union = b1_area + b2_area - intersection + 1e-7  # avoid division by zero
-        return intersection / union
+    Returns:
+        Total loss
+    """
+    total_loss = torch.tensor(0.0, device=targets[list(targets.keys())[0]].device, requires_grad=True)
+    
+    # Untuk model dengan attribute compute_loss
+    if hasattr(model, 'compute_loss'):
+        return model.compute_loss(predictions, targets)[0]
+    
+    # Untuk model yang memerlukan perhitungan loss manual
+    if hasattr(model, 'loss_fn'):
+        # Jika model memiliki loss functions per layer
+        if isinstance(model.loss_fn, dict):
+            for layer in active_layers:
+                if layer in model.loss_fn and layer in predictions and layer in targets:
+                    layer_loss, _ = model.loss_fn[layer](predictions[layer], targets[layer])
+                    total_loss = total_loss + layer_loss
+        # Jika model memiliki single loss function
+        else:
+            total_loss, _ = model.loss_fn(predictions, targets)
+    
+    return total_loss

@@ -13,7 +13,7 @@ import cv2
 
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
-from smartcash.model.services.evaluation.visualization import setup_visualization
+from smartcash.model.visualization import setup_visualization
 from smartcash.model.visualization.metrics_visualizer import MetricsVisualizer
 from smartcash.model.visualization.detection_visualizer import DetectionVisualizer
 

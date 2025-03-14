@@ -1,3 +1,13 @@
+"""
+File: smartcash/model/utils/research.py
+Author: Alfrida Sabar
+Deskripsi: Fungsi utilitas yang umum digunakan untuk visualisasi hasil penelitian
+"""
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from typing import Dict, List, Optional, Tuple, Union, Any
 
 def clean_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """

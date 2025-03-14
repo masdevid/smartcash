@@ -8,7 +8,7 @@ import torch.nn as nn
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
-from smartcash.commmon.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import BackboneError
 
 class BaseBackbone(ABC, nn.Module):

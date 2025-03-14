@@ -6,7 +6,7 @@ Deskripsi: Implementasi Non-Maximum Suppression untuk deteksi objek
 import torch
 from typing import List, Optional
 
-from smartcash.model.utils.metrics.metrics_core import box_iou, xywh2xyxy
+from smartcash.model.utils.metrics import box_iou
 
 
 def non_max_suppression(

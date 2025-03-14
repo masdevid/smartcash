@@ -5,7 +5,7 @@ Deskripsi: File inisialisasi untuk paket visualisasi SmartCash
 """
 
 # Import dari base dan helper
-from smartcash.model.visualization.base import VisualizationHelper
+from smartcash.model.visualization.base_visualizer import VisualizationHelper
 
 # Import dari visualizer utama
 from smartcash.model.visualization.metrics_visualizer import MetricsVisualizer, plot_confusion_matrix

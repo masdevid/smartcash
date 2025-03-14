@@ -1,0 +1,1 @@
+from smartcash.model.models.yolov5_model import YOLOv5Model

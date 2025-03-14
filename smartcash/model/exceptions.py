@@ -1,6 +1,6 @@
 """
 File: smartcash/model/exceptions.py
-Deskripsi: Definisi kelas exception khusus untuk modul model
+Deskripsi: Komponen untuk exceptions pada model deteksi objek
 """
 
 class ModelError(Exception):

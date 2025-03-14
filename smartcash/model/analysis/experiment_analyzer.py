@@ -1,6 +1,6 @@
 """
-File: smartcash/model/analysis/experiment_analyzer.py
-Deskripsi: Kelas analisis untuk hasil eksperimen dengan berbagai metode analisis dan rekomendasi
+File: analysis/experiment_analyzer.py
+Deskripsi: Modul untuk file experiment_analyzer.py
 """
 
 import pandas as pd

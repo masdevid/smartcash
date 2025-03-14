@@ -1,4 +1,3 @@
-# smartcash/common/exceptions.py
 """
 File: smartcash/common/exceptions.py
 Deskripsi: Custom exceptions untuk SmartCash

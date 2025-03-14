@@ -1,6 +1,6 @@
 """
 File: smartcash/model/__init__.py
-Deskripsi: Inisialisasi dan export komponen utama model SmartCash
+Deskripsi: Komponen utama model deteksi objek
 """
 
 from smartcash.model.manager import ModelManager, YOLOv5Model, DETECTION_LAYERS
@@ -32,6 +32,15 @@ from smartcash.model.architectures.heads import DetectionHead
 
 # Re-export dari components submodule
 from smartcash.model.components import YOLOLoss
+
+# Re-export dari visualization submodule
+from smartcash.model.visualization import (
+    MetricsVisualizer,
+    DetectionVisualizer,
+    ExperimentVisualizer,
+    ScenarioVisualizer,
+    ResearchVisualizer
+)
 
 __all__ = [
     # Core classes
@@ -65,5 +74,12 @@ __all__ = [
     'DetectionHead',
     
     # Components
-    'YOLOLoss'
+    'YOLOLoss',
+    
+    # Visualization
+    'MetricsVisualizer',
+    'DetectionVisualizer',
+    'ExperimentVisualizer',
+    'ScenarioVisualizer',
+    'ResearchVisualizer'
 ]

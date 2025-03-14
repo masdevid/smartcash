@@ -1,6 +1,6 @@
-# File: smartcash/__init__.py
 """
-SmartCash: Sistem Deteksi Uang Kertas Rupiah
+File: smartcash/__init_.py
+Deskripsi: Komponen utama SmartCash
 """
 
 # Definisi versi

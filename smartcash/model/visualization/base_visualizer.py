@@ -1,7 +1,6 @@
 """
-File: smartcash/model/visualization/base.py
-Author: Alfrida Sabar
-Deskripsi: Kelas dasar dengan utilitas umum untuk visualisasi model
+File: smartcash/model/visualization/base_visualizer.py
+Deskripsi: Modul dasar untuk visualisasi model deteksi objek
 """
 
 import os

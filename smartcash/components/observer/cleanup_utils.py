@@ -1,6 +1,6 @@
 """
-File: smartcash/commonents/observer/cleanup_utils.py
-Deskripsi: Utilitas untuk memastikan observer dibersihkan dengan benar, terutama untuk penggunaan dalam Jupyter/Colab
+File: smartcash/components/observer/cleanup_utils.py
+Deskripsi: Modul untuk file cleanup_utils.py
 """
 
 import atexit
@@ -8,8 +8,8 @@ import weakref
 from typing import Any, Optional, List, Dict, Callable
 
 from smartcash.common.logger import get_logger
-from smartcash.common.observer.observer_manager import ObserverManager
-from smartcash.common.observer import EventDispatcher
+from smartcash.components.observer.observer_manager import ObserverManager
+from smartcash.components.observer import EventDispatcher
 
 
 logger = get_logger("observer_cleanup")

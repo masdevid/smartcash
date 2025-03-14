@@ -1,7 +1,6 @@
 """
 File: smartcash/model/architectures/necks/fpn_pan.py
-Deskripsi: Implementasi Feature Pyramid Network dan Path Aggregation Network yang dioptimalkan 
-           untuk memproses dan fusi fitur multi-skala dari EfficientNet backbone
+Deskripsi: Feature Processing Neck implementation for YOLOv5
 """
 
 import torch

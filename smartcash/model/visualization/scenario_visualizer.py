@@ -1,7 +1,6 @@
 """
 File: smartcash/model/visualization/scenario_visualizer.py
-Author: Alfrida Sabar
-Deskripsi: Visualisasi dan analisis hasil skenario penelitian dengan berbagai jenis grafik
+Deskripsi: Komponen untuk visualisasi skenario penelitian model deteksi objek
 """
 
 import matplotlib.pyplot as plt

@@ -1,11 +1,8 @@
 """
-File: smartcash/utils/cache/cache_cleanup.py
-Author: Alfrida Sabar
-Deskripsi: Modul untuk cleanup dan integriti cache dengan garbage collection optimal.
+File: smartcash/components/cache/cache_cleanup.py
+Deskripsi: Modul untuk file cache_cleanup.py
 """
 
-import os
-import pickle
 import time
 import threading
 import weakref
@@ -13,7 +10,7 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 
 class CacheCleanup:
     def __init__(

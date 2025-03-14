@@ -1,7 +1,6 @@
 """
-File: smartcash/utils/cache/cache_manager.py
-Author: Alfrida Sabar
-Deskripsi: Kelas utama mengelola cache dengan TTL, garbage collection, dan monitoring.
+File: smartcash/components/cache/cache_manager.py
+Deskripsi: Modul untuk file cache_manager.py
 """
 
 from pathlib import Path
@@ -9,11 +8,11 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 import threading
 
-from smartcash.utils.logger import SmartCashLogger
-from smartcash.utils.cache.cache_index import CacheIndex
-from smartcash.utils.cache.cache_storage import CacheStorage
-from smartcash.utils.cache.cache_cleanup import CacheCleanup
-from smartcash.utils.cache.cache_stats import CacheStats
+from smartcash.common.logger import SmartCashLogger
+from smartcash.components.cache.cache_index import CacheIndex
+from smartcash.components.cache.cache_storage import CacheStorage
+from smartcash.components.cache.cache_cleanup import CacheCleanup
+from smartcash.components.cache.cache_stats import CacheStats
 
 class CacheManager:
     def __init__(

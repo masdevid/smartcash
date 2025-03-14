@@ -1,4 +1,3 @@
-# smartcash/common/constants.py
 """
 File: smartcash/common/constants.py
 Deskripsi: Konstanta global yang digunakan di seluruh project

@@ -1,4 +1,3 @@
-# smartcash/common/logger.py
 """
 File: smartcash/common/logger.py
 Deskripsi: Sistem logging terpusat dengan dukungan emoji, warna, dan callback

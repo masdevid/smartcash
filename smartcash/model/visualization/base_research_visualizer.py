@@ -1,7 +1,6 @@
 """
 File: smartcash/model/visualization/base_research_visualizer.py
-Author: Alfrida Sabar
-Deskripsi: Kelas dasar untuk visualisasi hasil penelitian dengan fungsionalitas utama
+Deskripsi: Modul dasar untuk visualisasi penelitian model deteksi objek
 """
 
 import matplotlib.pyplot as plt
@@ -10,7 +9,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.model.visualization.base import VisualizationHelper
+from smartcash.model.visualization.base_visualizer import VisualizationHelper
 from smartcash.common.logger import get_logger
 
 class BaseResearchVisualizer:

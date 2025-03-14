@@ -1,7 +1,6 @@
 """
-File: smartcash/mdoel/visualization/__init__.py
-Author: Alfrida Sabar
-Deskripsi: File inisialisasi untuk paket visualisasi SmartCash
+File: smartcash/model/visualization/__init__.py
+Deskripsi: Modul untuk file __init__.py
 """
 
 # Import dari base dan helper
@@ -13,7 +12,7 @@ from smartcash.model.visualization.research_visualizer import ResearchVisualizer
 from smartcash.model.visualization.experiment_visualizer import ExperimentVisualizer
 from smartcash.model.visualization.scenario_visualizer import ScenarioVisualizer
 from smartcash.model.visualization.evaluation_visualizer import EvaluationVisualizer
-
+from smartcash.model.visualization.detection_visualizer import DetectionVisualizer
 
 
 # Fungsi-fungsi helper untuk visualisasi cepat
@@ -33,4 +32,5 @@ __all__ = [
     'ExperimentVisualizer',
     'ScenarioVisualizer',
     'EvaluationVisualizer',
+    'DetectionVisualizer'
 ]

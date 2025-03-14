@@ -1,6 +1,6 @@
 """
 File: smartcash/model/utils/__init__.py
-Deskripsi: Inisialisasi paket utilitas model SmartCash
+Deskripsi: Modul untuk file __init__.py
 """
 
 from smartcash.model.utils.preprocessing import (
@@ -19,6 +19,9 @@ from smartcash.model.utils.validation import (
 from smartcash.model.utils.research import (
     clean_dataframe, format_metric_name, find_common_metrics, 
     create_benchmark_table, create_win_rate_table
+)
+from smartcash.model.utils.metrics import (
+    MetricsCalculator
 )
 
 # Fungsi dan kelas utilitas

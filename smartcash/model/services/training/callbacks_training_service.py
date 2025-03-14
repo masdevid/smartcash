@@ -1,7 +1,8 @@
 """
-File: smartcash/model/services/training/callbacks.py
-Deskripsi: Implementasi training callbacks untuk SmartCash yang memungkinkan kustomisasi training loop dengan berbagai aksi tersendiri.
+File: smartcash/model/services/training/callbacks_training_service.py
+Deskripsi: Modul callback untuk layanan pelatihan
 """
+
 import time
 import torch
 import os

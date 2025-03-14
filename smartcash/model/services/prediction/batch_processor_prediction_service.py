@@ -1,9 +1,8 @@
 """
-File: smartcash/model/services/prediction/batch_processor.py
-Deskripsi: Processor untuk menjalankan inferensi batch pada dataset besar
+File: smartcash/model/services/prediction/batch_processor_prediction_service.py
+Deskripsi: Modul untuk layanan batch processing prediksi
 """
 
-import os
 import time
 import torch
 import numpy as np
@@ -13,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
-from smartcash.model.services.prediction.core import PredictionService
+from smartcash.model.services.prediction.core_prediction_service import PredictionService
 
 
 class BatchPredictionProcessor:

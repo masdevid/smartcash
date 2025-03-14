@@ -1,6 +1,6 @@
 """
 File: smartcash/model/config/backbone_config.py
-Deskripsi: Konfigurasi untuk backbone networks pada model SmartCash
+Deskripsi: Konfigurasi model untuk backbone network
 """
 
 from typing import Dict, Any, Optional, List, Union

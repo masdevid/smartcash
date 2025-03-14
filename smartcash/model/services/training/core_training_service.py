@@ -1,17 +1,18 @@
 """
-File: smartcash/model/services/training/core.py
-Deskripsi: Implementasi inti untuk layanan training model SmartCash dengan pendekatan modular dan terintegrasi dengan EfficientNet-B4 sebagai backbone.
+File: smartcash/model/services/training/core_training_service.py
+Deskripsi: Modul utama untuk layanan pelatihan
 """
+
 import os
 import time
 import torch
 import torch.nn as nn
 from typing import Dict, Any, Optional, List, Tuple, Callable
 
-from smartcash.model.services.training.optimizer import OptimizerFactory
-from smartcash.model.services.training.scheduler import SchedulerFactory
-from smartcash.model.services.training.early_stopping import EarlyStoppingHandler
-from smartcash.model.services.training.experiment_tracker import ExperimentTracker
+from smartcash.model.services.training.optimizer_training_service import OptimizerFactory
+from smartcash.model.services.training.scheduler_training_service import SchedulerFactory
+from smartcash.model.services.training.early_stopping_training_service import EarlyStoppingHandler
+from smartcash.model.services.training.experiment_tracker_training_service import ExperimentTracker
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
 

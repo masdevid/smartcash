@@ -1,5 +1,7 @@
-# File: smartcash/components/observer/compatibility_observer.py
-# Deskripsi: Observer adapter untuk kompatibilitas dengan sistem observer lama
+"""
+File: smartcash/components/observer/compatibility_observer.py
+Deskripsi: Observer adapter untuk kompatibilitas dengan sistem observer lama
+"""
 
 from typing import Any, Callable, Dict, Optional
 

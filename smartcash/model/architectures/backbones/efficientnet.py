@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/backbones/efficientnet.py
-Deskripsi: Implementasi EfficientNet backbone untuk YOLOv5 dengan adaptasi channel yang lebih baik
+Deskripsi: EfficientNet backbone implementation for YOLOv5
 """
 
 import torch

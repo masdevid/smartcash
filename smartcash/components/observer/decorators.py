@@ -1,13 +1,15 @@
-# File: smartcash/components/observer/decorators.py
-# Deskripsi: Decorator untuk observer pattern di SmartCash
+"""
+File: smartcash/components/observer/decorators.py
+Deskripsi: Decorator untuk observer pattern di SmartCash
+"""
 
 import functools
 import inspect
 import threading
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, get_type_hints
 
-from .event_dispatcher import EventDispatcher
-from .base_observer import BaseObserver
+from smartcash.components.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.common.logger import get_logger
 
 

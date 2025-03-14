@@ -1,6 +1,7 @@
-# File: smartcash/model/visualization/experiment_visualizer.py
-# Author: Alfrida Sabar
-# Deskripsi: Visualisasi hasil eksperimen untuk perbandingan model/backbone
+"""
+File: smartcash/model/visualization/experiment_visualizer.py
+Deskripsi: Komponen untuk visualisasi hasil eksperimen model
+"""
 
 import matplotlib.pyplot as plt
 import numpy as np

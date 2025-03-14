@@ -1,7 +1,6 @@
 """
-File: smartcash/utils/visualization/detection.py
-Author: Alfrida Sabar
-Deskripsi: Visualisasi hasil deteksi objek dengan bounding box, label, dan informasi tambahan
+File: smartcash/model/visualization/detection_visualizer.py
+Deskripsi: Komponen untuk visualisasi deteksi objek
 """
 
 import cv2
@@ -10,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 import time
 
-from smartcash.model.visualization.base import VisualizationHelper
+from smartcash.model.visualization.base_research_visualizer import VisualizationHelper
 from smartcash.common.logger import get_logger
 
 class DetectionVisualizer:

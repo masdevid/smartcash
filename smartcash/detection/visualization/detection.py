@@ -1,6 +1,6 @@
 """
-File: smartcash/model/visualization/detection.py
-Deskripsi: Visualisasi hasil deteksi objek dengan bounding box, label, dan informasi tambahan
+File: smartcash/detection/visualization/detection.py
+Deskripsi: Utilitas untuk visualisasi deteksi objek
 """
 
 import cv2

@@ -1,6 +1,6 @@
 """
 File: smartcash/model/config/__init__.py
-Deskripsi: Inisialisasi paket konfigurasi untuk model SmartCash
+Deskripsi: Package initialization for model configss
 """
 
 from smartcash.model.config.model_config import ModelConfig

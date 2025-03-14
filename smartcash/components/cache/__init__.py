@@ -1,16 +1,12 @@
 """
 File: smartcash/components/cache/__init__.py
-Author: Alfrida Sabar
-Deskripsi: File inisialisasi untuk modul cache yang mengekspos kelas-kelas utama.
+Deskripsi: Package initialization untuk cache pattern terkonsolidasi di SmartCash
 """
 
-from .cache_manager import CacheManager
-from .cache_index import CacheIndex
-from .cache_storage import CacheStorage
-from .cache_cleanup import CacheCleanup
-from .cache_stats import CacheStats
+from smartcash.components.cache.cache_manager import CacheManager
+from smartcash.components.cache.cache_index import CacheIndex
+from smartcash.components.cache.cache_storage import CacheStorage
+from smartcash.components.cache.cache_cleanup import CacheCleanup
+from smartcash.components.cache.cache_stats import CacheStats
 
-# Alias untuk kompatibilitas mundur
-EnhancedCache = CacheManager
-
-__all__ = ['CacheManager', 'CacheIndex', 'CacheStorage', 'CacheCleanup', 'CacheStats', 'EnhancedCache']
+__all__ = ['CacheManager', 'CacheIndex', 'CacheStorage', 'CacheCleanup', 'CacheStats']

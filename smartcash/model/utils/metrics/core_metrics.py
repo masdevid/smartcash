@@ -1,6 +1,6 @@
 """
-File: smartcash/model/utils/metrics/metrics_core.py
-Deskripsi: Fungsi-fungsi dasar untuk manipulasi bounding box dan perhitungan IoU
+File: smartcash/model/utils/metrics/core_metrics.py
+Deskripsi: Modul untuk metrik dasar
 """
 
 import torch

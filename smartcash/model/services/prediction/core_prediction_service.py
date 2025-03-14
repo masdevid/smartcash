@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/prediction/core.py
-Deskripsi: Layanan inti prediksi untuk model deteksi mata uang SmartCash
+File: smartcash/model/services/prediction/core_prediction_service.py
+Deskripsi: Modul utama untuk layanan prediksi
 """
 
 import os

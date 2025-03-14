@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/prediction/postprocessing.py
-Deskripsi: Utilitas pascapemrosesan untuk deteksi mata uang SmartCash
+File: smartcash/model/services/prediction/postprocessing_prediction_service.py
+Deskripsi: Modul untuk layanan post-proses prediksi
 """
 
 import torch

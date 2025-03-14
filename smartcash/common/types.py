@@ -1,6 +1,5 @@
-# smartcash/common/types.py
 """
-File: smartcash/common/types.py
+File: smartchas/common/types.py
 Deskripsi: Type definitions untuk SmartCash
 """
 

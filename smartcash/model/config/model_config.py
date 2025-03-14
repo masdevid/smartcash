@@ -1,6 +1,6 @@
 """
 File: smartcash/model/config/model_config.py
-Deskripsi: Konfigurasi dasar untuk model SmartCash dengan dukungan YAML dan validasi
+Deskripsi: Konfigurasi dasar model SmartCash dengan dukungan load/save YAML
 """
 
 import yaml

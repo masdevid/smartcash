@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/__init__.py
-Deskripsi: Inisialisasi dan export komponen arsitektur model
+Deskripsi: Package initialization for architectures
 """
 
 # Re-export dari backbones submodule

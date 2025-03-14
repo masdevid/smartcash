@@ -1,6 +1,7 @@
-# File: smartcash/model/services/training/experiment_tracker.py
-# Author: Alfrida Sabar
-# Deskripsi: Utilitas untuk melacak dan menyimpan eksperimen training
+"""
+File: smartcash/model/services/training/experiment_tracker_training_service.py
+Deskripsi: Modul utilitas untuk layanan pelacakan dan penyimpanan eksperimen pelatihan
+"""
 
 import os
 import json

@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/backbones/cspdarknet.py
-Deskripsi: Implementasi CSPDarknet backbone untuk YOLOv5 dengan validasi struktur
+Deskripsi: CSPDarknet backbone implementation for YOLOv5
 """
 
 import torch

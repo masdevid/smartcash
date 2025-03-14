@@ -19,9 +19,9 @@ File: smartcash/model/services/evaluation/__init__.py
 Deskripsi: Modul inisialisasi untuk layanan evaluasi model yang terintegrasi
 """
 
-from smartcash.model.services.evaluation.core import EvaluationService
-from smartcash.model.services.evaluation.metrics import MetricsComputation
-from smartcash.model.services.evaluation.visualization import EvaluationVisualizer
+from smartcash.model.services.evaluation.core_evaluation import EvaluationService
+from smartcash.model.services.evaluation.metrics_evaluation import MetricsComputation
+from smartcash.model.services.evaluation.visualization_evaluation_service import EvaluationVisualizer
 
 __all__ = [
     'EvaluationService',
@@ -49,8 +49,8 @@ from tqdm.auto import tqdm
 
 from smartcash.utils.logger import get_logger
 from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.model.services.evaluation.metrics import MetricsComputation
-from smartcash.model.services.evaluation.visualization import EvaluationVisualizer
+from smartcash.model.services.evaluation.metrics_evaluation import MetricsComputation
+from smartcash.model.services.evaluation.visualization_evaluation_service import EvaluationVisualizer
 from smartcash.model.components.losses import compute_loss
 
 class EvaluationService:

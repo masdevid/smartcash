@@ -1,12 +1,12 @@
 """
-File: smartcash/model/utils/metrics_nms.py
-Deskripsi: Implementasi Non-Maximum Suppression untuk deteksi objek
+File: smartcash/model/utils/metrics/nms_metrics.py
+Deskripsi: Modul untuk metrik NMS
 """
 
 import torch
 from typing import List, Optional
 
-from smartcash.model.utils.metrics import box_iou
+from smartcash.model.utils.metrics.core_metrics import box_iou
 
 
 def non_max_suppression(

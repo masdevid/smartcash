@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/backbones/__init__.py
-Deskripsi: Inisialisasi dan export backbone networks
+Deskripsi: Package initialization untuk backbones
 """
 
 from smartcash.model.architectures.backbones.base import BaseBackbone

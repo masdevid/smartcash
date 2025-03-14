@@ -1,7 +1,6 @@
 """
-File: smartcash/model/utils/research.py
-Author: Alfrida Sabar
-Deskripsi: Fungsi utilitas yang umum digunakan untuk visualisasi hasil penelitian
+File: smartcash/model/utils/research_model_utils.py
+Deskripsi: Modul utilitas untuk penelitian model deteksi objek
 """
 
 import pandas as pd

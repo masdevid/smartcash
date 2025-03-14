@@ -1,7 +1,6 @@
 """
-File: smartcash/utils/cache/cache_storage.py
-Author: Alfrida Sabar
-Deskripsi: Modul untuk operasi penyimpanan dan loading data cache.
+File: smartcash/components/cache/cache_storage.py
+Deskripsi: Modul untuk file cache_storage.py
 """
 
 import os
@@ -13,7 +12,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any
 import threading
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 
 class CacheStorage:
     def __init__(self, cache_dir: Path, logger: Optional[SmartCashLogger] = None):

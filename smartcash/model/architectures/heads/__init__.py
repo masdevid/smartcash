@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/heads/__init__.py
-Deskripsi: Inisialisasi dan export modul heads untuk deteksi objek
+Deskripsi: Package initialization untuk heads
 """
 
 from smartcash.model.architectures.heads.detection_head import DetectionHead, LAYER_CONFIG

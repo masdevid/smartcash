@@ -1,6 +1,7 @@
-# File: smartcash/common/observer/base_observer.py
-# Deskripsi: Implementasi kelas dasar untuk observer pattern di SmartCash
-
+"""
+File: smartcash/components/observer/base_observer.py
+Deskripsi: Implementasi kelas dasar untuk observer pattern di SmartCash
+"""
 from abc import ABC, abstractmethod
 import re
 import uuid

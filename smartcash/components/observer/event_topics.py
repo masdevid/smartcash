@@ -1,5 +1,7 @@
-# File: smartcash/components/observer/event_topics.py
-# Deskripsi: Definisi topik event standar
+"""
+File: smartcash/components/observer/event_topics.py
+Deskripsi: Definisi topik event standar
+"""
 
 class EventTopics:
     """Definisi standar topik event dalam SmartCash."""

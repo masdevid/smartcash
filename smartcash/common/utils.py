@@ -1,4 +1,3 @@
-# smartcash/common/utils.py
 """
 File: smartcash/common/utils.py
 Deskripsi: Fungsi utilitas umum untuk SmartCash

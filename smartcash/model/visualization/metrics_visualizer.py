@@ -1,7 +1,6 @@
 """
 File: smartcash/model/visualization/metrics_visualizer.py
-Author: Alfrida Sabar
-Deskripsi: Visualisasi metrik evaluasi model dengan berbagai jenis plot dan grafik
+Deskripsi: Modul untuk visualisasi metrik evaluasi model
 """
 
 import numpy as np
@@ -12,7 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 
 from smartcash.common.logger import get_logger
-from smartcash.model.visualization.base import VisualizationHelper
+from smartcash.model.visualization.base_visualizer import VisualizationHelper
 
 class MetricsVisualizer:
     """

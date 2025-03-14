@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/evaluation/visualization.py
-Deskripsi: Layanan visualisasi hasil evaluasi model deteksi mata uang
+File: smartcash/model/services/evaluation/visualization_evaluation_service.py
+Deskripsi: Layanan visualisasi evaluasi deteksi mata uang
 """
 
 import os

@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/evaluation/metrics.py
-Deskripsi: Implementasi perhitungan metrik evaluasi untuk model deteksi mata uang
+File: smartcash/model/services/evaluation/metrics_evaluation_service.py
+Deskripsi: Layanan evaluasi metrik deteksi mata uang
 """
 
 import torch

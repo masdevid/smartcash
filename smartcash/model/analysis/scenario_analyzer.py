@@ -1,6 +1,6 @@
 """
-File: smartcash/model/analysis/scenario_analyzer.py
-Deskripsi: Kelas analisis untuk hasil skenario penelitian dengan metode evaluasi per skenario
+File: analysis/scenario_analyzer.py
+Deskripsi: Modul untuk file scenario_analyzer.py
 """
 
 import pandas as pd

@@ -1,7 +1,8 @@
 """
-File: smartcash/model/services/training/early_stopping.py
-Deskripsi: Handler untuk early stopping yang dapat mencegah overfitting dengan menghentikan training saat tidak ada peningkatan.
+File: smartcash/model/services/training/early_stopping_training_service.py
+Deskripsi: Modul early stopping untuk layanan pelatihan
 """
+
 import numpy as np
 from typing import Dict, Union, Optional, Any
 

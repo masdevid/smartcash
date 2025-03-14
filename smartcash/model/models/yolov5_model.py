@@ -1,6 +1,6 @@
 """
 File: smartcash/model/models/yolov5_model.py
-Deskripsi: Implementasi model YOLOv5 terintegrasi yang menggabungkan backbone, neck, dan head
+Deskripsi: Implementasi modul standart YOLOv5 dengan CSPDarknet sebagai Backbone
 """
 
 import torch

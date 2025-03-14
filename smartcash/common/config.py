@@ -1,4 +1,3 @@
-# smartcash/common/config.py
 """
 File: smartcash/common/config.py
 Deskripsi: Manager konfigurasi dengan dukungan YAML dan environment variables

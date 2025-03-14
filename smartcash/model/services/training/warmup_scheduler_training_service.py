@@ -1,7 +1,8 @@
 """
-File: smartcash/model/services/training/warmup_scheduler.py
-Deskripsi: Implementasi scheduler custom dengan dukungan fase warmup untuk pembelajaran yang lebih efektif pada awal training.
+File: smartcash/model/services/training/warmup_scheduler_training_service.py
+Deskripsi: Modul pemanasan penjadwalan untuk layanan pelatihan
 """
+
 import math
 import torch
 import torch.optim as optim

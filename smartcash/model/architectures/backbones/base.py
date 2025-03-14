@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/backbones/base.py
-Deskripsi: Kelas dasar untuk semua backbone network yang digunakan dalam SmartCash
+Deskripsi: Base class for all backbone networks
 """
 
 import torch

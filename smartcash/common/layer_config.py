@@ -1,8 +1,6 @@
 """
-File: smartcash/utils/layer_config_manager.py
-Author: Alfrida Sabar
-Deskripsi: Manager untuk konfigurasi layer deteksi terpusat yang memastikan 
-           konsistensi kelas dan label yang digunakan di seluruh aplikasi.
+File: smartcash/common/layer_config.py
+Deskripsi: Modul untuk file layer_config.py
 """
 
 import os

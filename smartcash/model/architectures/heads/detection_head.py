@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/heads/detection_head.py
-Deskripsi: Implementasi Detection Head dengan dukungan multi-layer untuk deteksi berbagai level semantik
+Deskripsi: Detection head implementation for YOLOv5
 """
 
 import torch

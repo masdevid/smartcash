@@ -1,6 +1,6 @@
 """
 File: smartcash/model/components/__init__.py
-Deskripsi: Inisialisasi dan export komponen-komponen model yang dapat digunakan kembali
+Deskripsi: Package initialization for components
 """
 
 from smartcash.model.components.losses import YOLOLoss

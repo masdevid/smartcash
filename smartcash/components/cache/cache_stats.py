@@ -1,14 +1,13 @@
 """
-File: smartcash/utils/cache/cache_stats.py
-Author: Alfrida Sabar
-Deskripsi: Modul untuk pengelolaan statistik cache dengan dukungan metrik performa.
+File: smartcash/components/cache/cache_stats.py
+Deskripsi: Modul untuk file cache_stats.py
 """
 
 import threading
 from typing import Dict, Any, Optional
 from pathlib import Path
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 
 class CacheStats:
     def __init__(self, logger: Optional[SmartCashLogger] = None):

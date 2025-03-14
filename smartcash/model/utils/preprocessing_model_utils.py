@@ -1,6 +1,6 @@
 """
-File: smartcash/model/utils/preprocessing.py
-Deskripsi: Utilitas preprocessing untuk model deteksi mata uang dengan EfficientNet
+File: smartcash/model/utils/preprocessing_model_utils.py
+Deskripsi: Modul untuk pemrosesan gambar untuk model deteksi objek
 """
 
 import cv2

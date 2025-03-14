@@ -1,7 +1,8 @@
 """
-File: smartcash/model/services/prediction/interface.py
-Deskripsi: Interface antarmuka prediksi untuk kemudahan integrasi dengan aplikasi
+File: smartcash/model/services/prediction/interface_prediction_service.py
+Deskripsi: Modul interface untuk layanan prediksi
 """
+
 import os
 import time
 import torch
@@ -13,8 +14,8 @@ from typing import Dict, List, Union, Tuple, Optional, Any
 from PIL import Image
 
 from smartcash.common.logger import get_logger
-from smartcash.model.services.prediction.core import PredictionService
-from smartcash.model.services.prediction.batch_processor import BatchPredictionProcessor
+from smartcash.model.services.prediction.core_prediction_service import PredictionService
+from smartcash.model.services.prediction.batch_processor_prediction_service import BatchPredictionProcessor
 from smartcash.model.exceptions import ModelInferenceError
 
 

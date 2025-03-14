@@ -1,7 +1,6 @@
 """
-File: smartcash/utils/cache/cache_index.py
-Author: Alfrida Sabar
-Deskripsi: Modul untuk mengelola index cache dengan persistensi dan validasi efisien.
+File: smartcash/components/cache/cache_index.py
+Deskripsi: Modul untuk file cache_index.py
 """
 
 import json
@@ -11,7 +10,7 @@ from typing import Dict, Optional
 from datetime import datetime
 import threading
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 
 class CacheIndex:
     def __init__(self, cache_dir: Path, logger: Optional[SmartCashLogger] = None):

@@ -1,7 +1,6 @@
 """
 File: smartcash/model/manager.py
-Deskripsi: Manajer model yang mengkoordinasikan berbagai arsitektur dan layanan model
-           dengan dukungan untuk model teroptimasi menggunakan FeatureAdapter dan CIoU
+Deskripsi: Komponen untuk manajemen model deteksi objek
 """
 
 import torch

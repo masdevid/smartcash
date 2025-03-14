@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/training/scheduler.py
-Deskripsi: Factory untuk learning rate scheduler yang dioptimalkan untuk proses training deteksi mata uang.
+File: smartcash/model/services/training/scheduler_training_service.py
+Deskripsi: Modul penjadwalan untuk layanan pelatihan
 """
 
 import math
@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import _LRScheduler
 from typing import Dict, Type, Any, Optional
 
-from smartcash.model.services.training.warmup_scheduler import CosineDecayWithWarmup
+from smartcash.model.services.training.warmup_scheduler_training_service import CosineDecayWithWarmup
 
 
 class SchedulerFactory:

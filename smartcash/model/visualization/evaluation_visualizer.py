@@ -1,6 +1,7 @@
-# File: smartcash/model/visualization/evaluation_visualizer.py
-# Author: Alfrida Sabar
-# Deskripsi: Komponen visualisasi untuk hasil evaluasi model
+"""
+File: smartcash/model/visualization/evaluation_visualizer.py
+Deskripsi: Komponen visualisasi untuk hasil evaluasi model
+"""
 
 import os
 import pandas as pd

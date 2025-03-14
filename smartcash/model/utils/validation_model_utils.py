@@ -1,6 +1,6 @@
 """
-File: smartcash/model/utils/validation.py
-Deskripsi: Utilitas validasi model SmartCash dan kompatibilitas konfigurasi
+File: smartcash/model/utils/validation_model_utils.py
+Deskripsi: Modul utilitas untuk validasi model deteksi objek
 """
 
 import os

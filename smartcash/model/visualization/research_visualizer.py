@@ -1,7 +1,6 @@
 """
 File: smartcash/model/visualization/research_visualizer.py
-Author: Alfrida Sabar
-Deskripsi: Modul utama visualisasi penelitian yang mengintegrasikan semua komponen
+Deskripsi: Komponen untuk visualisasi penelitian model deteksi objek
 """
 
 import pandas as pd
@@ -11,7 +10,7 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 from smartcash.model.visualization.base_research_visualizer import BaseResearchVisualizer
 from smartcash.model.visualization.experiment_visualizer import ExperimentVisualizer
 from smartcash.model.visualization.scenario_visualizer import ScenarioVisualizer
-from smartcash.model.utils.research import clean_dataframe
+from smartcash.model.utils.research_model_utils import clean_dataframe
 
 class ResearchVisualizer(BaseResearchVisualizer):
     """

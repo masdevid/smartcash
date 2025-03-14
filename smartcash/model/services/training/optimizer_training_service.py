@@ -1,7 +1,8 @@
 """
-File: smartcash/model/services/training/optimizer.py
-Deskripsi: Factory untuk optimizer dengan berbagai konfigurasi yang dioptimalkan untuk model deteksi mata uang SmartCash.
+File: smartcash/model/services/training/optimizer_training_service.py
+Deskripsi: Modul optimasi untuk layanan pelatihan
 """
+
 import torch
 import torch.optim as optim
 from typing import Dict, Any, Iterator, List, Union, Type, Optional

@@ -1,6 +1,6 @@
 """
 File: smartcash/model/config/experiment_config.py
-Deskripsi: Konfigurasi untuk eksperimen model SmartCash
+Deskripsi: Konfigurasi untuk eksperimen pelatihan dan evaluasi model SmartCash
 """
 
 import os

@@ -1,5 +1,7 @@
-# File: smartcash/components/observer/event_dispatcher.py
-# Deskripsi: Dispatcher untuk event observer di SmartCash
+"""
+File: smartcash/components/observer/event_dispatcher.py
+Deskripsi: Dispatcher untuk event observer di SmartCash
+"""
 
 import threading
 import concurrent.futures
@@ -7,8 +9,8 @@ import traceback
 import time
 from typing import Any, Dict, List, Optional, Set, Union, Callable
 
-from .base_observer import BaseObserver
-from .event_registry import EventRegistry
+from smartcash.components.observer.base_observer import BaseObserver
+from smartcash.components.observer.event_registry import EventRegistry
 from smartcash.common.logger import get_logger
 
 

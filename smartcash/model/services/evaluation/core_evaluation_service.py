@@ -1,6 +1,6 @@
 """
-File: smartcash/model/services/evaluation/core.py
-Deskripsi: Layanan inti untuk evaluasi model deteksi mata uang
+File: smartcash/model/services/evaluation/core_evaluation_service.py
+Deskripsi: Layanan evaluasi model deteksi mata uang dengan dukungan lengkap
 """
 
 import os
@@ -13,8 +13,8 @@ from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
-from smartcash.model.services.evaluation.metrics import MetricsComputation
-from smartcash.model.services.evaluation.visualization import EvaluationVisualizer
+from smartcash.model.services.evaluation.metrics_evaluation_service import MetricsComputation
+from smartcash.model.services.evaluation.visualization_evaluation_service import EvaluationVisualizer
 from smartcash.model.components.losses import compute_loss
 
 class EvaluationService:

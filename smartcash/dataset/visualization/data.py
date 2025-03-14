@@ -1,5 +1,7 @@
-# File: smartcash/utils/visualization/data.py
-# Deskripsi: Utilitas untuk visualisasi data dan dataset
+"""
+File: smartcash/dataset/visualization/data.py
+Deskripsi: Utilitas untuk visualisasi data dan dataset
+"""
 
 import os
 import random

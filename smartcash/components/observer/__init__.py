@@ -1,14 +1,15 @@
-# File: smartcash/common/observer/__init__.py
-# Author: Alfrida Sabar
-# Deskripsi: Package initialization untuk observer pattern terkonsolidasi di SmartCash
+"""
+File: smartcash/components/observer/__init__.py
+Deskripsi: Package initialization untuk observer pattern terkonsolidasi di SmartCash
+"""
 
-from .event_dispatcher import EventDispatcher
-from .base_observer import BaseObserver
-from .event_registry import EventRegistry
-from .observer_manager import ObserverManager
-from .decorators import observable, observe
-from .event_topics import EventTopics
-from .observer_priority import ObserverPriority
+from smartcash.components.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.base_observer import BaseObserver
+from smartcash.components.observer.event_registry import EventRegistry
+from smartcash.components.observer.observer_manager import ObserverManager
+from smartcash.components.observer.decorators import observable, observe
+from smartcash.components.observer.event_topics import EventTopics
+from smartcash.components.observer.observer_priority import ObserverPriority
 
 # Shortcut functions
 register = EventDispatcher.register

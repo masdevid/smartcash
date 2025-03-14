@@ -1,13 +1,14 @@
-# File: smartcash/common/observer/observer_manager.py
-# Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan memory leak dan resource management
-
+"""
+File: smartcash/components/observer/observer_manager.py
+Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan memory leak dan resource management
+"""
 import inspect
 import weakref
 from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
 import threading
 
-from smartcash.common.observer.base_observer import BaseObserver
-from smartcash.common.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.base_observer import BaseObserver
+from smartcash.components.observer.event_dispatcher import EventDispatcher
 from smartcash.common.logger import get_logger
 
 

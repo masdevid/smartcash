@@ -1,5 +1,4 @@
-# File: smartcash/common/observer/event_registry.py
-# Author: Alfrida Sabar
+# File: smartcash/components/observer/event_registry.py
 # Deskripsi: Registry untuk event dan observer di SmartCash
 
 import threading
@@ -7,7 +6,7 @@ import weakref
 from typing import Dict, List, Set, Any, Optional
 import time
 
-from smartcash.common.observer.base_observer import BaseObserver
+from .base_observer import BaseObserver
 
 
 class EventRegistry:

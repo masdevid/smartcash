@@ -1,8 +1,6 @@
 """
-File: smartcash/common/observer/cleanup_utils.py
-Author: Alfrida Sabar
-Deskripsi: Utilitas untuk memastikan observer dibersihkan dengan benar, 
-           terutama untuk penggunaan dalam Jupyter/Colab
+File: smartcash/commonents/observer/cleanup_utils.py
+Deskripsi: Utilitas untuk memastikan observer dibersihkan dengan benar, terutama untuk penggunaan dalam Jupyter/Colab
 """
 
 import atexit

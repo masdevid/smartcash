@@ -11,9 +11,9 @@ from typing import Dict, Any, Optional, List, Tuple, Callable
 from smartcash.model.services.training.optimizer import OptimizerFactory
 from smartcash.model.services.training.scheduler import SchedulerFactory
 from smartcash.model.services.training.early_stopping import EarlyStoppingHandler
-from smartcash.utils.experiment_tracker import ExperimentTracker
-from smartcash.utils.logger import get_logger
-from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.model.services.training.experiment_tracker import ExperimentTracker
+from smartcash.common.logger import get_logger
+from smartcash.common.layer_config import get_layer_config
 
 
 class TrainingService:

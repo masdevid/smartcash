@@ -9,6 +9,7 @@ from smartcash.model.services.training.scheduler import SchedulerFactory
 from smartcash.model.services.training.early_stopping import EarlyStoppingHandler
 from smartcash.model.services.training.callbacks import TrainingCallbacks
 from smartcash.model.services.training.warmup_scheduler import CosineDecayWithWarmup
+from smartcash.model.services.training.experiment_tracker import ExperimentTracker
 
 # Ekspor semua komponen publik
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     'SchedulerFactory',
     'EarlyStoppingHandler',
     'TrainingCallbacks',
-    'CosineDecayWithWarmup'
+    'CosineDecayWithWarmup',
+    'ExperimentTracker'
 ]

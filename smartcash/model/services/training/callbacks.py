@@ -8,7 +8,7 @@ import os
 import numpy as np
 from typing import Dict, Any, Optional, List, Callable, Union
 
-from smartcash.utils.logger import get_logger
+from smartcash.common.logger import get_logger
 
 
 class TrainingCallbacks:

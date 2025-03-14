@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Union, Tuple, Any
 import os
 from pathlib import Path
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import ModelError, ModelConfigurationError
 
 # Imports dari architectures

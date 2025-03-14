@@ -9,8 +9,8 @@ import torch
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.model.config.base import ModelConfig
-from smartcash.model.config.backbone import BackboneConfig
+from smartcash.model.config.model_config import ModelConfig
+from smartcash.model.config.backbone_config import BackboneConfig
 
 
 class ModelValidator:

@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, List, Optional, Union, Tuple
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import HeadError
 
 class DetectionHead(nn.Module):

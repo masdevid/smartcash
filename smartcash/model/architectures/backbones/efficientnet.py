@@ -8,7 +8,7 @@ import torch.nn as nn
 from typing import List, Tuple, Optional, Dict, Any
 import timm
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import BackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
 

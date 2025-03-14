@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from typing import List, Dict, Tuple, Union, Optional
 
-from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.common.layer_config import get_layer_config
 
 
 def process_detections(

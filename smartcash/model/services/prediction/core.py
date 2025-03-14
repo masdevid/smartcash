@@ -9,8 +9,8 @@ import torch
 import numpy as np
 from typing import Dict, List, Union, Tuple, Optional, Any
 
-from smartcash.utils.logger import get_logger
-from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.common.logger import get_logger
+from smartcash.common.layer_config import get_layer_config
 from smartcash.model.exceptions import ModelInferenceError
 
 

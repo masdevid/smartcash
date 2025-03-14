@@ -11,11 +11,11 @@ from pathlib import Path
 import torch
 import cv2
 
-from smartcash.utils.logger import get_logger
-from smartcash.utils.layer_config_manager import get_layer_config
-from smartcash.utils.visualization import setup_visualization
-from smartcash.utils.visualization.metrics import MetricsVisualizer
-from smartcash.utils.visualization.detection import DetectionVisualizer
+from smartcash.common.logger import get_logger
+from smartcash.common.layer_config import get_layer_config
+from smartcash.model.services.evaluation.visualization import setup_visualization
+from smartcash.model.visualization.metrics_visualizer import MetricsVisualizer
+from smartcash.model.visualization.detection_visualizer import DetectionVisualizer
 
 class EvaluationVisualizer:
     """

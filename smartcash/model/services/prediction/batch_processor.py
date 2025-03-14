@@ -12,7 +12,7 @@ from typing import Dict, List, Union, Tuple, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 from tqdm.auto import tqdm
 
-from smartcash.utils.logger import get_logger
+from smartcash.common.logger import get_logger
 from smartcash.model.services.prediction.core import PredictionService
 
 

@@ -12,7 +12,7 @@ import urllib.request
 import warnings
 from tqdm import tqdm
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import BackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
 

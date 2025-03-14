@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Union, Any
 from collections import defaultdict
 import time
 
-from smartcash.utils.logger import get_logger
-from smartcash.utils.layer_config_manager import get_layer_config
+from smartcash.common.logger import get_logger
+from smartcash.common.layer_config import get_layer_config
 from smartcash.model.utils.metrics import (
     box_iou, xywh2xyxy, xyxy2xywh, compute_ap, ap_per_class, 
     precision_recall_curve, MetricsCalculator as BaseMetricsCalculator

@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import List, Tuple, Dict, Optional, Union
 
-from smartcash.utils.logger import SmartCashLogger
+from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import ModelError
 
 class YOLOLoss(nn.Module):

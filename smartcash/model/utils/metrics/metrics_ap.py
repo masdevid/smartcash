@@ -1,12 +1,12 @@
 """
-File: smartcash/model/utils/metrics_ap.py
+File: smartcash/model/utils/metrics/metrics_ap.py
 Deskripsi: Fungsi-fungsi untuk menghitung Average Precision dan metrik performa
 """
 
 import numpy as np
 from typing import Tuple
 
-from smartcash.model.utils.metrics_core import compute_ap
+from smartcash.model.utils.metrics.metrics_core import compute_ap
 
 
 def ap_per_class(

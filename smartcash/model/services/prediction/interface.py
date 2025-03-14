@@ -12,7 +12,7 @@ from io import BytesIO
 from typing import Dict, List, Union, Tuple, Optional, Any
 from PIL import Image
 
-from smartcash.utils.logger import get_logger
+from smartcash.common.logger import get_logger
 from smartcash.model.services.prediction.core import PredictionService
 from smartcash.model.services.prediction.batch_processor import BatchPredictionProcessor
 from smartcash.model.exceptions import ModelInferenceError

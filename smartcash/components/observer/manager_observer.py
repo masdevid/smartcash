@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/observer_manager.py
+File: smartcash/components/observer/manager_observer.py
 Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan memory leak dan resource management
 """
 import inspect

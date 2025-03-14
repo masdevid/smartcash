@@ -1,6 +1,6 @@
 """
-File: smartcash/components/cache/cache_storage.py
-Deskripsi: Modul untuk file cache_storage.py
+File: smartcash/components/cache/storage_cache.py
+Deskripsi: Modul penyimpanan cache
 """
 
 import os

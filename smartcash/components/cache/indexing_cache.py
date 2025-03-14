@@ -1,6 +1,6 @@
 """
-File: smartcash/components/cache/cache_index.py
-Deskripsi: Modul untuk file cache_index.py
+File: smartcash/components/cache/indexing_cache.py
+Deskripsi: Modul pengindeksan cache
 """
 
 import json

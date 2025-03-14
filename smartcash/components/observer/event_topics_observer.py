@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/event_topics.py
+File: smartcash/components/observer/event_topics_observer.py
 Deskripsi: Definisi topik event standar
 """
 

@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/observer_priority.py
+File: smartcash/components/observer/priority_observer.py
 Deskripsi: Prioritas observer di SmartCash
 """
 # Definisi prioritas observer (untuk urutan eksekusi)

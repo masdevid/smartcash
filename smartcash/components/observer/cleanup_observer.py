@@ -1,6 +1,6 @@
 """
-File: smartcash/components/observer/cleanup_utils.py
-Deskripsi: Modul untuk file cleanup_utils.py
+File: smartcash/components/observer/cleanup_observer.py
+Deskripsi: Modul pembersihan observer yang teregistrasi
 """
 
 import atexit
@@ -8,8 +8,8 @@ import weakref
 from typing import Any, Optional, List, Dict, Callable
 
 from smartcash.common.logger import get_logger
-from smartcash.components.observer.observer_manager import ObserverManager
-from smartcash.components.observer import EventDispatcher
+from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 
 
 logger = get_logger("observer_cleanup")

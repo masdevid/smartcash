@@ -1,6 +1,6 @@
 """
-File: smartcash/components/cache/cache_manager.py
-Deskripsi: Modul untuk file cache_manager.py
+File: smartcash/components/cache/manager_cache.py
+Deskripsi: Modul manajemen cache
 """
 
 from pathlib import Path
@@ -9,10 +9,10 @@ from datetime import datetime
 import threading
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.components.cache.cache_index import CacheIndex
-from smartcash.components.cache.cache_storage import CacheStorage
-from smartcash.components.cache.cache_cleanup import CacheCleanup
-from smartcash.components.cache.cache_stats import CacheStats
+from smartcash.components.cache.indexing_cache import CacheIndex
+from smartcash.components.cache.storage_cache import CacheStorage
+from smartcash.components.cache.cleanup_cache import CacheCleanup
+from smartcash.components.cache.stats_cache import CacheStats
 
 class CacheManager:
     def __init__(

@@ -1,6 +1,6 @@
 """
-File: smartcash/components/cache/cache_cleanup.py
-Deskripsi: Modul untuk file cache_cleanup.py
+File: smartcash/components/cache/cleanup_cache.py
+Deskripsi: Modul pembersihan cache
 """
 
 import time

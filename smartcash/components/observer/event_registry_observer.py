@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/event_registry.py
+File: smartcash/components/observer/event_registry_observer.py
 Deskripsi: Registry untuk event dan observer di SmartCash
 """
 

@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/decorators.py
+File: smartcash/components/observer/decorators_observer.py
 Deskripsi: Decorator untuk observer pattern di SmartCash
 """
 
@@ -8,7 +8,7 @@ import inspect
 import threading
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, get_type_hints
 
-from smartcash.components.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.common.logger import get_logger
 

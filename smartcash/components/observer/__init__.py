@@ -3,13 +3,13 @@ File: smartcash/components/observer/__init__.py
 Deskripsi: Package initialization untuk observer pattern terkonsolidasi di SmartCash
 """
 
-from smartcash.components.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.components.observer.base_observer import BaseObserver
-from smartcash.components.observer.event_registry import EventRegistry
-from smartcash.components.observer.observer_manager import ObserverManager
-from smartcash.components.observer.decorators import observable, observe
-from smartcash.components.observer.event_topics import EventTopics
-from smartcash.components.observer.observer_priority import ObserverPriority
+from smartcash.components.observer.event_registry_observer import EventRegistry
+from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer.decorators_observer import observable, observe
+from smartcash.components.observer.event_topics_observer import EventTopics
+from smartcash.components.observer.priority_observer import ObserverPriority
 
 # Shortcut functions
 register = EventDispatcher.register

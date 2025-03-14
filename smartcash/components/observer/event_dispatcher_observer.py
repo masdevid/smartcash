@@ -1,5 +1,5 @@
 """
-File: smartcash/components/observer/event_dispatcher.py
+File: smartcash/components/observer/event_dispatcher_observer.py
 Deskripsi: Dispatcher untuk event observer di SmartCash
 """
 
@@ -10,7 +10,7 @@ import time
 from typing import Any, Dict, List, Optional, Set, Union, Callable
 
 from smartcash.components.observer.base_observer import BaseObserver
-from smartcash.components.observer.event_registry import EventRegistry
+from smartcash.components.observer.event_registry_observer import EventRegistry
 from smartcash.common.logger import get_logger
 
 

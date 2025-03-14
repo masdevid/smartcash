@@ -1,6 +1,6 @@
 """
-File: smartcash/components/cache/cache_stats.py
-Deskripsi: Modul untuk file cache_stats.py
+File: smartcash/components/cache/stats_cache.py
+Deskripsi: Modul pengecekan status cache
 """
 
 import threading

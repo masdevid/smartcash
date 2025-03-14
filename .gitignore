@@ -37,6 +37,7 @@ dataset/
 !docs/dataset
 !utils/dataset
 !handlers/dataset/
+!smartcash/dataset
 weights/
 *.pt
 *.pth

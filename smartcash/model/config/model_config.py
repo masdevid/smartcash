@@ -1,5 +1,5 @@
 """
-File: smartcash/model/config/base.py
+File: smartcash/model/config/model_config.py
 Deskripsi: Konfigurasi dasar untuk model SmartCash dengan dukungan YAML dan validasi
 """
 

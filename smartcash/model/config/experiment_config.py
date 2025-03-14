@@ -1,5 +1,5 @@
 """
-File: smartcash/model/config/experiment.py
+File: smartcash/model/config/experiment_config.py
 Deskripsi: Konfigurasi untuk eksperimen model SmartCash
 """
 
@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 
-from smartcash.model.config.base import ModelConfig
+from smartcash.model.config.model_config import ModelConfig
 
 class ExperimentConfig:
     """

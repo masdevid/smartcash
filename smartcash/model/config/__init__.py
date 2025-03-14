@@ -3,9 +3,9 @@ File: smartcash/model/config/__init__.py
 Deskripsi: Inisialisasi paket konfigurasi untuk model SmartCash
 """
 
-from smartcash.model.config.base import ModelConfig
-from smartcash.model.config.backbone import BackboneConfig
-from smartcash.model.config.experiment import ExperimentConfig
+from smartcash.model.config.model_config import ModelConfig
+from smartcash.model.config.backbone_config import BackboneConfig
+from smartcash.model.config.experiment_config import ExperimentConfig
 
 # Factory function untuk memudahkan akses
 def load_config(config_path=None, **kwargs):

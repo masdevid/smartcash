@@ -117,6 +117,7 @@ pretrained/
 *.yaml
 !configs/*.yaml
 !config/*.yaml
+!smartcash/config/*.yaml
 
 # Model Metadata
 *.index

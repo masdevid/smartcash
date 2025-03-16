@@ -1,0 +1,65 @@
+# File: configs/training_config.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi khusus untuk proses training dengan EfficientNet-B4
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
+
+# Override konfigurasi training
+training:
+  epochs: 50
+  batch_size: 16
+  early_stopping_patience: 15
+  optimizer: 'Adam'
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  lr_scheduler: 'ReduceLROnPlateau'
+  lr_patience: 5
+  lr_factor: 0.1
+  save_best_only: true
+  save_every: 5  # Simpan checkpoint setiap 5 epoch
+
+# Override konfigurasi model
+model:
+  backbone: 'EfficientNet-B4'
+  input_size: [640, 640]
+  confidence: 0.25
+  iou_threshold: 0.45
+  max_detections: 100
+  transfer_learning: true
+  pretrained: true
+  workers: 8  # Peningkatan jumlah worker untuk training
+  freeze_backbone: true  # Bekukan layer backbone pada awal training
+  unfreeze_epoch: 5      # Unfreeze backbone setelah 5 epoch
+
+# Override konfigurasi augmentasi untuk training lebih agresif
+augmentation:
+  enabled: true
+  num_variations: 3  # Lebih banyak variasi untuk dataset lebih besar
+  types:
+    - 'position'
+    - 'lighting'
+    - 'combined'
+    - 'extreme_rotation'  # Tambahkan rotasi ekstrem untuk robust training
+  position:
+    fliplr: 0.5
+    degrees: 15  # Rotasi lebih ekstrem
+    translate: 0.15
+    scale: 0.15
+  lighting:
+    hsv_h: 0.025
+    hsv_s: 0.8
+    hsv_v: 0.5
+    contrast: 0.4
+    brightness: 0.4
+
+# Konfigurasi tambahan untuk proses training
+training_utils:
+  experiment_name: 'efficientnet_b4_training'
+  checkpoint_dir: 'runs/train/checkpoints'
+  tensorboard: true
+  log_metrics_every: 10  # Log metrik setiap 10 batch
+  visualize_batch_every: 100  # Visualisasi batch setiap 100 batch
+  gradient_clipping: 1.0  # Clipping gradien maksimum
+  mixed_precision: true  # Gunakan mixed precision training

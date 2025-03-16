@@ -4,10 +4,12 @@ Deskripsi: Komponen untuk transformasi dan augmentasi gambar
 """
 
 import cv2
+import numpy as np
 import albumentations as A
-from typing import Dict, Tuple, Optional, Any
+from typing import Dict, Tuple, Optional, Any, List, Union
 
-from smartcash.utils.logger import get_logger
+from smartcash.common.logger import get_logger
+from smartcash.dataset.utils.transform.bbox_transform import BBoxTransformer
 
 
 class ImageTransformer:
@@ -156,7 +158,44 @@ class ImageTransformer:
             A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0)
         ], bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'], min_visibility=0.3))
     
-    def get_normalization_params(self) -> Dict:
+    def process_image(
+        self,
+        image: np.ndarray,
+        bboxes: Optional[List[List[float]]] = None,
+        class_labels: Optional[List[int]] = None,
+        mode: str = 'train'
+    ) -> Dict[str, Any]:
+        """
+        Proses gambar dengan transform yang sesuai.
+        
+        Args:
+            image: Array gambar (H, W, C)
+            bboxes: Lista bounding box dalam format YOLO (opsional)
+            class_labels: List class ID untuk bboxes (opsional)
+            mode: Mode transformasi
+            
+        Returns:
+            Dictionary hasil transformasi
+        """
+        transform = self.get_transform(mode)
+        
+        if bboxes and class_labels and len(bboxes) > 0:
+            # Terapkan transformasi dengan bbox
+            transformed = transform(image=image, bboxes=bboxes, class_labels=class_labels)
+            return transformed
+        else:
+            # Terapkan transformasi tanpa bbox
+            if mode == 'train':
+                # Gunakan versi tanpa bbox_params untuk mode train
+                transform = A.Compose([t for t in transform if not isinstance(t, A.Normalize)] + 
+                                     [A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0)])
+            
+            transformed = transform(image=image)
+            transformed['bboxes'] = bboxes or []
+            transformed['class_labels'] = class_labels or []
+            return transformed
+    
+    def get_normalization_params(self) -> Dict[str, List[float]]:
         """
         Dapatkan parameter normalisasi untuk inferensi.
         
@@ -167,3 +206,41 @@ class ImageTransformer:
             'mean': [0.485, 0.456, 0.406], 
             'std': [0.229, 0.224, 0.225]
         }
+    
+    def resize_image(self, image: np.ndarray, keep_ratio: bool = True) -> np.ndarray:
+        """
+        Resize gambar ke target size.
+        
+        Args:
+            image: Array gambar (H, W, C)
+            keep_ratio: Pertahankan aspek rasio asli
+            
+        Returns:
+            Gambar yang telah di-resize
+        """
+        if keep_ratio:
+            # Maintain aspect ratio
+            h, w = image.shape[:2]
+            target_h, target_w = self.img_size
+            
+            # Calculate scale
+            scale = min(target_h / h, target_w / w)
+            
+            # Calculate new dimensions
+            new_h, new_w = int(h * scale), int(w * scale)
+            
+            # Resize image
+            resized = cv2.resize(image, (new_w, new_h))
+            
+            # Create canvas of target size
+            canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+            
+            # Center image on canvas
+            x_offset = (target_w - new_w) // 2
+            y_offset = (target_h - new_h) // 2
+            
+            canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+            return canvas
+        else:
+            # Simple resize
+            return cv2.resize(image, (self.img_size[0], self.img_size[1]))

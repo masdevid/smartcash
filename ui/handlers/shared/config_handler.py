@@ -1,16 +1,12 @@
 """
 File: smartcash/ui/handlers/shared/config_handler.py
-Deskripsi: Handler untuk manajemen konfigurasi
+Deskripsi: Handler untuk manajemen konfigurasi dengan metode yang lebih efisien
 """
 
 import os
-import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Union
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-
-from smartcash.ui.components.shared.alerts import create_status_indicator
+import yaml
+from typing import Dict, Any, Optional, Union
 
 def setup_config_handlers(
     ui_components: Dict[str, Any],
@@ -34,21 +30,94 @@ def setup_config_handlers(
     if 'config_manager' not in ui_components:
         try:
             from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
-            ui_components['config_manager'] = config_manager
+            ui_components['config_manager'] = get_config_manager()
         except ImportError:
             pass
     
     return ui_components
 
+def handle_config_save(ui_components: Dict[str, Any], config_path: str) -> bool:
+    """
+    Handler untuk menyimpan konfigurasi ke file.
+    
+    Args:
+        ui_components: Dictionary berisi widget UI
+        config_path: Path file konfigurasi
+        
+    Returns:
+        Boolean menunjukkan keberhasilan
+    """
+    config_manager = ui_components.get('config_manager')
+    config = ui_components.get('config', {})
+    
+    try:
+        if config_manager:
+            config_manager.save_config(config_path)
+        else:
+            # Buat direktori jika belum ada
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            
+            # Simpan ke file
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False)
+        return True
+    except Exception:
+        return False
+
+def handle_config_load(ui_components: Dict[str, Any], config_path: str, merge: bool = True) -> Dict[str, Any]:
+    """
+    Handler untuk memuat konfigurasi dari file.
+    
+    Args:
+        ui_components: Dictionary berisi widget UI
+        config_path: Path file konfigurasi
+        merge: Gabungkan dengan konfigurasi yang sudah ada
+        
+    Returns:
+        Dictionary konfigurasi yang dimuat
+    """
+    config_manager = ui_components.get('config_manager')
+    
+    try:
+        if config_manager:
+            if merge:
+                config = config_manager.merge_config(config_path)
+            else:
+                config = config_manager.load_config(config_path)
+            ui_components['config'] = config
+        else:
+            # Load file secara manual
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    loaded_config = yaml.safe_load(f) or {}
+                
+                if merge and 'config' in ui_components:
+                    # Merge konfigurasi
+                    config = ui_components['config']
+                    for k, v in loaded_config.items():
+                        if isinstance(v, dict) and k in config and isinstance(config[k], dict):
+                            config[k].update(v)
+                        else:
+                            config[k] = v
+                else:
+                    ui_components['config'] = loaded_config
+                    config = loaded_config
+            else:
+                config = {}
+        return config
+    except Exception:
+        if 'config' in ui_components:
+            return ui_components['config']
+        return {}
+
 def update_config(
     ui_components: Dict[str, Any],
     config_updates: Dict[str, Any],
-    save_to_file: bool = True,
+    save_to_file: bool = False,
     config_path: Optional[str] = None
 ) -> bool:
     """
-    Update konfigurasi dan simpan ke file.
+    Update konfigurasi dan simpan ke file jika diperlukan.
     
     Args:
         ui_components: Dictionary berisi widget UI
@@ -64,98 +133,44 @@ def update_config(
     
     if config_manager:
         # Update konfigurasi via config manager
-        config_manager.update_config(config_updates)
+        for key, value in config_updates.items():
+            if isinstance(value, dict):
+                for subkey, subvalue in value.items():
+                    config_manager.set(f"{key}.{subkey}", subvalue)
+            else:
+                config_manager.set(key, value)
         
         # Simpan ke file jika diperlukan
         if save_to_file and config_path:
             config_manager.save_config(config_path)
         
         # Update ui_components config
-        try:
-            ui_components['config'] = config_manager.config
-        except AttributeError:
-            ui_components['config'] = getattr(config_manager, 'config', {})
+        ui_components['config'] = config_manager.config
         return True
     else:
         # Fallback: update config di ui_components
         if 'config' in ui_components:
-            current_config = ui_components['config']
+            config = ui_components['config']
             
             # Update config secara flat
             for key, value in config_updates.items():
-                if isinstance(value, dict) and key in current_config and isinstance(current_config[key], dict):
-                    current_config[key].update(value)
+                if isinstance(value, dict) and key in config and isinstance(config[key], dict):
+                    config[key].update(value)
                 else:
-                    current_config[key] = value
+                    config[key] = value
             
             # Simpan ke file jika diperlukan
             if save_to_file and config_path:
                 try:
+                    Path(config_path).parent.mkdir(parents=True, exist_ok=True)
                     with open(config_path, 'w') as f:
-                        yaml.dump(current_config, f)
+                        yaml.dump(config, f, default_flow_style=False)
                 except Exception:
                     return False
                     
             return True
     
     return False
-
-def load_config(
-    ui_components: Dict[str, Any],
-    config_path: str,
-    output_widget_key: str = 'status'
-) -> Dict[str, Any]:
-    """
-    Load konfigurasi dari file dan tampilkan status.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        config_path: Path file konfigurasi
-        output_widget_key: Key untuk output widget
-        
-    Returns:
-        Dictionary berisi konfigurasi
-    """
-    config = {}
-    output_widget = ui_components.get(output_widget_key)
-    
-    # Dapatkan config manager jika ada
-    config_manager = ui_components.get('config_manager')
-    
-    if config_manager:
-        try:
-            config = config_manager.load_config(config_path)
-            ui_components['config'] = config
-            
-            if output_widget:
-                with output_widget:
-                    display(create_status_indicator("success", f"✅ Konfigurasi dimuat dari {config_path}"))
-        except Exception as e:
-            if output_widget:
-                with output_widget:
-                    display(create_status_indicator("error", f"❌ Gagal memuat konfigurasi: {str(e)}"))
-    else:
-        # Fallback implementation
-        try:
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config = yaml.safe_load(f)
-                
-                ui_components['config'] = config
-                
-                if output_widget:
-                    with output_widget:
-                        display(create_status_indicator("success", f"✅ Konfigurasi dimuat dari {config_path}"))
-            else:
-                if output_widget:
-                    with output_widget:
-                        display(create_status_indicator("warning", f"⚠️ File konfigurasi tidak ditemukan: {config_path}"))
-        except Exception as e:
-            if output_widget:
-                with output_widget:
-                    display(create_status_indicator("error", f"❌ Gagal memuat konfigurasi: {str(e)}"))
-    
-    return config
 
 def get_config_value(
     ui_components: Dict[str, Any],
@@ -178,24 +193,24 @@ def get_config_value(
     
     if config_manager:
         return config_manager.get(key_path, default_value)
-    else:
-        # Fallback: manual traversal
-        config = ui_components.get('config', {})
-        keys = key_path.split('.')
-        
-        for key in keys:
-            if isinstance(config, dict) and key in config:
-                config = config[key]
-            else:
-                return default_value
-                
-        return config
+    
+    # Manual traversal
+    config = ui_components.get('config', {})
+    keys = key_path.split('.')
+    
+    for key in keys:
+        if isinstance(config, dict) and key in config:
+            config = config[key]
+        else:
+            return default_value
+            
+    return config
 
 def set_config_value(
     ui_components: Dict[str, Any],
     key_path: str,
     value: Any,
-    save_to_file: bool = False,
+    save: bool = False,
     config_path: Optional[str] = None
 ) -> bool:
     """
@@ -205,44 +220,41 @@ def set_config_value(
         ui_components: Dictionary berisi widget UI
         key_path: Path key dengan dot notation (e.g., 'training.batch_size')
         value: Nilai yang akan diset
-        save_to_file: Simpan ke file setelah update
+        save: Simpan ke file setelah update
         config_path: Path file konfigurasi (opsional)
         
     Returns:
         Boolean menunjukkan keberhasilan
     """
-    # Check if config manager exists
     config_manager = ui_components.get('config_manager')
     
     if config_manager:
         config_manager.set(key_path, value)
-        
-        # Save to file if needed
-        if save_to_file and config_path:
+        if save and config_path:
             config_manager.save_config(config_path)
-            
         return True
-    else:
-        # Fallback: manual traversal and update
-        config = ui_components.get('config', {})
-        keys = key_path.split('.')
-        
-        # Create nested dictionaries if needed
-        current = config
-        for i, key in enumerate(keys[:-1]):
-            if key not in current or not isinstance(current[key], dict):
-                current[key] = {}
-            current = current[key]
-        
-        # Set value
-        current[keys[-1]] = value
-        
-        # Save to file if needed
-        if save_to_file and config_path:
-            try:
-                with open(config_path, 'w') as f:
-                    yaml.dump(config, f)
-            except Exception:
-                return False
-                
-        return True
+    
+    # Manual update
+    config = ui_components.get('config', {})
+    keys = key_path.split('.')
+    
+    # Create nested dictionaries
+    current = config
+    for i, key in enumerate(keys[:-1]):
+        if key not in current or not isinstance(current[key], dict):
+            current[key] = {}
+        current = current[key]
+    
+    # Set value
+    current[keys[-1]] = value
+    
+    # Save if needed
+    if save and config_path:
+        try:
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False)
+        except Exception:
+            return False
+    
+    return True

@@ -1,14 +1,13 @@
 """
 File: smartcash/ui/utils/cell_utils.py
-Author: Refactored
-Deskripsi: Utilitas untuk cell notebook dengan fungsi setup environment dan komponen UI
+Deskripsi: Utilitas untuk cell notebook dengan fungsi setup environment dan komponen UI yang sederhana
 """
 
 import importlib
 import sys
 import os
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, Union
+from typing import Dict, Any, Tuple, Optional
 import yaml
 import ipywidgets as widgets
 from IPython.display import display, HTML
@@ -112,25 +111,11 @@ def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
         )
     )
     
-    progress_bar = widgets.IntProgress(
-        value=0,
-        min=0,
-        max=100,
-        description='Progress:',
-        bar_style='info',
-        orientation='horizontal',
-        layout=widgets.Layout(
-            width='100%',
-            margin='10px 0'
-        )
-    )
-    
     # Return dictionary
     return {
-        'ui': widgets.VBox([header, status, progress_bar]),
+        'ui': widgets.VBox([header, status]),
         'header': header,
         'status': status,
-        'progress_bar': progress_bar,
         'module_name': cell_name
     }
 
@@ -153,106 +138,60 @@ def setup_ui_component(
     # Buat default UI components
     ui_components = create_default_ui_components(component_name)
     
-   # Import komponen UI dengan fallback, termasuk pencarian di subdirektori
+    # Import komponen UI dengan fallback, termasuk pencarian di subdirektori
     try:
         # Coba import dari lokasi baru (setelah refactor)
         import_locations = [
-            f"smartcash.ui.components.{component_name}",  # Base location
-            f"smartcash.ui.components.setup.{component_name}",  # Setup subdirectory
-            f"smartcash.ui.components.dataset.{component_name}",  # Dataset subdirectory
-            f"smartcash.ui.components.training_config.{component_name}",  # Training config subdirectory
-            f"smartcash.ui.components.training_execution.{component_name}",  # Training execution subdirectory
-            f"smartcash.ui.components.model_evaluation.{component_name}",  # Model evaluation subdirectory
-            f"smartcash.ui.components.detection.{component_name}"  # Detection subdirectory
+            f"smartcash.ui.components.{component_name}",
+            f"smartcash.ui.components.setup.{component_name}",  
+            f"smartcash.ui.components.dataset.{component_name}",
+            f"smartcash.ui.components.training_config.{component_name}",
+            f"smartcash.ui.components.training_execution.{component_name}",
+            f"smartcash.ui.components.model_evaluation.{component_name}",
+            f"smartcash.ui.components.detection.{component_name}"
         ]
         
-        ui_module = None
-        create_func = None
-        error = None
-        
-        # Try each possible location
-        for module_path in import_locations:
-            try:
-                ui_module = importlib.import_module(module_path)
-                create_func = getattr(ui_module, f"create_{component_name}_ui")
-                break
-            except (ImportError, AttributeError) as e:
-                error = e
-                continue
-                
-        if create_func:
-            ui_components = create_func(env, config)
-        else:
-            # Try fallback to old location
-            module_path = f"smartcash.ui_components.{component_name}"
+        # Coba impor dari semua lokasi yang mungkin
+        for module_path in import_locations + [
+            f"smartcash.ui_components.{component_name}",
+            f"smartcash.ui_components.setup.{component_name}",
+            f"smartcash.ui_components.dataset.{component_name}",
+            f"smartcash.ui_components.training.{component_name}"
+        ]:
             try:
                 ui_module = importlib.import_module(module_path)
                 create_func = getattr(ui_module, f"create_{component_name}_ui")
                 ui_components = create_func(env, config)
+                break
             except (ImportError, AttributeError):
-                # Also try subdirectories in old location
-                old_import_locations = [
-                    f"smartcash.ui_components.setup.{component_name}",
-                    f"smartcash.ui_components.dataset.{component_name}",
-                    f"smartcash.ui_components.training.{component_name}"
-                ]
+                continue
+        else:
+            # Jika tidak ditemukan
+            with ui_components['status']:
+                display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found. Using minimal implementation.</p>"))
                 
-                for module_path in old_import_locations:
-                    try:
-                        ui_module = importlib.import_module(module_path)
-                        create_func = getattr(ui_module, f"create_{component_name}_ui")
-                        ui_components = create_func(env, config)
-                        break
-                    except (ImportError, AttributeError):
-                        continue
-                
-                # If still not found, fallback to default
-                if not create_func:
-                    with ui_components['status']:
-                        display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found in any directory. Using minimal implementation.</p>"))
     except Exception as e:
         # Catch any other errors during import
         with ui_components['status']:
             display(HTML(f"<p style='color:#721c24'>❌ Error importing component '{component_name}': {str(e)}</p>"))
     
-    # Tambahkan progress_bar jika belum ada
-    if 'progress_bar' not in ui_components:
-        progress_bar = widgets.IntProgress(
-            value=0,
-            min=0,
-            max=100,
-            description='Progress:',
-            bar_style='info',
-            orientation='horizontal',
-            layout=widgets.Layout(
-                width='100%',
-                margin='10px 0'
-            )
-        )
-        ui_components['progress_bar'] = progress_bar
-        
-        # Tambahkan ke UI jika ui_components memiliki 'ui'
-        if 'ui' in ui_components and isinstance(ui_components['ui'], widgets.Box):
-            ui_children = list(ui_components['ui'].children)
-            ui_children.append(progress_bar)
-            ui_components['ui'].children = tuple(ui_children)
-    
     # Setup handler jika tersedia
     try:
-        handler_module_path = f"smartcash.ui.handlers.{component_name}"
-        handler_module = importlib.import_module(handler_module_path)
-        setup_handlers_func = getattr(handler_module, f"setup_{component_name}_handlers")
-        ui_components = setup_handlers_func(ui_components, env, config)
-    except (ImportError, AttributeError):
-        try:
-            # Fallback ke lokasi lama
-            handler_module_path = f"smartcash.ui_handlers.{component_name}"
-            handler_module = importlib.import_module(handler_module_path)
-            setup_handlers_func = getattr(handler_module, f"setup_{component_name}_handlers")
-            ui_components = setup_handlers_func(ui_components, env, config)
-        except (ImportError, AttributeError):
-            # No handlers available, just continue
-            pass
+        handler_locations = [
+            f"smartcash.ui.handlers.{component_name}",
+            f"smartcash.ui_handlers.{component_name}"
+        ]
+        
+        for handler_path in handler_locations:
+            try:
+                handler_module = importlib.import_module(handler_path)
+                setup_handlers_func = getattr(handler_module, f"setup_{component_name}_handlers")
+                ui_components = setup_handlers_func(ui_components, env, config)
+                break
+            except (ImportError, AttributeError):
+                continue
+    except Exception:
+        pass  # Handler tidak tersedia, lanjutkan
     
     return ui_components
 

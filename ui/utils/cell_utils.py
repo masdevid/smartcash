@@ -39,8 +39,8 @@ def setup_notebook_environment(
         
         # Setup komponen
         logger = get_logger(f"cell_{cell_name}")
-        env_manager = get_environment_manager(logger=logger)
-        config_manager = get_config_manager(logger=logger)
+        env_manager = get_environment_manager()
+        config_manager = get_config_manager()
         
         # Load konfigurasi
         try:

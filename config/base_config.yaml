@@ -1,0 +1,139 @@
+# File: configs/base_config.yaml
+# Author: Alfrida Sabar
+# Deskripsi: Konfigurasi dasar untuk sistem SmartCash dengan dukungan preprocessing terpisah
+
+# Informasi project
+project:
+  name: 'SmartCash'
+  version: '1.0.0'
+  description: 'Sistem deteksi denominasi mata uang dengan YOLOv5 dan EfficientNet'
+
+# Struktur dasar data
+data:
+  dir: 'data'                    # Direktori utama data
+  processed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessing
+  local:
+    train: 'data/train'
+    valid: 'data/valid'
+    test: 'data/test'
+  processed:
+    train: 'data/preprocessed/train'
+    valid: 'data/preprocessed/valid'
+    test: 'data/preprocessed/test'
+  source: 'roboflow'
+  roboflow:
+    api_key: ''  # Diisi oleh user atau dari Google Secret
+    workspace: 'smartcash-wo2us'
+    project: 'rupiah-emisi-2022'
+    version: '3'
+
+# Konfigurasi layer deteksi
+layers:
+  - 'banknote'  # Deteksi uang kertas utuh
+  - 'nominal'   # Deteksi area nominal
+  - 'security'  # Deteksi fitur keamanan
+
+# Konfigurasi model
+model:
+  backbone: 'EfficientNet-B4'  # Backbone yang digunakan
+  input_size: [640, 640]       # Ukuran input model
+  confidence: 0.25             # Threshold untuk deteksi
+  iou_threshold: 0.45          # Threshold untuk NMS
+  max_detections: 100          # Jumlah maksimum deteksi
+  transfer_learning: true      # Menggunakan transfer learning
+  pretrained: true             # Menggunakan bobot pre-trained
+  workers: 4                   # Jumlah worker untuk dataloader
+
+# Konfigurasi training
+training:
+  epochs: 30
+  batch_size: 16
+  early_stopping_patience: 10
+  optimizer: 'Adam'
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  lr_scheduler: 'ReduceLROnPlateau'
+  lr_patience: 3
+  lr_factor: 0.1
+
+# Konfigurasi augmentasi
+augmentation:
+  enabled: true
+  num_variations: 2
+  output_prefix: 'aug'
+  types:
+    - 'position'
+    - 'lighting'
+    - 'combined'
+  position:
+    fliplr: 0.5
+    degrees: 10
+    translate: 0.1
+    scale: 0.1
+  lighting:
+    hsv_h: 0.015
+    hsv_s: 0.7
+    hsv_v: 0.4
+    contrast: 0.3
+    brightness: 0.3
+
+# Konfigurasi preprocessing
+preprocessing:
+  output_dir: 'data/preprocessed'
+  save_visualizations: true
+  vis_dir: 'visualizations'
+  normalization:
+    enabled: true
+    method: 'minmax'
+  validate:
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+
+# Konfigurasi untuk pembersihan dataset
+cleanup:
+  augmentation_patterns:
+    - 'aug_.*'
+    - '.*_augmented.*'
+    - '.*_modified.*'
+    - '.*_processed.*'
+  ignored_patterns:
+    - '.*\.gitkeep'
+    - '.*\.DS_Store'
+  backup_dir: 'data/backup'
+  backup_enabled: true
+
+# Konfigurasi evaluasi
+evaluation:
+  metrics:
+    - 'precision'
+    - 'recall'
+    - 'mAP'
+    - 'f1'
+  test_batch_size: 8
+  save_predictions: true
+  visualize_results: true
+
+# Konfigurasi logger
+logging:
+  level: 'INFO'
+  use_colors: true
+  use_emojis: true
+  log_to_file: true
+  logs_dir: 'logs'
+
+# Konfigurasi cache
+cache:
+  enabled: true
+  dir: '.cache/smartcash'
+  max_size_gb: 1.0
+  ttl_hours: 24
+  auto_cleanup: true
+
+# Konfigurasi UI
+ui:
+  theme: 'default'  # default, dark, light
+  plot_style: 'seaborn'
+  max_displayed_items: 20
+  enable_animations: true

@@ -2,7 +2,7 @@
 
 ## DOMAIN COMMON
 
-### ConfigManager (config.py)
+### ConfigManager (smartcash/common/config.py)
 - **Fungsi**: Mengelola konfigurasi aplikasi dengan dukungan dependency injection
 - **Metode Utama**:
   - `load_config(config_file)`: Memuat konfigurasi dari file YAML/JSON
@@ -20,7 +20,7 @@
 - **Fungsi Global**:
   - `get_config_manager()`: Dapatkan singleton instance
 
-### SmartCashLogger (logger.py)
+### SmartCashLogger (smartcash/common/logger.py)
 - **Fungsi**: Sistem logging dengan emoji dan warna
 - **Metode Utama**:
   - `log(level, message)`: Mencatat pesan log
@@ -33,7 +33,7 @@
 - **Fungsi Global**:
   - `get_logger(name, level, log_file, use_colors, use_emojis, log_dir)`: Mendapatkan instance logger
 
-### LayerConfigManager (layer_config.py)
+### LayerConfigManager (smartcash/common/layer_config.py)
 - **Fungsi**: Mengelola konfigurasi layer deteksi berdasarkan interface
 - **Metode Utama**:
   - `get_layer_config(layer_name)`: Dapatkan konfigurasi spesifik layer
@@ -52,7 +52,7 @@
 - **Fungsi Global**:
   - `get_layer_config()`: Fungsi helper untuk mendapatkan instance singleton
 
-### EnvironmentManager (environment.py)
+### EnvironmentManager (smartcash/common/environment.py)
 - **Fungsi**: Mengelola deteksi dan konfigurasi lingkungan aplikasi
 - **Metode Utama**:
   - `mount_drive(mount_path)`: Mount Google Drive jika di Colab
@@ -73,14 +73,14 @@
 - **Fungsi Global**:
   - `get_environment_manager()`: Dapatkan singleton instance
 
-### VisualizationBase (common/visualization/core/visualization_base.py)
+### VisualizationBase (smartcash/common/visualization/core/visualization_base.py)
 - **Fungsi**: Kelas dasar untuk semua komponen visualisasi
 - **Metode Utama**:
   - `set_plot_style(style)`: Set style untuk matplotlib plots
   - `save_figure(fig, filepath, dpi)`: Simpan figure matplotlib
   - `create_output_directory(output_dir)`: Buat direktori output
 
-### ChartHelper (common/visualization/helpers/chart_helper.py)
+### ChartHelper (smartcash/common/visualization/helpers/chart_helper.py)
 - **Fungsi**: Visualisasi berbasis chart
 - **Metode Utama**:
   - `create_bar_chart(data, title, horizontal, figsize, ...)`: Buat bar chart
@@ -89,7 +89,7 @@
   - `create_heatmap(data, row_labels, col_labels, ...)`: Buat heatmap
   - `create_stacked_bar_chart(data, title, figsize, ...)`: Buat stacked bar chart
 
-### ColorHelper (common/visualization/helpers/color_helper.py)
+### ColorHelper (smartcash/common/visualization/helpers/color_helper.py)
 - **Fungsi**: Manajemen warna untuk visualisasi
 - **Metode Utama**:
   - `get_color_palette(n_colors, palette_name, as_hex, desat)`: Dapatkan palette warna
@@ -99,7 +99,7 @@
   - `get_color_for_value(value, vmin, vmax, cmap_name, as_hex)`: Dapatkan warna berdasarkan nilai
   - `get_semantic_color(key, as_hex)`: Dapatkan warna semantik (success, warning, dll)
 
-### AnnotationHelper (common/visualization/helpers/annotation_helper.py)
+### AnnotationHelper (smartcash/common/visualization/helpers/annotation_helper.py)
 - **Fungsi**: Anotasi pada visualisasi
 - **Metode Utama**:
   - `add_bar_annotations(ax, bars, horizontal, fontsize, ...)`: Tambah anotasi pada bar chart
@@ -111,7 +111,7 @@
   - `add_text_box(ax, text, x, y, fontsize, ...)`: Tambah text box
   - `add_annotated_heatmap(ax, data, text_format, threshold, ...)`: Tambah anotasi pada heatmap
 
-### ExportHelper (common/visualization/helpers/export_helper.py)
+### ExportHelper (smartcash/common/visualization/helpers/export_helper.py)
 - **Fungsi**: Export visualisasi
 - **Metode Utama**:
   - `save_figure(fig, output_path, dpi, format, ...)`: Simpan figure
@@ -120,7 +120,7 @@
   - `save_as_dashboard(figures, output_path, title, ...)`: Simpan multiple figures sebagai dashboard
   - `create_output_directory(output_dir)`: Buat direktori output
 
-### LayoutHelper (common/visualization/helpers/layout_helper.py)
+### LayoutHelper (smartcash/common/visualization/helpers/layout_helper.py)
 - **Fungsi**: Layout untuk visualisasi
 - **Metode Utama**:
   - `create_grid_layout(nrows, ncols, figsize, ...)`: Buat layout grid
@@ -129,7 +129,7 @@
   - `adjust_subplots_spacing(fig, left, right, ...)`: Sesuaikan spacing subplots
   - `add_colorbar(fig, mappable, ax, location, ...)`: Tambahkan colorbar ke figure
 
-### StyleHelper (common/visualization/helpers/style_helper.py)
+### StyleHelper (smartcash/common/visualization/helpers/style_helper.py)
 - **Fungsi**: Styling visualisasi
 - **Metode Utama**:
   - `set_style(style, custom_params)`: Set style untuk visualisasi
@@ -139,7 +139,7 @@
   - `get_current_style_params()`: Dapatkan parameter style saat ini
   - `register_custom_style(name, params)`: Daftarkan style kustom
 
-### Constants (constants.py)
+### Constants (smartcash/common/constants.py)
 - **Fungsi**: Konstanta global yang digunakan di seluruh project
 - **Konstanta Utama**:
   - `VERSION`, `APP_NAME`: Metadata aplikasi
@@ -154,7 +154,7 @@
   - `MAX_BATCH_SIZE`, `MAX_IMAGE_SIZE`: Batasan aplikasi
   - `API_*`: Pengaturan API
 
-### Utils (utils.py)
+### Utils (smartcash/common/utils.py)
 - **Fungsi**: Berbagai utilitas umum untuk SmartCash
 - **Fungsi Utama**:
   - `is_colab()`, `is_notebook()`: Deteksi lingkungan
@@ -167,7 +167,7 @@
   - Format operations: `load_json()`, `save_json()`, `load_yaml()`, `save_yaml()`
   - `get_project_root()`: Dapatkan root direktori project
 
-### Interfaces (common/interfaces/)
+### Interfaces (smartcash/common/interfaces/)
 - **IDetectionVisualizer**: Interface untuk visualisasi deteksi
   - `visualize_detection(image, detections, filename, conf_threshold)`: Visualisasi hasil deteksi
 - **IMetricsVisualizer**: Interface untuk visualisasi metrik
@@ -178,7 +178,7 @@
   - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`
   - `load_checkpoint(path, model, optimizer, map_location)`
 
-## Exceptions (exceptions.py)
+## Exceptions (smartcash/common/exceptions.py)
 - **Fungsi**: Hierarki exception terpadu untuk seluruh komponen SmartCash
 - **Exception Classes Dasar**:
   - `SmartCashError`: Exception dasar untuk semua error SmartCash
@@ -226,7 +226,7 @@
   - `NotSupportedError`: Fitur tidak didukung
   - `ExperimentError`: Error manajemen eksperimen
 
-### Types (types.py)
+### Types (smartcash/common/types.py)
 - **Fungsi**: Type definitions untuk SmartCash
 - **Type Aliases**:
   - `ImageType`: Type untuk gambar (np.ndarray, string, bytes)

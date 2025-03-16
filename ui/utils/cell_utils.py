@@ -48,7 +48,7 @@ def setup_notebook_environment(
                 config = config_manager.load_config(config_path)
                 logger.info(f"🔄 Loaded config from {config_path}")
             else:
-                config = config_manager.get_config()
+                config = config_manager.config
                 logger.warning(f"⚠️ Config file {config_path} not found, using default")
         except Exception as e:
             logger.error(f"❌ Error loading config: {e}")

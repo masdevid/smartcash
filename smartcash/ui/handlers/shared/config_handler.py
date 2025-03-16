@@ -71,7 +71,10 @@ def update_config(
             config_manager.save_config(config_path)
         
         # Update ui_components config
-        ui_components['config'] = config_manager.get_config()
+        try:
+            ui_components['config'] = config_manager.config
+        except AttributeError:
+            ui_components['config'] = getattr(config_manager, 'config', {})
         return True
     else:
         # Fallback: update config di ui_components

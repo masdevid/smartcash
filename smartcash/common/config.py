@@ -318,6 +318,239 @@ class ConfigManager:
         
         # Jika tidak ditemukan implementasi, raise exception
         raise KeyError(f"Tidak ada implementasi terdaftar untuk {interface_type.__name__}")
+
+    def sync_with_drive(self, config_file, sync_strategy='merge', drive_path=None):
+        """
+        Sinkronisasi file konfigurasi dengan Google Drive dengan penanganan konflik.
+        
+        Args:
+            config_file: Nama file konfigurasi
+            sync_strategy: Strategi sinkronisasi - 'merge' (gabungkan), 'repo_priority' (repo lebih penting),
+                        'drive_priority' (drive lebih penting), atau 'newest' (yang terbaru menang)
+            drive_path: Path di Drive (default: 'configs/{config_file}')
+        
+        Returns:
+            Tuple (success, message)
+        """
+        from pathlib import Path
+        import os
+        import shutil
+        import time
+        
+        env_manager = get_environment_manager(logger=self._logger)
+        
+        if not env_manager.is_drive_mounted:
+            return False, "⚠️ Google Drive tidak ter-mount"
+        
+        drive_config_path = drive_path or env_manager.drive_path / 'configs' / config_file
+        local_config_path = env_manager.get_path(f'configs/{config_file}')
+        
+        # Buat direktori jika belum ada
+        os.makedirs(os.path.dirname(str(drive_config_path)), exist_ok=True)
+        os.makedirs(os.path.dirname(str(local_config_path)), exist_ok=True)
+        
+        try:
+            local_exists = os.path.exists(str(local_config_path))
+            drive_exists = os.path.exists(str(drive_config_path))
+            
+            # Kedua file tidak ada - tidak ada yang perlu dilakukan
+            if not local_exists and not drive_exists:
+                return False, f"⚠️ File konfigurasi tidak ditemukan: {config_file}"
+                
+            # Hanya file lokal ada - salin ke Drive
+            if local_exists and not drive_exists:
+                shutil.copy2(str(local_config_path), str(drive_config_path))
+                if self._logger:
+                    self._logger.info(f"⬆️ Upload: Lokal → Drive ({config_file})")
+                return True, f"✅ File lokal disalin ke Drive: {config_file}"
+                
+            # Hanya file Drive ada - salin ke lokal
+            if not local_exists and drive_exists:
+                shutil.copy2(str(drive_config_path), str(local_config_path))
+                if self._logger:
+                    self._logger.info(f"⬇️ Download: Drive → Lokal ({config_file})")
+                return True, f"✅ File Drive disalin ke lokal: {config_file}"
+            
+            # Kedua file ada - terapkan strategi konflik
+            # Dapatkan timestamp modifikasi
+            local_mtime = os.path.getmtime(str(local_config_path))
+            drive_mtime = os.path.getmtime(str(drive_config_path))
+            
+            # Bandingkan konten untuk melihat apakah berbeda
+            with open(str(local_config_path), 'rb') as f_local:
+                local_content = f_local.read()
+            with open(str(drive_config_path), 'rb') as f_drive:
+                drive_content = f_drive.read()
+                
+            if local_content == drive_content:
+                if self._logger:
+                    self._logger.info(f"✅ Konfigurasi sudah tersinkronisasi: {config_file}")
+                return True, f"✅ Konfigurasi sudah tersinkronisasi: {config_file}"
+            
+            # Buat backup sebelum melakukan perubahan
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            if drive_exists:
+                drive_backup = f"{str(drive_config_path)}.{timestamp}.bak"
+                shutil.copy2(str(drive_config_path), drive_backup)
+            if local_exists:
+                local_backup = f"{str(local_config_path)}.{timestamp}.bak"
+                shutil.copy2(str(local_config_path), local_backup)
+            
+            # Terapkan strategi konflik yang dipilih
+            if sync_strategy == 'repo_priority':
+                # Repo lebih penting - selalu gunakan file lokal
+                shutil.copy2(str(local_config_path), str(drive_config_path))
+                if self._logger:
+                    self._logger.info(f"🔄 Sinkronisasi (repo_priority): Lokal → Drive ({config_file})")
+                return True, f"✅ Konfigurasi repo diterapkan ke Drive: {config_file}"
+                
+            elif sync_strategy == 'drive_priority':
+                # Drive lebih penting - selalu gunakan file drive
+                shutil.copy2(str(drive_config_path), str(local_config_path))
+                if self._logger:
+                    self._logger.info(f"🔄 Sinkronisasi (drive_priority): Drive → Lokal ({config_file})")
+                return True, f"✅ Konfigurasi Drive diterapkan ke lokal: {config_file}"
+                
+            elif sync_strategy == 'newest':
+                # Yang terbaru yang menang
+                if local_mtime > drive_mtime:
+                    shutil.copy2(str(local_config_path), str(drive_config_path))
+                    if self._logger:
+                        self._logger.info(f"🔄 Sinkronisasi (newest): Lokal → Drive ({config_file})")
+                    return True, f"✅ File lokal lebih baru, disalin ke Drive: {config_file}"
+                else:
+                    shutil.copy2(str(drive_config_path), str(local_config_path))
+                    if self._logger:
+                        self._logger.info(f"🔄 Sinkronisasi (newest): Drive → Lokal ({config_file})")
+                    return True, f"✅ File Drive lebih baru, disalin ke lokal: {config_file}"
+                    
+            elif sync_strategy == 'merge':
+                # Gabungkan konfigurasi
+                # Load kedua konfigurasi
+                local_config = self.load_config(str(local_config_path))
+                drive_config = self.load_config(str(drive_config_path))
+                
+                # Gabungkan (merge) konfigurasi, prioritaskan nilai yang tidak None/empty
+                merged_config = self._merge_configs_smart(local_config, drive_config)
+                
+                # Simpan hasil merge ke kedua lokasi
+                self.save_config(merged_config, str(local_config_path))
+                self.save_config(merged_config, str(drive_config_path))
+                
+                if self._logger:
+                    self._logger.info(f"🔄 Konfigurasi berhasil digabungkan: {config_file}")
+                return True, f"✅ Konfigurasi berhasil digabungkan: {config_file}"
+                
+            else:
+                return False, f"❌ Strategi sinkronisasi tidak valid: {sync_strategy}"
+                
+        except Exception as e:
+            if self._logger:
+                self._logger.error(f"❌ Error sinkronisasi konfigurasi: {str(e)}")
+            return False, f"❌ Error sinkronisasi: {str(e)}"
+
+    def _merge_configs_smart(self, config1, config2):
+        """
+        Menggabungkan dua konfigurasi dengan strategi smart.
+        - Untuk list, gabungkan dengan unik
+        - Untuk dict, gabungkan rekursif
+        - Untuk nilai skalar, prioritaskan nilai yang tidak None/empty
+        
+        Args:
+            config1: Konfigurasi pertama (biasanya lokal)
+            config2: Konfigurasi kedua (biasanya dari Drive)
+            
+        Returns:
+            Konfigurasi yang digabungkan
+        """
+        import copy
+        # Merge konfigurasi secara rekursif dengan strategi smart
+        
+        # Jika salah satu None, kembalikan yang lain
+        if config1 is None:
+            return copy.deepcopy(config2)
+        if config2 is None:
+            return copy.deepcopy(config1)
+        
+        # Jika keduanya adalah dict, proses secara rekursif
+        if isinstance(config1, dict) and isinstance(config2, dict):
+            result = copy.deepcopy(config1)
+            for key, value in config2.items():
+                if key in result:
+                    result[key] = self._merge_configs_smart(result[key], value)
+                else:
+                    result[key] = copy.deepcopy(value)
+            return result
+        
+        # Jika keduanya adalah list, gabungkan dan hilangkan duplikat
+        if isinstance(config1, list) and isinstance(config2, list):
+            # Khusus untuk list sederhana, gabungkan dengan unik
+            if all(not isinstance(x, (dict, list)) for x in config1 + config2):
+                return list(set(config1 + config2))
+            # Untuk list kompleks, gabungkan saja
+            return copy.deepcopy(config1) + copy.deepcopy(config2)
+        
+        # Untuk nilai skalar, prioritaskan nilai yang tidak None/empty
+        if config1 == "" or config1 is None or config1 == 0:
+            return copy.deepcopy(config2)
+        return copy.deepcopy(config1)
+
+    def sync_all_configs(self, sync_strategy='merge'):
+        """
+        Sinkronisasi semua file konfigurasi YAML antara repository dan Drive.
+        
+        Args:
+            sync_strategy: Strategi sinkronisasi untuk semua file
+            
+        Returns:
+            Dictionary hasil sinkronisasi
+        """
+        env_manager = get_environment_manager(logger=self._logger)
+        
+        if not env_manager.is_drive_mounted:
+            if self._logger:
+                self._logger.warning("⚠️ Google Drive tidak ter-mount, tidak dapat sinkronisasi")
+            return {"status": "error", "message": "Google Drive tidak ter-mount"}
+        
+        # Cari semua file YAML di direktori configs lokal dan Drive
+        config_dir_local = env_manager.get_path('configs')
+        config_dir_drive = env_manager.drive_path / 'configs'
+        
+        os.makedirs(str(config_dir_local), exist_ok=True)
+        os.makedirs(str(config_dir_drive), exist_ok=True)
+        
+        local_yamls = set()
+        drive_yamls = set()
+        
+        # Dapatkan file YAML lokal
+        for ext in ['.yaml', '.yml']:
+            local_yamls.update([f.name for f in config_dir_local.glob(f'*{ext}')])
+        
+        # Dapatkan file YAML di Drive
+        for ext in ['.yaml', '.yml']:
+            drive_yamls.update([f.name for f in config_dir_drive.glob(f'*{ext}')])
+        
+        # Gabungkan daftar file
+        all_yamls = local_yamls.union(drive_yamls)
+        
+        results = {
+            "synced": [],
+            "failed": [],
+            "skipped": []
+        }
+        
+        # Sinkronisasi setiap file
+        for yaml_file in all_yamls:
+            success, message = self.sync_with_drive(yaml_file, sync_strategy)
+            if success:
+                results["synced"].append({"file": yaml_file, "message": message})
+            else:
+                results["failed"].append({"file": yaml_file, "message": message})
+        
+        if self._logger:
+            self._logger.info(f"🔄 Sinkronisasi selesai: {len(results['synced'])} berhasil, {len(results['failed'])} gagal")
+        
+        return results
     
     def __getitem__(self, key):
         return self.get(key)

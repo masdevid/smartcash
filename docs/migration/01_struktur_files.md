@@ -29,7 +29,9 @@ smartcash/common/
 ├── exceptions.py              # Exception hierarchy
 ├── types.py                   # Type definitions
 ├── utils.py                   # Fungsi utilitas umum
-└── layer_config.py            # LayerConfigManager: Konfigurasi layer deteksi
+├── layer_config.py            # LayerConfigManager: Konfigurasi layer deteksi
+└── environment.py            # EnvironmentManager: Manajer lingkungan
+
 ```
 
 ## 2. Domain Components (Tidak Berubah)
@@ -175,64 +177,46 @@ smartcash/dataset/
 ```
 smartcash/detection/
 ├── __init__.py                 # Ekspor komponen deteksi
-├── detector.py                 # Detector: Koordinator utama deteksi
+├── detector.py                 # Detector: Koordinator utama deteksi (menggunakan ModelManager dari domain model)
 ├── services/
 │   ├── __init__.py
 │   ├── inference/              # Layanan inferensi
 │   │   ├── __init__.py
-│   │   ├── inference_service.py # InferenceService: Layanan inferensi
-│   │   ├── optimizers.py       # ModelOptimizer: Optimasi model
-│   │   ├── batch_processor.py  # BatchProcessor: Processor batch gambar
-│   │   └── accelerator.py      # HardwareAccelerator: Akselerator hardware
+│   │   ├── inference_service.py # InferenceService: Menggunakan PredictionService dari domain model
+│   │   ├── optimizers.py       # Menggunakan fungsi optimasi dari domain model
+│   │   ├── batch_processor.py  # Menggunakan BatchPredictionProcessor dari domain model
+│   │   └── accelerator.py      # HardwareAccelerator: Abstraksi hardware (CPU/GPU/TPU)
 │   ├── postprocessing/         # Layanan pasca-inferensi
 │   │   ├── __init__.py
-│   │   ├── nms_processor.py    # NMSProcessor: Non-Maximum Suppression
-│   │   ├── confidence_filter.py # ConfidenceFilter: Filter confidence
-│   │   ├── bbox_refiner.py     # BBoxRefiner: Perbaikan bounding box
+│   │   ├── nms_processor.py    # Menggunakan NMSProcessor dari domain model
+│   │   ├── confidence_filter.py # ConfidenceFilter: Filter berdasarkan confidence
+│   │   ├── bbox_refiner.py     # Menggunakan BBoxRefiner dari domain model
 │   │   └── result_formatter.py # ResultFormatter: Format hasil deteksi
 │   ├── evaluation/             # Layanan evaluasi model
 │   │   ├── __init__.py
-│   │   ├── metrics_calculator.py # MetricsCalculator: Penghitung metrik
-│   │   ├── evaluator.py        # DetectionEvaluator: Evaluator model
-│   │   └── benchmark.py        # DetectionBenchmark: Benchmark kinerja
-│   └── visualization_adapter.py # DetectionVisualizationAdapter: Adapter untuk visualisasi dari domain model
-├── models/
+│   │   ├── metrics_calculator.py # Menggunakan MetricsCalculator dari domain model
+│   │   ├── evaluator.py        # DetectionEvaluator: Wrapper untuk EvaluationService
+│   │   └── benchmark.py        # DetectionBenchmark: Benchmark kinerja deteksi
+│   └── visualization_adapter.py # Menggunakan DetectionVisualizer dari domain model
+├── handlers/                   # Handler untuk berbagai skenario deteksi
 │   ├── __init__.py
-│   ├── yolov5_model.py         # SmartCashYOLOv5: Model YOLOv5 dengan EfficientNet
-│   ├── efficientnet_backbone.py # EfficientNetBackbone: Backbone EfficientNet
-│   ├── fpn_pan_neck.py         # FPN_PAN_Neck: Neck model (FPN+PAN)
-│   ├── detection_head.py       # DetectionHead: Head untuk deteksi objek
-│   └── anchors.py              # AnchorGenerator: Generator anchors
-├── utils/
-│   ├── __init__.py
-│   ├── preprocess/             # Utilitas preprocessing
-│   │   ├── __init__.py
-│   │   ├── image_transform.py  # ImageTransformer: Transformer gambar
-│   │   ├── normalization.py    # ImageNormalizer: Normalisasi gambar
-│   │   └── augmentation.py     # RealTimeAugmentation: Augmentasi real-time
-│   ├── postprocess/            # Utilitas postprocessing
-│   │   ├── __init__.py
-│   │   ├── bbox_utils.py       # Utilitas bbox (konversi, scale, clip)
-│   │   ├── nms_utils.py        # Utilitas NMS (standard, weighted, class-agnostic)
-│   │   └── score_utils.py      # Utilitas score (filter, sigmoid)
-│   └── optimization/           # Utilitas optimasi
-│       ├── __init__.py
-│       ├── weight_quantization.py # Fungsi kuantisasi bobot dan aktivasi
-│       ├── pruning.py          # Fungsi pruning model
-│       └── memory_optimization.py # Fungsi optimasi memori
+│   ├── detection_handler.py    # Handler untuk deteksi gambar tunggal
+│   ├── batch_handler.py        # Handler untuk deteksi batch (folder/zip) 
+│   ├── video_handler.py        # Handler untuk deteksi video dan webcam
+│   └── integration_handler.py  # Handler untuk integrasi dengan UI/API
 └── adapters/
     ├── __init__.py
-    ├── onnx_adapter.py         # ONNXModelAdapter: Adapter untuk model ONNX
-    ├── torchscript_adapter.py  # TorchScriptAdapter: Adapter untuk TorchScript
-    ├── tensorrt_adapter.py     # TensorRTAdapter: Adapter untuk TensorRT
-    └── tflite_adapter.py       # TFLiteAdapter: Adapter untuk TFLite
+    ├── onnx_adapter.py         # Menggunakan ONNXModelAdapter dari domain model
+    ├── torchscript_adapter.py  # Menggunakan TorchScriptAdapter dari domain model
+    ├── tensorrt_adapter.py     # Menggunakan TensorRTAdapter dari domain model
+    └── tflite_adapter.py       # Menggunakan TFLiteAdapter dari domain model
 ```
 
 ## 5. Domain Model (Diperbarui)
 
 ```
 smartcash/model/
-├── __init__.py                 # Ekspor komponen model
+├── __init__.py                 # Ekspor komponen model deteksi objek
 ├── manager.py                  # ModelManager: Koordinator alur kerja model
 ├── manager_checkpoint.py       # ModelCheckpointManager: Integrasi dengan checkpoint service
 ├── services/
@@ -264,6 +248,9 @@ smartcash/model/
 │   │   ├── batch_processor_prediction_service.py # BatchPredictionProcessor: Processor batch
 │   │   ├── interface_prediction_service.py # PredictionInterface: Interface prediksi
 │   │   └── postprocessing_prediction_service.py # Postprocessing prediksi
+│   ├── postprocessing/         # Layanan postprocessing
+│   │   ├── __init__.py
+│   │   └── nms_processor.py    # NMSProcessor: Processor untuk Non-Maximum Suppression
 │   ├── experiment/             # Manajemen eksperimen
 │   │   ├── __init__.py
 │   │   ├── experiment_service.py # ExperimentService: Layanan eksperimen
@@ -317,16 +304,18 @@ smartcash/model/
 │   └── heads/                  # Head networks
 │       ├── __init__.py
 │       └── detection_head.py   # DetectionHead: Head deteksi
-├── visualization/              # Visualisasi model (Diimplementasikan)
+├── visualization/              # Visualisasi model
 │   ├── __init__.py             # Ekspor komponen visualisasi
-│   ├── base_visualizer.py      # VisualizationHelper: Kelas utilitas dasar visualisasi
-│   ├── base_research_visualizer.py # BaseResearchVisualizer: Kelas dasar visualisasi penelitian
+│   ├── base_visualizer.py      # ModelVisualizationBase: Kelas utilitas dasar visualisasi
 │   ├── metrics_visualizer.py   # MetricsVisualizer: Visualisasi metrik
 │   ├── detection_visualizer.py # DetectionVisualizer: Visualisasi deteksi
-│   ├── experiment_visualizer.py # ExperimentVisualizer: Visualisasi eksperimen
-│   ├── scenario_visualizer.py  # ScenarioVisualizer: Visualisasi skenario
-│   ├── research_visualizer.py  # ResearchVisualizer: Visualisasi penelitian
-│   └── evaluation_visualizer.py # EvaluationVisualizer: Visualisasi evaluasi
+│   ├── evaluation_visualizer.py # EvaluationVisualizer: Visualisasi evaluasi
+│   ├── research/                # Visualisasi penelitian 
+│   │   ├── __init__.py
+│   │   ├── base_research_visualizer.py # BaseResearchVisualizer: Kelas dasar visualisasi penelitian
+│   │   ├── experiment_visualizer.py # ExperimentVisualizer: Visualisasi eksperimen
+│   │   ├── scenario_visualizer.py  # ScenarioVisualizer: Visualisasi skenario
+│   │   └── research_visualizer.py  # ResearchVisualizer: Visualisasi penelitian
 └── exceptions.py               # Eksepsi khusus model (ModelError, etc.)
 ```
 

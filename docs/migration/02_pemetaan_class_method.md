@@ -1,6 +1,6 @@
 # SmartCash v2 - Pemetaan Kelas dan Fungsi yang Diperbarui
 
-## Domain Common
+## DOMAIN COMMON
 
 ### ConfigManager (config.py)
 - **Fungsi**: Mengelola konfigurasi aplikasi dengan dukungan dependency injection
@@ -14,26 +14,64 @@
   - `register_instance(interface_type, instance)`: Daftarkan singleton
   - `register_factory(interface_type, factory)`: Daftarkan factory
   - `resolve(interface_type, *args, **kwargs)`: Resolve dependency
+  - `sync_with_drive(config_file, sync_strategy)`: Sinkronisasi dengan Google Drive
+  - `sync_all_configs(sync_strategy)`: Sinkronisasi semua file konfigurasi
+  - `_merge_configs_smart(config1, config2)`: Gabungkan konfigurasi dengan strategi smart
 - **Fungsi Global**:
   - `get_config_manager()`: Dapatkan singleton instance
-
 
 ### SmartCashLogger (logger.py)
 - **Fungsi**: Sistem logging dengan emoji dan warna
 - **Metode Utama**:
   - `log(level, message)`: Mencatat pesan log
   - `add_callback(callback)`: Tambah callback untuk event log
+  - `remove_callback(callback)`: Hapus callback dari logger
   - `debug/info/success/warning/error/critical()`: Shortcut log level
   - `progress(iterable)`: Membuat progress bar dengan tqdm
+- **Class Tambahan**:
+  - `LogLevel`: Enum untuk level log (DEBUG, INFO, SUCCESS, WARNING, ERROR, CRITICAL)
+- **Fungsi Global**:
+  - `get_logger(name, level, log_file, use_colors, use_emojis, log_dir)`: Mendapatkan instance logger
 
 ### LayerConfigManager (layer_config.py)
 - **Fungsi**: Mengelola konfigurasi layer deteksi berdasarkan interface
 - **Metode Utama**:
-  - Semua metode sesuai dokumentasi awal
-  - **Pattern**: Implementasi singleton
-  - **Default Config**: Konfigurasi default untuk banknote, nominal, security
+  - `get_layer_config(layer_name)`: Dapatkan konfigurasi spesifik layer
+  - `get_layer_names()`: Dapatkan daftar semua nama layer 
+  - `get_enabled_layers()`: Dapatkan layer yang aktif
+  - `get_class_map()`: Mendapatkan mapping ID kelas ke nama kelas
+  - `get_all_class_ids()`: Mendapatkan semua ID kelas dari semua layer
+  - `get_layer_for_class_id(class_id)`: Mendapatkan nama layer untuk ID kelas
+  - `load_config(config_path)`: Memuat konfigurasi dari file
+  - `save_config(config_path)`: Menyimpan konfigurasi ke file
+  - `update_layer_config(layer_name, config)`: Memperbarui konfigurasi layer
+  - `set_layer_enabled(layer_name, enabled)`: Mengaktifkan/menonaktifkan layer
+  - `validate_class_ids()`: Validasi ID kelas untuk mencegah duplikat
+- **Pattern**: Implementasi singleton
+- **Default Config**: Konfigurasi default untuk banknote, nominal, security
 - **Fungsi Global**:
   - `get_layer_config()`: Fungsi helper untuk mendapatkan instance singleton
+
+### EnvironmentManager (environment.py)
+- **Fungsi**: Mengelola deteksi dan konfigurasi lingkungan aplikasi
+- **Metode Utama**:
+  - `mount_drive(mount_path)`: Mount Google Drive jika di Colab
+  - `get_path(relative_path)`: Mendapatkan path absolut
+  - `get_project_root()`: Mendapatkan direktori root proyek
+  - `setup_project_structure(use_drive)`: Membuat struktur direktori proyek
+  - `create_symlinks()`: Membuat symlink dari direktori lokal ke Drive
+  - `get_directory_tree(root_dir, max_depth)`: Mendapatkan struktur direktori dalam HTML
+  - `get_system_info()`: Mendapatkan informasi sistem komprehensif
+  - `install_requirements(requirements_file, additional_packages)`: Menginstal package yang diperlukan
+  - `_detect_colab()`, `_detect_notebook()`: Deteksi lingkungan
+- **Properties**:
+  - `is_colab`: Cek apakah berjalan di Google Colab
+  - `is_notebook`: Cek apakah berjalan di notebook
+  - `base_dir`: Dapatkan direktori dasar
+  - `drive_path`: Dapatkan path Google Drive
+  - `is_drive_mounted`: Cek apakah Google Drive ter-mount
+- **Fungsi Global**:
+  - `get_environment_manager()`: Dapatkan singleton instance
 
 ### VisualizationBase (common/visualization/core/visualization_base.py)
 - **Fungsi**: Kelas dasar untuk semua komponen visualisasi
@@ -42,7 +80,94 @@
   - `save_figure(fig, filepath, dpi)`: Simpan figure matplotlib
   - `create_output_directory(output_dir)`: Buat direktori output
 
-### Interfaces (common/visualization/interfaces/)
+### ChartHelper (common/visualization/helpers/chart_helper.py)
+- **Fungsi**: Visualisasi berbasis chart
+- **Metode Utama**:
+  - `create_bar_chart(data, title, horizontal, figsize, ...)`: Buat bar chart
+  - `create_pie_chart(data, title, figsize, color_palette, ...)`: Buat pie chart
+  - `create_line_chart(data, x_values, title, figsize, ...)`: Buat line chart
+  - `create_heatmap(data, row_labels, col_labels, ...)`: Buat heatmap
+  - `create_stacked_bar_chart(data, title, figsize, ...)`: Buat stacked bar chart
+
+### ColorHelper (common/visualization/helpers/color_helper.py)
+- **Fungsi**: Manajemen warna untuk visualisasi
+- **Metode Utama**:
+  - `get_color_palette(n_colors, palette_name, as_hex, desat)`: Dapatkan palette warna
+  - `create_color_mapping(categories, palette, as_hex)`: Buat mapping kategori ke warna
+  - `generate_gradient(start_color, end_color, steps, as_hex)`: Buat gradien warna
+  - `create_cmap(colors, name)`: Buat colormap kustom
+  - `get_color_for_value(value, vmin, vmax, cmap_name, as_hex)`: Dapatkan warna berdasarkan nilai
+  - `get_semantic_color(key, as_hex)`: Dapatkan warna semantik (success, warning, dll)
+
+### AnnotationHelper (common/visualization/helpers/annotation_helper.py)
+- **Fungsi**: Anotasi pada visualisasi
+- **Metode Utama**:
+  - `add_bar_annotations(ax, bars, horizontal, fontsize, ...)`: Tambah anotasi pada bar chart
+  - `add_stacked_bar_annotations(ax, bars, values, horizontal, ...)`: Tambah anotasi pada stacked bar
+  - `add_line_annotations(ax, x_values, y_values, labels, ...)`: Tambah anotasi pada line chart
+  - `create_legend(ax, labels, colors, title, ...)`: Buat legenda kustom
+  - `add_data_labels(ax, x_values, y_values, labels, ...)`: Tambah label data
+  - `get_pie_autopct_func(data, show_values, show_percents)`: Fungsi format untuk pie chart
+  - `add_text_box(ax, text, x, y, fontsize, ...)`: Tambah text box
+  - `add_annotated_heatmap(ax, data, text_format, threshold, ...)`: Tambah anotasi pada heatmap
+
+### ExportHelper (common/visualization/helpers/export_helper.py)
+- **Fungsi**: Export visualisasi
+- **Metode Utama**:
+  - `save_figure(fig, output_path, dpi, format, ...)`: Simpan figure
+  - `figure_to_base64(fig, format, dpi, close_fig)`: Konversi figure ke base64
+  - `save_as_html(fig, output_path, title, include_plotlyjs, ...)`: Simpan sebagai HTML
+  - `save_as_dashboard(figures, output_path, title, ...)`: Simpan multiple figures sebagai dashboard
+  - `create_output_directory(output_dir)`: Buat direktori output
+
+### LayoutHelper (common/visualization/helpers/layout_helper.py)
+- **Fungsi**: Layout untuk visualisasi
+- **Metode Utama**:
+  - `create_grid_layout(nrows, ncols, figsize, ...)`: Buat layout grid
+  - `create_subplot_mosaic(mosaic, figsize, empty_sentinel)`: Buat layout dengan subplot_mosaic
+  - `create_dashboard_layout(layout_spec, figsize, ...)`: Buat layout dashboard kustom
+  - `adjust_subplots_spacing(fig, left, right, ...)`: Sesuaikan spacing subplots
+  - `add_colorbar(fig, mappable, ax, location, ...)`: Tambahkan colorbar ke figure
+
+### StyleHelper (common/visualization/helpers/style_helper.py)
+- **Fungsi**: Styling visualisasi
+- **Metode Utama**:
+  - `set_style(style, custom_params)`: Set style untuk visualisasi
+  - `apply_style_to_figure(fig)`: Terapkan style ke figure
+  - `apply_style_to_axes(ax)`: Terapkan style ke axes
+  - `set_title_and_labels(ax, title, xlabel, ylabel)`: Set judul dan label dengan style
+  - `get_current_style_params()`: Dapatkan parameter style saat ini
+  - `register_custom_style(name, params)`: Daftarkan style kustom
+
+### Constants (constants.py)
+- **Fungsi**: Konstanta global yang digunakan di seluruh project
+- **Konstanta Utama**:
+  - `VERSION`, `APP_NAME`: Metadata aplikasi
+  - `DEFAULT_*_DIR`: Path direktori default
+  - `DRIVE_BASE_PATH`: Path Google Drive untuk Colab
+  - `DetectionLayer`: Enum untuk layer deteksi (BANKNOTE, NOMINAL, SECURITY)
+  - `ModelFormat`: Enum format model (PYTORCH, ONNX, TORCHSCRIPT, dll)
+  - `IMAGE_EXTENSIONS`, `VIDEO_EXTENSIONS`: Ekstensi file yang didukung
+  - `MODEL_EXTENSIONS`: Mapping format model ke ekstensi file
+  - `ENV_*`: Environment variables
+  - `DEFAULT_*`: Nilai default (confidence, IOU, img_size)
+  - `MAX_BATCH_SIZE`, `MAX_IMAGE_SIZE`: Batasan aplikasi
+  - `API_*`: Pengaturan API
+
+### Utils (utils.py)
+- **Fungsi**: Berbagai utilitas umum untuk SmartCash
+- **Fungsi Utama**:
+  - `is_colab()`, `is_notebook()`: Deteksi lingkungan
+  - `get_system_info()`: Dapatkan informasi sistem
+  - `generate_unique_id()`: Generate ID unik
+  - `format_time(seconds)`: Format waktu
+  - `get_timestamp()`: Dapatkan timestamp untuk nama file
+  - `ensure_dir(path)`: Pastikan direktori ada
+  - File operations: `copy_file()`, `file_exists()`, `file_size()`, `format_size()`
+  - Format operations: `load_json()`, `save_json()`, `load_yaml()`, `save_yaml()`
+  - `get_project_root()`: Dapatkan root direktori project
+
+### Interfaces (common/interfaces/)
 - **IDetectionVisualizer**: Interface untuk visualisasi deteksi
   - `visualize_detection(image, detections, filename, conf_threshold)`: Visualisasi hasil deteksi
 - **IMetricsVisualizer**: Interface untuk visualisasi metrik
@@ -53,74 +178,34 @@
   - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`
   - `load_checkpoint(path, model, optimizer, map_location)`
 
-### Utils (common/utils.py)
-- **Fungsi**: Berbagai utilitas umum untuk SmartCash
-- **Fungsi Utama**:
-  - `is_colab()`, `is_notebook()`: Deteksi lingkungan
-  - `get_system_info()`: Dapatkan informasi sistem
-  - `generate_unique_id()`: Generate ID unik
-  - `format_time(seconds)`: Format waktu
-  - `get_timestamp()`: Dapatkan timestamp untuk nama file
-  - `ensure_dir(path)`: Pastikan direktori ada
-  - File operations: `copy_file()`, `file_exists()`, dll
-  - Format operations: `load_json()`, `save_json()`, dll
-  - `get_project_root()`: Dapatkan root direktori project
+## Exceptions (exceptions.py)
+- **Fungsi**: Custom exceptions untuk SmartCash
+- **Exception Classes**:
+  - `SmartCashError`: Exception dasar
+  - `ConfigError`: Error konfigurasi
+  - `DatasetError`: Error terkait dataset
+  - `ModelError`: Error terkait model
+  - `DetectionError`: Error terkait proses deteksi
+  - `FileError`: Error file I/O
+  - `APIError`: Error API
+  - `ValidationError`: Error validasi input
+  - `NotSupportedError`: Fitur yang tidak didukung
 
-### ChartHelper (common/visualization/helpers/chart_helper.py)
-- **Fungsi**: Visualisasi berbasis chart
-- **Metode Utama**:
-  - `create_bar_chart(data, title, xlabel, ylabel)`: Buat bar chart
-  - `create_line_chart(data, title, xlabel, ylabel)`: Buat line chart
-  - `create_pie_chart(data, title, labels)`: Buat pie chart
-  - `create_scatter_plot(x, y, title, xlabel, ylabel)`: Buat scatter plot
-  - `create_heatmap(data, title, xlabel, ylabel)`: Buat heatmap
+### Types (types.py)
+- **Fungsi**: Type definitions untuk SmartCash
+- **Type Aliases**:
+  - `ImageType`: Type untuk gambar (np.ndarray, string, bytes)
+  - `PathType`: Type untuk path (string, Path)
+  - `TensorType`: Type untuk tensor (torch.Tensor, np.ndarray)
+  - `ConfigType`: Type untuk konfigurasi (Dict[str, Any])
+  - `ProgressCallback`, `LogCallback`: Type untuk callback functions
+- **Typed Dictionaries**:
+  - `BoundingBox`: Bounding box dengan format [x1, y1, x2, y2]
+  - `Detection`: Hasil deteksi objek
+  - `ModelInfo`: Informasi model
+  - `DatasetStats`: Statistik dataset
 
-### ColorHelper (common/visualization/helpers/color_helper.py)
-- **Fungsi**: Manajemen warna untuk visualisasi
-- **Metode Utama**:
-  - `get_color_palette(palette_name, n_colors)`: Dapatkan palette warna
-  - `get_categorical_colors(n_categories)`: Warna untuk kategori
-  - `get_sequential_colors(n_colors, start_color, end_color)`: Warna berurutan
-  - `get_color_for_value(value, min_val, max_val)`: Warna berdasarkan nilai
-  - `get_class_colors(class_names)`: Warna konsisten untuk kelas
-
-### AnnotationHelper (common/visualization/helpers/annotation_helper.py)
-- **Fungsi**: Anotasi pada visualisasi
-- **Metode Utama**:
-  - `add_text_annotations(ax, data, format_str)`: Tambah anotasi teks
-  - `add_arrow_annotations(ax, points, texts)`: Tambah anotasi panah
-  - `add_bbox_annotations(ax, boxes, labels)`: Tambah anotasi bbox
-  - `add_value_labels(ax, spacing, format_str)`: Tambah label nilai
-  - `add_statistical_annotations(ax, data, test, loc)`: Tambah anotasi statistik
-
-### ExportHelper (common/visualization/helpers/export_helper.py)
-- **Fungsi**: Export visualisasi
-- **Metode Utama**:
-  - `save_figure(fig, output_path, dpi)`: Simpan figure
-  - `save_interactive_plot(fig, output_path)`: Simpan plot interaktif
-  - `export_to_html(fig, output_path)`: Export ke HTML
-  - `export_to_notebook(fig)`: Export ke notebook
-  - `create_report_from_figures(figures, output_path)`: Buat laporan
-
-### LayoutHelper (common/visualization/helpers/layout_helper.py)
-- **Fungsi**: Layout untuk visualisasi
-- **Metode Utama**:
-  - `create_grid_layout(nrows, ncols, figsize)`: Buat layout grid
-  - `create_dashboard_layout(areas, figsize)`: Buat layout dashboard
-  - `adjust_subplots(fig, wspace, hspace)`: Atur spacing subplot
-  - `add_suptitle(fig, title, fontsize)`: Tambah judul utama
-  - `create_nested_layout(fig, areas)`: Buat layout bersarang
-
-### StyleHelper (common/visualization/helpers/style_helper.py)
-- **Fungsi**: Styling visualisasi
-- **Metode Utama**:
-  - `set_plot_style(style_name)`: Set style plot
-  - `apply_custom_theme(fig, theme_name)`: Terapkan tema kustom
-  - `set_fonts(font_family, title_size, label_size)`: Set font
-  - `set_grid_style(ax, grid_style)`: Set style grid
-  - `set_legend_style(ax, loc, frameon)`: Set style legend
-
-## Domain Components
+## DOMAIN COMPONENTS
 
 ### EventDispatcher (event_dispatcher_observer.py)
 
@@ -271,12 +356,19 @@
   - `get_raw_stats()`: Dapatkan raw stats
   - `get_all_stats(cache_dir, cache_index, max_size_bytes)`: Hitung dan validasi semua statistik
 
-## Domain Dataset
+## DOMAIN DATASET
+# Pemetaan Lengkap Domain Dataset SmartCash
 
-### DatasetManager (manager.py)
+## DatasetManager (manager.py)
 - **Fungsi**: Koordinator alur kerja dataset
 - **Metode Utama**:
+  - `__init__(config, logger)`: Inisialisasi dataset manager
   - `get_service(service_name)`: Lazy-initialization service dataset
+  - `_get_preprocessor()`: Dapatkan preprocessor dataset dengan lazy initialization
+  - `_get_preprocessed_loader()`: Dapatkan loader untuk dataset preprocessed
+  - `preprocess_dataset(split, force_reprocess)`: Preprocess dataset dan simpan hasil
+  - `clean_preprocessed(split)`: Bersihkan hasil preprocessing
+  - `get_preprocessed_stats()`: Dapatkan statistik hasil preprocessing
   - `get_dataset(split, **kwargs)`: Dapatkan dataset untuk split tertentu
   - `get_dataloader(split, **kwargs)`: Dapatkan dataloader untuk split
   - `get_all_dataloaders(**kwargs)`: Dapatkan semua dataloader
@@ -284,17 +376,66 @@
   - `fix_dataset(split, **kwargs)`: Perbaiki masalah dataset
   - `augment_dataset(**kwargs)`: Augmentasi dataset
   - `download_from_roboflow(**kwargs)`: Download dataset dari Roboflow
-  - `upload_local_dataset(zip_path, **kwargs)`: Upload dataset lokal
   - `explore_class_distribution(split)`: Analisis distribusi kelas
   - `explore_layer_distribution(split)`: Analisis distribusi layer
   - `explore_bbox_statistics(split)`: Analisis statistik bbox
   - `balance_dataset(split, **kwargs)`: Seimbangkan dataset
   - `generate_dataset_report(splits, **kwargs)`: Buat laporan dataset
   - `visualize_class_distribution(class_stats, **kwargs)`: Visualisasi distribusi kelas
-  - `visualize_sample_images(data_dir, **kwargs)`: Visualisasi sampel gambar
-  - `create_dataset_dashboard(report, **kwargs)`: Buat dashboard visualisasi
+  - `create_dataset_dashboard(report, save_path)`: Buat dashboard visualisasi dataset
   - `get_split_statistics()`: Dapatkan statistik dasar split
-  - `split_dataset(**kwargs)`: Pecah dataset menjadi train/valid/test
+  - `split_dataset(**kwargs)`: Pecah dataset menjadi train/val/test
+
+## Dataset Services - Preprocessor
+
+### DatasetPreprocessor (services/preprocessor/dataset_preprocessor.py)
+- **Fungsi**: Layanan preprocessing dataset dan penyimpanan hasil untuk penggunaan berikutnya
+- **Metode Utama**:
+  - `__init__(config, logger)`: Inisialisasi preprocessor
+  - `preprocess_dataset(split, force_reprocess, show_progress)`: Preprocess dataset dan simpan
+  - `_preprocess_single_image(img_path, labels_dir, target_images_dir, target_labels_dir)`: Preprocess satu gambar
+  - `clean_preprocessed(split)`: Bersihkan hasil preprocessing 
+  - `get_preprocessed_stats()`: Dapatkan statistik hasil preprocessing
+  - `is_preprocessed(split)`: Cek apakah split sudah dipreprocess
+
+### PreprocessingPipeline (services/preprocessor/pipeline.py)
+- **Fungsi**: Pipeline transformasi yang dapat dikonfigurasi untuk preprocessing
+- **Metode Utama**:
+  - `__init__(config, logger)`: Inisialisasi pipeline preprocessing
+  - `setup_pipeline()`: Setup urutan transformasi
+  - `process(image)`: Proses gambar melalui pipeline
+  - `bgr_to_rgb(image)`: Konversi BGR ke RGB
+  - `apply_letterbox(image)`: Resize dengan letterbox
+  - `resize_direct(image)`: Resize langsung
+  - `normalize(image)`: Normalisasi gambar
+  - `create_training_pipeline(img_size)`: Factory pipeline training
+  - `create_inference_pipeline(img_size)`: Factory pipeline inferensi
+
+### PreprocessedStorage (services/preprocessor/storage.py)
+- **Fungsi**: Pengelola penyimpanan hasil preprocessing dataset
+- **Metode Utama**:
+  - `__init__(base_dir, logger)`: Inisialisasi storage
+  - `_load_metadata()`: Load metadata dari file
+  - `_save_metadata()`: Simpan metadata ke file
+  - `get_split_path(split)`: Dapatkan path untuk split
+  - `get_split_metadata(split)`: Dapatkan metadata split
+  - `update_split_metadata(split, metadata)`: Update metadata split
+  - `save_preprocessed_image(split, image_id, image_data, metadata)`: Simpan gambar preprocessed
+  - `load_preprocessed_image(split, image_id, with_metadata)`: Load gambar preprocessed
+  - `copy_label_file(source_path, split, label_id)`: Salin file label
+  - `list_preprocessed_images(split)`: Daftar gambar preprocessed
+  - `get_stats(split)`: Dapatkan statistik storage
+  - `update_stats(split, stats)`: Update statistik
+  - `clean_storage(split)`: Bersihkan storage
+
+### PreprocessedCleaner (services/preprocessor/cleaner.py)
+- **Fungsi**: Pembersih cache dataset preprocessed
+- **Metode Utama**:
+  - `__init__(preprocessed_dir, max_age_days, logger)`: Inisialisasi cleaner
+  - `clean_expired()`: Bersihkan data kadaluarsa
+  - `clean_all()`: Bersihkan semua data
+  - `clean_split(split)`: Bersihkan data untuk split
+  - `_get_directory_size(directory)`: Hitung ukuran direktori
 
 ## Dataset Services - Loader
 
@@ -313,6 +454,17 @@
   - `get_dataset_stats(split)`: Dapatkan statistik dataset
   - `clear_cache()`: Bersihkan cache dataset
   - `_get_split_path(split)`: Dapatkan path split
+
+### PreprocessedDatasetLoader (services/loader/preprocessed_dataset_loader.py)
+- **Fungsi**: Loader untuk dataset yang sudah dipreprocessing
+- **Metode Utama**:
+  - `__init__(preprocessed_dir, fallback_to_raw, auto_preprocess, config, logger)`: Inisialisasi loader
+  - `get_dataset(split, require_all_layers, transform)`: Dapatkan dataset
+  - `get_dataloader(split, batch_size, num_workers, shuffle, require_all_layers, transform)`: Dapatkan dataloader
+  - `get_all_dataloaders(batch_size, num_workers, require_all_layers, transform)`: Dapatkan semua dataloader
+  - `ensure_preprocessed(splits, force_reprocess)`: Pastikan dataset sudah dipreprocessing
+  - `_is_split_available(split)`: Cek ketersediaan split
+  - `_get_raw_dataset(split, require_all_layers, transform)`: Gunakan dataset raw
 
 ### BatchGenerator (services/loader/batch_generator.py)
 - **Fungsi**: Generator batch optimasi dengan prefetching
@@ -400,45 +552,6 @@
   - `create_light_augmentation_pipeline(img_size)`: Buat pipeline augmentasi ringan
   - `create_heavy_augmentation_pipeline(img_size)`: Buat pipeline augmentasi berat
 
-## Dataset Services - Balancer
-
-### BalanceService (services/balancer/balance_service.py)
-- **Fungsi**: Menyeimbangkan dataset
-- **Metode Utama**:
-  - `balance_by_undersampling(split, strategy, target_count)`: Undersampling dataset
-  - `balance_by_oversampling(split, target_count, augmentation_types)`: Oversampling dataset
-  - `calculate_weights(split)`: Hitung bobot sampling untuk weighted dataset
-  - `_analyze_class_distribution(images_dir, labels_dir)`: Analisis distribusi kelas
-  - `_copy_file_pair(img_path, label_path, output_dir)`: Salin pasangan file
-
-### Oversampler (services/balancer/oversampler.py)
-- **Fungsi**: Metode oversampling dataset
-- **Metode Utama**:
-  - `oversample(data, labels, strategy, target_count)`: Lakukan oversampling
-  - `_generate_by_strategy(data, indices, strategy, n_samples)`: Generate sampel
-  - `_duplicate_samples(data, indices, n_samples)`: Duplikasi sampel
-  - `_smote_samples(data, indices, n_samples)`: Generate dengan SMOTE
-  - `_adasyn_samples(data, indices, n_samples)`: Generate dengan ADASYN
-  - `_augmentation_samples(data, indices, n_samples, pipeline)`: Generate dengan augmentasi
-
-### Undersampler (services/balancer/undersampler.py)
-- **Fungsi**: Metode undersampling dataset
-- **Metode Utama**:
-  - `undersample(data, labels, strategy, target_count)`: Lakukan undersampling
-  - `_select_by_strategy(data, indices, strategy, target_count)`: Pilih sampel
-  - `_cluster_undersampling(data, indices, target_count)`: Cluster undersampling
-  - `_neighbour_undersampling(data, indices, target_count)`: Nearest neighbour
-  - `_tomek_undersampling(data, indices, target_count)`: Tomek links
-
-### WeightCalculator (services/balancer/weight_calculator.py)
-- **Fungsi**: Hitung bobot sampling
-- **Metode Utama**:
-  - `calculate_class_weights(class_counts, strategy, beta)`: Hitung bobot kelas
-  - `calculate_sample_weights(targets, class_weights)`: Hitung bobot sampel
-  - `get_balanced_sampler_weights(dataset, strategy)`: Bobot untuk weighted sampler
-  - `calculate_focal_loss_weights(class_counts, gamma, alpha)`: Bobot focal loss
-  - `get_label_smoothing_factor(class_counts)`: Faktor label smoothing
-
 ## Dataset Services - Explorer
 
 ### ExplorerService (services/explorer/explorer_service.py)
@@ -485,28 +598,74 @@
 - **Metode Utama**:
   - `analyze_distribution(split, sample_size)`: Analisis distribusi layer
 
+## Dataset Services - Balancer
+
+### BalanceService (services/balancer/balance_service.py)
+- **Fungsi**: Menyeimbangkan dataset
+- **Metode Utama**:
+  - `balance_by_undersampling(split, strategy, target_count)`: Undersampling dataset
+  - `balance_by_oversampling(split, target_count, augmentation_types)`: Oversampling dataset
+  - `calculate_weights(split)`: Hitung bobot sampling untuk weighted dataset
+  - `_analyze_class_distribution(images_dir, labels_dir)`: Analisis distribusi kelas
+  - `_copy_file_pair(img_path, label_path, output_dir)`: Salin pasangan file
+
+### Oversampler (services/balancer/oversampler.py)
+- **Fungsi**: Metode oversampling dataset
+- **Metode Utama**:
+  - `oversample(data, labels, strategy, target_count)`: Lakukan oversampling
+  - `_generate_by_strategy(data, indices, strategy, n_samples)`: Generate sampel
+  - `_duplicate_samples(data, indices, n_samples)`: Duplikasi sampel
+  - `_smote_samples(data, indices, n_samples)`: Generate dengan SMOTE
+  - `_adasyn_samples(data, indices, n_samples)`: Generate dengan ADASYN
+  - `_augmentation_samples(data, indices, n_samples, pipeline)`: Generate dengan augmentasi
+
+### Undersampler (services/balancer/undersampler.py)
+- **Fungsi**: Metode undersampling dataset
+- **Metode Utama**:
+  - `undersample(data, labels, strategy, target_count)`: Lakukan undersampling
+  - `_select_by_strategy(data, indices, strategy, target_count)`: Pilih sampel
+  - `_cluster_undersampling(data, indices, target_count)`: Cluster undersampling
+  - `_neighbour_undersampling(data, indices, target_count)`: Nearest neighbour
+  - `_tomek_undersampling(data, indices, target_count)`: Tomek links
+
+### WeightCalculator (services/balancer/weight_calculator.py)
+- **Fungsi**: Hitung bobot sampling
+- **Metode Utama**:
+  - `calculate_class_weights(class_counts, strategy, beta)`: Hitung bobot kelas
+  - `calculate_sample_weights(targets, class_weights)`: Hitung bobot sampel
+  - `get_balanced_sampler_weights(dataset, strategy)`: Bobot untuk weighted sampler
+  - `calculate_focal_loss_weights(class_counts, gamma, alpha)`: Bobot focal loss
+  - `get_label_smoothing_factor(class_counts)`: Faktor label smoothing
+
+## Dataset Services - Reporter
+
+### ReportService (services/reporter/report_service.py)
+- **Fungsi**: Layanan untuk membuat laporan dataset
+- **Metode Utama**:
+  - `generate_dataset_report(splits, visualize, calculate_metrics)`: Buat laporan
+  - `_analyze_splits_parallel(splits)`: Analisis semua split secara paralel
+  - `_analyze_split(split)`: Analisis satu split dataset
+  - `_compile_metrics(report)`: Kompilasi metrik dari hasil analisis
+  - `_generate_visualizations(report, sample_count)`: Generate visualisasi
+  - `_calculate_quality_score(report)`: Hitung skor kualitas dataset
+  - `_generate_recommendations(report)`: Generate rekomendasi
+  - `export_report(report, formats)`: Ekspor laporan dalam berbagai format
+  - `generate_comparison_report(reports, labels)`: Laporan perbandingan dataset
+
 ## Dataset Components
+
+### PreprocessedMultilayerDataset (services/loader/preprocessed_dataset_loader.py)
+- **Fungsi**: Dataset untuk data yang sudah dipreprocessing dengan dukungan multilayer
+- **Metode Utama**:
+  - `__init__(root_dir, img_size, require_all_layers, transform, logger)`: Inisialisasi dataset
+  - `__len__()`: Dapatkan jumlah item
+  - `__getitem__(idx)`: Dapatkan satu item
 
 ### MultilayerDataset (components/datasets/multilayer_dataset.py)
 - **Fungsi**: Dataset multilayer untuk deteksi
 - **Metode Utama**:
   - `__getitem__(idx)`: Ambil item dataset
   - `get_layer_annotation(img_id, layer)`: Anotasi per layer
-
-### DatasetUtils (utils/dataset_utils.py)
-- **Fungsi**: Utilitas untuk operasi dataset
-- **Metode Utama**:
-  - `get_split_path(split)`: Dapatkan path untuk split dataset
-  - `get_class_name(cls_id)`: Dapatkan nama kelas dari ID
-  - `get_layer_from_class(cls_id)`: Dapatkan layer dari class ID
-  - `find_image_files(directory, with_labels)`: Cari file gambar
-  - `get_random_sample(items, sample_size, seed)`: Ambil sampel acak
-  - `load_image(image_path, target_size)`: Baca gambar dari file
-  - `parse_yolo_label(label_path)`: Parse file label YOLO
-  - `get_available_layers(label_path)`: Dapatkan layer dalam label
-  - `get_split_statistics(splits)`: Dapatkan statistik split
-  - `backup_directory(source_dir, suffix)`: Buat backup direktori
-  - `move_invalid_files(source_dir, target_dir, file_list)`: Pindahkan file invalid
 
 ## Dataset Utils - Transformasi
 
@@ -562,7 +721,7 @@
 ## Dataset Utils - Split
 
 ### DatasetSplitter (utils/split/dataset_splitter.py)
-- **Fungsi**: Memecah dataset menjadi train/valid/test
+- **Fungsi**: Memecah dataset menjadi train/val/test
 - **Metode Utama**:
   - `split_dataset(train_ratio, val_ratio, test_ratio)`: Pecah dataset
   - `_detect_data_structure(directory)`: Deteksi struktur dataset
@@ -585,7 +744,7 @@
   - `_group_files_by_class(files)`: Kelompokkan file berdasarkan kelas
   - `_group_files_by_layer(files)`: Kelompokkan file berdasarkan layer
 
-## Dataset Utils - Statistik dan Laporan
+## Dataset Utils - Statistik dan File
 
 ### ClassStatistics (utils/statistics/class_stats.py)
 - **Fungsi**: Analisis statistik distribusi kelas
@@ -600,8 +759,6 @@
   - `analyze_image_sizes(split, sample_size)`: Analisis ukuran gambar
   - `analyze_image_quality(split, sample_size)`: Analisis kualitas gambar
   - `find_problematic_images(split, threshold)`: Temukan gambar bermasalah
-  - `_analyze_images(image_files)`: Analisis ukuran gambar
-  - `_analyze_image_quality(image_files)`: Analisis kualitas gambar
 
 ### DistributionAnalyzer (utils/statistics/distribution_analyzer.py)
 - **Fungsi**: Analisis distribusi statistik dataset
@@ -609,7 +766,6 @@
   - `analyze_dataset(splits, sample_size)`: Analisis komprehensif dataset
   - `_analyze_cross_split_consistency(results)`: Analisis konsistensi antar split
   - `_generate_suggestions(results)`: Buat rekomendasi dari hasil analisis
-  - `_log_summary(results)`: Log ringkasan hasil analisis
 
 ### FileProcessor (utils/file/file_processor.py)
 - **Fungsi**: Pemrosesan file dan direktori
@@ -618,8 +774,6 @@
   - `copy_files(source_dir, target_dir, file_list)`: Salin file
   - `move_files(source_dir, target_dir, file_list)`: Pindahkan file
   - `extract_zip(zip_path, output_dir, include_patterns)`: Ekstrak zip
-  - `merge_splits(source_dir, target_dir, splits)`: Gabung split
-  - `find_corrupted_images(directory, recursive)`: Temukan gambar rusak
 
 ### ImageProcessor (utils/file/image_processor.py)
 - **Fungsi**: Pemrosesan dan manipulasi gambar
@@ -627,7 +781,6 @@
   - `resize_images(directory, target_size, output_dir)`: Resize gambar
   - `enhance_images(directory, output_dir, enhance_contrast)`: Tingkatkan kualitas
   - `convert_format(directory, target_format, output_dir)`: Konversi format
-  - `create_thumbnails(directory, thumbnail_size, output_dir)`: Buat thumbnail
 
 ### LabelProcessor (utils/file/label_processor.py)
 - **Fungsi**: Pemrosesan dan manipulasi file label
@@ -635,7 +788,6 @@
   - `fix_labels(directory, fix_coordinates, fix_class_ids)`: Perbaiki label
   - `filter_classes(directory, keep_classes, remove_classes)`: Filter kelas
   - `extract_layer(directory, layer_name, output_dir)`: Ekstrak satu layer
-  - `convert_to_coco(dataset_dir, output_file, split)`: Konversi ke COCO
 
 ## Dataset Utils - Progress Tracking
 
@@ -698,7 +850,7 @@
   - `export_report(report, formats)`: Ekspor laporan dalam berbagai format
   - `generate_comparison_report(reports, labels)`: Laporan perbandingan dataset
 
-## Domain Detection (Diperbarui)
+## DOMAIN DETECTION
 
 ### Detector (detector.py)
 - **Fungsi**: Koordinator utama proses deteksi
@@ -741,240 +893,271 @@
   - `get_optimizer(learning_rate, weight_decay)`: Buat optimizer
   - `compute_loss(predictions, targets, loss_fn)`: Hitung loss
 
-## Domain Model (Diperbarui)
+## DOMAIN MODEL
 
-### ModelManager (manager.py)
+## ModelManager (manager.py)
 - **Fungsi**: Koordinator alur kerja model
 - **Metode Utama**:
-  - `create_model(model_type, **kwargs)`: Factory untuk membuat model
+  - `__init__(config, model_type, logger)`: Inisialisasi Model Manager
+  - `_validate_config()`: Validasi konfigurasi model
   - `build_model()`: Buat dan inisialisasi model
-  - `update_config(config_updates)`: Update konfigurasi model
+  - `_build_backbone()`: Buat backbone berdasarkan konfigurasi
+  - `_build_neck()`: Buat neck berdasarkan konfigurasi
+  - `_build_head()`: Buat detection head berdasarkan konfigurasi
+  - `_build_loss_function()`: Buat loss function berdasarkan konfigurasi
+  - `create_model(model_type, **kwargs)`: Factory method untuk membuat model berdasarkan tipe
   - `get_config()`: Dapatkan konfigurasi model
+  - `update_config(config_updates)`: Update konfigurasi model
+  - `set_checkpoint_service(service)`: Set checkpoint service untuk model manager
+  - `set_training_service(service)`: Set training service untuk model manager
+  - `set_evaluation_service(service)`: Set evaluation service untuk model manager
+  - `save_model(path)`: Simpan model ke file
+  - `load_model(path)`: Load model dari file
+  - `train(*args, **kwargs)`: Latih model
+  - `evaluate(*args, **kwargs)`: Evaluasi model
+  - `predict(image, conf_threshold, iou_threshold)`: Lakukan prediksi pada gambar
 
-### ModelCheckpointManager (manager_checkpoint.py)
+## ModelCheckpointManager (manager_checkpoint.py)
 - **Fungsi**: Integrasi checkpoint service dengan model manager
 - **Metode Utama**:
-  - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`: Simpan checkpoint
-  - `load_checkpoint(path, model, optimizer, map_location)`: Load checkpoint
-  - `export_to_onnx(output_path, input_shape, opset_version)`: Export ke ONNX
+  - `__init__(model_manager, checkpoint_dir, max_checkpoints, logger)`: Inisialisasi ModelCheckpointManager
+  - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`: Simpan checkpoint model
+  - `load_checkpoint(path, model, optimizer, map_location)`: Load checkpoint ke model
+  - `get_best_checkpoint()`: Dapatkan path ke checkpoint terbaik
+  - `get_latest_checkpoint()`: Dapatkan path ke checkpoint terbaru
+  - `list_checkpoints(sort_by)`: Daftar semua checkpoint yang tersedia
+  - `export_to_onnx(output_path, input_shape, opset_version, dynamic_axes)`: Export model ke ONNX
 
-### VisualizationHelper (visualization/base_visualizer.py)
-- **Fungsi**: Utilitas dasar untuk visualisasi
+## Visualisasi
+
+### ModelVisualizationBase (visualization/base_visualizer.py)
+- **Fungsi**: Kelas dasar untuk visualisasi model
 - **Metode Utama**:
+  - `__init__(output_dir, logger)`: Inisialisasi visualizer
   - `set_plot_style(style)`: Set style untuk matplotlib plots
-  - `save_figure(fig, filepath, dpi)`: Simpan figure matplotlib
+  - `save_figure(fig, filepath, dpi, bbox_inches)`: Simpan figure matplotlib
   - `create_output_directory(output_dir)`: Buat direktori output
-
-### DetectionVisualizer (visualization/detection_visualizer.py)
-- **Fungsi**: Visualisasi hasil deteksi objek
-- **Metode Utama**:
-  - `visualize_detection(image, detections, filename, conf_threshold)`: Visualisasi deteksi pada gambar
-  - `visualize_detections_grid(images, detections_list, title, filename)`: Visualisasi batch deteksi dalam grid
-  - `calculate_denomination_total(detections)`: Hitung total nilai mata uang dari deteksi
 
 ### MetricsVisualizer (visualization/metrics_visualizer.py)
 - **Fungsi**: Visualisasi metrik evaluasi model
 - **Metode Utama**:
-  - `plot_confusion_matrix(cm, class_names, title, filename)`: Plot confusion matrix
-  - `plot_training_metrics(metrics, title, filename)`: Plot metrik training
-  - `plot_model_comparison(comparison_data, metric_cols, title)`: Plot perbandingan metrik model
-  - `plot_research_comparison(results_df, metric_cols, title)`: Plot perbandingan hasil skenario penelitian
+  - `__init__(output_dir, logger)`: Inisialisasi metrics visualizer
+  - `plot_confusion_matrix(cm, class_names, title, filename, normalize, figsize, cmap)`: Plot confusion matrix
+  - `plot_training_metrics(metrics, title, filename, figsize, include_lr)`: Plot metrik training
+  - `plot_accuracy_metrics(metrics, title, filename, figsize)`: Plot metrik akurasi
+  - `plot_model_comparison(comparison_data, metric_cols, title, filename, figsize)`: Plot perbandingan metrik model
+  - `plot_research_comparison(results_df, metric_cols, title, filename, figsize)`: Plot perbandingan hasil skenario
+
+### DetectionVisualizer (visualization/detection_visualizer.py)
+- **Fungsi**: Visualisasi hasil deteksi objek
+- **Metode Utama**:
+  - `__init__(output_dir, class_colors, logger)`: Inisialisasi visualizer deteksi
+  - `visualize_detection(image, detections, filename, conf_threshold, show_labels, show_conf, show_total, show_value)`: Visualisasikan deteksi pada gambar
+  - `visualize_detections_grid(images, detections_list, title, filename, grid_size, conf_threshold)`: Visualisasikan multiple deteksi dalam grid
+  - `calculate_denomination_total(detections)`: Hitung total nilai mata uang dari deteksi
+  - `_create_grid(images, grid_size, title)`: Buat grid dari gambar
 
 ### EvaluationVisualizer (visualization/evaluation_visualizer.py)
 - **Fungsi**: Visualisasi hasil evaluasi model
 - **Metode Utama**:
-  - `create_all_plots(metrics_data, prefix)`: Buat semua visualisasi yang tersedia
-  - `plot_map_f1_comparison(metrics_df, prefix)`: Plot perbandingan mAP dan F1
-  - `plot_inference_time(metrics_df, prefix)`: Plot perbandingan waktu inferensi
-  - `plot_backbone_comparison(metrics_df, prefix)`: Plot perbandingan backbone
-  - `plot_condition_comparison(metrics_df, prefix)`: Plot perbandingan kondisi pengujian
-  - `plot_combined_heatmap(metrics_df, prefix)`: Plot heatmap kombinasi
+  - `__init__(config, output_dir, logger)`: Inisialisasi visualizer evaluasi
+  - `create_all_plots(metrics_data, prefix, **kwargs)`: Buat semua visualisasi yang tersedia
+  - `plot_confusion_matrix(cm, class_names, title, filename, normalize, **kwargs)`: Plot confusion matrix
+  - `plot_map_f1_comparison(metrics_df, prefix, **kwargs)`: Plot perbandingan mAP dan F1
+  - `plot_inference_time(metrics_df, prefix, **kwargs)`: Plot perbandingan waktu inferensi
+  - `plot_backbone_comparison(metrics_df, prefix, **kwargs)`: Plot perbandingan backbone
+  - `plot_condition_comparison(metrics_df, prefix, **kwargs)`: Plot perbandingan kondisi pengujian
+  - `plot_combined_heatmap(metrics_df, prefix, **kwargs)`: Plot heatmap kombinasi
+  - `visualize_predictions(samples, conf_thres, title, filename, max_samples, save_path)`: Visualisasi hasil prediksi model
+  - `plot_metrics_history(metrics_history, title, figsize, save_path)`: Visualisasi history metrik training/validasi
 
-### ExperimentVisualizer (visualization/experiment_visualizer.py)
+### BaseResearchVisualizer (visualization/research/base_research_visualizer.py)
+- **Fungsi**: Kelas dasar untuk visualisasi hasil penelitian
+- **Metode Utama**:
+  - `__init__(output_dir, logger)`: Inisialisasi base visualizer penelitian
+  - `_create_styled_dataframe(df)`: Buat DataFrame dengan styling untuk highlight nilai terbaik
+  - `_add_tradeoff_regions(ax)`: Tambahkan regions untuk visualisasi trade-off
+  - `save_visualization(fig, filename)`: Simpan visualisasi ke file
+
+### ExperimentVisualizer (visualization/research/experiment_visualizer.py)
 - **Fungsi**: Visualisasi hasil eksperimen model
 - **Metode Utama**:
-  - `visualize_backbone_comparison(results, metrics, title)`: Visualisasi perbandingan antar backbone
-  - `visualize_training_curves(metrics_history, title)`: Visualisasi kurva training dan validasi
-  - `visualize_parameter_comparison(results, parameter_name, metrics)`: Visualisasi perbandingan hasil dengan parameter berbeda
+  - `__init__(output_dir, logger)`: Inisialisasi experiment visualizer
+  - `visualize_experiment_comparison(results_df, title, filename, highlight_best, figsize)`: Visualisasi perbandingan hasil eksperimen
+  - `_create_backbone_based_plots(axes, results_df, metric_cols, time_col)`: Buat plot berdasarkan backbone
+  - `_create_general_plots(axes, results_df, metric_cols, time_col)`: Buat plot umum
 
-### ScenarioVisualizer (visualization/scenario_visualizer.py)
-- **Fungsi**: Visualisasi dan analisis hasil skenario penelitian
+### ScenarioVisualizer (visualization/research/scenario_visualizer.py)
+- **Fungsi**: Visualisasi hasil skenario penelitian
 - **Metode Utama**:
-  - `visualize_scenario_comparison(results_df, title, filename)`: Visualisasi perbandingan berbagai skenario penelitian
+  - `__init__(output_dir, logger)`: Inisialisasi scenario visualizer
+  - `visualize_scenario_comparison(results_df, title, filename, figsize)`: Visualisasi perbandingan skenario penelitian
+  - `_filter_successful_scenarios(df)`: Filter skenario yang sukses
+  - `_add_scenario_column(df)`: Tambahkan kolom Skenario
+  - `_identify_columns(df)`: Identifikasi kolom-kolom penting
   - `_create_accuracy_plot(ax, df, metric_cols, backbone_col)`: Buat plot akurasi per skenario
   - `_create_inference_time_plot(ax, df, time_col, backbone_col)`: Buat plot waktu inferensi
+  - `_create_backbone_comparison_plot(ax, df, metric_cols, backbone_col)`: Buat plot perbandingan backbone
+  - `_create_condition_comparison_plot(ax, df, metric_cols, condition_col)`: Buat plot perbandingan kondisi
 
-### ResearchVisualizer (visualization/research_visualizer.py)
+### ResearchVisualizer (visualization/research/research_visualizer.py)
 - **Fungsi**: Visualisasi dan analisis hasil penelitian
 - **Metode Utama**:
-  - `visualize_experiment_comparison(results_df, title, filename)`: Visualisasi perbandingan berbagai eksperimen
-  - `visualize_scenario_comparison(results_df, title, filename)`: Visualisasi perbandingan berbagai skenario penelitian
+  - `__init__(output_dir, logger)`: Inisialisasi research visualizer
+  - `visualize_experiment_comparison(results_df, title, filename, highlight_best, figsize)`: Visualisasi perbandingan eksperimen
+  - `visualize_scenario_comparison(results_df, title, filename, figsize)`: Visualisasi perbandingan skenario
+
+## Services
 
 ### CheckpointService (services/checkpoint/checkpoint_service.py)
 - **Fungsi**: Layanan untuk mengelola checkpoint model
 - **Metode Utama**:
+  - `__init__(checkpoint_dir, max_checkpoints, logger)`: Inisialisasi Checkpoint Service
   - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`: Simpan checkpoint
   - `load_checkpoint(path, model, optimizer, map_location)`: Load checkpoint
+  - `get_latest_checkpoint()`: Dapatkan path ke checkpoint terbaru
+  - `get_best_checkpoint()`: Dapatkan path ke checkpoint terbaik
   - `list_checkpoints(sort_by)`: Daftar checkpoint yang tersedia
-  - `get_best_checkpoint()`: Dapatkan checkpoint terbaik
+  - `export_to_onnx(model, output_path, input_shape, opset_version, dynamic_axes)`: Export ke ONNX
+  - `add_metadata(checkpoint_path, metadata)`: Tambahkan metadata ke checkpoint
+  - `_cleanup_old_checkpoints()`: Hapus checkpoint lama
 
 ### TrainingService (services/training/core_training_service.py)
 - **Fungsi**: Layanan pelatihan model
 - **Metode Utama**:
-  - `train(train_loader, val_loader, epochs, callbacks)`: Training model
+  - `__init__(model, config, device, logger, experiment_name)`: Inisialisasi training service
+  - `_setup_components()`: Setup komponen training
+  - `_setup_experiment_tracker()`: Setup experiment tracker
+  - `train(train_loader, val_loader, callbacks)`: Training model
   - `_train_epoch(train_loader)`: Proses training untuk satu epoch
   - `_validate_epoch(val_loader)`: Proses validasi untuk satu epoch
+  - `_compute_loss(outputs, targets)`: Hitung loss untuk prediksi dan target
+  - `_compute_metrics(outputs, targets)`: Hitung metrics selain loss
+  - `_save_checkpoint(checkpoint_name)`: Simpan checkpoint model
   - `resume_from_checkpoint(checkpoint_path)`: Lanjutkan training dari checkpoint
 
 ### OptimizerFactory (services/training/optimizer_training_service.py)
 - **Fungsi**: Factory untuk membuat optimizer
 - **Metode Utama**:
   - `create(optimizer_type, model_params, **kwargs)`: Buat optimizer
-  - `create_optimizer_with_layer_lr(model, base_lr, backbone_lr_factor)`: Optimizer dengan LR berbeda
+  - `create_optimizer_with_layer_lr(model, base_lr, backbone_lr_factor, optimizer_type, **kwargs)`: Buat optimizer dengan LR berbeda per layer
 
 ### SchedulerFactory (services/training/scheduler_training_service.py)
 - **Fungsi**: Factory untuk membuat scheduler
 - **Metode Utama**:
   - `create(scheduler_type, optimizer, **kwargs)`: Buat scheduler
-  - `create_one_cycle_scheduler(optimizer, max_lr, total_steps)`: One Cycle LR scheduler
+  - `create_one_cycle_scheduler(optimizer, max_lr, total_steps, pct_start, **kwargs)`: Buat One Cycle LR scheduler
+
+### TrainingCallbacks (services/training/callbacks_training_service.py)
+- **Fungsi**: Kelas utilitas untuk callback
+- **Metode Utama**:
+  - `__init__(logger)`: Inisialisasi kumpulan callbacks
+  - `add_callback(callback)`: Tambahkan callback ke daftar
+  - `execute(metrics)`: Jalankan semua callbacks
+  - `create_checkpoint_callback(save_dir, model, prefix, every_n_epochs, save_best_only, monitor, mode, logger)`: Callback untuk checkpoint
+  - `create_progress_callback(log_every_n_steps, logger)`: Callback untuk progress
+  - `create_tensorboard_callback(log_dir, comment)`: Callback untuk logging ke TensorBoard
+  - `create_reduceLR_callback(scheduler, monitor, mode, patience, factor, min_lr, verbose, logger)`: Callback untuk mengurangi learning rate
 
 ### EarlyStoppingHandler (services/training/early_stopping_training_service.py)
 - **Fungsi**: Handler untuk early stopping
 - **Metode Utama**:
-  - `__call__(metrics)`: Cek apakah training harus dihentikan
+  - `__init__(patience, min_delta, monitor, mode, logger)`: Inisialisasi early stopping handler
+  - `__call__(metrics)`: Periksa apakah training harus dihentikan
   - `_handle_improvement(current_value)`: Handle kasus ada peningkatan
   - `_handle_no_improvement(current_value)`: Handle kasus tidak ada peningkatan
-
-### TrainingCallbacks (services/training/callbacks_training_service.py)
-- **Fungsi**: Kelas utilitas untuk mengelola callback
-- **Metode Utama**:
-  - `add_callback(callback)`: Tambahkan callback ke daftar
-  - `execute(metrics)`: Jalankan semua callbacks
-  - `create_checkpoint_callback(save_dir, model, prefix)`: Callback untuk checkpoint
-  - `create_progress_callback(log_every_n_steps)`: Callback untuk progress
+  - `reset()`: Reset state early stopping
 
 ### CosineDecayWithWarmup (services/training/warmup_scheduler_training_service.py)
-- **Fungsi**: Scheduler dengan fase warmup
+- **Fungsi**: Cosine learning rate decay dengan warmup phase
 - **Metode Utama**:
+  - `__init__(optimizer, warmup_epochs, max_epochs, min_lr_factor, last_epoch)`: Inisialisasi scheduler
   - `get_lr()`: Update learning rate berdasarkan schedule
 
 ### ExperimentTracker (services/training/experiment_tracker_training_service.py)
 - **Fungsi**: Tracking dan visualisasi eksperimen
 - **Metode Utama**:
+  - `__init__(experiment_name, output_dir, logger)`: Inisialisasi experiment tracker
   - `start_experiment(config)`: Mulai eksperimen baru
-  - `log_metrics(epoch, train_loss, val_loss, lr)`: Catat metrik
+  - `log_metrics(epoch, train_loss, val_loss, lr, additional_metrics)`: Catat metrik
   - `end_experiment(final_metrics)`: Akhiri eksperimen
+  - `save_metrics()`: Simpan metrik saat ini ke file
+  - `load_metrics()`: Muat metrik dari file
+  - `plot_metrics(save_to_file)`: Plot metrik training dan validation loss
   - `generate_report()`: Generate laporan eksperimen
+  - `list_experiments(output_dir)`: Daftar semua eksperimen yang tersedia
+  - `compare_experiments(experiment_names, output_dir, save_to_file)`: Bandingkan beberapa eksperimen
 
 ### EvaluationService (services/evaluation/core_evaluation_service.py)
 - **Fungsi**: Layanan evaluasi model
 - **Metode Utama**:
-  - `evaluate(model, dataloader, conf_thres, iou_thres)`: Evaluasi model
-  - `evaluate_by_layer(model, dataloader)`: Evaluasi model per layer
-  - `evaluate_by_class(model, dataloader)`: Evaluasi model per kelas
+  - `__init__(config, output_dir, logger, visualizer)`: Inisialisasi layanan evaluasi
+  - `evaluate(model, dataloader, conf_thres, iou_thres, max_det, visualize, batch_size, return_samples, experiment_tracker, **kwargs)`: Evaluasi model
+  - `evaluate_by_layer(model, dataloader, **kwargs)`: Evaluasi model per layer
+  - `evaluate_by_class(model, dataloader, **kwargs)`: Evaluasi model per kelas
 
 ### MetricsComputation (services/evaluation/metrics_evaluation_service.py)
 - **Fungsi**: Komputasi metrik evaluasi
 - **Metode Utama**:
+  - `__init__(config, logger)`: Inisialisasi MetricsComputation
+  - `reset()`: Reset statistik evaluasi
   - `update(predictions, targets, inference_time)`: Update metrik dengan batch baru
+  - `_update_confusion_matrix(layer, predictions, targets, iou_threshold)`: Update confusion matrix
+  - `_calculate_batch_metrics()`: Hitung metrik untuk batch terakhir
+  - `get_last_batch_metrics()`: Dapatkan metrik dari batch terakhir
   - `compute()`: Hitung metrik evaluasi final
-  - `get_confusion_matrix(normalized)`: Dapatkan confusion matrix
+  - `_compute_class_metrics()`: Hitung metrik per kelas
+  - `_compute_pr_curves()`: Hitung kurva precision-recall
 
 ### PredictionService (services/prediction/core_prediction_service.py)
-- **Fungsi**: Layanan prediksi untuk model
+- **Fungsi**: Layanan prediksi
 - **Metode Utama**:
-  - `predict(images, return_annotated)`: Buat prediksi untuk gambar
-  - `predict_from_files(image_paths, return_annotated)`: Prediksi dari file
+  - `__init__(model, config, logger)`: Inisialisasi service prediksi
+  - `predict(images, return_annotated, conf_threshold, iou_threshold)`: Prediksi objek dalam gambar
   - `_preprocess_images(images)`: Preproses gambar untuk inferensi
-  - `_postprocess_predictions(predictions, original_images)`: Postproses hasil prediksi
+  - `_postprocess_predictions(predictions, original_images, conf_threshold, iou_threshold)`: Postproses hasil prediksi
+  - `predict_from_files(image_paths, return_annotated, conf_threshold, iou_threshold)`: Prediksi dari file gambar
+  - `visualize_predictions(image, detections, conf_threshold, output_path)`: Visualisasikan hasil prediksi
 
 ### BatchPredictionProcessor (services/prediction/batch_processor_prediction_service.py)
-- **Fungsi**: Processor untuk batch prediksi
+- **Fungsi**: Processor untuk batch prediction
 - **Metode Utama**:
-  - `process_directory(input_dir, save_results, save_annotated)`: Proses semua gambar dalam direktori
+  - `__init__(prediction_service, output_dir, num_workers, batch_size, logger)`: Inisialisasi batch prediction processor
+  - `process_directory(input_dir, save_results, save_annotated, file_ext, recursive)`: Proses direktori gambar
   - `process_files(files, save_results, save_annotated)`: Proses list file gambar
+  - `_save_batch_results(batch_results, batch_idx)`: Simpan hasil batch
   - `run_and_save(input_source, output_filename, save_annotated)`: Jalankan prediksi dan simpan hasil
 
 ### ExperimentService (services/experiment/experiment_service.py)
 - **Fungsi**: Layanan untuk mengelola eksperimen
 - **Metode Utama**:
+  - `__init__(experiment_dir, training_service, evaluation_service, logger)`: Inisialisasi experiment service
   - `setup_experiment(name, config, description)`: Setup eksperimen baru
-  - `setup_model(model_type, batch_size, learning_rate)`: Setup model untuk eksperimen
-  - `run_training(train_loader, val_loader, epochs, callbacks)`: Jalankan training
-  - `run_evaluation(test_loader)`: Jalankan evaluasi
-  - `run_complete_experiment(train_loader, val_loader, test_loader)`: Jalankan eksperimen lengkap
+  - `setup_model(model_type, batch_size, learning_rate, **kwargs)`: Setup model untuk eksperimen
+  - `run_training(train_loader, val_loader, epochs, callbacks, **kwargs)`: Jalankan training
+  - `run_evaluation(test_loader, **kwargs)`: Jalankan evaluasi
+  - `run_complete_experiment(train_loader, val_loader, test_loader, model_type, epochs, batch_size, learning_rate, name, **kwargs)`: Jalankan eksperimen lengkap
+  - `save_checkpoint(filename)`: Simpan checkpoint model
+  - `load_checkpoint(checkpoint_path)`: Muat checkpoint model
+  - `save_results(results)`: Simpan hasil eksperimen
+  - `load_results()`: Muat hasil eksperimen
+  - `predict(inputs, **kwargs)`: Lakukan prediksi dengan model
 
-### ExperimentCreator (services/research/experiment_creator.py)
-- **Fungsi**: Membuat dan mengelola konfigurasi eksperimen
+### ResearchExperimentService (services/research/experiment_service.py)
+- **Fungsi**: Facade untuk layanan penelitian model
 - **Metode Utama**:
+  - `__init__(base_dir, config, logger)`: Inisialisasi experiment service
   - `create_experiment(name, description, config_overrides, tags)`: Buat eksperimen baru
-  - `create_experiment_group(name, group_type)`: Buat grup eksperimen
+  - `run_experiment(experiment, dataset_path, epochs, batch_size, learning_rate, model_type, callbacks, **kwargs)`: Jalankan eksperimen
+  - `run_comparison_experiment(name, dataset_path, models_to_compare, epochs, batch_size, **kwargs)`: Jalankan perbandingan model
+  - `run_parameter_tuning(name, dataset_path, model_type, param_grid, **kwargs)`: Jalankan tuning parameter
+  - `get_experiment_results(experiment_id)`: Dapatkan hasil eksperimen
+  - `list_experiments(filter_tags)`: Dapatkan daftar eksperimen
+  - `compare_experiments(experiment_ids, metrics)`: Bandingkan eksperimen
+  - `generate_experiment_report(experiment_id, include_plots)`: Generate report eksperimen
 
-### ExperimentRunner (services/research/experiment_runner.py)
-- **Fungsi**: Menjalankan eksperimen model
+### NMSProcessor (services/postprocessing/nms_processor.py)
+- **Fungsi**: Processor untuk melakukan Non-Maximum Suppression pada hasil deteksi
 - **Metode Utama**:
-  - `run_experiment(experiment, dataset_path, epochs, batch_size, learning_rate)`: Jalankan eksperimen
-  - `_setup_model(model_type, batch_size, learning_rate)`: Setup model untuk eksperimen
-  - `_execute_training(model, train_loader, val_loader, epochs)`: Jalankan proses training
-  - `_execute_evaluation(model, test_loader)`: Jalankan evaluasi
-
-### ExperimentAnalyzer (services/research/experiment_analyzer.py)
-- **Fungsi**: Menganalisis hasil eksperimen
-- **Metode Utama**:
-  - `analyze_experiment_results(df, metric_cols, time_col)`: Analisis hasil eksperimen
-  - `_identify_best_model(best_row, metric, model_col, idx)`: Identifikasi model terbaik
-  - `_generate_recommendation(analysis)`: Buat rekomendasi berdasarkan analisis
-
-### ParameterTuner (services/research/parameter_tuner.py)
-- **Fungsi**: Melakukan tuning parameter model
-- **Metode Utama**:
-  - `run_parameter_tuning(name, dataset_path, model_type, param_grid)`: Jalankan tuning parameter
-  - `_generate_param_combinations(param_grid)`: Generate kombinasi parameter dari grid
-  - `_get_best_params(tuning_df)`: Dapatkan parameter terbaik
-
-### ComparisonRunner (services/research/comparison_runner.py)
-- **Fungsi**: Menjalankan eksperimen perbandingan model
-- **Metode Utama**:
-  - `run_comparison_experiment(name, dataset_path, models_to_compare)`: Jalankan eksperimen perbandingan
-  - `_run_model_comparison_experiments(name, dataset_path, models_to_compare)`: Jalankan eksperimen untuk setiap model
-  - `_get_best_model(comparison_df)`: Dapatkan model terbaik
-
-### BaseBackbone (architectures/backbones/base.py)
-- **Fungsi**: Kelas dasar untuk semua backbone network
-- **Metode Utama**:
-  - `get_output_channels()`: Dapatkan jumlah output channel
-  - `get_output_shapes(input_size)`: Dapatkan dimensi output
-  - `forward(x)`: Forward pass
-  - `validate_output(features, expected_channels)`: Validasi output
-
-### EfficientNetBackbone (architectures/backbones/efficientnet.py)
-- **Fungsi**: Backbone EfficientNet untuk YOLOv5
-- **Metode Utama**:
-  - `forward(x)`: Forward pass dengan ekstraksi fitur dan adaptasi channel
-  - `get_output_channels()`: Dapatkan jumlah output channel
-  - `get_output_shapes(input_size)`: Dapatkan dimensi output feature maps
-
-### CSPDarknet (architectures/backbones/cspdarknet.py)
-- **Fungsi**: CSPDarknet backbone untuk YOLOv5
-- **Metode Utama**:
-  - `forward(x)`: Forward pass, mengembalikan feature maps
-  - `get_output_channels()`: Dapatkan jumlah output channel
-  - `get_output_shapes(input_size)`: Dapatkan dimensi output feature maps
-  - `load_weights(state_dict, strict)`: Load state dictionary dengan validasi
-
-### FeatureProcessingNeck (architectures/necks/fpn_pan.py)
-- **Fungsi**: Neck untuk mengkombinasikan FPN dan PAN
-- **Metode Utama**:
-  - `forward(features)`: Forward pass FPN-PAN
-
-### DetectionHead (architectures/heads/detection_head.py)
-- **Fungsi**: Detection Head untuk YOLOv5 dengan dukungan multi-layer
-- **Metode Utama**:
-  - `forward(features)`: Forward pass detection head
-  - `get_config()`: Dapatkan konfigurasi detection head
-
-### YOLOLoss (components/losses.py)
-- **Fungsi**: YOLOv5 Loss Function dengan CIoU
-- **Metode Utama**:
-  - `forward(predictions, targets)`: Hitung loss untuk prediksi dan target
-  - `_build_targets(pred, targets, layer_idx)`: Build targets untuk satu skala
+  - `__init__(logger)`: Inisialisasi NMS processor
+  - `process(detections, iou_threshold, conf_threshold, class_specific, max_detections)`: Proses deteksi dengan Non-Maximum Suppression

@@ -1,6 +1,5 @@
 """
 File: smartcash/ui/components/setup/env_config.py
-Author: Refactored
 Deskripsi: Komponen UI untuk konfigurasi environment SmartCash di subdirektori setup
 """
 

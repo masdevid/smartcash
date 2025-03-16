@@ -1,24 +1,96 @@
 """
 File: smartcash/ui/handlers/shared/environment_handler.py
-Deskripsi: Handler umum untuk environment dan operasi file sistem
+Deskripsi: Handler bersama untuk manajemen environment SmartCash
 """
 
+from IPython.display import display, HTML, clear_output
+from pathlib import Path
 import os
 import shutil
-from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, List, Union
+import platform
+import sys
 
-from IPython.display import display, HTML, clear_output
-
-def filter_drive_tree(tree_html: str) -> str:
+def detect_environment(ui_components, env=None):
     """
-    Filter directory tree untuk hanya menampilkan struktur SmartCash.
+    Deteksi environment dan update UI.
     
     Args:
-        tree_html: HTML string tree direktori
+        ui_components: Dictionary komponen UI
+        env: Environment manager (optional)
         
     Returns:
-        HTML string yang sudah difilter
+        Boolean menunjukkan apakah environment adalah Colab
+    """
+    is_colab = False
+    
+    if env and hasattr(env, 'is_colab'):
+        is_colab = env.is_colab
+        # Tampilkan informasi sistem
+        with ui_components['info_panel']:
+            clear_output(wait=True)
+            try:
+                system_info = env.get_system_info()
+                info_html = f"""
+                <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
+                    <h4 style="margin-top:0">📊 System Information</h4>
+                    <ul>
+                        <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
+                        <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
+                        <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
+                        <li><b>Platform:</b> {system_info.get('platform', 'Unknown')}</li>
+                    </ul>
+                </div>
+                """
+                display(HTML(info_html))
+            except Exception as e:
+                display(HTML(f"<p>⚠️ Error getting system info: {str(e)}</p>"))
+    else:
+        try:
+            import google.colab
+            is_colab = True
+        except ImportError:
+            pass
+            
+        # Fallback system info
+        with ui_components['info_panel']:
+            clear_output(wait=True)
+            display(HTML(f"""
+            <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
+                <h4 style="margin-top:0">📊 System Information</h4>
+                <ul>
+                    <li><b>Python:</b> {platform.python_version()}</li>
+                    <li><b>Platform:</b> {platform.system()} {platform.release()}</li>
+                    <li><b>Base Directory:</b> {Path.cwd()}</li>
+                </ul>
+            </div>
+            """))
+    
+    # Update UI berdasarkan environment
+    ui_components['colab_panel'].value = """
+        <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
+            <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
+            <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
+        </div>
+    """ if is_colab else """
+        <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
+            <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
+            <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
+        </div>
+    """
+    
+    # Tampilkan tombol drive hanya di Colab
+    ui_components['drive_button'].layout.display = '' if is_colab else 'none'
+    return is_colab
+
+def filter_drive_tree(tree_html):
+    """
+    Filter directory tree untuk fokus ke SmartCash di Google Drive.
+    
+    Args:
+        tree_html: HTML string dari directory tree
+        
+    Returns:
+        HTML string yang difilter
     """
     if not tree_html or '/content/drive' not in tree_html:
         return tree_html
@@ -35,18 +107,18 @@ def filter_drive_tree(tree_html: str) -> str:
         
         lines = content.split("\n")
         filtered_lines = []
-        inside_drive = False
+        inside_smartcash = False
         
         for line in lines:
-            if '/content/drive' in line and 'MyDrive/SmartCash' not in line and not inside_drive:
+            if '/content/drive' in line and 'SmartCash' not in line and not inside_smartcash:
                 continue
                 
-            if 'SmartCash/' in line:
-                inside_drive = True
+            if 'SmartCash/' in line or 'SmartCash_Drive' in line:
+                inside_smartcash = True
                 filtered_lines.append(line)
-            elif inside_drive and ('│' not in line and '├' not in line and '└' not in line):
-                inside_drive = False
-            elif inside_drive:
+            elif inside_smartcash and ('│' not in line and '├' not in line and '└' not in line):
+                inside_smartcash = False
+            elif inside_smartcash:
                 filtered_lines.append(line)
             elif '/content/drive' not in line:
                 filtered_lines.append(line)
@@ -55,23 +127,23 @@ def filter_drive_tree(tree_html: str) -> str:
     except Exception:
         return tree_html
 
-def fallback_get_directory_tree(root_dir: Union[str, Path], max_depth: int = 2) -> str:
+def fallback_get_directory_tree(root_dir, max_depth=2):
     """
-    Fallback untuk directory tree view dengan filter khusus untuk Drive.
+    Fallback implementation untuk directory tree jika env_manager tidak tersedia.
     
     Args:
         root_dir: Path direktori root
-        max_depth: Kedalaman maksimum traversal
+        max_depth: Kedalaman maksimum tree
         
     Returns:
-        HTML string representasi struktur direktori
+        HTML string dari directory tree
     """
     root_dir = Path(root_dir)
     if not root_dir.exists():
         return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
     
     # Khusus untuk drive, tampilkan hanya folder SmartCash
-    if '/content/drive' in str(root_dir):
+    if '/content/drive' in str(root_dir) and 'SmartCash' not in str(root_dir):
         root_dir = Path('/content/drive/MyDrive/SmartCash')
         if not root_dir.exists():
             return f"<span style='color:orange'>⚠️ SmartCash folder tidak ditemukan di Google Drive</span>"
@@ -82,14 +154,14 @@ def fallback_get_directory_tree(root_dir: Union[str, Path], max_depth: int = 2) 
     def traverse_dir(path, prefix="", depth=0):
         if depth > max_depth: return ""
         # Skip jika bukan SmartCash directory di drive
-        if '/content/drive' in str(path) and '/MyDrive/SmartCash' not in str(path):
+        if '/content/drive' in str(path) and 'SmartCash' not in str(path):
             return ""
             
         items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
         tree = ""
         for i, item in enumerate(items):
             # Skip directory lain di drive yang bukan bagian SmartCash
-            if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
+            if '/content/drive' in str(item) and 'SmartCash' not in str(item):
                 continue
                 
             is_last = i == len(items) - 1
@@ -107,150 +179,80 @@ def fallback_get_directory_tree(root_dir: Union[str, Path], max_depth: int = 2) 
     result += "</pre>"
     return result
 
-def sync_configs(
-    source_dirs: List[Path], 
-    target_dirs: List[Path],
-    logger = None
-) -> Tuple[int, int]:
+def sync_configs(source_dirs, target_dirs, logger=None):
     """
-    Sinkronisasi file konfigurasi antar direktori.
+    Sinkronisasi config files dari source ke target directory.
     
     Args:
         source_dirs: List direktori sumber
-        target_dirs: List direktori target
-        logger: Logger opsional
+        target_dirs: List direktori tujuan
+        logger: Logger instance (optional)
         
     Returns:
-        Tuple (total_files, synced_files)
+        Tuple (total_files, copied_files)
     """
-    total_files = synced_files = 0
+    total_files = copied_files = 0
     
-    # Pastikan semua direktori target ada
-    for target_dir in target_dirs:
-        target_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Kumpulkan semua file yaml/yml dari source dirs
-    source_files = []
-    for source_dir in source_dirs:
-        if source_dir.exists() and source_dir.is_dir():
-            source_files.extend(list(source_dir.glob('*.y*ml')))
-    
-    # Sync files
-    for source_file in source_files:
-        total_files += 1
-        filename = source_file.name
-        
-        for target_dir in target_dirs:
-            target_file = target_dir / filename
-            if not target_file.exists() or target_file.stat().st_mtime < source_file.stat().st_mtime:
-                try:
-                    shutil.copy2(source_file, target_file)
-                    synced_files += 1
-                    if logger:
-                        logger.info(f"✅ Copied {filename} to {target_dir}")
-                except Exception as e:
-                    if logger:
-                        logger.warning(f"⚠️ Failed to copy {filename}: {e}")
-    
-    return total_files, synced_files
-
-def detect_environment(ui_components: Dict[str, Any], env: Any = None) -> bool:
-    """
-    Deteksi environment dan update UI.
-    
-    Args:
-        ui_components: Komponen UI
-        env: Environment manager opsional
-        
-    Returns:
-        Boolean menunjukkan apakah environment adalah Colab
-    """
-    is_colab = False
-    
-    if env:
-        is_colab = getattr(env, 'is_colab', False)
-        with ui_components['info_panel']:
-            clear_output()
-            try:
-                system_info = env.get_system_info() if hasattr(env, 'get_system_info') else {}
-                info_html = f"""
-                <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                    <h4 style="margin-top:0">📊 System Information</h4>
-                    <ul>
-                        <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
-                        <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
-                        <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
-                    </ul>
-                </div>
-                """
-                display(HTML(info_html))
-            except Exception as e:
-                display(HTML(f"<p>⚠️ Error getting system info: {str(e)}</p>"))
-    else:
-        try:
-            import google.colab
-            is_colab = True
-        except ImportError:
-            pass
+    try:
+        for source_dir in source_dirs:
+            if not isinstance(source_dir, Path):
+                source_dir = Path(source_dir)
             
-        with ui_components['info_panel']:
-            clear_output()
-            import sys, platform
-            display(HTML(f"""
-            <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                <h4 style="margin-top:0">📊 System Information</h4>
-                <ul>
-                    <li><b>Python:</b> {platform.python_version()}</li>
-                    <li><b>OS:</b> {platform.system()} {platform.release()}</li>
-                    <li><b>Base Directory:</b> {Path.cwd()}</li>
-                </ul>
-            </div>
-            """))
-    
-    ui_components['colab_panel'].value = """
-        <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
-            <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
-            <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
-        </div>
-    """ if is_colab else """
-        <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-            <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
-            <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
-        </div>
-    """
-    
-    # Update button visibility
-    if 'drive_button' in ui_components:
-        ui_components['drive_button'].layout.display = '' if is_colab else 'none'
-    
-    return is_colab
+            if not source_dir.exists() or not source_dir.is_dir():
+                continue
+            
+            config_files = list(source_dir.glob('*.y*ml'))
+            
+            for config_file in config_files:
+                total_files += 1
+                
+                for target_dir in target_dirs:
+                    if not isinstance(target_dir, Path):
+                        target_dir = Path(target_dir)
+                    
+                    target_dir.mkdir(parents=True, exist_ok=True)
+                    target_file = target_dir / config_file.name
+                    
+                    if not target_file.exists():
+                        try:
+                            shutil.copy2(config_file, target_file)
+                            copied_files += 1
+                            if logger:
+                                logger.info(f"✅ Copied {config_file.name} to {target_dir}")
+                        except Exception as e:
+                            if logger:
+                                logger.warning(f"⚠️ Failed to copy {config_file.name}: {str(e)}")
+        
+        return total_files, copied_files
+    except Exception as e:
+        if logger:
+            logger.error(f"❌ Error syncing configs: {str(e)}")
+        return total_files, copied_files
 
-def check_smartcash_dir(ui_components: Dict[str, Any]) -> bool:
+def check_smartcash_dir(ui_components):
     """
-    Cek keberadaan folder smartcash dan tampilkan pesan jika tidak ada.
+    Cek apakah folder smartcash ada dan tampilkan warning jika tidak ada.
     
     Args:
-        ui_components: Komponen UI
+        ui_components: Dictionary komponen UI
         
     Returns:
-        Boolean menunjukkan apakah folder ada
+        Boolean menunjukkan apakah folder smartcash ada
     """
     if not Path('smartcash').exists() or not Path('smartcash').is_dir():
-        output_widget = ui_components.get('status', None)
-        if output_widget:
-            with output_widget:
-                clear_output()
-                alert_html = f"""
-                <div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
-                    <h3 style="margin-top:0">❌ Folder SmartCash tidak ditemukan!</h3>
-                    <p>Repository belum di-clone dengan benar. Silakan jalankan cell clone repository terlebih dahulu.</p>
-                    <ol>
-                        <li>Jalankan cell repository clone (Cell 1.1)</li>
-                        <li>Restart runtime (Runtime > Restart runtime)</li>
-                        <li>Jalankan kembali notebook dari awal</li>
-                    </ol>
-                </div>
-                """
-                display(HTML(alert_html))
-        return False
+        with ui_components['status']:
+            clear_output(wait=True)
+            alert_html = f"""
+            <div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
+                <h3 style="margin-top:0">❌ Folder SmartCash tidak ditemukan!</h3>
+                <p>Repository belum di-clone dengan benar. Silakan jalankan cell clone repository terlebih dahulu.</p>
+                <ol>
+                    <li>Jalankan cell repository clone (Cell 1.1)</li>
+                    <li>Restart runtime (Runtime > Restart runtime)</li>
+                    <li>Jalankan kembali notebook dari awal</li>
+                </ol>
+            </div>
+            """
+            display(HTML(alert_html))
+            return False
     return True

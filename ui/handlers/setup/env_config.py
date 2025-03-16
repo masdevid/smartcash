@@ -1,18 +1,16 @@
 """
 File: smartcash/ui/handlers/setup/env_config.py
-Author: Refactored
 Deskripsi: Handler untuk UI konfigurasi environment SmartCash di subdirektori setup
 """
 
 from IPython.display import display, HTML, clear_output
 from pathlib import Path
+import os
+import shutil
 
 from smartcash.ui.components.shared.alerts import create_status_indicator
 from smartcash.ui.handlers.shared.error_handler import handle_error
-from smartcash.ui.handlers.shared.environment_handler import (
-    detect_environment, filter_drive_tree, fallback_get_directory_tree, 
-    sync_configs, check_smartcash_dir
-)
+from smartcash.ui.handlers.shared.environment_handler import detect_environment, filter_drive_tree, fallback_get_directory_tree, sync_configs, check_smartcash_dir
 from smartcash.ui.handlers.shared.observer_handler import setup_observer_handlers, register_ui_observer
 from smartcash.ui.handlers.shared.config_handler import setup_config_handlers, update_config
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
@@ -39,6 +37,9 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
         ["environment.drive.mount", "environment.directory.setup"],
         observer_group="env_config_observers"
     )
+    
+    # Use shared implementations from environment_handler.py
+    # These functions were moved to shared handlers for reuse
     
     def on_drive_connect(b):
         """Handler koneksi Google Drive"""

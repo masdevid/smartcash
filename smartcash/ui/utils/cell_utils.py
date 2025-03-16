@@ -153,28 +153,67 @@ def setup_ui_component(
     # Buat default UI components
     ui_components = create_default_ui_components(component_name)
     
-    # Import komponen UI dengan fallback
+   # Import komponen UI dengan fallback, termasuk pencarian di subdirektori
     try:
         # Coba import dari lokasi baru (setelah refactor)
-        module_path = f"smartcash.ui.components.{component_name}"
-        ui_module = importlib.import_module(module_path)
+        import_locations = [
+            f"smartcash.ui.components.{component_name}",  # Base location
+            f"smartcash.ui.components.setup.{component_name}",  # Setup subdirectory
+            f"smartcash.ui.components.dataset.{component_name}",  # Dataset subdirectory
+            f"smartcash.ui.components.training_config.{component_name}",  # Training config subdirectory
+            f"smartcash.ui.components.training_execution.{component_name}",  # Training execution subdirectory
+            f"smartcash.ui.components.model_evaluation.{component_name}",  # Model evaluation subdirectory
+            f"smartcash.ui.components.detection.{component_name}"  # Detection subdirectory
+        ]
         
-        # Panggil fungsi create_*_ui()
-        create_func = getattr(ui_module, f"create_{component_name}_ui")
-        ui_components = create_func(env, config)
+        ui_module = None
+        create_func = None
+        error = None
         
-    except (ImportError, AttributeError) as e1:
-        try:
-            # Fallback ke lokasi lama (sebelum refactor)
-            module_path = f"smartcash.ui_components.{component_name}"
-            ui_module = importlib.import_module(module_path)
-            create_func = getattr(ui_module, f"create_{component_name}_ui")
+        # Try each possible location
+        for module_path in import_locations:
+            try:
+                ui_module = importlib.import_module(module_path)
+                create_func = getattr(ui_module, f"create_{component_name}_ui")
+                break
+            except (ImportError, AttributeError) as e:
+                error = e
+                continue
+                
+        if create_func:
             ui_components = create_func(env, config)
-            
-        except (ImportError, AttributeError) as e2:
-            # Fallback ke default UI sudah dibuat diatas
-            with ui_components['status']:
-                display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found. Using minimal implementation.</p>"))
+        else:
+            # Try fallback to old location
+            module_path = f"smartcash.ui_components.{component_name}"
+            try:
+                ui_module = importlib.import_module(module_path)
+                create_func = getattr(ui_module, f"create_{component_name}_ui")
+                ui_components = create_func(env, config)
+            except (ImportError, AttributeError):
+                # Also try subdirectories in old location
+                old_import_locations = [
+                    f"smartcash.ui_components.setup.{component_name}",
+                    f"smartcash.ui_components.dataset.{component_name}",
+                    f"smartcash.ui_components.training.{component_name}"
+                ]
+                
+                for module_path in old_import_locations:
+                    try:
+                        ui_module = importlib.import_module(module_path)
+                        create_func = getattr(ui_module, f"create_{component_name}_ui")
+                        ui_components = create_func(env, config)
+                        break
+                    except (ImportError, AttributeError):
+                        continue
+                
+                # If still not found, fallback to default
+                if not create_func:
+                    with ui_components['status']:
+                        display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found in any directory. Using minimal implementation.</p>"))
+    except Exception as e:
+        # Catch any other errors during import
+        with ui_components['status']:
+            display(HTML(f"<p style='color:#721c24'>❌ Error importing component '{component_name}': {str(e)}</p>"))
     
     # Tambahkan progress_bar jika belum ada
     if 'progress_bar' not in ui_components:

@@ -1,7 +1,7 @@
 """
-File: smartcash/ui/components/env_config.py
+File: smartcash/ui/components/setup/env_config.py
 Author: Refactored
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan styling konsisten
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash di subdirektori setup
 """
 
 import ipywidgets as widgets

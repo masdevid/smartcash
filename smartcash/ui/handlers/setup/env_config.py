@@ -1,7 +1,7 @@
 """
-File: smartcash/ui/handlers/env_config.py
+File: smartcash/ui/handlers/setup/env_config.py
 Author: Refactored
-Deskripsi: Handler untuk UI konfigurasi environment SmartCash dengan implementasi DRY
+Deskripsi: Handler untuk UI konfigurasi environment SmartCash di subdirektori setup
 """
 
 from IPython.display import display, HTML, clear_output
@@ -15,9 +15,18 @@ from smartcash.ui.handlers.shared.environment_handler import (
 )
 from smartcash.ui.handlers.shared.observer_handler import setup_observer_handlers, register_ui_observer
 from smartcash.ui.handlers.shared.config_handler import setup_config_handlers, update_config
+from smartcash.ui.utils.logging_utils import setup_ipython_logging
 
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
+    # Get logger dari ui_components atau buat baru
+    logger = ui_components.get('logger')
+    if not logger:
+        try:
+            logger = setup_ipython_logging(ui_components, logger_name="env_config")
+        except ImportError:
+            pass
+    
     # Setup observer
     ui_components = setup_observer_handlers(ui_components, observer_group="env_config_observers")
     
@@ -67,7 +76,7 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                             if configs_path.exists():
                                 source_dirs.append(configs_path)
                         
-                        total_files, synced_files = sync_configs(source_dirs, target_dirs)
+                        total_files, synced_files = sync_configs(source_dirs, target_dirs, logger)
                         
                         if total_files > 0:
                             status = "success" if synced_files > 0 else "info"

@@ -216,11 +216,7 @@ smartcash/model/
 │   ├── __init__.py
 │   ├── checkpoint/             # Manajemen checkpoint model
 │   │   ├── __init__.py
-│   │   ├── checkpoint_service.py # CheckpointService: Layanan checkpoint 
-│   │   ├── local_storage.py    # LocalCheckpointStorage: Storage checkpoint lokal
-│   │   ├── drive_storage.py    # DriveCheckpointStorage: Storage checkpoint Drive
-│   │   ├── sync_storage.py     # CheckpointStorageSynchronizer: Sinkronisasi storage
-│   │   └── cleanup.py          # CheckpointCleanup: Pembersihan checkpoint
+│   │   └── checkpoint_service.py # CheckpointService: Layanan penyimpanan dan pemulihan checkpoint
 │   ├── training/               # Layanan pelatihan model
 │   │   ├── __init__.py
 │   │   ├── core_training_service.py # TrainingService: Layanan training
@@ -283,7 +279,8 @@ smartcash/model/
 │   └── losses.py               # Loss functions (YOLO, BBOX, Classification)
 ├── models/                     # Model terintegrasi
 │   ├── __init__.py
-│   └── yolov5_model.py         # YOLOv5Model: Model YOLOv5 terintegrasi
+│   ├── yolov5_model.py         # YOLOv5Model: Model YOLOv5 terintegrasi
+│   └── smartcash_yolov5.py     # SmartCashYOLOv5: Model YOLOv5 dengan EfficientNet backbone
 ├── architectures/              # Arsitektur model
 │   ├── __init__.py
 │   ├── backbones/              # Backbone networks
@@ -297,19 +294,18 @@ smartcash/model/
 │   └── heads/                  # Head networks
 │       ├── __init__.py
 │       └── detection_head.py   # DetectionHead: Head deteksi
-├── visualization/              # Visualisasi model
-│   ├── __init__.py             # Ekspor komponen visualisasi
-│   ├── base_visualizer.py      # ModelVisualizationBase: Kelas utilitas dasar visualisasi
-│   ├── metrics_visualizer.py   # MetricsVisualizer: Visualisasi metrik
-│   ├── detection_visualizer.py # DetectionVisualizer: Visualisasi deteksi
-│   ├── evaluation_visualizer.py # EvaluationVisualizer: Visualisasi evaluasi
-│   ├── research/                # Visualisasi penelitian 
-│   │   ├── __init__.py
-│   │   ├── base_research_visualizer.py # BaseResearchVisualizer: Kelas dasar visualisasi penelitian
-│   │   ├── experiment_visualizer.py # ExperimentVisualizer: Visualisasi eksperimen
-│   │   ├── scenario_visualizer.py  # ScenarioVisualizer: Visualisasi skenario
-│   │   └── research_visualizer.py  # ResearchVisualizer: Visualisasi penelitian
-└── exceptions.py               # Eksepsi khusus model (ModelError, etc.)
+└── visualization/              # Visualisasi model
+    ├── __init__.py             # Ekspor komponen visualisasi
+    ├── base_visualizer.py      # ModelVisualizationBase: Kelas utilitas dasar visualisasi
+    ├── metrics_visualizer.py   # MetricsVisualizer: Visualisasi metrik
+    ├── detection_visualizer.py # DetectionVisualizer: Visualisasi deteksi
+    ├── evaluation_visualizer.py # EvaluationVisualizer: Visualisasi evaluasi
+    └── research/               # Visualisasi penelitian 
+        ├── __init__.py
+        ├── base_research_visualizer.py # BaseResearchVisualizer: Kelas dasar visualisasi penelitian
+        ├── experiment_visualizer.py # ExperimentVisualizer: Visualisasi eksperimen
+        ├── scenario_visualizer.py  # ScenarioVisualizer: Visualisasi skenario
+        └── research_visualizer.py  # ResearchVisualizer: Visualisasi penelitian
 ```
 
 ## 6. Domain UI (Tidak Berubah)

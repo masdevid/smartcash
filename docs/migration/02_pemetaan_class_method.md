@@ -179,17 +179,52 @@
   - `load_checkpoint(path, model, optimizer, map_location)`
 
 ## Exceptions (exceptions.py)
-- **Fungsi**: Custom exceptions untuk SmartCash
-- **Exception Classes**:
-  - `SmartCashError`: Exception dasar
+- **Fungsi**: Hierarki exception terpadu untuk seluruh komponen SmartCash
+- **Exception Classes Dasar**:
+  - `SmartCashError`: Exception dasar untuk semua error SmartCash
+
+- **Exception Config**:
   - `ConfigError`: Error konfigurasi
-  - `DatasetError`: Error terkait dataset
-  - `ModelError`: Error terkait model
-  - `DetectionError`: Error terkait proses deteksi
+
+- **Exception Dataset**:
+  - `DatasetError`: Error dasar terkait dataset
+  - `DatasetFileError`: Error file dataset
+  - `DatasetValidationError`: Error validasi dataset
+  - `DatasetProcessingError`: Error pemrosesan dataset
+  - `DatasetCompatibilityError`: Masalah kompatibilitas dataset dengan model
+
+- **Exception Model**:
+  - `ModelError`: Error dasar terkait model
+  - `ModelConfigurationError`: Error konfigurasi model
+  - `ModelTrainingError`: Error proses training model
+  - `ModelInferenceError`: Error inferensi model
+  - `ModelCheckpointError`: Error checkpoint model
+  - `ModelExportError`: Error ekspor model
+  - `ModelEvaluationError`: Error evaluasi model
+  - `ModelServiceError`: Error model service
+
+- **Exception Model Components**:
+  - `ModelComponentError`: Error dasar komponen model
+  - `BackboneError`: Error backbone model
+  - `UnsupportedBackboneError`: Error backbone tidak didukung
+  - `NeckError`: Error neck model
+  - `HeadError`: Error detection head model
+
+- **Exception Detection**:
+  - `DetectionError`: Error dasar proses deteksi
+  - `DetectionInferenceError`: Error inferensi deteksi
+  - `DetectionPostprocessingError`: Error post-processing deteksi
+
+- **Exception I/O**:
   - `FileError`: Error file I/O
+
+- **Exception API & Validation**:
   - `APIError`: Error API
   - `ValidationError`: Error validasi input
-  - `NotSupportedError`: Fitur yang tidak didukung
+
+- **Exception Lainnya**:
+  - `NotSupportedError`: Fitur tidak didukung
+  - `ExperimentError`: Error manajemen eksperimen
 
 ### Types (types.py)
 - **Fungsi**: Type definitions untuk SmartCash

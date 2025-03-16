@@ -33,7 +33,7 @@ def setup_config_handlers(
     # Coba tambahkan config manager jika belum ada
     if 'config_manager' not in ui_components:
         try:
-            from smartcash.utils.config_manager import get_config_manager
+            from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             ui_components['config_manager'] = config_manager
         except ImportError:

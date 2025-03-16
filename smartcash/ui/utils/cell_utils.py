@@ -1,5 +1,6 @@
 """
 File: smartcash/ui/utils/cell_utils.py
+Author: Refactored
 Deskripsi: Utilitas untuk cell notebook dengan fungsi setup environment dan komponen UI
 """
 
@@ -32,9 +33,9 @@ def setup_notebook_environment(
         
     # Import dependencies dengan fallback
     try:
-        from smartcash.utils.logger import get_logger
-        from smartcash.utils.environment_manager import get_environment_manager
-        from smartcash.utils.config_manager import get_config_manager
+        from smartcash.common.logger import get_logger
+        from smartcash.common.environment import get_environment_manager
+        from smartcash.common.config import get_config_manager
         
         # Setup komponen
         logger = get_logger(f"cell_{cell_name}")
@@ -77,6 +78,62 @@ def setup_notebook_environment(
             
         return env, config
 
+def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
+    """
+    Buat komponen UI default untuk cell.
+    
+    Args:
+        cell_name: Nama cell
+        
+    Returns:
+        Dictionary berisi widget UI default
+    """
+    # Format judul cell dari nama
+    title = " ".join(word.capitalize() for word in cell_name.split("_"))
+    
+    # Buat komponen UI default
+    header = widgets.HTML(
+        f"""<div style="background-color: #f0f8ff; padding: 15px; color: black; 
+                      border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
+            <h2 style="color: #2c3e50; margin-top: 0;">{title}</h2>
+            <p style="color: #2c3e50; margin-bottom: 0;">No UI component found for this cell</p>
+        </div>"""
+    )
+    
+    status = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            border='1px solid #ddd',
+            min_height='100px',
+            max_height='300px',
+            margin='10px 0',
+            padding='8px',
+            overflow='auto'
+        )
+    )
+    
+    progress_bar = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=100,
+        description='Progress:',
+        bar_style='info',
+        orientation='horizontal',
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0'
+        )
+    )
+    
+    # Return dictionary
+    return {
+        'ui': widgets.VBox([header, status, progress_bar]),
+        'header': header,
+        'status': status,
+        'progress_bar': progress_bar,
+        'module_name': cell_name
+    }
+
 def setup_ui_component(
     env: Any, 
     config: Dict[str, Any], 
@@ -93,7 +150,8 @@ def setup_ui_component(
     Returns:
         Dictionary berisi widget UI
     """
-    ui_components = {}
+    # Buat default UI components
+    ui_components = create_default_ui_components(component_name)
     
     # Import komponen UI dengan fallback
     try:
@@ -114,15 +172,31 @@ def setup_ui_component(
             ui_components = create_func(env, config)
             
         except (ImportError, AttributeError) as e2:
-            # Fallback ke implementasi minimal
-            print(f"⚠️ UI component '{component_name}' not found. Using minimal implementation.")
-            title = component_name.replace("_", " ").title()
-            ui_components = {
-                'ui': widgets.VBox([
-                    widgets.HTML(f"<h2>{title}</h2>"),
-                    widgets.HTML(f"<p>UI component '{component_name}' not available</p>")
-                ])
-            }
+            # Fallback ke default UI sudah dibuat diatas
+            with ui_components['status']:
+                display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found. Using minimal implementation.</p>"))
+    
+    # Tambahkan progress_bar jika belum ada
+    if 'progress_bar' not in ui_components:
+        progress_bar = widgets.IntProgress(
+            value=0,
+            min=0,
+            max=100,
+            description='Progress:',
+            bar_style='info',
+            orientation='horizontal',
+            layout=widgets.Layout(
+                width='100%',
+                margin='10px 0'
+            )
+        )
+        ui_components['progress_bar'] = progress_bar
+        
+        # Tambahkan ke UI jika ui_components memiliki 'ui'
+        if 'ui' in ui_components and isinstance(ui_components['ui'], widgets.Box):
+            ui_children = list(ui_components['ui'].children)
+            ui_children.append(progress_bar)
+            ui_components['ui'].children = tuple(ui_children)
     
     # Setup handler jika tersedia
     try:
@@ -173,7 +247,7 @@ def cleanup_resources(ui_components: Dict[str, Any]) -> None:
     
     # Cleanup observer jika ada
     try:
-        from smartcash.utils.observer.observer_manager import ObserverManager
+        from smartcash.components.observer import ObserverManager
         observer_manager = ObserverManager.get_instance()
         if observer_manager:
             group_name = ui_components.get('observer_group', 'cell_observers')

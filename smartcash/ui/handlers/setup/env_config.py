@@ -18,14 +18,6 @@ from smartcash.ui.handlers.shared.config_handler import setup_config_handlers, u
 
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
-    # Init logger
-    logger = None
-    try:
-        from smartcash.utils.logger import get_logger
-        logger = get_logger("env_config")
-    except ImportError:
-        pass
-    
     # Setup observer
     ui_components = setup_observer_handlers(ui_components, observer_group="env_config_observers")
     
@@ -75,7 +67,7 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                             if configs_path.exists():
                                 source_dirs.append(configs_path)
                         
-                        total_files, synced_files = sync_configs(source_dirs, target_dirs, logger)
+                        total_files, synced_files = sync_configs(source_dirs, target_dirs)
                         
                         if total_files > 0:
                             status = "success" if synced_files > 0 else "info"

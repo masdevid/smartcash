@@ -172,44 +172,37 @@ smartcash/dataset/
         └── yolo_collate.py     # yolo_collate_fn(): Collate untuk YOLO
 ```
 
-## 4. Domain Detection (Diperbarui)
+## 4. Domain Detection
 
 ```
-smartcash/detection/
-├── __init__.py                 # Ekspor komponen deteksi
-├── detector.py                 # Detector: Koordinator utama deteksi (menggunakan ModelManager dari domain model)
+ssmartcash/detection/
+├── __init__.py                 # Ekspor komponen deteksi dengan __all__
+├── detector.py                 # Detector: Koordinator utama proses deteksi
 ├── services/
-│   ├── __init__.py
+│   ├── __init__.py             # Ekspor layanan detection dengan __all__
 │   ├── inference/              # Layanan inferensi
-│   │   ├── __init__.py
-│   │   ├── inference_service.py # InferenceService: Menggunakan PredictionService dari domain model
-│   │   ├── optimizers.py       # Menggunakan fungsi optimasi dari domain model
-│   │   ├── batch_processor.py  # Menggunakan BatchPredictionProcessor dari domain model
-│   │   └── accelerator.py      # HardwareAccelerator: Abstraksi hardware (CPU/GPU/TPU)
+│   │   ├── __init__.py         # Ekspor komponen inferensi dengan __all__
+│   │   ├── inference_service.py # InferenceService: Koordinator inferensi model 
+│   │   ├── accelerator.py      # HardwareAccelerator: Abstraksi hardware (CPU/GPU/TPU)
+│   │   ├── batch_processor.py  # BatchProcessor: Processor batch gambar paralel
+│   │   └── optimizers.py       # ModelOptimizer: Optimasi model (ONNX, TorchScript)
 │   ├── postprocessing/         # Layanan pasca-inferensi
-│   │   ├── __init__.py
-│   │   ├── nms_processor.py    # Menggunakan NMSProcessor dari domain model
-│   │   ├── confidence_filter.py # ConfidenceFilter: Filter berdasarkan confidence
-│   │   ├── bbox_refiner.py     # Menggunakan BBoxRefiner dari domain model
-│   │   └── result_formatter.py # ResultFormatter: Format hasil deteksi
-│   ├── evaluation/             # Layanan evaluasi model
-│   │   ├── __init__.py
-│   │   ├── metrics_calculator.py # Menggunakan MetricsCalculator dari domain model
-│   │   ├── evaluator.py        # DetectionEvaluator: Wrapper untuk EvaluationService
-│   │   └── benchmark.py        # DetectionBenchmark: Benchmark kinerja deteksi
-│   └── visualization_adapter.py # Menggunakan DetectionVisualizer dari domain model
+│   │   ├── __init__.py         # Ekspor komponen postprocessing dengan __all__
+│   │   ├── postprocessing_service.py # PostprocessingService: Koordinator postprocessing
+│   │   ├── confidence_filter.py # ConfidenceFilter: Filter confidence dengan threshold
+│   │   ├── bbox_refiner.py     # BBoxRefiner: Perbaikan bounding box
+│   │   └── result_formatter.py # ResultFormatter: Format hasil (JSON, CSV, YOLO, COCO)
+│   └── visualization_adapter.py # Adapter visualisasi dari domain model
 ├── handlers/                   # Handler untuk berbagai skenario deteksi
-│   ├── __init__.py
-│   ├── detection_handler.py    # Handler untuk deteksi gambar tunggal
-│   ├── batch_handler.py        # Handler untuk deteksi batch (folder/zip) 
-│   ├── video_handler.py        # Handler untuk deteksi video dan webcam
-│   └── integration_handler.py  # Handler untuk integrasi dengan UI/API
+│   ├── __init__.py             # Ekspor handler dengan __all__
+│   ├── detection_handler.py    # DetectionHandler: Handler untuk deteksi gambar tunggal
+│   ├── batch_handler.py        # BatchHandler: Handler untuk deteksi batch (folder/zip) 
+│   ├── video_handler.py        # VideoHandler: Handler untuk deteksi video dan webcam
+│   └── integration_handler.py  # IntegrationHandler: Integrasi dengan UI/API (async)
 └── adapters/
-    ├── __init__.py
-    ├── onnx_adapter.py         # Menggunakan ONNXModelAdapter dari domain model
-    ├── torchscript_adapter.py  # Menggunakan TorchScriptAdapter dari domain model
-    ├── tensorrt_adapter.py     # Menggunakan TensorRTAdapter dari domain model
-    └── tflite_adapter.py       # Menggunakan TFLiteAdapter dari domain model
+    ├── __init__.py             # Ekspor adapter dengan __all__
+    ├── onnx_adapter.py         # ONNXModelAdapter: Adapter untuk model ONNX
+    └── torchscript_adapter.py  # TorchScriptAdapter: Adapter untuk model TorchScript
 ```
 
 ## 5. Domain Model (Diperbarui)

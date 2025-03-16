@@ -1,21 +1,24 @@
 """
 File: smartcash/detection/adapters/onnx_adapter.py
-Deskripsi: Adapter untuk model ONNX.
+Deskripsi: Adapter untuk model ONNX yang dioptimasi.
 """
 
 import os
+import time
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Union, Any
-import time
+
+import cv2
+from PIL import Image
 
 from smartcash.common.logger import SmartCashLogger, get_logger
 from smartcash.common.types import Detection, ImageType
-from smartcash.common.utils import ensure_dir
 from smartcash.common.layer_config import get_layer_config
+from smartcash.model.services.postprocessing.nms_processor import NMSProcessor
 
 
 class ONNXModelAdapter:
-    """Adapter untuk model ONNX"""
+    """Adapter untuk model ONNX yang dioptimasi"""
     
     def __init__(self, 
                 onnx_path: str,
@@ -41,6 +44,9 @@ class ONNXModelAdapter:
         if self.class_map is None:
             layer_config = get_layer_config()
             self.class_map = layer_config.get_class_map()
+        
+        # Inisialisasi NMS processor dari model domain
+        self.nms_processor = NMSProcessor(logger=self.logger)
         
         # Load model ONNX
         self._load_model()
@@ -113,9 +119,6 @@ class ONNXModelAdapter:
             Array numpy yang sudah dipreproses
         """
         try:
-            import cv2
-            from PIL import Image
-            
             # Load gambar jika berupa path
             if isinstance(image, str):
                 img = cv2.imread(image)
@@ -125,8 +128,9 @@ class ONNXModelAdapter:
                 img = np.array(image)
             # Gunakan langsung jika sudah berupa numpy array
             elif isinstance(image, np.ndarray):
+                img = image.copy()
                 # Convert BGR ke RGB jika perlu
-                if img.shape[2] == 3 and img.dtype == np.uint8:
+                if len(img.shape) == 3 and img.shape[2] == 3 and img.dtype == np.uint8:
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             else:
                 self.logger.error(f"❌ Format gambar tidak didukung: {type(image)}")
@@ -172,9 +176,6 @@ class ONNXModelAdapter:
             List hasil deteksi
         """
         try:
-            import cv2
-            from PIL import Image
-            
             # Dapatkan dimensi gambar original
             if isinstance(original_image, str):
                 img = cv2.imread(original_image)
@@ -250,11 +251,8 @@ class ONNXModelAdapter:
                 
                 detections.append(detection)
             
-            # Terapkan NMS jika diperlukan
-            from ...model.services.postprocessing.nms_processor import NMSProcessor
-            nms_processor = NMSProcessor()
-            
-            filtered_detections = nms_processor.process(
+            # Terapkan NMS menggunakan processor dari domain model
+            filtered_detections = self.nms_processor.process(
                 detections=detections,
                 iou_threshold=iou_threshold,
                 conf_threshold=conf_threshold
@@ -324,9 +322,6 @@ class ONNXModelAdapter:
             Gambar dengan visualisasi deteksi
         """
         try:
-            import cv2
-            from PIL import Image
-            
             # Load gambar jika berupa path
             if isinstance(image, str):
                 img = cv2.imread(image)
@@ -338,17 +333,17 @@ class ONNXModelAdapter:
             elif isinstance(image, np.ndarray):
                 img = image.copy()
                 # Convert BGR ke RGB jika perlu
-                if img.shape[2] == 3 and img.dtype == np.uint8:
+                if len(img.shape) == 3 and img.shape[2] == 3 and img.dtype == np.uint8:
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             else:
                 self.logger.error(f"❌ Format gambar tidak didukung: {type(image)}")
                 raise ValueError(f"Format gambar tidak didukung: {type(image)}")
             
-            # Dapatkan dimensi gambar
-            height, width = img.shape[:2]
-            
             # Filter deteksi berdasarkan conf_threshold
             filtered_detections = [d for d in detections if d.confidence >= conf_threshold]
+            
+            # Dapatkan dimensi gambar
+            height, width = img.shape[:2]
             
             # Generate warna unik untuk setiap kelas
             unique_classes = set(d.class_id for d in filtered_detections)

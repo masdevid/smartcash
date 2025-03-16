@@ -1,21 +1,25 @@
 """
-smartcash/detection/adapters/torchscript_adapter.py
-Adapter untuk model TorchScript.
+File: smartcash/detection/adapters/torchscript_adapter.py
+Deskripsi: Adapter untuk model TorchScript yang dioptimasi.
 """
 
 import os
+import time
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Union, Any
-import time
 
-from ...common.logger import SmartCashLogger, get_logger
-from ...common.types import Detection, ImageType
-from ...common.utils import ensure_dir
-from ...common.layer_config import get_layer_config
+import torch
+import cv2
+from PIL import Image
+
+from smartcash.common.logger import SmartCashLogger, get_logger
+from smartcash.common.types import Detection, ImageType
+from smartcash.common.layer_config import get_layer_config
+from smartcash.model.services.postprocessing.nms_processor import NMSProcessor
 
 
 class TorchScriptAdapter:
-    """Adapter untuk model TorchScript"""
+    """Adapter untuk model TorchScript yang dioptimasi"""
     
     def __init__(self, 
                 model_path: str,
@@ -46,14 +50,15 @@ class TorchScriptAdapter:
             layer_config = get_layer_config()
             self.class_map = layer_config.get_class_map()
         
+        # Inisialisasi NMS processor dari model domain
+        self.nms_processor = NMSProcessor(logger=self.logger)
+        
         # Load model
         self._load_model()
     
     def _load_model(self):
         """Load model TorchScript"""
         try:
-            import torch
-            
             if not os.path.exists(self.model_path):
                 self.logger.error(f"❌ File model TorchScript tidak ditemukan: {self.model_path}")
                 raise FileNotFoundError(f"File model TorchScript tidak ditemukan: {self.model_path}")
@@ -84,14 +89,11 @@ class TorchScriptAdapter:
             
             self.logger.info(f"✅ Model TorchScript berhasil dimuat ke {self.device}")
             
-        except ImportError:
-            self.logger.error(f"❌ Package PyTorch tidak terinstal")
-            raise
         except Exception as e:
             self.logger.error(f"❌ Error saat memuat model TorchScript: {str(e)}")
             raise
     
-    def preprocess(self, image: ImageType) -> Any:
+    def preprocess(self, image: ImageType) -> torch.Tensor:
         """
         Preprocess gambar untuk inferensi
         
@@ -102,10 +104,6 @@ class TorchScriptAdapter:
             Tensor yang sudah dipreproses
         """
         try:
-            import torch
-            import cv2
-            from PIL import Image
-            
             # Load gambar jika berupa path
             if isinstance(image, str):
                 img = cv2.imread(image)
@@ -122,59 +120,6 @@ class TorchScriptAdapter:
             else:
                 self.logger.error(f"❌ Format gambar tidak didukung: {type(image)}")
                 raise ValueError(f"Format gambar tidak didukung: {type(image)}")
-            
-            # Filter deteksi berdasarkan conf_threshold
-            filtered_detections = [d for d in detections if d.confidence >= conf_threshold]
-            
-            # Dapatkan dimensi gambar
-            height, width = img.shape[:2]
-            
-            # Generate warna unik untuk setiap kelas
-            unique_classes = set(d.class_id for d in filtered_detections)
-            colors = {}
-            
-            for class_id in unique_classes:
-                # Generate warna berbeda untuk setiap kelas
-                hue = (class_id * 60) % 360
-                hsv = np.array([[[hue, 255, 255]]], dtype=np.uint8)
-                rgb = cv2.cvtColor(hsv, cv2.COLOR_HSV2RGB)
-                colors[class_id] = rgb[0, 0].tolist()
-            
-            # Visualisasikan deteksi
-            for detection in filtered_detections:
-                # Dapatkan koordinat bbox dalam piksel
-                x1, y1, x2, y2 = detection.bbox
-                x1_px = int(x1 * width)
-                y1_px = int(y1 * height)
-                x2_px = int(x2 * width)
-                y2_px = int(y2 * height)
-                
-                # Dapatkan warna untuk kelas ini
-                color = colors.get(detection.class_id, [0, 255, 0])
-                
-                # Gambar bounding box
-                cv2.rectangle(img, (x1_px, y1_px), (x2_px, y2_px), color, 2)
-                
-                # Siapkan teks label
-                label_text = f"{detection.class_name}: {detection.confidence:.2f}"
-                
-                # Gambar background untuk teks
-                text_size, _ = cv2.getTextSize(label_text, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
-                cv2.rectangle(img, (x1_px, y1_px - text_size[1] - 5), (x1_px + text_size[0], y1_px), color, -1)
-                
-                # Gambar teks
-                cv2.putText(img, label_text, (x1_px, y1_px - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, [255, 255, 255], 2)
-            
-            # Tambahkan informasi jumlah deteksi
-            info_text = f"Deteksi: {len(filtered_detections)}"
-            cv2.putText(img, info_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, [0, 255, 0], 2)
-            
-            return img
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error saat visualisasi: {str(e)}")
-            # Kembalikan gambar kosong
-            return np.zeros((100, 100, 3), dtype=np.uint8)
             
             # Resize gambar ke ukuran input model
             height, width = self.input_shape[2], self.input_shape[3]
@@ -199,7 +144,7 @@ class TorchScriptAdapter:
             raise
     
     def postprocess(self, 
-                   output, 
+                   output: torch.Tensor, 
                    original_image: ImageType,
                    conf_threshold: float = 0.25,
                    iou_threshold: float = 0.45) -> List[Detection]:
@@ -216,10 +161,6 @@ class TorchScriptAdapter:
             List hasil deteksi
         """
         try:
-            import torch
-            import cv2
-            from PIL import Image
-            
             # Convert output ke numpy jika perlu
             if isinstance(output, torch.Tensor):
                 output_np = output.detach().cpu().numpy()
@@ -289,11 +230,8 @@ class TorchScriptAdapter:
                 
                 detections.append(detection)
             
-            # Terapkan NMS jika diperlukan
-            from ...model.services.postprocessing.nms_processor import NMSProcessor
-            nms_processor = NMSProcessor()
-            
-            filtered_detections = nms_processor.process(
+            # Terapkan NMS menggunakan processor dari domain model
+            filtered_detections = self.nms_processor.process(
                 detections=detections,
                 iou_threshold=iou_threshold,
                 conf_threshold=conf_threshold
@@ -361,9 +299,6 @@ class TorchScriptAdapter:
             Gambar dengan visualisasi deteksi
         """
         try:
-            import cv2
-            from PIL import Image
-            
             # Load gambar jika berupa path
             if isinstance(image, str):
                 img = cv2.imread(image)
@@ -432,4 +367,4 @@ class TorchScriptAdapter:
         except Exception as e:
             self.logger.error(f"❌ Error saat visualisasi: {str(e)}")
             # Kembalikan gambar kosong
-            return np.zeros((100, 100, 3), dtype=np.uint8)  
+            return np.zeros((100, 100, 3), dtype=np.uint8)

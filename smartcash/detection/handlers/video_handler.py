@@ -13,7 +13,6 @@ from tqdm import tqdm
 from smartcash.common.utils import ensure_dir, get_timestamp
 from smartcash.common.logger import SmartCashLogger, get_logger
 from smartcash.common.constants import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
-from smartcash.common.types import Detection
 
 
 class VideoHandler:
@@ -103,126 +102,6 @@ class VideoHandler:
             "start_time": time.time()
         }
         
-        # Variabel untuk penghitungan FPS
-        fps_counter = 0
-        fps_timer = time.time()
-        current_fps = 0
-        
-        # Proses frame webcam
-        self._stop_flag = False
-        
-        self.logger.info(f"🎥 Memulai deteksi dari webcam (ID: {camera_id})")
-        
-        # Hitung waktu selesai jika max_time ditentukan
-        end_time = None
-        if max_time is not None:
-            end_time = time.time() + max_time
-            
-        while not self._stop_flag:
-            # Cek waktu maksimum
-            if end_time and time.time() > end_time:
-                self.logger.info(f"⏱️ Waktu maksimum ({max_time}s) tercapai")
-                break
-                
-            # Baca frame
-            ret, frame = cap.read()
-            if not ret:
-                self.logger.error("❌ Tidak dapat membaca frame dari kamera")
-                break
-            
-            # Hitung waktu deteksi
-            start_time = time.time()
-            
-            # Deteksi objek pada frame
-            detections = self.detection_handler.detect(
-                image=frame,
-                conf_threshold=conf_threshold,
-                iou_threshold=iou_threshold
-            )
-            
-            # Update statistik
-            processing_time = time.time() - start_time
-            stats["frames_processed"] += 1
-            stats["total_detections"] += len(detections)
-            stats["processing_time"] += processing_time
-            
-            # Hitung FPS setiap detik
-            fps_counter += 1
-            if time.time() - fps_timer >= 1.0:
-                current_fps = fps_counter / (time.time() - fps_timer)
-                fps_counter = 0
-                fps_timer = time.time()
-            
-            # Visualisasi hasil deteksi
-            visualized_frame = self.detection_handler.inference_service.visualize(frame, detections)
-            
-            # Tambahkan overlay info jika diminta
-            if overlay_info:
-                fps_text = f"FPS: {current_fps:.1f}"
-                count_text = f"Deteksi: {len(detections)}"
-                time_text = f"Waktu: {(time.time() - stats['start_time']):.1f}s"
-                
-                # Tambahkan teks ke frame
-                cv2.putText(visualized_frame, fps_text, (10, 30), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                cv2.putText(visualized_frame, count_text, (10, 60), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                cv2.putText(visualized_frame, time_text, (10, 90), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-            
-            # Tulis ke file output jika ada
-            if video_writer:
-                video_writer.write(visualized_frame)
-            
-            # Tampilkan preview
-            cv2.imshow('Webcam Detection', visualized_frame)
-            
-            # Tekan 'q' untuk keluar
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                self._stop_flag = True
-                break
-            
-            # Panggil callback jika ada
-            if callback:
-                stop_requested = callback(stats["frames_processed"], frame, detections, processing_time)
-                if stop_requested:
-                    self._stop_flag = True
-                    break
-        
-        # Hitung statistik akhir
-        stats["end_time"] = time.time()
-        stats["total_time"] = stats["end_time"] - stats["start_time"]
-        stats["avg_processing_time"] = stats["processing_time"] / max(stats["frames_processed"], 1)
-        stats["avg_fps"] = stats["frames_processed"] / max(stats["total_time"], 0.001)
-        stats["avg_detections_per_frame"] = stats["total_detections"] / max(stats["frames_processed"], 1)
-        
-        # Tutup resources
-        cap.release()
-        if video_writer:
-            video_writer.release()
-        cv2.destroyAllWindows()
-        
-        self.logger.info(f"✅ Selesai deteksi webcam: {stats['frames_processed']} frame, "
-                       f"{stats['total_detections']} objek terdeteksi, "
-                       f"{stats['avg_fps']:.2f} FPS")
-                       
-        return {
-            "status": "success" if not self._stop_flag else "stopped",
-            "stats": stats,
-            "video_info": {
-                "width": width,
-                "height": height,
-                "fps": fps,
-                "input": f"Webcam ID {camera_id}",
-                "output_path": output_path
-            }
-        }
-    
-    def stop(self):
-        """Menghentikan proses deteksi yang sedang berjalan"""
-        self._stop_flag = True
-        self.logger.info("🛑 Menghentikan proses deteksi video/webcam")
-        
         # Pindah ke frame awal
         cap.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
         
@@ -260,17 +139,14 @@ class VideoHandler:
                     
                     # Tambahkan overlay info jika diminta
                     if overlay_info:
-                        fps_text = f"FPS: {1/processing_time:.1f}" if processing_time > 0 else "FPS: N/A"
-                        frame_text = f"Frame: {frame_idx}/{total_frames}"
-                        count_text = f"Deteksi: {len(detections)}"
-                        
-                        # Tambahkan teks ke frame
-                        cv2.putText(visualized_frame, fps_text, (10, 30), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(visualized_frame, frame_text, (10, 60), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(visualized_frame, count_text, (10, 90), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        visualized_frame = self._add_overlay_text(
+                            visualized_frame,
+                            [
+                                f"FPS: {1/processing_time:.1f}" if processing_time > 0 else "FPS: N/A",
+                                f"Frame: {frame_idx}/{total_frames}",
+                                f"Deteksi: {len(detections)}"
+                            ]
+                        )
                     
                     # Tulis ke file output jika ada
                     if video_writer:
@@ -397,3 +273,143 @@ class VideoHandler:
             "processing_time": 0,
             "start_time": time.time()
         }
+        
+        # Variabel untuk penghitungan FPS
+        fps_counter = 0
+        fps_timer = time.time()
+        current_fps = 0
+        
+        # Proses frame webcam
+        self._stop_flag = False
+        
+        self.logger.info(f"🎥 Memulai deteksi dari webcam (ID: {camera_id})")
+        
+        # Hitung waktu selesai jika max_time ditentukan
+        end_time = None
+        if max_time is not None:
+            end_time = time.time() + max_time
+            
+        while not self._stop_flag:
+            # Cek waktu maksimum
+            if end_time and time.time() > end_time:
+                self.logger.info(f"⏱️ Waktu maksimum ({max_time}s) tercapai")
+                break
+                
+            # Baca frame
+            ret, frame = cap.read()
+            if not ret:
+                self.logger.error("❌ Tidak dapat membaca frame dari kamera")
+                break
+            
+            # Hitung waktu deteksi
+            start_time = time.time()
+            
+            # Deteksi objek pada frame
+            detections = self.detection_handler.detect(
+                image=frame,
+                conf_threshold=conf_threshold,
+                iou_threshold=iou_threshold
+            )
+            
+            # Update statistik
+            processing_time = time.time() - start_time
+            stats["frames_processed"] += 1
+            stats["total_detections"] += len(detections)
+            stats["processing_time"] += processing_time
+            
+            # Hitung FPS setiap detik
+            fps_counter += 1
+            if time.time() - fps_timer >= 1.0:
+                current_fps = fps_counter / (time.time() - fps_timer)
+                fps_counter = 0
+                fps_timer = time.time()
+            
+            # Visualisasi hasil deteksi
+            visualized_frame = self.detection_handler.inference_service.visualize(frame, detections)
+            
+            # Tambahkan overlay info jika diminta
+            if overlay_info:
+                visualized_frame = self._add_overlay_text(
+                    visualized_frame,
+                    [
+                        f"FPS: {current_fps:.1f}",
+                        f"Deteksi: {len(detections)}",
+                        f"Waktu: {(time.time() - stats['start_time']):.1f}s"
+                    ]
+                )
+            
+            # Tulis ke file output jika ada
+            if video_writer:
+                video_writer.write(visualized_frame)
+            
+            # Tampilkan preview
+            cv2.imshow('Webcam Detection', visualized_frame)
+            
+            # Tekan 'q' untuk keluar
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                self._stop_flag = True
+                break
+            
+            # Panggil callback jika ada
+            if callback:
+                stop_requested = callback(stats["frames_processed"], frame, detections, processing_time)
+                if stop_requested:
+                    self._stop_flag = True
+                    break
+        
+        # Hitung statistik akhir
+        stats["end_time"] = time.time()
+        stats["total_time"] = stats["end_time"] - stats["start_time"]
+        stats["avg_processing_time"] = stats["processing_time"] / max(stats["frames_processed"], 1)
+        stats["avg_fps"] = stats["frames_processed"] / max(stats["total_time"], 0.001)
+        stats["avg_detections_per_frame"] = stats["total_detections"] / max(stats["frames_processed"], 1)
+        
+        # Tutup resources
+        cap.release()
+        if video_writer:
+            video_writer.release()
+        cv2.destroyAllWindows()
+        
+        self.logger.info(f"✅ Selesai deteksi webcam: {stats['frames_processed']} frame, "
+                       f"{stats['total_detections']} objek terdeteksi, "
+                       f"{stats['avg_fps']:.2f} FPS")
+                       
+        return {
+            "status": "success" if not self._stop_flag else "stopped",
+            "stats": stats,
+            "video_info": {
+                "width": width,
+                "height": height,
+                "fps": fps,
+                "input": f"Webcam ID {camera_id}",
+                "output_path": output_path
+            }
+        }
+    
+    def stop(self):
+        """Menghentikan proses deteksi yang sedang berjalan"""
+        self._stop_flag = True
+        self.logger.info("🛑 Menghentikan proses deteksi video/webcam")
+    
+    def _add_overlay_text(self, frame, text_lines, start_y=30, line_height=30, color=(0, 255, 0), thickness=2, font_scale=0.7):
+        """
+        Tambahkan teks overlay ke frame
+        
+        Args:
+            frame: Frame untuk ditambahkan teks
+            text_lines: List teks yang akan ditampilkan
+            start_y: Posisi y awal
+            line_height: Tinggi baris
+            color: Warna teks (B,G,R)
+            thickness: Ketebalan teks
+            font_scale: Skala font
+            
+        Returns:
+            Frame dengan teks overlay
+        """
+        for i, text in enumerate(text_lines):
+            y_pos = start_y + (i * line_height)
+            cv2.putText(frame, text, (10, y_pos), 
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
+        
+        return frame

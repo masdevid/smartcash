@@ -855,43 +855,148 @@
 ### Detector (detector.py)
 - **Fungsi**: Koordinator utama proses deteksi
 - **Metode Utama**:
-  - `detect(image, **kwargs)`: Deteksi pada gambar
-  - `detect_multilayer(image, threshold)`: Deteksi multilayer
-  - `detect_batch(images)`: Deteksi pada batch gambar
-  - `visualize(image, detections)`: Visualisasi hasil dengan visualisasi terpadu dari domain model
+  - `__init__(model_manager, prediction_service, inference_service, postprocessing_service, visualization_adapter, logger)`: Inisialisasi detector dengan dependensi
+  - `detect(image, conf_threshold, iou_threshold, with_visualization)`: Deteksi pada gambar tunggal dengan opsi visualisasi
+  - `detect_multilayer(image, threshold)`: Deteksi multilayer dengan threshold khusus per layer
+  - `detect_batch(images, conf_threshold, iou_threshold)`: Deteksi pada batch gambar
+  - `visualize(image, detections, conf_threshold, show_labels, show_conf, filename)`: Visualisasi hasil deteksi
 
 ### DetectionVisualizationAdapter (services/visualization_adapter.py)
-- **Fungsi**: Adapter untuk mengintegrasikan visualisasi dari domain model ke domain detection
+- **Fungsi**: Adapter visualisasi dari domain model ke domain detection
 - **Metode Utama**:
-  - `visualize_detection(image, detections)`: Visualisasi deteksi menggunakan DetectionVisualizer
-  - `visualize_confusion_matrix(cm, class_names)`: Visualisasi confusion matrix menggunakan MetricsVisualizer
-  - `visualize_model_comparison(comparison_data)`: Visualisasi perbandingan model menggunakan MetricsVisualizer
+  - `__init__(detection_output_dir, metrics_output_dir, logger)`: Inisialisasi adapter visualisasi
+  - `visualize_detection(image, detections, filename, conf_threshold, show_labels, show_conf)`: Visualisasi hasil deteksi
+  - `plot_confusion_matrix(cm, class_names, title, filename, normalize)`: Visualisasi confusion matrix
+  - `visualize_model_comparison(comparison_data, metric_cols, title, filename)`: Visualisasi perbandingan model
 
 ### InferenceService (services/inference/inference_service.py)
-- **Fungsi**: Mengelola proses inferensi model
+- **Fungsi**: Koordinator layanan inferensi model
 - **Metode Utama**:
-  - `infer(image)`: Inferensi pada gambar
-  - `batch_infer(images)`: Inferensi pada batch
-  - `_optimize_model()`: Optimasi model untuk inferensi
+  - `__init__(prediction_service, postprocessing_service, accelerator, logger)`: Inisialisasi layanan dengan dependensi
+  - `infer(image, conf_threshold, iou_threshold)`: Inferensi pada gambar tunggal
+  - `batch_infer(images, conf_threshold, iou_threshold)`: Inferensi pada batch gambar
+  - `visualize(image, detections)`: Visualisasi hasil inferensi
+  - `optimize_model(target_format, **kwargs)`: Optimasi model untuk inferensi
+  - `get_model_info()`: Informasi model yang digunakan
 
-### NMSProcessor (services/postprocessing/nms_processor.py)
-- **Fungsi**: Pemrosesan Non-Maximum Suppression
+### HardwareAccelerator (services/inference/accelerator.py)
+- **Fungsi**: Abstraksi hardware untuk akselerasi inferensi
 - **Metode Utama**:
-  - `process(detections, iou_threshold)`: Proses NMS
+  - `__init__(accelerator_type, device_id, use_fp16, logger)`: Inisialisasi akselerator
+  - `setup()`: Setup akselerator untuk inferensi
+  - `get_device()`: Dapatkan device yang dikonfigurasi
+  - `get_device_info()`: Informasi device (CUDA, MPS, CPU, etc)
+  - `_auto_detect_hardware()`: Deteksi otomatis hardware terbaik
+  - `_setup_cuda/mps/tpu/rocm/cpu()`: Setup untuk berbagai tipe akselerator
 
-### DetectionEvaluator (services/evaluation/evaluator.py)
-- **Fungsi**: Evaluasi model deteksi
+### BatchProcessor (services/inference/batch_processor.py)
+- **Fungsi**: Processor untuk inferensi batch gambar paralel
 - **Metode Utama**:
-  - `evaluate(iou_threshold, conf_threshold)`: Evaluasi model
-  - `generate_report()`: Laporan evaluasi
+  - `__init__(inference_service, output_dir, num_workers, batch_size, logger)`: Inisialisasi processor
+  - `process_directory(input_dir, output_dir, extensions, recursive, conf_threshold, iou_threshold, save_results, save_visualizations, result_format, callback)`: Proses semua gambar dalam direktori
+  - `process_batch(images, output_dir, filenames, conf_threshold, iou_threshold, save_results, save_visualizations, result_format)`: Proses batch gambar yang sudah dimuat
+  - `_save_result(img_path, detections, output_path, save_visualization, format)`: Simpan hasil deteksi
 
-### SmartCashYOLOv5 (models/yolov5_model.py)
-- **Fungsi**: Model YOLOv5 dengan EfficientNet backbone
+### ModelOptimizer (services/inference/optimizers.py)
+- **Fungsi**: Utilitas optimasi model untuk inferensi
 - **Metode Utama**:
-  - `forward(x)`: Forward pass model
-  - `predict(x, conf_threshold, nms_threshold)`: Prediksi dengan post-processing
-  - `get_optimizer(learning_rate, weight_decay)`: Buat optimizer
-  - `compute_loss(predictions, targets, loss_fn)`: Hitung loss
+  - `__init__(logger)`: Inisialisasi optimizer
+  - `optimize_to_onnx(model, output_path, input_shape, dynamic_axes, opset_version, simplify)`: Optimasi ke ONNX
+  - `optimize_to_torchscript(model, output_path, input_shape, method)`: Optimasi ke TorchScript
+  - `optimize_to_tensorrt(onnx_path, output_path, fp16_mode, int8_mode, workspace_size)`: Optimasi ke TensorRT
+  - `optimize_to_tflite(model_path, output_path, quantize, input_shape)`: Optimasi ke TFLite
+  - `optimize_model(model, model_format, output_path, **kwargs)`: Optimasi model ke format yang ditentukan
+
+### PostprocessingService (services/postprocessing/postprocessing_service.py)
+- **Fungsi**: Koordinator postprocessing hasil deteksi
+- **Metode Utama**:
+  - `__init__(logger)`: Inisialisasi service
+  - `process(detections, conf_threshold, iou_threshold, refine_boxes, class_specific_nms, max_detections)`: Proses postprocessing lengkap
+
+### ConfidenceFilter (services/postprocessing/confidence_filter.py)
+- **Fungsi**: Filter deteksi berdasarkan confidence threshold
+- **Metode Utama**:
+  - `__init__(default_threshold, class_thresholds, logger)`: Inisialisasi filter
+  - `process(detections, global_threshold)`: Filter deteksi berdasarkan threshold
+  - `set_threshold(class_id, threshold)`: Set threshold per kelas
+  - `get_threshold(class_id)`: Dapatkan threshold untuk kelas
+  - `reset_thresholds()`: Reset semua threshold ke default
+
+### BBoxRefiner (services/postprocessing/bbox_refiner.py)
+- **Fungsi**: Perbaikan bounding box hasil deteksi
+- **Metode Utama**:
+  - `__init__(clip_boxes, expand_factor, logger)`: Inisialisasi refiner
+  - `process(detections, image_width, image_height, specific_classes)`: Perbaiki bounding box deteksi
+  - `_expand_bbox(bbox, factor)`: Ekspansi bbox dengan factor tertentu
+  - `_clip_bbox(bbox)`: Clip bbox ke range [0,1]
+  - `_fix_absolute_bbox(bbox, img_width, img_height)`: Perbaiki bbox dalam koordinat absolut
+
+### ResultFormatter (services/postprocessing/result_formatter.py)
+- **Fungsi**: Format hasil deteksi ke berbagai format
+- **Metode Utama**:
+  - `__init__(logger)`: Inisialisasi formatter
+  - `to_json(detections, include_metadata, pretty)`: Format ke JSON
+  - `to_csv(detections, include_header)`: Format ke CSV
+  - `to_yolo_format(detections)`: Format ke format YOLO
+  - `to_coco_format(detections, image_id, image_width, image_height)`: Format ke COCO
+  - `format_detections(detections, format, **kwargs)`: Format dengan format yang ditentukan
+
+### DetectionHandler (handlers/detection_handler.py)
+- **Fungsi**: Handler untuk deteksi gambar tunggal
+- **Metode Utama**:
+  - `__init__(inference_service, postprocessing_service, logger)`: Inisialisasi handler
+  - `detect(image, conf_threshold, iou_threshold, apply_postprocessing, return_visualization)`: Deteksi objek pada gambar
+  - `save_result(detections, output_path, image, save_visualization, format)`: Simpan hasil deteksi ke file
+
+### BatchHandler (handlers/batch_handler.py)
+- **Fungsi**: Handler untuk deteksi batch/kumpulan gambar
+- **Metode Utama**:
+  - `__init__(detection_handler, num_workers, batch_size, max_batch_size, logger)`: Inisialisasi handler batch
+  - `detect_directory(input_dir, output_dir, extensions, recursive, conf_threshold, iou_threshold, save_results, save_visualizations, result_format)`: Deteksi pada semua gambar di direktori
+  - `detect_zip(zip_path, output_dir, conf_threshold, iou_threshold, extensions, save_extracted)`: Deteksi pada gambar dalam file ZIP
+
+### VideoHandler (handlers/video_handler.py)
+- **Fungsi**: Handler untuk deteksi video dan webcam
+- **Metode Utama**:
+  - `__init__(detection_handler, logger)`: Inisialisasi handler
+  - `detect_video(video_path, output_path, conf_threshold, iou_threshold, start_frame, end_frame, step, show_progress, show_preview, overlay_info, callback)`: Deteksi pada file video
+  - `detect_webcam(camera_id, output_path, conf_threshold, iou_threshold, display_width, display_height, overlay_info, max_time, callback)`: Deteksi pada webcam
+  - `stop()`: Hentikan proses yang berjalan
+  - `_add_overlay_text(frame, text_lines, start_y, line_height, color, thickness, font_scale)`: Tambahkan teks overlay
+
+### IntegrationHandler (handlers/integration_handler.py)
+- **Fungsi**: Handler untuk integrasi dengan UI/API
+- **Metode Utama**:
+  - `__init__(detection_handler, logger)`: Inisialisasi handler
+  - `detect_from_base64(image_base64, conf_threshold, iou_threshold, return_visualization, visualization_format)`: Deteksi dari gambar base64
+  - `start_async_worker(num_workers)`: Mulai worker thread asinkron
+  - `stop_async_worker()`: Hentikan worker thread
+  - `detect_async(image, task_id, conf_threshold, iou_threshold, callback, return_visualization)`: Deteksi asinkron
+  - `get_task_result(task_id, remove_after_get)`: Dapatkan hasil task asinkron
+  - `get_queue_status()`: Status queue dan task
+  - `clean_old_results(max_age_seconds)`: Bersihkan hasil lama
+  - `_async_worker_loop()`: Loop worker asinkron
+  - `to_json_response(result)`: Konversi hasil ke respons JSON
+
+### ONNXModelAdapter (adapters/onnx_adapter.py)
+- **Fungsi**: Adapter untuk model ONNX yang dioptimasi
+- **Metode Utama**:
+  - `__init__(onnx_path, input_shape, class_map, logger)`: Inisialisasi adapter
+  - `_load_model()`: Load model ONNX
+  - `preprocess(image)`: Preprocess gambar untuk inferensi
+  - `postprocess(outputs, original_image, conf_threshold, iou_threshold)`: Postprocess hasil
+  - `predict(image, conf_threshold, iou_threshold)`: Prediksi objek pada gambar
+  - `visualize(image, detections, conf_threshold)`: Visualisasi hasil
+
+### TorchScriptAdapter (adapters/torchscript_adapter.py)
+- **Fungsi**: Adapter untuk model TorchScript yang dioptimasi
+- **Metode Utama**:
+  - `__init__(model_path, input_shape, class_map, device, logger)`: Inisialisasi adapter
+  - `_load_model()`: Load model TorchScript
+  - `preprocess(image)`: Preprocess gambar untuk inferensi
+  - `postprocess(output, original_image, conf_threshold, iou_threshold)`: Postprocess hasil
+  - `predict(image, conf_threshold, iou_threshold)`: Prediksi objek pada gambar
+  - `visualize(image, detections, conf_threshold)`: Visualisasi hasil
 
 ## DOMAIN MODEL
 

@@ -139,5 +139,26 @@ class BBoxRefiner:
             img_height: Tinggi gambar
             
         Returns:
-            Bounding box yang sudah diperbaiki        """
-      
+            Bounding box yang sudah diperbaiki
+        """
+        x1, y1, x2, y2 = bbox
+        
+        # Convert ke koordinat absolut
+        x1_abs = x1 * img_width
+        y1_abs = y1 * img_height
+        x2_abs = x2 * img_width
+        y2_abs = y2 * img_height
+        
+        # Clip ke batasan gambar
+        x1_abs = max(0, min(img_width, x1_abs))
+        y1_abs = max(0, min(img_height, y1_abs))
+        x2_abs = max(0, min(img_width, x2_abs))
+        y2_abs = max(0, min(img_height, y2_abs))
+        
+        # Convert kembali ke koordinat relatif
+        x1_rel = x1_abs / img_width
+        y1_rel = y1_abs / img_height
+        x2_rel = x2_abs / img_width
+        y2_rel = y2_abs / img_height
+        
+        return np.array([x1_rel, y1_rel, x2_rel, y2_rel])

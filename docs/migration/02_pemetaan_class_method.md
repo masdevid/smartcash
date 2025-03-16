@@ -1301,3 +1301,439 @@
 - **Metode Utama**:
   - `__init__(logger)`: Inisialisasi NMS processor
   - `process(detections, iou_threshold, conf_threshold, class_specific, max_detections)`: Proses deteksi dengan Non-Maximum Suppression
+
+
+## DOMAIN UI COMPONENTS
+
+### Shared Components
+
+#### Headers (smartcash/components/shared/headers.py)
+- **Fungsi**: Komponen header dan section title reusable
+- **Metode Utama**:
+  - `create_header(title, description, icon)`: Buat komponen header dengan style konsisten
+  - `create_section_title(title, icon)`: Buat judul section dengan style konsisten
+  - `create_component_header(title, description, icon)`: Alias untuk create_header untuk backward compatibility
+
+#### Alerts (smartcash/components/shared/alerts.py)
+- **Fungsi**: Komponen alerts, info boxes, dan status indicators
+- **Metode Utama**:
+  - `create_status_indicator(status, message)`: Buat indikator status dengan style yang sesuai
+  - `create_info_alert(message, alert_type, icon)`: Buat alert box dengan style yang sesuai
+  - `create_info_box(title, content, style, icon, collapsed)`: Buat info box yang dapat di-collapse
+
+#### Layouts (smartcash/components/shared/layouts.py)
+- **Fungsi**: Layout standar untuk widgets UI
+- **Konstanta Utama**:
+  - `STANDARD_LAYOUTS`: Dictionary layout standar (header, section, container, output, button, hbox, vbox)
+  - `MAIN_CONTAINER`: Layout untuk container utama
+  - `OUTPUT_WIDGET`: Layout untuk output widget
+  - `BUTTON`, `HIDDEN_BUTTON`: Layout untuk tombol
+  - `TEXT_INPUT`, `TEXT_AREA`: Layout untuk input text
+  - `HORIZONTAL_GROUP`, `VERTICAL_GROUP`: Layout untuk grup widget
+  - `CARD`, `TABS`, `ACCORDION`: Layout untuk komponen container
+- **Metode Utama**:
+  - `create_divider()`: Buat divider horizontal
+
+#### Metrics (smartcash/components/shared/metrics.py)
+- **Fungsi**: Komponen UI untuk menampilkan metrik dengan styling konsisten
+- **Metode Utama**:
+  - `create_metric_display(label, value, unit, is_good)`: Buat display metrik dengan style konsisten
+  - `create_result_table(data, title, highlight_max)`: Tampilkan table hasil dengan highlighting
+  - `plot_statistics(data, title, kind, figsize, **kwargs)`: Plot statistik data
+  - `styled_html(content, bg_color, text_color, border_color, padding, margin)`: Buat HTML dengan styling kustom
+
+#### Helpers (ui_components/shared/helpers.py)
+- **Fungsi**: Helper functions untuk komponen UI
+- **Metode Utama**:
+  - `create_tab_view(tabs)`: Buat komponen Tab dengan konfigurasi otomatis
+  - `create_loading_indicator(message)`: Buat indikator loading dengan callback
+  - `update_output_area(output_widget, message, status, clear)`: Update area output dengan status baru
+  - `register_observer_callback(observer_manager, event_type, output_widget, group_name)`: Register callback for observer events
+  - `display_file_info(file_path, description)`: Tampilkan informasi file
+  - `create_progress_updater(progress_bar)`: Buat fungsi updater untuk progress bar
+  - `run_async_task(task_func, on_complete, on_error, with_output)`: Jalankan task secara asinkron
+  - `create_button_group(buttons, layout)`: Buat grup tombol dengan layout konsisten
+  - `create_confirmation_dialog(title, message, on_confirm, on_cancel, confirm_label, cancel_label)`: Buat dialog konfirmasi
+
+#### Widget Layouts (smartcash/components/shared/widget_layouts.py)
+- **Fungsi**: Layout standar untuk widgets UI dengan pendekatan factory
+- **Konstanta Utama**:
+  - `CONTAINER_LAYOUTS`: Layout untuk containers (main, card, section, sidebar)
+  - `CONTENT_LAYOUTS`: Layout untuk content (output, status, log)
+  - `INPUT_LAYOUTS`: Layout untuk input (text, textarea, dropdown, slider, checkbox, radio)
+  - `BUTTON_LAYOUTS`: Layout untuk buttons (standard, small, hidden, inline)
+  - `GROUP_LAYOUTS`: Layout untuk grup (horizontal, vertical, grid)
+  - `COMPONENT_LAYOUTS`: Layout untuk komponen (tabs, accordion, progress, divider)
+- **Metode Utama**:
+  - `create_layout(width, height, margin, padding, border, display, **kwargs)`: Factory untuk membuat layout
+  - `create_divider()`: Buat divider horizontal
+  - `create_spacing(height)`: Buat elemen spacing
+  - `create_grid_layout(nrows, ncols, layout_kwargs)`: Buat layout grid
+
+#### Validators (smartcash/components/shared/validators.py)
+- **Fungsi**: Utilitas validasi untuk input UI dan form handling
+- **Metode Utama**:
+  - `create_validation_message(message, is_error)`: Buat pesan validasi
+  - `show_validation_message(container, message, is_error)`: Tampilkan pesan validasi
+  - `clear_validation_messages(container)`: Hapus semua pesan validasi
+  - `validate_required(value)`: Validasi field tidak boleh kosong
+  - `validate_numeric(value)`, `validate_integer(value)`: Validasi nilai numerik/integer
+  - `validate_min_value(value, min_value)`, `validate_max_value(value, max_value)`: Validasi nilai min/max
+  - `validate_range(value, min_value, max_value)`: Validasi nilai dalam range
+  - `validate_min_length(value, min_length)`, `validate_max_length(value, max_length)`: Validasi panjang string
+  - `validate_regex(value, pattern, message)`: Validasi string dengan regex
+  - `validate_email(value)`, `validate_url(value)`: Validasi format email/URL
+  - `validate_file_exists(value)`, `validate_directory_exists(value)`: Validasi file/direktori ada
+  - `validate_file_extension(value, allowed_extensions)`: Validasi ekstensi file
+  - `validate_api_key(value, min_length)`: Validasi API key
+  - `validate_form(form_data, validation_rules)`: Validasi form dengan berbagai aturan
+  - `create_validator(validation_func, error_message)`: Buat fungsi validator kustom
+  - `combine_validators(*validators)`: Gabungkan beberapa validator
+
+### Dataset Components
+
+#### Download Component (smartcash/components/dataset/download.py)
+- **Fungsi**: Komponen UI untuk download dataset
+- **Metode Utama**:
+  - `create_download_ui(env, config)`: Buat UI untuk download dataset
+  - `create_source_selection(env, config)`: Buat komponen pemilihan sumber dataset
+  - `create_roboflow_config(env, config)`: Buat konfigurasi Roboflow
+  - `create_local_upload(env, config)`: Buat komponen upload dataset lokal
+
+#### Preprocessing Component (ui_components/dataset/preprocessing.py)
+- **Fungsi**: Komponen UI untuk preprocessing dataset
+- **Metode Utama**:
+  - `create_preprocessing_ui(env, config)`: Buat UI untuk preprocessing dataset
+  - `create_preprocessing_options(env, config)`: Buat opsi preprocessing
+  - `create_preprocessing_preview(env, config)`: Buat komponen preview hasil preprocessing
+
+#### Split Component (smartcash/components/dataset/split.py)
+- **Fungsi**: Komponen UI untuk split dataset
+- **Metode Utama**:
+  - `create_split_ui(env, config)`: Buat UI untuk split dataset
+  - `create_split_ratio_selector(env, config)`: Buat komponen pemilihan rasio split
+  - `create_stratification_options(env, config)`: Buat opsi stratifikasi
+
+#### Augmentation Component (smartcash/components/dataset/augmentation.py)
+- **Fungsi**: Komponen UI untuk augmentasi dataset
+- **Metode Utama**:
+  - `create_augmentation_ui(env, config)`: Buat UI untuk augmentasi dataset
+  - `create_augmentation_options(env, config)`: Buat opsi augmentasi
+  - `create_augmentation_preview(env, config)`: Buat komponen preview hasil augmentasi
+
+### Training Config Components
+
+#### Backbone Selection Component (smartcash/components/training_config/backbone_selection.py)
+- **Fungsi**: Komponen UI untuk pemilihan backbone model
+- **Metode Utama**:
+  - `create_backbone_ui(env, config)`: Buat UI untuk pemilihan backbone
+  - `create_backbone_selector(env, config)`: Buat komponen pemilihan backbone
+  - `create_backbone_info(env, config)`: Buat info tentang backbone yang dipilih
+
+#### Hyperparameters Component (smartcash/components/training_config/hyperparameters.py)
+- **Fungsi**: Komponen UI untuk setting hyperparameter
+- **Metode Utama**:
+  - `create_hyperparameters_ui(env, config)`: Buat UI untuk setting hyperparameter
+  - `create_batch_size_selector(env, config)`: Buat komponen pemilihan batch size
+  - `create_learning_rate_selector(env, config)`: Buat komponen pemilihan learning rate
+  - `create_epochs_selector(env, config)`: Buat komponen pemilihan epochs
+  - `create_optimization_options(env, config)`: Buat komponen opsi optimisasi
+
+#### Training Strategy Component (smartcash/components/training_config/training_strategy.py)
+- **Fungsi**: Komponen UI untuk strategi training
+- **Metode Utama**:
+  - `create_training_strategy_ui(env, config)`: Buat UI untuk strategi training
+  - `create_scheduler_options(env, config)`: Buat komponen opsi scheduler
+  - `create_early_stopping_options(env, config)`: Buat komponen opsi early stopping
+  - `create_checkpoint_options(env, config)`: Buat komponen opsi checkpoint
+
+#### Layer Config Component (smartcash/components/training_config/layer_config.py)
+- **Fungsi**: Komponen UI untuk konfigurasi layer deteksi
+- **Metode Utama**:
+  - `create_layer_config_ui(env, config)`: Buat UI untuk konfigurasi layer
+  - `create_layer_selector(env, config)`: Buat komponen pemilihan layer
+  - `create_class_config(env, config)`: Buat komponen konfigurasi class
+
+### Training Execution Components
+
+#### Model Training Component (smartcash/components/training_execution/model_training.py)
+- **Fungsi**: Komponen UI untuk pelatihan model
+- **Metode Utama**:
+  - `create_model_training_ui(env, config)`: Buat UI untuk pelatihan model
+  - `create_training_controls(env, config)`: Buat komponen kontrol training
+  - `create_training_progress(env, config)`: Buat komponen progress training
+  - `create_training_output(env, config)`: Buat komponen output training
+
+#### Performance Tracking Component (smartcash/components/training_execution/performance_tracking.py)
+- **Fungsi**: Komponen UI untuk tracking performa
+- **Metode Utama**:
+  - `create_performance_tracking_ui(env, config)`: Buat UI untuk tracking performa
+  - `create_metrics_display(env, config)`: Buat komponen display metrik
+  - `create_loss_chart(env, config)`: Buat komponen chart loss
+  - `create_metrics_history(env, config)`: Buat komponen history metrik
+
+#### Checkpoint Management Component (smartcash/components/training_execution/checkpoint_management.py)
+- **Fungsi**: Komponen UI untuk manajemen checkpoint
+- **Metode Utama**:
+  - `create_checkpoint_management_ui(env, config)`: Buat UI untuk manajemen checkpoint
+  - `create_checkpoint_list(env, config)`: Buat komponen daftar checkpoint
+  - `create_checkpoint_actions(env, config)`: Buat komponen aksi checkpoint
+  - `create_checkpoint_details(env, config)`: Buat komponen detail checkpoint
+
+### Model Evaluation Components
+
+#### Performance Metrics Component (smartcash/components/model_evaluation/performance_metrics.py)
+- **Fungsi**: Komponen UI untuk metrik performa
+- **Metode Utama**:
+  - `create_performance_metrics_ui(env, config)`: Buat UI untuk metrik performa
+  - `create_metrics_dashboard(env, config)`: Buat dashboard metrik
+  - `create_confusion_matrix(env, config)`: Buat komponen confusion matrix
+  - `create_precision_recall_curve(env, config)`: Buat komponen kurva precision-recall
+
+#### Comparative Analysis Component (smartcash/components/model_evaluation/comparative_analysis.py)
+- **Fungsi**: Komponen UI untuk analisis komparatif
+- **Metode Utama**:
+  - `create_comparative_analysis_ui(env, config)`: Buat UI untuk analisis komparatif
+  - `create_model_selector(env, config)`: Buat komponen pemilihan model
+  - `create_comparison_chart(env, config)`: Buat komponen chart perbandingan
+  - `create_comparison_table(env, config)`: Buat komponen tabel perbandingan
+
+#### Visualization Component (smartcash/components/model_evaluation/visualization.py)
+- **Fungsi**: Komponen UI untuk visualisasi hasil
+- **Metode Utama**:
+  - `create_visualization_ui(env, config)`: Buat UI untuk visualisasi hasil
+  - `create_detection_visualizer(env, config)`: Buat komponen visualisasi deteksi
+  - `create_layer_visualizer(env, config)`: Buat komponen visualisasi layer
+  - `create_export_options(env, config)`: Buat komponen opsi export
+
+## DOMAIN UI HANDLERS
+
+### Shared Handlers
+
+#### Config Handler (smartcash/handlers/shared/config_handler.py)
+- **Fungsi**: Handler untuk manajemen konfigurasi
+- **Metode Utama**:
+  - `setup_config_handlers(ui, env, config)`: Setup handler untuk komponen konfigurasi
+  - `handle_config_save(ui, env, config)`: Handle event save konfigurasi
+  - `handle_config_load(ui, env, config)`: Handle event load konfigurasi
+  - `handle_config_update(ui, env, config)`: Handle event update konfigurasi
+
+#### Observer Handler (smartcash/handlers/shared/observer_handler.py)
+- **Fungsi**: Handler untuk sistem observer
+- **Metode Utama**:
+  - `setup_observer_handlers(ui, env, config)`: Setup handler untuk komponen observer
+  - `register_ui_observers(ui, env, config)`: Register observer untuk UI
+  - `handle_event(event_type, sender, **kwargs)`: Handler untuk event observer
+
+#### Error Handler (smartcash/handlers/shared/error_handler.py)
+- **Fungsi**: Handler untuk penanganan error
+- **Metode Utama**:
+  - `setup_error_handlers(ui, env, config)`: Setup handler untuk error
+  - `handle_error(error, ui_output)`: Handle error dan tampilkan di UI
+  - `create_error_handler(ui_output)`: Buat error handler untuk callbacks
+
+### Dataset Handlers
+
+#### Download Handler (smartcash/handlers/dataset/download_handler.py)
+- **Fungsi**: Handler untuk download dataset
+- **Metode Utama**:
+  - `setup_download_handlers(ui, env, config)`: Setup handler untuk download dataset
+  - `handle_roboflow_download(ui, env, config)`: Handle download dari Roboflow
+  - `handle_local_upload(ui, env, config)`: Handle upload dataset lokal
+  - `handle_source_change(ui, env, config)`: Handle perubahan sumber dataset
+
+#### Preprocessing Handler (smartcash/handlers/dataset/preprocessing_handler.py)
+- **Fungsi**: Handler untuk preprocessing dataset
+- **Metode Utama**:
+  - `setup_preprocessing_handlers(ui, env, config)`: Setup handler untuk preprocessing
+  - `handle_preprocessing_start(ui, env, config)`: Handle start preprocessing
+  - `handle_preprocessing_option_change(ui, env, config)`: Handle perubahan opsi preprocessing
+  - `handle_preview_update(ui, env, config)`: Handle update preview preprocessing
+
+#### Split Handler (smartcash/handlers/dataset/split_handler.py)
+- **Fungsi**: Handler untuk split dataset
+- **Metode Utama**:
+  - `setup_split_handlers(ui, env, config)`: Setup handler untuk split dataset
+  - `handle_split_execution(ui, env, config)`: Handle eksekusi split
+  - `handle_ratio_change(ui, env, config)`: Handle perubahan rasio split
+  - `handle_stratification_change(ui, env, config)`: Handle perubahan stratifikasi
+
+#### Augmentation Handler (smartcash/handlers/dataset/augmentation_handler.py)
+- **Fungsi**: Handler untuk augmentasi dataset
+- **Metode Utama**:
+  - `setup_augmentation_handlers(ui, env, config)`: Setup handler untuk augmentasi
+  - `handle_augmentation_start(ui, env, config)`: Handle start augmentasi
+  - `handle_augmentation_option_change(ui, env, config)`: Handle perubahan opsi augmentasi
+  - `handle_preview_update(ui, env, config)`: Handle update preview augmentasi
+
+### Training Config Handlers
+
+#### Backbone Handler (smartcash/handlers/training_config/backbone_handler.py)
+- **Fungsi**: Handler untuk pemilihan backbone
+- **Metode Utama**:
+  - `setup_backbone_handlers(ui, env, config)`: Setup handler untuk backbone
+  - `handle_backbone_selection(ui, env, config)`: Handle pemilihan backbone
+  - `handle_backbone_info_update(ui, env, config)`: Handle update info backbone
+
+#### Hyperparameters Handler (smartcash/handlers/training_config/hyperparameters_handler.py)
+- **Fungsi**: Handler untuk hyperparameter
+- **Metode Utama**:
+  - `setup_hyperparameters_handlers(ui, env, config)`: Setup handler untuk hyperparameter
+  - `handle_batch_size_change(ui, env, config)`: Handle perubahan batch size
+  - `handle_learning_rate_change(ui, env, config)`: Handle perubahan learning rate
+  - `handle_epochs_change(ui, env, config)`: Handle perubahan epochs
+  - `handle_optimization_change(ui, env, config)`: Handle perubahan opsi optimisasi
+
+#### Training Strategy Handler (smartcash/handlers/training_config/training_strategy_handler.py)
+- **Fungsi**: Handler untuk strategi training
+- **Metode Utama**:
+  - `setup_training_strategy_handlers(ui, env, config)`: Setup handler untuk strategi training
+  - `handle_scheduler_change(ui, env, config)`: Handle perubahan scheduler
+  - `handle_early_stopping_change(ui, env, config)`: Handle perubahan early stopping
+  - `handle_checkpoint_option_change(ui, env, config)`: Handle perubahan opsi checkpoint
+
+#### Layer Config Handler (smartcash/handlers/training_config/layer_config_handler.py)
+- **Fungsi**: Handler untuk konfigurasi layer
+- **Metode Utama**:
+  - `setup_layer_config_handlers(ui, env, config)`: Setup handler untuk konfigurasi layer
+  - `handle_layer_selection(ui, env, config)`: Handle pemilihan layer
+  - `handle_class_config_change(ui, env, config)`: Handle perubahan konfigurasi class
+
+### Training Execution Handlers
+
+#### Model Training Handler (smartcash/handlers/training_execution/model_training_handler.py)
+- **Fungsi**: Handler untuk pelatihan model
+- **Metode Utama**:
+  - `setup_model_training_handlers(ui, env, config)`: Setup handler untuk training
+  - `handle_training_start(ui, env, config)`: Handle start training
+  - `handle_training_stop(ui, env, config)`: Handle stop training
+  - `handle_training_pause(ui, env, config)`: Handle pause/resume training
+  - `update_training_progress(ui, env, progress, message)`: Update progress training
+
+#### Performance Tracking Handler (smartcash/handlers/training_execution/performance_tracking_handler.py)
+- **Fungsi**: Handler untuk tracking performa
+- **Metode Utama**:
+  - `setup_performance_tracking_handlers(ui, env, config)`: Setup handler untuk tracking
+  - `handle_metrics_update(ui, env, metrics)`: Handle update metrik
+  - `handle_chart_update(ui, env, history)`: Handle update chart
+  - `handle_metrics_export(ui, env, format)`: Handle export metrik ke file
+  - `handle_history_clear(ui, env)`: Handle clear history metrik
+
+#### Checkpoint Handler (smartcash/handlers/training_execution/checkpoint_handler.py)
+- **Fungsi**: Handler untuk manajemen checkpoint
+- **Metode Utama**:
+  - `setup_checkpoint_handlers(ui, env, config)`: Setup handler untuk checkpoint
+  - `handle_checkpoint_save(ui, env, config)`: Handle save checkpoint
+  - `handle_checkpoint_load(ui, env, config)`: Handle load checkpoint
+  - `handle_checkpoint_delete(ui, env, config)`: Handle delete checkpoint
+  - `handle_checkpoint_export(ui, env, config, format)`: Handle export checkpoint ke format lain
+  - `handle_checkpoint_comparison(ui, env, checkpoints)`: Handle perbandingan checkpoint
+
+### Model Evaluation Handlers
+
+#### Performance Metrics Handler (smartcash/handlers/model_evaluation/performance_metrics_handler.py)
+- **Fungsi**: Handler untuk metrik performa
+- **Metode Utama**:
+  - `setup_performance_metrics_handlers(ui, env, config)`: Setup handler untuk metrik performa
+  - `handle_metrics_calculation(ui, env, config)`: Handle kalkulasi metrik
+  - `handle_confusion_matrix_update(ui, env, matrix)`: Handle update confusion matrix
+  - `handle_pr_curve_update(ui, env, data)`: Handle update kurva precision-recall
+  - `handle_metrics_export(ui, env, format)`: Handle export metrik
+
+#### Comparative Analysis Handler (smartcash/handlers/model_evaluation/comparative_analysis_handler.py)
+- **Fungsi**: Handler untuk analisis komparatif
+- **Metode Utama**:
+  - `setup_comparative_analysis_handlers(ui, env, config)`: Setup handler untuk analisis komparatif
+  - `handle_model_selection(ui, env, model_ids)`: Handle pemilihan model
+  - `handle_comparison_execution(ui, env, models, metrics)`: Handle eksekusi perbandingan
+  - `handle_comparison_export(ui, env, format)`: Handle export hasil perbandingan
+  - `handle_comparison_visualization(ui, env, data, chart_type)`: Handle visualisasi perbandingan
+
+#### Visualization Handler (smartcash/handlers/model_evaluation/visualization_handler.py)
+- **Fungsi**: Handler untuk visualisasi
+- **Metode Utama**:
+  - `setup_visualization_handlers(ui, env, config)`: Setup handler untuk visualisasi
+  - `handle_detection_visualization(ui, env, image, detections)`: Handle visualisasi deteksi
+  - `handle_layer_visualization(ui, env, layers)`: Handle visualisasi layer
+  - `handle_visualization_export(ui, env, format)`: Handle export visualisasi
+  - `handle_batch_visualization(ui, env, images)`: Handle visualisasi batch gambar
+
+### Constants (smartcash/ui/utils/constants.py)
+- **Fungsi**: Konstanta untuk komponen UI
+- **Konstanta Utama**:
+  - `COLORS`: Palet warna untuk UI (primary, secondary, success, warning, dll)
+  - `THEMES`: Tema UI (default, dark)
+  - `ICONS`: Emoji icons untuk UI (success, warning, error, info, dll)
+  - `ALERT_STYLES`: Style untuk alert (info, success, warning, error)
+  - `BUTTON_STYLES`: Style untuk button (primary, success, info, warning, danger)
+  - `FONTS`: Config font (default, monospace, header)
+  - `SIZES`: Config ukuran (xs, sm, md, lg, xl, 2xl)
+  - `PADDINGS`, `MARGINS`: Config padding dan margin (none, small, medium, large, xl)
+  - `IMAGE_EXTENSIONS`, `VIDEO_EXTENSIONS`, `DOCUMENT_EXTENSIONS`, `CODE_EXTENSIONS`: Ekstensi file
+  - `FILE_SIZE_UNITS`: Unit ukuran file (B, KB, MB, GB, TB, PB)
+
+### UI Utils (utils/ui_utils.py)
+- **Fungsi**: Utilitas umum untuk UI
+- **Metode Utama**:
+  - `set_active_theme(theme_name)`: Set tema aktif untuk UI
+  - `inject_css_styles()`: Inject CSS styles untuk komponen UI
+  - `format_file_size(size_bytes)`: Format ukuran file menjadi string yang mudah dibaca
+  - `run_async_task(task_func, on_complete, on_error, with_output)`: Jalankan task secara asinkron
+  - `create_confirmation_dialog(title, message, on_confirm, on_cancel)`: Buat dialog konfirmasi
+  - `create_button_group(buttons, layout)`: Buat group tombol
+  - `create_loading_indicator(message)`: Buat indikator loading
+  - `create_progress_updater(progress_bar)`: Buat fungsi updater untuk progress bar
+  - `display_file_info(file_path, description)`: Tampilkan informasi file
+  - `update_output_area(output_widget, message, status, clear)`: Update area output
+  - `register_observer_callback(observer_manager, event_type, output_widget)`: Register callback
+  - `create_divider()`, `create_spacing(height)`: Buat elemen pemisah
+
+### File Utils (smartcash/ui/utils/file_utils.py)
+- **Fungsi**: Utilitas file untuk UI
+- **Metode Utama**:
+  - `format_file_size(size_bytes)`: Format ukuran file menjadi string yang mudah dibaca
+  - `display_file_info(file_path, description)`: Tampilkan informasi file
+  - `directory_tree(root_dir, max_depth, exclude_patterns, include_only)`: Buat representasi tree direktori
+  - `create_file_upload_widget(accept, multiple, description, callback)`: Buat widget upload file
+  - `save_uploaded_file(file_content, file_name, target_dir, create_dirs)`: Simpan file yang diupload
+  - `create_file_browser(root_dir, file_extensions, on_select)`: Buat file browser sederhana
+  - `backup_file(file_path, backup_dir, timestamp)`: Buat backup file dengan timestamp
+  - `list_files(directory, pattern, recursive, include_dirs, sort_by)`: Daftar file dalam direktori
+  - `is_image_file(file_path)`, `is_video_file(file_path)`: Cek tipe file
+  - `get_file_info(file_path)`: Dapatkan informasi lengkap tentang file
+  - `create_file_download_link(file_path, link_text)`: Buat link download untuk file
+
+### Visualization Utils (smartcash/ui/utils/visualization_utils.py)
+- **Fungsi**: Utilitas visualisasi untuk UI
+- **Metode Utama**:
+  - `create_class_distribution_plot(class_counts, title, figsize, colors, sort_by)`: Plot distribusi kelas
+  - `create_confusion_matrix_plot(cm, class_names, normalize, title, figsize, cmap)`: Plot confusion matrix
+  - `create_metrics_history_plot(metrics_history, title, figsize, include_lr, log_lr)`: Plot history metrik
+  - `create_model_comparison_plot(comparison_data, x_col, metric_cols, title, figsize, plot_type)`: Plot perbandingan
+  - `create_metric_display(label, value, unit, is_good)`: Buat widget display untuk metrik
+  - `create_metrics_dashboard(metrics, title, description)`: Buat dashboard metrik dengan layout grid
+
+### Cells (smartcash/ui/cells/)
+
+#### Repository Clone (smartcash/ui/cells/setup/cell_1_1_repository_clone.py)
+- **Fungsi**: Cell untuk clone repositori
+- **Metode Utama**:
+  - `create_status_alert(msg, alert_type, icon)`: Buat alert status
+  - `get_git_status(repo_path)`: Cek status git repository
+  - `update_repo(repo_path)`: Update repository dengan git pull
+  - `clone_or_update_repos(b)`: Clone atau update repositori
+  - `clone_or_update_single_repo(repo_url, repo_path, repo_name)`: Clone atau update satu repositori
+
+#### Environment Config (smartcash/ui/cells/setup/cell_1_2_environment_config.py)
+- **Fungsi**: Cell untuk konfigurasi lingkungan
+- **Konfigurasi Utama**:
+  - Setup notebook environment dengan `setup_notebook_environment()`
+  - Setup UI component dengan `setup_ui_component()`
+  - Display UI dengan `display_ui()`
+
+#### Dependency Installation (smartcash/ui/cells/setup/cell_1_3_dependency_installation.py)
+- **Fungsi**: Cell untuk instalasi dependencies
+- **Konfigurasi Utama**:
+  - Setup notebook environment dengan `setup_notebook_environment()`
+  - Setup UI component dengan `setup_ui_component()`
+  - Display UI dengan `display_ui()`

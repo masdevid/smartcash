@@ -1,83 +1,35 @@
-# File: configs/colab_config.yaml
-# Author: Alfrida Sabar
-# Deskripsi: Konfigurasi khusus untuk lingkungan Google Colab dengan penyesuaian untuk Google Drive
+# Configuration for SmartCash in Google Colab environment
+use_drive: true
+project_path: "/content/drive/MyDrive/SmartCash"
 
-# Inherit dari base_config.yaml
-_base_: 'base_config.yaml'
+# Environment settings
+is_colab: true
+runtime:
+  tensorflow: true
+  pytorch: true
+  cuda: true
 
-# Pengaturan untuk environment Colab
-environment:
-  colab: true
-  use_drive: true
-  drive_mount_path: '/content/drive/MyDrive/SmartCash'
-  symlinks: true
-  create_dirs_on_start: true
-  required_packages:
-    - 'albumentations>=1.1.0'
-    - 'roboflow>=0.2.29'
-    - 'PyYAML>=6.0'
-    - 'tqdm>=4.64.0'
-    - 'ultralytics>=8.0.0'
-    - 'pandas>=1.3.5'
-    - 'seaborn>=0.11.2'
+# Data directories
+data_dir: "${project_path}/data"
+dataset_dir: "${data_dir}/datasets"
+model_dir: "${project_path}/models"
+checkpoints_dir: "${model_dir}/checkpoints"
+export_dir: "${model_dir}/exported"
+logs_dir: "${project_path}/logs"
 
-# Konfigurasi jalur khusus untuk Google Drive
-data:
-  dir: '/content/data'
-  processed_dir: '/content/data/preprocessed'
-  drive_data_dir: '/content/drive/MyDrive/SmartCash/data'
-  drive_output_dir: '/content/drive/MyDrive/SmartCash/runs'
-  drive_logs_dir: '/content/drive/MyDrive/SmartCash/logs'
-  local:
-    train: '/content/data/train'
-    valid: '/content/data/valid'
-    test: '/content/data/test'
-  processed:
-    train: '/content/data/preprocessed/train'
-    valid: '/content/data/preprocessed/valid'
-    test: '/content/data/preprocessed/test'
+# Dataset configuration
+dataset:
+  default_source: "roboflow"
+  formats:
+    - "yolo"
+    - "coco"
+  preprocessing:
+    img_size: 640
+    batch_size: 16
+    augmentation: true
 
-# Penyesuaian untuk Google Colab TPU/GPU
-model:
-  use_tpu: false  # Set ke true untuk menggunakan TPU jika tersedia
-  use_gpu: true
-  precision: 'mixed_float16'  # float32, mixed_float16, atau mixed_bfloat16
-  batch_size_auto: true  # Otomatis menentukan batch size berdasarkan memori
-  workers: 2  # Jumlah worker lebih rendah untuk Colab (mencegah OOM)
-
-# Pengaturan visualisasi untuk notebook Colab
+# UI configuration
 ui:
-  theme: 'default'
-  plot_style: 'seaborn'
-  max_displayed_items: 10
-  enable_animations: false  # Nonaktifkan animasi untuk kinerja lebih baik
-  update_progress_bar: true
-  log_to_output: true
-  display_system_info: true
-  interactive_plots: true
-  save_outputs: true
-  save_path: '/content/drive/MyDrive/SmartCash/outputs'
-
-# Penyesuaian untuk mengelola resource Colab yang terbatas
-performance:
-  auto_garbage_collect: true
-  checkpoint_to_drive: true  # Simpan checkpoint ke Drive
-  release_memory: true  # Lepaskan memori setelah training/evaluasi
-  cache:
-    enabled: true
-    dir: '/content/.cache/smartcash'
-    max_size_gb: 2.0
-    ttl_hours: 12  # Waktu hidup cache lebih pendek di Colab
-    auto_cleanup: true
-
-# Pengaturan untuk runtime lanjutan
-advanced:
-  debug_mode: false
-  profile_execution: false
-  export_metrics: true
-  save_every_epoch: false
-  early_stopping_monitor: 'val_loss'
-  check_disk_space: true
-  min_free_space_gb: 5.0
-  colab_runtime_alert: true  # Peringatan jika runtime akan berakhir
-  auto_backup_config: true   # Backup config ke Drive
+  theme: "light"
+  log_level: "INFO"
+  show_advanced: false

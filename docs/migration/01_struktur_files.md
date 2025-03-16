@@ -5,13 +5,22 @@
 ```
 smartcash/common/
 ├── __init__.py                 # Ekspor utilitas umum dengan __all__
+├── visualization/              # Visualisasi
+│   ├── __init__.py             # Ekspor komponen visualisasi
+│   └── helpers/                # Komponen visualisasi  
+│       ├── __init__.py         # Ekspor komponen helper visualisasi
+│       ├── chart_helper.py     # ChartHelper: Visualisasi chart
+│       ├── color_helper.py     # ColorHelper: Visualisasi warna
+│       ├── annotation_helper.py # AnnotationHelper: Visualisasi anotasi
+│       ├── export_helper.py    # ExportHelper: Export visualisasi
+│       ├── layout_helper.py    # LayoutHelper: Layout visualisasi
+│       └── style_helper.py     # StyleHelper: Styling visualisasi
 ├── config.py                   # ConfigManager: Manager konfigurasi multi-format
 ├── constants.py                # Konstanta global (VERSION, APP_NAME, DetectionLayer, dll)
 ├── logger.py                   # SmartCashLogger: Logger dengan emojis, warna, callback
 ├── exceptions.py               # Exception hierarchy (SmartCashError, ConfigError, dll)
 ├── types.py                    # Type definitions (ImageType, PathType, BoundingBox, dll)
 ├── utils.py                    # Fungsi utilitas umum (path, file, format, system info)
-├── header_fixer.py             # Utilitas header file untuk standarisasi kode
 └── layer_config.py             # LayerConfigManager: Konfigurasi layer deteksi
 ```
 
@@ -34,7 +43,7 @@ smartcash/components/
     ├── __init__.py             # Ekspor komponen cache
     ├── cleanup_cache.py        # CacheCleanup: Pembersihan cache
     ├── indexing_cache.py       # CacheIndex: Pengindeksan cache
-    ├── manger_cache.py         # CacheManager: Manager cache utama
+    ├── manager_cache.py         # CacheManager: Manager cache utama
     ├── stats_cache.py          # CacheStats: Statistik cache
     └── storage_cache.py        # CacheStorage: Penyimpanan cache
 ```
@@ -67,10 +76,10 @@ smartcash/dataset/
 │   │   └── pipeline_factory.py # AugmentationPipelineFactory: Factory pipeline
 │   ├── downloader/             # Layanan download dataset
 │   │   ├── __init__.py
-│   │   ├── download_service.py # DownloadService: Layanan download dataset
+│   │   ├── download_service.py # DownloadService: Service utama download
 │   │   ├── roboflow_downloader.py # RoboflowDownloader: Download dari Roboflow
-│   │   ├── local_uploader.py   # LocalUploader: Upload dari lokal
-│   │   └── zip_processor.py    # ZipProcessor: Proses file zip
+│   │   ├── download_validator.py # DownloadValidator: Validasi integritas download
+│   │   └── file_processor.py   # FileProcessor: Pemrosesan file dataset
 │   ├── explorer/               # Layanan eksplorasi dataset
 │   │   ├── __init__.py
 │   │   ├── explorer_service.py # ExplorerService: Layanan eksplorasi
@@ -86,10 +95,10 @@ smartcash/dataset/
 │   │   └── weight_calculator.py # WeightCalculator: Perhitungan bobot kelas
 │   └── reporter/               # Layanan pelaporan dataset
 │       ├── __init__.py
-│       ├── report_service.py   # ReportService: Layanan pelaporan
+│       ├── report_service.py   # ReportService: Layanan pelaporan dataset
 │       ├── metrics_reporter.py # MetricsReporter: Pelaporan metrik
-│       ├── visualization.py    # DatasetVisualizer: Visualisasi dataset
-│       └── export_formatter.py # ExportFormatter: Format ekspor laporan
+│       ├── export_formatter.py # ExportFormatter: Format ekspor laporan
+│       └── visualization_service.py # VisualizationService: Visualisasi metrik dan laporan
 ├── utils/
 │   ├── __init__.py
 │   ├── transform/              # Transformasi dataset

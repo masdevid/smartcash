@@ -8,6 +8,7 @@ from typing import Dict, Optional, Any, List, Union
 
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
+from smartcash.dataset.utils.dataset_utils import DatasetUtils
 
 
 class DatasetManager:
@@ -32,6 +33,9 @@ class DatasetManager:
         # Inisialisasi layer config
         self.layer_config = get_layer_config()
         self.active_layers = config.get('layers', self.layer_config.get_layer_names())
+        
+        # Utilitas dataset
+        self.utils = DatasetUtils(config, str(self.data_dir), self.logger)
         
         # Layanan di-inisialisasi secara lazy saat diperlukan
         self._services = {}
@@ -83,6 +87,13 @@ class DatasetManager:
                 from smartcash.dataset.services.reporter import ReportService
                 self._services[service_name] = ReportService(
                     self.config, str(self.data_dir), self.logger)
+                
+            elif service_name == 'visualizer':
+                from smartcash.dataset.visualization import DataVisualizationHelper, ReportVisualizer
+                self._services[service_name] = {
+                    'data_viz': DataVisualizationHelper(str(self.data_dir / 'visualizations'), self.logger),
+                    'report_viz': ReportVisualizer(str(self.data_dir / 'reports'), self.logger)
+                }
                 
             else:
                 self.logger.warning(f"⚠️ Service tidak dikenal: {service_name}")
@@ -269,6 +280,50 @@ class DatasetManager:
             splits = ['train', 'valid', 'test']
         return self.get_service('reporter').generate_dataset_report(splits, **kwargs)
     
+    # ===== Delegasi ke Visualizer Service =====
+    
+    def visualize_class_distribution(self, class_stats: Dict[str, int], **kwargs) -> str:
+        """
+        Visualisasikan distribusi kelas dalam dataset.
+        
+        Args:
+            class_stats: Dictionary dengan class_name: count
+            **kwargs: Parameter tambahan untuk visualisasi
+            
+        Returns:
+            Path ke file visualisasi
+        """
+        visualizer = self.get_service('visualizer')['data_viz']
+        return visualizer.plot_class_distribution(class_stats, **kwargs)
+    
+    def visualize_sample_images(self, data_dir: str, **kwargs) -> str:
+        """
+        Visualisasikan sampel gambar dengan bounding box.
+        
+        Args:
+            data_dir: Direktori dataset
+            **kwargs: Parameter tambahan untuk visualisasi
+            
+        Returns:
+            Path ke file visualisasi
+        """
+        visualizer = self.get_service('visualizer')['data_viz']
+        return visualizer.plot_sample_images(data_dir, **kwargs)
+    
+    def create_dataset_dashboard(self, report: Dict[str, Any], **kwargs) -> str:
+        """
+        Buat dashboard visualisasi dari laporan dataset.
+        
+        Args:
+            report: Laporan dataset
+            **kwargs: Parameter tambahan untuk visualisasi
+            
+        Returns:
+            Path ke file dashboard
+        """
+        visualizer = self.get_service('visualizer')['report_viz']
+        return visualizer.create_dataset_dashboard(report, **kwargs)
+    
     # ===== Metode Utilitas =====
     
     def get_split_statistics(self) -> Dict[str, Dict[str, int]]:
@@ -278,9 +333,7 @@ class DatasetManager:
         Returns:
             Dictionary berisi statistik setiap split
         """
-        from smartcash.dataset.utils.dataset_utils import DatasetUtils
-        utils = DatasetUtils(self.config, str(self.data_dir), self.logger)
-        return utils.get_split_statistics()
+        return self.utils.get_split_statistics()
     
     def split_dataset(self, **kwargs) -> Dict[str, int]:
         """

@@ -1,350 +1,496 @@
 """
 File: smartcash/dataset/manager.py
-Deskripsi: Koordinator alur kerja dataset tingkat tinggi
+Deskripsi: Koordinator utama untuk alur kerja dataset
 """
 
+import torch
+from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
-from typing import Dict, Optional, Any, List, Union
 
 from smartcash.common.logger import get_logger
-from smartcash.common.layer_config import get_layer_config
-from smartcash.dataset.utils.dataset_utils import DatasetUtils
+from smartcash.dataset.services.loader.dataset_loader import DatasetLoaderService
+from smartcash.dataset.services.validator.dataset_validator import DatasetValidatorService
+from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
+from smartcash.dataset.services.explorer.explorer_service import ExplorerService
+from smartcash.dataset.services.balancer.balance_service import BalanceService
+from smartcash.dataset.services.reporter.report_service import ReportService
+from smartcash.dataset.services.downloader.download_service import DownloadService
+
+# Import baru untuk preprocessing
+from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
+from smartcash.dataset.services.loader.preprocessed_dataset_loader import PreprocessedDatasetLoader
 
 
 class DatasetManager:
     """
-    Manager utama untuk dataset yang bertindak sebagai koordinator untuk
-    semua operasi dataset dengan lazy-loading service.
+    Koordinator utama untuk alur kerja dataset.
+    Menyediakan akses terpadu ke berbagai layanan dataset seperti 
+    loading, validasi, augmentasi, dan eksplorasi.
     """
     
-    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger=None):
+    def __init__(
+        self,
+        config: Optional[Dict[str, Any]] = None,
+        logger: Optional[Any] = None
+    ):
         """
-        Inisialisasi DatasetManager.
+        Inisialisasi dataset manager.
         
         Args:
-            config: Konfigurasi aplikasi
-            data_dir: Direktori utama data (opsional)
-            logger: Logger kustom (opsional)
+            config: Konfigurasi dataset
+            logger: Logger kustom
         """
-        self.config = config
-        self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
         self.logger = logger or get_logger("dataset_manager")
         
-        # Inisialisasi layer config
-        self.layer_config = get_layer_config()
-        self.active_layers = config.get('layers', self.layer_config.get_layer_names())
+        # Default config
+        self.config = {
+            'dataset_dir': 'data/dataset',
+            'img_size': (640, 640),
+            'batch_size': 16,
+            'num_workers': 4,
+            'multilayer': True
+        }
         
-        # Utilitas dataset
-        self.utils = DatasetUtils(config, str(self.data_dir), self.logger)
+        # Tambahkan konfigurasi preprocessing
+        self.preprocess_config = {
+            'enable_preprocessing': True,
+            'use_preprocessed': True,  # Gunakan dataset yang sudah di-preprocess
+            'img_size': (640, 640),
+            'preprocessed_dir': 'data/preprocessed',
+            'raw_dataset_dir': 'data/dataset'
+        }
         
-        # Layanan di-inisialisasi secara lazy saat diperlukan
+        # Update config dari parameter
+        if config:
+            if 'dataset' in config:
+                self.config.update(config['dataset'])
+            elif isinstance(config, dict):
+                # Legacy support
+                self.config.update(config)
+                
+            # Update preprocessing config
+            if 'preprocessing' in config:
+                self.preprocess_config.update(config['preprocessing'])
+        
+        # Dictionary services dengan lazy initialization
         self._services = {}
         
-        self.logger.info(f"🚀 DatasetManager diinisialisasi dengan data_dir: {self.data_dir}")
+        self.logger.info(f"📊 DatasetManager diinisialisasi (dataset_dir: {self.config['dataset_dir']})")
     
     def get_service(self, service_name: str) -> Any:
         """
-        Dapatkan service dengan lazy initialization.
+        Dapatkan instance service dengan lazy initialization.
         
         Args:
-            service_name: Nama service yang diinginkan
+            service_name: Nama service
             
         Returns:
-            Instance dari service yang diminta
+            Instance service
+            
+        Raises:
+            ValueError: Jika service_name tidak valid
         """
-        if service_name not in self._services:
-            if service_name == 'loader':
-                from smartcash.dataset.services.loader import DatasetLoaderService
-                self._services[service_name] = DatasetLoaderService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'validator':
-                from smartcash.dataset.services.validator import DatasetValidatorService
-                self._services[service_name] = DatasetValidatorService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'augmentor':
-                from smartcash.dataset.services.augmentor import AugmentationService
-                self._services[service_name] = AugmentationService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'downloader':
-                from smartcash.dataset.services.downloader import DownloadService
-                self._services[service_name] = DownloadService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'explorer':
-                from smartcash.dataset.services.explorer import ExplorerService
-                self._services[service_name] = ExplorerService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'balancer':
-                from smartcash.dataset.services.balancer import BalanceService
-                self._services[service_name] = BalanceService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'reporter':
-                from smartcash.dataset.services.reporter import ReportService
-                self._services[service_name] = ReportService(
-                    self.config, str(self.data_dir), self.logger)
-                
-            elif service_name == 'visualizer':
-                from smartcash.dataset.visualization import DataVisualizationHelper, ReportVisualizer
-                self._services[service_name] = {
-                    'data_viz': DataVisualizationHelper(str(self.data_dir / 'visualizations'), self.logger),
-                    'report_viz': ReportVisualizer(str(self.data_dir / 'reports'), self.logger)
-                }
-                
-            else:
-                self.logger.warning(f"⚠️ Service tidak dikenal: {service_name}")
-                return None
-                
-        return self._services[service_name]
+        if service_name in self._services:
+            return self._services[service_name]
+            
+        # Inisialisasi service sesuai permintaan
+        if service_name == 'loader':
+            service = DatasetLoaderService(
+                dataset_dir=self.config['dataset_dir'],
+                img_size=self.config['img_size'],
+                multilayer=self.config.get('multilayer', True),
+                logger=self.logger
+            )
+        elif service_name == 'validator':
+            service = DatasetValidatorService(
+                dataset_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        elif service_name == 'augmentor':
+            service = AugmentationService(
+                dataset_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        elif service_name == 'explorer':
+            service = ExplorerService(
+                dataset_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        elif service_name == 'balancer':
+            service = BalanceService(
+                dataset_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        elif service_name == 'reporter':
+            service = ReportService(
+                dataset_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        elif service_name == 'downloader':
+            service = DownloadService(
+                output_dir=self.config['dataset_dir'],
+                logger=self.logger
+            )
+        else:
+            raise ValueError(f"Service '{service_name}' tidak dikenal")
+            
+        # Simpan instance untuk penggunaan berikutnya
+        self._services[service_name] = service
+        return service
     
-    # ===== Delegasi ke Loader Service =====
+    def _get_preprocessor(self):
+        """
+        Dapatkan preprocessor dataset dengan lazy initialization.
+        
+        Returns:
+            DatasetPreprocessor: Preprocessor dataset
+        """
+        if not hasattr(self, '_preprocessor'):
+            self._preprocessor = DatasetPreprocessor(
+                config={
+                    'img_size': self.preprocess_config['img_size'],
+                    'preprocessed_dir': self.preprocess_config['preprocessed_dir'],
+                    'dataset_dir': self.preprocess_config['raw_dataset_dir']
+                },
+                logger=self.logger
+            )
+        return self._preprocessor
     
-    def get_dataset(self, split: str, **kwargs):
+    def _get_preprocessed_loader(self):
+        """
+        Dapatkan loader untuk dataset preprocessed dengan lazy initialization.
+        
+        Returns:
+            PreprocessedDatasetLoader: Loader dataset preprocessed
+        """
+        if not hasattr(self, '_preprocessed_loader'):
+            self._preprocessed_loader = PreprocessedDatasetLoader(
+                preprocessed_dir=self.preprocess_config['preprocessed_dir'],
+                fallback_to_raw=True,
+                auto_preprocess=self.preprocess_config.get('auto_preprocess', True),
+                config={
+                    'raw_dataset_dir': self.preprocess_config['raw_dataset_dir'],
+                    'img_size': self.preprocess_config['img_size'],
+                    'batch_size': self.config.get('batch_size', 16),
+                    'num_workers': self.config.get('num_workers', 4)
+                },
+                logger=self.logger
+            )
+        return self._preprocessed_loader
+    
+    def preprocess_dataset(self, split='all', force_reprocess=False):
+        """
+        Preprocess dataset dan simpan hasilnya.
+        
+        Args:
+            split: Split dataset ('train', 'val', 'test', 'all')
+            force_reprocess: Paksa proses ulang meskipun sudah ada
+            
+        Returns:
+            Dict: Statistik hasil preprocessing
+        """
+        preprocessor = self._get_preprocessor()
+        return preprocessor.preprocess_dataset(split=split, force_reprocess=force_reprocess)
+    
+    def clean_preprocessed(self, split='all'):
+        """
+        Bersihkan hasil preprocessing.
+        
+        Args:
+            split: Split dataset yang akan dibersihkan ('train', 'val', 'test', 'all')
+            
+        Returns:
+            bool: True jika berhasil, False jika gagal
+        """
+        preprocessor = self._get_preprocessor()
+        return preprocessor.clean_preprocessed(split=split)
+    
+    def get_preprocessed_stats(self):
+        """
+        Dapatkan statistik hasil preprocessing.
+        
+        Returns:
+            Dict: Statistik data preprocessed
+        """
+        preprocessor = self._get_preprocessor()
+        return preprocessor.get_preprocessed_stats()
+    
+    def get_dataset(self, split: str, **kwargs) -> torch.utils.data.Dataset:
         """
         Dapatkan dataset untuk split tertentu.
         
         Args:
-            split: Split dataset ('train', 'valid', 'test')
-            **kwargs: Parameter tambahan untuk dataset
+            split: Split dataset ('train', 'val', 'test')
+            **kwargs: Parameter tambahan untuk loader dataset
             
         Returns:
-            Instance dari Dataset
+            Dataset
         """
-        return self.get_service('loader').get_dataset(split, **kwargs)
+        # Gunakan preprocessed loader jika diaktifkan
+        if self.preprocess_config.get('use_preprocessed', True):
+            return self._get_preprocessed_loader().get_dataset(split, **kwargs)
+        
+        # Fallback ke loader asli
+        loader = self.get_service('loader')
+        return loader.get_dataset(split, **kwargs)
     
-    def get_dataloader(self, split: str, **kwargs):
+    def get_dataloader(self, split: str, **kwargs) -> torch.utils.data.DataLoader:
         """
         Dapatkan dataloader untuk split tertentu.
         
         Args:
-            split: Split dataset ('train', 'valid', 'test')
+            split: Split dataset ('train', 'val', 'test')
             **kwargs: Parameter tambahan untuk dataloader
             
         Returns:
-            Instance dari DataLoader
+            DataLoader
         """
-        return self.get_service('loader').get_dataloader(split, **kwargs)
+        # Gunakan preprocessed loader jika diaktifkan
+        if self.preprocess_config.get('use_preprocessed', True):
+            return self._get_preprocessed_loader().get_dataloader(split, **kwargs)
+        
+        # Fallback ke loader asli
+        loader = self.get_service('loader')
+        return loader.get_dataloader(split, **kwargs)
     
-    def get_all_dataloaders(self, **kwargs) -> Dict[str, Any]:
+    def get_all_dataloaders(self, **kwargs) -> Dict[str, torch.utils.data.DataLoader]:
         """
-        Dapatkan semua dataloader untuk semua split yang tersedia.
+        Dapatkan dataloader untuk semua split.
         
         Args:
             **kwargs: Parameter tambahan untuk dataloader
             
         Returns:
-            Dictionary berisi dataloader untuk setiap split
+            Dictionary dengan dataloader per split
         """
-        return self.get_service('loader').get_all_dataloaders(**kwargs)
-    
-    # ===== Delegasi ke Validator Service =====
+        # Gunakan preprocessed loader jika diaktifkan
+        if self.preprocess_config.get('use_preprocessed', True):
+            return self._get_preprocessed_loader().get_all_dataloaders(**kwargs)
+        
+        # Fallback ke loader asli
+        loader = self.get_service('loader')
+        return loader.get_all_dataloaders(**kwargs)
     
     def validate_dataset(self, split: str, **kwargs) -> Dict[str, Any]:
         """
-        Validasi dataset untuk memastikan integritas data.
+        Validasi dataset untuk split tertentu.
         
         Args:
-            split: Split dataset yang akan divalidasi
+            split: Split dataset ('train', 'val', 'test', 'all')
             **kwargs: Parameter tambahan untuk validasi
             
         Returns:
             Hasil validasi
         """
-        return self.get_service('validator').validate_dataset(split, **kwargs)
+        validator = self.get_service('validator')
+        
+        if split == 'all':
+            results = {}
+            for s in ['train', 'val', 'test']:
+                results[s] = validator.validate_dataset(s, **kwargs)
+            return results
+        else:
+            return validator.validate_dataset(split, **kwargs)
     
     def fix_dataset(self, split: str, **kwargs) -> Dict[str, Any]:
         """
-        Perbaiki masalah yang ditemukan dalam dataset.
+        Perbaiki masalah pada dataset.
         
         Args:
-            split: Split dataset yang akan diperbaiki
+            split: Split dataset ('train', 'val', 'test', 'all')
             **kwargs: Parameter tambahan untuk perbaikan
             
         Returns:
             Hasil perbaikan
         """
-        return self.get_service('validator').fix_dataset(split, **kwargs)
-    
-    # ===== Delegasi ke Augmentor Service =====
+        validator = self.get_service('validator')
+        
+        if split == 'all':
+            results = {}
+            for s in ['train', 'val', 'test']:
+                results[s] = validator.fix_dataset(s, **kwargs)
+            return results
+        else:
+            return validator.fix_dataset(split, **kwargs)
     
     def augment_dataset(self, **kwargs) -> Dict[str, Any]:
         """
-        Augmentasi dataset untuk meningkatkan variasi data.
+        Augmentasi dataset.
         
         Args:
-            **kwargs: Parameter untuk augmentasi
+            **kwargs: Parameter tambahan untuk augmentasi
             
         Returns:
             Hasil augmentasi
         """
-        return self.get_service('augmentor').augment_dataset(**kwargs)
+        augmentor = self.get_service('augmentor')
+        return augmentor.augment_dataset(**kwargs)
     
-    # ===== Delegasi ke Downloader Service =====
-    
-    def download_from_roboflow(self, **kwargs) -> str:
+    def download_from_roboflow(self, **kwargs) -> Dict[str, Any]:
         """
         Download dataset dari Roboflow.
         
         Args:
-            **kwargs: Parameter untuk download
+            **kwargs: Parameter untuk download (api_key, workspace, project, version)
             
         Returns:
-            Path ke dataset yang didownload
+            Info hasil download
         """
-        return self.get_service('downloader').download_dataset(**kwargs)
-    
-    def upload_local_dataset(self, zip_path: str, **kwargs) -> Dict[str, Any]:
-        """
-        Upload dataset lokal dari file zip.
-        
-        Args:
-            zip_path: Path ke file zip
-            **kwargs: Parameter tambahan
-            
-        Returns:
-            Hasil import
-        """
-        return self.get_service('downloader').import_from_zip(zip_path, **kwargs)
-    
-    # ===== Delegasi ke Explorer Service =====
+        downloader = self.get_service('downloader')
+        return downloader.download_from_roboflow(**kwargs)
     
     def explore_class_distribution(self, split: str) -> Dict[str, Any]:
         """
         Analisis distribusi kelas dalam dataset.
         
         Args:
-            split: Split dataset yang akan dianalisis
+            split: Split dataset ('train', 'val', 'test', 'all')
             
         Returns:
-            Hasil analisis distribusi kelas
+            Statistik distribusi kelas
         """
-        return self.get_service('explorer').analyze_class_distribution(split)
+        explorer = self.get_service('explorer')
+        
+        if split == 'all':
+            results = {}
+            for s in ['train', 'val', 'test']:
+                try:
+                    results[s] = explorer.analyze_class_distribution(s)
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Tidak dapat menganalisis split {s}: {str(e)}")
+                    results[s] = None
+            return results
+        else:
+            return explorer.analyze_class_distribution(split)
     
     def explore_layer_distribution(self, split: str) -> Dict[str, Any]:
         """
         Analisis distribusi layer dalam dataset.
         
         Args:
-            split: Split dataset yang akan dianalisis
+            split: Split dataset ('train', 'val', 'test', 'all')
             
         Returns:
-            Hasil analisis distribusi layer
+            Statistik distribusi layer
         """
-        return self.get_service('explorer').analyze_layer_distribution(split)
+        explorer = self.get_service('explorer')
+        
+        if split == 'all':
+            results = {}
+            for s in ['train', 'val', 'test']:
+                try:
+                    results[s] = explorer.analyze_layer_distribution(s)
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Tidak dapat menganalisis split {s}: {str(e)}")
+                    results[s] = None
+            return results
+        else:
+            return explorer.analyze_layer_distribution(split)
     
     def explore_bbox_statistics(self, split: str) -> Dict[str, Any]:
         """
         Analisis statistik bounding box dalam dataset.
         
         Args:
-            split: Split dataset yang akan dianalisis
+            split: Split dataset ('train', 'val', 'test', 'all')
             
         Returns:
-            Hasil analisis statistik bbox
+            Statistik bounding box
         """
-        return self.get_service('explorer').analyze_bbox_statistics(split)
-    
-    # ===== Delegasi ke Balance Service =====
+        explorer = self.get_service('explorer')
+        
+        if split == 'all':
+            results = {}
+            for s in ['train', 'val', 'test']:
+                try:
+                    results[s] = explorer.analyze_bbox_statistics(s)
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Tidak dapat menganalisis split {s}: {str(e)}")
+                    results[s] = None
+            return results
+        else:
+            return explorer.analyze_bbox_statistics(split)
     
     def balance_dataset(self, split: str, **kwargs) -> Dict[str, Any]:
         """
-        Seimbangkan dataset untuk mengatasi ketidakseimbangan kelas.
+        Seimbangkan dataset.
         
         Args:
-            split: Split dataset yang akan diseimbangkan
-            **kwargs: Parameter tambahan
+            split: Split dataset ('train', 'val', 'test')
+            **kwargs: Parameter tambahan untuk balancing
             
         Returns:
-            Hasil penyeimbangan
+            Hasil balancing
         """
-        return self.get_service('balancer').balance_by_undersampling(split, **kwargs)
+        balancer = self.get_service('balancer')
+        return balancer.balance_by_undersampling(split, **kwargs)
     
-    # ===== Delegasi ke Reporter Service =====
-    
-    def generate_dataset_report(self, splits: List[str] = None, **kwargs) -> Dict[str, Any]:
+    def generate_dataset_report(self, splits: List[str], **kwargs) -> Dict[str, Any]:
         """
-        Buat laporan komprehensif tentang dataset.
+        Buat laporan dataset.
         
         Args:
-            splits: List split dataset yang akan dimasukkan dalam laporan
-            **kwargs: Parameter tambahan
+            splits: List split untuk laporan
+            **kwargs: Parameter tambahan untuk laporan
             
         Returns:
             Laporan dataset
         """
-        if splits is None:
-            splits = ['train', 'valid', 'test']
-        return self.get_service('reporter').generate_dataset_report(splits, **kwargs)
+        reporter = self.get_service('reporter')
+        return reporter.generate_dataset_report(splits, **kwargs)
     
-    # ===== Delegasi ke Visualizer Service =====
-    
-    def visualize_class_distribution(self, class_stats: Dict[str, int], **kwargs) -> str:
+    def visualize_class_distribution(self, class_stats: Dict[str, Any], **kwargs) -> Dict[str, str]:
         """
-        Visualisasikan distribusi kelas dalam dataset.
+        Visualisasi distribusi kelas dalam dataset.
         
         Args:
-            class_stats: Dictionary dengan class_name: count
+            class_stats: Statistik kelas (dari explore_class_distribution)
             **kwargs: Parameter tambahan untuk visualisasi
             
         Returns:
-            Path ke file visualisasi
+            Path visualisasi
         """
-        visualizer = self.get_service('visualizer')['data_viz']
-        return visualizer.plot_class_distribution(class_stats, **kwargs)
+        reporter = self.get_service('reporter')
+        return reporter.visualize_class_distribution(class_stats, **kwargs)
     
-    def visualize_sample_images(self, data_dir: str, **kwargs) -> str:
+    def create_dataset_dashboard(self, report: Dict[str, Any], **kwargs) -> Dict[str, str]:
         """
-        Visualisasikan sampel gambar dengan bounding box.
+        Buat dashboard visualisasi dataset.
         
         Args:
-            data_dir: Direktori dataset
-            **kwargs: Parameter tambahan untuk visualisasi
+            report: Laporan dataset (dari generate_dataset_report)
+            **kwargs: Parameter tambahan untuk dashboard
             
         Returns:
-            Path ke file visualisasi
+            Path visualisasi
         """
-        visualizer = self.get_service('visualizer')['data_viz']
-        return visualizer.plot_sample_images(data_dir, **kwargs)
-    
-    def create_dataset_dashboard(self, report: Dict[str, Any], **kwargs) -> str:
-        """
-        Buat dashboard visualisasi dari laporan dataset.
-        
-        Args:
-            report: Laporan dataset
-            **kwargs: Parameter tambahan untuk visualisasi
-            
-        Returns:
-            Path ke file dashboard
-        """
-        visualizer = self.get_service('visualizer')['report_viz']
-        return visualizer.create_dataset_dashboard(report, **kwargs)
-    
-    # ===== Metode Utilitas =====
+        reporter = self.get_service('reporter')
+        return reporter.create_dashboard(report, **kwargs)
     
     def get_split_statistics(self) -> Dict[str, Dict[str, int]]:
         """
-        Dapatkan statistik dasar untuk semua split.
+        Dapatkan statistik dasar tentang split dataset.
         
         Returns:
-            Dictionary berisi statistik setiap split
+            Dictionary dengan informasi jumlah file per split
         """
-        return self.utils.get_split_statistics()
+        # Jika menggunakan preprocessed data, dapatkan statistik dari sana
+        if self.preprocess_config.get('use_preprocessed', True):
+            return self.get_preprocessed_stats()
+            
+        # Fallback ke loader asli
+        loader = self.get_service('loader')
+        return loader.get_dataset_stats()
     
-    def split_dataset(self, **kwargs) -> Dict[str, int]:
+    def split_dataset(self, **kwargs) -> Dict[str, Any]:
         """
-        Pecah dataset menjadi train/valid/test.
+        Pecah dataset menjadi split train/val/test.
         
         Args:
-            **kwargs: Parameter split
+            **kwargs: Parameter untuk splitting
             
         Returns:
-            Hasil pemecahan dataset
+            Hasil splitting
         """
-        from smartcash.dataset.utils.split import DatasetSplitter
-        splitter = DatasetSplitter(self.config, str(self.data_dir), self.logger)
-        return splitter.split_dataset(**kwargs)
+        # Ini akan memerlukan implementasi baru di DatasetSplitter
+        raise NotImplementedError("Splitting dataset belum diimplementasikan")

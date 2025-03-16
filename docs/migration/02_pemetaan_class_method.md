@@ -1,15 +1,22 @@
 # SmartCash v2 - Pemetaan Kelas dan Fungsi yang Diperbarui
 
-## Domain Common (Tidak Berubah)
+## Domain Common
 
 ### ConfigManager (config.py)
-- **Fungsi**: Mengelola konfigurasi aplikasi
+- **Fungsi**: Mengelola konfigurasi aplikasi dengan dukungan dependency injection
 - **Metode Utama**:
   - `load_config(config_file)`: Memuat konfigurasi dari file YAML/JSON
   - `get(key, default)`: Mengambil nilai dengan dot notation
   - `set(key, value)`: Mengatur nilai dengan dot notation
   - `merge_config(config)`: Menggabungkan konfigurasi dari dict/file
   - `save_config(config_file)`: Menyimpan konfigurasi ke file
+  - `register(interface_type, implementation)`: Daftarkan implementasi
+  - `register_instance(interface_type, instance)`: Daftarkan singleton
+  - `register_factory(interface_type, factory)`: Daftarkan factory
+  - `resolve(interface_type, *args, **kwargs)`: Resolve dependency
+- **Fungsi Global**:
+  - `get_config_manager()`: Dapatkan singleton instance
+
 
 ### SmartCashLogger (logger.py)
 - **Fungsi**: Sistem logging dengan emoji dan warna
@@ -20,13 +27,44 @@
   - `progress(iterable)`: Membuat progress bar dengan tqdm
 
 ### LayerConfigManager (layer_config.py)
-- **Fungsi**: Mengelola konfigurasi layer deteksi
+- **Fungsi**: Mengelola konfigurasi layer deteksi berdasarkan interface
 - **Metode Utama**:
-  - `get_layer_config(layer_name)`: Config untuk layer tertentu
-  - `get_class_map()`: Mapping class_id ke class_name
-  - `get_layer_for_class_id(class_id)`: Layer untuk class_id
-  - `update_layer_config(layer_name, config)`: Update config layer
-  - `validate_class_ids()`: Validasi class_id (duplikat, gap)
+  - Semua metode sesuai dokumentasi awal
+  - **Pattern**: Implementasi singleton
+  - **Default Config**: Konfigurasi default untuk banknote, nominal, security
+- **Fungsi Global**:
+  - `get_layer_config()`: Fungsi helper untuk mendapatkan instance singleton
+
+### VisualizationBase (common/visualization/core/visualization_base.py)
+- **Fungsi**: Kelas dasar untuk semua komponen visualisasi
+- **Metode Utama**:
+  - `set_plot_style(style)`: Set style untuk matplotlib plots
+  - `save_figure(fig, filepath, dpi)`: Simpan figure matplotlib
+  - `create_output_directory(output_dir)`: Buat direktori output
+
+### Interfaces (common/visualization/interfaces/)
+- **IDetectionVisualizer**: Interface untuk visualisasi deteksi
+  - `visualize_detection(image, detections, filename, conf_threshold)`: Visualisasi hasil deteksi
+- **IMetricsVisualizer**: Interface untuk visualisasi metrik
+  - `plot_confusion_matrix(cm, class_names, title, filename)`: Plot confusion matrix
+- **ILayerConfigManager**: Interface untuk konfigurasi layer
+  - `get_layer_config(layer_name)`, `get_class_map()`, `get_layer_for_class_id(class_id)`
+- **ICheckpointService**: Interface untuk checkpoint model
+  - `save_checkpoint(model, path, optimizer, epoch, metadata, is_best)`
+  - `load_checkpoint(path, model, optimizer, map_location)`
+
+### Utils (common/utils.py)
+- **Fungsi**: Berbagai utilitas umum untuk SmartCash
+- **Fungsi Utama**:
+  - `is_colab()`, `is_notebook()`: Deteksi lingkungan
+  - `get_system_info()`: Dapatkan informasi sistem
+  - `generate_unique_id()`: Generate ID unik
+  - `format_time(seconds)`: Format waktu
+  - `get_timestamp()`: Dapatkan timestamp untuk nama file
+  - `ensure_dir(path)`: Pastikan direktori ada
+  - File operations: `copy_file()`, `file_exists()`, dll
+  - Format operations: `load_json()`, `save_json()`, dll
+  - `get_project_root()`: Dapatkan root direktori project
 
 ### ChartHelper (common/visualization/helpers/chart_helper.py)
 - **Fungsi**: Visualisasi berbasis chart
@@ -81,40 +119,159 @@
   - `set_fonts(font_family, title_size, label_size)`: Set font
   - `set_grid_style(ax, grid_style)`: Set style grid
   - `set_legend_style(ax, loc, frameon)`: Set style legend
-## Domain Components (Tidak Berubah)
+
+## Domain Components
 
 ### EventDispatcher (event_dispatcher_observer.py)
-- **Fungsi**: Mengelola notifikasi event ke observer
+
+- **Fungsi**: Mengelola notifikasi event ke observer dengan thread-safety dan dukungan asinkron
 - **Metode Utama**:
-  - `register(event_type, observer)`: Daftarkan observer
-  - `notify(event_type, sender, **kwargs)`: Kirim notifikasi
-  - `unregister_from_all(observer)`: Batalkan registrasi
+  - `register(event_type, observer, priority)`: Daftarkan observer untuk tipe event
+  - `register_many(event_types, observer, priority)`: Daftarkan observer untuk beberapa event
+  - `notify(event_type, sender, async_mode, **kwargs)`: Kirim notifikasi ke semua observer
+  - `unregister(event_type, observer)`: Batalkan registrasi observer
+  - `unregister_from_all(observer)`: Batalkan registrasi dari semua event
+  - `unregister_all(event_type)`: Hapus semua observer dari registry
+  - `wait_for_async_notifications(timeout)`: Tunggu notifikasi asinkron selesai
   - `get_stats()`: Dapatkan statistik dispatcher
+  - `enable_logging()`, `disable_logging()`: Aktifkan/nonaktifkan logging
+  - `shutdown()`: Bersihkan resources dispatcher
+
+### EventRegistry (event_registry_observer.py)
+
+- **Fungsi**: Registry thread-safe dengan weak reference untuk mencegah memory leak
+- **Metode Utama**:
+  - `register(event_type, observer, priority)`: Daftarkan observer untuk event
+  - `unregister(event_type, observer)`: Hapus observer dari registry
+  - `unregister_from_all(observer)`: Hapus observer dari semua event
+  - `unregister_all(event_type)`: Hapus semua observer untuk event atau semua event
+  - `get_observers(event_type)`: Dapatkan observer untuk event, termasuk hierarki event
+  - `get_all_event_types()`: Dapatkan semua tipe event terdaftar
+  - `get_stats()`: Dapatkan statistik registry
+  - `clean_references()`: Bersihkan weak references yang tidak valid
 
 ### BaseObserver (base_observer.py)
-- **Fungsi**: Kelas dasar untuk implementasi observer
+
+- **Fungsi**: Kelas dasar untuk semua observer dengan filter event dan prioritas
 - **Metode Utama**:
   - `update(event_type, sender, **kwargs)`: Handler event (abstract)
-  - `should_process_event(event_type)`: Cek filter event
-  - `enable()/disable()`: Aktifkan/nonaktifkan observer
+  - `should_process_event(event_type)`: Cek filter event (string/regex/list/callback)
+  - `enable()`, `disable()`: Aktifkan/nonaktifkan observer
+  - `__lt__(other)`: Support pengurutan berdasarkan prioritas
+  - `__eq__(other)`, `__hash__()`: Dukungan untuk set/dict dengan ID unik
 
 ### ObserverManager (manager_observer.py)
-- **Fungsi**: Mengelola observer dengan sistem grup
+
+- **Fungsi**: Mengelola observer dengan sistem grup untuk lifecycle management
 - **Metode Utama**:
-  - `create_simple_observer(event_type, callback)`: Buat observer
-  - `create_progress_observer(event_types, total)`: Observer progress
-  - `unregister_group(group)`: Batalkan registrasi grup
-  - `get_observers_by_group(group)`: Observer dalam grup
+  - `create_simple_observer(event_type, callback, name, priority, group)`: Buat observer sederhana
+  - `create_observer(observer_class, event_type, name, priority, group, **kwargs)`: Buat observer custom
+  - `create_progress_observer(event_types, total, desc, use_tqdm, callback, group)`: Buat observer progress
+  - `create_logging_observer(event_types, log_level, format_string, group)`: Buat observer untuk logging
+  - `get_observers_by_group(group)`: Dapatkan observer dalam grup
+  - `unregister_group(group)`: Batalkan registrasi grup observer
+  - `unregister_all()`: Batalkan registrasi semua observer
+  - `get_stats()`: Dapatkan statistik manager
+
+### CompatibilityObserver (compatibility_observer.py)
+
+- **Fungsi**: Adapter untuk observer lama (non-BaseObserver)
+- **Metode Utama**:
+  - `update(event_type, sender, **kwargs)`: Mapping ke metode observer lama
+  - `_map_event_to_method(event_type)`: Konversi tipe event ke nama metode
+  - `_check_on_event_methods()`: Periksa metode on_* yang tersedia
+
+### Decorators (decorators_observer.py)
+
+- **Fungsi**: Dekorator untuk observer pattern
+- **Dekorator Utama**:
+  - `@observable(event_type, include_args, include_result)`: Tandai metode sebagai observable
+  - `@observe(event_types, priority, event_filter)`: Buat kelas menjadi observer
+
+### EventTopics (event_topics_observer.py)
+
+- **Fungsi**: Definisi konstanta untuk topik event standar
+- **Konstanta Utama**:
+  - `Kategori`: TRAINING, EVALUATION, DETECTION, dll.
+  - `Events terstruktur`: TRAINING_START, EPOCH_END, BATCH_START, dll.
+  - `get_all_topics()`: Dapatkan semua topik event yang didefinisikan
+
+### ObserverPriority (priority_observer.py)
+
+- **Fungsi**: Konstanta untuk prioritas observer
+- **Konstanta**:
+  - `CRITICAL=100, HIGH=75, NORMAL=50, LOW=25, LOWEST=0`
+
+### CleanupObserver (cleanup_observer.py)
+
+- **Fungsi**: Pembersihan otomatis observer saat aplikasi selesai
+- **Metode Utama**:
+  - `register_observer_manager(manager)`: Daftarkan manager untuk dibersihkan
+  - `register_cleanup_function(cleanup_func)`: Daftarkan fungsi cleanup
+  - `cleanup_observer_group(manager, group)`: Bersihkan grup observer
+  - `cleanup_all_observers()`: Bersihkan semua observer (atexit handler)
+  - `register_notebook_cleanup(observer_managers, cleanup_functions)`: Setup cleanup untuk notebook
 
 ### CacheManager (manager_cache.py)
-- **Fungsi**: Mengelola sistem caching terpusat
-- **Metode Utama**:
-  - `get(key)`: Ambil data dari cache
-  - `put(key, data)`: Simpan data ke cache
-  - `cleanup(expired_only)`: Bersihkan cache
-  - `get_stats()`: Dapatkan statistik cache
 
-## Domain Dataset (Diperbarui)
+- **Fungsi**: Koordinator sistem caching terpadu dengan cleanup otomatis
+- **Metode Utama**:
+  - `get(key, measure_time)`: Ambil data dari cache dengan statistik
+  - `put(key, data, estimated_size)`: Simpan data ke cache
+  - `get_cache_key(file_path, params)`: Buat kunci cache dari file dan parameter
+  - `cleanup(expired_only, force)`: Bersihkan cache
+  - `clear()`: Hapus seluruh cache
+  - `get_stats()`: Dapatkan statistik lengkap cache
+  - `verify_integrity(fix)`: Periksa dan perbaiki integritas cache
+
+### CacheStorage (storage_cache.py)
+
+- **Fungsi**: Menyimpan dan memuat data cache dari disk dengan pengukuran performa
+- **Metode Utama**:
+  - `create_cache_key(file_path, params)`: Buat key unik berbasis hash
+  - `save_to_cache(cache_path, data)`: Simpan data ke file
+  - `load_from_cache(cache_path, measure_time)`: Muat data dengan timing
+  - `delete_file(cache_path)`: Hapus file cache
+
+### CacheIndex (indexing_cache.py)
+
+- **Fungsi**: Mengelola metadata cache dengan atomic update
+- **Metode Utama**:
+  - `load_index()`: Muat index dari disk
+  - `save_index()`: Simpan index ke disk secara atomic
+  - `get_files()`: Dapatkan semua file terdaftar
+  - `get_file_info(key)`: Dapatkan info file cache
+  - `add_file(key, size)`: Tambahkan file ke index
+  - `remove_file(key)`: Hapus file dari index
+  - `update_access_time(key)`: Update waktu akses terakhir
+  - `get/set_total_size()`: Get/set ukuran total cache
+
+### CacheCleanup (cleanup_cache.py)
+
+- **Fungsi**: Pembersihan cache otomatis dengan thread worker
+- **Metode Utama**:
+  - `setup_auto_cleanup()`: Jalankan thread worker otomatis
+  - `cleanup(expired_only, force)`: Bersihkan cache dengan strategi expired/LRU
+  - `_identify_expired_files(current_time)`: Identifikasi file kadaluarsa
+  - `_remove_by_lru(cleanup_stats, already_removed)`: Hapus file dengan LRU
+  - `clear_all()`: Hapus seluruh cache
+  - `verify_integrity(fix)`: Validasi dan perbaiki integritas cache
+
+### CacheStats (stats_cache.py)
+
+- **Fungsi**: Melacak dan menghitung statistik penggunaan cache
+- **Metode Utama**:
+  - `reset()`: Reset semua statistik
+  - `update_hits()`: Tambah hit count
+  - `update_misses()`: Tambah miss count
+  - `update_evictions()`: Tambah eviction count
+  - `update_expired()`: Tambah expired count
+  - `update_saved_bytes(bytes_saved)`: Tambah byte tersimpan
+  - `update_saved_time(time_saved)`: Tambah waktu tersimpan
+  - `get_raw_stats()`: Dapatkan raw stats
+  - `get_all_stats(cache_dir, cache_index, max_size_bytes)`: Hitung dan validasi semua statistik
+
+## Domain Dataset
 
 ### DatasetManager (manager.py)
 - **Fungsi**: Koordinator alur kerja dataset

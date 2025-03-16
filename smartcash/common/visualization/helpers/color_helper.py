@@ -1,6 +1,6 @@
 """
-File: smartcash/dataset/visualization/helpers/color_helper.py
-Deskripsi: Utilitas untuk manajemen warna, palet, dan gradien warna
+File: smartcash/common/visualization/helpers/color_helper.py
+Deskripsi: Utilitas untuk manajemen warna, palet, dan gradien warna dengan inheritance dari VisualizationBase
 """
 
 import numpy as np
@@ -10,9 +10,10 @@ import seaborn as sns
 from typing import Dict, List, Tuple, Union, Optional, Any
 
 from smartcash.common.logger import get_logger
+from smartcash.common.visualization.core.visualization_base import VisualizationBase
 
 
-class ColorHelper:
+class ColorHelper(VisualizationBase):
     """Helper untuk manajemen palet warna dan gradien."""
     
     def __init__(self, logger=None):
@@ -22,6 +23,7 @@ class ColorHelper:
         Args:
             logger: Logger kustom (opsional)
         """
+        super().__init__()
         self.logger = logger or get_logger("color_helper")
         
         # Palet warna default untuk berbagai kasus penggunaan

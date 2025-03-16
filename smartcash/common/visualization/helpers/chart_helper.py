@@ -11,12 +11,12 @@ from matplotlib.figure import Figure
 from matplotlib.axes import Axes
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.visualization.helpers.color_helper import ColorHelper
-from smartcash.dataset.visualization.helpers.annotation_helper import AnnotationHelper
-from smartcash.dataset.visualization.helpers.style_helper import StyleHelper
+from smartcash.common.visualization.helpers.color_helper import ColorHelper
+from smartcash.common.visualization.helpers.annotation_helper import AnnotationHelper
+from smartcash.common.visualization.helpers.style_helper import StyleHelper
+from smartcash.common.visualization.core.visualization_base import VisualizationBase
 
-
-class ChartHelper:
+class ChartHelper(VisualizationBase):
     """Helper untuk pembuatan dan styling berbagai jenis chart."""
     
     def __init__(self, style: str = 'seaborn-v0_8-whitegrid', logger=None):

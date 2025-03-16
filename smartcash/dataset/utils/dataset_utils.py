@@ -13,6 +13,7 @@ from typing import Dict, List, Tuple, Optional, Any, Union
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
+from smartcash.common.interfaces.layer_config_interface import ILayerConfigManager
 from smartcash.common.layer_config import get_layer_config
 
 # Konstanta
@@ -25,7 +26,7 @@ DEFAULT_RANDOM_SEED = 42
 class DatasetUtils:
     """Utilitas umum untuk operasi dataset."""
     
-    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger=None):
+    def __init__(self, config: Dict, data_dir: Optional[str] = None, logger=None, layer_config: Optional[ILayerConfigManager] = None):
         """
         Inisialisasi DatasetUtils.
         
@@ -33,6 +34,7 @@ class DatasetUtils:
             config: Konfigurasi aplikasi
             data_dir: Direktori utama data (opsional)
             logger: Logger kustom (opsional)
+            layer_config: ILayerConfigManager instance (opsional)
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
@@ -40,7 +42,7 @@ class DatasetUtils:
         
         # Setup layer config
         if config:
-            self.layer_config = get_layer_config()
+            self.layer_config = layer_config or get_layer_config()
             self.active_layers = config.get('layers', self.layer_config.get_layer_names())
             
             # Buat mapping class ID ke layer/nama

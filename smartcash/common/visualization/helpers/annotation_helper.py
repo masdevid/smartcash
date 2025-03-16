@@ -1,6 +1,6 @@
 """
-File: smartcash/dataset/visualization/helpers/annotation_helper.py
-Deskripsi: Utilitas untuk menambahkan anotasi pada visualisasi
+File: smartcash/common/visualization/helpers/annotation_helper.py
+Deskripsi: Utilitas untuk menambahkan anotasi pada visualisasi dengan inheritance dari VisualizationBase
 """
 
 import matplotlib.pyplot as plt
@@ -10,9 +10,10 @@ from matplotlib.axes import Axes
 from matplotlib.container import BarContainer
 
 from smartcash.common.logger import get_logger
+from smartcash.common.visualization.core.visualization_base import VisualizationBase
 
 
-class AnnotationHelper:
+class AnnotationHelper(VisualizationBase):
     """Helper untuk menambahkan dan mengelola anotasi pada visualisasi."""
     
     def __init__(self, logger=None):
@@ -22,6 +23,7 @@ class AnnotationHelper:
         Args:
             logger: Logger kustom (opsional)
         """
+        super().__init__()
         self.logger = logger or get_logger("annotation_helper")
         self.logger.info("📝 AnnotationHelper diinisialisasi")
     

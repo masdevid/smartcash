@@ -6,11 +6,12 @@ Deskripsi: Adapter untuk mengintegrasikan visualisasi dari domain model ke domai
 from typing import Dict, List, Optional, Any, Union
 import numpy as np
 
+from smartcash.common.interfaces.visualization_interface import IDetectionVisualizer, IMetricsVisualizer
 from smartcash.model.visualization.detection_visualizer import DetectionVisualizer
 from smartcash.model.visualization.metrics_visualizer import MetricsVisualizer
 from smartcash.common.logger import get_logger
 
-class DetectionVisualizationAdapter:
+class DetectionVisualizationAdapter(IDetectionVisualizer, IMetricsVisualizer):
     """
     Adapter untuk mengintegrasikan visualisasi dari domain model ke domain detection.
     Mengimplementasikan prinsip DRY dengan memanfaatkan kelas visualisasi yang sudah ada.
@@ -71,7 +72,7 @@ class DetectionVisualizationAdapter:
             show_conf=show_conf
         )
     
-    def visualize_confusion_matrix(
+    def plot_confusion_matrix(
         self,
         cm: np.ndarray,
         class_names: List[str],

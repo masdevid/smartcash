@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/visualization/report.py
-Deskripsi: Utilitas untuk membuat visualisasi laporan dataset
+Deskripsi: Utilitas untuk visualisasi laporan dataset dengan inheritance dari VisualizationBase
 """
 
 import matplotlib.pyplot as plt
@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple, Union
 from matplotlib.gridspec import GridSpec
 
+from smartcash.common.visualization.core.visualization_base import VisualizationBase
+from smartcash.common.visualization.helpers.annotation_helper import AnnotationHelper
+from smartcash.common.visualization.helpers.color_helper import ColorHelper
 from smartcash.common.logger import get_logger
 
 
-class ReportVisualizer:
+class ReportVisualizer(VisualizationBase):
     """Komponen untuk membuat visualisasi komprehensif untuk laporan dataset."""
     
     def __init__(self, output_dir: str, logger=None):
@@ -24,16 +27,20 @@ class ReportVisualizer:
             output_dir: Direktori untuk menyimpan visualisasi
             logger: Logger kustom (opsional)
         """
+        super().__init__()
         self.output_dir = Path(output_dir)
         self.logger = logger or get_logger("report_visualizer")
         
         # Buat direktori output jika belum ada
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        # Setup style
-        plt.style.use('seaborn-v0_8-whitegrid')
-        self.palette = sns.color_palette("viridis", 12)
-        self.accent_palette = sns.color_palette("Set2", 8)
+        # Setup color helpers
+        self.color_helper = ColorHelper(logger)
+        self.annotation_helper = AnnotationHelper(logger)
+        
+        # Setup palette
+        self.palette = self.color_helper.get_color_palette(12, 'viridis')
+        self.accent_palette = self.color_helper.get_color_palette(8, 'Set2')
         
         self.logger.info(f"📊 ReportVisualizer diinisialisasi dengan output di: {self.output_dir}")
     
@@ -56,7 +63,7 @@ class ReportVisualizer:
         Returns:
             Path ke file visualisasi
         """
-        # Transformasi data untuk plotting
+        # Validasi data
         if not class_stats:
             return ""
             
@@ -112,7 +119,7 @@ class ReportVisualizer:
         else:
             output_path = str(self.output_dir / "class_distribution_summary.png")
             
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
+        self.save_figure(fig, output_path)
         plt.close()
         
         return output_path
@@ -169,8 +176,7 @@ class ReportVisualizer:
         else:
             output_path = str(self.output_dir / "dataset_dashboard.png")
             
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        plt.close()
+        self.save_figure(fig, output_path)
         
         self.logger.info(f"📊 Dashboard dataset disimpan ke: {output_path}")
         return output_path
@@ -201,11 +207,8 @@ class ReportVisualizer:
         ax.bar(x + width/2, labels, width, label='Label', color=self.palette[2])
         
         # Add text labels
-        for i, v in enumerate(images):
-            ax.text(i - width/2, v + max(images) * 0.02, str(v), ha='center', fontsize=9)
-        
-        for i, v in enumerate(labels):
-            ax.text(i + width/2, v + max(labels) * 0.02, str(v), ha='center', fontsize=9)
+        self.annotation_helper.add_bar_annotations(ax, ax.containers[0])
+        self.annotation_helper.add_bar_annotations(ax, ax.containers[1])
         
         # Styling
         ax.set_title('Distribusi Split')
@@ -229,11 +232,10 @@ class ReportVisualizer:
         
         # Create horizontal bar chart
         y_pos = np.arange(len(classes))
-        ax.barh(y_pos, percentages, color=self.palette[:len(classes)])
+        bars = ax.barh(y_pos, percentages, color=self.palette[:len(classes)])
         
         # Add percentage labels
-        for i, v in enumerate(percentages):
-            ax.text(v + 0.5, i, f"{v:.1f}%", va='center')
+        self.annotation_helper.add_bar_annotations(ax, bars, horizontal=True)
         
         # Styling
         ax.set_title('Top 5 Kelas')
@@ -283,11 +285,10 @@ class ReportVisualizer:
         
         # Create bar chart
         x_pos = np.arange(len(categories))
-        ax.bar(x_pos, counts, color=self.palette[3:6])
+        bars = ax.bar(x_pos, counts, color=self.palette[3:6])
         
         # Add count labels
-        for i, v in enumerate(counts):
-            ax.text(i, v + max(counts) * 0.02, str(v), ha='center')
+        self.annotation_helper.add_bar_annotations(ax, bars)
         
         # Styling
         ax.set_title('Distribusi Ukuran Bounding Box')
@@ -346,8 +347,7 @@ class ReportVisualizer:
             recommendations_text += f"\n...dan {len(recommendations) - 3} rekomendasi lainnya."
         
         # Plot text
-        ax.text(0.5, 0.5, recommendations_text, ha='center', va='center', 
-               bbox=dict(boxstyle="round,pad=0.5", facecolor='#f5f5f5', alpha=0.5))
+        self.annotation_helper.add_text_box(ax, recommendations_text)
         
         # Remove axis
         ax.axis('off')

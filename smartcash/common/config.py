@@ -1,13 +1,16 @@
 """
 File: smartcash/common/config.py
-Deskripsi: Manager konfigurasi dengan dukungan YAML dan environment variables
+Deskripsi: Manager konfigurasi dengan dukungan YAML, environment variables, dan dependency injection
 """
 
 import os
 import yaml
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable
+
+# Type variable untuk dependency injection
+T = TypeVar('T')
 
 class ConfigManager:
     """
@@ -15,6 +18,7 @@ class ConfigManager:
     - Loading dari file YAML/JSON
     - Environment variable overrides
     - Hierarki konfigurasi
+    - Dependency injection
     """
     
     DEFAULT_CONFIG_DIR = 'config'
@@ -37,6 +41,10 @@ class ConfigManager:
         
         # Konfigurasi dasar
         self.config = {}
+        
+        # Dependency container
+        self._dependencies = {}
+        self._factory_functions = {}
         
         # Muat konfigurasi dari file jika disediakan
         if config_file:
@@ -192,7 +200,6 @@ class ConfigManager:
         # Load dari file jika string
         if isinstance(config, str):
             config_path = self._resolve_config_path(config)
-            
             if config_path.suffix.lower() in ('.yml', '.yaml'):
                 with open(config_path, 'r', encoding='utf-8') as f:
                     config = yaml.safe_load(f) or {}
@@ -247,6 +254,70 @@ class ConfigManager:
             # Default ke YAML
             with open(f"{config_path}.yaml", 'w', encoding='utf-8') as f:
                 yaml.dump(self.config, f, default_flow_style=False)
+    
+    # ===== Dependency Injection Methods =====
+    
+    def register(self, interface_type: Type[T], implementation: Type[T]) -> None:
+        """
+        Daftarkan implementasi untuk interface tertentu.
+        
+        Args:
+            interface_type: Tipe interface yang akan diregister
+            implementation: Implementasi dari interface tersebut
+        """
+        self._dependencies[interface_type] = implementation
+    
+    def register_instance(self, interface_type: Type[T], instance: T) -> None:
+        """
+        Daftarkan instance untuk interface tertentu (singleton).
+        
+        Args:
+            interface_type: Tipe interface yang akan diregister
+            instance: Instance objek implementasi
+        """
+        self._dependencies[interface_type] = instance
+    
+    def register_factory(self, interface_type: Type[T], factory: Callable[..., T]) -> None:
+        """
+        Daftarkan factory function untuk membuat implementasi.
+        
+        Args:
+            interface_type: Tipe interface yang akan diregister
+            factory: Factory function untuk membuat implementasi
+        """
+        self._factory_functions[interface_type] = factory
+    
+    def resolve(self, interface_type: Type[T], *args, **kwargs) -> T:
+        """
+        Resolve dependency untuk interface tertentu.
+        
+        Args:
+            interface_type: Tipe interface yang akan diresolve
+            *args, **kwargs: Parameter tambahan untuk konstruktor/factory
+            
+        Returns:
+            Implementasi dari interface yang diminta
+            
+        Raises:
+            KeyError: Jika interface tidak terdaftar
+        """
+        # Cek apakah ada factory function
+        if interface_type in self._factory_functions:
+            return self._factory_functions[interface_type](*args, **kwargs)
+        
+        # Cek dependencies
+        if interface_type in self._dependencies:
+            implementation = self._dependencies[interface_type]
+            
+            # Jika implementation sudah berupa instance, langsung kembalikan
+            if not isinstance(implementation, type):
+                return implementation
+                
+            # Jika implementation adalah kelas, buat instance baru
+            return implementation(*args, **kwargs)
+        
+        # Jika tidak ditemukan implementasi, raise exception
+        raise KeyError(f"Tidak ada implementasi terdaftar untuk {interface_type.__name__}")
     
     def __getitem__(self, key):
         return self.get(key)

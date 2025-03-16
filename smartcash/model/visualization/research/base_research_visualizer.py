@@ -1,5 +1,5 @@
 """
-File: smartcash/model/visualization/base_research_visualizer.py
+File: smartcash/model/visualization/research/base_research_visualizer.py
 Deskripsi: Modul dasar untuk visualisasi penelitian model deteksi objek
 """
 
@@ -9,10 +9,9 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.model.visualization.base_visualizer import VisualizationHelper
-from smartcash.common.logger import get_logger
+from smartcash.model.visualization.base_visualizer import ModelVisualizationBase
 
-class BaseResearchVisualizer:
+class BaseResearchVisualizer(ModelVisualizationBase):
     """Kelas dasar untuk visualisasi hasil penelitian dengan fungsionalitas umum."""
     
     def __init__(
@@ -27,11 +26,7 @@ class BaseResearchVisualizer:
             output_dir: Direktori untuk menyimpan hasil
             logger: Logger untuk logging
         """
-        self.output_dir = VisualizationHelper.create_output_directory(output_dir)
-        self.logger = logger or get_logger("research_visualizer")
-        
-        # Setup plot style
-        VisualizationHelper.set_plot_style()
+        super().__init__(output_dir, logger)
     
     def _create_styled_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -117,4 +112,4 @@ class BaseResearchVisualizer:
             return False
             
         output_path = self.output_dir / filename
-        return VisualizationHelper.save_figure(fig, output_path, logger=self.logger)
+        return self.save_figure(fig, output_path)

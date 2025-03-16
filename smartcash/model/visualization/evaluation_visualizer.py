@@ -3,16 +3,18 @@ File: smartcash/model/visualization/evaluation_visualizer.py
 Deskripsi: Komponen visualisasi untuk hasil evaluasi model
 """
 
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 from typing import Dict, List, Optional, Any, Union
 from pathlib import Path
 
-from smartcash.common.logger import SmartCashLogger, get_logger
+from smartcash.common.interfaces.visualization_interface import IMetricsVisualizer
+from smartcash.common.logger import get_logger
+from smartcash.model.visualization.base_visualizer import ModelVisualizationBase
 
-class EvaluationVisualizer:
+class EvaluationVisualizer(ModelVisualizationBase, IMetricsVisualizer):
     """
     Komponen visualisasi untuk hasil evaluasi model.
     Digunakan untuk menghasilkan visualisasi perbandingan model, metrik, backbone, dll.
@@ -20,22 +22,22 @@ class EvaluationVisualizer:
     
     def __init__(
         self,
+        config: Dict,
         output_dir: Optional[str] = None,
-        logger: Optional[SmartCashLogger] = None
+        logger: Optional[Any] = None
     ):
         """
         Inisialisasi visualizer evaluasi.
         
         Args:
+            config: Konfigurasi model dan evaluasi
             output_dir: Direktori output untuk visualisasi (opsional)
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("evaluation_visualizer")
+        output_dir = output_dir or "results/evaluation/plots"
+        super().__init__(output_dir, logger=logger)
         
-        # Output directory
-        self.output_dir = Path(output_dir) if output_dir else Path("results/evaluation/plots")
-        self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+        self.config = config
         self.logger.debug(f"🔧 EvaluationVisualizer diinisialisasi (output_dir={self.output_dir})")
     
     def create_all_plots(
@@ -100,6 +102,78 @@ class EvaluationVisualizer:
             
         return plots
     
+    def plot_confusion_matrix(
+        self,
+        cm: np.ndarray,
+        class_names: List[str],
+        title: str = "Confusion Matrix",
+        filename: Optional[str] = None,
+        normalize: bool = True,
+        **kwargs
+    ) -> str:
+        """
+        Plot confusion matrix.
+        
+        Args:
+            cm: Confusion matrix
+            class_names: List nama kelas
+            title: Judul plot
+            filename: Nama file untuk menyimpan plot
+            normalize: Normalisasi nilai dalam matriks
+            **kwargs: Parameter tambahan untuk plotting
+            
+        Returns:
+            Path ke plot yang dibuat
+        """
+        try:
+            # Normalisasi matrix jika diminta
+            if normalize and cm.sum() > 0:
+                cm_norm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis] + 1e-6)
+                cm_norm = np.nan_to_num(cm_norm)  # Handle division by zero
+                fmt = '.2f'
+                plot_data = cm_norm
+            else:
+                fmt = 'd'
+                plot_data = cm
+            
+            # Setup figure
+            figsize = kwargs.get('figsize', (10, 8))
+            plt.figure(figsize=figsize)
+            
+            # Plot heatmap
+            ax = sns.heatmap(
+                plot_data, 
+                annot=True,
+                fmt=fmt,
+                cmap=kwargs.get('cmap', 'Blues'),
+                xticklabels=class_names,
+                yticklabels=class_names,
+                square=True,
+                cbar_kws={"shrink": .8}
+            )
+            
+            plt.title(title, size=16)
+            plt.ylabel('True Label', size=14)
+            plt.xlabel('Predicted Label', size=14)
+            plt.xticks(rotation=45, ha="right")
+            plt.yticks(rotation=0)
+            plt.tight_layout()
+            
+            # Save plot
+            if filename is None:
+                filename = "confusion_matrix.png"
+                
+            plot_path = self.output_dir / filename
+            self.save_figure(plt.gcf(), plot_path)
+            plt.close()
+            
+            self.logger.debug(f"✅ Plot confusion matrix dibuat: {plot_path}")
+            return str(plot_path)
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal membuat confusion matrix: {str(e)}")
+            return ""
+    
     def plot_map_f1_comparison(
         self,
         metrics_df: pd.DataFrame,
@@ -148,7 +222,7 @@ class EvaluationVisualizer:
             # Save plot
             filename = f"{prefix}_map_f1_comparison.png" if prefix else "map_f1_comparison.png"
             plot_path = self.output_dir / filename
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            self.save_figure(plt.gcf(), plot_path)
             plt.close()
             
             self.logger.debug(f"✅ Plot mAP/F1 dibuat: {plot_path}")
@@ -213,7 +287,7 @@ class EvaluationVisualizer:
             # Save plot
             filename = f"{prefix}_inference_time.png" if prefix else "inference_time.png"
             plot_path = self.output_dir / filename
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            self.save_figure(plt.gcf(), plot_path)
             plt.close()
             
             self.logger.debug(f"✅ Plot waktu inferensi dibuat: {plot_path}")
@@ -284,7 +358,7 @@ class EvaluationVisualizer:
             # Save plot
             filename = f"{prefix}_backbone_comparison.png" if prefix else "backbone_comparison.png"
             plot_path = self.output_dir / filename
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            self.save_figure(plt.gcf(), plot_path)
             plt.close()
             
             self.logger.debug(f"✅ Plot perbandingan backbone dibuat: {plot_path}")
@@ -354,7 +428,7 @@ class EvaluationVisualizer:
             # Save plot
             filename = f"{prefix}_condition_comparison.png" if prefix else "condition_comparison.png"
             plot_path = self.output_dir / filename
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+            self.save_figure(plt.gcf(), plot_path)
             plt.close()
             
             self.logger.debug(f"✅ Plot perbandingan kondisi pengujian dibuat: {plot_path}")
@@ -436,7 +510,7 @@ class EvaluationVisualizer:
                 # Save plot
                 filename = f"{prefix}_combined_heatmap.png" if prefix else "combined_heatmap.png"
                 plot_path = self.output_dir / filename
-                plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+                self.save_figure(plt.gcf(), plot_path)
                 plt.close()
                 
                 self.logger.debug(f"✅ Heatmap kombinasi dibuat: {plot_path}")
@@ -448,3 +522,62 @@ class EvaluationVisualizer:
         except Exception as e:
             self.logger.warning(f"⚠️ Gagal membuat heatmap kombinasi: {str(e)}")
             return None
+    
+    def visualize_predictions(
+        self,
+        samples: List[Dict],
+        conf_thres: float = 0.25,
+        title: str = "Sample Predictions",
+        filename: Optional[str] = None,
+        **kwargs
+    ) -> str:
+        """
+        Visualisasikan hasil prediksi model terhadap sampel gambar.
+        
+        Args:
+            samples: List sampel [{'image', 'prediction', 'target'}]
+            conf_thres: Threshold confidence untuk deteksi
+            title: Judul visualisasi
+            filename: Nama file output (opsional)
+            **kwargs: Parameter tambahan
+            
+        Returns:
+            Path ke file visualisasi
+        """
+        try:
+            from smartcash.model.visualization.detection_visualizer import DetectionVisualizer
+            
+            # Proses sampel terlebih dahulu
+            processed_images = []
+            processed_detections = []
+            
+            for sample in samples[:min(9, len(samples))]:
+                # Proses gambar dan label
+                image = sample['image']
+                prediction = sample.get('prediction', {})
+                target = sample.get('target', {})
+                
+                # Post-process predictions & targets
+                # ...
+                # NOTE: Implementasi post-processing disesuaikan dengan format prediksi dan target
+                
+                processed_images.append(image)
+                processed_detections.append([])  # Deteksi yang sudah diformat
+            
+            # Gunakan detection visualizer untuk membuat grid visualisasi
+            det_visualizer = DetectionVisualizer(self.output_dir)
+            grid_img = det_visualizer.visualize_detections_grid(
+                processed_images,
+                processed_detections,
+                title=title,
+                filename=filename or "sample_predictions.png",
+                conf_threshold=conf_thres
+            )
+            
+            if grid_img is not None:
+                return str(self.output_dir / (filename or "sample_predictions.png"))
+            return ""
+            
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal membuat visualisasi prediksi: {str(e)}")
+            return ""

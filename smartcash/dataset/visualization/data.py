@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/visualization/data.py
-Deskripsi: Utilitas untuk visualisasi data dan dataset
+Deskripsi: Utilitas untuk visualisasi data dan dataset dengan inheritance dari VisualizationBase
 """
 
 import os
@@ -13,10 +13,11 @@ from typing import Dict, List, Optional, Any, Tuple, Union
 from collections import Counter
 
 from smartcash.common.logger import SmartCashLogger, get_logger
+from smartcash.common.visualization.core.visualization_base import VisualizationBase
 import albumentations as A
 
 
-class DataVisualizationHelper:
+class DataVisualizationHelper(VisualizationBase):
     """Helper untuk visualisasi dataset dan data-related components."""
     
     def __init__(self, output_dir: str, logger: Optional[SmartCashLogger] = None):
@@ -27,6 +28,7 @@ class DataVisualizationHelper:
             output_dir: Direktori untuk menyimpan hasil visualisasi
             logger: Logger untuk output informasi
         """
+        super().__init__()
         self.output_dir = Path(output_dir)
         self.logger = logger or get_logger("DataVisualization")
         
@@ -149,6 +151,50 @@ class DataVisualizationHelper:
         plt.close()
         
         self.logger.info(f"📊 Plot distribusi layer disimpan ke: {save_path}")
+        return save_path
+    
+    def plot_size_distribution(self, size_stats: Dict[str, int],
+                              title: str = "Distribusi Ukuran Bounding Box",
+                              save_path: Optional[str] = None,
+                              figsize: Tuple[int, int] = (8, 6)) -> str:
+        """
+        Visualisasikan distribusi ukuran bounding box.
+        
+        Args:
+            size_stats: Dictionary dengan size_category: count
+            title: Judul plot
+            save_path: Path untuk menyimpan plot (opsional)
+            figsize: Ukuran figure (width, height)
+            
+        Returns:
+            Path lengkap ke file visualisasi yang disimpan
+        """
+        plt.figure(figsize=figsize)
+        
+        # Plot distribusi
+        labels = list(size_stats.keys())
+        values = list(size_stats.values())
+        colors = plt.cm.viridis(np.linspace(0, 1, len(labels)))
+        
+        plt.bar(labels, values, color=colors)
+        plt.title(title, fontsize=14, fontweight='bold')
+        plt.xlabel('Kategori Ukuran', fontsize=12)
+        plt.ylabel('Jumlah', fontsize=12)
+        plt.grid(axis='y', linestyle='--', alpha=0.7)
+        
+        # Tambahkan nilai di atas setiap bar
+        for i, v in enumerate(values):
+            plt.text(i, v + max(values) * 0.01, str(v), 
+                     ha='center', fontweight='bold')
+        
+        plt.tight_layout()
+        
+        # Simpan plot
+        save_path = self._get_save_path(save_path, "bbox_size_distribution.png")
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        self.logger.info(f"📊 Plot distribusi ukuran bbox disimpan ke: {save_path}")
         return save_path
     
     def plot_sample_images(self, data_dir: str, num_samples: int = 9,

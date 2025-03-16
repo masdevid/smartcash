@@ -9,11 +9,12 @@ from pathlib import Path
 import torch
 
 from smartcash.common.logger import get_logger
+from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.model.exceptions import ModelCheckpointError
-from smartcash.model.services.checkpoint import CheckpointService
+from smartcash.model.services.checkpoint.checkpoint_service import CheckpointService
 
 
-class ModelCheckpointManager:
+class ModelCheckpointManager(ICheckpointService):
     """
     Manager untuk integrasi model manager dengan checkpoint service.
     Menyediakan fungsi-fungsi untuk menyimpan, memuat, dan mengelola 
@@ -109,7 +110,7 @@ class ModelCheckpointManager:
         except Exception as e:
             error_msg = f"❌ Gagal menyimpan checkpoint model: {str(e)}"
             self.logger.error(error_msg)
-            raise ModelCheckpointError(error_msg)
+            raise ModelCheckpointError(error_msg) from e
     
     def load_checkpoint(
         self,
@@ -117,7 +118,7 @@ class ModelCheckpointManager:
         model: Optional[torch.nn.Module] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         map_location: Optional[str] = None
-    ) -> torch.nn.Module:
+    ) -> Dict[str, Any]:
         """
         Load checkpoint ke model.
         
@@ -145,7 +146,7 @@ class ModelCheckpointManager:
                 map_location = self.model_manager.config.get('device', 'cpu')
             
             # Load checkpoint ke model
-            loaded_model = self.checkpoint_service.load_checkpoint(
+            loaded_checkpoint = self.checkpoint_service.load_checkpoint(
                 path=path,
                 model=model,
                 optimizer=optimizer,
@@ -153,14 +154,14 @@ class ModelCheckpointManager:
             )
             
             # Update model di model_manager
-            self.model_manager.model = loaded_model
+            self.model_manager.model = model
             
-            return loaded_model
+            return loaded_checkpoint
             
         except Exception as e:
             error_msg = f"❌ Gagal load checkpoint model: {str(e)}"
             self.logger.error(error_msg)
-            raise ModelCheckpointError(error_msg)
+            raise ModelCheckpointError(error_msg) from e
     
     def get_best_checkpoint(self) -> Optional[str]:
         """
@@ -236,4 +237,4 @@ class ModelCheckpointManager:
         except Exception as e:
             error_msg = f"❌ Gagal mengekspor model ke ONNX: {str(e)}"
             self.logger.error(error_msg)
-            raise ModelCheckpointError(error_msg)
+            raise ModelCheckpointError(error_msg) from e

@@ -1,5 +1,5 @@
 """
-File: smartcash/model/visualization/scenario_visualizer.py
+File: smartcash/model/visualization/research/scenario_visualizer.py
 Deskripsi: Komponen untuk visualisasi skenario penelitian model deteksi objek
 """
 
@@ -8,7 +8,7 @@ import seaborn as sns
 import pandas as pd
 from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.model.visualization.base_research_visualizer import BaseResearchVisualizer
+from smartcash.model.visualization.research.base_research_visualizer import BaseResearchVisualizer
 from smartcash.model.analysis import ScenarioAnalyzer
 
 class ScenarioVisualizer(BaseResearchVisualizer):

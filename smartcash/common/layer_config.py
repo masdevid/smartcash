@@ -1,6 +1,6 @@
 """
 File: smartcash/common/layer_config.py
-Deskripsi: Modul untuk file layer_config.py
+Deskripsi: Modul untuk manajemen konfigurasi layer deteksi dengan implementasi interface
 """
 
 import os
@@ -10,13 +10,17 @@ from typing import Dict, List, Any, Optional, Union
 from pathlib import Path
 import threading
 
-class LayerConfigManager:
+from smartcash.common.interfaces.layer_config_interface import ILayerConfigManager
+
+class LayerConfigManager(ILayerConfigManager):
     """
     Manager konfigurasi layer deteksi untuk memastikan konsistensi definisi layer
     dan kelas yang digunakan di berbagai bagian aplikasi.
     
     Menyediakan akses terpusat ke konfigurasi layer dan class mapping,
     dengan dukungan untuk penyimpanan dan pemulihan konfigurasi.
+    
+    Implementasi dari ILayerConfigManager interface.
     """
     
     # Singleton instance
@@ -93,7 +97,7 @@ class LayerConfigManager:
         if self.logger:
             self.logger.info(f"✅ Layer config manager diinisialisasi dengan {len(self.config)} layer")
     
-    def get_layer_config(self, layer_name: str) -> Dict:
+    def get_layer_config(self, layer_name: str) -> Dict[str, Any]:
         """
         Dapatkan konfigurasi untuk layer tertentu.
         
@@ -332,7 +336,7 @@ class LayerConfigManager:
         }
 
 # Global function to get an instance of LayerConfigManager
-def get_layer_config(config_path: Optional[str] = None, logger: Optional[Any] = None) -> LayerConfigManager:
+def get_layer_config(config_path: Optional[str] = None, logger: Optional[Any] = None) -> ILayerConfigManager:
     """
     Fungsi global untuk mendapatkan instance LayerConfigManager.
     
@@ -341,6 +345,6 @@ def get_layer_config(config_path: Optional[str] = None, logger: Optional[Any] = 
         logger: Optional logger
         
     Returns:
-        Instance LayerConfigManager (singleton)
+        Instance ILayerConfigManager (singleton)
     """
     return LayerConfigManager(config_path=config_path, logger=logger)

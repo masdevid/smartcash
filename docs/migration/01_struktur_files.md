@@ -4,24 +4,32 @@
 
 ```
 smartcash/common/
-├── __init__.py                 # Ekspor utilitas umum dengan __all__
-├── visualization/              # Visualisasi
-│   ├── __init__.py             # Ekspor komponen visualisasi
-│   └── helpers/                # Komponen visualisasi  
-│       ├── __init__.py         # Ekspor komponen helper visualisasi
-│       ├── chart_helper.py     # ChartHelper: Visualisasi chart
-│       ├── color_helper.py     # ColorHelper: Visualisasi warna
+├── __init__.py                # Ekspor utilitas umum dengan __all__
+├── visualization/             # Visualisasi
+│   ├── __init__.py            # Ekspor komponen visualisasi
+│   ├── core/                  # Core visualisasi
+│   │   ├── __init__.py        # Ekspor komponen core
+│   │   └── visualization_base.py # Base class untuk visualisasi
+│   └── helpers/               # Komponen visualisasi
+│       ├── __init__.py        # Ekspor komponen helper visualisasi
+│       ├── chart_helper.py    # ChartHelper: Visualisasi chart
+│       ├── color_helper.py    # ColorHelper: Visualisasi warna
 │       ├── annotation_helper.py # AnnotationHelper: Visualisasi anotasi
-│       ├── export_helper.py    # ExportHelper: Export visualisasi
-│       ├── layout_helper.py    # LayoutHelper: Layout visualisasi
-│       └── style_helper.py     # StyleHelper: Styling visualisasi
-├── config.py                   # ConfigManager: Manager konfigurasi multi-format
-├── constants.py                # Konstanta global (VERSION, APP_NAME, DetectionLayer, dll)
-├── logger.py                   # SmartCashLogger: Logger dengan emojis, warna, callback
-├── exceptions.py               # Exception hierarchy (SmartCashError, ConfigError, dll)
-├── types.py                    # Type definitions (ImageType, PathType, BoundingBox, dll)
-├── utils.py                    # Fungsi utilitas umum (path, file, format, system info)
-└── layer_config.py             # LayerConfigManager: Konfigurasi layer deteksi
+│       ├── export_helper.py   # ExportHelper: Export visualisasi
+│       ├── layout_helper.py   # LayoutHelper: Layout visualisasi
+│       └── style_helper.py    # StyleHelper: Styling visualisasi
+├── interfaces/                # Abstract interfaces
+│   ├── __init__.py            # Ekspor interfaces
+│   ├── visualization_interface.py # Interface untuk visualisasi
+│   ├── layer_config_interface.py  # Interface untuk konfigurasi layer
+│   └── checkpoint_interface.py    # Interface untuk checkpoint
+├── config.py                  # ConfigManager: Manager konfigurasi multi-format
+├── constants.py               # Konstanta global (VERSION, APP_NAME, dll)
+├── logger.py                  # SmartCashLogger: Logger dengan emojis, warna, callback
+├── exceptions.py              # Exception hierarchy
+├── types.py                   # Type definitions
+├── utils.py                   # Fungsi utilitas umum
+└── layer_config.py            # LayerConfigManager: Konfigurasi layer deteksi
 ```
 
 ## 2. Domain Components (Tidak Berubah)
@@ -32,18 +40,19 @@ smartcash/components/
 ├── observer/                   # Observer pattern
 │   ├── __init__.py             # Ekspor komponen observer pattern
 │   ├── base_observer.py        # BaseObserver: Kelas dasar untuk semua observer
-│   ├── compatibility_observer.py # Adapter untuk observer lama
+│   ├── compatibility_observer.py # CompatibilityObserver: Adapter untuk observer lama
 │   ├── decorators_observer.py  # Dekorator @observable dan @observe
 │   ├── event_dispatcher_observer.py # EventDispatcher: Dispatcher untuk notifikasi
 │   ├── event_registry_observer.py # EventRegistry: Registry untuk observer
 │   ├── event_topics_observer.py # EventTopics: Topik event standar
 │   ├── manager_observer.py     # ObserverManager: Manager untuk observer
-│   └── priority_observer.py    # ObserverPriority: Prioritas observer
+│   ├── priority_observer.py    # ObserverPriority: Prioritas observer
+│   └── cleanup_observer.py     # CleanupObserver: Pembersihan observer saat exit
 └── cache/                      # Cache pattern
     ├── __init__.py             # Ekspor komponen cache
-    ├── cleanup_cache.py        # CacheCleanup: Pembersihan cache
+    ├── cleanup_cache.py        # CacheCleanup: Pembersihan cache otomatis
     ├── indexing_cache.py       # CacheIndex: Pengindeksan cache
-    ├── manager_cache.py         # CacheManager: Manager cache utama
+    ├── manager_cache.py        # CacheManager: Manager cache utama
     ├── stats_cache.py          # CacheStats: Statistik cache
     └── storage_cache.py        # CacheStorage: Penyimpanan cache
 ```
@@ -62,12 +71,19 @@ smartcash/dataset/
 │   │   ├── multilayer_loader.py # MultilayerLoader: Loader untuk dataset multilayer
 │   │   ├── cache_manager.py    # DatasetCacheManager: Cache untuk dataset
 │   │   └── batch_generator.py  # BatchGenerator: Generator batch data
+│   │   ├── preprocessed_dataset_loader.py # PreprocessedDatasetLoader: Loading dataset hasil preprocessing
 │   ├── validator/              # Layanan validasi dataset
 │   │   ├── __init__.py
 │   │   ├── dataset_validator.py # DatasetValidator: Validasi dataset utama
 │   │   ├── label_validator.py  # LabelValidator: Validasi file label
 │   │   ├── image_validator.py  # ImageValidator: Validasi gambar
 │   │   └── fixer.py            # DatasetFixer: Perbaikan dataset
+│   ├── preprocessor/           # Layanan preprocessing dataset
+│   │   ├── __init__.py
+│   │   ├── dataset_preprocessor.py   # Koordinator utama preprocessing dataset
+│   │   ├── pipeline.py               # Pipeline transformasi preprocessing
+│   │   ├── storage.py                # Pengelolaan file hasil preprocessing
+│   │   └── cleaner.py                # Pembersih cache preprocessed
 │   ├── augmentor/              # Layanan augmentasi dataset
 │   │   ├── __init__.py
 │   │   ├── augmentation_service.py # AugmentationService: Layanan augmentasi
@@ -425,11 +441,6 @@ smartcash/
 │   ├── preprocessing_config.yaml # Konfigurasi preprocessing
 │   ├── dataset_config.yaml     # Konfigurasi dataset
 │   └── colab_config.yaml       # Konfigurasi khusus Colab
-├── scripts/                    # Scripts utilitas
-│   ├── benchmark.py            # Benchmark model
-│   ├── export_model.py         # Export model ke berbagai format
-│   ├── convert_dataset.py      # Konversi format dataset
-│   └── setup_env.py            # Setup lingkungan pengembangan
 ├── tests/                      # Unit dan integration tests
 │   ├── __init__.py
 │   ├── test_dataset.py         # Test untuk dataset

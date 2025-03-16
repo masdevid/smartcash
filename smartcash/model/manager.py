@@ -11,6 +11,7 @@ from pathlib import Path
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.model.exceptions import ModelError, ModelConfigurationError
+from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.common.layer_config import get_layer_config
 
 # Imports dari architectures
@@ -457,16 +458,31 @@ class ModelManager:
             self.logger.error(f"❌ Gagal update konfigurasi: {str(e)}")
             raise ModelConfigurationError(f"Gagal update konfigurasi: {str(e)}")
     
-    def set_checkpoint_service(self, service):
-        """Set checkpoint service"""
+    def set_checkpoint_service(self, service: ICheckpointService):
+        """
+        Set checkpoint service untuk model manager.
+        
+        Args:
+            service: ICheckpointService instance
+        """
         self.checkpoint_service = service
         
     def set_training_service(self, service):
-        """Set training service"""
+        """
+        Set training service untuk model manager.
+        
+        Args:
+            service: Training service instance
+        """
         self.training_service = service
         
     def set_evaluation_service(self, service):
-        """Set evaluation service"""
+        """
+        Set evaluation service untuk model manager.
+        
+        Args:
+            service: Evaluation service instance
+        """
         self.evaluation_service = service
         
     def save_model(self, path: str) -> str:
@@ -509,7 +525,8 @@ class ModelManager:
             ModelError: Jika gagal load model
         """
         if self.checkpoint_service:
-            self.model = self.checkpoint_service.load_checkpoint(path)
+            loaded_checkpoint = self.checkpoint_service.load_checkpoint(path, self.model)
+            self.model = loaded_checkpoint
             return self.model
         else:
             try:

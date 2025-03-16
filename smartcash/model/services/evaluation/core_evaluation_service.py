@@ -3,10 +3,9 @@ File: smartcash/model/services/evaluation/core_evaluation_service.py
 Deskripsi: Layanan evaluasi model deteksi mata uang dengan dukungan lengkap
 """
 
-import os
 import torch
 import numpy as np
-from typing import Dict, List, Optional, Union, Any, Tuple
+from typing import Dict, List, Optional, Union, Any
 from pathlib import Path
 import time
 from tqdm.auto import tqdm
@@ -14,7 +13,8 @@ from tqdm.auto import tqdm
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
 from smartcash.model.services.evaluation.metrics_evaluation_service import MetricsComputation
-from smartcash.model.services.evaluation.visualization_evaluation_service import EvaluationVisualizer
+from smartcash.common.interfaces.visualization_interface import IMetricsVisualizer
+from smartcash.model.visualization.evaluation_visualizer import EvaluationVisualizer
 from smartcash.model.components.losses import compute_loss
 
 class EvaluationService:
@@ -32,7 +32,8 @@ class EvaluationService:
         self, 
         config: Dict,
         output_dir: Optional[str] = None,
-        logger=None
+        logger=None,
+        visualizer: Optional[IMetricsVisualizer] = None
     ):
         """
         Inisialisasi layanan evaluasi.
@@ -41,6 +42,7 @@ class EvaluationService:
             config: Konfigurasi model dan evaluasi
             output_dir: Direktori output untuk hasil evaluasi
             logger: Logger instance
+            visualizer: Interface visualisasi (opsional)
         """
         # Inisialisasi dasar
         self.config = config
@@ -53,7 +55,9 @@ class EvaluationService:
         
         # Inisialisasi komponen evaluasi
         self.metrics = MetricsComputation(config, logger=self.logger)
-        self.visualizer = EvaluationVisualizer(config, output_dir=str(self.output_dir), logger=self.logger)
+        
+        # Gunakan visualizer yang disediakan atau buat baru
+        self.visualizer = visualizer or EvaluationVisualizer(config, output_dir=str(self.output_dir), logger=self.logger)
         
         # Konfigurasi layer
         self.layer_config = get_layer_config()
@@ -76,9 +80,6 @@ class EvaluationService:
     ) -> Dict[str, Any]:
         """
         Evaluasi model pada dataset.
-        
-        * old: handlers.model.evaluation.evaluate_model()
-        * migrated: Flexible service-based evaluation
         
         Args:
             model: Model yang akan dievaluasi
@@ -180,30 +181,25 @@ class EvaluationService:
         # Buat visualisasi jika diminta
         if visualize:
             # Visualisasi confusion matrix
-            cm_path = self.visualizer.plot_confusion_matrix(
-                metrics.get('confusion_matrix', {}),
-                title="Confusion Matrix",
-                normalized=True
-            )
-            metrics['confusion_matrix_path'] = cm_path
-            
-            # Visualisasi precision-recall curve
-            pr_path = self.visualizer.plot_pr_curve(
-                metrics.get('precision_curve', {}),
-                metrics.get('recall_curve', {}),
-                metrics.get('f1_curve', {}),
-                title="Precision-Recall Curve"
-            )
-            metrics['pr_curve_path'] = pr_path
+            if 'confusion_matrix' in metrics and isinstance(self.visualizer, IMetricsVisualizer):
+                confusion_matrix = metrics['confusion_matrix']
+                class_names = self.metrics.get_class_names()
+                cm_path = self.visualizer.plot_confusion_matrix(
+                    confusion_matrix,
+                    class_names,
+                    title="Confusion Matrix",
+                    filename="confusion_matrix.png"
+                )
+                metrics['confusion_matrix_path'] = str(cm_path)
             
             # Visualisasi contoh prediksi jika ada sampel
-            if samples:
+            if samples and hasattr(self.visualizer, 'visualize_predictions'):
                 samples_path = self.visualizer.visualize_predictions(
                     samples[:10],  # Batasi 10 sampel saja
                     conf_thres=conf_thres,
                     title="Sample Predictions"
                 )
-                metrics['samples_path'] = samples_path
+                metrics['samples_path'] = str(samples_path)
         
         # Log hasil evaluasi
         duration = time.time() - start_time
@@ -235,8 +231,6 @@ class EvaluationService:
     ) -> Dict[str, Dict[str, float]]:
         """
         Evaluasi model per layer.
-        
-        * new: Layer-specific evaluation metrics
         
         Args:
             model: Model yang akan dievaluasi
@@ -295,8 +289,6 @@ class EvaluationService:
     ) -> Dict[str, Dict[str, float]]:
         """
         Evaluasi model per kelas.
-        
-        * new: Class-specific evaluation metrics
         
         Args:
             model: Model yang akan dievaluasi

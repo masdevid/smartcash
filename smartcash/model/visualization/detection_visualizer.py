@@ -7,12 +7,11 @@ import cv2
 import numpy as np
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
-import time
 
-from smartcash.model.visualization.base_research_visualizer import VisualizationHelper
-from smartcash.common.logger import get_logger
+from smartcash.common.interfaces.visualization_interface import IDetectionVisualizer
+from smartcash.model.visualization.base_visualizer import ModelVisualizationBase
 
-class DetectionVisualizer:
+class DetectionVisualizer(ModelVisualizationBase, IDetectionVisualizer):
     """
     Visualisasi hasil deteksi objek dengan bounding box, label dan informasi tambahan.
     """
@@ -68,8 +67,7 @@ class DetectionVisualizer:
             class_colors: Dictionary warna kelas kustom
             logger: Logger untuk logging
         """
-        self.output_dir = VisualizationHelper.create_output_directory(output_dir)
-        self.logger = logger or get_logger("detection_visualizer")
+        super().__init__(output_dir, logger)
         
         # Gunakan warna default jika tidak ada kustom
         self.class_colors = class_colors or self.DEFAULT_COLORS

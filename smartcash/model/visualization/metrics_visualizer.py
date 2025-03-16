@@ -7,13 +7,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
-from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 
-from smartcash.common.logger import get_logger
-from smartcash.model.visualization.base_visualizer import VisualizationHelper
+from smartcash.common.interfaces.visualization_interface import IMetricsVisualizer
+from smartcash.model.visualization.base_visualizer import ModelVisualizationBase
 
-class MetricsVisualizer:
+class MetricsVisualizer(ModelVisualizationBase, IMetricsVisualizer):
     """
     Visualisasi metrik evaluasi model dengan berbagai tipe plot.
     """
@@ -30,11 +29,7 @@ class MetricsVisualizer:
             output_dir: Direktori untuk menyimpan hasil
             logger: Logger untuk logging
         """
-        self.output_dir = VisualizationHelper.create_output_directory(output_dir)
-        self.logger = logger or get_logger("metrics_visualizer")
-        
-        # Setup plot style
-        VisualizationHelper.set_plot_style()
+        super().__init__(output_dir, logger)
     
     def plot_confusion_matrix(
         self,
@@ -63,7 +58,7 @@ class MetricsVisualizer:
         """
         # Normalisasi matrix jika diminta
         if normalize:
-            cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+            cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis] + 1e-6)
             cm = np.nan_to_num(cm)  # Handle division by zero
             fmt = '.2f'
         else:
@@ -94,7 +89,7 @@ class MetricsVisualizer:
         # Simpan jika diminta
         if filename:
             output_path = self.output_dir / filename
-            VisualizationHelper.save_figure(plt.gcf(), output_path, logger=self.logger)
+            self.save_figure(plt.gcf(), output_path)
         
         fig = plt.gcf()
         plt.close()
@@ -178,7 +173,7 @@ class MetricsVisualizer:
         # Simpan jika diminta
         if filename:
             output_path = self.output_dir / filename
-            VisualizationHelper.save_figure(fig, output_path, logger=self.logger)
+            self.save_figure(fig, output_path)
         
         return fig
     
@@ -233,7 +228,7 @@ class MetricsVisualizer:
         # Simpan jika diminta
         if filename:
             output_path = self.output_dir / filename
-            VisualizationHelper.save_figure(fig, output_path, logger=self.logger)
+            self.save_figure(fig, output_path)
         
         return fig
     
@@ -309,7 +304,7 @@ class MetricsVisualizer:
         # Simpan jika diminta
         if filename:
             output_path = self.output_dir / filename
-            VisualizationHelper.save_figure(fig, output_path, logger=self.logger)
+            self.save_figure(fig, output_path)
         
         return fig
     
@@ -439,7 +434,7 @@ class MetricsVisualizer:
         # Simpan jika diminta
         if filename:
             output_path = self.output_dir / filename
-            VisualizationHelper.save_figure(fig, output_path, logger=self.logger)
+            self.save_figure(fig, output_path)
         
         return fig
 

@@ -13,10 +13,11 @@ from pathlib import Path
 import time
 
 from smartcash.common.logger import get_logger
+from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.model.exceptions import ModelCheckpointError
 
 
-class CheckpointService:
+class CheckpointService(ICheckpointService):
     """
     Layanan untuk mengelola checkpoint model dengan fitur penyimpanan, 
     pemulihan, dan manajemen versi. Mendukung format PyTorch dan ONNX.

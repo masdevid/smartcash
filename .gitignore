@@ -33,11 +33,6 @@ coverage.xml
 # Dataset
 data/
 */data/
-dataset/
-!docs/dataset
-!utils/dataset
-!handlers/dataset/
-!smartcash/dataset
 weights/
 *.pt
 *.pth

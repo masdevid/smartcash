@@ -14,7 +14,6 @@ from smartcash.common.logger import get_logger
 class DetectionVisualizationAdapter(IDetectionVisualizer, IMetricsVisualizer):
     """
     Adapter untuk mengintegrasikan visualisasi dari domain model ke domain detection.
-    Mengimplementasikan prinsip DRY dengan memanfaatkan kelas visualisasi yang sudah ada.
     """
     
     def __init__(

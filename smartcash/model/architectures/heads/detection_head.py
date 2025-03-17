@@ -1,6 +1,6 @@
 """
 File: smartcash/model/architectures/heads/detection_head.py
-Deskripsi: Detection head implementation for YOLOv5
+Deskripsi: Detection head implementation for YOLOv5 dengan ekspor LAYER_CONFIG
 """
 
 import torch
@@ -9,6 +9,23 @@ from typing import Dict, List, Optional, Union, Tuple
 
 from smartcash.common.logger import SmartCashLogger
 from smartcash.common.exceptions import HeadError
+
+# Konfigurasi layer yang didukung dengan nama kelas aktual
+# Ekspor ini sebagai variabel modul agar bisa diimpor langsung dari file lain
+LAYER_CONFIG = {
+    'banknote': {
+        'num_classes': 7,  # 7 denominasi ('001', '002', '005', '010', '020', '050', '100')
+        'description': 'Deteksi uang kertas utuh'
+    },
+    'nominal': {
+        'num_classes': 7,  # 7 area nominal ('l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100')
+        'description': 'Deteksi area nominal'
+    },
+    'security': {
+        'num_classes': 3,  # 3 fitur keamanan ('l3_sign', 'l3_text', 'l3_thread')
+        'description': 'Deteksi fitur keamanan'
+    }
+}
 
 class DetectionHead(nn.Module):
     """
@@ -19,22 +36,6 @@ class DetectionHead(nn.Module):
     - Layer nominal untuk deteksi area nominal
     - Layer security untuk deteksi fitur keamanan
     """
-    
-    # Konfigurasi layer yang didukung dengan nama kelas aktual
-    LAYER_CONFIG = {
-        'banknote': {
-            'num_classes': 7,  # 7 denominasi ('001', '002', '005', '010', '020', '050', '100')
-            'description': 'Deteksi uang kertas utuh'
-        },
-        'nominal': {
-            'num_classes': 7,  # 7 area nominal ('l2_001', 'l2_002', 'l2_005', 'l2_010', 'l2_020', 'l2_050', 'l2_100')
-            'description': 'Deteksi area nominal'
-        },
-        'security': {
-            'num_classes': 3,  # 3 fitur keamanan ('l3_sign', 'l3_text', 'l3_thread')
-            'description': 'Deteksi fitur keamanan'
-        }
-    }
     
     def __init__(
         self,
@@ -63,15 +64,15 @@ class DetectionHead(nn.Module):
         
         # Validasi layer yang diminta
         for layer in self.layers:
-            if layer not in self.LAYER_CONFIG:
-                supported = list(self.LAYER_CONFIG.keys())
+            if layer not in LAYER_CONFIG:
+                supported = list(LAYER_CONFIG.keys())
                 raise HeadError(f"❌ Layer '{layer}' tidak didukung. Layer yang didukung: {supported}")
         
         # Buat head untuk setiap kombinasi layer dan skala
         self.heads = nn.ModuleDict()
         for layer in self.layers:
             heads_per_scale = nn.ModuleList()
-            num_classes = self.LAYER_CONFIG[layer]['num_classes']
+            num_classes = LAYER_CONFIG[layer]['num_classes']
             
             for ch in in_channels:
                 heads_per_scale.append(
@@ -177,7 +178,7 @@ class DetectionHead(nn.Module):
             
             for layer_name, heads in self.heads.items():
                 layer_preds = []
-                num_classes = self.LAYER_CONFIG[layer_name]['num_classes']
+                num_classes = LAYER_CONFIG[layer_name]['num_classes']
                 
                 # Detection head untuk setiap skala
                 for feat, head in zip(features, heads):
@@ -209,7 +210,7 @@ class DetectionHead(nn.Module):
         return {
             'layers': self.layers,
             'layer_config': {
-                layer: self.LAYER_CONFIG[layer]
+                layer: LAYER_CONFIG[layer]
                 for layer in self.layers
             }
         }

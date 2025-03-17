@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
 import threading
 
 from smartcash.components.observer.base_observer import BaseObserver
-from smartcash.components.observer.event_dispatcher import EventDispatcher
+from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.common.logger import get_logger
 
 

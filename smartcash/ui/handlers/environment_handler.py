@@ -7,8 +7,7 @@ from IPython.display import display, HTML, clear_output
 from pathlib import Path
 import os
 import shutil
-import platform
-import sys
+import re
 
 def detect_environment(ui_components, env=None):
     """
@@ -23,41 +22,50 @@ def detect_environment(ui_components, env=None):
     """
     is_colab = False
     
+    # Gunakan environment manager jika tersedia
     if env and hasattr(env, 'is_colab'):
         is_colab = env.is_colab
+        
         # Tampilkan informasi sistem
         with ui_components['info_panel']:
             clear_output(wait=True)
             try:
                 system_info = env.get_system_info()
-                info_html = f"""
+                display(HTML(f"""
                 <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
                     <h4 style="margin-top:0">📊 System Information</h4>
                     <ul>
+                        <li><b>Environment:</b> {system_info.get('environment', 'Unknown')}</li>
                         <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
                         <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
                         <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
-                        <li><b>Platform:</b> {system_info.get('platform', 'Unknown')}</li>
+                        {f"<li><b>GPU:</b> {system_info.get('cuda', {}).get('device_name', '')}</li>" if system_info.get('cuda', {}).get('available', False) else ""}
                     </ul>
                 </div>
-                """
-                display(HTML(info_html))
+                """))
             except Exception as e:
-                display(HTML(f"<p>⚠️ Error getting system info: {str(e)}</p>"))
+                logger = ui_components.get('logger')
+                if logger:
+                    logger.warning(f"⚠️ Error mendapatkan system info: {str(e)}")
+                display(HTML("<p>⚠️ Error mendapatkan system info</p>"))
     else:
+        # Fallback deteksi Colab
         try:
             import google.colab
             is_colab = True
         except ImportError:
             pass
             
-        # Fallback system info
+        # Fallback informasi sistem sederhana
+        import platform
+        import sys
         with ui_components['info_panel']:
             clear_output(wait=True)
             display(HTML(f"""
             <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
                 <h4 style="margin-top:0">📊 System Information</h4>
                 <ul>
+                    <li><b>Environment:</b> {'Google Colab' if is_colab else 'Local'}</li>
                     <li><b>Python:</b> {platform.python_version()}</li>
                     <li><b>Platform:</b> {platform.system()} {platform.release()}</li>
                     <li><b>Base Directory:</b> {Path.cwd()}</li>
@@ -96,88 +104,43 @@ def filter_drive_tree(tree_html):
         return tree_html
         
     try:
+        # Cari awal dan akhir dari <pre> tag
         pre_start = tree_html.find("<pre")
         pre_end = tree_html.find("</pre>")
         
         if pre_start == -1 or pre_end == -1:
             return tree_html
             
+        # Pisahkan header, content, dan footer
         header = tree_html[:pre_start + tree_html[pre_start:].find(">") + 1]
         content = tree_html[pre_start + tree_html[pre_start:].find(">") + 1:pre_end]
+        footer = tree_html[pre_end:]
         
+        # Filter baris-baris yang berhubungan dengan SmartCash
         lines = content.split("\n")
         filtered_lines = []
         inside_smartcash = False
         
         for line in lines:
-            if '/content/drive' in line and 'SmartCash' not in line and not inside_smartcash:
-                continue
-                
+            # Deteksi direktori SmartCash
             if 'SmartCash/' in line or 'SmartCash_Drive' in line:
                 inside_smartcash = True
                 filtered_lines.append(line)
+            # Deteksi folder drive root
+            elif '/content/drive' in line and 'SmartCash' not in line and not inside_smartcash:
+                # Skip direktori drive yang bukan SmartCash
+                continue
+            # Deteksi keluar dari subtree SmartCash
             elif inside_smartcash and ('│' not in line and '├' not in line and '└' not in line):
                 inside_smartcash = False
-            elif inside_smartcash:
-                filtered_lines.append(line)
-            elif '/content/drive' not in line:
+            # Simpan baris jika masih dalam SmartCash atau bukan bagian dari Drive
+            elif inside_smartcash or '/content/drive' not in line:
                 filtered_lines.append(line)
         
-        return header + "\n".join(filtered_lines) + "</pre>"
+        return header + "\n".join(filtered_lines) + footer
     except Exception:
+        # Jika terjadi error, kembalikan tree asli
         return tree_html
-
-def fallback_get_directory_tree(root_dir, max_depth=2):
-    """
-    Fallback implementation untuk directory tree jika env_manager tidak tersedia.
-    
-    Args:
-        root_dir: Path direktori root
-        max_depth: Kedalaman maksimum tree
-        
-    Returns:
-        HTML string dari directory tree
-    """
-    root_dir = Path(root_dir)
-    if not root_dir.exists():
-        return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
-    
-    # Khusus untuk drive, tampilkan hanya folder SmartCash
-    if '/content/drive' in str(root_dir) and 'SmartCash' not in str(root_dir):
-        root_dir = Path('/content/drive/MyDrive/SmartCash')
-        if not root_dir.exists():
-            return f"<span style='color:orange'>⚠️ SmartCash folder tidak ditemukan di Google Drive</span>"
-    
-    result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
-    result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
-    
-    def traverse_dir(path, prefix="", depth=0):
-        if depth > max_depth: return ""
-        # Skip jika bukan SmartCash directory di drive
-        if '/content/drive' in str(path) and 'SmartCash' not in str(path):
-            return ""
-            
-        items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
-        tree = ""
-        for i, item in enumerate(items):
-            # Skip directory lain di drive yang bukan bagian SmartCash
-            if '/content/drive' in str(item) and 'SmartCash' not in str(item):
-                continue
-                
-            is_last = i == len(items) - 1
-            connector = "└─ " if is_last else "├─ "
-            if item.is_dir():
-                tree += f"{prefix}{connector}<span style='color:#0366d6;font-weight:bold'>{item.name}/</span>\n"
-                next_prefix = prefix + ("   " if is_last else "│  ")
-                if depth < max_depth:
-                    tree += traverse_dir(item, next_prefix, depth + 1)
-            else:
-                tree += f"{prefix}{connector}{item.name}\n"
-        return tree
-    
-    result += traverse_dir(root_dir)
-    result += "</pre>"
-    return result
 
 def sync_configs(source_dirs, target_dirs, logger=None):
     """
@@ -194,6 +157,27 @@ def sync_configs(source_dirs, target_dirs, logger=None):
     total_files = copied_files = 0
     
     try:
+        # Coba gunakan ConfigManager jika tersedia
+        try:
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager()
+            
+            # Gunakan fungsi sinkronisasi bawaan jika tersedia
+            if hasattr(config_manager, 'sync_all_configs'):
+                results = config_manager.sync_all_configs('merge')
+                
+                if logger:
+                    logger.info(f"✅ Sinkronisasi config berhasil menggunakan ConfigManager")
+                    
+                # Ekstrak statistik dari hasil
+                synced = len(results.get('synced', []))
+                failed = len(results.get('failed', []))
+                return synced + failed, synced
+        except ImportError:
+            # Lanjutkan dengan implementasi manual
+            pass
+            
+        # Implementasi manual
         for source_dir in source_dirs:
             if not isinstance(source_dir, Path):
                 source_dir = Path(source_dir)
@@ -201,32 +185,47 @@ def sync_configs(source_dirs, target_dirs, logger=None):
             if not source_dir.exists() or not source_dir.is_dir():
                 continue
             
+            # Dapatkan semua file YAML/YAML di direktori sumber
             config_files = list(source_dir.glob('*.y*ml'))
+            total_files += len(config_files)
             
             for config_file in config_files:
-                total_files += 1
-                
                 for target_dir in target_dirs:
                     if not isinstance(target_dir, Path):
                         target_dir = Path(target_dir)
                     
+                    # Buat direktori target jika belum ada
                     target_dir.mkdir(parents=True, exist_ok=True)
                     target_file = target_dir / config_file.name
                     
+                    # Salin file jika belum ada di target
                     if not target_file.exists():
                         try:
                             shutil.copy2(config_file, target_file)
                             copied_files += 1
                             if logger:
-                                logger.info(f"✅ Copied {config_file.name} to {target_dir}")
+                                logger.info(f"✅ Copied {config_file.name} ke {target_dir}")
                         except Exception as e:
                             if logger:
-                                logger.warning(f"⚠️ Failed to copy {config_file.name}: {str(e)}")
+                                logger.warning(f"⚠️ Gagal menyalin {config_file.name}: {str(e)}")
+                    elif config_file.stat().st_mtime > target_file.stat().st_mtime:
+                        # File sumber lebih baru dari target
+                        try:
+                            shutil.copy2(config_file, target_file)
+                            copied_files += 1
+                            if logger:
+                                logger.info(f"✅ Updated {config_file.name} yang lebih baru ke {target_dir}")
+                        except Exception as e:
+                            if logger:
+                                logger.warning(f"⚠️ Gagal update {config_file.name}: {str(e)}")
         
+        if logger and total_files > 0:
+            logger.info(f"🔄 Sinkronisasi config: {copied_files} dari {total_files} file disalin")
+            
         return total_files, copied_files
     except Exception as e:
         if logger:
-            logger.error(f"❌ Error syncing configs: {str(e)}")
+            logger.error(f"❌ Error sinkronisasi config: {str(e)}")
         return total_files, copied_files
 
 def check_smartcash_dir(ui_components):

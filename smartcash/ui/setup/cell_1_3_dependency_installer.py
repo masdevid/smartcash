@@ -38,10 +38,10 @@ def run_cell():
     if logger:
         logger.info("🚀 Cell dependency_installer diinisialisasi")
     
-    # Tampilkan UI
+    # Tampilkan UI - Pastikan hanya menampilkan widget UI, bukan dictionary UI components
     display(ui_components['ui'])
     
     return ui_components
 
-# Jalankan cell
-run_cell()
+# Jalankan cell dan simpan hasil tanpa menampilkannya
+ui_components = run_cell()

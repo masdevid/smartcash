@@ -69,7 +69,7 @@ def create_dependency_installer_ui(env=None, config=None):
         # VBox untuk checkboxes
         checkboxes_group = widgets.VBox(
             checkboxes,
-            layout=widgets.Layout(padding='5px 10px')
+            layout=widgets.Layout(padding='5px 10px', width='32%', min_width='250px')
         )
         
         # Box untuk grup

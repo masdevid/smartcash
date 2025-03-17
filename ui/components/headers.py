@@ -6,7 +6,7 @@ from typing import Optional, Dict, Callable, Tuple
 from datetime import datetime
 from pathlib import Path
 from IPython.display import display, clear_output
-
+from ipywidgets import widgets
 from smartcash.ui.utils.constants import COLORS, ICONS, BUTTON_STYLES
 from smartcash.ui.components.widget_layouts import (
     COMPONENT_LAYOUTS, 

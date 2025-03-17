@@ -53,7 +53,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         button_style='primary',
         icon=FA_ICONS['link'],
         tooltip='Mount Google Drive dan siapkan struktur direktori',
-        layout=BUTTON_LAYOUTS['inline']
+        layout=BUTTON_LAYOUTS['standard']
     )
     
     directory_button = widgets.Button(
@@ -61,7 +61,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         button_style='info',
         icon=FA_ICONS['folder-plus'],
         tooltip='Buat struktur direktori lokal',
-        layout=BUTTON_LAYOUTS['inline']
+        layout=BUTTON_LAYOUTS['standard']
     )
     
     # Kelompokkan tombol dalam grup horizontal

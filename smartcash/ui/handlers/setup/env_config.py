@@ -5,74 +5,39 @@ Deskripsi: Handler untuk UI konfigurasi environment SmartCash di subdirektori se
 
 import os
 import shutil
-import threading
-import time
-from IPython.display import display, HTML, clear_output
+import concurrent.futures
 from pathlib import Path
+from IPython.display import display, HTML, clear_output
 
-from smartcash.ui.components.shared.alerts import create_info_alert, create_status_indicator
-from smartcash.ui.handlers.shared.error_handler import handle_error
+from smartcash.ui.components.shared.alerts import create_status_indicator
 
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
     
-    # Print debugging info to help troubleshoot
-    with ui_components['status']:
-        clear_output(wait=True)
-        display(HTML("<p>🚀 Environment Config handler initialized</p>"))
-        
-        # Display current working directory for debugging
-        cwd = Path.cwd()
-        display(HTML(f"<p>Current directory: <code>{cwd}</code></p>"))
-        
-        # Check for configs folder
-        config_dir = Path('configs')
-        if config_dir.exists():
-            config_files = list(config_dir.glob('*.y*ml'))
-            display(HTML(f"<p>Found {len(config_files)} config files in configs folder</p>"))
-        else:
-            display(HTML("<p>⚠️ configs folder not found, will create</p>"))
-            try:
-                config_dir.mkdir(exist_ok=True)
-            except Exception as e:
-                display(HTML(f"<p>❌ Error creating configs folder: {str(e)}</p>"))
+    # Create thread pool for background operations
+    thread_pool = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     
-    # Initialize variables
+    # Initialize dependencies
     logger = env_manager = observer_manager = config_manager = None
     
-    # Try to import SmartCash modules
+    # Try loading SmartCash modules
     try:
-        # Import modules
         from smartcash.common.logger import get_logger
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
+        from smartcash.components.observer.manager_observer import ObserverManager
         
         logger = get_logger("env_config")
         env_manager = get_environment_manager()
         config_manager = get_config_manager()
+        observer_manager = ObserverManager.get_instance()
         
-        # Try to load config directly
-        if config_manager:
-            try:
-                if Path('configs/colab_config.yaml').exists():
-                    config = config_manager.load_config('configs/colab_config.yaml')
-                elif Path('configs/base_config.yaml').exists():
-                    config = config_manager.load_config('configs/base_config.yaml')
-            except Exception as e:
-                if logger:
-                    logger.warning(f"⚠️ Could not load config: {str(e)}")
-        
-        # Setup observer if available
-        try:
-            from smartcash.components.observer.manager_observer import ObserverManager
-            observer_manager = ObserverManager.get_instance()
-            if observer_manager:
-                observer_manager.unregister_group("env_config_observers")
-        except ImportError:
-            pass
+        # Clean up previous observer group
+        if observer_manager:
+            observer_manager.unregister_group("env_config_observers")
     except ImportError as e:
         with ui_components['status']:
-            display(HTML(f"<p style='color:orange'>⚠️ Limited functionality mode - SmartCash modules not fully loaded: {str(e)}</p>"))
+            display(HTML(f"<p style='color:#856404'>⚠️ Running in limited mode: {str(e)}</p>"))
     
     # Helper functions
     def filter_drive_tree(tree_html):
@@ -95,7 +60,7 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
             inside_drive = False
             
             for line in lines:
-                if '/content/drive' in line and 'MyDrive/SmartCash' not in line and not inside_drive:
+                if '/content/drive' in line and 'SmartCash' not in line and not inside_drive:
                     continue
                     
                 if 'SmartCash/' in line:
@@ -113,16 +78,10 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
             return tree_html
     
     def fallback_get_directory_tree(root_dir, max_depth=2):
-        """Basic directory tree visualization without relying on environment manager"""
+        """Simple directory tree visualization"""
         root_dir = Path(root_dir)
         if not root_dir.exists():
             return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
-        
-        # Focus on SmartCash folder for drive
-        if '/content/drive' in str(root_dir):
-            root_dir = Path('/content/drive/MyDrive/SmartCash')
-            if not root_dir.exists():
-                root_dir.mkdir(parents=True, exist_ok=True)
         
         result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
         result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
@@ -133,12 +92,12 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                 
             try:
                 items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
-            except PermissionError:
-                return f"{prefix}└─ <span style='color:red'>❌ Permission denied</span>\n"
+            except (PermissionError, OSError):
+                return f"{prefix}└─ <span style='color:red'>❌ Access error</span>\n"
                 
             tree = ""
             for i, item in enumerate(items):
-                # Skip if it's not SmartCash related in drive
+                # Skip non-SmartCash directories in Drive
                 if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
                     continue
                     
@@ -163,9 +122,7 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
         
         try:
             for source_dir in source_dirs:
-                if not isinstance(source_dir, Path):
-                    source_dir = Path(source_dir)
-                
+                source_dir = Path(source_dir)
                 if not source_dir.exists() or not source_dir.is_dir():
                     continue
                 
@@ -175,21 +132,20 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     total_files += 1
                     
                     for target_dir in target_dirs:
-                        if not isinstance(target_dir, Path):
-                            target_dir = Path(target_dir)
+                        target_dir = Path(target_dir)
                         
-                        target_dir.mkdir(parents=True, exist_ok=True)
-                        target_file = target_dir / config_file.name
-                        
-                        if not target_file.exists():
-                            try:
+                        try:
+                            target_dir.mkdir(parents=True, exist_ok=True)
+                            target_file = target_dir / config_file.name
+                            
+                            if not target_file.exists():
                                 shutil.copy2(config_file, target_file)
                                 copied_files += 1
                                 if logger:
                                     logger.info(f"✅ Copied {config_file.name} to {target_dir}")
-                            except Exception as e:
-                                if logger:
-                                    logger.warning(f"⚠️ Failed to copy {config_file.name}: {str(e)}")
+                        except Exception as e:
+                            if logger:
+                                logger.warning(f"⚠️ Failed to copy {config_file.name}: {str(e)}")
             
             return total_files, copied_files
         except Exception as e:
@@ -197,140 +153,39 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                 logger.error(f"❌ Error syncing configs: {str(e)}")
             return total_files, copied_files
     
-    def detect_environment():
-        """Detect environment and update UI"""
-        is_colab = False
-        if env_manager:
-            is_colab = env_manager.is_colab
-            with ui_components['info_panel']:
-                clear_output(wait=True)
-                try:
-                    system_info = env_manager.get_system_info()
-                    info_html = f"""
-                    <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                        <h4 style="margin-top:0">📊 System Information</h4>
-                        <ul>
-                            <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
-                            <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
-                            <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
-                        </ul>
-                    </div>
-                    """
-                    display(HTML(info_html))
-                except Exception as e:
-                    display(HTML(f"<p>⚠️ Error getting system info: {str(e)}</p>"))
-        else:
-            try:
-                import google.colab
-                is_colab = True
-            except ImportError:
-                pass
-                
-            # Simple system information in fallback mode
-            with ui_components['info_panel']:
-                clear_output(wait=True)
-                import sys, platform
-                display(HTML(f"""
-                <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                    <h4 style="margin-top:0">📊 System Information</h4>
-                    <ul>
-                        <li><b>Python:</b> {platform.python_version()}</li>
-                        <li><b>OS:</b> {platform.system()} {platform.release()}</li>
-                        <li><b>Base Directory:</b> {Path.cwd()}</li>
-                    </ul>
-                </div>
-                """))
-        
-        # Update UI based on environment
-        ui_components['colab_panel'].value = """
-            <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
-                <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
-                <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
-            </div>
-        """ if is_colab else """
-            <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-                <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
-                <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
-            </div>
-        """
-        
-        return is_colab
-    
-    def check_smartcash_dir():
-        """Check if SmartCash directory exists"""
-        if not Path('smartcash').exists() or not Path('smartcash').is_dir():
-            with ui_components['status']:
-                clear_output(wait=True)
-                alert_html = f"""
-                <div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
-                    <h3 style="margin-top:0">❌ Folder SmartCash tidak ditemukan!</h3>
-                    <p>Repository belum di-clone dengan benar. Silakan jalankan cell clone repository terlebih dahulu.</p>
-                    <ol>
-                        <li>Jalankan cell repository clone (Cell 1.1)</li>
-                        <li>Restart runtime (Runtime > Restart runtime)</li>
-                        <li>Jalankan kembali notebook dari awal</li>
-                    </ol>
-                </div>
-                """
-                display(HTML(alert_html))
-                return False
-        return True
-    
-    # Initialize button handlers with explicit debugging
     def on_drive_connect(b):
-        """Handler koneksi Google Drive"""
+        """Handler for Google Drive connection"""
+        future = None
+        
         with ui_components['status']:
             clear_output(wait=True)
-            
-            display(HTML("<p>🔄 Starting Google Drive connection...</p>"))
+            display(create_status_indicator("info", "🔄 Connecting to Google Drive..."))
             
             try:
-                # Always use the direct Colab approach for reliability
+                # Always use direct Colab approach for reliability
                 from google.colab import drive
-                display(HTML("<p>🔄 Mounting Google Drive...</p>"))
                 drive.mount('/content/drive')
                 
-                # Setup dirs
+                # Setup directories
                 drive_path = Path('/content/drive/MyDrive/SmartCash')
                 drive_path.mkdir(parents=True, exist_ok=True)
-                display(HTML(f'<p>✅ SmartCash directory ready: <code>{drive_path}</code></p>'))
+                display(create_status_indicator("success", f"✅ SmartCash directory in Drive: {drive_path}"))
                 
                 # Create symlink
                 if not Path('SmartCash_Drive').exists():
                     os.symlink(drive_path, 'SmartCash_Drive')
-                    display(HTML('<p>✅ Symlink <code>SmartCash_Drive</code> created</p>'))
-                else:
-                    display(HTML('<p>ℹ️ Symlink already exists</p>'))
+                    display(create_status_indicator("success", "✅ Created symlink 'SmartCash_Drive'"))
                 
-                # Sync configs
+                # Create configs directory
                 configs_dir = drive_path / 'configs'
-                configs_dir.mkdir(exist_ok=True)
-                
-                # Create local configs dir if it doesn't exist
+                configs_dir.mkdir(parents=True, exist_ok=True)
                 Path('configs').mkdir(exist_ok=True)
                 
-                # Copy default configs if needed
-                for config_name in ['base_config.yaml', 'colab_config.yaml']:
-                    source_path = Path(f'configs/{config_name}')
-                    if not source_path.exists() and Path(f'/content/{config_name}').exists():
-                        shutil.copy2(Path(f'/content/{config_name}'), source_path)
+                # Sync configs asynchronously
+                display(create_status_indicator("info", "🔄 Syncing configuration files..."))
+                future = thread_pool.submit(sync_configs, [Path('configs')], [configs_dir])
                 
-                # Sync configs between local and Drive
-                local_configs = list(Path('configs').glob('*.y*ml'))
-                
-                missing_count = copied_count = 0
-                if local_configs:
-                    for config_file in local_configs:
-                        drive_file = configs_dir / config_file.name
-                        if not drive_file.exists():
-                            missing_count += 1
-                            try:
-                                shutil.copy2(config_file, drive_file)
-                                copied_count += 1
-                                display(HTML(f'<p>✅ Copied <code>{config_file.name}</code> to Drive</p>'))
-                            except Exception as e:
-                                display(HTML(f'<p>⚠️ Failed to copy <code>{config_file.name}</code>: {str(e)}</p>'))
-                
+                # Show confirmation
                 display(HTML(
                     """<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
                         <h3 style="margin-top:0">✅ Google Drive Connected</h3>
@@ -340,7 +195,20 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                 
                 # Display directory tree
                 display(HTML("<h4>📂 SmartCash Directory Structure:</h4>"))
-                display(HTML(fallback_get_directory_tree(drive_path, max_depth=2)))
+                tree_html = fallback_get_directory_tree(drive_path, max_depth=2)
+                display(HTML(tree_html))
+                
+                # Update config if available
+                if config_manager:
+                    try:
+                        config_manager.update_config({
+                            'environment': {
+                                'drive_mounted': True,
+                                'drive_path': str(drive_path)
+                            }
+                        })
+                    except Exception as e:
+                        display(create_status_indicator("warning", f"⚠️ Could not update config: {str(e)}"))
                 
             except Exception as e:
                 display(HTML(
@@ -349,13 +217,25 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                         <p>Error: {str(e)}</p>
                     </div>"""
                 ))
+            finally:
+                # Wait for future if active
+                if future and not future.done():
+                    try:
+                        total, copied = future.result(timeout=5)
+                        if total > 0:
+                            status = "success" if copied > 0 else "info"
+                            message = f"✅ {copied} configs copied to Drive" if copied > 0 else "ℹ️ All configs already synced"
+                            display(create_status_indicator(status, message))
+                    except concurrent.futures.TimeoutError:
+                        display(create_status_indicator("info", "🔄 Config syncing continues in background"))
     
     def on_dir_setup(b):
-        """Setup directory structure"""
+        """Handler for directory structure setup"""
+        future = None
+        
         with ui_components['status']:
             clear_output(wait=True)
-            
-            display(HTML("<p>🔄 Setting up directory structure...</p>"))
+            display(create_status_indicator("info", "🔄 Setting up directory structure..."))
             
             try:
                 # Define directories to create
@@ -368,32 +248,25 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                 
                 created = existing = 0
                 
-                # Create directories
+                # Create local directories
                 for d in dirs:
                     path = Path(d)
                     if not path.exists():
                         path.mkdir(parents=True, exist_ok=True)
                         created += 1
-                        display(HTML(f'<p>✅ Created directory: <code>{d}</code></p>'))
-                    else:
-                        existing += 1
                 
-                # Check if we're in Colab and Drive is mounted
+                # Create directories in Drive if mounted
                 drive_mounted = Path('/content/drive/MyDrive').exists()
-                
                 if drive_mounted:
                     drive_path = Path('/content/drive/MyDrive/SmartCash')
-                    if not drive_path.exists():
-                        drive_path.mkdir(parents=True, exist_ok=True)
-                        display(HTML(f'<p>✅ Created SmartCash directory in Drive</p>'))
+                    drive_path.mkdir(parents=True, exist_ok=True)
                     
-                    # Create the same structure in Drive
-                    for d in dirs:
-                        drive_dir = drive_path / d
-                        if not drive_dir.exists():
-                            drive_dir.mkdir(parents=True, exist_ok=True)
-                            created += 1
-                            display(HTML(f'<p>✅ Created directory in Drive: <code>{d}</code></p>'))
+                    # Start async directory creation
+                    display(create_status_indicator("info", "🔄 Creating directories in Drive..."))
+                    future = thread_pool.submit(lambda: [
+                        Path(drive_path / d).mkdir(parents=True, exist_ok=True) 
+                        for d in dirs
+                    ])
                 
                 # Show completion message
                 display(HTML(
@@ -412,13 +285,21 @@ exports/</pre>
                     </div>"""
                 ))
                 
-                # Display tree
+                # Display local directory tree
                 display(HTML("<h4>📂 Project Directory Structure:</h4>"))
-                display(HTML(fallback_get_directory_tree(Path.cwd(), max_depth=2)))
+                tree_html = fallback_get_directory_tree(Path.cwd(), max_depth=2)
+                display(HTML(tree_html))
                 
-                if drive_mounted:
-                    display(HTML("<h4>📂 Drive Directory Structure:</h4>"))
-                    display(HTML(fallback_get_directory_tree(drive_path, max_depth=2)))
+                # Update config if available
+                if config_manager:
+                    try:
+                        config_manager.update_config({
+                            'environment': {
+                                'setup_complete': True
+                            }
+                        })
+                    except Exception as e:
+                        display(create_status_indicator("warning", f"⚠️ Could not update config: {str(e)}"))
                 
             except Exception as e:
                 display(HTML(
@@ -427,12 +308,24 @@ exports/</pre>
                         <p>Error: {str(e)}</p>
                     </div>"""
                 ))
+            finally:
+                # Wait for and process future if active
+                if future and not future.done():
+                    try:
+                        future.result(timeout=5)
+                        if drive_mounted:
+                            drive_path = Path('/content/drive/MyDrive/SmartCash')
+                            display(HTML("<h4>📂 Drive Directory Structure:</h4>"))
+                            tree_html = fallback_get_directory_tree(drive_path, max_depth=2)
+                            display(HTML(tree_html))
+                    except concurrent.futures.TimeoutError:
+                        display(create_status_indicator("info", "🔄 Drive directory creation continues in background"))
     
-    # Register event handlers directly
+    # Register event handlers
     ui_components['drive_button'].on_click(on_drive_connect)
     ui_components['dir_button'].on_click(on_dir_setup)
     
-    # Setup observer for module-specific events
+    # Setup observer if available
     if observer_manager:
         observer_manager.create_logging_observer(
             event_types=["environment.drive.mount", "environment.directory.setup"],
@@ -441,16 +334,52 @@ exports/</pre>
             group="env_config_observers"
         )
     
-    # Run initialization
-    if check_smartcash_dir():
-        detect_environment()
+    # Check for smartcash directory
+    if not Path('smartcash').exists() or not Path('smartcash').is_dir():
+        with ui_components['status']:
+            display(HTML(
+                """<div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
+                    <h3 style="margin-top:0">❌ SmartCash folder not found!</h3>
+                    <p>Repository hasn't been properly cloned. Please run the repository clone cell first.</p>
+                    <ol>
+                        <li>Run the repository clone cell (Cell 1.1)</li>
+                        <li>Restart runtime (Runtime > Restart runtime)</li>
+                        <li>Run the notebook from the beginning</li>
+                    </ol>
+                </div>"""
+            ))
+    else:
+        # Detect environment
+        is_colab = False
+        try:
+            import google.colab
+            is_colab = True
+        except ImportError:
+            pass
+            
+        # Update UI based on environment
+        ui_components['colab_panel'].value = """
+            <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
+                <h3 style="margin-top:0; color: inherit">☁️ Google Colab Environment Detected</h3>
+                <p>Project will be configured for Google Colab. Connecting to Google Drive is recommended.</p>
+            </div>
+        """ if is_colab else """
+            <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
+                <h3 style="margin-top:0; color: inherit">💻 Local Environment Detected</h3>
+                <p>Project will be configured for local development.</p>
+            </div>
+        """
     
-    # To ensure cleanup of resources, add a cleanup function
+    # Create cleanup function to shut down thread pool
     def cleanup():
-        """Cleanup resources"""
-        if observer_manager:
-            observer_manager.unregister_group("env_config_observers")
-    
+        """Clean up resources"""
+        try:
+            thread_pool.shutdown(wait=False)
+            if observer_manager:
+                observer_manager.unregister_group("env_config_observers")
+        except Exception:
+            pass
+            
     ui_components['cleanup'] = cleanup
     
     return ui_components

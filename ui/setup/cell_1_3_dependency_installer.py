@@ -3,15 +3,16 @@ File: smartcash/ui/setup/cell_1_3_dependency_installer.py
 Deskripsi: Cell instalasi dependencies untuk SmartCash dengan pendekatan modular
 """
 
-import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display
 
 def run_cell():
     """Runner utama untuk cell instalasi dependencies"""
     try:
         from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
         from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging
     except ImportError as e:
+        from IPython.display import HTML
         display(HTML(f"<div style='color:red'>❌ Error: {str(e)}</div>"))
         display(HTML("<div style='color:orange'>⚠️ Pastikan repository SmartCash sudah di-clone dengan benar</div>"))
         return
@@ -32,14 +33,10 @@ def run_cell():
     # Setup handlers
     ui_components = setup_dependency_installer_handlers(ui_components, config)
     
-    # Tambahkan logger jika tersedia
-    try:
-        from smartcash.common.logger import get_logger
-        logger = get_logger("dependency_installer")
-        ui_components['logger'] = logger
+    # Setup ipython logging menggunakan utilitas yang sudah ada
+    logger = setup_ipython_logging(ui_components, "dependency_installer")
+    if logger:
         logger.info("🚀 Cell dependency_installer diinisialisasi")
-    except ImportError:
-        pass
     
     # Tampilkan UI
     display(ui_components['ui'])

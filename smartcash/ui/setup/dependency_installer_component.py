@@ -5,12 +5,11 @@ Deskripsi: Komponen UI untuk instalasi dependencies
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
+
 def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
 
-    from smartcash.ui.utils.constants import ICONS
     from smartcash.ui.components.headers import create_header
-    from smartcash.ui.components.alerts import create_status_indicator, create_info_box
     
     # Header 
     header = create_header(
@@ -37,11 +36,15 @@ def create_dependency_installer_ui(env=None, config=None):
         ]
     }
     
-    # Status panel
-    status_panel = create_status_indicator(
-        'info',
-        'ℹ️ Pilih packages yang akan diinstall dan klik "Install Packages"'
-    )
+    # Status panel - Gunakan widgets.HTML bukan create_status_indicator yang mengembalikan HTML
+    status_panel = widgets.HTML(value="""
+        <div style="margin: 5px 0; padding: 8px 12px; 
+                    border-radius: 4px; background-color: #f8f9fa;">
+            <span style="color: #0c5460; font-weight: bold;"> 
+                ℹ️ Pilih packages yang akan diinstall dan klik "Install Packages"
+            </span>
+        </div>
+    """)
     
     # Buat UI untuk package groups
     package_section_widgets = []
@@ -86,7 +89,7 @@ def create_dependency_installer_ui(env=None, config=None):
         package_section_widgets,
         layout=widgets.Layout(
             display='flex',
-            flex_flow='row wrap',
+            flex_flow='row',
             justify_content='space-between',
             width='100%'
         )
@@ -181,22 +184,24 @@ def create_dependency_installer_ui(env=None, config=None):
         )
     )
     
-    # Info box
-    info_box = create_info_box  (
-        "Tentang Package Installation",
-        """
-        <p>Package diurutkan instalasi dari kecil ke besar:</p>
-        <ol>
-            <li>Notebook tools (ipywidgets, tqdm)</li>
-            <li>Utility packages (pyyaml, termcolor)</li>
-            <li>Data processing (matplotlib, pandas)</li>
-            <li>Computer vision (OpenCV, Albumentations)</li>
-            <li>Machine learning (PyTorch)</li>
-        </ol>
-    """,
-        style="info",
-        collapsed=True
+    # Info box - Gunakan widgets.HTML bukan create_info_box yang mungkin mengembalikan HTML
+    info_box = widgets.Accordion(
+        children=[widgets.HTML("""
+            <div style="padding: 10px;">
+                <p>Package diurutkan instalasi dari kecil ke besar:</p>
+                <ol>
+                    <li>Notebook tools (ipywidgets, tqdm)</li>
+                    <li>Utility packages (pyyaml, termcolor)</li>
+                    <li>Data processing (matplotlib, pandas)</li>
+                    <li>Computer vision (OpenCV, Albumentations)</li>
+                    <li>Machine learning (PyTorch)</li>
+                </ol>
+            </div>
+        """)],
+        layout=widgets.Layout(width='100%', margin='10px 0')
     )
+    info_box.set_title(0, "Tentang Package Installation")
+    info_box.selected_index = None  # Initially collapsed
     
     # Container utama
     main = widgets.VBox(

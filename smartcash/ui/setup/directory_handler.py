@@ -88,7 +88,7 @@ def display_directory_tree(ui_components: Dict[str, Any]):
     with ui_components['status']:
         display(HTML("""
             <div style="margin-top:10px">
-                <h3 style="color:#155724; margin:5px 0">📂 Struktur Direktori Project</h3>
+                <h3 style="color:inherit; margin:5px 0">📂 Struktur Direktori Project</h3>
             </div>
         """))
         

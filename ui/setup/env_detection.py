@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_detection.py
-Deskripsi: Modul untuk deteksi environment SmartCash dengan styling konsisten
+Deskripsi: Modul untuk deteksi environment SmartCash
 """
 
 import os
@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional
 
 def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
     """
-    Deteksi dan konfigurasi environment UI dengan tema konsisten.
+    Deteksi dan konfigurasi environment UI.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -18,10 +18,6 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
     Returns:
         Dictionary UI components yang telah diperbarui
     """
-    # Import komponen UI yang sudah ada
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.components.alerts import create_info_alert
-    
     # Coba gunakan environment manager atau gunakan fallback detection
     is_colab = False
     is_drive_mounted = False
@@ -43,30 +39,30 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             is_colab = 'google.colab' in sys.modules
             is_drive_mounted = os.path.exists('/content/drive/MyDrive')
     
-    # Update colab panel dengan styling konsisten
+    # Update colab panel
     if 'colab_panel' in ui_components:
         if is_colab:
-            # Tampilkan informasi Colab environment dengan komponen yang konsisten
-            status_text = "terhubung" if is_drive_mounted else "tidak terhubung"
-            icon = ICONS['success'] if is_drive_mounted else ICONS['warning']
+            # Tampilkan informasi Colab environment
+            status = "terhubung" if is_drive_mounted else "tidak terhubung"
+            icon = "✅" if is_drive_mounted else "⚠️"
             
-            message = f"""
-            <h3 style="color:{COLORS['primary']}; margin:5px 0">{ICONS['settings']} Environment: Google Colab</h3>
-            <p style="margin:5px 0">{icon} Status Google Drive: <strong>{status_text}</strong></p>
-            <p style="margin:5px 0">Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
+            ui_components['colab_panel'].value = f"""
+            <div style="padding:10px; background-color:#d1ecf1; color:#0c5460; border-radius:4px; margin:10px 0">
+                <h3 style="color:inherit; margin:5px 0">🔍 Environment: Google Colab</h3>
+                <p style="margin:5px 0">{icon} Status Google Drive: <strong>{status}</strong></p>
+                <p style="margin:5px 0">Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
+            </div>
             """
-            
-            ui_components['colab_panel'].value = message
             # Aktifkan tombol drive
             ui_components['drive_button'].layout.display = 'block'
         else:
-            # Tampilkan informasi local environment dengan komponen yang konsisten
-            message = f"""
-            <h3 style="color:{COLORS['success']}; margin:5px 0">{ICONS['settings']} Environment: Local</h3>
-            <p style="margin:5px 0">Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
+            # Tampilkan informasi local environment
+            ui_components['colab_panel'].value = """
+            <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:10px 0">
+                <h3 style="color:inherit; margin:5px 0">🔍 Environment: Local</h3>
+                <p style="margin:5px 0">Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
+            </div>
             """
-            
-            ui_components['colab_panel'].value = message
             # Sembunyikan tombol drive
             ui_components['drive_button'].layout.display = 'none'
     

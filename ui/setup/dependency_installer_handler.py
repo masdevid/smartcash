@@ -12,28 +12,44 @@ from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 
 def _get_yolov5_requirements() -> List[str]:
-    """Dapatkan requirements YOLOv5."""
-    try:
-        req_file = Path('yolov5/requirements.txt')
-        if not req_file.exists():
-            return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
-        
-        with open(req_file, 'r') as f:
-            return [re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1) 
-                    for line in f if line.strip() and not line.startswith('#')]
-    except Exception:
-        return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
+    """Dapatkan requirements YOLOv5 dengan deteksi cerdas."""
+    default_requirements = [
+        "matplotlib", "numpy", "opencv-python", 
+        "torch", "torchvision", "tqdm", "pillow", 
+        "requests", "scipy"
+    ]
+    
+    # Lokasi potensial file requirements
+    potential_paths = [
+        Path('yolov5/requirements.txt'),
+        Path.cwd() / 'yolov5/requirements.txt',
+        Path.home() / 'yolov5/requirements.txt'
+    ]
+    
+    # Fungsi untuk parsing requirements
+    def parse_requirements(file_path):
+        try:
+            with open(file_path, 'r') as f:
+                return [
+                    re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1)
+                    for line in f 
+                    if line.strip() and not line.startswith('#')
+                ]
+        except Exception:
+            return []
+    
+    # Coba temukan dan parsing requirements
+    for path in potential_paths:
+        if path.exists():
+            parsed_reqs = parse_requirements(path)
+            if parsed_reqs:
+                return list(dict.fromkeys(parsed_reqs + default_requirements))
+    
+    return default_requirements
 
 def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, Any]):
     """
     Setup handler untuk instalasi dependencies.
-    
-    Args:
-        ui_components: Komponen UI untuk instalasi
-        config: Konfigurasi dependencies
-    
-    Returns:
-        Dictionary UI components yang telah ditambahkan handler
     """
     # Definisi package dan requirement
     PACKAGE_GROUPS = {
@@ -48,6 +64,7 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
         'seaborn_req': f"{sys.executable} -m pip install seaborn"
     }
 
+    # Remaining code continues from the previous implementation
     PACKAGE_CHECKS = [
         ('PyTorch', 'torch'), ('TorchVision', 'torchvision'), 
         ('OpenCV', 'cv2'), ('Albumentations', 'albumentations'), 
@@ -67,14 +84,14 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
         except Exception as e:
             return False, f"❌ Gagal install {package_name}: {str(e)}"
 
-    
-
     def _check_package_status(package_checks: List[Tuple[str, str]]) -> None:
         """Periksa status paket yang terinstall."""
         for display_name, import_name in package_checks:
             try:
                 module = __import__(import_name)
-                display(HTML(f"<div style='color:green'>✅ {display_name} (v{module.__version__})</div>"))
+                version = getattr(module, '__version__', 'Unknown')
+                version_display = f" (v{version})" if version != 'Unknown' else ''
+                display(HTML(f"<div style='color:green'>✅ {display_name}{version_display}</div>"))
             except ImportError:
                 display(HTML(f"<div style='color:orange'>⚠️ {display_name} tidak terinstall</div>"))
 

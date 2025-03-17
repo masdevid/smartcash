@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/utils/file/__init__.py
-Deskripsi: Ekspor komponen pemrosesan file dataset
+Deskripsi: Ekspor utilitas pemrosesan file dataset
 """
 
 from smartcash.dataset.utils.file.file_processor import FileProcessor

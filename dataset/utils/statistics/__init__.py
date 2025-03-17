@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/utils/statistics/__init__.py
-Deskripsi: Ekspor komponen statistik dataset
+Deskripsi: Ekspor utilitas statistik dataset
 """
 
 from smartcash.dataset.utils.statistics.class_stats import ClassStatistics

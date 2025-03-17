@@ -5,16 +5,16 @@ Deskripsi: Komponen UI untuk instalasi dependencies
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
-
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.components.headers import create_header
+from smartcash.ui.components.alerts import create_status_indicator, create_info_box
 def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
     # Header 
-    header = widgets.HTML("""
-    <div style="background:#f8f9fa;padding:15px;border-radius:5px;border-left:5px solid #3498db;margin-bottom:15px">
-        <h1 style="margin:0;color:inherit">📦 Instalasi Dependencies</h1>
-        <p style="margin:5px 0;color:inherit">Setup package yang diperlukan untuk SmartCash</p>
-    </div>
-    """)
+    header = create_header(
+        "📦 Instalasi Dependencies", 
+        "Setup package yang diperlukan untuk SmartCash"
+    )
     
     # Package groups
     package_groups = {
@@ -36,11 +36,10 @@ def create_dependency_installer_ui(env=None, config=None):
     }
     
     # Status panel
-    status_panel = widgets.HTML("""
-    <div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">
-        <p style="margin:0;color:inherit">ℹ️ Pilih packages yang akan diinstall dan klik 'Install Packages'</p>
-    </div>
-    """)
+    status_panel = create_status_indicator(
+        'info',
+        'ℹ️ Pilih packages yang akan diinstall dan klik "Install Packages"'
+    )
     
     # Buat UI untuk package groups
     package_section_widgets = []
@@ -75,7 +74,8 @@ def create_dependency_installer_ui(env=None, config=None):
                 margin='5px',
                 padding='10px',
                 border='1px solid #dee2e6',
-                border_radius='5px'
+                border_radius='5px',
+                width='150px'
             )
         )
         package_section_widgets.append(group_box)
@@ -181,19 +181,21 @@ def create_dependency_installer_ui(env=None, config=None):
     )
     
     # Info box
-    info_box = widgets.HTML("""
-    <div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">
-        <h4 style="margin-top:0;color:inherit">ℹ️ Tentang Package Installation</h4>
-        <p style="color:inherit">Package diurutkan instalasi dari kecil ke besar:</p>
-        <ol style="color:inherit">
+    info_box = create_info_box  (
+        "Tentang Package Installation",
+        """
+        <p>Package diurutkan instalasi dari kecil ke besar:</p>
+        <ol>
             <li>Notebook tools (ipywidgets, tqdm)</li>
             <li>Utility packages (pyyaml, termcolor)</li>
             <li>Data processing (matplotlib, pandas)</li>
             <li>Computer vision (OpenCV, Albumentations)</li>
             <li>Machine learning (PyTorch)</li>
         </ol>
-    </div>
-    """)
+    """,
+        style="info",
+        collapsed=True
+    )
     
     # Container utama
     main = widgets.VBox(

@@ -3,6 +3,7 @@ File: smartcash/ui/setup/env_config_component.py
 Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan styling default widget
 """
 
+from turtle import width
 import ipywidgets as widgets
 from typing import Dict, Any
 
@@ -48,6 +49,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         description='Hubungkan Google Drive',
         button_style='primary',
         icon='link',
+        width='150px',
         tooltip='Mount Google Drive dan siapkan struktur direktori'
     )
     
@@ -55,6 +57,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         description='Setup Direktori Lokal',
         button_style='info',
         icon='folder-plus',
+        width='150px',
         tooltip='Buat struktur direktori lokal'
     )
     

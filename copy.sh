@@ -8,4 +8,4 @@ cp -r smartcash/common .
 git add .
 git commit -am "update"
 git push origin migration
-git rm -rf smartcash/ui
+git rm -rf ui

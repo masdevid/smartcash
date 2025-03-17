@@ -1,7 +1,7 @@
 """
 File: smartcash/ui/utils/constants.py
 Author: Refactored
-Deskripsi: Konstanta untuk komponen UI dengan struktur yang lebih terorganisir
+Deskripsi: Konstanta untuk komponen UI dengan struktur yang lebih terorganisir dan warna konsisten
 """
 
 # Color palette
@@ -67,6 +67,43 @@ THEMES = {
 
 # Active theme (can be changed at runtime)
 ACTIVE_THEME = 'default'
+
+# Font Awesome icon mapping for ipywidgets
+FA_ICONS = {
+    'check': 'check',
+    'times': 'times',
+    'warning': 'exclamation-triangle',
+    'info': 'info-circle',
+    'error': 'exclamation-circle',
+    'success': 'check-circle',
+    'refresh': 'sync',
+    'save': 'save',
+    'upload': 'upload',
+    'download': 'download',
+    'folder': 'folder',
+    'file': 'file',
+    'plus': 'plus',
+    'minus': 'minus',
+    'edit': 'edit',
+    'delete': 'trash',
+    'search': 'search',
+    'settings': 'cog',
+    'link': 'link',
+    'folder-plus': 'folder-plus',
+    'folder-open': 'folder-open',
+    'chart': 'chart-bar',
+    'camera': 'camera',
+    'play': 'play',
+    'pause': 'pause',
+    'stop': 'stop',
+    'code': 'code',
+    'home': 'home',
+    'cog': 'cog',
+    'arrow-up': 'arrow-up',
+    'arrow-down': 'arrow-down',
+    'arrow-left': 'arrow-left',
+    'arrow-right': 'arrow-right',
+}
 
 # Emoji icons
 ICONS = {
@@ -150,56 +187,3 @@ ALERT_STYLES = {
         'icon': ICONS['error']
     }
 }
-
-# Button styles
-BUTTON_STYLES = {
-    'primary': 'primary',
-    'success': 'success',
-    'info': 'info',
-    'warning': 'warning',
-    'danger': 'danger',
-    'default': ''
-}
-
-# Font Config
-FONTS = {
-    'default': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    'monospace': 'Consolas, Menlo, Monaco, "Courier New", monospace',
-    'header': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-}
-
-# Size Config
-SIZES = {
-    'xs': '0.75rem',   # 12px
-    'sm': '0.875rem',  # 14px
-    'md': '1rem',      # 16px
-    'lg': '1.25rem',   # 20px
-    'xl': '1.5rem',    # 24px
-    '2xl': '2rem',     # 32px
-}
-
-# Layout constants
-PADDINGS = {
-    'none': '0',
-    'small': '5px',
-    'medium': '10px',
-    'large': '15px',
-    'xl': '20px'
-}
-
-MARGINS = {
-    'none': '0',
-    'small': '5px',
-    'medium': '10px',
-    'large': '15px',
-    'xl': '20px'
-}
-
-# File Related
-IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']
-VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv']
-DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx', 'ppt', 'pptx']
-CODE_EXTENSIONS = ['py', 'js', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json', 'xml']
-
-# For file size formatting
-FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']

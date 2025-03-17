@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash yang terintegrasi dengan tema dan komponen UI yang ada
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan styling yang lebih baik
 """
 
 import ipywidgets as widgets
@@ -20,10 +20,9 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Import komponen UI yang sudah ada
     from smartcash.ui.components.headers import create_header
     from smartcash.ui.components.alerts import create_info_box
-    from smartcash.ui.components.layouts import STANDARD_LAYOUTS
     from smartcash.ui.components.widget_layouts import (
-        main_container, button, section_container, 
-        output_area, CONTAINER_LAYOUTS, BUTTON_LAYOUTS
+        main_container, button, section_container, output_area, 
+        create_divider, BUTTON_LAYOUTS, GROUP_LAYOUTS
     )
     from smartcash.ui.utils.constants import ICONS
     
@@ -48,26 +47,33 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         collapsed=True
     )
     
-    # Tombol aksi dengan styling konsisten
+    # Tombol aksi dengan styling konsisten dan icon yang benar
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
         button_style='primary',
         icon='link',
-        layout=button
+        tooltip='Mount Google Drive dan siapkan struktur direktori',
+        layout=BUTTON_LAYOUTS['standard']
     )
     
     directory_button = widgets.Button(
         description='Setup Direktori Lokal',
         button_style='info',
         icon='folder-plus',
-        layout=button
+        tooltip='Buat struktur direktori lokal',
+        layout=BUTTON_LAYOUTS['standard']
+    )
+    
+    # Kelompokkan tombol dalam grup horizontal
+    button_group = widgets.HBox(
+        [drive_button, directory_button],
+        layout=GROUP_LAYOUTS['horizontal']
     )
     
     # Panel output dengan komponen yang sudah ada
     status = widgets.Output(layout=output_area)
     
     # Divider
-    from smartcash.ui.components.widget_layouts import create_divider
     divider = create_divider()
     
     # Container utama dengan styling konsisten
@@ -76,8 +82,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         colab_panel,
         help_box,
         divider,
-        drive_button,
-        directory_button,
+        button_group,
         status
     ], layout=main_container)
     

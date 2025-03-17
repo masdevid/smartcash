@@ -1,12 +1,12 @@
 """
 File: smartcash/ui/components/widget_layouts.py
-Deskripsi: Definisi layout standar untuk widgets UI dengan pendekatan factory
+Deskripsi: Definisi layout standar untuk widgets UI dengan pendekatan factory dan styling yang lebih konsisten
 """
 
 import ipywidgets as widgets
 from typing import Optional, Dict, Any, Union
 
-from smartcash.ui.utils.constants import PADDINGS, MARGINS
+from smartcash.ui.utils.constants import PADDINGS, MARGINS, COLORS
 
 def create_layout(
     width: str = '100%',
@@ -50,35 +50,49 @@ def create_layout(
 
 # Container Layouts
 CONTAINER_LAYOUTS = {
-    'main': create_layout(width='100%', padding=PADDINGS['medium']),
+    'main': create_layout(
+        width='100%', 
+        padding=PADDINGS['medium'],
+        overflow='visible'
+    ),
     'card': create_layout(
-        border='1px solid #ddd',
+        border=f'1px solid {COLORS["border"]}',
         border_radius='4px',
         padding=PADDINGS['medium'],
-        margin=MARGINS['medium']
+        margin=MARGINS['medium'],
+        overflow='visible'
     ),
-    'section': create_layout(margin=f'{MARGINS["medium"]} 0'),
-    'sidebar': create_layout(width='250px', padding=PADDINGS['small']),
+    'section': create_layout(
+        margin=f'{MARGINS["medium"]} 0',
+        overflow='visible'
+    ),
+    'sidebar': create_layout(
+        width='250px', 
+        padding=PADDINGS['small'],
+        overflow='auto'
+    ),
 }
 
 # Content Layouts
 CONTENT_LAYOUTS = {
     'output': create_layout(
-        border='1px solid #ddd',
+        border=f'1px solid {COLORS["border"]}',
         min_height='100px',
         max_height='300px',
         margin=f'{MARGINS["medium"]} 0',
+        padding=PADDINGS['small'],
         overflow='auto'
     ),
     'status': create_layout(
-        border='1px solid #ddd',
+        border=f'1px solid {COLORS["border"]}',
         min_height='50px',
         max_height='150px',
         margin=f'{MARGINS["small"]} 0',
+        padding=PADDINGS['small'],
         overflow='auto'
     ),
     'log': create_layout(
-        border='1px solid #ddd',
+        border=f'1px solid {COLORS["border"]}',
         min_height='150px',
         max_height='300px',
         margin=f'{MARGINS["medium"]} 0',
@@ -90,20 +104,59 @@ CONTENT_LAYOUTS = {
 
 # Input Layouts
 INPUT_LAYOUTS = {
-    'text': create_layout(width='60%', margin=f'{MARGINS["small"]} 0'),
-    'textarea': create_layout(width='60%', height='150px', margin=f'{MARGINS["small"]} 0'),
-    'dropdown': create_layout(width='50%', margin=f'{MARGINS["small"]} 0'),
-    'slider': create_layout(width='70%', margin=f'{MARGINS["small"]} 0'),
+    'text': create_layout(
+        width='100%', 
+        max_width='500px',
+        margin=f'{MARGINS["small"]} 0'
+    ),
+    'textarea': create_layout(
+        width='100%', 
+        max_width='500px',
+        height='150px', 
+        margin=f'{MARGINS["small"]} 0'
+    ),
+    'dropdown': create_layout(
+        width='100%',
+        max_width='500px',
+        margin=f'{MARGINS["small"]} 0'
+    ),
+    'slider': create_layout(
+        width='100%',
+        max_width='500px',
+        margin=f'{MARGINS["small"]} 0'
+    ),
     'checkbox': create_layout(margin=f'{MARGINS["small"]} 0'),
     'radio': create_layout(margin=f'{MARGINS["small"]} 0'),
 }
 
 # Button Layouts
 BUTTON_LAYOUTS = {
-    'standard': create_layout(margin=f'{MARGINS["medium"]} 0'),
-    'small': create_layout(margin=MARGINS['small']),
-    'hidden': create_layout(margin=f'{MARGINS["medium"]} 0', display='none'),
-    'inline': create_layout(margin='0 5px 0 0', width='auto'),
+    'standard': create_layout(
+        margin=f'{MARGINS["medium"]} 0',
+        width='auto',
+        min_width='120px'
+    ),
+    'small': create_layout(
+        margin=MARGINS['small'],
+        width='auto',
+        min_width='100px'
+    ),
+    'hidden': create_layout(
+        margin=f'{MARGINS["medium"]} 0', 
+        display='none',
+        width='auto'
+    ),
+    'inline': create_layout(
+        margin='0 5px 0 0', 
+        width='auto',
+        min_width='80px'
+    ),
+    'icon_button': create_layout(
+        width='44px',
+        height='44px',
+        margin=MARGINS['small'],
+        padding='0px'
+    ),
 }
 
 # Group Layouts
@@ -112,38 +165,56 @@ GROUP_LAYOUTS = {
         display='flex',
         flex_flow='row wrap',
         align_items='center',
-        width='100%'
+        width='100%',
+        overflow='visible',
+        gap='10px'
     ),
     'vertical': create_layout(
         display='flex',
         flex_flow='column',
         align_items='stretch',
-        width='100%'
+        width='100%',
+        overflow='visible',
+        gap='10px'
     ),
     'grid': create_layout(
         display='grid',
         grid_gap='10px',
         grid_template_columns='repeat(auto-fit, minmax(250px, 1fr))',
-        width='100%'
+        width='100%',
+        overflow='visible'
     ),
 }
 
 # Component Layouts
 COMPONENT_LAYOUTS = {
-    'tabs': create_layout(width='100%', margin=f'{MARGINS["medium"]} 0'),
-    'accordion': create_layout(width='100%', margin=f'{MARGINS["medium"]} 0'),
-    'progress': create_layout(width='100%', margin=f'{MARGINS["small"]} 0'),
+    'tabs': create_layout(
+        width='100%', 
+        margin=f'{MARGINS["medium"]} 0',
+        overflow='visible'
+    ),
+    'accordion': create_layout(
+        width='100%', 
+        margin=f'{MARGINS["medium"]} 0',
+        overflow='visible'
+    ),
+    'progress': create_layout(
+        width='100%', 
+        margin=f'{MARGINS["small"]} 0',
+        overflow='visible'
+    ),
     'divider': create_layout(
         height='1px',
         border='0',
-        border_top='1px solid #eee',
-        margin=f'{MARGINS["large"]} 0'
+        border_top=f'1px solid {COLORS["border"]}',
+        margin=f'{MARGINS["large"]} 0',
+        width='100%'
     ),
 }
 
 def create_divider() -> widgets.HTML:
     """Buat divider horizontal."""
-    return widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>")
+    return widgets.HTML(f"<hr style='margin: 15px 0; border: 0; border-top: 1px solid {COLORS['border']};'>")
 
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""
@@ -170,7 +241,8 @@ def create_grid_layout(
         'grid_template_rows': f'repeat({nrows}, auto)',
         'grid_template_columns': f'repeat({ncols}, 1fr)',
         'grid_gap': '10px',
-        'width': '100%'
+        'width': '100%',
+        'overflow': 'visible'
     }
     
     if layout_kwargs:

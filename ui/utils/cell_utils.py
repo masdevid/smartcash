@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/cell_utils.py
-Deskripsi: Utilitas untuk cell notebook dengan fungsi setup environment dan komponen UI yang sederhana
+Deskripsi: Utilitas untuk cell notebook dengan fungsi setup environment dan komponen UI yang lebih konsisten
 """
 
 import importlib
@@ -11,6 +11,8 @@ from typing import Dict, Any, Tuple, Optional
 import yaml
 import ipywidgets as widgets
 from IPython.display import display, HTML
+
+from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_notebook_environment(
     cell_name: str,
@@ -90,19 +92,20 @@ def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
     # Format judul cell dari nama
     title = " ".join(word.capitalize() for word in cell_name.split("_"))
     
-    # Buat komponen UI default
+    # Buat komponen UI default dengan styling yang lebih baik
     header = widgets.HTML(
-        f"""<div style="background-color: #f0f8ff; padding: 15px; color: black; 
-                      border-radius: 5px; margin-bottom: 15px; border-left: 5px solid #3498db;">
-            <h2 style="color: #2c3e50; margin-top: 0;">{title}</h2>
-            <p style="color: #2c3e50; margin-bottom: 0;">No UI component found for this cell</p>
+        f"""<div style="background-color: {COLORS['header_bg']}; padding: 15px; 
+                      color: {COLORS['dark']}; border-radius: 5px; 
+                      margin-bottom: 15px; border-left: 5px solid {COLORS['header_border']};">
+            <h2 style="color: {COLORS['secondary']}; margin-top: 0;">{title}</h2>
+            <p style="color: {COLORS['secondary']}; margin-bottom: 0;">Cell untuk {title}</p>
         </div>"""
     )
     
     status = widgets.Output(
         layout=widgets.Layout(
             width='100%',
-            border='1px solid #ddd',
+            border=f'1px solid {COLORS["border"]}',
             min_height='100px',
             max_height='300px',
             margin='10px 0',
@@ -113,7 +116,8 @@ def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
     
     # Return dictionary
     return {
-        'ui': widgets.VBox([header, status]),
+        'ui': widgets.VBox([header, status], 
+            layout=widgets.Layout(width='100%', padding='10px')),
         'header': header,
         'status': status,
         'module_name': cell_name
@@ -162,12 +166,27 @@ def setup_ui_component(
         else:
             # Jika tidak ditemukan
             with ui_components['status']:
-                display(HTML(f"<p style='color:#856404'>⚠️ UI component '{component_name}' not found. Using minimal implementation.</p>"))
+                display(HTML(f"""
+                <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                          color:{COLORS['alert_warning_text']}; 
+                          border-radius:4px; margin:5px 0;
+                          border-left:4px solid {COLORS['alert_warning_text']};">
+                    <p style="margin:5px 0">{ICONS['warning']} UI component '{component_name}' tidak ditemukan. 
+                       Menggunakan implementasi minimal.</p>
+                </div>
+                """))
                 
     except Exception as e:
         # Catch any other errors during import
         with ui_components['status']:
-            display(HTML(f"<p style='color:#721c24'>❌ Error importing component '{component_name}': {str(e)}</p>"))
+            display(HTML(f"""
+            <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                      color:{COLORS['alert_danger_text']}; 
+                      border-radius:4px; margin:5px 0;
+                      border-left:4px solid {COLORS['alert_danger_text']};">
+                <p style="margin:5px 0">{ICONS['error']} Error saat import komponen '{component_name}': {str(e)}</p>
+            </div>
+            """))
     
     # Setup handler jika tersedia
     try:
@@ -205,7 +224,13 @@ def display_ui(ui_components: Dict[str, Any]) -> None:
                 display(component)
                 break
         else:
-            display(HTML("<p>⚠️ No UI component found to display</p>"))
+            display(HTML(f"""
+            <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                      color:{COLORS['alert_warning_text']}; 
+                      border-radius:4px; margin:5px 0;">
+                <p style="margin:5px 0">{ICONS['warning']} Tidak ada komponen UI yang dapat ditampilkan</p>
+            </div>
+            """))
 
 def cleanup_resources(ui_components: Dict[str, Any]) -> None:
     """

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/ui_helpers.py
-Deskripsi: Fungsi helper untuk komponen UI dan integrasi dengan notebook, tanpa ThreadPool
+Deskripsi: Fungsi helper untuk komponen UI dan integrasi dengan notebook dengan styling yang lebih baik
 """
 
 import ipywidgets as widgets
@@ -11,6 +11,9 @@ from pathlib import Path
 import datetime
 
 from smartcash.ui.utils.constants import COLORS, ICONS, FILE_SIZE_UNITS
+from smartcash.ui.components.widget_layouts import (
+    BUTTON_LAYOUTS, GROUP_LAYOUTS, CONTAINER_LAYOUTS, CONTENT_LAYOUTS
+)
 
 def set_active_theme(theme_name: str = 'default') -> bool:
     """
@@ -47,14 +50,17 @@ def inject_css_styles() -> None:
     
     .smartcash-section {
         color: %s;
+        font-size: %s; 
         margin-top: 15px;
         margin-bottom: 10px;
+        font-family: %s;
     }
     
     .smartcash-info-box {
         padding: 10px;
         border-radius: 4px;
         margin: 10px 0;
+        border: 1px solid %s;
     }
     
     .smartcash-status {
@@ -87,11 +93,35 @@ def inject_css_styles() -> None:
         color: %s;
         border-left: 4px solid %s;
     }
+
+    /* Button Styles */
+    .jupyter-button {
+        font-family: %s;
+        font-size: %s;
+        transition: all 0.2s ease;
+    }
+    
+    .jupyter-button:hover {
+        opacity: 0.9;
+    }
+    
+    /* Progress bar styles */
+    .widget-progressbar {
+        height: 20px;
+        border-radius: 4px;
+    }
+    
+    .widget-hbox, .widget-vbox {
+        overflow: visible;
+    }
     </style>
     """ % (
         COLORS['header_bg'],
         COLORS['header_border'],
         COLORS['dark'],
+        SIZES['lg'],
+        FONTS['header'],
+        COLORS['border'],
         COLORS['alert_info_bg'],
         COLORS['alert_info_text'],
         COLORS['alert_info_text'],
@@ -103,7 +133,9 @@ def inject_css_styles() -> None:
         COLORS['alert_warning_text'],
         COLORS['alert_danger_bg'],
         COLORS['alert_danger_text'],
-        COLORS['alert_danger_text']
+        COLORS['alert_danger_text'],
+        FONTS['default'],
+        SIZES['md']
     )
     
     display(HTML(css))
@@ -170,27 +202,31 @@ def create_confirmation_dialog(title, message, on_confirm, on_cancel=None,
     # Dialog content
     content = widgets.VBox([
         widgets.HTML(f"""
-        <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+        <div style="padding:15px; background-color:{COLORS['alert_warning_bg']}; 
                      color:{COLORS['alert_warning_text']}; 
                      border-left:4px solid {COLORS['alert_warning_text']}; 
                      border-radius:4px; margin:10px 0;">
-            <h4 style="margin-top:0;">{ICONS['warning']} {title}</h4>
-            <p>{message}</p>
+            <h4 style="margin-top:0; font-family:{FONTS['header']};">{ICONS['warning']} {title}</h4>
+            <p style="margin-bottom:0;">{message}</p>
         </div>
         """),
         widgets.HBox([
             widgets.Button(
                 description=cancel_label,
                 button_style="warning",
-                layout=widgets.Layout(margin='5px')
+                icon='times',
+                layout=BUTTON_LAYOUTS['small'],
+                tooltip="Batalkan operasi"
             ),
             widgets.Button(
                 description=confirm_label,
                 button_style="danger",
-                layout=widgets.Layout(margin='5px')
+                icon='check',
+                layout=BUTTON_LAYOUTS['small'],
+                tooltip="Konfirmasi operasi"
             )
-        ])
-    ])
+        ], layout=GROUP_LAYOUTS['horizontal'])
+    ], layout=CONTAINER_LAYOUTS['card'])
     
     # Set callbacks
     content.children[1].children[0].on_click(
@@ -222,7 +258,8 @@ def create_button_group(buttons, layout=None):
             description=label,
             button_style=BUTTON_STYLES.get(style, ''),
             icon=icon,
-            layout=widgets.Layout(margin='5px')
+            layout=BUTTON_LAYOUTS['small'],
+            tooltip=label
         )
         
         if callback:
@@ -230,12 +267,10 @@ def create_button_group(buttons, layout=None):
             
         btn_widgets.append(btn)
     
-    return widgets.HBox(btn_widgets, layout=layout or widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='center',
-        width='100%'
-    ))
+    return widgets.HBox(
+        btn_widgets, 
+        layout=layout or GROUP_LAYOUTS['horizontal']
+    )
 
 def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBox, Callable]:
     """
@@ -253,8 +288,15 @@ def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBo
     
     message_widget = widgets.HTML(value=f'<span style="margin-left: 10px;">{message}</span>')
     
-    loading = widgets.HBox([spinner, message_widget])
-    loading.layout.display = 'none'  # Hide by default
+    loading = widgets.HBox(
+        [spinner, message_widget],
+        layout=widgets.Layout(
+            display='none',
+            align_items='center',
+            margin='10px 0',
+            width='auto'
+        )
+    )
     
     def toggle_loading(show: bool = True, new_message: Optional[str] = None):
         loading.layout.display = 'flex' if show else 'none'
@@ -312,7 +354,9 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
         
         # Buat HTML
         html = f"""
-        <div style="padding: 10px; background-color: {COLORS['light']}; border-radius: 5px; margin: 10px 0;">
+        <div style="padding: 15px; background-color: {COLORS['light']}; 
+                  border-radius: 5px; margin: 10px 0; 
+                  border: 1px solid {COLORS['border']};">
             <p><strong>{ICONS['file']} File:</strong> {path.name}</p>
             <p><strong>{ICONS['folder']} Path:</strong> {path.parent}</p>
             <p><strong>📏 Size:</strong> {formatted_size}</p>
@@ -326,7 +370,13 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
         
         return widgets.HTML(value=html)
     else:
-        return widgets.HTML(value=f"<p>{ICONS['warning']} File not found: {file_path}</p>")
+        return widgets.HTML(value=f"""
+        <div style="padding: 10px; background-color: {COLORS['alert_warning_bg']}; 
+                  color: {COLORS['alert_warning_text']}; border-radius: 5px; margin: 10px 0;
+                  border-left: 4px solid {COLORS['alert_warning_text']};">
+            <p>{ICONS['warning']} File tidak ditemukan: {file_path}</p>
+        </div>
+        """)
 
 def update_output_area(output_widget: widgets.Output, message: str, status: str = 'info', clear: bool = False):
     """
@@ -375,7 +425,7 @@ def register_observer_callback(observer_manager, event_type, output_widget,
 
 def create_divider() -> widgets.HTML:
     """Buat divider horizontal."""
-    return widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>")
+    return widgets.HTML(f"<hr style='margin: 15px 0; border: 0; border-top: 1px solid {COLORS['border']};'>")
 
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""

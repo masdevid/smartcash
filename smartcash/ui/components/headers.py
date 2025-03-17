@@ -2,11 +2,20 @@
 File: smartcash/ui/components/headers.py
 Deskripsi: Komponen header dan section title yang reusable
 """
+from typing import Optional, Dict, Callable, Tuple
+from datetime import datetime
+from pathlib import Path
+from IPython.display import display, clear_output
 
-import ipywidgets as widgets
-from typing import Optional
-
-from smartcash.ui.utils.constants import COLORS
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.components.widget_layouts import (
+    COMPONENT_LAYOUTS, 
+    BUTTON_LAYOUTS, 
+    GROUP_LAYOUTS
+)
+from smartcash.ui.components.layouts import (
+    BUTTON_STYLES
+)
 
 def create_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """

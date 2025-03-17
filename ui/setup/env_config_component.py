@@ -24,7 +24,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         main_container, button, section_container, output_area, 
         create_divider, BUTTON_LAYOUTS, GROUP_LAYOUTS
     )
-    from smartcash.ui.utils.constants import ICONS
+    from smartcash.ui.utils.constants import ICONS, FA_ICONS
     
     # Header dengan styling konsisten
     header = create_header(
@@ -51,7 +51,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
         button_style='primary',
-        icon='link',
+        icon=FA_ICONS['link'],
         tooltip='Mount Google Drive dan siapkan struktur direktori',
         layout=BUTTON_LAYOUTS['inline']
     )
@@ -59,7 +59,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     directory_button = widgets.Button(
         description='Setup Direktori Lokal',
         button_style='info',
-        icon='folder-plus',
+        icon=FA_ICONS['folder-plus'],
         tooltip='Buat struktur direktori lokal',
         layout=BUTTON_LAYOUTS['inline']
     )

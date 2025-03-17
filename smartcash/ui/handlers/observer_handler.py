@@ -25,7 +25,8 @@ def setup_observer_handlers(
         from smartcash.components.observer.manager_observer import ObserverManager
         
         # Dapatkan observer manager
-        observer_manager = ObserverManager.get_instance()
+        # Ubah dari .get_instance() ke cara inisialisasi yang benar
+        observer_manager = ObserverManager()
         if observer_manager:
             # Unregister group yang lama jika ada
             observer_manager.unregister_group(observer_group)
@@ -73,7 +74,8 @@ def register_ui_observer(
         if not observer_manager:
             try:
                 from smartcash.components.observer.manager_observer import ObserverManager
-                observer_manager = ObserverManager.get_instance()
+                # Ubah dari .get_instance() ke cara inisialisasi yang benar
+                observer_manager = ObserverManager()
             except ImportError:
                 return False
                 
@@ -147,7 +149,8 @@ def create_progress_observer(
         if not observer_manager:
             try:
                 from smartcash.components.observer.manager_observer import ObserverManager
-                observer_manager = ObserverManager.get_instance()
+                # Ubah dari .get_instance() ke cara inisialisasi yang benar
+                observer_manager = ObserverManager()
             except ImportError:
                 return False
                 

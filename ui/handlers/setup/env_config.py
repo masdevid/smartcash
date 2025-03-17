@@ -3,149 +3,307 @@ File: smartcash/ui/handlers/setup/env_config.py
 Deskripsi: Handler untuk UI konfigurasi environment SmartCash di subdirektori setup
 """
 
-from IPython.display import display, HTML, clear_output
-from pathlib import Path
 import os
 import shutil
+import threading
+import time
+from IPython.display import display, HTML, clear_output
+from pathlib import Path
 
-from smartcash.ui.components.shared.alerts import create_status_indicator
+from smartcash.ui.components.shared.alerts import create_info_alert, create_status_indicator
 from smartcash.ui.handlers.shared.error_handler import handle_error
-from smartcash.ui.handlers.shared.environment_handler import detect_environment, filter_drive_tree, fallback_get_directory_tree, sync_configs, check_smartcash_dir
-from smartcash.ui.handlers.shared.observer_handler import setup_observer_handlers, register_ui_observer
-from smartcash.ui.handlers.shared.config_handler import setup_config_handlers, update_config
-from smartcash.ui.utils.logging_utils import setup_ipython_logging
 
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
-    # Try to load config from multiple possible paths
-    config_paths = [
-        'configs/colab_config.yaml',
-        'config/colab_config.yaml',
-        './configs/colab_config.yaml', 
-        './config/colab_config.yaml',
-        '../configs/colab_config.yaml',
-        '../config/colab_config.yaml'
-    ]
     
-    # Get logger dari ui_components atau buat baru
-    logger = ui_components.get('logger')
-    if not logger:
+    # Initialize variables
+    logger = env_manager = observer_manager = config_manager = None
+    
+    # Try to import SmartCash modules
+    try:
+        # Import modules
+        from smartcash.common.logger import get_logger
+        from smartcash.common.environment import get_environment_manager
+        from smartcash.common.config import get_config_manager
+        
+        logger = get_logger("env_config")
+        env_manager = get_environment_manager()
+        config_manager = get_config_manager()
+        
+        # Try to load config directly
+        if config_manager:
+            try:
+                if Path('configs/colab_config.yaml').exists():
+                    config = config_manager.load_config('configs/colab_config.yaml')
+                elif Path('configs/base_config.yaml').exists():
+                    config = config_manager.load_config('configs/base_config.yaml')
+            except Exception as e:
+                if logger:
+                    logger.warning(f"⚠️ Could not load config: {str(e)}")
+        
+        # Setup observer if available
         try:
-            logger = setup_ipython_logging(ui_components, logger_name="env_config")
+            from smartcash.components.observer.manager_observer import ObserverManager
+            observer_manager = ObserverManager.get_instance()
+            if observer_manager:
+                observer_manager.unregister_group("env_config_observers")
         except ImportError:
             pass
+    except ImportError as e:
+        with ui_components['status']:
+            display(HTML(f"<p style='color:orange'>⚠️ Limited functionality mode - SmartCash modules not fully loaded: {str(e)}</p>"))
     
-    # Load config if needed and not already loaded
-    if 'config' not in ui_components or not ui_components['config']:
+    # Helper functions
+    def filter_drive_tree(tree_html):
+        """Filter directory tree to focus on SmartCash"""
+        if not tree_html or '/content/drive' not in tree_html:
+            return tree_html
+            
         try:
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
+            pre_start = tree_html.find("<pre")
+            pre_end = tree_html.find("</pre>")
             
-            # Try multiple config paths
-            for config_path in config_paths:
-                try:
-                    if Path(config_path).exists():
-                        with ui_components['status']:
-                            display(HTML(f"<p>🔄 Loading config from {config_path}</p>"))
-                        config = config_manager.load_config(config_path)
-                        ui_components['config'] = config
-                        ui_components['config_path'] = config_path
-                        break
-                except Exception as e:
-                    if logger:
-                        logger.warning(f"⚠️ Failed to load {config_path}: {str(e)}")
+            if pre_start == -1 or pre_end == -1:
+                return tree_html
+                
+            header = tree_html[:pre_start + tree_html[pre_start:].find(">") + 1]
+            content = tree_html[pre_start + tree_html[pre_start:].find(">") + 1:pre_end]
             
-            # If still no config, use default
-            if 'config' not in ui_components or not ui_components['config']:
-                with ui_components['status']:
-                    display(HTML("<p>⚠️ No config file found, using default settings</p>"))
-                ui_components['config'] = config_manager.config
+            lines = content.split("\n")
+            filtered_lines = []
+            inside_drive = False
+            
+            for line in lines:
+                if '/content/drive' in line and 'MyDrive/SmartCash' not in line and not inside_drive:
+                    continue
+                    
+                if 'SmartCash/' in line:
+                    inside_drive = True
+                    filtered_lines.append(line)
+                elif inside_drive and ('│' not in line and '├' not in line and '└' not in line):
+                    inside_drive = False
+                elif inside_drive:
+                    filtered_lines.append(line)
+                elif '/content/drive' not in line:
+                    filtered_lines.append(line)
+            
+            return header + "\n".join(filtered_lines) + "</pre>"
+        except Exception:
+            return tree_html
+    
+    def fallback_get_directory_tree(root_dir, max_depth=2):
+        """Basic directory tree visualization without relying on environment manager"""
+        root_dir = Path(root_dir)
+        if not root_dir.exists():
+            return f"<span style='color:red'>❌ Directory not found: {root_dir}</span>"
+        
+        # Focus on SmartCash folder for drive
+        if '/content/drive' in str(root_dir):
+            root_dir = Path('/content/drive/MyDrive/SmartCash')
+            if not root_dir.exists():
+                root_dir.mkdir(parents=True, exist_ok=True)
+        
+        result = "<pre style='margin:0;padding:5px;background:#f8f9fa;font-family:monospace;color:#333'>\n"
+        result += f"<span style='color:#0366d6;font-weight:bold'>{root_dir.name}/</span>\n"
+        
+        def traverse_dir(path, prefix="", depth=0):
+            if depth > max_depth: 
+                return ""
+                
+            try:
+                items = sorted(list(path.iterdir()), key=lambda x: (not x.is_dir(), x.name))
+            except PermissionError:
+                return f"{prefix}└─ <span style='color:red'>❌ Permission denied</span>\n"
+                
+            tree = ""
+            for i, item in enumerate(items):
+                # Skip if it's not SmartCash related in drive
+                if '/content/drive/MyDrive' in str(item) and '/SmartCash' not in str(item):
+                    continue
+                    
+                is_last = i == len(items) - 1
+                connector = "└─ " if is_last else "├─ "
+                if item.is_dir():
+                    tree += f"{prefix}{connector}<span style='color:#0366d6;font-weight:bold'>{item.name}/</span>\n"
+                    next_prefix = prefix + ("   " if is_last else "│  ")
+                    if depth < max_depth:
+                        tree += traverse_dir(item, next_prefix, depth + 1)
+                else:
+                    tree += f"{prefix}{connector}{item.name}\n"
+            return tree
+        
+        result += traverse_dir(root_dir)
+        result += "</pre>"
+        return result
+    
+    def sync_configs(source_dirs, target_dirs):
+        """Sync config files from source to target directories"""
+        total_files = copied_files = 0
+        
+        try:
+            for source_dir in source_dirs:
+                if not isinstance(source_dir, Path):
+                    source_dir = Path(source_dir)
+                
+                if not source_dir.exists() or not source_dir.is_dir():
+                    continue
+                
+                config_files = list(source_dir.glob('*.y*ml'))
+                
+                for config_file in config_files:
+                    total_files += 1
+                    
+                    for target_dir in target_dirs:
+                        if not isinstance(target_dir, Path):
+                            target_dir = Path(target_dir)
+                        
+                        target_dir.mkdir(parents=True, exist_ok=True)
+                        target_file = target_dir / config_file.name
+                        
+                        if not target_file.exists():
+                            try:
+                                shutil.copy2(config_file, target_file)
+                                copied_files += 1
+                                if logger:
+                                    logger.info(f"✅ Copied {config_file.name} to {target_dir}")
+                            except Exception as e:
+                                if logger:
+                                    logger.warning(f"⚠️ Failed to copy {config_file.name}: {str(e)}")
+            
+            return total_files, copied_files
         except Exception as e:
+            if logger:
+                logger.error(f"❌ Error syncing configs: {str(e)}")
+            return total_files, copied_files
+    
+    def detect_environment():
+        """Detect environment and update UI"""
+        is_colab = False
+        if env_manager:
+            is_colab = env_manager.is_colab
+            with ui_components['info_panel']:
+                clear_output(wait=True)
+                try:
+                    system_info = env_manager.get_system_info()
+                    info_html = f"""
+                    <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
+                        <h4 style="margin-top:0">📊 System Information</h4>
+                        <ul>
+                            <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
+                            <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
+                            <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
+                        </ul>
+                    </div>
+                    """
+                    display(HTML(info_html))
+                except Exception as e:
+                    display(HTML(f"<p>⚠️ Error getting system info: {str(e)}</p>"))
+        else:
+            try:
+                import google.colab
+                is_colab = True
+            except ImportError:
+                pass
+                
+            # Simple system information in fallback mode
+            with ui_components['info_panel']:
+                clear_output(wait=True)
+                import sys, platform
+                display(HTML(f"""
+                <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
+                    <h4 style="margin-top:0">📊 System Information</h4>
+                    <ul>
+                        <li><b>Python:</b> {platform.python_version()}</li>
+                        <li><b>OS:</b> {platform.system()} {platform.release()}</li>
+                        <li><b>Base Directory:</b> {Path.cwd()}</li>
+                    </ul>
+                </div>
+                """))
+        
+        # Update UI based on environment
+        ui_components['colab_panel'].value = """
+            <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
+                <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
+                <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
+            </div>
+        """ if is_colab else """
+            <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
+                <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
+                <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
+            </div>
+        """
+        
+        return is_colab
+    
+    def check_smartcash_dir():
+        """Check if SmartCash directory exists"""
+        if not Path('smartcash').exists() or not Path('smartcash').is_dir():
             with ui_components['status']:
-                display(HTML(f"<p>⚠️ Error loading config: {str(e)}</p>"))
-    
-    # Setup observer
-    ui_components = setup_observer_handlers(ui_components, observer_group="env_config_observers")
-    
-    # Setup config handler
-    ui_components = setup_config_handlers(ui_components, config)
-    
-    # Register UI observers
-    register_ui_observer(
-        ui_components,
-        ["environment.drive.mount", "environment.directory.setup"],
-        observer_group="env_config_observers"
-    )
-    
-    # Use shared implementations from environment_handler.py
-    # These functions were moved to shared handlers for reuse
+                clear_output(wait=True)
+                alert_html = f"""
+                <div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
+                    <h3 style="margin-top:0">❌ Folder SmartCash tidak ditemukan!</h3>
+                    <p>Repository belum di-clone dengan benar. Silakan jalankan cell clone repository terlebih dahulu.</p>
+                    <ol>
+                        <li>Jalankan cell repository clone (Cell 1.1)</li>
+                        <li>Restart runtime (Runtime > Restart runtime)</li>
+                        <li>Jalankan kembali notebook dari awal</li>
+                    </ol>
+                </div>
+                """
+                display(HTML(alert_html))
+                return False
+        return True
     
     def on_drive_connect(b):
         """Handler koneksi Google Drive"""
         with ui_components['status']:
             clear_output(wait=True)
-            display(HTML('<p>🔄 Menghubungkan ke Google Drive...</p>'))
             
-            if env and hasattr(env, 'mount_drive'):
-                try:
-                    display(create_status_indicator("info", "🔄 Menghubungkan ke Google Drive..."))
-                    success, message = env.mount_drive()
+            if env_manager:
+                display(create_status_indicator("info", "🔄 Menghubungkan ke Google Drive..."))
+                success, message = env_manager.mount_drive()
+                
+                if success:
+                    display(create_status_indicator("info", "🔄 Membuat symlink ke Google Drive..."))
+                    symlink_stats = env_manager.create_symlinks()
+                    display(create_status_indicator("success", 
+                        f"✅ Drive terhubung: {env_manager.drive_path} ({symlink_stats['created']} symlinks baru)"
+                    ))
                     
-                    if success:
-                        display(create_status_indicator("info", "🔄 Membuat symlink ke Google Drive..."))
-                        symlink_stats = env.create_symlinks() if hasattr(env, 'create_symlinks') else {'created': 0}
-                        display(create_status_indicator("success", 
-                            f"✅ Drive terhubung: {env.drive_path} ({symlink_stats.get('created', 0)} symlinks baru)"
-                        ))
-                        
-                        display(create_status_indicator("info", "🔄 Memeriksa file konfigurasi..."))
-                        drive_configs_dir = env.drive_path / 'configs'
-                        
-                        # Sync configs antara local dan drive
-                        source_dirs = [Path('configs')]
-                        target_dirs = [drive_configs_dir]
-                        
-                        try:
-                            import importlib
-                            from importlib.resources import files
-                            source_module = files('smartcash.configs')
-                            if source_module.is_dir():
-                                source_dirs.append(Path(source_module))
-                        except Exception:
-                            smartcash_path = Path(__file__).parent.parent.parent
-                            configs_path = smartcash_path / 'configs'
-                            if configs_path.exists():
-                                source_dirs.append(configs_path)
-                        
-                        total_files, synced_files = sync_configs(source_dirs, target_dirs, logger)
-                        
-                        if total_files > 0:
-                            status = "success" if synced_files > 0 else "info"
-                            message = f"✅ {synced_files} config disalin ke Drive" if synced_files > 0 else "ℹ️ Semua config sudah ada di Drive"
-                            display(create_status_indicator(status, message))
-                        
-                        # Display tree - fokus ke SmartCash di Drive
-                        display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
-                        drive_path = env.drive_path if hasattr(env, 'drive_path') else Path('/content/drive/MyDrive/SmartCash')
-                        raw_tree_html = env.get_directory_tree(drive_path, max_depth=2) if hasattr(env, 'get_directory_tree') else fallback_get_directory_tree(drive_path, max_depth=2)
-                        tree_html = filter_drive_tree(raw_tree_html)
-                        display(HTML(tree_html))
-                        
-                        # Update config
-                        update_config(ui_components, {
+                    display(create_status_indicator("info", "🔄 Memeriksa file konfigurasi..."))
+                    drive_configs_dir = env_manager.drive_path / 'configs'
+                    missing, copied = sync_configs([Path('configs')], [drive_configs_dir])
+                    
+                    if missing > 0:
+                        status = "success" if copied == missing else "warning"
+                        message = f"✅ {copied} config disalin ke Drive" if copied == missing else f"⚠️ {copied}/{missing} config berhasil disalin"
+                        display(create_status_indicator(status, message))
+                    else:
+                        display(create_status_indicator("info", "ℹ️ Semua config sudah ada di Drive"))
+                    
+                    # Display tree focusing on SmartCash
+                    display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
+                    drive_path = env_manager.drive_path
+                    raw_tree_html = env_manager.get_directory_tree(drive_path, max_depth=2)
+                    tree_html = filter_drive_tree(raw_tree_html)
+                    display(HTML(tree_html))
+                    
+                    # Update config if manager available
+                    if config_manager:
+                        config_manager.update_config({
                             'environment': {
                                 'drive_mounted': True,
-                                'drive_path': str(env.drive_path)
+                                'drive_path': str(env_manager.drive_path)
                             }
                         })
-                    else:
-                        display(create_status_indicator("error", f"❌ Gagal koneksi Drive: {message}"))
-                except Exception as e:
-                    handle_error(e, ui_components['status'], clear=False)
+                else:
+                    display(create_status_indicator("error", f"❌ Gagal koneksi Drive: {message}"))
             else:
-                # Fallback implementation for Google Colab
+                # Fallback implementation
                 try:
                     display(HTML('<p>🔄 Menghubungkan ke Google Drive...</p>'))
+                    
                     from google.colab import drive
                     drive.mount('/content/drive')
                     
@@ -156,7 +314,6 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     
                     # Create symlink
                     if not Path('SmartCash_Drive').exists():
-                        import os
                         os.symlink(drive_path, 'SmartCash_Drive')
                         display(HTML('<p>✅ Symlink <code>SmartCash_Drive</code> dibuat</p>'))
                     else:
@@ -165,16 +322,24 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     # Sync configs
                     configs_dir = drive_path / 'configs'
                     configs_dir.mkdir(exist_ok=True)
+                    local_configs = list(Path('configs').glob('*.y*ml')) if Path('configs').exists() else []
                     
-                    source_dirs = [Path('configs')]
-                    target_dirs = [configs_dir]
-                    
-                    total_files, synced_files = sync_configs(source_dirs, target_dirs)
-                    
-                    if total_files > 0:
-                        status = "✅" if synced_files > 0 else "ℹ️"
-                        message = f"{synced_files} config disalin" if synced_files > 0 else "Semua config sudah tersinkronisasi"
-                        display(HTML(f'<p>{status} {message}</p>'))
+                    missing_count = copied_count = 0
+                    if local_configs:
+                        for config_file in local_configs:
+                            drive_file = configs_dir / config_file.name
+                            if not drive_file.exists():
+                                missing_count += 1
+                                try:
+                                    shutil.copy2(config_file, drive_file)
+                                    copied_count += 1
+                                except Exception:
+                                    pass
+                        
+                        if missing_count > 0:
+                            status = "✅" if copied_count == missing_count else "⚠️"
+                            message = f"{copied_count} config disalin" if copied_count == missing_count else f"{copied_count}/{missing_count} berhasil disalin"
+                            display(HTML(f'<p>{status} {message}</p>'))
                     
                     display(HTML(
                         """<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
@@ -183,13 +348,11 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                         </div>"""
                     ))
                     
-                    # Update config
-                    update_config(ui_components, {
-                        'environment': {
-                            'drive_mounted': True,
-                            'drive_path': str(drive_path)
-                        }
-                    })
+                    # Display tree
+                    display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
+                    tree_html = fallback_get_directory_tree(drive_path, max_depth=2)
+                    display(HTML(tree_html))
+                    
                 except Exception as e:
                     display(HTML(
                         f"""<div style="padding:10px;background:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0">
@@ -202,40 +365,36 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
         """Setup directory structure"""
         with ui_components['status']:
             clear_output(wait=True)
-            display(HTML('<p>🔄 Membuat struktur direktori...</p>'))
             
-            if env and hasattr(env, 'setup_directories'):
-                try:
-                    display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
-                    use_drive = getattr(env, 'is_drive_mounted', False)
-                    stats = env.setup_directories(use_drive=use_drive)
-                    display(create_status_indicator("success", 
-                        f"✅ Direktori dibuat: {stats['created']} baru, {stats['existing']} sudah ada"
-                    ))
-                    
-                    # Display tree - tampilkan struktur project
-                    display(HTML("<h4>📂 Struktur direktori project:</h4>"))
-                    tree_path = getattr(env, 'base_dir', Path.cwd())
-                    
-                    # Jika Drive terhubung, fokus ke direktori SmartCash
-                    if use_drive and getattr(env, 'is_drive_mounted', False) and hasattr(env, 'drive_path'):
-                        tree_path = env.drive_path
-                    
-                    raw_tree_html = env.get_directory_tree(tree_path, max_depth=3) if hasattr(env, 'get_directory_tree') else fallback_get_directory_tree(tree_path, max_depth=3)
-                    tree_html = filter_drive_tree(raw_tree_html)
-                    display(HTML(tree_html))
-                    
-                    # Update config
-                    update_config(ui_components, {
+            if env_manager:
+                display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
+                use_drive = getattr(env_manager, 'is_drive_mounted', False)
+                stats = env_manager.setup_directories(use_drive=use_drive)
+                display(create_status_indicator("success", 
+                    f"✅ Direktori dibuat: {stats['created']} baru, {stats['existing']} sudah ada"
+                ))
+                
+                # Display tree
+                display(HTML("<h4>📂 Struktur direktori project:</h4>"))
+                tree_path = env_manager.base_dir
+                # Focus on Drive if connected
+                if use_drive and env_manager.is_drive_mounted and hasattr(env_manager, 'drive_path'):
+                    tree_path = env_manager.drive_path
+                
+                raw_tree_html = env_manager.get_directory_tree(tree_path, max_depth=3)
+                tree_html = filter_drive_tree(raw_tree_html)
+                display(HTML(tree_html))
+                
+                # Update config
+                if config_manager:
+                    config_manager.update_config({
                         'environment': {
-                            'is_colab': getattr(env, 'is_colab', False),
-                            'drive_mounted': getattr(env, 'is_drive_mounted', False),
-                            'base_dir': str(getattr(env, 'base_dir', Path.cwd())),
+                            'is_colab': env_manager.is_colab,
+                            'drive_mounted': env_manager.is_drive_mounted,
+                            'base_dir': str(env_manager.base_dir),
                             'setup_complete': True
                         }
                     })
-                except Exception as e:
-                    handle_error(e, ui_components['status'], clear=False)
             else:
                 # Fallback implementation
                 dirs = [
@@ -245,7 +404,7 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     'configs', 'runs/train/weights', 'logs', 'exports'
                 ]
                 
-                display(HTML('<p>🔄 Membuat struktur direktori...</p>'))
+                display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
                 created = existing = 0
                 
                 for d in dirs:
@@ -256,6 +415,8 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     else:
                         existing += 1
                 
+                # Show completion message
+                display(create_status_indicator("success", f"✅ Struktur direktori berhasil dibuat"))
                 display(HTML(
                     f"""<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
                         <h3 style="margin-top:0">✅ Struktur Direktori Dibuat</h3>
@@ -272,23 +433,34 @@ exports/</pre>
                     </div>"""
                 ))
                 
-                # Update config
-                update_config(ui_components, {
-                    'environment': {
-                        'setup_complete': True
-                    }
-                })
+                # Display tree
+                display(HTML("<h4>📂 Struktur direktori project:</h4>"))
+                tree_html = fallback_get_directory_tree(Path.cwd(), max_depth=2)
+                display(HTML(tree_html))
     
-    # Register event handlers
+    # Register event handlers directly
     ui_components['drive_button'].on_click(on_drive_connect)
     ui_components['dir_button'].on_click(on_dir_setup)
     
-    # Run init
-    if check_smartcash_dir(ui_components):
-        detect_environment(ui_components, env)
-        
-    # Make sure buttons are properly connected
-    ui_components['drive_button'].on_click(on_drive_connect)
-    ui_components['dir_button'].on_click(on_dir_setup)
+    # Setup observer for module-specific events
+    if observer_manager:
+        observer_manager.create_logging_observer(
+            event_types=["environment.drive.mount", "environment.directory.setup"],
+            logger_name="env_config",
+            name="EnvironmentLogObserver",
+            group="env_config_observers"
+        )
+    
+    # Run initialization
+    if check_smartcash_dir():
+        detect_environment()
+    
+    # To ensure cleanup of resources, add a cleanup function
+    def cleanup():
+        """Cleanup resources"""
+        if observer_manager:
+            observer_manager.unregister_group("env_config_observers")
+    
+    ui_components['cleanup'] = cleanup
     
     return ui_components

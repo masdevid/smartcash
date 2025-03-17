@@ -11,23 +11,38 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 
-def _get_yolov5_requirements() -> List[str]:
-    """Dapatkan requirements YOLOv5 dengan deteksi cerdas."""
-    default_requirements = [
-        "matplotlib", "numpy", "opencv-python", 
-        "torch", "torchvision", "tqdm", "pillow", 
-        "requests", "scipy"
-    ]
+def _get_project_requirements(project_name: str) -> List[str]:
+    """
+    Dapatkan requirements untuk project tertentu.
+    
+    Args:
+        project_name: Nama project (e.g. 'smartcash', 'yolov5')
+    
+    Returns:
+        List requirements terdeteksi
+    """
+    default_requirements = {
+        'smartcash': [
+            "pyyaml", "termcolor", "python-dotenv", 
+            "roboflow", "ultralytics", "matplotlib", 
+            "seaborn", "pandas"
+        ],
+        'yolov5': [
+            "matplotlib", "numpy", "opencv-python", 
+            "torch", "torchvision", "tqdm", "pillow", 
+            "requests", "scipy"
+        ]
+    }
     
     # Lokasi potensial file requirements
     potential_paths = [
-        Path('yolov5/requirements.txt'),
-        Path.cwd() / 'yolov5/requirements.txt',
-        Path.home() / 'yolov5/requirements.txt'
+        Path(f'{project_name}/requirements.txt'),
+        Path.cwd() / f'{project_name}/requirements.txt',
+        Path.home() / f'{project_name}/requirements.txt'
     ]
     
-    # Fungsi untuk parsing requirements
     def parse_requirements(file_path):
+        """Parse requirements dari file."""
         try:
             with open(file_path, 'r') as f:
                 return [
@@ -43,28 +58,42 @@ def _get_yolov5_requirements() -> List[str]:
         if path.exists():
             parsed_reqs = parse_requirements(path)
             if parsed_reqs:
-                return list(dict.fromkeys(parsed_reqs + default_requirements))
+                return list(dict.fromkeys(parsed_reqs + default_requirements.get(project_name, [])))
     
-    return default_requirements
+    return default_requirements.get(project_name, [])
+
+def _simulate_progress(progress_widget, message: str = 'Memproses...'):
+    """
+    Simulasi progress bar tanpa threading.
+    
+    Args:
+        progress_widget: Widget progress untuk diupdate
+        message: Pesan progress
+    """
+    progress_widget.layout.visibility = 'visible'
+    
+    for i in range(0, 101, 10):
+        progress_widget.value = i
+        progress_widget.description = f"{message} {i}%"
+        time.sleep(0.2)  # Simulasi delay
+    
+    progress_widget.description = 'Selesai!'
 
 def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, Any]):
-    """
-    Setup handler untuk instalasi dependencies.
-    """
+    """Setup handler untuk instalasi dependencies SmartCash."""
     # Definisi package dan requirement
     PACKAGE_GROUPS = {
-        'yolov5_req': _get_yolov5_requirements,
+        'yolov5_req': lambda: f"{sys.executable} -m pip install {' '.join(_get_project_requirements('yolov5'))}",
         'torch_req': f"{sys.executable} -m pip install torch torchvision torchaudio",
         'albumentations_req': f"{sys.executable} -m pip install albumentations",
         'notebook_req': f"{sys.executable} -m pip install ipywidgets tqdm",
-        'smartcash_req': f"{sys.executable} -m pip install pyyaml termcolor python-dotenv",
+        'smartcash_req': lambda: f"{sys.executable} -m pip install {' '.join(_get_project_requirements('smartcash'))}",
         'opencv_req': f"{sys.executable} -m pip install opencv-python",
         'matplotlib_req': f"{sys.executable} -m pip install matplotlib seaborn",
         'pandas_req': f"{sys.executable} -m pip install pandas",
         'seaborn_req': f"{sys.executable} -m pip install seaborn"
     }
 
-    # Remaining code continues from the previous implementation
     PACKAGE_CHECKS = [
         ('PyTorch', 'torch'), ('TorchVision', 'torchvision'), 
         ('OpenCV', 'cv2'), ('Albumentations', 'albumentations'), 
@@ -101,10 +130,6 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
             clear_output()
             start_time = time.time()
             
-            # Update UI state
-            ui_components['install_progress'].layout.visibility = 'visible'
-            ui_components['install_progress'].value = 0
-
             # Proses instalasi package yang dipilih
             total_packages = 0
             installed_packages = 0
@@ -116,6 +141,9 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
                 # Dapatkan command untuk instalasi
                 cmd = pkg_cmd() if callable(pkg_cmd) else pkg_cmd
                 display(HTML(f"📦 Memulai instalasi: {pkg_key}"))
+                
+                # Simulasi progress
+                _simulate_progress(ui_components['install_progress'], f'Instalasi {pkg_key}')
                 
                 # Jalankan instalasi
                 success, msg = _run_pip_install(cmd, pkg_key)
@@ -131,6 +159,9 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
                 pkg = pkg.strip()
                 if pkg:
                     cmd = f"{sys.executable} -m pip install {pkg}"
+                    # Simulasi progress
+                    _simulate_progress(ui_components['install_progress'], f'Instalasi {pkg}')
+                    
                     success, msg = _run_pip_install(cmd, pkg)
                     display(HTML(f"{'✅' if success else '❌'} {msg}"))
                     

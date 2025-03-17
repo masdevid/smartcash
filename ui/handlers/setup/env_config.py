@@ -17,6 +17,16 @@ from smartcash.ui.utils.logging_utils import setup_ipython_logging
 
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
+    # Try to load config from multiple possible paths
+    config_paths = [
+        'configs/colab_config.yaml',
+        'config/colab_config.yaml',
+        './configs/colab_config.yaml', 
+        './config/colab_config.yaml',
+        '../configs/colab_config.yaml',
+        '../config/colab_config.yaml'
+    ]
+    
     # Get logger dari ui_components atau buat baru
     logger = ui_components.get('logger')
     if not logger:
@@ -24,6 +34,35 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
             logger = setup_ipython_logging(ui_components, logger_name="env_config")
         except ImportError:
             pass
+    
+    # Load config if needed and not already loaded
+    if 'config' not in ui_components or not ui_components['config']:
+        try:
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager()
+            
+            # Try multiple config paths
+            for config_path in config_paths:
+                try:
+                    if Path(config_path).exists():
+                        with ui_components['status']:
+                            display(HTML(f"<p>🔄 Loading config from {config_path}</p>"))
+                        config = config_manager.load_config(config_path)
+                        ui_components['config'] = config
+                        ui_components['config_path'] = config_path
+                        break
+                except Exception as e:
+                    if logger:
+                        logger.warning(f"⚠️ Failed to load {config_path}: {str(e)}")
+            
+            # If still no config, use default
+            if 'config' not in ui_components or not ui_components['config']:
+                with ui_components['status']:
+                    display(HTML("<p>⚠️ No config file found, using default settings</p>"))
+                ui_components['config'] = config_manager.config
+        except Exception as e:
+            with ui_components['status']:
+                display(HTML(f"<p>⚠️ Error loading config: {str(e)}</p>"))
     
     # Setup observer
     ui_components = setup_observer_handlers(ui_components, observer_group="env_config_observers")
@@ -44,7 +83,8 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
     def on_drive_connect(b):
         """Handler koneksi Google Drive"""
         with ui_components['status']:
-            clear_output()
+            clear_output(wait=True)
+            display(HTML('<p>🔄 Menghubungkan ke Google Drive...</p>'))
             
             if env and hasattr(env, 'mount_drive'):
                 try:
@@ -161,7 +201,8 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
     def on_dir_setup(b):
         """Setup directory structure"""
         with ui_components['status']:
-            clear_output()
+            clear_output(wait=True)
+            display(HTML('<p>🔄 Membuat struktur direktori...</p>'))
             
             if env and hasattr(env, 'setup_directories'):
                 try:
@@ -245,5 +286,9 @@ exports/</pre>
     # Run init
     if check_smartcash_dir(ui_components):
         detect_environment(ui_components, env)
+        
+    # Make sure buttons are properly connected
+    ui_components['drive_button'].on_click(on_drive_connect)
+    ui_components['dir_button'].on_click(on_dir_setup)
     
     return ui_components

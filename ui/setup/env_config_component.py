@@ -53,7 +53,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         button_style='primary',
         icon=FA_ICONS['link'],
         tooltip='Mount Google Drive dan siapkan struktur direktori',
-        layout=BUTTON_LAYOUTS['standard']
+        layout=BUTTON_LAYOUTS['inline']
     )
     
     directory_button = widgets.Button(
@@ -61,13 +61,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         button_style='info',
         icon=FA_ICONS['folder-plus'],
         tooltip='Buat struktur direktori lokal',
-        layout=BUTTON_LAYOUTS['standard']
-    )
-    
-    # Kelompokkan tombol dalam grup horizontal
-    button_group = widgets.GridBox(
-        [drive_button, directory_button],
-        layout=GROUP_LAYOUTS['horizontal']
+        layout=BUTTON_LAYOUTS['inline']
     )
     
     # Panel output dengan komponen yang sudah ada
@@ -82,7 +76,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         colab_panel,
         help_box,
         divider,
-        button_group,
+        drive_button,
+        directory_button,
         status
     ], layout=main_container)
     

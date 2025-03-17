@@ -3,7 +3,7 @@ File: smartcash/dataset/utils/progress/observer_adapter.py
 Deskripsi: Adapter untuk integrasi sistem progress dengan observer pattern
 """
 
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 
 from smartcash.common.logger import get_logger
 from smartcash.components.observer.base_observer import BaseObserver

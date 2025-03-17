@@ -1,151 +1,154 @@
 """
 File: smartcash/common/exceptions.py
-Deskripsi: Hierarki exception terpadu untuk seluruh komponen SmartCash
+Deskripsi: Definisi hierarki exception terpadu untuk seluruh komponen SmartCash
 """
 
+# Exception Classes Dasar
 class SmartCashError(Exception):
-    """Exception dasar untuk semua error SmartCash."""
-    pass
+    """Exception dasar untuk semua error SmartCash"""
+    def __init__(self, message="Terjadi error pada sistem SmartCash"):
+        self.message = message
+        super().__init__(self.message)
 
-
-# =============== Exception Config ===============
+# Exception Config
 class ConfigError(SmartCashError):
-    """Exception untuk error konfigurasi."""
-    pass
+    """Error pada konfigurasi"""
+    def __init__(self, message="Error pada konfigurasi SmartCash"):
+        super().__init__(message)
 
-
-# =============== Exception Dataset ===============
+# Exception Dataset
 class DatasetError(SmartCashError):
-    """Exception untuk error terkait dataset."""
-    pass
-
+    """Error dasar terkait dataset"""
+    def __init__(self, message="Error pada dataset"):
+        super().__init__(message)
 
 class DatasetFileError(DatasetError):
-    """Exception untuk error file dataset."""
-    pass
-
+    """Error file dataset"""
+    def __init__(self, message="Error pada file dataset"):
+        super().__init__(message)
 
 class DatasetValidationError(DatasetError):
-    """Exception untuk error validasi dataset."""
-    pass
-
-
+    """Error validasi dataset"""
+    def __init__(self, message="Error validasi dataset"):
+        super().__init__(message)
+        
 class DatasetProcessingError(DatasetError):
-    """Exception untuk error pemrosesan dataset."""
-    pass
-
+    """Error pemrosesan dataset"""
+    def __init__(self, message="Error saat memproses dataset"):
+        super().__init__(message)
 
 class DatasetCompatibilityError(DatasetError):
-    """Exception untuk masalah kompatibilitas dataset dengan model."""
-    pass
+    """Masalah kompatibilitas dataset dengan model"""
+    def __init__(self, message="Dataset tidak kompatibel dengan model"):
+        super().__init__(message)
 
-
-# =============== Exception Model ===============
+# Exception Model
 class ModelError(SmartCashError):
-    """Exception untuk error terkait model."""
-    pass
-
+    """Error dasar terkait model"""
+    def __init__(self, message="Error pada model"):
+        super().__init__(message)
 
 class ModelConfigurationError(ModelError):
-    """Error konfigurasi model."""
-    pass
-
+    """Error konfigurasi model"""
+    def __init__(self, message="Error konfigurasi model"):
+        super().__init__(message)
 
 class ModelTrainingError(ModelError):
-    """Error saat proses training model."""
-    pass
-
+    """Error proses training model"""
+    def __init__(self, message="Error saat training model"):
+        super().__init__(message)
 
 class ModelInferenceError(ModelError):
-    """Error saat melakukan inferensi dengan model."""
-    pass
-
+    """Error inferensi model"""
+    def __init__(self, message="Error saat inferensi model"):
+        super().__init__(message)
 
 class ModelCheckpointError(ModelError):
-    """Error terkait checkpoint model."""
-    pass
-
+    """Error checkpoint model"""
+    def __init__(self, message="Error pada checkpoint model"):
+        super().__init__(message)
 
 class ModelExportError(ModelError):
-    """Error saat mengekspor model."""
-    pass
-
+    """Error ekspor model"""
+    def __init__(self, message="Error saat ekspor model"):
+        super().__init__(message)
 
 class ModelEvaluationError(ModelError):
-    """Error selama proses evaluasi model."""
-    pass
-
+    """Error evaluasi model"""
+    def __init__(self, message="Error saat evaluasi model"):
+        super().__init__(message)
 
 class ModelServiceError(ModelError):
-    """Error saat menggunakan model service."""
-    pass
+    """Error model service"""
+    def __init__(self, message="Error pada model service"):
+        super().__init__(message)
 
-
-# =============== Exception Model Components ===============
+# Exception Model Components
 class ModelComponentError(ModelError):
-    """Exception dasar untuk error komponen model."""
-    pass
-
+    """Error dasar komponen model"""
+    def __init__(self, message="Error pada komponen model"):
+        super().__init__(message)
 
 class BackboneError(ModelComponentError):
-    """Error terkait backbone model."""
-    pass
-
+    """Error backbone model"""
+    def __init__(self, message="Error pada backbone model"):
+        super().__init__(message)
 
 class UnsupportedBackboneError(BackboneError):
-    """Error untuk jenis backbone yang tidak didukung."""
-    pass
-
+    """Error backbone tidak didukung"""
+    def __init__(self, message="Backbone model tidak didukung"):
+        super().__init__(message)
 
 class NeckError(ModelComponentError):
-    """Error terkait neck model."""
-    pass
-
+    """Error neck model"""
+    def __init__(self, message="Error pada neck model"):
+        super().__init__(message)
 
 class HeadError(ModelComponentError):
-    """Error terkait detection head model."""
-    pass
+    """Error detection head model"""
+    def __init__(self, message="Error pada detection head model"):
+        super().__init__(message)
 
-
-# =============== Exception Detection ===============
+# Exception Detection
 class DetectionError(SmartCashError):
-    """Exception untuk error terkait proses deteksi."""
-    pass
-
+    """Error dasar proses deteksi"""
+    def __init__(self, message="Error pada proses deteksi"):
+        super().__init__(message)
 
 class DetectionInferenceError(DetectionError):
-    """Error saat inferensi pada proses deteksi."""
-    pass
-
+    """Error inferensi deteksi"""
+    def __init__(self, message="Error pada inferensi deteksi"):
+        super().__init__(message)
 
 class DetectionPostprocessingError(DetectionError):
-    """Error saat post-processing hasil deteksi."""
-    pass
+    """Error post-processing deteksi"""
+    def __init__(self, message="Error saat post-processing deteksi"):
+        super().__init__(message)
 
-
-# =============== Exception I/O ===============
+# Exception I/O
 class FileError(SmartCashError):
-    """Exception untuk error file I/O."""
-    pass
+    """Error file I/O"""
+    def __init__(self, message="Error pada operasi file"):
+        super().__init__(message)
 
-
-# =============== Exception API & Validation ===============
+# Exception API & Validation
 class APIError(SmartCashError):
-    """Exception untuk error API."""
-    pass
-
+    """Error API"""
+    def __init__(self, message="Error pada API"):
+        super().__init__(message)
 
 class ValidationError(SmartCashError):
-    """Exception untuk error validasi input."""
-    pass
+    """Error validasi input"""
+    def __init__(self, message="Error validasi input"):
+        super().__init__(message)
 
-
-# =============== Exception Lainnya ===============
+# Exception Lainnya
 class NotSupportedError(SmartCashError):
-    """Exception untuk fitur yang tidak didukung."""
-    pass
-
-
+    """Fitur tidak didukung"""
+    def __init__(self, message="Fitur ini tidak didukung"):
+        super().__init__(message)
+        
 class ExperimentError(SmartCashError):
-    """Exception untuk kesalahan dalam manajemen eksperimen."""
-    pass
+    """Error manajemen eksperimen"""
+    def __init__(self, message="Error pada manajemen eksperimen"):
+        super().__init__(message)

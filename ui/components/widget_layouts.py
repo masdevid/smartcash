@@ -132,13 +132,11 @@ INPUT_LAYOUTS = {
 # Button Layouts
 BUTTON_LAYOUTS = {
     'standard': create_layout(
-        margin=f'{MARGINS["medium"]} 0',
         width='auto',
         padding=f'{PADDINGS["small"]} {PADDINGS["medium"]}',
         min_width='120px'
     ),
     'small': create_layout(
-        margin=MARGINS['small'],
         width='auto',
         min_width='100px'
     ),

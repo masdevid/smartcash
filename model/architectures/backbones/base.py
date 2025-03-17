@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from typing import List, Tuple
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import BackboneError
+from smartcash.common.exceptions import BackboneError
 
 class BaseBackbone(ABC, nn.Module):
     """

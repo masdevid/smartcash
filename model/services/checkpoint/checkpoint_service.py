@@ -14,7 +14,7 @@ import time
 
 from smartcash.common.logger import get_logger
 from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
-from smartcash.model.exceptions import ModelCheckpointError
+from smartcash.common.exceptions import ModelCheckpointError
 
 
 class CheckpointService(ICheckpointService):

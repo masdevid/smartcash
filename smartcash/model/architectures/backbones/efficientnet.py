@@ -9,7 +9,7 @@ from typing import List, Tuple, Optional, Dict, Any
 import timm
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import BackboneError
+from smartcash.common.exceptions import BackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
 
 class FeatureAdapter(nn.Module):

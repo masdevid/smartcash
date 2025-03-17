@@ -13,7 +13,7 @@ import warnings
 from tqdm import tqdm
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import BackboneError
+from smartcash.common.exceptions import BackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
 
 class DownloadProgressBar(tqdm):

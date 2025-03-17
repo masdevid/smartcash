@@ -4,7 +4,7 @@ Deskripsi: Komponen utama model deteksi objek
 """
 
 from smartcash.model.manager import ModelManager, YOLOv5Model, DETECTION_LAYERS
-from smartcash.model.exceptions import (
+from smartcash.common.exceptions import (
     ModelError,
     ModelConfigurationError,
     ModelTrainingError,

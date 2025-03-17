@@ -10,7 +10,7 @@ import os
 from pathlib import Path
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import ModelError, ModelConfigurationError
+from smartcash.common.exceptions import ModelError, ModelConfigurationError
 from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.common.layer_config import get_layer_config
 

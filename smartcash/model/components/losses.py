@@ -10,7 +10,7 @@ from typing import List, Tuple, Dict, Optional, Union
 import math
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import ModelError
+from smartcash.common.exceptions import ModelError
 from smartcash.model.utils.metrics.core_metrics import box_iou
 
 def bbox_ciou(box1, box2, format="xyxy", eps=1e-7):

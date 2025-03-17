@@ -16,7 +16,7 @@ from PIL import Image
 from smartcash.common.logger import get_logger
 from smartcash.model.services.prediction.core_prediction_service import PredictionService
 from smartcash.model.services.prediction.batch_processor_prediction_service import BatchPredictionProcessor
-from smartcash.model.exceptions import ModelInferenceError
+from smartcash.common.exceptions import ModelInferenceError
 
 
 class PredictionInterface:

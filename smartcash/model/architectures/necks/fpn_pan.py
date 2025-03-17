@@ -8,7 +8,7 @@ import torch.nn as nn
 from typing import Dict, List, Optional, Tuple
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.model.exceptions import NeckError
+from smartcash.common.exceptions import NeckError
 
 class ConvBlock(nn.Module):
     """Convolution block dengan BatchNorm dan aktivasi."""

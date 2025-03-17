@@ -8,7 +8,12 @@ import subprocess
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
+import os
 
+if not os.path.exists('/content/drive/MyDrive'):
+  from google.colab import drive
+  drive.mount('/content/drive')
+  
 def create_alert(msg, type='info'): return HTML(f"""<div style="padding:10px;margin:10px;background-color:{'#d4edda' if type=='success' else '#fff3cd' if type=='warning' else '#f8d7da' if type=='error' else '#d1ecf1'};color:{'#155724' if type=='success' else '#856404' if type=='warning' else '#721c24' if type=='error' else '#0c5460'};border-radius:4px">{"✅ " if type=='success' else "⚠️ " if type=='warning' else "❌ " if type=='error' else "📘 "}{msg}</div>""")
 
 def clone_or_update_repos(b):

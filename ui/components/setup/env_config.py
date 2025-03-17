@@ -62,8 +62,8 @@ def create_env_config_ui(env=None, config=None):
         icon='link',
         tooltip='Mount and connect to Google Drive',
         layout=widgets.Layout(
-            margin='0 10px 0 0',
-            display='none'  # Hidden by default
+            margin='0 10px 0 0'
+            # Visible by default now
         )
     )
     

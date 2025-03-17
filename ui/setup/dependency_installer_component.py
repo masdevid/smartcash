@@ -9,7 +9,12 @@ from typing import Dict, Any, Optional
 def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
     # Header 
-    header = widgets.HTML("""<div style="background:#f8f9fa;padding:15px;border-radius:5px;border-left:5px solid #3498db;margin-bottom:15px"><h1 style="margin:0;color:#2c3e50">📦 Instalasi Dependencies</h1><p style="margin:5px 0;color:#7f8c8d">Setup package yang diperlukan untuk SmartCash</p></div>""")
+    header = widgets.HTML("""
+    <div style="background:#f8f9fa;padding:15px;border-radius:5px;border-left:5px solid #3498db;margin-bottom:15px">
+        <h1 style="margin:0;color:inherit">📦 Instalasi Dependencies</h1>
+        <p style="margin:5px 0;color:inherit">Setup package yang diperlukan untuk SmartCash</p>
+    </div>
+    """)
     
     # Package groups
     package_groups = {
@@ -31,72 +36,134 @@ def create_dependency_installer_ui(env=None, config=None):
     }
     
     # Status panel
-    status_panel = widgets.HTML("""<div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">ℹ️ Pilih packages yang akan diinstall dan klik 'Install Packages'</div>""")
+    status_panel = widgets.HTML("""
+    <div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">
+        <p style="margin:0;color:inherit">ℹ️ Pilih packages yang akan diinstall dan klik 'Install Packages'</p>
+    </div>
+    """)
     
     # Buat UI untuk package groups
     package_section_widgets = []
     for group_name, packages in package_groups.items():
         # Header untuk grup
-        group_header = widgets.HTML(f"<h3 style='margin:10px 0'>📌 {group_name.upper()} Packages</h3>")
+        group_header = widgets.HTML(f"""
+        <div style="padding:5px 0">
+            <h3 style="margin:5px 0;color:inherit">📌 {group_name.upper()} Packages</h3>
+        </div>
+        """)
         
         # Checkbox untuk packages
         checkboxes = []
         for desc, key in packages:
             checkbox = widgets.Checkbox(
                 value=True, 
-                description=desc
+                description=desc,
+                layout=widgets.Layout(padding='3px 0')
             )
             checkboxes.append(checkbox)
         
         # VBox untuk checkboxes
-        checkboxes_group = widgets.VBox(checkboxes)
+        checkboxes_group = widgets.VBox(
+            checkboxes,
+            layout=widgets.Layout(padding='5px 10px')
+        )
         
         # Box untuk grup
-        group_box = widgets.VBox([group_header, checkboxes_group])
+        group_box = widgets.VBox(
+            [group_header, checkboxes_group],
+            layout=widgets.Layout(
+                margin='5px',
+                padding='10px',
+                border='1px solid #dee2e6',
+                border_radius='5px'
+            )
+        )
         package_section_widgets.append(group_box)
     
     # Container untuk groups
-    packages_container = widgets.HBox(package_section_widgets)
+    packages_container = widgets.HBox(
+        package_section_widgets,
+        layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            justify_content='space-between',
+            width='100%'
+        )
+    )
     
     # Custom package input
-    custom_header = widgets.HTML("<h3 style='margin:10px 0'>📝 Custom Packages</h3>")
+    custom_header = widgets.HTML("""
+    <div style="padding:5px 0">
+        <h3 style="margin:5px 0;color:inherit">📝 Custom Packages</h3>
+    </div>
+    """)
+    
     custom_packages = widgets.Textarea(
-        placeholder='Tambahkan package tambahan (satu per baris)'
+        placeholder='Tambahkan package tambahan (satu per baris)',
+        layout=widgets.Layout(
+            width='100%',
+            height='80px'
+        )
+    )
+    
+    custom_section = widgets.VBox(
+        [custom_header, custom_packages],
+        layout=widgets.Layout(
+            margin='10px 0',
+            padding='10px',
+            border='1px solid #dee2e6',
+            border_radius='5px'
+        )
     )
     
     # Tombol aksi
     check_all_button = widgets.Button(
         description='Check All', 
         button_style='info', 
-        icon='check-square'
+        icon='check-square',
+        layout=widgets.Layout(margin='5px')
     )
     
     uncheck_all_button = widgets.Button(
         description='Uncheck All', 
         button_style='warning', 
-        icon='square'
+        icon='square',
+        layout=widgets.Layout(margin='5px')
     )
     
     install_button = widgets.Button(
         description='Install Packages', 
         button_style='primary', 
-        icon='download'
+        icon='download',
+        layout=widgets.Layout(margin='5px')
     )
     
     check_button = widgets.Button(
         description='Check Installations', 
         button_style='success', 
-        icon='check'
+        icon='check',
+        layout=widgets.Layout(margin='5px')
     )
     
-    buttons = widgets.HBox([check_all_button, uncheck_all_button, install_button, check_button])
+    buttons = widgets.HBox(
+        [check_all_button, uncheck_all_button, install_button, check_button],
+        layout=widgets.Layout(
+            display='flex',
+            justify_content='center',
+            margin='10px 0'
+        )
+    )
     
     # Progress bar
     progress = widgets.IntProgress(
         value=0, 
         min=0, 
         max=100, 
-        description='Installing:'
+        description='Installing:',
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0'
+        )
     )
     progress.layout.visibility = 'hidden'
     
@@ -104,10 +171,11 @@ def create_dependency_installer_ui(env=None, config=None):
     status = widgets.Output(
         layout=widgets.Layout(
             width='100%',
-            border='1px solid #ddd',
+            border='1px solid #dee2e6',
             min_height='100px',
             max_height='300px',
             margin='10px 0',
+            padding='10px',
             overflow='auto'
         )
     )
@@ -115,9 +183,9 @@ def create_dependency_installer_ui(env=None, config=None):
     # Info box
     info_box = widgets.HTML("""
     <div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">
-        <h4 style="margin-top:0">ℹ️ Tentang Package Installation</h4>
-        <p>Package diurutkan instalasi dari kecil ke besar:</p>
-        <ol>
+        <h4 style="margin-top:0;color:inherit">ℹ️ Tentang Package Installation</h4>
+        <p style="color:inherit">Package diurutkan instalasi dari kecil ke besar:</p>
+        <ol style="color:inherit">
             <li>Notebook tools (ipywidgets, tqdm)</li>
             <li>Utility packages (pyyaml, termcolor)</li>
             <li>Data processing (matplotlib, pandas)</li>
@@ -128,17 +196,22 @@ def create_dependency_installer_ui(env=None, config=None):
     """)
     
     # Container utama
-    main = widgets.VBox([
-        header,
-        status_panel,
-        packages_container,
-        custom_header,
-        custom_packages,
-        buttons,
-        progress,
-        status,
-        info_box
-    ])
+    main = widgets.VBox(
+        [
+            header,
+            status_panel,
+            packages_container,
+            custom_section,
+            buttons,
+            progress,
+            status,
+            info_box
+        ],
+        layout=widgets.Layout(
+            width='100%',
+            padding='15px'
+        )
+    )
     
     # Construct checkboxes mapping
     checkboxes = {}

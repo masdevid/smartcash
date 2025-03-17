@@ -142,22 +142,16 @@ def setup_ui_component(
     try:
         # Coba import dari lokasi baru (setelah refactor)
         import_locations = [
-            f"smartcash.ui.components.{component_name}",
-            f"smartcash.ui.components.setup.{component_name}",  
-            f"smartcash.ui.components.dataset.{component_name}",
-            f"smartcash.ui.components.training_config.{component_name}",
-            f"smartcash.ui.components.training_execution.{component_name}",
-            f"smartcash.ui.components.model_evaluation.{component_name}",
-            f"smartcash.ui.components.detection.{component_name}"
+            f"smartcash.ui.01_setup.{component_name}",
+            f"smartcash.ui.02_dataset.{component_name}",
+            f"smartcash.ui.03_training_config.{component_name}",
+            f"smartcash.ui.04_training_execution.{component_name}",
+            f"smartcash.ui.05_model_evaluation.{component_name}",
+            f"smartcash.ui.06_detection.{component_name}"
         ]
         
         # Coba impor dari semua lokasi yang mungkin
-        for module_path in import_locations + [
-            f"smartcash.ui_components.{component_name}",
-            f"smartcash.ui_components.setup.{component_name}",
-            f"smartcash.ui_components.dataset.{component_name}",
-            f"smartcash.ui_components.training.{component_name}"
-        ]:
+        for module_path in import_locations:
             try:
                 ui_module = importlib.import_module(module_path)
                 create_func = getattr(ui_module, f"create_{component_name}_ui")

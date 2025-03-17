@@ -65,9 +65,13 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     )
     
     # Kelompokkan tombol dalam grup horizontal
-    button_group = widgets.HBox(
-        [drive_button, directory_button],
-        layout=GROUP_LAYOUTS['horizontal']
+    button_group = widgets.HTML(
+        f"""
+        <div style="display: flex; gap: 10px;">
+            {drive_button}
+            {directory_button}
+        </div>
+        """
     )
     
     # Panel output dengan komponen yang sudah ada

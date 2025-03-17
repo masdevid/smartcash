@@ -20,60 +20,15 @@ def detect_environment(ui_components, env=None):
     Returns:
         Boolean menunjukkan apakah environment adalah Colab
     """
+    # Fallback deteksi Colab
     is_colab = False
+    try:
+        import google.colab
+        is_colab = True
+    except ImportError:
+        pass
     
-    # Gunakan environment manager jika tersedia
-    if env and hasattr(env, 'is_colab'):
-        is_colab = env.is_colab
-        
-        # Tampilkan informasi sistem
-        with ui_components['info_panel']:
-            clear_output(wait=True)
-            try:
-                system_info = env.get_system_info()
-                display(HTML(f"""
-                <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                    <h4 style="margin-top:0">📊 System Information</h4>
-                    <ul>
-                        <li><b>Environment:</b> {system_info.get('environment', 'Unknown')}</li>
-                        <li><b>Python:</b> {system_info.get('python_version', 'Unknown')}</li>
-                        <li><b>Base Directory:</b> {system_info.get('base_directory', 'Unknown')}</li>
-                        <li><b>CUDA Available:</b> {'Yes' if system_info.get('cuda', {}).get('available', False) else 'No'}</li>
-                        {f"<li><b>GPU:</b> {system_info.get('cuda', {}).get('device_name', '')}</li>" if system_info.get('cuda', {}).get('available', False) else ""}
-                    </ul>
-                </div>
-                """))
-            except Exception as e:
-                logger = ui_components.get('logger')
-                if logger:
-                    logger.warning(f"⚠️ Error mendapatkan system info: {str(e)}")
-                display(HTML("<p>⚠️ Error mendapatkan system info</p>"))
-    else:
-        # Fallback deteksi Colab
-        try:
-            import google.colab
-            is_colab = True
-        except ImportError:
-            pass
-            
-        # Fallback informasi sistem sederhana
-        import platform
-        import sys
-        with ui_components['info_panel']:
-            clear_output(wait=True)
-            display(HTML(f"""
-            <div style="background:#f8f9fa;padding:10px;margin:5px 0;border-radius:5px;color:#212529">
-                <h4 style="margin-top:0">📊 System Information</h4>
-                <ul>
-                    <li><b>Environment:</b> {'Google Colab' if is_colab else 'Local'}</li>
-                    <li><b>Python:</b> {platform.python_version()}</li>
-                    <li><b>Platform:</b> {platform.system()} {platform.release()}</li>
-                    <li><b>Base Directory:</b> {Path.cwd()}</li>
-                </ul>
-            </div>
-            """))
-    
-    # Update UI berdasarkan environment
+    # Update panel Colab
     ui_components['colab_panel'].value = """
         <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
             <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
@@ -88,6 +43,7 @@ def detect_environment(ui_components, env=None):
     
     # Tampilkan tombol drive hanya di Colab
     ui_components['drive_button'].layout.display = '' if is_colab else 'none'
+    
     return is_colab
 
 def filter_drive_tree(tree_html):

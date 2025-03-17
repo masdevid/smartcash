@@ -1,318 +1,204 @@
 """
-File: smartcash/ui/handlers/config_handler.py
-Deskripsi: Handler untuk manajemen konfigurasi dengan integrasi ke ConfigManager
+File: smartcash/ui/setup/env_config_handler.py
+Deskripsi: Handler untuk konfigurasi environment SmartCash dengan deteksi dan status komprehensif
 """
 
-import os
+from typing import Dict, Any, Optional
 from pathlib import Path
-import yaml
-from typing import Dict, Any, Optional, Union
+import ipywidgets as widgets
+from IPython.display import display, HTML, clear_output
+import platform
+import sys
 
-def setup_config_handlers(
-    ui_components: Dict[str, Any],
+def setup_env_config_handlers(
+    ui_components: Dict[str, Any], 
+    env: Optional[Any] = None, 
     config: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """
-    Setup handler untuk konfigurasi di UI components.
+    Setup handler untuk konfigurasi environment dengan status komprehensif.
     
     Args:
-        ui_components: Dictionary berisi widget UI
-        config: Konfigurasi opsional
+        ui_components: Dictionary komponen UI
+        env: Environment manager
+        config: Konfigurasi environment
         
     Returns:
-        Dictionary UI components yang telah ditambahkan config handler
+        Dictionary UI components yang telah ditambahkan handler
     """
-    # Coba gunakan ConfigManager dari smartcash.common jika tersedia
-    try:
-        from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager()
-        ui_components['config_manager'] = config_manager
-        
-        # Jika config disediakan, update ConfigManager
-        if config:
-            for key, value in config.items():
-                if isinstance(value, dict):
-                    for subkey, subvalue in value.items():
-                        config_manager.set(f"{key}.{subkey}", subvalue)
-                else:
-                    config_manager.set(key, value)
+    # Import dependencies
+    from smartcash.ui.handlers.environment_handler import (
+        detect_environment, 
+        check_smartcash_dir, 
+        filter_drive_tree,
+        sync_configs
+    )
+    from smartcash.ui.handlers.config_handler import setup_config_handlers
+    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+    
+    # Setup config dan observer handlers
+    ui_components = setup_config_handlers(ui_components, config)
+    ui_components = setup_observer_handlers(ui_components)
+    
+    # Logger
+    logger = ui_components.get('logger')
+    
+    def update_environment_status():
+        """Update status lingkungan secara komprehensif."""
+        try:
+            # Deteksi lingkungan
+            is_colab = detect_environment(ui_components, env)
             
-        # Simpan config dari manager ke components
-        ui_components['config'] = config_manager.config
-    except ImportError:
-        # Fallback: simpan config langsung ke components
-        if config is not None:
-            ui_components['config'] = config
+            # Informasi sistem dasar
+            system_info = {
+                'Environment': 'Google Colab' if is_colab else 'Lokal',
+                'Python Version': platform.python_version(),
+                'Platform': f"{platform.system()} {platform.release()}",
+                'Base Directory': str(Path.cwd())
+            }
+            
+            # Deteksi CUDA/GPU
+            try:
+                import torch
+                system_info.update({
+                    'CUDA Available': torch.cuda.is_available(),
+                    'GPU Device Count': torch.cuda.device_count(),
+                    'Current GPU': torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'Tidak Ada'
+                })
+            except ImportError:
+                system_info.update({
+                    'CUDA Available': 'Tidak Dapat Dideteksi',
+                    'GPU Device Count': 0,
+                    'Current GPU': 'Tidak Dapat Dideteksi'
+                })
+            
+            # Deteksi Google Drive
+            drive_status = 'Tidak Ter-mount'
+            drive_path = 'Tidak Tersedia'
+            
+            if is_colab:
+                try:
+                    from google.colab import drive
+                    from pathlib import Path
+                    
+                    drive_mount_path = Path('/content/drive/MyDrive')
+                    if drive_mount_path.exists():
+                        drive_status = 'Ter-mount'
+                        drive_path = str(drive_mount_path)
+                except ImportError:
+                    pass
+            
+            system_info['Google Drive'] = {
+                'Status': drive_status,
+                'Path': drive_path
+            }
+            
+            # Tampilkan status di info panel
+            with ui_components['info_panel']:
+                clear_output(wait=True)
+                status_html = "<div style='background:#f8f9fa; padding:15px; border-radius:5px;'>"
+                status_html += "<h4>📊 Informasi Lingkungan Sistem</h4>"
+                status_html += "<ul>"
+                for key, value in system_info.items():
+                    if isinstance(value, dict):
+                        status_html += f"<li><strong>{key}:</strong>"
+                        status_html += "<ul>"
+                        for subkey, subvalue in value.items():
+                            status_html += f"<li>{subkey}: {subvalue}</li>"
+                        status_html += "</ul></li>"
+                    else:
+                        status_html += f"<li><strong>{key}:</strong> {value}</li>"
+                status_html += "</ul></div>"
+                
+                display(HTML(status_html))
+            
+            return system_info
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error updating environment status: {str(e)}")
+            return {}
+    
+    def handle_drive_connection(b):
+        """Handler untuk koneksi Google Drive."""
+        try:
+            # Pastikan environment manager tersedia
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager(logger=logger)
+            
+            # Mount drive
+            mount_success, mount_msg = env_manager.mount_drive()
+            
+            if mount_success:
+                # Buat symlink
+                symlink_stats = env_manager.create_symlinks()
+                
+                # Sinkronisasi konfigurasi
+                sync_configs(
+                    [env_manager.get_path('configs')],
+                    [env_manager.drive_path / 'configs'],
+                    logger
+                )
+                
+                # Update status
+                update_environment_status()
+                
+                # Tampilkan tree drive
+                with ui_components['info_panel']:
+                    tree_html = env_manager.get_directory_tree(
+                        env_manager.drive_path, 
+                        max_depth=3
+                    )
+                    display(HTML(filter_drive_tree(tree_html)))
+                
+                if logger:
+                    logger.success(f"🔗 Google Drive berhasil ter-mount: {mount_msg}")
+            else:
+                # Tampilkan pesan error
+                with ui_components['status']:
+                    display(HTML(f"""
+                    <div style='color:red; padding:10px; background:#f8d7da; border-radius:4px;'>
+                        ❌ Gagal koneksi Google Drive: {mount_msg}
+                    </div>
+                    """))
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error koneksi Drive: {str(e)}")
+    
+    def handle_local_dir_setup(b):
+        """Handler untuk setup direktori lokal."""
+        try:
+            # Pastikan environment manager tersedia
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager(logger=logger)
+            
+            # Setup struktur proyek
+            dir_stats = env_manager.setup_project_structure()
+            
+            # Update status
+            update_environment_status()
+            
+            # Tampilkan tree direktori
+            with ui_components['info_panel']:
+                tree_html = env_manager.get_directory_tree(
+                    env_manager.base_dir, 
+                    max_depth=3
+                )
+                display(HTML(tree_html))
+                
+            if logger:
+                logger.success(f"📁 Setup direktori berhasil: {dir_stats}")
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Error setup direktori: {str(e)}")
+    
+    # Tambahkan handler ke tombol
+    ui_components['drive_button'].on_click(handle_drive_connection)
+    ui_components['dir_button'].on_click(handle_local_dir_setup)
+    
+    # Deteksi environment awal
+    update_environment_status()
+    
+    # Cek direktori smartcash
+    check_smartcash_dir(ui_components)
     
     return ui_components
-
-def handle_config_load(ui_components: Dict[str, Any], config_path: str, merge: bool = True) -> Dict[str, Any]:
-    """
-    Handler untuk memuat konfigurasi dari file.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        config_path: Path file konfigurasi
-        merge: Gabungkan dengan konfigurasi yang sudah ada
-        
-    Returns:
-        Dictionary konfigurasi yang dimuat
-    """
-    logger = ui_components.get('logger')
-    
-    # Gunakan ConfigManager jika tersedia
-    config_manager = ui_components.get('config_manager')
-    
-    try:
-        if config_manager:
-            if merge:
-                config = config_manager.merge_config(config_path)
-            else:
-                config = config_manager.load_config(config_path)
-                
-            # Update config di ui_components
-            ui_components['config'] = config
-            
-            if logger:
-                logger.info(f"✅ Config berhasil dimuat dari {config_path}")
-        else:
-            # Fallback: load file secara manual
-            if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    loaded_config = yaml.safe_load(f) or {}
-                
-                if merge and 'config' in ui_components:
-                    # Merge konfigurasi dengan helper function
-                    config = _deep_merge(ui_components['config'], loaded_config)
-                else:
-                    config = loaded_config
-                    
-                ui_components['config'] = config
-                
-                if logger:
-                    logger.info(f"✅ Config berhasil dimuat dari {config_path}")
-            else:
-                if logger:
-                    logger.warning(f"⚠️ File config tidak ditemukan: {config_path}")
-                config = ui_components.get('config', {})
-        
-        return config
-    except Exception as e:
-        if logger:
-            logger.error(f"❌ Error memuat config: {str(e)}")
-        return ui_components.get('config', {})
-
-def handle_config_save(ui_components: Dict[str, Any], config_path: str) -> bool:
-    """
-    Handler untuk menyimpan konfigurasi ke file.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        config_path: Path file konfigurasi
-        
-    Returns:
-        Boolean menunjukkan keberhasilan
-    """
-    logger = ui_components.get('logger')
-    config_manager = ui_components.get('config_manager')
-    
-    try:
-        if config_manager:
-            config_manager.save_config(config_path)
-            if logger:
-                logger.info(f"✅ Config berhasil disimpan ke {config_path}")
-        else:
-            # Buat direktori jika belum ada
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            
-            # Simpan ke file
-            config = ui_components.get('config', {})
-            with open(config_path, 'w') as f:
-                yaml.dump(config, f, default_flow_style=False)
-                
-            if logger:
-                logger.info(f"✅ Config berhasil disimpan ke {config_path}")
-                
-        return True
-    except Exception as e:
-        if logger:
-            logger.error(f"❌ Error menyimpan config: {str(e)}")
-        return False
-
-def update_config(
-    ui_components: Dict[str, Any],
-    config_updates: Dict[str, Any],
-    save_to_file: bool = False,
-    config_path: Optional[str] = None
-) -> bool:
-    """
-    Update konfigurasi dan simpan ke file jika diperlukan.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        config_updates: Dictionary berisi update konfigurasi
-        save_to_file: Simpan ke file setelah update
-        config_path: Path file konfigurasi (opsional)
-        
-    Returns:
-        Boolean menunjukkan keberhasilan
-    """
-    logger = ui_components.get('logger')
-    config_manager = ui_components.get('config_manager')
-    
-    try:
-        if config_manager:
-            # Update konfigurasi via config manager
-            for key, value in config_updates.items():
-                if isinstance(value, dict):
-                    for subkey, subvalue in value.items():
-                        config_manager.set(f"{key}.{subkey}", subvalue)
-                else:
-                    config_manager.set(key, value)
-            
-            # Simpan ke file jika diperlukan
-            if save_to_file and config_path:
-                config_manager.save_config(config_path)
-                if logger:
-                    logger.info(f"✅ Config berhasil disimpan ke {config_path}")
-            
-            # Update ui_components config
-            ui_components['config'] = config_manager.config
-        else:
-            # Fallback: update config di ui_components
-            if 'config' not in ui_components:
-                ui_components['config'] = {}
-                
-            config = ui_components['config']
-            
-            # Update config dengan deep merge
-            _deep_merge(config, config_updates)
-            
-            # Simpan ke file jika diperlukan
-            if save_to_file and config_path:
-                try:
-                    Path(config_path).parent.mkdir(parents=True, exist_ok=True)
-                    with open(config_path, 'w') as f:
-                        yaml.dump(config, f, default_flow_style=False)
-                    if logger:
-                        logger.info(f"✅ Config berhasil disimpan ke {config_path}")
-                except Exception as e:
-                    if logger:
-                        logger.error(f"❌ Error menyimpan config: {str(e)}")
-                    return False
-        
-        return True
-    except Exception as e:
-        if logger:
-            logger.error(f"❌ Error update config: {str(e)}")
-        return False
-
-def get_config_value(
-    ui_components: Dict[str, Any],
-    key_path: str,
-    default_value: Any = None
-) -> Any:
-    """
-    Dapatkan nilai dari konfigurasi dengan dot notation.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        key_path: Path key dengan dot notation (e.g., 'training.batch_size')
-        default_value: Nilai default jika key tidak ditemukan
-        
-    Returns:
-        Nilai konfigurasi
-    """
-    # Check if config manager exists
-    config_manager = ui_components.get('config_manager')
-    
-    if config_manager:
-        return config_manager.get(key_path, default_value)
-    
-    # Manual traversal
-    config = ui_components.get('config', {})
-    keys = key_path.split('.')
-    
-    for key in keys:
-        if isinstance(config, dict) and key in config:
-            config = config[key]
-        else:
-            return default_value
-            
-    return config
-
-def set_config_value(
-    ui_components: Dict[str, Any],
-    key_path: str,
-    value: Any,
-    save: bool = False,
-    config_path: Optional[str] = None
-) -> bool:
-    """
-    Set nilai dalam konfigurasi dengan dot notation.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        key_path: Path key dengan dot notation (e.g., 'training.batch_size')
-        value: Nilai yang akan diset
-        save: Simpan ke file setelah update
-        config_path: Path file konfigurasi (opsional)
-        
-    Returns:
-        Boolean menunjukkan keberhasilan
-    """
-    config_manager = ui_components.get('config_manager')
-    
-    try:
-        if config_manager:
-            config_manager.set(key_path, value)
-            if save and config_path:
-                config_manager.save_config(config_path)
-            return True
-        
-        # Manual update
-        config = ui_components.get('config', {})
-        keys = key_path.split('.')
-        
-        # Create nested dictionaries
-        current = config
-        for i, key in enumerate(keys[:-1]):
-            if key not in current or not isinstance(current[key], dict):
-                current[key] = {}
-            current = current[key]
-        
-        # Set value
-        current[keys[-1]] = value
-        
-        # Save if needed
-        if save and config_path:
-            try:
-                os.makedirs(os.path.dirname(config_path), exist_ok=True)
-                with open(config_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
-            except Exception:
-                return False
-        
-        return True
-    except Exception:
-        return False
-
-def _deep_merge(target: Dict, source: Dict) -> Dict:
-    """
-    Deep merge dua dictionary rekursif.
-    
-    Args:
-        target: Dictionary target
-        source: Dictionary source
-        
-    Returns:
-        Dictionary target yang telah diupdate
-    """
-    for key, value in source.items():
-        if key in target and isinstance(target[key], dict) and isinstance(value, dict):
-            # Rekursif untuk nested dict
-            _deep_merge(target[key], value)
-        else:
-            # Override atau tambahkan key baru
-            target[key] = value
-    return target

@@ -6,9 +6,8 @@ Deskripsi: Handler untuk komponen UI konfigurasi environment
 import os
 import sys
 from typing import Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor
 
-def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=None, executor=None) -> Dict[str, Any]:
+def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
     Setup handler untuk komponen UI environment config.
     
@@ -16,7 +15,6 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
         ui_components: Dictionary komponen UI
         env: Environment manager
         config: Konfigurasi aplikasi
-        executor: ThreadPoolExecutor untuk operasi asinkron
         
     Returns:
         Dictionary UI components yang telah diupdate
@@ -30,17 +28,11 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     
     # Handler untuk tombol Drive
     def on_drive_button_clicked(b):
-        if executor:
-            future = executor.submit(handle_drive_connection, ui_components)
-        else:
-            handle_drive_connection(ui_components)
+        handle_drive_connection(ui_components)
     
     # Handler untuk tombol Directory
     def on_directory_button_clicked(b):
-        if executor:
-            future = executor.submit(handle_directory_setup, ui_components)
-        else:
-            handle_directory_setup(ui_components)
+        handle_directory_setup(ui_components)
     
     # Daftarkan handler
     ui_components['drive_button'].on_click(on_drive_button_clicked)

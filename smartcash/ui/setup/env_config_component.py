@@ -21,7 +21,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     header = widgets.HTML(
         """<div style="background:#f0f8ff; padding:15px; border-radius:5px; border-left:5px solid #3498db; margin-bottom:15px">
             <h1 style="margin:0; color:#2c3e50">⚙️ Konfigurasi Environment</h1>
-            <p style="margin:5px 0; color:#7f8c8d">Setup environment untuk project SmartCash</p>
+            <p style="margin:5px 0; color:#2c3e50">Setup environment untuk project SmartCash</p>
         </div>"""
     )
     
@@ -31,9 +31,9 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Panel info bantuan
     help_panel = widgets.HTML(
         """<div style="padding:10px; background-color:#f8f9fa; border-left:4px solid #6c757d; margin:10px 0">
-            <h3>ℹ️ Informasi</h3>
-            <p>Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
-            <ul>
+            <h3 style="color:#2c3e50">ℹ️ Informasi</h3>
+            <p style="color:#2c3e50">Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
+            <ul style="color:#2c3e50">
                 <li>Di Google Colab: Sebaiknya hubungkan ke Google Drive untuk menyimpan dataset dan model</li>
                 <li>Di lingkungan lokal: Pastikan struktur direktori telah dibuat</li>
             </ul>

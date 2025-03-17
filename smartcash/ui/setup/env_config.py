@@ -6,10 +6,6 @@ Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash
 import ipywidgets as widgets
 from IPython.display import display
 from typing import Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor
-
-# Thread pool untuk operasi asinkron
-_executor = ThreadPoolExecutor(max_workers=2)
 
 def setup_environment_config():
     """Setup dan jalankan konfigurasi environment"""
@@ -37,7 +33,7 @@ def setup_environment_config():
     ui_components = create_env_config_ui(env, config)
     
     # Setup handlers
-    ui_components = setup_env_config_handlers(ui_components, env, config, _executor)
+    ui_components = setup_env_config_handlers(ui_components, env, config)
     
     # Tampilkan UI
     display(ui_components['ui'])

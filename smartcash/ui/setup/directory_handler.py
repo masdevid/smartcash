@@ -19,7 +19,7 @@ def handle_directory_setup(ui_components: Dict[str, Any]):
         clear_output()
         display(HTML("""
             <div style="padding:8px; background-color:#d1ecf1; color:#0c5460; border-radius:4px">
-                🔄 Membuat struktur direktori...
+                <p style="margin:5px 0">🔄 Membuat struktur direktori...</p>
             </div>
         """))
     
@@ -30,7 +30,7 @@ def handle_directory_setup(ui_components: Dict[str, Any]):
             clear_output()
             display(HTML(f"""
                 <div style="padding:8px; background-color:#f8d7da; color:#721c24; border-radius:4px">
-                    ❌ Error saat membuat struktur direktori: {str(e)}
+                    <p style="margin:5px 0">❌ Error saat membuat struktur direktori: {str(e)}</p>
                 </div>
             """))
 
@@ -63,7 +63,7 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
                 stats['created'] += 1
                 display(HTML(f"""
                     <div style="padding:4px; color:#155724">
-                        ✅ Direktori dibuat: {dir_path}
+                        <p style="margin:5px 0">✅ Direktori dibuat: {dir_path}</p>
                     </div>
                 """))
             else:
@@ -71,7 +71,7 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
         
         display(HTML(f"""
             <div style="padding:8px; background-color:#d4edda; color:#155724; border-radius:4px; margin-top:10px">
-                ✅ Struktur direktori selesai dibuat: {stats['created']} direktori baru, {stats['existing']} sudah ada
+                <p style="margin:5px 0">✅ Struktur direktori selesai dibuat: {stats['created']} direktori baru, {stats['existing']} sudah ada</p>
             </div>
         """))
         
@@ -88,7 +88,7 @@ def display_directory_tree(ui_components: Dict[str, Any]):
     with ui_components['status']:
         display(HTML("""
             <div style="margin-top:15px">
-                <h3>📂 Struktur Direktori Project</h3>
+                <h3 style="color:#155724">📂 Struktur Direktori Project</h3>
             </div>
         """))
         
@@ -149,6 +149,6 @@ def directory_tree_fallback(ui_components: Dict[str, Any], max_depth: int = 2):
         with ui_components['status']:
             display(HTML(f"""
                 <div style="padding:8px; background-color:#fff3cd; color:#856404; border-radius:4px">
-                    ⚠️ Tidak dapat menampilkan struktur direktori: {str(e)}
+                    <p style="margin:5px 0">⚠️ Tidak dapat menampilkan struktur direktori: {str(e)}</p>
                 </div>
             """))

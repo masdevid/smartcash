@@ -18,11 +18,6 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
     Returns:
         Dictionary UI components yang telah diperbarui
     """
-    # Log status awal
-    logger = ui_components.get('logger')
-    if logger:
-        logger.info("🔍 Mendeteksi environment...")
-    
     # Coba gunakan environment manager atau gunakan fallback detection
     is_colab = False
     is_drive_mounted = False
@@ -43,44 +38,31 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             # Fallback: Deteksi manual
             is_colab = 'google.colab' in sys.modules
             is_drive_mounted = os.path.exists('/content/drive/MyDrive')
-            if logger:
-                logger.warning("⚠️ EnvironmentManager tidak tersedia, menggunakan deteksi manual")
     
     # Update colab panel
     if 'colab_panel' in ui_components:
         if is_colab:
             # Tampilkan informasi Colab environment
-            style = "padding: 10px; background-color: #d1ecf1; color: #0c5460; border-radius: 4px; margin: 10px 0;"
             status = "terhubung" if is_drive_mounted else "tidak terhubung"
             icon = "✅" if is_drive_mounted else "⚠️"
             
             ui_components['colab_panel'].value = f"""
-            <div style="{style}">
-                <h3>🔍 Environment: Google Colab</h3>
+            <div style="padding:10px; background-color:#d1ecf1; color:#0c5460; border-radius:4px; margin:10px 0">
+                <h3 style="color:#0c5460">🔍 Environment: Google Colab</h3>
                 <p>{icon} Status Google Drive: <strong>{status}</strong></p>
                 <p>Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
             </div>
             """
-            
-            # Log jika tersedia
-            if logger:
-                logger.info("🔍 Environment terdeteksi: Google Colab")
-                
             # Aktifkan tombol drive
             ui_components['drive_button'].layout.display = 'block'
         else:
             # Tampilkan informasi local environment
             ui_components['colab_panel'].value = """
-            <div style="padding: 10px; background-color: #d4edda; color: #155724; border-radius: 4px; margin: 10px 0;">
-                <h3>🔍 Environment: Local</h3>
+            <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:10px 0">
+                <h3 style="color:#155724">🔍 Environment: Local</h3>
                 <p>Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
             </div>
             """
-            
-            # Log jika tersedia
-            if logger:
-                logger.info("🔍 Environment terdeteksi: Local")
-                
             # Sembunyikan tombol drive
             ui_components['drive_button'].layout.display = 'none'
     

@@ -43,14 +43,12 @@ from smartcash.ui.utils.ui_helpers import (
     set_active_theme,
     inject_css_styles,
     create_loading_indicator,
-    run_async_task,
     create_confirmation_dialog,
     create_button_group,
     create_progress_updater,
     update_output_area,
     create_divider,
     create_spacing,
-    shutdown_thread_pool
 )
 
 __all__ = [
@@ -94,12 +92,10 @@ __all__ = [
     'set_active_theme',
     'inject_css_styles',
     'create_loading_indicator',
-    'run_async_task',
     'create_confirmation_dialog',
     'create_button_group',
     'create_progress_updater',
     'update_output_area',
     'create_divider',
     'create_spacing',
-    'shutdown_thread_pool'
 ]

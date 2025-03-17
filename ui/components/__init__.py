@@ -9,7 +9,7 @@ from smartcash.ui.components.headers import create_header, create_component_head
 from smartcash.ui.components.helpers import (
     create_tab_view, create_loading_indicator, update_output_area,
     register_observer_callback, display_file_info, create_progress_updater,
-    run_async_task, create_button_group, create_confirmation_dialog
+    create_button_group, create_confirmation_dialog
 )
 from smartcash.ui.components.layouts import (
     STANDARD_LAYOUTS, MAIN_CONTAINER, OUTPUT_WIDGET, BUTTON,
@@ -47,7 +47,7 @@ __all__ = [
     # Helpers
     'create_tab_view', 'create_loading_indicator', 'update_output_area',
     'register_observer_callback', 'display_file_info', 'create_progress_updater',
-    'run_async_task', 'create_button_group', 'create_confirmation_dialog',
+    'create_button_group', 'create_confirmation_dialog',
     
     # Layouts
     'STANDARD_LAYOUTS', 'MAIN_CONTAINER', 'OUTPUT_WIDGET', 'BUTTON',

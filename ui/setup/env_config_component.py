@@ -4,89 +4,89 @@ Deskripsi: Komponen UI untuk konfigurasi environment SmartCash
 """
 
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from typing import Dict, Any, Optional
 
-from smartcash.ui.components.headers import create_header
-from smartcash.ui.components.layouts import (
-    STANDARD_LAYOUTS, 
-    OUTPUT_WIDGET,
-    HORIZONTAL_GROUP
-)
-from smartcash.ui.utils.constants import COLORS, ICONS
-
-def create_env_config_ui(env=None, config=None):
+def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat UI untuk konfigurasi environment.
+    Buat komponen UI untuk environment config.
     
     Args:
-        env: Environment manager (opsional)
-        config: Konfigurasi environment (opsional)
+        env: Environment manager
+        config: Konfigurasi aplikasi
         
     Returns:
-        Dictionary komponen UI
+        Dictionary berisi widget UI
     """
-    # Header utama
-    header = create_header(
-        "🖥️ Konfigurasi Environment", 
-        "Setup lingkungan proyek SmartCash"
+    # Header
+    header = widgets.HTML(
+        """<div style="background:#f0f8ff; padding:15px; border-radius:5px; border-left:5px solid #3498db; margin-bottom:15px">
+            <h1 style="margin:0; color:#2c3e50">⚙️ Konfigurasi Environment</h1>
+            <p style="margin:5px 0; color:#7f8c8d">Setup environment untuk project SmartCash</p>
+        </div>"""
     )
     
-    # Panel informasi Colab
-    colab_panel = widgets.HTML(value="", layout=widgets.Layout(width='100%'))
+    # Panel status Colab/Drive
+    colab_panel = widgets.HTML(value="Mendeteksi environment...")
     
-    # Panel informasi sistem
-    info_panel = widgets.Output(layout=OUTPUT_WIDGET)
+    # Panel info bantuan
+    help_panel = widgets.HTML(
+        """<div style="padding:10px; background-color:#f8f9fa; border-left:4px solid #6c757d; margin:10px 0">
+            <h3>ℹ️ Informasi</h3>
+            <p>Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
+            <ul>
+                <li>Di Google Colab: Sebaiknya hubungkan ke Google Drive untuk menyimpan dataset dan model</li>
+                <li>Di lingkungan lokal: Pastikan struktur direktori telah dibuat</li>
+            </ul>
+        </div>"""
+    )
     
-    # Status output
-    status = widgets.Output(layout=OUTPUT_WIDGET)
-    
-    # Tombol koneksi Drive (hanya di Colab)
+    # Tombol aksi
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
-        icon='cloud-upload',
         button_style='primary',
-        layout=HORIZONTAL_GROUP
+        icon='link',
+        layout=widgets.Layout(width='100%', margin='10px 0')
     )
     
-    # Tombol setup direktori lokal
-    dir_button = widgets.Button(
+    directory_button = widgets.Button(
         description='Setup Direktori Lokal',
-        icon='folder-open',
-        button_style='success',
-        layout=HORIZONTAL_GROUP
+        button_style='info',
+        icon='folder-plus',
+        layout=widgets.Layout(width='100%', margin='10px 0')
     )
     
-    # Buat help info yang collapsible
-    help_content = """
-    <h4>🛠️ Petunjuk Konfigurasi Environment</h4>
-    <ul>
-        <li><strong>Google Colab</strong>: Gunakan tombol 'Hubungkan Google Drive' untuk menyambungkan dan mensinkronkan proyek</li>
-        <li><strong>Local Environment</strong>: Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek</li>
-        <li>Pastikan anda sudah clone repository SmartCash sebelum konfigurasi</li>
-    </ul>
-    """
-    help_box = widgets.Accordion(children=[widgets.HTML(help_content)])
-    help_box.set_title(0, "📖 Panduan Konfigurasi")
-    help_box.selected_index = 0
+    # Panel output
+    status = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            border='1px solid #ddd',
+            min_height='150px',
+            max_height='300px',
+            margin='10px 0',
+            padding='10px',
+            overflow='auto'
+        )
+    )
     
-    # Susun layout UI
+    # Container utama
     ui = widgets.VBox([
         header,
         colab_panel,
-        info_panel,
-        status,
-        help_box,
-        widgets.HBox([drive_button, dir_button])
-    ])
+        help_panel,
+        drive_button,
+        directory_button,
+        status
+    ], layout=widgets.Layout(width='100%', padding='10px'))
     
-    # Kembalikan komponen UI dalam dictionary
-    return {
+    # Komponen UI
+    ui_components = {
         'ui': ui,
         'header': header,
         'colab_panel': colab_panel,
-        'info_panel': info_panel,
-        'status': status,
+        'help_panel': help_panel,
         'drive_button': drive_button,
-        'dir_button': dir_button,
-        'help_box': help_box
+        'directory_button': directory_button,
+        'status': status
     }
+    
+    return ui_components

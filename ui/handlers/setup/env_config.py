@@ -16,6 +16,27 @@ from smartcash.ui.handlers.shared.error_handler import handle_error
 def setup_env_config_handlers(ui_components, env=None, config=None):
     """Setup handlers untuk UI konfigurasi environment SmartCash."""
     
+    # Print debugging info to help troubleshoot
+    with ui_components['status']:
+        clear_output(wait=True)
+        display(HTML("<p>🚀 Environment Config handler initialized</p>"))
+        
+        # Display current working directory for debugging
+        cwd = Path.cwd()
+        display(HTML(f"<p>Current directory: <code>{cwd}</code></p>"))
+        
+        # Check for configs folder
+        config_dir = Path('configs')
+        if config_dir.exists():
+            config_files = list(config_dir.glob('*.y*ml'))
+            display(HTML(f"<p>Found {len(config_files)} config files in configs folder</p>"))
+        else:
+            display(HTML("<p>⚠️ configs folder not found, will create</p>"))
+            try:
+                config_dir.mkdir(exist_ok=True)
+            except Exception as e:
+                display(HTML(f"<p>❌ Error creating configs folder: {str(e)}</p>"))
+    
     # Initialize variables
     logger = env_manager = observer_manager = config_manager = None
     
@@ -255,148 +276,89 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                 return False
         return True
     
+    # Initialize button handlers with explicit debugging
     def on_drive_connect(b):
         """Handler koneksi Google Drive"""
         with ui_components['status']:
             clear_output(wait=True)
             
-            if env_manager:
-                display(create_status_indicator("info", "🔄 Menghubungkan ke Google Drive..."))
-                success, message = env_manager.mount_drive()
+            display(HTML("<p>🔄 Starting Google Drive connection...</p>"))
+            
+            try:
+                # Always use the direct Colab approach for reliability
+                from google.colab import drive
+                display(HTML("<p>🔄 Mounting Google Drive...</p>"))
+                drive.mount('/content/drive')
                 
-                if success:
-                    display(create_status_indicator("info", "🔄 Membuat symlink ke Google Drive..."))
-                    symlink_stats = env_manager.create_symlinks()
-                    display(create_status_indicator("success", 
-                        f"✅ Drive terhubung: {env_manager.drive_path} ({symlink_stats['created']} symlinks baru)"
-                    ))
-                    
-                    display(create_status_indicator("info", "🔄 Memeriksa file konfigurasi..."))
-                    drive_configs_dir = env_manager.drive_path / 'configs'
-                    missing, copied = sync_configs([Path('configs')], [drive_configs_dir])
-                    
-                    if missing > 0:
-                        status = "success" if copied == missing else "warning"
-                        message = f"✅ {copied} config disalin ke Drive" if copied == missing else f"⚠️ {copied}/{missing} config berhasil disalin"
-                        display(create_status_indicator(status, message))
-                    else:
-                        display(create_status_indicator("info", "ℹ️ Semua config sudah ada di Drive"))
-                    
-                    # Display tree focusing on SmartCash
-                    display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
-                    drive_path = env_manager.drive_path
-                    raw_tree_html = env_manager.get_directory_tree(drive_path, max_depth=2)
-                    tree_html = filter_drive_tree(raw_tree_html)
-                    display(HTML(tree_html))
-                    
-                    # Update config if manager available
-                    if config_manager:
-                        config_manager.update_config({
-                            'environment': {
-                                'drive_mounted': True,
-                                'drive_path': str(env_manager.drive_path)
-                            }
-                        })
+                # Setup dirs
+                drive_path = Path('/content/drive/MyDrive/SmartCash')
+                drive_path.mkdir(parents=True, exist_ok=True)
+                display(HTML(f'<p>✅ SmartCash directory ready: <code>{drive_path}</code></p>'))
+                
+                # Create symlink
+                if not Path('SmartCash_Drive').exists():
+                    os.symlink(drive_path, 'SmartCash_Drive')
+                    display(HTML('<p>✅ Symlink <code>SmartCash_Drive</code> created</p>'))
                 else:
-                    display(create_status_indicator("error", f"❌ Gagal koneksi Drive: {message}"))
-            else:
-                # Fallback implementation
-                try:
-                    display(HTML('<p>🔄 Menghubungkan ke Google Drive...</p>'))
-                    
-                    from google.colab import drive
-                    drive.mount('/content/drive')
-                    
-                    # Setup dirs
-                    drive_path = Path('/content/drive/MyDrive/SmartCash')
-                    drive_path.mkdir(parents=True, exist_ok=True)
-                    display(HTML(f'<p>{"✅ Direktori dibuat" if not drive_path.exists() else "ℹ️ Direktori sudah ada"}: <code>{drive_path}</code></p>'))
-                    
-                    # Create symlink
-                    if not Path('SmartCash_Drive').exists():
-                        os.symlink(drive_path, 'SmartCash_Drive')
-                        display(HTML('<p>✅ Symlink <code>SmartCash_Drive</code> dibuat</p>'))
-                    else:
-                        display(HTML('<p>ℹ️ Symlink sudah ada</p>'))
-                    
-                    # Sync configs
-                    configs_dir = drive_path / 'configs'
-                    configs_dir.mkdir(exist_ok=True)
-                    local_configs = list(Path('configs').glob('*.y*ml')) if Path('configs').exists() else []
-                    
-                    missing_count = copied_count = 0
-                    if local_configs:
-                        for config_file in local_configs:
-                            drive_file = configs_dir / config_file.name
-                            if not drive_file.exists():
-                                missing_count += 1
-                                try:
-                                    shutil.copy2(config_file, drive_file)
-                                    copied_count += 1
-                                except Exception:
-                                    pass
-                        
-                        if missing_count > 0:
-                            status = "✅" if copied_count == missing_count else "⚠️"
-                            message = f"{copied_count} config disalin" if copied_count == missing_count else f"{copied_count}/{missing_count} berhasil disalin"
-                            display(HTML(f'<p>{status} {message}</p>'))
-                    
-                    display(HTML(
-                        """<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-                            <h3 style="margin-top:0">✅ Google Drive Terhubung</h3>
-                            <p>Data akan disimpan di <code>/content/drive/MyDrive/SmartCash</code></p>
-                        </div>"""
-                    ))
-                    
-                    # Display tree
-                    display(HTML("<h4>📂 Struktur direktori SmartCash:</h4>"))
-                    tree_html = fallback_get_directory_tree(drive_path, max_depth=2)
-                    display(HTML(tree_html))
-                    
-                except Exception as e:
-                    display(HTML(
-                        f"""<div style="padding:10px;background:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0">
-                            <h3 style="margin-top:0">❌ Gagal koneksi Drive</h3>
-                            <p>Error: {str(e)}</p>
-                        </div>"""
-                    ))
+                    display(HTML('<p>ℹ️ Symlink already exists</p>'))
+                
+                # Sync configs
+                configs_dir = drive_path / 'configs'
+                configs_dir.mkdir(exist_ok=True)
+                
+                # Create local configs dir if it doesn't exist
+                Path('configs').mkdir(exist_ok=True)
+                
+                # Copy default configs if needed
+                for config_name in ['base_config.yaml', 'colab_config.yaml']:
+                    source_path = Path(f'configs/{config_name}')
+                    if not source_path.exists() and Path(f'/content/{config_name}').exists():
+                        shutil.copy2(Path(f'/content/{config_name}'), source_path)
+                
+                # Sync configs between local and Drive
+                local_configs = list(Path('configs').glob('*.y*ml'))
+                
+                missing_count = copied_count = 0
+                if local_configs:
+                    for config_file in local_configs:
+                        drive_file = configs_dir / config_file.name
+                        if not drive_file.exists():
+                            missing_count += 1
+                            try:
+                                shutil.copy2(config_file, drive_file)
+                                copied_count += 1
+                                display(HTML(f'<p>✅ Copied <code>{config_file.name}</code> to Drive</p>'))
+                            except Exception as e:
+                                display(HTML(f'<p>⚠️ Failed to copy <code>{config_file.name}</code>: {str(e)}</p>'))
+                
+                display(HTML(
+                    """<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
+                        <h3 style="margin-top:0">✅ Google Drive Connected</h3>
+                        <p>Data will be stored in <code>/content/drive/MyDrive/SmartCash</code></p>
+                    </div>"""
+                ))
+                
+                # Display directory tree
+                display(HTML("<h4>📂 SmartCash Directory Structure:</h4>"))
+                display(HTML(fallback_get_directory_tree(drive_path, max_depth=2)))
+                
+            except Exception as e:
+                display(HTML(
+                    f"""<div style="padding:10px;background:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0">
+                        <h3 style="margin-top:0">❌ Failed to connect to Google Drive</h3>
+                        <p>Error: {str(e)}</p>
+                    </div>"""
+                ))
     
     def on_dir_setup(b):
         """Setup directory structure"""
         with ui_components['status']:
             clear_output(wait=True)
             
-            if env_manager:
-                display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
-                use_drive = getattr(env_manager, 'is_drive_mounted', False)
-                stats = env_manager.setup_directories(use_drive=use_drive)
-                display(create_status_indicator("success", 
-                    f"✅ Direktori dibuat: {stats['created']} baru, {stats['existing']} sudah ada"
-                ))
-                
-                # Display tree
-                display(HTML("<h4>📂 Struktur direktori project:</h4>"))
-                tree_path = env_manager.base_dir
-                # Focus on Drive if connected
-                if use_drive and env_manager.is_drive_mounted and hasattr(env_manager, 'drive_path'):
-                    tree_path = env_manager.drive_path
-                
-                raw_tree_html = env_manager.get_directory_tree(tree_path, max_depth=3)
-                tree_html = filter_drive_tree(raw_tree_html)
-                display(HTML(tree_html))
-                
-                # Update config
-                if config_manager:
-                    config_manager.update_config({
-                        'environment': {
-                            'is_colab': env_manager.is_colab,
-                            'drive_mounted': env_manager.is_drive_mounted,
-                            'base_dir': str(env_manager.base_dir),
-                            'setup_complete': True
-                        }
-                    })
-            else:
-                # Fallback implementation
+            display(HTML("<p>🔄 Setting up directory structure...</p>"))
+            
+            try:
+                # Define directories to create
                 dirs = [
                     'data/train/images', 'data/train/labels',
                     'data/valid/images', 'data/valid/labels',
@@ -404,23 +366,40 @@ def setup_env_config_handlers(ui_components, env=None, config=None):
                     'configs', 'runs/train/weights', 'logs', 'exports'
                 ]
                 
-                display(create_status_indicator("info", "🔄 Membuat struktur direktori..."))
                 created = existing = 0
                 
+                # Create directories
                 for d in dirs:
                     path = Path(d)
                     if not path.exists():
                         path.mkdir(parents=True, exist_ok=True)
                         created += 1
+                        display(HTML(f'<p>✅ Created directory: <code>{d}</code></p>'))
                     else:
                         existing += 1
                 
+                # Check if we're in Colab and Drive is mounted
+                drive_mounted = Path('/content/drive/MyDrive').exists()
+                
+                if drive_mounted:
+                    drive_path = Path('/content/drive/MyDrive/SmartCash')
+                    if not drive_path.exists():
+                        drive_path.mkdir(parents=True, exist_ok=True)
+                        display(HTML(f'<p>✅ Created SmartCash directory in Drive</p>'))
+                    
+                    # Create the same structure in Drive
+                    for d in dirs:
+                        drive_dir = drive_path / d
+                        if not drive_dir.exists():
+                            drive_dir.mkdir(parents=True, exist_ok=True)
+                            created += 1
+                            display(HTML(f'<p>✅ Created directory in Drive: <code>{d}</code></p>'))
+                
                 # Show completion message
-                display(create_status_indicator("success", f"✅ Struktur direktori berhasil dibuat"))
                 display(HTML(
                     f"""<div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-                        <h3 style="margin-top:0">✅ Struktur Direktori Dibuat</h3>
-                        <p>Direktori baru: {created}, sudah ada: {existing}</p>
+                        <h3 style="margin-top:0">✅ Directory Structure Created</h3>
+                        <p>New directories: {created}, Existing: {existing}</p>
                         <pre style="margin:10px 0 0 10px;color:#155724;background:transparent;border:none">
 data/
   ├── train/images/ & labels/
@@ -434,9 +413,20 @@ exports/</pre>
                 ))
                 
                 # Display tree
-                display(HTML("<h4>📂 Struktur direktori project:</h4>"))
-                tree_html = fallback_get_directory_tree(Path.cwd(), max_depth=2)
-                display(HTML(tree_html))
+                display(HTML("<h4>📂 Project Directory Structure:</h4>"))
+                display(HTML(fallback_get_directory_tree(Path.cwd(), max_depth=2)))
+                
+                if drive_mounted:
+                    display(HTML("<h4>📂 Drive Directory Structure:</h4>"))
+                    display(HTML(fallback_get_directory_tree(drive_path, max_depth=2)))
+                
+            except Exception as e:
+                display(HTML(
+                    f"""<div style="padding:10px;background:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0">
+                        <h3 style="margin-top:0">❌ Failed to set up directory structure</h3>
+                        <p>Error: {str(e)}</p>
+                    </div>"""
+                ))
     
     # Register event handlers directly
     ui_components['drive_button'].on_click(on_drive_connect)

@@ -24,7 +24,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         main_container, button, section_container, output_area, 
         create_divider, BUTTON_LAYOUTS, GROUP_LAYOUTS
     )
-    from smartcash.ui.utils.constants import ICONS, FA_ICONS
+    from smartcash.ui.utils.constants import ICONS
     
     # Header dengan styling konsisten
     header = create_header(
@@ -51,17 +51,23 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
         button_style='primary',
-        icon=FA_ICONS['link'],
+        icon='link',
         tooltip='Mount Google Drive dan siapkan struktur direktori',
-        layout=BUTTON_LAYOUTS['inline']
+        layout=BUTTON_LAYOUTS['standard']
     )
     
     directory_button = widgets.Button(
         description='Setup Direktori Lokal',
         button_style='info',
-        icon=FA_ICONS['folder-plus'],
+        icon='folder-plus',
         tooltip='Buat struktur direktori lokal',
-        layout=BUTTON_LAYOUTS['inline']
+        layout=BUTTON_LAYOUTS['standard']
+    )
+    
+    # Kelompokkan tombol dalam grup horizontal
+    button_group = widgets.HBox(
+        [drive_button, directory_button],
+        layout=GROUP_LAYOUTS['horizontal']
     )
     
     # Panel output dengan komponen yang sudah ada
@@ -76,8 +82,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         colab_panel,
         help_box,
         divider,
-        drive_button,
-        directory_button,
+        button_group,
         status
     ], layout=main_container)
     

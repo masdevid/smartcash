@@ -187,3 +187,56 @@ ALERT_STYLES = {
         'icon': ICONS['error']
     }
 }
+
+# Button styles
+BUTTON_STYLES = {
+    'primary': 'primary',
+    'success': 'success',
+    'info': 'info',
+    'warning': 'warning',
+    'danger': 'danger',
+    'default': ''
+}
+
+# Font Config
+FONTS = {
+    'default': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    'monospace': 'Consolas, Menlo, Monaco, "Courier New", monospace',
+    'header': '"Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+}
+
+# Size Config
+SIZES = {
+    'xs': '0.75rem',   # 12px
+    'sm': '0.875rem',  # 14px
+    'md': '1rem',      # 16px
+    'lg': '1.25rem',   # 20px
+    'xl': '1.5rem',    # 24px
+    '2xl': '2rem',     # 32px
+}
+
+# Layout constants
+PADDINGS = {
+    'none': '0',
+    'small': '5px',
+    'medium': '10px',
+    'large': '15px',
+    'xl': '20px'
+}
+
+MARGINS = {
+    'none': '0',
+    'small': '5px',
+    'medium': '10px',
+    'large': '15px',
+    'xl': '20px'
+}
+
+# File Related
+IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']
+VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv']
+DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx', 'ppt', 'pptx']
+CODE_EXTENSIONS = ['py', 'js', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json', 'xml']
+
+# For file size formatting
+FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']

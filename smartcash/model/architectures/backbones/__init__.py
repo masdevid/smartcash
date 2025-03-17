@@ -19,5 +19,6 @@ __all__ = [
     'SUPPORTED_MODELS',
     'EXPECTED_CHANNELS',
     'FeatureAdapter',
+    'CSPDarknet',
     'ChannelAttention'
 ]

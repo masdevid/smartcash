@@ -1,213 +1,280 @@
 """
 File: smartcash/ui/handlers/environment_handler.py
-Deskripsi: Handler bersama untuk manajemen environment SmartCash
+Deskripsi: Handler untuk deteksi dan konfigurasi environment
 """
 
-from IPython.display import display, HTML, clear_output
-from pathlib import Path
 import os
+import sys
+from pathlib import Path
 import shutil
-import re
+from typing import Dict, Any, Optional, List, Union
+from IPython.display import display, HTML
 
-def detect_environment(ui_components, env=None):
+def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any]:
     """
-    Deteksi environment dan update UI.
+    Deteksi dan konfigurasi environment UI.
     
     Args:
         ui_components: Dictionary komponen UI
-        env: Environment manager (optional)
+        env: Environment manager (opsional)
         
     Returns:
-        Boolean menunjukkan apakah environment adalah Colab
+        Dictionary UI components yang telah diperbarui
     """
-    # Fallback deteksi Colab
-    is_colab = False
+    # Colab detection message
     try:
-        import google.colab
-        is_colab = True
-    except ImportError:
-        pass
-    
-    # Update panel Colab
-    ui_components['colab_panel'].value = """
-        <div style="padding:10px;background:#d1ecf1;border-left:4px solid #0c5460;color:#0c5460;margin:10px 0">
-            <h3 style="margin-top:0; color: inherit">☁️ Google Colab Terdeteksi</h3>
-            <p>Project akan dikonfigurasi untuk berjalan di Google Colab. Koneksi ke Google Drive direkomendasikan.</p>
-        </div>
-    """ if is_colab else """
-        <div style="padding:10px;background:#d4edda;border-left:4px solid #155724;color:#155724;margin:10px 0">
-            <h3 style="margin-top:0; color: inherit">💻 Environment Lokal Terdeteksi</h3>
-            <p>Project akan dikonfigurasi untuk berjalan di environment lokal.</p>
-        </div>
-    """
-    
-    # Tampilkan tombol drive hanya di Colab
-    ui_components['drive_button'].layout.display = '' if is_colab else 'none'
-    
-    return is_colab
-
-def filter_drive_tree(tree_html):
-    """
-    Filter directory tree untuk fokus ke SmartCash di Google Drive.
-    
-    Args:
-        tree_html: HTML string dari directory tree
+        # Coba gunakan environment manager atau gunakan fallback detection
+        is_colab = False
+        is_drive_mounted = False
         
-    Returns:
-        HTML string yang difilter
-    """
-    if not tree_html or '/content/drive' not in tree_html:
-        return tree_html
+        # Jika env sudah diberikan, gunakan itu
+        if env and hasattr(env, 'is_colab'):
+            is_colab = env.is_colab
+            if hasattr(env, 'is_drive_mounted'):
+                is_drive_mounted = env.is_drive_mounted
+        else:
+            # Coba import environment manager
+            try:
+                from smartcash.common.environment import get_environment_manager
+                env_manager = get_environment_manager()
+                is_colab = env_manager.is_colab
+                is_drive_mounted = env_manager.is_drive_mounted
+            except ImportError:
+                # Fallback: Deteksi manual
+                is_colab = 'google.colab' in sys.modules
+                is_drive_mounted = os.path.exists('/content/drive/MyDrive')
         
-    try:
-        # Cari awal dan akhir dari <pre> tag
-        pre_start = tree_html.find("<pre")
-        pre_end = tree_html.find("</pre>")
-        
-        if pre_start == -1 or pre_end == -1:
-            return tree_html
-            
-        # Pisahkan header, content, dan footer
-        header = tree_html[:pre_start + tree_html[pre_start:].find(">") + 1]
-        content = tree_html[pre_start + tree_html[pre_start:].find(">") + 1:pre_end]
-        footer = tree_html[pre_end:]
-        
-        # Filter baris-baris yang berhubungan dengan SmartCash
-        lines = content.split("\n")
-        filtered_lines = []
-        inside_smartcash = False
-        
-        for line in lines:
-            # Deteksi direktori SmartCash
-            if 'SmartCash/' in line or 'SmartCash_Drive' in line:
-                inside_smartcash = True
-                filtered_lines.append(line)
-            # Deteksi folder drive root
-            elif '/content/drive' in line and 'SmartCash' not in line and not inside_smartcash:
-                # Skip direktori drive yang bukan SmartCash
-                continue
-            # Deteksi keluar dari subtree SmartCash
-            elif inside_smartcash and ('│' not in line and '├' not in line and '└' not in line):
-                inside_smartcash = False
-            # Simpan baris jika masih dalam SmartCash atau bukan bagian dari Drive
-            elif inside_smartcash or '/content/drive' not in line:
-                filtered_lines.append(line)
-        
-        return header + "\n".join(filtered_lines) + footer
-    except Exception:
-        # Jika terjadi error, kembalikan tree asli
-        return tree_html
-
-def sync_configs(source_dirs, target_dirs, logger=None):
-    """
-    Sinkronisasi config files dari source ke target directory.
-    
-    Args:
-        source_dirs: List direktori sumber
-        target_dirs: List direktori tujuan
-        logger: Logger instance (optional)
-        
-    Returns:
-        Tuple (total_files, copied_files)
-    """
-    total_files = copied_files = 0
-    
-    try:
-        # Coba gunakan ConfigManager jika tersedia
-        try:
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
-            
-            # Gunakan fungsi sinkronisasi bawaan jika tersedia
-            if hasattr(config_manager, 'sync_all_configs'):
-                results = config_manager.sync_all_configs('merge')
+        # Update colab panel
+        if 'colab_panel' in ui_components:
+            logger = ui_components.get('logger')
+            if is_colab:
+                # Tampilkan informasi Colab environment
+                style = "padding: 10px; background-color: #d1ecf1; color: #0c5460; border-radius: 4px; margin: 10px 0;"
+                status = "terhubung" if is_drive_mounted else "tidak terhubung"
+                icon = "✅" if is_drive_mounted else "⚠️"
                 
+                ui_components['colab_panel'].value = f"""
+                <div style="{style}">
+                    <h3>🔍 Environment: Google Colab</h3>
+                    <p>{icon} Status Google Drive: <strong>{status}</strong></p>
+                    <p>Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
+                </div>
+                """
+                
+                # Log jika tersedia
                 if logger:
-                    logger.info(f"✅ Sinkronisasi config berhasil menggunakan ConfigManager")
+                    logger.info("🔍 Environment terdeteksi: Google Colab")
                     
-                # Ekstrak statistik dari hasil
-                synced = len(results.get('synced', []))
-                failed = len(results.get('failed', []))
-                return synced + failed, synced
-        except ImportError:
-            # Lanjutkan dengan implementasi manual
-            pass
-            
-        # Implementasi manual
-        for source_dir in source_dirs:
-            if not isinstance(source_dir, Path):
-                source_dir = Path(source_dir)
-            
-            if not source_dir.exists() or not source_dir.is_dir():
-                continue
-            
-            # Dapatkan semua file YAML/YAML di direktori sumber
-            config_files = list(source_dir.glob('*.y*ml'))
-            total_files += len(config_files)
-            
-            for config_file in config_files:
-                for target_dir in target_dirs:
-                    if not isinstance(target_dir, Path):
-                        target_dir = Path(target_dir)
+                # Aktifkan tombol drive
+                ui_components['drive_button'].layout.display = 'block'
+            else:
+                # Tampilkan informasi local environment
+                ui_components['colab_panel'].value = """
+                <div style="padding: 10px; background-color: #d4edda; color: #155724; border-radius: 4px; margin: 10px 0;">
+                    <h3>🔍 Environment: Local</h3>
+                    <p>Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
+                </div>
+                """
+                
+                # Log jika tersedia
+                if logger:
+                    logger.info("🔍 Environment terdeteksi: Local")
                     
-                    # Buat direktori target jika belum ada
-                    target_dir.mkdir(parents=True, exist_ok=True)
-                    target_file = target_dir / config_file.name
-                    
-                    # Salin file jika belum ada di target
-                    if not target_file.exists():
-                        try:
-                            shutil.copy2(config_file, target_file)
-                            copied_files += 1
-                            if logger:
-                                logger.info(f"✅ Copied {config_file.name} ke {target_dir}")
-                        except Exception as e:
-                            if logger:
-                                logger.warning(f"⚠️ Gagal menyalin {config_file.name}: {str(e)}")
-                    elif config_file.stat().st_mtime > target_file.stat().st_mtime:
-                        # File sumber lebih baru dari target
-                        try:
-                            shutil.copy2(config_file, target_file)
-                            copied_files += 1
-                            if logger:
-                                logger.info(f"✅ Updated {config_file.name} yang lebih baru ke {target_dir}")
-                        except Exception as e:
-                            if logger:
-                                logger.warning(f"⚠️ Gagal update {config_file.name}: {str(e)}")
-        
-        if logger and total_files > 0:
-            logger.info(f"🔄 Sinkronisasi config: {copied_files} dari {total_files} file disalin")
-            
-        return total_files, copied_files
+                # Sembunyikan tombol drive
+                ui_components['drive_button'].layout.display = 'none'
     except Exception as e:
-        if logger:
-            logger.error(f"❌ Error sinkronisasi config: {str(e)}")
-        return total_files, copied_files
+        # Fallback: Tangani error
+        from smartcash.ui.setup.env_config_fallbacks import handle_environment_detection_error
+        ui_components = handle_environment_detection_error(ui_components, e)
+    
+    return ui_components
 
-def check_smartcash_dir(ui_components):
+def filter_drive_tree(drive_tree_html: str) -> str:
     """
-    Cek apakah folder smartcash ada dan tampilkan warning jika tidak ada.
+    Filter tree direktori Drive untuk hanya menampilkan yang relevan.
+    
+    Args:
+        drive_tree_html: HTML tree direktori drive
+        
+    Returns:
+        HTML tree yang sudah difilter
+    """
+    # Filter hanya direktori SmartCash dan subdirektori yang relevan
+    if "SmartCash" not in drive_tree_html:
+        return """
+        <div style="padding: 10px; background-color: #fff3cd; color: #856404; border-radius: 4px;">
+            ⚠️ Direktori SmartCash tidak ditemukan di Google Drive.
+            <p>Pastikan direktori SmartCash sudah dibuat di Google Drive.</p>
+        </div>
+        """
+    
+    # Tambahkan header dan styling
+    filtered_html = """
+    <div style="padding: 10px; background-color: #f0f8ff; color: #0c5460; border-radius: 4px; margin: 10px 0;">
+        <h3>📂 Struktur Direktori Project (Google Drive)</h3>
+    """ + drive_tree_html + "</div>"
+    
+    return filtered_html
+
+def fallback_get_directory_tree(directory: str, max_depth: int = 3) -> str:
+    """
+    Implementasi fallback untuk mendapatkan tree direktori.
+    
+    Args:
+        directory: Path direktori
+        max_depth: Kedalaman maksimum tree
+        
+    Returns:
+        HTML representasi tree direktori
+    """
+    # Simple function to get directory tree when env_manager is not available
+    dir_path = Path(directory)
+    if not dir_path.exists():
+        return f"<p style='color:red'>❌ Direktori tidak ditemukan: {directory}</p>"
+    
+    html = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
+    html += f"<span style='color:#0366d6; font-weight:bold;'>{dir_path.name}/</span>\n"
+    
+    def _get_tree(path, prefix="", depth=0):
+        if depth >= max_depth:
+            return ""
+        
+        try:
+            items = sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name))
+        except PermissionError:
+            return f"{prefix}<span style='color:red'>❌ Akses ditolak</span>\n"
+            
+        result = ""
+        for i, item in enumerate(items):
+            is_last = i == len(items) - 1
+            connector = "└─ " if is_last else "├─ "
+            
+            if item.is_dir():
+                result += f"{prefix}{connector}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
+                next_prefix = prefix + ("   " if is_last else "│  ")
+                if depth < max_depth - 1:
+                    result += _get_tree(item, next_prefix, depth + 1)
+            else:
+                result += f"{prefix}{connector}{item.name}\n"
+        
+        return result
+    
+    html += _get_tree(dir_path)
+    html += "</pre>"
+    
+    return html
+
+def check_smartcash_dir(ui_components: Dict[str, Any]) -> bool:
+    """
+    Cek apakah direktori SmartCash tersedia.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Boolean menunjukkan apakah folder smartcash ada
+        Boolean status ketersediaan direktori
     """
-    if not Path('smartcash').exists() or not Path('smartcash').is_dir():
-        with ui_components['status']:
-            clear_output(wait=True)
-            alert_html = f"""
-            <div style="padding:15px;background-color:#f8d7da;border-left:4px solid #721c24;color:#721c24;margin:10px 0;border-radius:4px">
-                <h3 style="margin-top:0">❌ Folder SmartCash tidak ditemukan!</h3>
-                <p>Repository belum di-clone dengan benar. Silakan jalankan cell clone repository terlebih dahulu.</p>
-                <ol>
-                    <li>Jalankan cell repository clone (Cell 1.1)</li>
-                    <li>Restart runtime (Runtime > Restart runtime)</li>
-                    <li>Jalankan kembali notebook dari awal</li>
-                </ol>
-            </div>
-            """
-            display(HTML(alert_html))
-            return False
-    return True
+    try:
+        # Cek direktori SmartCash
+        if os.path.exists("smartcash"):
+            return True
+            
+        # Jika tidak ada, tampilkan pesan error
+        if 'status' in ui_components:
+            with ui_components['status']:
+                display(HTML("""
+                <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px;">
+                    ❌ Direktori SmartCash tidak ditemukan.
+                    <p>Pastikan repository SmartCash sudah di-clone dengan benar.</p>
+                    <p>Gunakan cell pertama (Repository Clone) untuk mengunduh repository.</p>
+                </div>
+                """))
+        return False
+    except Exception as e:
+        if 'logger' in ui_components:
+            ui_components['logger'].error(f"❌ Error cek direktori: {str(e)}")
+        return False
+
+def sync_configs(
+    local_dirs: List[Path], 
+    drive_dirs: List[Path],
+    logger = None
+) -> Dict[str, Any]:
+    """
+    Sinkronisasi konfigurasi antara lokal dan Google Drive.
+    
+    Args:
+        local_dirs: List direktori lokal
+        drive_dirs: List direktori Google Drive
+        logger: Logger (opsional)
+        
+    Returns:
+        Dictionary hasil sinkronisasi
+    """
+    if not drive_dirs or not local_dirs:
+        return {'status': 'error', 'message': 'Direktori tidak valid'}
+    
+    result = {
+        'synced': [],
+        'errors': []
+    }
+    
+    # Iterasi semua direktori
+    for local_dir, drive_dir in zip(local_dirs, drive_dirs):
+        if not local_dir.exists() or not drive_dir.exists():
+            result['errors'].append(f"Direktori tidak ditemukan: {local_dir or drive_dir}")
+            continue
+        
+        # Cek file YAML di lokal
+        yaml_files = list(local_dir.glob('*.yaml')) + list(local_dir.glob('*.yml'))
+        
+        for yaml_file in yaml_files:
+            try:
+                # Path file di drive
+                drive_file = drive_dir / yaml_file.name
+                
+                # Buat direktori di Drive jika belum ada
+                drive_dir.mkdir(parents=True, exist_ok=True)
+                
+                # Cek apakah kedua file ada
+                local_exists = yaml_file.exists()
+                drive_exists = drive_file.exists()
+                
+                if local_exists and not drive_exists:
+                    # Salin ke Drive
+                    shutil.copy2(yaml_file, drive_file)
+                    result['synced'].append(f"🔄 {yaml_file.name}: Lokal → Drive")
+                    if logger:
+                        logger.info(f"🔄 Konfigurasi {yaml_file.name}: Lokal → Drive")
+                        
+                elif not local_exists and drive_exists:
+                    # Salin ke lokal
+                    shutil.copy2(drive_file, yaml_file)
+                    result['synced'].append(f"🔄 {yaml_file.name}: Drive → Lokal")
+                    if logger:
+                        logger.info(f"🔄 Konfigurasi {yaml_file.name}: Drive → Lokal")
+                        
+                elif local_exists and drive_exists:
+                    # Jika kedua file ada, bandingkan timestamp
+                    local_time = yaml_file.stat().st_mtime
+                    drive_time = drive_file.stat().st_mtime
+                    
+                    if local_time > drive_time:
+                        # Lokal lebih baru
+                        shutil.copy2(yaml_file, drive_file)
+                        result['synced'].append(f"🔄 {yaml_file.name}: Lokal → Drive (file lokal lebih baru)")
+                        if logger:
+                            logger.info(f"🔄 Konfigurasi {yaml_file.name}: Lokal → Drive (file lokal lebih baru)")
+                    else:
+                        # Drive lebih baru
+                        shutil.copy2(drive_file, yaml_file)
+                        result['synced'].append(f"🔄 {yaml_file.name}: Drive → Lokal (file drive lebih baru)")
+                        if logger:
+                            logger.info(f"🔄 Konfigurasi {yaml_file.name}: Drive → Lokal (file drive lebih baru)")
+                            
+            except Exception as e:
+                result['errors'].append(f"❌ Error sinkronisasi {yaml_file.name}: {str(e)}")
+                if logger:
+                    logger.warning(f"❌ Error sinkronisasi {yaml_file.name}: {str(e)}")
+    
+    return result

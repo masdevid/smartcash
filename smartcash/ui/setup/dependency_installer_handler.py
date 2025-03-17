@@ -12,7 +12,6 @@ from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
 
-from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
 from smartcash.ui.components.metrics import create_metric_display
 
@@ -197,7 +196,6 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 _update_status_panel(f"Semua {installed_count} package berhasil diinstall", 'success')
             
             # Buat widget metrics untuk ringkasan
-            metrics_container = display(create_metric_display("Total Package", len(packages_to_install)))
             display(create_metric_display("Berhasil", installed_count, is_good=installed_count > 0))
             display(create_metric_display("Gagal", len(failed_packages), is_good=len(failed_packages) == 0))
             display(create_metric_display("Waktu Instalasi", f"{duration:.2f} detik"))

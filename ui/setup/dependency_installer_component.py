@@ -80,6 +80,8 @@ def create_dependency_installer_ui(env=None, config=None):
                 padding='10px',
                 border='1px solid #dee2e6',
                 border_radius='5px',
+                width='32%',
+                min_width='250px'
             )
         )
         package_section_widgets.append(group_box)

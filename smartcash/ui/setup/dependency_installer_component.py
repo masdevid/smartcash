@@ -83,7 +83,7 @@ def create_dependency_installer_ui(env=None, config=None):
         placeholder='Tambahkan package tambahan (satu per baris)',
         layout=create_layout(
             width='100%', 
-            height='100px', 
+            height='80px', 
             border=f'1px solid {COLORS["border"]}',
             border_radius='4px',
             padding='10px'
@@ -96,24 +96,28 @@ def create_dependency_installer_ui(env=None, config=None):
             description='Check All', 
             button_style='info', 
             icon='check-square',
+            min_height='40px',
             layout=create_layout(margin='0 5px')
         ),
         widgets.Button(
             description='Uncheck All', 
             button_style='warning', 
             icon='square',
+            min_height='40px',
             layout=create_layout(margin='0 5px')
         ),
         widgets.Button(
             description='Install Packages', 
             button_style='primary', 
             icon='download',
+            min_height='40px',
             layout=create_layout(margin='0 5px')
         ),
         widgets.Button(
             description='Check Installations', 
             button_style='success', 
             icon='check',
+            min_height='40px',
             layout=create_layout(margin='0 5px')
         )
     ])

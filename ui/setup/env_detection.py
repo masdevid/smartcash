@@ -48,9 +48,9 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             
             ui_components['colab_panel'].value = f"""
             <div style="padding:10px; background-color:#d1ecf1; color:#0c5460; border-radius:4px; margin:10px 0">
-                <h3 style="color:#0c5460">🔍 Environment: Google Colab</h3>
-                <p>{icon} Status Google Drive: <strong>{status}</strong></p>
-                <p>Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
+                <h3 style="color:#0c5460; margin:5px 0">🔍 Environment: Google Colab</h3>
+                <p style="margin:5px 0">{icon} Status Google Drive: <strong>{status}</strong></p>
+                <p style="margin:5px 0">Klik tombol 'Hubungkan Google Drive' untuk mount drive dan menyinkronkan proyek.</p>
             </div>
             """
             # Aktifkan tombol drive
@@ -59,8 +59,8 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             # Tampilkan informasi local environment
             ui_components['colab_panel'].value = """
             <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:10px 0">
-                <h3 style="color:#155724">🔍 Environment: Local</h3>
-                <p>Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
+                <h3 style="color:#155724; margin:5px 0">🔍 Environment: Local</h3>
+                <p style="margin:5px 0">Gunakan tombol 'Setup Direktori Lokal' untuk membuat struktur direktori proyek.</p>
             </div>
             """
             # Sembunyikan tombol drive

@@ -20,8 +20,8 @@ def handle_drive_connection(ui_components: Dict[str, Any]):
     with ui_components['status']:
         clear_output()
         display(HTML("""
-            <div style="padding:8px; background-color:#d1ecf1; color:#0c5460; border-radius:4px">
-                🔄 Menghubungkan ke Google Drive...
+            <div style="padding:10px; background-color:#d1ecf1; color:#0c5460; border-radius:4px; margin:5px 0">
+                <p style="margin:5px 0">🔄 Menghubungkan ke Google Drive...</p>
             </div>
         """))
     
@@ -35,8 +35,8 @@ def handle_drive_connection(ui_components: Dict[str, Any]):
         with ui_components['status']:
             clear_output()
             display(HTML("""
-                <div style="padding:8px; background-color:#d4edda; color:#155724; border-radius:4px">
-                    ✅ Google Drive berhasil terhubung!
+                <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:5px 0">
+                    <p style="margin:5px 0">✅ Google Drive berhasil terhubung!</p>
                 </div>
             """))
             
@@ -45,8 +45,8 @@ def handle_drive_connection(ui_components: Dict[str, Any]):
                 create_symlinks(drive_path, ui_components)
             except Exception as e:
                 display(HTML(f"""
-                    <div style="padding:8px; background-color:#fff3cd; color:#856404; border-radius:4px">
-                        ⚠️ Error saat membuat symlinks: {str(e)}
+                    <div style="padding:10px; background-color:#fff3cd; color:#856404; border-radius:4px; margin:5px 0">
+                        <p style="margin:5px 0">⚠️ Error saat membuat symlinks: {str(e)}</p>
                     </div>
                 """))
             
@@ -55,25 +55,25 @@ def handle_drive_connection(ui_components: Dict[str, Any]):
                 sync_configs(drive_path, ui_components)
             except Exception as e:
                 display(HTML(f"""
-                    <div style="padding:8px; background-color:#fff3cd; color:#856404; border-radius:4px">
-                        ⚠️ Error saat sinkronisasi konfigurasi: {str(e)}
+                    <div style="padding:10px; background-color:#fff3cd; color:#856404; border-radius:4px; margin:5px 0">
+                        <p style="margin:5px 0">⚠️ Error saat sinkronisasi konfigurasi: {str(e)}</p>
                     </div>
                 """))
         
         # Update panel Colab
         ui_components['colab_panel'].value = """
         <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:10px 0">
-            <h3>🔍 Environment: Google Colab</h3>
-            <p>✅ Status Google Drive: <strong>terhubung</strong></p>
-            <p>Drive terhubung dan struktur direktori telah dibuat.</p>
+            <h3 style="color:#155724; margin:5px 0">🔍 Environment: Google Colab</h3>
+            <p style="margin:5px 0">✅ Status Google Drive: <strong>terhubung</strong></p>
+            <p style="margin:5px 0">Drive terhubung dan struktur direktori telah dibuat.</p>
         </div>
         """
     except Exception as e:
         with ui_components['status']:
             clear_output()
             display(HTML(f"""
-                <div style="padding:8px; background-color:#f8d7da; color:#721c24; border-radius:4px">
-                    ❌ Error saat menghubungkan ke Google Drive: {str(e)}
+                <div style="padding:10px; background-color:#f8d7da; color:#721c24; border-radius:4px; margin:5px 0">
+                    <p style="margin:5px 0">❌ Error saat menghubungkan ke Google Drive: {str(e)}</p>
                 </div>
             """))
 
@@ -102,8 +102,8 @@ def mount_google_drive(ui_components: Dict[str, Any]) -> Optional[Path]:
     except Exception as e:
         with ui_components['status']:
             display(HTML(f"""
-                <div style="padding:8px; background-color:#f8d7da; color:#721c24; border-radius:4px">
-                    ❌ Error saat mounting Google Drive: {str(e)}
+                <div style="padding:10px; background-color:#f8d7da; color:#721c24; border-radius:4px; margin:5px 0">
+                    <p style="margin:5px 0">❌ Error saat mounting Google Drive: {str(e)}</p>
                 </div>
             """))
         return None
@@ -128,7 +128,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any]):
     with ui_components['status']:
         display(HTML("""
             <div style="margin-top:10px">
-                <h3>🔗 Membuat Symlinks</h3>
+                <h3 style="color:#0c5460; margin:5px 0">🔗 Membuat Symlinks</h3>
             </div>
         """))
     
@@ -144,7 +144,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any]):
                 backup_path = local_path.with_name(f"{local_name}_backup")
                 display(HTML(f"""
                     <div style="padding:4px; color:#0c5460">
-                        🔄 Memindahkan direktori lokal ke backup: {local_name} → {local_name}_backup
+                        <p style="margin:5px 0">🔄 Memindahkan direktori lokal ke backup: {local_name} → {local_name}_backup</p>
                     </div>
                 """))
                 if backup_path.exists():
@@ -156,7 +156,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any]):
                 local_path.symlink_to(target_path)
                 display(HTML(f"""
                     <div style="padding:4px; color:#155724">
-                        ✅ Symlink dibuat: {local_name} → {target_path}
+                        <p style="margin:5px 0">✅ Symlink dibuat: {local_name} → {target_path}</p>
                     </div>
                 """))
 
@@ -178,7 +178,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
     with ui_components['status']:
         display(HTML("""
             <div style="margin-top:10px">
-                <h3>🔄 Sinkronisasi Konfigurasi</h3>
+                <h3 style="color:#0c5460; margin:5px 0">🔄 Sinkronisasi Konfigurasi</h3>
             </div>
         """))
     
@@ -202,7 +202,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
                 shutil.copy2(local_file, drive_configs / filename)
                 display(HTML(f"""
                     <div style="padding:4px; color:#0c5460">
-                        ⬆️ File lokal disalin ke Drive: {filename}
+                        <p style="margin:5px 0">⬆️ File lokal disalin ke Drive: {filename}</p>
                     </div>
                 """))
             
@@ -211,26 +211,48 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
                 shutil.copy2(drive_file, local_configs / filename)
                 display(HTML(f"""
                     <div style="padding:4px; color:#0c5460">
-                        ⬇️ File Drive disalin ke lokal: {filename}
+                        <p style="margin:5px 0">⬇️ File Drive disalin ke lokal: {filename}</p>
                     </div>
                 """))
             
             # Kedua file ada, bandingkan timestamp
             elif local_file and drive_file:
-                local_time = local_file.stat().st_mtime
-                drive_time = drive_file.stat().st_mtime
-                
-                if local_time > drive_time:
-                    shutil.copy2(local_file, drive_file)
+                # Handle the SameFileError case - check if the files are the same
+                if os.path.samefile(local_file, drive_file):
                     display(HTML(f"""
                         <div style="padding:4px; color:#0c5460">
-                            ⬆️ File lokal lebih baru, disalin ke Drive: {filename}
+                            <p style="margin:5px 0">ℹ️ File sudah sinkron (symlink): {filename}</p>
                         </div>
                     """))
-                else:
-                    shutil.copy2(drive_file, local_file)
+                    continue
+                    
+                try:
+                    local_time = local_file.stat().st_mtime
+                    drive_time = drive_file.stat().st_mtime
+                    
+                    if local_time > drive_time:
+                        shutil.copy2(local_file, drive_file)
+                        display(HTML(f"""
+                            <div style="padding:4px; color:#0c5460">
+                                <p style="margin:5px 0">⬆️ File lokal lebih baru, disalin ke Drive: {filename}</p>
+                            </div>
+                        """))
+                    else:
+                        shutil.copy2(drive_file, local_file)
+                        display(HTML(f"""
+                            <div style="padding:4px; color:#0c5460">
+                                <p style="margin:5px 0">⬇️ File Drive lebih baru, disalin ke lokal: {filename}</p>
+                            </div>
+                        """))
+                except shutil.SameFileError:
                     display(HTML(f"""
                         <div style="padding:4px; color:#0c5460">
-                            ⬇️ File Drive lebih baru, disalin ke lokal: {filename}
+                            <p style="margin:5px 0">ℹ️ File sudah sinkron (symlink): {filename}</p>
+                        </div>
+                    """))
+                except Exception as e:
+                    display(HTML(f"""
+                        <div style="padding:4px; color:#856404">
+                            <p style="margin:5px 0">⚠️ Error saat sinkronisasi {filename}: {str(e)}</p>
                         </div>
                     """))

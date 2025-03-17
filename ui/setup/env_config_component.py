@@ -28,17 +28,21 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Panel status Colab/Drive
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
     
-    # Panel info bantuan
-    help_panel = widgets.HTML(
-        """<div style="padding:10px; background-color:#f8f9fa; border-left:4px solid #6c757d; margin:10px 0">
-            <h3 style="color:#2c3e50">ℹ️ Informasi</h3>
-            <p style="color:#2c3e50">Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
-            <ul style="color:#2c3e50">
-                <li>Di Google Colab: Sebaiknya hubungkan ke Google Drive untuk menyimpan dataset dan model</li>
-                <li>Di lingkungan lokal: Pastikan struktur direktori telah dibuat</li>
-            </ul>
-        </div>"""
+    # Panel info bantuan (collapsible)
+    help_accordion = widgets.Accordion(
+        children=[widgets.HTML(
+            """<div style="padding:10px; background-color:#f8f9fa; border-left:4px solid #6c757d; margin:0">
+                <p style="margin:5px 0; color:#2c3e50">Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
+                <ul style="color:#2c3e50">
+                    <li>Di Google Colab: Sebaiknya hubungkan ke Google Drive untuk menyimpan dataset dan model</li>
+                    <li>Di lingkungan lokal: Pastikan struktur direktori telah dibuat</li>
+                </ul>
+            </div>"""
+        )],
+        selected_index=None,  # Collapsed by default
+        layout=widgets.Layout(margin="10px 0")
     )
+    help_accordion.set_title(0, "ℹ️ Informasi")
     
     # Tombol aksi
     drive_button = widgets.Button(
@@ -72,7 +76,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         colab_panel,
-        help_panel,
+        help_accordion,
         drive_button,
         directory_button,
         status
@@ -83,7 +87,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'colab_panel': colab_panel,
-        'help_panel': help_panel,
+        'help_panel': help_accordion,
         'drive_button': drive_button,
         'directory_button': directory_button,
         'status': status

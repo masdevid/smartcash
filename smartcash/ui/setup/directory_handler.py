@@ -18,7 +18,7 @@ def handle_directory_setup(ui_components: Dict[str, Any]):
     with ui_components['status']:
         clear_output()
         display(HTML("""
-            <div style="padding:8px; background-color:#d1ecf1; color:#0c5460; border-radius:4px">
+            <div style="padding:10px; background-color:#d1ecf1; color:#0c5460; border-radius:4px; margin:5px 0">
                 <p style="margin:5px 0">🔄 Membuat struktur direktori...</p>
             </div>
         """))
@@ -29,7 +29,7 @@ def handle_directory_setup(ui_components: Dict[str, Any]):
         with ui_components['status']:
             clear_output()
             display(HTML(f"""
-                <div style="padding:8px; background-color:#f8d7da; color:#721c24; border-radius:4px">
+                <div style="padding:10px; background-color:#f8d7da; color:#721c24; border-radius:4px; margin:5px 0">
                     <p style="margin:5px 0">❌ Error saat membuat struktur direktori: {str(e)}</p>
                 </div>
             """))
@@ -70,7 +70,7 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
                 stats['existing'] += 1
         
         display(HTML(f"""
-            <div style="padding:8px; background-color:#d4edda; color:#155724; border-radius:4px; margin-top:10px">
+            <div style="padding:10px; background-color:#d4edda; color:#155724; border-radius:4px; margin:5px 0">
                 <p style="margin:5px 0">✅ Struktur direktori selesai dibuat: {stats['created']} direktori baru, {stats['existing']} sudah ada</p>
             </div>
         """))
@@ -87,68 +87,41 @@ def display_directory_tree(ui_components: Dict[str, Any]):
     """
     with ui_components['status']:
         display(HTML("""
-            <div style="margin-top:15px">
-                <h3 style="color:#155724">📂 Struktur Direktori Project</h3>
+            <div style="margin-top:10px">
+                <h3 style="color:#155724; margin:5px 0">📂 Struktur Direktori Project</h3>
             </div>
         """))
         
         try:
-            # Coba gunakan environment manager
-            from smartcash.common.environment import get_environment_manager
-            env = get_environment_manager()
-            tree_html = env.get_directory_tree(Path.cwd(), max_depth=2)
+            # Dapatkan direktori project
+            project_path = Path.cwd()
+            tree_html = create_project_tree(project_path)
             display(HTML(tree_html))
-        except Exception:
-            # Fallback ke implementasi sederhana
-            directory_tree_fallback(ui_components)
-
-def directory_tree_fallback(ui_components: Dict[str, Any], max_depth: int = 2):
-    """
-    Implementasi fallback untuk directory tree jika environment manager tidak tersedia.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        max_depth: Kedalaman maksimum directory tree
-    """
-    try:
-        # Implementasi sederhana untuk directory tree
-        tree = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
-        cwd = Path.cwd()
-        tree += f"<span style='color:#0366d6; font-weight:bold;'>{cwd.name}/</span>\n"
-        
-        # Buat tree rekursif
-        def _add_tree(path, prefix="", depth=0):
-            if depth >= max_depth:
-                return ""
-                
-            items = sorted(path.iterdir(), key=lambda x: (not x.is_dir(), x.name))
-            last_idx = len(items) - 1
-            result = ""
-            
-            for i, item in enumerate(items):
-                is_last = i == last_idx
-                connector = "└─ " if is_last else "├─ "
-                next_prefix = prefix + ("   " if is_last else "│  ")
-                
-                if item.is_dir() and not item.name.startswith('.'):
-                    result += f"{prefix}{connector}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
-                    if depth < max_depth - 1:
-                        result += _add_tree(item, next_prefix, depth + 1)
-                elif not item.name.startswith('.'):
-                    result += f"{prefix}{connector}{item.name}\n"
-                    
-            return result
-        
-        # Tambahkan tree direktori
-        tree += _add_tree(cwd)
-        tree += "</pre>"
-        
-        with ui_components['status']:
-            display(HTML(tree))
-    except Exception as e:
-        with ui_components['status']:
+        except Exception as e:
             display(HTML(f"""
-                <div style="padding:8px; background-color:#fff3cd; color:#856404; border-radius:4px">
+                <div style="padding:10px; background-color:#fff3cd; color:#856404; border-radius:4px; margin:5px 0">
                     <p style="margin:5px 0">⚠️ Tidak dapat menampilkan struktur direktori: {str(e)}</p>
                 </div>
             """))
+
+def create_project_tree(project_path: Path) -> str:
+    """
+    Buat struktur direktori yang hanya menampilkan folder project.
+    
+    Args:
+        project_path: Path direktori project
+        
+    Returns:
+        HTML string berisi tree direktori
+    """
+    tree = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
+    tree += f"<span style='color:#0366d6; font-weight:bold;'>{project_path.name}/</span>\n"
+    
+    # Dapatkan folder-folder di root project
+    for item in sorted(project_path.iterdir()):
+        if item.is_dir() and not item.name.startswith('.'):
+            # Hanya tampilkan folder (tanpa subfolder)
+            tree += f"├─ <span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
+    
+    tree += "</pre>"
+    return tree

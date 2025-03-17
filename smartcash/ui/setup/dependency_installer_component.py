@@ -5,11 +5,13 @@ Deskripsi: Komponen UI untuk instalasi dependencies
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.headers import create_header
-from smartcash.ui.components.alerts import create_status_indicator, create_info_box
 def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
+
+    from smartcash.ui.utils.constants import ICONS
+    from smartcash.ui.components.headers import create_header
+    from smartcash.ui.components.alerts import create_status_indicator, create_info_box
+    
     # Header 
     header = create_header(
         "📦 Instalasi Dependencies", 
@@ -75,7 +77,6 @@ def create_dependency_installer_ui(env=None, config=None):
                 padding='10px',
                 border='1px solid #dee2e6',
                 border_radius='5px',
-                width='150px'
             )
         )
         package_section_widgets.append(group_box)

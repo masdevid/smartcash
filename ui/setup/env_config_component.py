@@ -49,7 +49,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         description='Hubungkan Google Drive',
         button_style='primary',
         icon='link',
-        width='150px',
+        miidth='200px',
         tooltip='Mount Google Drive dan siapkan struktur direktori'
     )
     
@@ -57,7 +57,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         description='Setup Direktori Lokal',
         button_style='info',
         icon='folder-plus',
-        width='150px',
+        min_width='200px',
         tooltip='Buat struktur direktori lokal'
     )
     

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/file_utils.py
-Deskripsi: Utilitas file untuk komponen UI dengan operasi general dan visualisasi
+Deskripsi: Utilitas file untuk komponen UI dengan operasi general dan visualisasi, tanpa ThreadPool
 """
 
 import ipywidgets as widgets

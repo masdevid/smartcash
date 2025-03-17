@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/components/helpers.py
-Deskripsi: Helper functions untuk komponen UI
+Deskripsi: Helper functions untuk komponen UI tanpa ThreadPool
 """
 
 import ipywidgets as widgets
@@ -9,9 +9,8 @@ from typing import Dict, Any, List, Optional, Tuple, Union, Callable
 from datetime import datetime
 from pathlib import Path
 
-from smartcash.ui.utils.constants import COLORS, BUTTON_STYLES
+from smartcash.ui.utils.constants import COLORS, BUTTON_STYLES, ICONS
 from smartcash.ui.components.layouts import STANDARD_LAYOUTS
-from smartcash.ui.utils.ui_helpers import _thread_pool
 
 def create_tab_view(tabs: Dict[str, widgets.Widget]) -> widgets.Tab:
     """
@@ -114,8 +113,6 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
     Returns:
         Widget HTML berisi info file
     """
-    from smartcash.ui.utils.constants import ICONS
-    
     # Ambil info file
     path = Path(file_path)
     if path.exists():
@@ -176,9 +173,9 @@ def create_progress_updater(progress_bar: widgets.IntProgress) -> Callable:
     
     return update_progress
 
-def run_async_task(task_func, on_complete=None, on_error=None, with_output=None):
+def run_task(task_func, on_complete=None, on_error=None, with_output=None):
     """
-    Jalankan task secara asinkron menggunakan ThreadPoolExecutor.
+    Jalankan task secara langsung dengan penanganan callback.
     
     Args:
         task_func: Fungsi task yang akan dijalankan
@@ -187,33 +184,28 @@ def run_async_task(task_func, on_complete=None, on_error=None, with_output=None)
         with_output: Widget output untuk menampilkan error
         
     Returns:
-        Future object dari ThreadPoolExecutor
+        Hasil dari task_func atau None jika terjadi error
     """
-    def task_wrapper():
-        try:
-            # Run task
-            result = task_func()
+    try:
+        # Run task langsung
+        result = task_func()
+        
+        # Handle completion
+        if on_complete:
+            on_complete(result)
             
-            # Handle completion
-            if on_complete:
-                on_complete(result)
-                
-            return result
-                
-        except Exception as e:
-            # Handle error
-            if on_error:
-                on_error(e)
-            elif with_output:
-                from smartcash.ui.components.alerts import create_status_indicator
-                with with_output:
-                    display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-            
-            # Re-raise the exception for the future object
-            raise
-    
-    # Submit to thread pool
-    return _thread_pool.submit(task_wrapper)
+        return result
+    except Exception as e:
+        # Handle error
+        if on_error:
+            on_error(e)
+        elif with_output:
+            from smartcash.ui.components.alerts import create_status_indicator
+            with with_output:
+                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+        
+        # Re-raise exception untuk penanganan lebih lanjut jika diperlukan
+        raise
 
 def create_button_group(buttons, layout=None):
     """
@@ -260,8 +252,6 @@ def create_confirmation_dialog(title, message, on_confirm, on_cancel=None,
         Widget VBox berisi dialog konfirmasi
     """
     # Dialog content
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    
     content = widgets.VBox([
         widgets.HTML(f"""
         <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 

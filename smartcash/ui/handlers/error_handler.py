@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/error_handler.py
-Deskripsi: Handler untuk penanganan error di komponen UI
+Deskripsi: Handler untuk penanganan error di komponen UI tanpa ThreadPool
 """
 
 import traceback

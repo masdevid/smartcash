@@ -1,20 +1,16 @@
 """
 File: smartcash/ui/utils/ui_helpers.py
-Deskripsi: Fungsi helper untuk komponen UI dan integrasi dengan notebook, menggunakan ThreadPool
+Deskripsi: Fungsi helper untuk komponen UI dan integrasi dengan notebook, tanpa ThreadPool
 """
 
 import ipywidgets as widgets
 from IPython.display import display, HTML, clear_output
-from concurrent.futures import ThreadPoolExecutor
 from typing import Callable, Any, Optional, Dict, List, Union, Tuple
 import time
 from pathlib import Path
 import datetime
 
 from smartcash.ui.utils.constants import COLORS, ICONS, FILE_SIZE_UNITS
-
-# Global thread pool executor with limited workers
-_thread_pool = ThreadPoolExecutor(max_workers=4)
 
 def set_active_theme(theme_name: str = 'default') -> bool:
     """
@@ -132,44 +128,28 @@ def format_file_size(size_bytes: int) -> str:
     
     return f"{size_bytes:.2f}{FILE_SIZE_UNITS[i]}"
 
-def run_async_task(task_func, on_complete=None, on_error=None, with_output=None):
+def run_task(task_func, with_output=None):
     """
-    Jalankan task secara asinkron dalam ThreadPool.
+    Eksekusi fungsi tugas dan tangani error.
     
     Args:
         task_func: Fungsi task yang akan dijalankan
-        on_complete: Callback saat task selesai
-        on_error: Callback saat task error
         with_output: Widget output untuk menampilkan error
         
     Returns:
-        Future object dari ThreadPoolExecutor
+        Hasil dari task_func atau None jika terjadi error
     """
-    def task_wrapper():
-        try:
-            # Run task
-            result = task_func()
-            
-            # Handle completion
-            if on_complete:
-                on_complete(result)
-            
-            return result
-                
-        except Exception as e:
-            # Handle error
-            if on_error:
-                on_error(e)
-            elif with_output:
-                from smartcash.ui.components.shared.alerts import create_status_indicator
-                with with_output:
-                    display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-            
-            # Re-raise the exception for the future object
-            raise
-    
-    # Submit to thread pool
-    return _thread_pool.submit(task_wrapper)
+    try:
+        # Run task langsung
+        return task_func()
+    except Exception as e:
+        # Handle error
+        if with_output:
+            from smartcash.ui.components.alerts import create_status_indicator
+            with with_output:
+                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+        # Re-raise exception untuk penanganan lebih lanjut jika diperlukan
+        raise
 
 def create_confirmation_dialog(title, message, on_confirm, on_cancel=None, 
                              confirm_label="Konfirmasi", cancel_label="Batal"):
@@ -358,7 +338,7 @@ def update_output_area(output_widget: widgets.Output, message: str, status: str 
         status: Jenis status ('info', 'success', 'warning', 'error')
         clear: Apakah perlu clear output sebelumnya
     """
-    from smartcash.ui.components.shared.alerts import create_status_indicator
+    from smartcash.ui.components.alerts import create_status_indicator
     
     with output_widget:
         if clear:
@@ -377,7 +357,7 @@ def register_observer_callback(observer_manager, event_type, output_widget,
         group_name: Nama group untuk observer
     """
     if observer_manager:
-        from smartcash.ui.components.shared.alerts import create_status_indicator
+        from smartcash.ui.components.alerts import create_status_indicator
         
         def update_ui_callback(event_type, sender, message=None, **kwargs):
             if message:
@@ -400,14 +380,3 @@ def create_divider() -> widgets.HTML:
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""
     return widgets.HTML(f"<div style='height: {height};'></div>")
-
-# Cleanup function to properly shutdown the thread pool
-def shutdown_thread_pool():
-    """Shutdown thread pool saat aplikasi selesai."""
-    global _thread_pool
-    if _thread_pool:
-        _thread_pool.shutdown(wait=True)
-
-# Import atexit and register shutdown function
-import atexit
-atexit.register(shutdown_thread_pool)

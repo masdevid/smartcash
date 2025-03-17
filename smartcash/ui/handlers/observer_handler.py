@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/observer_handler.py
-Deskripsi: Handler untuk sistem observer dengan integrasi UI
+Deskripsi: Handler untuk sistem observer dengan integrasi UI tanpa ThreadPool
 """
 
 import ipywidgets as widgets

@@ -20,10 +20,6 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Import komponen UI
     from smartcash.ui.components.headers import create_header
     from smartcash.ui.components.alerts import create_info_box
-    from smartcash.ui.components.widget_layouts import (
-        COMPONENT_LAYOUTS, BUTTON_LAYOUTS, INPUT_LAYOUTS, 
-        CONTAINER_LAYOUTS, CONTENT_LAYOUTS
-    )
     from smartcash.ui.utils.constants import COLORS, ICONS
     
     # Header
@@ -45,8 +41,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     download_options = widgets.RadioButtons(
         options=['Roboflow (Online)', 'Local Data (Upload)'],
         description='Sumber:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(margin='10px 0')
+        style={'description_width': 'initial'}
     )
     
     # Roboflow settings
@@ -54,51 +49,45 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         widgets.Password(
             value='',
             description='API Key:',
-            style={'description_width': 'initial'},
-            layout=INPUT_LAYOUTS['text']
+            style={'description_width': 'initial'}
         ),
         widgets.Text(
             value='smartcash-wo2us',
             description='Workspace:',
-            style={'description_width': 'initial'},
-            layout=INPUT_LAYOUTS['text']
+            style={'description_width': 'initial'}
         ),
         widgets.Text(
             value='rupiah-emisi-2022',
             description='Project:',
-            style={'description_width': 'initial'},
-            layout=INPUT_LAYOUTS['text']
+            style={'description_width': 'initial'}
         ),
         widgets.Text(
             value='3',
             description='Version:',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='40%', margin='5px 0')
+            layout=widgets.Layout(width='40%')
         )
-    ], layout=CONTAINER_LAYOUTS['card'])
+    ])
     
     # Local upload widget
     local_upload = widgets.VBox([
         widgets.FileUpload(
             description='Upload ZIP:',
             accept='.zip',
-            multiple=False,
-            layout=widgets.Layout(width='300px', margin='5px 0')
+            multiple=False
         ),
         widgets.Text(
             value='data/uploaded',
             description='Target dir:',
-            style={'description_width': 'initial'},
-            layout=INPUT_LAYOUTS['text']
+            style={'description_width': 'initial'}
         )
-    ], layout=CONTAINER_LAYOUTS['card'])
+    ])
     
     # Tombol aksi
     download_button = widgets.Button(
         description='Download Dataset',
         button_style='primary',
-        icon='download',
-        layout=BUTTON_LAYOUTS['standard']
+        icon='download'
     )
     
     # Progress bar
@@ -108,17 +97,19 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         max=100,
         description='0%',
         bar_style='',
-        orientation='horizontal',
-        layout=COMPONENT_LAYOUTS['progress']
+        orientation='horizontal'
     )
-    
-    # Divider
-    from smartcash.ui.components.widget_layouts import create_divider
-    divider = create_divider()
     
     # Status output
     status = widgets.Output(
-        layout=CONTENT_LAYOUTS['output']
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            max_height='300px',
+            margin='10px 0',
+            padding='10px',
+            overflow='auto'
+        )
     )
     
     # Panel info bantuan
@@ -166,20 +157,17 @@ data/
     download_settings_container = widgets.VBox([roboflow_settings])
     
     # Rakit komponen UI
-    ui = widgets.VBox(
-        [
-            header,
-            status_panel,
-            download_options,
-            download_settings_container,
-            divider,
-            download_button,
-            progress_bar,
-            status,
-            help_panel
-        ],
-        layout=CONTAINER_LAYOUTS['main']
-    )
+    ui = widgets.VBox([
+        header,
+        status_panel,
+        download_options,
+        download_settings_container,
+        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
+        download_button,
+        progress_bar,
+        status,
+        help_panel
+    ])
     
     # Komponen UI
     ui_components = {

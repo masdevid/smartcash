@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow
+Deskripsi: Handler untuk download dataset dari Roboflow dengan integrasi logging
 """
 
 from pathlib import Path
@@ -16,6 +16,7 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
         env: Environment manager
         config: Konfigurasi aplikasi
     """
+    logger = ui_components.get('logger')
     try:
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
@@ -43,8 +44,11 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
         }
     
     if 'dataset_manager' not in ui_components:
-        with ui_components['status']:
-            display(create_status_indicator("error", f"{ICONS['error']} DatasetManager tidak tersedia"))
+        if logger:
+            logger.error(f"{ICONS['error']} DatasetManager tidak tersedia")
+        else:
+            with ui_components['status']:
+                display(create_status_indicator("error", f"{ICONS['error']} DatasetManager tidak tersedia"))
         return
     
     # Get download settings
@@ -57,10 +61,13 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
     if not data_dir:
         return
     
-    # Download dataset
-    with ui_components['status']:
-        display(create_status_indicator("info", 
-            f"{ICONS['key']} Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})..."))
+    # Log download
+    if logger:
+        logger.info(f"🔑 Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})")
+    else:
+        with ui_components['status']:
+            display(create_status_indicator("info", 
+                f"{ICONS['key']} Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})..."))
     
     try:
         dataset_paths = execute_download(ui_components, settings, data_dir)
@@ -78,6 +85,7 @@ def get_roboflow_settings(ui_components):
     Returns:
         Dictionary berisi pengaturan Roboflow atau None jika gagal
     """
+    logger = ui_components.get('logger')
     try:
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
@@ -103,8 +111,11 @@ def get_roboflow_settings(ui_components):
         if api_key:
             api_settings[0].value = api_key
         else:
-            with ui_components['status']:
-                display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
+            if logger:
+                logger.error(f"{ICONS['error']} API Key Roboflow tidak tersedia")
+            else:
+                with ui_components['status']:
+                    display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
             return None
     
     # Update config dengan pengaturan baru
@@ -138,6 +149,7 @@ def setup_data_directory(ui_components, env, config):
     Returns:
         Path direktori data atau None jika gagal
     """
+    logger = ui_components.get('logger')
     try:
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
@@ -160,23 +172,36 @@ def setup_data_directory(ui_components, env, config):
     if env and hasattr(env, 'is_colab') and env.is_colab:
         # Gunakan direktori Drive yang sudah terhubung
         if hasattr(env, 'drive_path') and env.is_drive_mounted:
-            with ui_components['status']:
-                display(create_status_indicator("info", f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset"))
+            if logger:
+                logger.info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset")
+            else:
+                with ui_components['status']:
+                    display(create_status_indicator("info", f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset"))
             data_dir = str(env.drive_path / 'data')
         # Coba hubungkan ke Drive
         elif hasattr(env, 'mount_drive'):
-            with ui_components['status']:
-                display(create_status_indicator("info", f"{ICONS['folder']} Mencoba menghubungkan ke Google Drive..."))
+            if logger:
+                logger.info(f"{ICONS['folder']} Mencoba menghubungkan ke Google Drive...")
+            else:
+                with ui_components['status']:
+                    display(create_status_indicator("info", f"{ICONS['folder']} Mencoba menghubungkan ke Google Drive..."))
             try:
                 env.mount_drive()
                 if env.is_drive_mounted:
                     data_dir = str(env.drive_path / 'data')
-                    display(create_status_indicator("success", f"{ICONS['success']} Google Drive berhasil terhubung"))
+                    if logger:
+                        logger.success(f"{ICONS['success']} Google Drive berhasil terhubung")
+                    else:
+                        display(create_status_indicator("success", f"{ICONS['success']} Google Drive berhasil terhubung"))
             except Exception as e:
-                with ui_components['status']:
-                    display(create_status_indicator("warning", 
-                        f"{ICONS['warning']} Tidak dapat menghubungkan ke Google Drive: {str(e)}"))
-                display(create_status_indicator("info", f"{ICONS['folder']} Menggunakan penyimpanan lokal"))
+                if logger:
+                    logger.warning(f"{ICONS['warning']} Tidak dapat menghubungkan ke Google Drive: {str(e)}")
+                    logger.info(f"{ICONS['folder']} Menggunakan penyimpanan lokal")
+                else:
+                    with ui_components['status']:
+                        display(create_status_indicator("warning", 
+                            f"{ICONS['warning']} Tidak dapat menghubungkan ke Google Drive: {str(e)}"))
+                    display(create_status_indicator("info", f"{ICONS['folder']} Menggunakan penyimpanan lokal"))
     
     # Pastikan direktori ada
     Path(data_dir).mkdir(parents=True, exist_ok=True)
@@ -216,6 +241,7 @@ def handle_successful_download(ui_components, dataset_paths, data_dir):
         dataset_paths: Path dataset yang di-download
         data_dir: Direktori data
     """
+    logger = ui_components.get('logger')
     try:
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
@@ -231,12 +257,15 @@ def handle_successful_download(ui_components, dataset_paths, data_dir):
             
         ICONS = {'success': '✅'}
     
-    with ui_components['status']:
-        display(create_status_indicator("success", f"{ICONS['success']} Dataset berhasil diunduh ke {data_dir}"))
-        
-        # Validasi struktur dataset
-        if 'validate_dataset_structure' in ui_components and callable(ui_components['validate_dataset_structure']):
-            ui_components['validate_dataset_structure'](data_dir)
+    if logger:
+        logger.success(f"{ICONS['success']} Dataset berhasil diunduh ke {data_dir}")
+    else:
+        with ui_components['status']:
+            display(create_status_indicator("success", f"{ICONS['success']} Dataset berhasil diunduh ke {data_dir}"))
+    
+    # Validasi struktur dataset
+    if 'validate_dataset_structure' in ui_components and callable(ui_components['validate_dataset_structure']):
+        ui_components['validate_dataset_structure'](data_dir)
     
     # Update status panel
     update_status_panel(ui_components, "success", f"{ICONS['success']} Dataset siap digunakan: {len(dataset_paths)} splits")
@@ -262,6 +291,7 @@ def handle_download_error(ui_components, error):
         ui_components: Dictionary komponen UI
         error: Exception yang terjadi
     """
+    logger = ui_components.get('logger')
     try:
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
@@ -277,8 +307,11 @@ def handle_download_error(ui_components, error):
             
         ICONS = {'error': '❌'}
     
-    with ui_components['status']:
-        display(create_status_indicator("error", f"{ICONS['error']} Error: {str(error)}"))
+    if logger:
+        logger.error(f"{ICONS['error']} Error: {str(error)}")
+    else:
+        with ui_components['status']:
+            display(create_status_indicator("error", f"{ICONS['error']} Error: {str(error)}"))
     
     # Update status panel
     update_status_panel(ui_components, "error", f"{ICONS['error']} Download dataset gagal")

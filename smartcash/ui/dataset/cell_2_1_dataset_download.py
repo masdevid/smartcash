@@ -1,6 +1,6 @@
 """
 File: cell_2_1_dataset_download.py
-Deskripsi: Cell untuk download dataset SmartCash dengan pendekatan modular
+Deskripsi: Cell untuk download dataset SmartCash dengan integrasi logging UI
 """
 
 # Import komponen UI dari smartcash
@@ -13,6 +13,8 @@ if '.' not in sys.path:
 
 # Setup environment dan load config
 from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
+from smartcash.ui.utils.logging_utils import setup_ipython_logging
+import logging
 
 # Setup environment dan load config
 env, config = setup_notebook_environment(
@@ -22,6 +24,23 @@ env, config = setup_notebook_environment(
 
 # Setup komponen UI dan handler
 ui_components = setup_ui_component(env, config, "dataset_download")
+
+# Setup logger yang terintegrasi dengan UI
+logger = setup_ipython_logging(ui_components, "dataset_download", log_level=logging.INFO)
+if logger:
+    ui_components['logger'] = logger
+    logger.info("🚀 Cell dataset_download diinisialisasi")
+
+# Tambahkan dataset manager jika tersedia
+try:
+    from smartcash.dataset.manager import DatasetManager
+    dataset_manager = DatasetManager(config=config, logger=logger)
+    ui_components['dataset_manager'] = dataset_manager
+    logger.info("✅ Dataset Manager berhasil diinisialisasi")
+except ImportError as e:
+    if logger:
+        logger.warning(f"⚠️ Tidak dapat menggunakan DatasetManager: {str(e)}")
+        logger.info("ℹ️ Beberapa fitur mungkin tidak tersedia")
 
 # Tampilkan UI
 display_ui(ui_components)

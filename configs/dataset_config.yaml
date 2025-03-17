@@ -1,46 +1,48 @@
-# Dataset Configuration
+# File: configs/dataset_config.yaml
+# Author: Alfrida Sabar (direvisi)
+# Deskripsi: Konfigurasi dataset dengan struktur yang diselaraskan dengan base_config.yaml
 
-# Konfigurasi dasar dataset
-dataset:
-  root_dir: "data/dataset"          # Direktori dataset utama
-  img_size: [640, 640]              # Ukuran gambar untuk training/inference
-  batch_size: 16                    # Ukuran batch default
-  num_workers: 4                    # Jumlah worker untuk dataloader
-  pin_memory: true                  # Gunakan pin memory untuk percepatan GPU
-  multilayer: true                  # Gunakan dataset multilayer
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
 
-# Konfigurasi preprocessing - BARU
-preprocessing:
-  enable_preprocessing: true        # Aktifkan preprocessing dataset
-  use_preprocessed: true            # Gunakan dataset preprocessed untuk training
-  auto_preprocess: true             # Otomatis preprocessing jika belum ada
-  img_size: [640, 640]              # Ukuran target preprocessing
-  preprocessed_dir: "data/preprocessed"  # Direktori untuk menyimpan hasil
-  preserve_labels: true             # Salin label ke direktori preprocessed
-  use_letterbox: true               # Gunakan letterbox resize untuk mempertahankan ratio
-  normalize: true                   # Normalisasi gambar (0-1)
-  max_workers: 8                    # Jumlah worker untuk preprocessing paralel
-  clean_expired_days: 30            # Usia maksimum data preprocessed (hari)
+# Struktur direktori data yang diselaraskan
+data:
+  dir: "data"  # Direktori utama data
+  # Directory paths
+  local:
+    train: "data/train"
+    valid: "data/valid"
+    test: "data/test"
+  
+  # Roboflow config
+  source: "roboflow"  # 'local' atau 'roboflow'
+  roboflow:
+    api_key: ""  # API key diisi oleh pengguna
+    workspace: "smartcash-wo2us"
+    project: "rupiah-emisi-2022"
+    version: "3"
+  
+  # Pengaturan preprocessing diselaraskan dengan base_config
+  preprocessing:
+    img_size: [640, 640]
+    cache_dir: ".cache/smartcash"
+    num_workers: 4
+    
+  # Split ratios (tambahan)
+  split_ratios:
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  
+  # Split settings (tambahan)
+  stratified_split: true
+  random_seed: 42
 
-# Konfigurasi augmentasi
-augmentation:
-  enabled: true                     # Aktifkan augmentasi
-  flip_lr: 0.5                      # Probabilitas flip horizontal
-  flip_ud: 0.1                      # Probabilitas flip vertikal
-  rotate_max: 15                    # Rotasi maksimum (derajat)
-  scale_range: [0.8, 1.2]           # Range skala
-  translate_percent: [0.1, 0.1]     # Translasi max (persen)
-  brightness_range: [0.8, 1.2]      # Range brightness
-  contrast_range: [0.8, 1.2]        # Range contrast
-  saturation_range: [0.8, 1.2]      # Range saturation
-  hue_range: [-0.05, 0.05]          # Range hue
-  mosaic_prob: 0.5                  # Probabilitas mosaic augmentation
-  mixup_prob: 0.2                   # Probabilitas mixup augmentation
-  cutout_prob: 0.3                  # Probabilitas cutout augmentation
-  cutout_max_boxes: 3               # Jumlah maksimal box untuk cutout
-
-# Konfigurasi validasi
-validation:
-  check_integrity: true             # Periksa integritas dataset
-  move_invalid: true                # Pindahkan file invalid ke folder terpisah
-  required_layers: ["banknote"]     # Layer yang dibutuhkan dalam dataset
+# Override konfigurasi cache untuk dataset
+cache:
+  enabled: true
+  dir: ".cache/smartcash"
+  max_size_gb: 1.0
+  ttl_hours: 24
+  auto_cleanup: true
+  cleanup_interval_mins: 30

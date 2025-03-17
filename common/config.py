@@ -21,7 +21,7 @@ class ConfigManager:
     - Dependency injection
     """
     
-    DEFAULT_CONFIG_DIR = 'config'
+    DEFAULT_CONFIG_DIR = 'configs'
     
     def __init__(self, 
                 base_dir: Optional[str] = None, 

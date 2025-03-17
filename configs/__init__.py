@@ -1,7 +1,8 @@
-# File: smartcash/config/__init__.py
-# Author: Alfrida Sabar
-# Deskripsi: Package untuk konfigurasi SmartCash
+"""
+File: smartcash/config/__init__.py
+Deskripsi: Package initialization untuk konfigurasi SmartCash
+"""
 
-from smartcash.utils.config_manager import ConfigManager, get_config_manager
+from smartcash.common.config import ConfigManager, get_config_manager
 
 __all__ = ['ConfigManager', 'get_config_manager']

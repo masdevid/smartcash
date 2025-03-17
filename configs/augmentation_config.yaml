@@ -1,5 +1,5 @@
 # File: configs/augmentation_config.yaml
-# Author: Refactored
+# Author: Refactored (direvisi)
 # Deskripsi: Konfigurasi khusus untuk augmentasi dataset dengan opsi transformasi yang valid
 
 # Inherit dari base_config.yaml
@@ -17,18 +17,18 @@ augmentation:
   validate_results: true
   resume: true
   
-  # Opsi augmentasi posisi (menggunakan Affine daripada ShiftScaleRotate)
+  # Opsi augmentasi posisi dengan dokumentasi untuk properti tambahan
   position:
     fliplr: 0.5          # Probabilitas flip horizontal
     flipud: 0.0          # Probabilitas flip vertical
-    degrees: 15          # Derajat maksimum rotasi
+    degrees: 15          # Derajat maksimum rotasi (sama dengan max_angle untuk kompatibilitas)
     translate: 0.1       # Nilai maksimum translasi (sebagai fraksi dari ukuran)
     scale: 0.1           # Nilai maksimum scaling (sebagai fraksi dari ukuran)
     shear: 0.0           # Nilai maksimum shearing (0.0 = disabled)
-    rotation_prob: 0.5   # Probabilitas rotasi
-    max_angle: 30        # Sudut maksimum
-    flip_prob: 0.5       # Probabilitas flip
-    scale_ratio: 0.3     # Rasio scaling
+    rotation_prob: 0.5   # Probabilitas rotasi (tambahan)
+    max_angle: 30        # Sudut maksimum (tambahan, akan digunakan jika > degrees)
+    flip_prob: 0.5       # Probabilitas flip (tambahan, prioritas lebih tinggi dari fliplr)
+    scale_ratio: 0.3     # Rasio scaling (tambahan, sama dengan scale)
   
   # Opsi augmentasi pencahayaan (menggunakan Blur sebagai alternatif kompresi)
   lighting:
@@ -38,18 +38,19 @@ augmentation:
     contrast: 0.3        # Contrast adjustment (0-1)
     brightness: 0.3      # Brightness adjustment (0-1)
     compress: 0.2        # Probabilitas efek blur
-    brightness_prob: 0.5 # Probabilitas perubahan brightness
-    brightness_limit: 0.3 # Batasan perubahan brightness
-    contrast_prob: 0.5   # Probabilitas perubahan contrast
-    contrast_limit: 0.3  # Batasan perubahan contrast
+    brightness_prob: 0.5 # Probabilitas perubahan brightness (tambahan)
+    brightness_limit: 0.3 # Batasan perubahan brightness (tambahan, sama dengan brightness)
+    contrast_prob: 0.5   # Probabilitas perubahan contrast (tambahan)
+    contrast_limit: 0.3  # Batasan perubahan contrast (tambahan, sama dengan contrast)
   
-  # Augmentasi ekstrim (untuk data lebih robust)
+  # Augmentasi ekstrim (untuk data lebih robust) - tambahan dari base config
   extreme:
     rotation_min: 30     # Rotasi minimum (derajat)
     rotation_max: 90     # Rotasi maksimum (derajat)
     probability: 0.3     # Probabilitas
 
 # Pengaturan pengelolaan data augmentasi
+# Dokumentasi: Pengaturan untuk cleanup dan backup hasil augmentasi
 cleanup:
   backup_enabled: true
   backup_dir: 'data/backup/augmentation'
@@ -59,6 +60,7 @@ cleanup:
     - '*_augmented*'     # Pola alternatif hasil augmentasi
 
 # Pengaturan visualisasi
+# Dokumentasi: Pengaturan khusus untuk visualisasi hasil augmentasi
 visualization:
   enabled: true
   sample_count: 5        # Jumlah sampel untuk visualisasi

@@ -1,5 +1,5 @@
 cp -r smartcash/model .
-cp -r smartcash/config .
+cp -r smartcash/configs .
 cp -r smartcash/components .
 cp -r smartcash/ui .
 cp -r smartcash/dataset .

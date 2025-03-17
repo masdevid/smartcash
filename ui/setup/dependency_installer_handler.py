@@ -11,6 +11,19 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 
+def _get_yolov5_requirements() -> List[str]:
+    """Dapatkan requirements YOLOv5."""
+    try:
+        req_file = Path('yolov5/requirements.txt')
+        if not req_file.exists():
+            return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
+        
+        with open(req_file, 'r') as f:
+            return [re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1) 
+                    for line in f if line.strip() and not line.startswith('#')]
+    except Exception:
+        return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
+
 def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, Any]):
     """
     Setup handler untuk instalasi dependencies.
@@ -54,18 +67,7 @@ def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, A
         except Exception as e:
             return False, f"❌ Gagal install {package_name}: {str(e)}"
 
-    def _get_yolov5_requirements() -> List[str]:
-        """Dapatkan requirements YOLOv5."""
-        try:
-            req_file = Path('yolov5/requirements.txt')
-            if not req_file.exists():
-                return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
-            
-            with open(req_file, 'r') as f:
-                return [re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1) 
-                        for line in f if line.strip() and not line.startswith('#')]
-        except Exception:
-            return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
+    
 
     def _check_package_status(package_checks: List[Tuple[str, str]]) -> None:
         """Periksa status paket yang terinstall."""

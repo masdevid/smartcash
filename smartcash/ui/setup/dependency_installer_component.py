@@ -165,6 +165,14 @@ def create_dependency_installer_ui(env=None, config=None):
     ], layout=main_container)
     
     # Return UI components
+    # Construct checkboxes mapping
+    checkboxes = {}
+    for group_name, packages in package_groups.items():
+        for i, (desc, key) in enumerate(packages):
+            # Find the group widget matching the current group name
+            group_widget = package_grid.children[list(package_groups.keys()).index(group_name)]
+            checkboxes[key] = group_widget.children[i+1]
+    
     return {
         'ui': main,
         'status': status,
@@ -174,6 +182,5 @@ def create_dependency_installer_ui(env=None, config=None):
         'check_all_button': buttons.children[0],
         'uncheck_all_button': buttons.children[1],
         'custom_packages': custom_packages,
-        **{key: group.children[i+1] for group in package_grid.children 
-           for i, (_, key) in enumerate(list(package_groups.values())[list(package_groups.keys()).index(group.children[0].value.split()[-1].lower())])}
+        **checkboxes
     }

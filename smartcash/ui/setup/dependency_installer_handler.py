@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 from tqdm.auto import tqdm
+from smartcash.ui.components.alerts import create_info_alert, create_status_indicator, create_info_box
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):
     """Setup handler untuk instalasi dependencies SmartCash."""
@@ -104,38 +105,22 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 module = __import__(import_name)
                 version = getattr(module, '__version__', 'Unknown')
                 version_display = f" (v{version})" if version != 'Unknown' else ''
-                display(HTML(f"""
-                <div style="color:green;padding:5px 0">
-                    <span style="color:inherit">✅ {display_name}{version_display}</span>
-                </div>
-                """))
+                display(create_status_indicator('success', f"✅ {display_name}{version_display}"))
             except ImportError:
-                display(HTML(f"""
-                <div style="color:orange;padding:5px 0">
-                    <span style="color:inherit">⚠️ {display_name} tidak terinstall</span>
-                </div>
-                """))
+                display(create_status_indicator('warning', f"⚠️ {display_name} tidak terinstall"))
 
     def _update_status_panel(status_message, status_type='info'):
         """Update status panel."""
         if status_type == 'warning':
-            bg_color, text_color = '#fff3cd', '#856404'
             icon = '⚠️'
         elif status_type == 'success':
-            bg_color, text_color = '#d4edda', '#155724'
             icon = '✅'
         elif status_type == 'error':
-            bg_color, text_color = '#f8d7da', '#721c24'
             icon = '❌'
         else:  # info
-            bg_color, text_color = '#d1ecf1', '#0c5460'
             icon = 'ℹ️'
             
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px;margin:10px 0;background-color:{bg_color};color:{text_color};border-radius:4px">
-            <p style="margin:0;color:inherit">{icon} {status_message}</p>
-        </div>
-        """
+        ui_components['info_box'].value = create_info_alert(message=status_message, alert_type=status_type, icon=icon)
 
     def _on_install_packages(b):
         """Handler untuk tombol install packages."""
@@ -163,11 +148,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             
             if not packages_to_install:
                 _update_status_panel("Tidak ada package yang dipilih", 'warning')
-                display(HTML("""
-                <div style="color:orange;padding:10px 0">
-                    <span style="color:inherit">⚠️ Tidak ada package yang dipilih untuk diinstall</span>
-                </div>
-                """))
+                display(create_info_alert(message="Tidak ada package yang dipilih", alert_type='warning'))
                 return
             
             # Siapkan progress bar
@@ -187,11 +168,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             failed_packages = []
             
             for pkg in packages_to_install:
-                display(HTML(f"""
-                <div style="padding:5px 0">
-                    <span>📦 Memulai instalasi: {pkg}</span>
-                </div>
-                """))
+                display(create_info_alert(message=f"📦 Memulai instalasi: {pkg}", alert_type='info'))
                 
                 # Jalankan instalasi
                 success, error_msg = _run_pip_install([pkg])
@@ -199,18 +176,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Update progress
                 if success:
                     installed_count += 1
-                    display(HTML(f"""
-                    <div style="color:green;padding:5px 0">
-                        <span style="color:inherit">✅ {pkg} berhasil diinstall</span>
-                    </div>
-                    """))
+                    display(create_info_alert(message=f"✅ {pkg} berhasil diinstall", alert_type='success'))
                 else:
                     failed_packages.append(pkg)
-                    display(HTML(f"""
-                    <div style="color:red;padding:5px 0">
-                        <span style="color:inherit">❌ Gagal install {pkg}: {error_msg}</span>
-                    </div>
-                    """))
+                    display(create_info_alert(message=f"❌ Gagal install {pkg}: {error_msg}", alert_type='error'))
                 
                 # Update progress bar
                 progress_bar.update(1)
@@ -253,9 +222,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         """Handler untuk tombol cek instalasi."""
         with ui_components['status']:
             clear_output()
-            display(HTML("""
-            <h3 style="margin:10px 0;color:inherit">🔍 Memeriksa Status Instalasi</h3>
-            """))
+            display(create_info_box(message="🔍 Memeriksa Status Instalasi"))
             _check_package_status(PACKAGE_CHECKS)
 
     def _on_check_all(b):

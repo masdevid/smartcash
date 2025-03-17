@@ -1,16 +1,22 @@
 """
 File: smartcash/model/architectures/backbones/__init__.py
-Deskripsi: Package initialization untuk backbones
+Deskripsi: Inisialisasi modul backbones dengan ekspor komponen yang diperlukan
 """
 
 from smartcash.model.architectures.backbones.base import BaseBackbone
-from smartcash.model.architectures.backbones.efficientnet import EfficientNetBackbone, EXPECTED_CHANNELS
-from smartcash.model.architectures.backbones.cspdarknet import CSPDarknet, YOLOV5_CONFIG
+from smartcash.model.architectures.backbones.efficientnet import (
+    EfficientNetBackbone, 
+    SUPPORTED_MODELS, 
+    EXPECTED_CHANNELS,
+    FeatureAdapter,
+    ChannelAttention
+)
 
 __all__ = [
     'BaseBackbone',
     'EfficientNetBackbone',
+    'SUPPORTED_MODELS',
     'EXPECTED_CHANNELS',
-    'CSPDarknet',
-    'YOLOV5_CONFIG'
+    'FeatureAdapter',
+    'ChannelAttention'
 ]

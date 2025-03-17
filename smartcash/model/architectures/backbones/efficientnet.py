@@ -5,12 +5,27 @@ Deskripsi: EfficientNet backbone implementation for YOLOv5
 
 import torch
 import torch.nn as nn
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Tuple, Optional, Dict, Any, Union
+from pathlib import Path
 import timm
 
 from smartcash.common.logger import SmartCashLogger
-from smartcash.common.exceptions import BackboneError
+from smartcash.common.exceptions import BackboneError, UnsupportedBackboneError
 from smartcash.model.architectures.backbones.base import BaseBackbone
+
+# Daftar variasi model EfficientNet yang didukung
+SUPPORTED_MODELS = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 
+                    'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5']
+
+# Definisi channel output untuk setiap stage - versi public untuk akses modul lain
+EXPECTED_CHANNELS = {
+    'efficientnet_b0': [24, 48, 208],  # P3, P4, P5 stages
+    'efficientnet_b1': [32, 88, 320],
+    'efficientnet_b2': [32, 112, 352], 
+    'efficientnet_b3': [40, 112, 384],
+    'efficientnet_b4': [56, 160, 448],
+    'efficientnet_b5': [64, 176, 512],
+}
 
 class FeatureAdapter(nn.Module):
     """
@@ -84,16 +99,6 @@ class EfficientNetBackbone(BaseBackbone):
     adaptasi channel output untuk kompatibilitas dengan arsitektur YOLOv5.
     """
     
-    # Channel yang diharapkan dari berbagai varian EfficientNet
-    EXPECTED_CHANNELS = {
-        'efficientnet_b0': [24, 48, 208],  # P3, P4, P5 stages
-        'efficientnet_b1': [32, 88, 320],
-        'efficientnet_b2': [32, 112, 352], 
-        'efficientnet_b3': [40, 112, 384],
-        'efficientnet_b4': [56, 160, 448],
-        'efficientnet_b5': [64, 176, 512],
-    }
-    
     # Output channels standar yang digunakan YOLOv5
     YOLO_CHANNELS = [128, 256, 512]
     
@@ -123,8 +128,8 @@ class EfficientNetBackbone(BaseBackbone):
         
         try:
             # Validasi model name
-            if model_name not in self.EXPECTED_CHANNELS:
-                supported = list(self.EXPECTED_CHANNELS.keys())
+            if model_name not in EXPECTED_CHANNELS:
+                supported = list(EXPECTED_CHANNELS.keys())
                 raise BackboneError(
                     f"❌ Model {model_name} tidak didukung. "
                     f"Model yang didukung: {supported}"
@@ -146,7 +151,7 @@ class EfficientNetBackbone(BaseBackbone):
                 actual_channels = [o.shape[1] for o in outputs]
                 
                 # Log informasi channel
-                expected = self.EXPECTED_CHANNELS[model_name]
+                expected = EXPECTED_CHANNELS[model_name]
                 self.logger.debug(f"🔍 {model_name} channels (expected): {expected}")
                 self.logger.debug(f"🔍 {model_name} channels (actual): {actual_channels}")
                 

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer_handler.py
-Deskripsi: Handler untuk instalasi dependencies SmartCash dengan UI yang ditingkatkan
+Deskripsi: Handler untuk instalasi dependencies SmartCash
 """
 
 import sys
@@ -11,8 +11,6 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 from tqdm.auto import tqdm
-
-from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):
     """Setup handler untuk instalasi dependencies SmartCash."""
@@ -106,38 +104,13 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 module = __import__(import_name)
                 version = getattr(module, '__version__', 'Unknown')
                 version_display = f" (v{version})" if version != 'Unknown' else ''
-                display(HTML(f"""
-                <div style="padding:5px; color:{COLORS['alert_success_text']};">
-                    <p style="margin:5px 0">{ICONS['success']} {display_name}{version_display}</p>
-                </div>
-                """))
+                display(HTML(f"<div style='color:green'>✅ {display_name}{version_display}</div>"))
             except ImportError:
-                display(HTML(f"""
-                <div style="padding:5px; color:{COLORS['alert_warning_text']};">
-                    <p style="margin:5px 0">{ICONS['warning']} {display_name} tidak terinstall</p>
-                </div>
-                """))
+                display(HTML(f"<div style='color:orange'>⚠️ {display_name} tidak terinstall</div>"))
 
-    def _update_status_panel(ui_components, message, status='info'):
+    def _update_status_panel(status_message):
         """Update status panel."""
-        style_config = {
-            'info': {'bg': COLORS['alert_info_bg'], 'text': COLORS['alert_info_text'], 'icon': ICONS['info']},
-            'success': {'bg': COLORS['alert_success_bg'], 'text': COLORS['alert_success_text'], 'icon': ICONS['success']},
-            'warning': {'bg': COLORS['alert_warning_bg'], 'text': COLORS['alert_warning_text'], 'icon': ICONS['warning']},
-            'error': {'bg': COLORS['alert_danger_bg'], 'text': COLORS['alert_danger_text'], 'icon': ICONS['error']}
-        }
-        
-        style = style_config.get(status, style_config['info'])
-        
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{style['bg']}; 
-                 color:{style['text']}; 
-                 border-radius:4px; margin:10px 0;
-                 border-left:4px solid {style['text']};">
-            <h3 style="color:inherit; margin:5px 0">{ICONS['config']} Status Dependencies</h3>
-            <p style="margin:5px 0">{style['icon']} {message}</p>
-        </div>
-        """
+        ui_components['status_panel'].value = f"""<div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">ℹ️ {status_message}</div>"""
 
     def _on_install_packages(b):
         """Handler untuk tombol install packages."""
@@ -146,7 +119,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             start_time = time.time()
             
             # Update status panel
-            _update_status_panel(ui_components, "Memulai instalasi packages...", 'info')
+            _update_status_panel("Memulai instalasi packages...")
             
             # Dapatkan daftar package yang akan diinstall
             packages_to_install = []
@@ -164,15 +137,8 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             packages_to_install = list(dict.fromkeys(packages_to_install))
             
             if not packages_to_install:
-                _update_status_panel(ui_components, "Tidak ada package yang dipilih", 'warning')
-                display(HTML(f"""
-                <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
-                          color:{COLORS['alert_warning_text']}; 
-                          border-radius:4px; margin:5px 0;
-                          border-left:4px solid {COLORS['alert_warning_text']};">
-                    <p style="margin:5px 0">{ICONS['warning']} Tidak ada package yang dipilih untuk diinstall</p>
-                </div>
-                """))
+                _update_status_panel("Tidak ada package yang dipilih")
+                display(HTML("<div style='color:orange'>⚠️ Tidak ada package yang dipilih untuk diinstall</div>"))
                 return
             
             # Siapkan progress bar
@@ -192,11 +158,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             failed_packages = []
             
             for pkg in packages_to_install:
-                display(HTML(f"""
-                <div style="padding:5px; color:{COLORS['alert_info_text']};">
-                    <p style="margin:5px 0">{ICONS['processing']} Memulai instalasi: {pkg}</p>
-                </div>
-                """))
+                display(HTML(f"📦 Memulai instalasi: {pkg}"))
                 
                 # Jalankan instalasi
                 success, error_msg = _run_pip_install([pkg])
@@ -204,18 +166,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Update progress
                 if success:
                     installed_count += 1
-                    display(HTML(f"""
-                    <div style="padding:5px; color:{COLORS['alert_success_text']};">
-                        <p style="margin:5px 0">{ICONS['success']} {pkg} berhasil diinstall</p>
-                    </div>
-                    """))
+                    display(HTML(f"✅ {pkg} berhasil diinstall"))
                 else:
                     failed_packages.append(pkg)
-                    display(HTML(f"""
-                    <div style="padding:5px; color:{COLORS['alert_danger_text']};">
-                        <p style="margin:5px 0">{ICONS['error']} Gagal install {pkg}: {error_msg}</p>
-                    </div>
-                    """))
+                    display(HTML(f"❌ Gagal install {pkg}: {error_msg}"))
                 
                 # Update progress bar
                 progress_bar.update(1)
@@ -229,29 +183,18 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             
             # Update status panel berdasarkan hasil
             if failed_packages:
-                _update_status_panel(
-                    ui_components, 
-                    f"Instalasi selesai dengan {len(failed_packages)} error", 
-                    'warning'
-                )
+                _update_status_panel(f"Instalasi selesai dengan {len(failed_packages)} error")
             else:
-                _update_status_panel(
-                    ui_components, 
-                    f"Semua {installed_count} package berhasil diinstall", 
-                    'success'
-                )
+                _update_status_panel(f"Semua {installed_count} package berhasil diinstall")
             
             # Tampilkan ringkasan
             display(HTML(f"""
-            <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                      color:{COLORS['alert_info_text']}; 
-                      border-radius:4px; margin:10px 0;
-                      border-left:4px solid {COLORS['alert_info_text']};">
-                <h3 style="margin:5px 0">{ICONS['stats']} Ringkasan Instalasi</h3>
-                <p style="margin:5px 0">🕒 Waktu instalasi: {duration:.2f} detik</p>
-                <p style="margin:5px 0">📦 Total package: {len(packages_to_install)}</p>
-                <p style="margin:5px 0">✅ Berhasil: {installed_count}</p>
-                <p style="margin:5px 0">❌ Gagal: {len(failed_packages)}</p>
+            <div style="padding:10px;margin:10px 0;background-color:#d1ecf1;color:#0c5460;border-radius:4px">
+                <h3>📊 Ringkasan Instalasi</h3>
+                <p>🕒 Waktu instalasi: {duration:.2f} detik</p>
+                <p>📦 Total package: {len(packages_to_install)}</p>
+                <p>✅ Berhasil: {installed_count}</p>
+                <p>❌ Gagal: {len(failed_packages)}</p>
             </div>
             """))
             
@@ -259,11 +202,8 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             if failed_packages:
                 failed_list = "<br>".join([f"❌ {pkg}" for pkg in failed_packages])
                 display(HTML(f"""
-                <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                          color:{COLORS['alert_danger_text']}; 
-                          border-radius:4px; margin:10px 0;
-                          border-left:4px solid {COLORS['alert_danger_text']};">
-                    <h3 style="margin:5px 0">{ICONS['error']} Package Gagal Diinstall</h3>
+                <div style="padding:10px;margin:10px 0;background-color:#f8d7da;color:#721c24;border-radius:4px">
+                    <h3>❌ Package Gagal Diinstall</h3>
                     {failed_list}
                 </div>
                 """))
@@ -272,14 +212,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         """Handler untuk tombol cek instalasi."""
         with ui_components['status']:
             clear_output()
-            display(HTML(f"""
-            <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                      color:{COLORS['alert_info_text']}; 
-                      border-radius:4px; margin:10px 0;
-                      border-left:4px solid {COLORS['alert_info_text']};">
-                <h3 style="margin:5px 0">{ICONS['search']} Memeriksa Status Instalasi</h3>
-            </div>
-            """))
+            display(HTML("<h3>🔍 Memeriksa Status Instalasi</h3>"))
             _check_package_status(PACKAGE_CHECKS)
 
     def _on_check_all(b):
@@ -288,7 +221,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             if key in ui_components:
                 ui_components[key].value = True
         
-        _update_status_panel(ui_components, "Semua package dipilih", 'info')
+        _update_status_panel("Semua package dipilih")
 
     def _on_uncheck_all(b):
         """Handler untuk uncheck semua package."""
@@ -296,7 +229,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             if key in ui_components:
                 ui_components[key].value = False
         
-        _update_status_panel(ui_components, "Semua package tidak dipilih", 'warning')
+        _update_status_panel("Semua package tidak dipilih")
 
     # Registrasi event handlers
     ui_components['install_button'].on_click(_on_install_packages)

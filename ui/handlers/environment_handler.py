@@ -21,6 +21,21 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
     Returns:
         Dictionary UI components yang telah diperbarui
     """
+    # Log status awal
+    logger = ui_components.get('logger')
+    if logger:
+        logger.info("🔍 Mendeteksi environment...")
+    
+    # Tampilkan informasi di status panel
+    if 'status' in ui_components:
+        with ui_components['status']:
+            from IPython.display import display, HTML
+            display(HTML("""
+                <div style="padding: 8px; background-color: #d1ecf1; color: #0c5460; border-radius: 4px;">
+                    🔄 Mendeteksi environment dan konfigurasi...
+                </div>
+            """))
+            
     # Colab detection message
     try:
         # Coba gunakan environment manager atau gunakan fallback detection
@@ -43,6 +58,8 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
                 # Fallback: Deteksi manual
                 is_colab = 'google.colab' in sys.modules
                 is_drive_mounted = os.path.exists('/content/drive/MyDrive')
+                if logger:
+                    logger.warning("⚠️ EnvironmentManager tidak tersedia, menggunakan deteksi manual")
         
         # Update colab panel
         if 'colab_panel' in ui_components:

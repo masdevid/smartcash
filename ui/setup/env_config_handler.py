@@ -24,21 +24,62 @@ def setup_env_config_handlers(
     Returns:
         Dictionary UI components yang telah ditambahkan handler
     """
-    # Import dependencies
-    from smartcash.ui.handlers.environment_handler import (
-        detect_environment, 
-        check_smartcash_dir, 
-        filter_drive_tree,
-        sync_configs
-    )
-    from smartcash.ui.handlers.config_handler import setup_config_handlers
-    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-    
-    # Setup config handlers
-    ui_components = setup_config_handlers(ui_components, config)
-    
-    # Setup observer handlers
-    ui_components = setup_observer_handlers(ui_components)
+    # Import dependencies dengan penanganan error
+    try:
+        from smartcash.ui.handlers.environment_handler import (
+            detect_environment, 
+            check_smartcash_dir, 
+            filter_drive_tree,
+            sync_configs
+        )
+    except ImportError:
+        # Tampilkan error di status panel
+        with ui_components['status']:
+            from IPython.display import display, HTML
+            display(HTML("""
+                <div style="background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 4px;">
+                    ❌ Error: Module environment_handler tidak ditemukan.
+                    <p>Pastikan SmartCash repository sudah benar dan file ada.</p>
+                </div>
+            """))
+            # Buat implementasi sementara fungsi-fungsi yang diperlukan
+            def detect_environment(ui_components, env): 
+                return ui_components
+            def check_smartcash_dir(ui_components): 
+                return False
+            def filter_drive_tree(html): 
+                return html
+            def sync_configs(local, drive, logger): 
+                return {"synced": [], "errors": ["Not implemented"]}
+
+    # Coba setup config dan observer
+    try:
+        from smartcash.ui.handlers.config_handler import setup_config_handlers
+        from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+        
+        # Setup config handlers
+        ui_components = setup_config_handlers(ui_components, config)
+        
+        # Setup observer handlers
+        ui_components = setup_observer_handlers(ui_components)
+    except ImportError:
+        # Jika terjadi error, coba manual load config dan tampilkan pesan
+        try:
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager()
+            if config:
+                config_manager.merge_config(config)
+        except:
+            pass
+            
+        with ui_components['status']:
+            from IPython.display import display, HTML
+            display(HTML("""
+                <div style="background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 4px;">
+                    ⚠️ Warning: Handler config/observer tidak ditemukan.
+                    <p>Beberapa fitur mungkin tidak berfungsi optimal.</p>
+                </div>
+            """))
     
     # Tambahkan fungsi-fungsi handler
     def handle_drive_connection(b):

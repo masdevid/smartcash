@@ -60,3 +60,4 @@ display(widgets.VBox([
     clone_button, 
     output
 ], layout={'width': '100%', 'padding': '15px'}))
+# !pip install -q ipywidgets tqdm pyyaml matplotlib seaborn

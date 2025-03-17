@@ -3,28 +3,36 @@ File: smartcash/ui/setup/dependency_installer_handler.py
 Deskripsi: Handler untuk instalasi dependencies SmartCash
 """
 
-import re
 import sys
+import re
 import time
 import subprocess
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output, HTML
 
-def setup_dependency_installer_handlers(ui_components, config=None):
-    """Setup handler untuk instalasi dependencies SmartCash."""
+def setup_dependency_installer_handlers(ui_components: Dict, config: Dict[Any, Any]):
+    """
+    Setup handler untuk instalasi dependencies.
     
+    Args:
+        ui_components: Komponen UI untuk instalasi
+        config: Konfigurasi dependencies
+    
+    Returns:
+        Dictionary UI components yang telah ditambahkan handler
+    """
     # Definisi package dan requirement
     PACKAGE_GROUPS = {
-        'yolov5_req': ('YOLOv5 Requirements', _get_yolov5_requirements),
-        'torch_req': ('PyTorch', f"{sys.executable} -m pip install torch torchvision torchaudio"),
-        'albumentations_req': ('Albumentations', f"{sys.executable} -m pip install albumentations"),
-        'notebook_req': ('Notebook Packages', f"{sys.executable} -m pip install ipywidgets tqdm"),
-        'smartcash_req': ('SmartCash Utils', f"{sys.executable} -m pip install pyyaml python-dotenv termcolor"),
-        'opencv_req': ('OpenCV', f"{sys.executable} -m pip install opencv-python"),
-        'matplotlib_req': ('Matplotlib', f"{sys.executable} -m pip install matplotlib seaborn"),
-        'pandas_req': ('Pandas', f"{sys.executable} -m pip install pandas"),
-        'seaborn_req': ('Seaborn', f"{sys.executable} -m pip install seaborn")
+        'yolov5_req': _get_yolov5_requirements,
+        'torch_req': f"{sys.executable} -m pip install torch torchvision torchaudio",
+        'albumentations_req': f"{sys.executable} -m pip install albumentations",
+        'notebook_req': f"{sys.executable} -m pip install ipywidgets tqdm",
+        'smartcash_req': f"{sys.executable} -m pip install pyyaml termcolor python-dotenv",
+        'opencv_req': f"{sys.executable} -m pip install opencv-python",
+        'matplotlib_req': f"{sys.executable} -m pip install matplotlib seaborn",
+        'pandas_req': f"{sys.executable} -m pip install pandas",
+        'seaborn_req': f"{sys.executable} -m pip install seaborn"
     }
 
     PACKAGE_CHECKS = [
@@ -37,86 +45,95 @@ def setup_dependency_installer_handlers(ui_components, config=None):
     ]
 
     def _run_pip_install(cmd: str, package_name: str) -> Tuple[bool, str]:
-        """Eksekusi perintah pip install dengan update progress."""
+        """Eksekusi perintah pip install."""
         try:
-            ui_components['install_progress'].description = f'Installing {package_name}...'
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-            return result.returncode == 0, f"✅ {package_name} berhasil diinstall"
+            status = result.returncode == 0
+            msg = f"✅ {package_name} berhasil diinstall" if status else f"❌ Gagal install {package_name}"
+            return status, msg
         except Exception as e:
             return False, f"❌ Gagal install {package_name}: {str(e)}"
 
     def _get_yolov5_requirements() -> List[str]:
-        """Dapatkan daftar requirements YOLOv5."""
+        """Dapatkan requirements YOLOv5."""
         try:
             req_file = Path('yolov5/requirements.txt')
             if not req_file.exists():
-                return ["matplotlib", "numpy", "opencv-python", "PyYAML", "torch", "torchvision", "tqdm"]
+                return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
             
             with open(req_file, 'r') as f:
                 return [re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1) 
                         for line in f if line.strip() and not line.startswith('#')]
         except Exception:
-            return ["matplotlib", "numpy", "opencv-python", "PyYAML", "torch", "torchvision", "tqdm"]
+            return ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm"]
 
-    def _check_installed_packages(package_checks: List[Tuple[str, str]]) -> List[str]:
-        """Cek paket yang sudah terinstall."""
-        installed_packages = []
+    def _check_package_status(package_checks: List[Tuple[str, str]]) -> None:
+        """Periksa status paket yang terinstall."""
         for display_name, import_name in package_checks:
             try:
-                __import__(import_name)
-                installed_packages.append(import_name)
-                display(HTML(f"<div style='color:green'>✅ {display_name} terinstall</div>"))
+                module = __import__(import_name)
+                display(HTML(f"<div style='color:green'>✅ {display_name} (v{module.__version__})</div>"))
             except ImportError:
                 display(HTML(f"<div style='color:orange'>⚠️ {display_name} tidak terinstall</div>"))
-        return installed_packages
 
     def _on_install_packages(b):
         """Handler untuk tombol install packages."""
         with ui_components['status']:
             clear_output()
             start_time = time.time()
-            installed_count = 0
-            total_packages = 0
-
+            
             # Update UI state
             ui_components['install_progress'].layout.visibility = 'visible'
             ui_components['install_progress'].value = 0
 
             # Proses instalasi package yang dipilih
-            for pkg_key, (pkg_name, pkg_cmd) in PACKAGE_GROUPS.items():
+            total_packages = 0
+            installed_packages = 0
+
+            for pkg_key, pkg_cmd in PACKAGE_GROUPS.items():
                 if not ui_components[pkg_key].value:
                     continue
 
-                total_packages += 1
+                # Dapatkan command untuk instalasi
                 cmd = pkg_cmd() if callable(pkg_cmd) else pkg_cmd
-                success, msg = _run_pip_install(cmd, pkg_name)
+                display(HTML(f"📦 Memulai instalasi: {pkg_key}"))
                 
-                display(HTML(f"<div style='color:{'green' if success else 'red'}'>{msg}</div>"))
+                # Jalankan instalasi
+                success, msg = _run_pip_install(cmd, pkg_key)
+                display(HTML(f"{'✅' if success else '❌'} {msg}"))
+                
+                total_packages += 1
                 if success:
-                    installed_count += 1
+                    installed_packages += 1
 
             # Tambahan package custom
             custom_packages = ui_components['custom_packages'].value.strip().split('\n')
             for pkg in custom_packages:
                 pkg = pkg.strip()
                 if pkg:
-                    total_packages += 1
                     cmd = f"{sys.executable} -m pip install {pkg}"
                     success, msg = _run_pip_install(cmd, pkg)
-                    display(HTML(f"<div style='color:{'green' if success else 'red'}'>{msg}</div>"))
+                    display(HTML(f"{'✅' if success else '❌'} {msg}"))
+                    
+                    total_packages += 1
                     if success:
-                        installed_count += 1
+                        installed_packages += 1
 
             # Update progress
-            ui_components['install_progress'].value = 100
             duration = time.time() - start_time
-            display(HTML(f"✅ Instalasi selesai: {installed_count}/{total_packages} package dalam {duration:.2f} detik"))
+            display(HTML(
+                f"🏁 Instalasi selesai: "
+                f"{installed_packages}/{total_packages} package "
+                f"dalam {duration:.2f} detik"
+            ))
+            
+            ui_components['install_progress'].value = 100
 
     def _on_check_installations(b):
         """Handler untuk tombol cek instalasi."""
         with ui_components['status']:
             clear_output()
-            _check_installed_packages(PACKAGE_CHECKS)
+            _check_package_status(PACKAGE_CHECKS)
 
     def _on_check_all(b):
         """Handler untuk cek semua package."""

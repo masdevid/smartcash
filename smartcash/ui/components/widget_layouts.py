@@ -133,7 +133,8 @@ INPUT_LAYOUTS = {
 BUTTON_LAYOUTS = {
     'standard': create_layout(
         width='auto',
-        padding=f'{PADDINGS["small"]} {PADDINGS["medium"]}',
+        margin=f'{MARGINS["medium"]} 0',
+        min_height='50px',
         min_width='120px'
     ),
     'small': create_layout(

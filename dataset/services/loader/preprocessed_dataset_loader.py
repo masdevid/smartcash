@@ -7,7 +7,7 @@ import os
 import torch
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Tuple, Any
+from typing import Dict, List, Optional, Union, Tuple, Any, Callable
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.components.datasets.multilayer_dataset import MultilayerDataset

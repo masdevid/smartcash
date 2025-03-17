@@ -67,7 +67,7 @@ def create_env_config_ui(env=None, config=None):
     """
     help_box = widgets.Accordion(children=[widgets.HTML(help_content)])
     help_box.set_title(0, "📖 Panduan Konfigurasi")
-    help_box.selected_index = None  # Collapsible by default
+    help_box.selected_index = 0
     
     # Susun layout UI
     ui = widgets.VBox([

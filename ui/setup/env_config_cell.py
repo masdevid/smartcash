@@ -12,7 +12,7 @@ if '.' not in sys.path:
     sys.path.append('.')
 
 # Setup environment
-from smartcash.ui.utils.cell_utils import run_cell
+from smartcash.ui.components.cell_template import run_cell
 
 def main():
     """

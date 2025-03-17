@@ -142,12 +142,12 @@ def setup_ui_component(
     try:
         # Coba import dari lokasi baru (setelah refactor)
         import_locations = [
-            f"smartcash.ui.setup.{component_name}",
-            f"smartcash.ui.dataset.{component_name}",
-            f"smartcash.ui.training_config.{component_name}",
-            f"smartcash.ui.training_execution.{component_name}",
-            f"smartcash.ui.model_evaluation.{component_name}",
-            f"smartcash.ui.detection.{component_name}"
+            f"smartcash.ui.setup.{component_name}_component",
+            f"smartcash.ui.dataset.{component_name}_component",
+            f"smartcash.ui.training_config.{component_name}_component",
+            f"smartcash.ui.training_execution.{component_name}_component",
+            f"smartcash.ui.model_evaluation.{component_name}_component",
+            f"smartcash.ui.detection.{component_name}_component"
         ]
         
         # Coba impor dari semua lokasi yang mungkin

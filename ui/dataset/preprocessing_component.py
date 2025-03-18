@@ -177,7 +177,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Collapsible log output
     log_accordion = widgets.Accordion(
         children=[status],
-        selected_index=0,
+        selected_index=None,
         layout=widgets.Layout(margin='10px 0')
     )
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")

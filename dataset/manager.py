@@ -82,7 +82,8 @@ class DatasetManager:
         self._services = {}
         
         self.logger.info(f"📊 DatasetManager diinisialisasi (dataset_dir: {self.config['dataset_dir']})")
-        self.logger.info(f"📊 Pre-processing diinisialisasi (preprocessed_dir: {self.preprocess_config['preprocessed_dir']}); use_preprocessed: {self.preprocess_config['use_preprocessed']}")
+        self.logger.info(f"📊 Pre-processing Config (preprocessed_dir: {self.preprocess_config['preprocessed_dir']})")
+        self.logger.info(f"📊 Pre-processing Config (use_preprocessed: {self.preprocess_config['use_preprocessed']})")
     
     def get_service(self, service_name: str) -> Any:
         """

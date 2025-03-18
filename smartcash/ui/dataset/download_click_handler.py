@@ -1,18 +1,16 @@
 """
 File: smartcash/ui/dataset/download_click_handler.py
-Deskripsi: Handler untuk tombol download dataset dengan perbaikan validasi indeks array
+Deskripsi: Handler untuk event click tombol download dan upload dataset
 """
 
-import os
-from pathlib import Path
-from typing import Dict, Any, Optional, Callable
-from IPython.display import display, clear_output
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.alerts import create_status_indicator
+from typing import Dict, Any, Optional
+from IPython.display import display, HTML, clear_output
+
+from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup handler untuk klik tombol download.
+    Setup handlers untuk tombol download dataset.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -22,103 +20,201 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Setup handler untuk tombol download dengan validasi callback
+    logger = ui_components.get('logger')
+    
+    # Dapatkan tombol-tombol dari UI components
+    download_button = ui_components.get('download_button')
+    upload_button = ui_components.get('upload_button')
+    
+    # Handler untuk tombol download Roboflow
     def on_download_click(b):
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS['processing']} Memulai download dataset..."))
+        # Dapatkan semua parameter dari UI
+        api_key = ui_components.get('api_key_input').value
+        workspace = ui_components.get('workspace_input').value
+        project = ui_components.get('project_input').value
+        version = ui_components.get('version_input').value
+        format_select = ui_components.get('format_select')
         
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 0
-            
+        # Validasi input
+        status_widget = ui_components.get('status')
+        if not all([api_key, workspace, project, version]):
+            if status_widget:
+                with status_widget:
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                                  color:{COLORS['alert_warning_text']}; 
+                                  border-radius:4px; margin:5px 0;">
+                            <p style="margin:5px 0">{ICONS['warning']} Mohon lengkapi semua field Roboflow API Key, Workspace, Project, dan Version!</p>
+                        </div>
+                    """))
+            return
+        
+        # Import fungsi download dari handler yang sudah dibuat
         try:
-            # Periksa dahulu apakah komponen UI ada sebelum mengaksesnya
-            download_option = ui_components.get('download_options', None)
-            if download_option is None:
-                raise ValueError("Komponen download_options tidak ditemukan")
+            from smartcash.ui.dataset.roboflow_download_handler import download_from_roboflow
+            
+            # Dapatkan format yang dipilih atau default ke yolov5pytorch
+            download_format = format_select.value if format_select else "yolov5pytorch"
+            
+            # Jalankan fungsi download
+            result = download_from_roboflow(
+                ui_components,
+                api_key=api_key,
+                workspace=workspace,
+                project=project,
+                version=int(version),
+                format=download_format
+            )
+            
+            # Log hasil jika berhasil
+            if logger:
+                logger.success(f"✅ Dataset berhasil didownload dari Roboflow: {project} (v{version})")
                 
-            download_option_value = download_option.value
-            
-            # Notify event if observer manager available
-            if 'observer_manager' in ui_components:
-                try:
-                    from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-                    EventDispatcher.notify(
-                        event_type="DOWNLOAD_START",
-                        sender="download_handler",
-                        message=f"Memulai download dataset dari {download_option_value}"
-                    )
-                except ImportError:
-                    pass
-            
-            # Execute download based on option
-            if download_option_value == 'Roboflow (Online)':
-                # Import handler on-demand untuk mengurangi dependencies
-                from smartcash.ui.dataset.roboflow_download_handler import download_from_roboflow
-                download_from_roboflow(ui_components, env, config)
-            elif download_option_value == 'Local Data (Upload)':
-                from smartcash.ui.dataset.local_upload_handler import process_local_upload
-                process_local_upload(ui_components, env, config)
+            # Jika ada callback onDownloadSuccess, panggil
+            if 'onDownloadSuccess' in ui_components and callable(ui_components['onDownloadSuccess']):
+                ui_components['onDownloadSuccess'](result)
                 
         except Exception as e:
-            with ui_components['status']:
-                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+            # Error sudah ditangani di download_from_roboflow, tambahkan logging saja
+            if logger:
+                logger.error(f"❌ Gagal download dataset: {str(e)}")
             
-            # Log error
-            if 'logger' in ui_components:
-                ui_components['logger'].error(f"{ICONS['error']} Error saat download dataset: {str(e)}")
+            # Jika ada callback onDownloadError, panggil
+            if 'onDownloadError' in ui_components and callable(ui_components['onDownloadError']):
+                ui_components['onDownloadError'](str(e))
     
-    # Validasi dataset
-    def validate_dataset_structure(data_dir):
-        """Validasi struktur dataset dasar tanpa fallback berlebihan."""
-        splits = ['train', 'valid', 'test']
-        valid_structure = True
-        missing_parts = []
+    # Handler untuk tombol upload lokal
+    def on_upload_click(b):
+        # Dapatkan file upload widget
+        file_upload = ui_components.get('file_upload')
         
-        for split in splits:
-            split_dir = Path(data_dir) / split
-            images_dir = split_dir / 'images'
-            labels_dir = split_dir / 'labels'
+        if not file_upload or not file_upload.value:
+            status_widget = ui_components.get('status')
+            if status_widget:
+                with status_widget:
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                                  color:{COLORS['alert_warning_text']}; 
+                                  border-radius:4px; margin:5px 0;">
+                            <p style="margin:5px 0">{ICONS['warning']} Mohon pilih file dataset terlebih dahulu!</p>
+                        </div>
+                    """))
+            return
             
-            if not split_dir.exists():
-                missing_parts.append(f"{split}/")
-                valid_structure = False
-            elif not images_dir.exists():
-                missing_parts.append(f"{split}/images/")
-                valid_structure = False
-            elif not labels_dir.exists():
-                missing_parts.append(f"{split}/labels/")
-                valid_structure = False
-        
-        with ui_components['status']:
-            if valid_structure:
-                display(create_status_indicator("success", 
-                    f"{ICONS['success']} Struktur dataset valid dan siap digunakan"))
+        try:
+            # Import fungsi process_local_upload dari handler yang sudah dibuat
+            from smartcash.ui.dataset.local_upload_handler import process_local_upload
+            
+            # Proses upload file
+            result = process_local_upload(ui_components, env)
+            
+            # Log ke logger jika tersedia
+            if logger:
+                logger.success(f"✅ File dataset berhasil diupload")
+                
+            # Jika ada callback onUploadSuccess, panggil
+            if 'onUploadSuccess' in ui_components and callable(ui_components['onUploadSuccess']):
+                ui_components['onUploadSuccess'](result)
+                
+        except Exception as e:
+            # Tampilkan error jika belum ditangani
+            status_widget = ui_components.get('status')
+            if status_widget:
+                with status_widget:
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                                  color:{COLORS['alert_danger_text']}; 
+                                  border-radius:4px; margin:5px 0;">
+                            <p style="margin:5px 0">{ICONS['error']} Error saat upload file: {str(e)}</p>
+                        </div>
+                    """))
+            
+            # Log ke logger jika tersedia
+            if logger:
+                logger.error(f"❌ Gagal upload file dataset: {str(e)}")
+                
+            # Jika ada callback onUploadError, panggil
+            if 'onUploadError' in ui_components and callable(ui_components['onUploadError']):
+                ui_components['onUploadError'](str(e))
+    
+    # Register handlers ke tombol-tombol
+    if download_button:
+        # Clear handlers yang ada untuk menghindari duplikasi
+        if hasattr(download_button, '_click_handlers'):
+            download_button._click_handlers.callbacks = []
+        download_button.on_click(on_download_click)
+        if logger:
+            logger.debug("🔄 Handler tombol download terdaftar")
+            
+    if upload_button:
+        # Clear handlers yang ada untuk menghindari duplikasi
+        if hasattr(upload_button, '_click_handlers'):
+            upload_button._click_handlers.callbacks = []
+        upload_button.on_click(on_upload_click)
+        if logger:
+            logger.debug("🔄 Handler tombol upload terdaftar")
+    
+    # Setup handler untuk perubahan tipe sumber dataset
+    source_select = ui_components.get('source_select')
+    if source_select:
+        def on_source_change(change):
+            if not change or change['name'] != 'value':
+                return
+                
+            source_type = change['new']
+            roboflow_section = ui_components.get('roboflow_section')
+            local_section = ui_components.get('local_section')
+            
+            # Toggle visibility roboflow vs local upload
+            if source_type == 'roboflow':
+                if roboflow_section:
+                    roboflow_section.layout.display = 'block'
+                if local_section:
+                    local_section.layout.display = 'none'
             else:
-                display(create_status_indicator("warning", 
-                    f"{ICONS['warning']} Struktur dataset belum lengkap: {', '.join(missing_parts)} tidak ditemukan"))
-    
-    # Setup dialog konfirmasi dengan validasi handler
-    try:
-        from smartcash.ui.dataset.download_confirmation_handler import setup_confirmation_handlers
-        ui_components = setup_confirmation_handlers(ui_components, env, config)
-    except ImportError as e:
-        # Fallback ke handler langsung jika tidak ada confirmation handler
-        if 'download_button' in ui_components:
-            # Reset handlers terlebih dahulu untuk menghindari duplikasi
-            if hasattr(ui_components['download_button'], '_click_handlers'):
-                try:
-                    ui_components['download_button']._click_handlers.callbacks.clear()
-                except (AttributeError, IndexError):
-                    pass
-            # Register fresh handler
-            ui_components['download_button'].on_click(on_download_click)
+                if roboflow_section:
+                    roboflow_section.layout.display = 'none'
+                if local_section:
+                    local_section.layout.display = 'block'
         
-        if 'logger' in ui_components:
-            ui_components['logger'].warning(f"{ICONS['warning']} Dialog konfirmasi tidak tersedia: {str(e)}")
+        # Clear handlers yang ada untuk menghindari duplikasi
+        if hasattr(source_select, '_observe_handlers'):
+            for handler in source_select._observe_handlers:
+                if handler.change_type == 'value':
+                    source_select.unobserve(handler.handler, names='value')
+        
+        # Register handler
+        source_select.observe(on_source_change, names='value')
+        
+        # Initialize visibility
+        on_source_change({'name': 'value', 'new': source_select.value})
+        
+        if logger:
+            logger.debug("🔄 Handler selector sumber dataset terdaftar")
     
-    # Tambahkan fungsi ke ui_components
-    ui_components['on_download_click'] = on_download_click
-    ui_components['validate_dataset_structure'] = validate_dataset_structure
+    # Tambahkan function cleanup untuk penghapusan handler saat dibutuhkan
+    def cleanup():
+        # Unregister handlers
+        if download_button:
+            if hasattr(download_button, '_click_handlers'):
+                download_button._click_handlers.callbacks = []
+                
+        if upload_button:
+            if hasattr(upload_button, '_click_handlers'):
+                upload_button._click_handlers.callbacks = []
+                
+        if source_select:
+            if hasattr(source_select, '_observe_handlers'):
+                for handler in source_select._observe_handlers:
+                    if handler.change_type == 'value':
+                        source_select.unobserve(handler.handler, names='value')
+                
+        if logger:
+            logger.info("🧹 Download click handlers dibersihkan")
+    
+    ui_components['cleanup_handlers'] = cleanup
     
     return ui_components

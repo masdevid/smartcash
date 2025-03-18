@@ -11,29 +11,7 @@ from pathlib import Path
 import datetime
 import re
 
-from smartcash.ui.utils.constants import COLORS, BUTTON_STYLES, ICONS, ALERT_STYLES
-
-# Standarisasi Layout Import - Pastikan tersedia
-try:
-    from smartcash.ui.components.widget_layouts import (
-        CONTAINER_LAYOUTS, CONTENT_LAYOUTS, INPUT_LAYOUTS,
-        BUTTON_LAYOUTS, GROUP_LAYOUTS, COMPONENT_LAYOUTS
-    )
-except ImportError:
-    # Fallback layouts dasar
-    BUTTON_LAYOUTS = {
-        'standard': widgets.Layout(width='auto', margin='10px 0'),
-        'small': widgets.Layout(width='auto', margin='5px')
-    }
-    GROUP_LAYOUTS = {
-        'horizontal': widgets.Layout(display='flex', flex_flow='row wrap', align_items='center')
-    }
-    CONTAINER_LAYOUTS = {
-        'card': widgets.Layout(border='1px solid #ddd', border_radius='4px', padding='15px')
-    }
-    CONTENT_LAYOUTS = {
-        'output': widgets.Layout(border='1px solid #ddd', min_height='100px', padding='10px')
-    }
+from smartcash.ui.utils.constants import COLORS, ICONS, ALERT_STYLES
 
 # Pengaturan Tema
 def set_active_theme(theme_name: str = 'default') -> bool:
@@ -48,8 +26,8 @@ def set_active_theme(theme_name: str = 'default') -> bool:
     """
     from smartcash.ui.utils.constants import THEMES
     
-    global ACTIVE_THEME
     if theme_name in THEMES:
+        global ACTIVE_THEME
         ACTIVE_THEME = theme_name
         return True
     return False
@@ -312,10 +290,7 @@ def create_tab_view(tabs: Dict[str, widgets.Widget]) -> widgets.Tab:
     """
     # Buat tab
     tab = widgets.Tab(children=list(tabs.values()))
-    try:
-        tab.layout = COMPONENT_LAYOUTS['tabs']
-    except (NameError, KeyError):
-        tab.layout = widgets.Layout(width='100%', margin='10px 0')
+    tab.layout = widgets.Layout(width='100%', margin='10px 0', overflow='visible')
     
     # Set judul tab
     for i, title in enumerate(tabs.keys()):
@@ -524,9 +499,9 @@ def create_button_group(buttons, layout=None):
     for label, style, icon, callback in buttons:
         btn = widgets.Button(
             description=label,
-            button_style=BUTTON_STYLES.get(style, ''),
+            button_style=style,
             icon=icon,
-            layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px'))
+            layout=widgets.Layout(margin='5px')
         )
         
         if callback:
@@ -534,9 +509,16 @@ def create_button_group(buttons, layout=None):
             
         btn_widgets.append(btn)
     
+    default_layout = widgets.Layout(
+        display='flex',
+        flex_flow='row wrap',
+        align_items='center',
+        width='100%'
+    )
+    
     return widgets.HBox(
         btn_widgets, 
-        layout=layout or GROUP_LAYOUTS.get('horizontal', widgets.Layout(display='flex'))
+        layout=layout or default_layout
     )
 
 # Confirmation dialog
@@ -556,6 +538,8 @@ def create_confirmation_dialog(title, message, on_confirm, on_cancel=None,
     Returns:
         Widget VBox berisi dialog konfirmasi
     """
+    from smartcash.ui.utils.constants import FONTS
+    
     # Dialog content
     content = widgets.VBox([
         widgets.HTML(f"""
@@ -572,18 +556,18 @@ def create_confirmation_dialog(title, message, on_confirm, on_cancel=None,
                 description=cancel_label,
                 button_style="warning",
                 icon='times',
-                layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px')),
+                layout=widgets.Layout(margin='5px'),
                 tooltip="Batalkan operasi"
             ),
             widgets.Button(
                 description=confirm_label,
                 button_style="danger",
                 icon='check',
-                layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px')),
+                layout=widgets.Layout(margin='5px'),
                 tooltip="Konfirmasi operasi"
             )
-        ], layout=GROUP_LAYOUTS.get('horizontal', widgets.Layout(display='flex')))
-    ], layout=CONTAINER_LAYOUTS.get('card', widgets.Layout(padding='15px')))
+        ], layout=widgets.Layout(display='flex'))
+    ], layout=widgets.Layout(padding='15px', border='1px solid #ddd', border_radius='4px'))
     
     # Set callbacks
     content.children[1].children[0].on_click(

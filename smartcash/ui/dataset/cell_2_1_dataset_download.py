@@ -14,6 +14,7 @@ if '.' not in sys.path:
 # Setup environment dan load config
 from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
 from smartcash.ui.utils.logging_utils import setup_ipython_logging
+from smartcash.ui.dataset.dataset_download_handler import setup_dataset_download_handlers
 import logging
 
 # Setup environment dan load config
@@ -51,7 +52,7 @@ except Exception as e:
     if logger:
         logger.warning(f"⚠️ Tidak dapat memvalidasi dataset: {str(e)}")
 
-ui_components = setup_ui_handlers(ui_components, env, config)
+ui_components = setup_dataset_download_handlers(ui_components, env, config)
 # Tampilkan UI
 display_ui(ui_components)
 

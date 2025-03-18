@@ -34,13 +34,12 @@ def setup_notebook_environment(
         
     # Import dependencies dengan fallback
     try:
-        import logging
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        from smartcash.common.logger import get_logger
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
         
         # Setup komponen
-        logger = setup_ipython_logging(cell_name, log_level=logging.INFO)
+        logger = get_logger(f"cell_{cell_name}")
         env_manager = get_environment_manager()
         config_manager = get_config_manager()
         

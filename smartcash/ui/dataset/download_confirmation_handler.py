@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_confirmation_handler.py
-Deskripsi: Handler untuk menampilkan dialog konfirmasi sebelum download dataset dan pengecekan dataset yang sudah ada
+Deskripsi: Handler untuk menampilkan dialog konfirmasi sebelum download dataset dengan validasi callbacks
 """
 
 import os
@@ -95,16 +95,16 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
             on_confirm()
             return None
     
-    # Cek apakah kita memiliki fungsi asli download dari roboflow handler
-    original_roboflow_handler = None
-    if 'download_button' in ui_components and hasattr(ui_components['download_button'], '_click_handlers'):
-        original_roboflow_handler = ui_components['download_button']._click_handlers.callbacks[0]
+    # Cek apakah kita memiliki fungsi asli download dari click handler
+    original_click_handler = None
+    if 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
+        original_click_handler = ui_components['on_download_click']
     
     # Handler untuk download button dengan konfirmasi
     def on_download_click_with_confirmation(b):
         # Dapatkan lokasi data
-        data_dir = config.get('data', {}).get('dir', 'data')
-        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
+        data_dir = config.get('data', {}).get('dir', 'data') if config else 'data'
+        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
             data_dir = str(env.drive_path / 'data')
         
         # Cek dataset yang sudah ada
@@ -119,12 +119,10 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
             
             def on_confirm_redownload():
                 # Jalankan download original
-                if original_roboflow_handler:
-                    original_roboflow_handler(b)
-                else:
-                    # Fallback jika tidak menemukan handler asli
-                    from smartcash.ui.dataset.download_click_handler import on_download_click
-                    on_download_click(b)
+                if original_click_handler:
+                    original_click_handler(b)
+                elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
+                    ui_components['on_download_click'](b)
             
             def on_cancel_download():
                 with ui_components['status']:
@@ -148,24 +146,22 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
                 display(create_status_indicator("info", f"{ICONS['download']} Dataset belum ada, memulai download..."))
             
             # Jalankan download original
-            if original_roboflow_handler:
-                original_roboflow_handler(b)
-            else:
-                # Fallback jika tidak menemukan handler asli
-                from smartcash.ui.dataset.download_click_handler import on_download_click
-                on_download_click(b)
+            if original_click_handler:
+                original_click_handler(b)
+            elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
+                ui_components['on_download_click'](b)
     
-    # Update handler untuk tombol download
+    # Update handler untuk tombol download dengan validasi
     if 'download_button' in ui_components:
         # Hapus semua handler yang ada
         if hasattr(ui_components['download_button'], '_click_handlers'):
-            ui_components['download_button']._click_handlers.callbacks.clear()
+            try:
+                ui_components['download_button']._click_handlers.callbacks.clear()
+            except (AttributeError, IndexError):
+                pass
             
         # Registrasi handler baru dengan konfirmasi
         ui_components['download_button'].on_click(on_download_click_with_confirmation)
-        
-        # Tambahkan referensi handler asli untuk digunakan nanti
-        ui_components['original_download_handler'] = original_roboflow_handler
     
     # Tambahkan fungsi utilitas ke ui_components
     ui_components['check_existing_dataset'] = check_existing_dataset

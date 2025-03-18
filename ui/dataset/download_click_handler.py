@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_click_handler.py
-Deskripsi: Handler untuk tombol download dataset tanpa fallback berlebihan - diperbaiki untuk mencegah index out of range
+Deskripsi: Handler untuk tombol download dataset dengan perbaikan validasi indeks array
 """
 
 import os
@@ -22,7 +22,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Setup handler untuk tombol download
+    # Setup handler untuk tombol download dengan validasi callback
     def on_download_click(b):
         with ui_components['status']:
             clear_output(wait=True)
@@ -98,14 +98,24 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 display(create_status_indicator("warning", 
                     f"{ICONS['warning']} Struktur dataset belum lengkap: {', '.join(missing_parts)} tidak ditemukan"))
     
-    # Setup dialog konfirmasi
+    # Setup dialog konfirmasi dengan validasi handler
     try:
         from smartcash.ui.dataset.download_confirmation_handler import setup_confirmation_handlers
         ui_components = setup_confirmation_handlers(ui_components, env, config)
-    except ImportError:
+    except ImportError as e:
         # Fallback ke handler langsung jika tidak ada confirmation handler
         if 'download_button' in ui_components:
+            # Reset handlers terlebih dahulu untuk menghindari duplikasi
+            if hasattr(ui_components['download_button'], '_click_handlers'):
+                try:
+                    ui_components['download_button']._click_handlers.callbacks.clear()
+                except (AttributeError, IndexError):
+                    pass
+            # Register fresh handler
             ui_components['download_button'].on_click(on_download_click)
+        
+        if 'logger' in ui_components:
+            ui_components['logger'].warning(f"{ICONS['warning']} Dialog konfirmasi tidak tersedia: {str(e)}")
     
     # Tambahkan fungsi ke ui_components
     ui_components['on_download_click'] = on_download_click

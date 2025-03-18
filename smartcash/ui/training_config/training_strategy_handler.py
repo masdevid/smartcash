@@ -142,15 +142,15 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                     
                     # Gunakan grid layout yang sederhana
                     html = """
-                    <div style="background-color:#f8f9fa; padding:10px; border-radius:5px; color:#2c3e50">
-                        <h4 style="margin-top:0">📊 Training Strategy Overview</h4>
+                    <div style="background-color:#f8f9fa; padding:10px; border-radius:5px; color:black">
+                        <h4 style="margin-top:0; color: inherit">📊 Training Strategy Overview</h4>
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px">
                     """
                     
                     # Optimization
                     html += """
-                        <div style="border:1px solid #ddd; border-radius:5px; padding:10px">
-                            <h5 style="margin-top:0">⚙️ Optimization</h5>
+                        <div style="border:1px solid #ddd; color:black; border-radius:5px; padding:10px">
+                            <h5 style="margin-top:0; color: inherit">⚙️ Optimization</h5>
                             <ul style="margin:0; padding-left:20px">
                     """
                     html += f"<li><b>Precision:</b> {'Mixed (FP16)' if opt_config.get('mixed_precision', True) else 'Full (FP32)'}</li>"
@@ -161,8 +161,8 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                     
                     # Policy
                     html += """
-                        <div style="border:1px solid #ddd; border-radius:5px; padding:10px">
-                            <h5 style="margin-top:0">📋 Training Policy</h5>
+                        <div style="border:1px solid #ddd; color:black; border-radius:5px; padding:10px">
+                            <h5 style="margin-top:0; color: inherit">📋 Training Policy</h5>
                             <ul style="margin:0; padding-left:20px">
                     """
                     html += f"<li><b>Save Best:</b> {'Yes' if policy_config.get('save_best', True) else 'No'}</li>"

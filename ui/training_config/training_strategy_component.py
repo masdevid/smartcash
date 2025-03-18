@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/training_config/training_strategy_component.py
-Deskripsi: Komponen UI untuk konfigurasi strategi training model
+Deskripsi: Komponen UI untuk konfigurasi strategi training model (tanpa augmentasi)
 """
 
 import ipywidgets as widgets
@@ -27,51 +27,6 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
         f"{ICONS['training']} Training Strategy",
         "Konfigurasi strategi dan teknik optimasi untuk training model SmartCash"
     )
-    
-    # Augmentation strategy section
-    augmentation_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['augmentation']} Data Augmentation Strategy</h3>"
-    )
-    
-    augmentation_options = widgets.VBox([
-        widgets.Checkbox(
-            value=True,
-            description='Enable data augmentation',
-            style={'description_width': 'initial'}
-        ),
-        widgets.FloatSlider(
-            value=0.5,
-            min=0,
-            max=1.0,
-            step=0.05,
-            description='Mosaic prob:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%')
-        ),
-        widgets.FloatSlider(
-            value=0.5,
-            min=0,
-            max=1.0,
-            step=0.05,
-            description='Flip prob:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%')
-        ),
-        widgets.FloatSlider(
-            value=0.3,
-            min=0,
-            max=1.0,
-            step=0.05,
-            description='Scale jitter:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%')
-        ),
-        widgets.Checkbox(
-            value=False,
-            description='Enable mixup',
-            style={'description_width': 'initial'}
-        )
-    ])
     
     # Optimization strategy section
     optimization_section = widgets.HTML(
@@ -181,11 +136,10 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
         """
         <p>Strategi training yang tepat dapat meningkatkan performa model secara signifikan:</p>
         <ul>
-            <li><strong>Data Augmentation</strong> - Memperbanyak variasi data training dengan transformasi</li>
             <li><strong>Optimization</strong> - Teknik untuk mempercepat training dan mencapai konvergensi lebih baik</li>
             <li><strong>Training Policy</strong> - Pengaturan untuk proses dan monitoring training</li>
         </ul>
-        <p><strong>Rekomendasi:</strong> Gunakan kombinasi mosaic augmentation (0.5-0.8), EMA, dan cosine scheduler untuk kasus SmartCash.</p>
+        <p><strong>Rekomendasi:</strong> Gunakan EMA dan cosine scheduler untuk kasus SmartCash. Augmentasi dataset harus dikonfigurasi pada bagian dataset preparation.</p>
         """,
         'info',
         collapsed=True
@@ -194,8 +148,6 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
     # Rakit komponen UI
     ui = widgets.VBox([
         header,
-        augmentation_section,
-        augmentation_options,
         optimization_section,
         optimization_options,
         policy_section,
@@ -211,7 +163,6 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
     ui_components = {
         'ui': ui,
         'header': header,
-        'augmentation_options': augmentation_options,
         'optimization_options': optimization_options,
         'policy_options': policy_options,
         'strategy_summary': strategy_summary,

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow tanpa fallback berlebihan
+Deskripsi: Handler untuk download dataset dari Roboflow yang diperbaiki untuk mencegah index out of range
 """
 
 from pathlib import Path
@@ -22,27 +22,21 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
     
     # Cek ketersediaan dataset manager
     if 'dataset_manager' not in ui_components:
-        with ui_components['status']:
-            display(create_status_indicator("error", f"{ICONS['error']} DatasetManager tidak tersedia"))
+        with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} DatasetManager tidak tersedia"))
         return
     
     # Get Roboflow settings
     settings = get_roboflow_settings(ui_components)
-    if not settings:
-        return
+    if not settings: return
     
     # Setup data directory
     data_dir = setup_data_directory(ui_components, env, config)
-    if not data_dir:
-        return
+    if not data_dir: return
     
     # Log download
-    if logger:
-        logger.info(f"🔑 Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})")
+    if logger: logger.info(f"🔑 Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})")
     else:
-        with ui_components['status']:
-            display(create_status_indicator("info", 
-                f"{ICONS['key']} Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})..."))
+        with ui_components['status']: display(create_status_indicator("info", f"{ICONS['key']} Mengunduh dataset dari Roboflow ({settings['workspace']}/{settings['project']} v{settings['version']})..."))
     
     try:
         # Eksekusi download
@@ -56,8 +50,7 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
         )
         
         # Handle sukses
-        with ui_components['status']:
-            display(create_status_indicator("success", f"{ICONS['success']} Dataset berhasil diunduh ke {data_dir}"))
+        with ui_components['status']: display(create_status_indicator("success", f"{ICONS['success']} Dataset berhasil diunduh ke {data_dir}"))
         
         # Validasi struktur
         if 'validate_dataset_structure' in ui_components and callable(ui_components['validate_dataset_structure']):
@@ -66,7 +59,7 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
         # Update status panel
         if 'status_panel' in ui_components:
             ui_components['status_panel'].value = create_status_indicator(
-                "success", f"{ICONS['success']} Dataset siap digunakan: {len(dataset_paths)} splits"
+                "success", f"{ICONS['success']} Dataset siap digunakan: {len(dataset_paths) if dataset_paths else 0} splits"
             ).value
             
         # Notify event if observer available
@@ -79,25 +72,15 @@ def download_from_roboflow(ui_components: Dict[str, Any], env=None, config=None)
                     message="Download dataset berhasil",
                     dataset_path=data_dir
                 )
-            except ImportError:
-                pass
-                
+            except ImportError: pass
     except Exception as e:
-        with ui_components['status']:
-            display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-        
-        if logger:
-            logger.error(f"{ICONS['error']} Error saat download: {str(e)}")
-        
-        # Update status panel
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = create_status_indicator(
-                "error", f"{ICONS['error']} Download dataset gagal"
-            ).value
+        with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+        if logger: logger.error(f"{ICONS['error']} Error saat download: {str(e)}")
+        if 'status_panel' in ui_components: ui_components['status_panel'].value = create_status_indicator("error", f"{ICONS['error']} Download dataset gagal").value
 
 def get_roboflow_settings(ui_components):
     """
-    Ambil pengaturan download Roboflow
+    Ambil pengaturan download Roboflow dengan verifikasi ketersediaan komponen
     
     Args:
         ui_components: Dictionary komponen UI
@@ -105,12 +88,22 @@ def get_roboflow_settings(ui_components):
     Returns:
         Dictionary berisi pengaturan Roboflow atau None jika gagal
     """
-    # Get settings
-    api_settings = ui_components['roboflow_settings'].children
-    api_key = api_settings[0].value
-    workspace = api_settings[1].value
-    project = api_settings[2].value
-    version = api_settings[3].value
+    # Periksa keberadaan komponen terlebih dahulu
+    if 'roboflow_settings' not in ui_components:
+        with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} Konfigurasi Roboflow tidak ditemukan"))
+        return None
+    
+    roboflow_settings = ui_components['roboflow_settings']
+    if not hasattr(roboflow_settings, 'children') or len(roboflow_settings.children) < 4:
+        with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} Konfigurasi Roboflow tidak lengkap"))
+        return None
+    
+    # Get settings dengan aman
+    api_settings = roboflow_settings.children
+    api_key = api_settings[0].value if len(api_settings) > 0 else ""
+    workspace = api_settings[1].value if len(api_settings) > 1 else "smartcash-wo2us"
+    project = api_settings[2].value if len(api_settings) > 2 else "rupiah-emisi-2022"
+    version = api_settings[3].value if len(api_settings) > 3 else "3"
     
     # Try to get API key from Google Secret if not provided
     if not api_key:
@@ -118,14 +111,13 @@ def get_roboflow_settings(ui_components):
             from google.colab import userdata
             api_key = userdata.get('ROBOFLOW_API_KEY')
             if api_key:
-                api_settings[0].value = api_key
+                if len(api_settings) > 0:
+                    api_settings[0].value = api_key
             else:
-                with ui_components['status']:
-                    display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
+                with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
                 return None
-        except:
-            with ui_components['status']:
-                display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
+        except Exception:
+            with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
             return None
     
     return {
@@ -148,15 +140,21 @@ def setup_data_directory(ui_components, env, config):
         Path direktori data atau None jika gagal
     """
     logger = ui_components.get('logger')
-    data_dir = config.get('data', {}).get('dir', 'data')
+    # Default data directory jika config tidak tersedia
+    data_dir = "data" 
+    
+    # Coba ambil dari config jika tersedia
+    if config and isinstance(config, dict) and 'data' in config:
+        data_dir = config.get('data', {}).get('dir', 'data')
     
     # Gunakan Google Drive jika tersedia
     if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
         data_dir = str(env.drive_path / 'data')
-        if logger:
-            logger.info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset")
+        if logger: logger.info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset")
     
     # Pastikan direktori ada
-    Path(data_dir).mkdir(parents=True, exist_ok=True)
-    
+    try: Path(data_dir).mkdir(parents=True, exist_ok=True)
+    except Exception as e: 
+        with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} Error membuat direktori: {str(e)}"))
+        return None
     return data_dir

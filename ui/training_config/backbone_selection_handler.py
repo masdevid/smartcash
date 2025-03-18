@@ -11,7 +11,8 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
     # Import dengan penanganan error sederhana
     try:
         from smartcash.ui.training_config.config_handler import save_config, reset_config
-        from smartcash.ui.utils.ui_helpers import create_status_indicator, update_output_area
+        from smartcash.ui.utils.ui_helpers import create_status_indicator
+        from smartcash.ui.components.alerts import create_info_alert
         
         # Dapatkan logger jika tersedia
         logger = None
@@ -58,7 +59,7 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
         # Pemetaan model_type ke konfigurasi backbone dan fitur
         MODEL_CONFIGS = {
             'efficient_basic': {
-                'backbone': 'efficientnet_b4',
+                'backbone': 'efficientnet_b0',
                 'use_attention': False,
                 'use_residual': False,
                 'use_ciou': False,
@@ -69,7 +70,7 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                 'use_attention': True,
                 'use_residual': False,
                 'use_ciou': False,
-                'num_repeats': 1
+                'num_repeats': 3
             },
             'efficient_advanced': {
                 'backbone': 'efficientnet_b4',
@@ -86,11 +87,11 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                 'num_repeats': 1
             },
             'efficient_experiment': {
-                'backbone': 'efficientnet_b4',
+                'backbone': 'efficientnet_b5',
                 'use_attention': True,
                 'use_residual': True,
                 'use_ciou': True,
-                'num_repeats': 3
+                'num_repeats': 5
             }
         }
         
@@ -151,39 +152,61 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                 
             # Get model type
             model_options = ui_components['model_options']
+            if not model_options or not hasattr(model_options, 'children') or len(model_options.children) < 1:
+                return current_config
+                
             model_dropdown = model_options.children[0]
             model_option = model_dropdown.value
             model_type = model_option.split(' - ')[0].strip()
             
             # Get backbone config
             backbone_options = ui_components['backbone_options']
+            if not backbone_options or not hasattr(backbone_options, 'children') or len(backbone_options.children) < 3:
+                return current_config
+                
             backbone_dropdown = backbone_options.children[0]
-            backbone_option = backbone_dropdown.options[backbone_dropdown.index]
-            backbone_type = backbone_option.split(' - ')[0].strip()
-            
-            pretrained = backbone_options.children[1].value
-            freeze_backbone = backbone_options.children[2].value
+            if hasattr(backbone_dropdown, 'options') and hasattr(backbone_dropdown, 'index'):
+                backbone_option = backbone_dropdown.options[backbone_dropdown.index]
+                backbone_type = backbone_option.split(' - ')[0].strip()
+                pretrained = backbone_options.children[1].value
+                freeze_backbone = backbone_options.children[2].value
+            else:
+                backbone_type = MODEL_CONFIGS[model_type]['backbone']
+                pretrained = True
+                freeze_backbone = True
             
             # Get features config
             features_options = ui_components['features_options']
-            use_attention = features_options.children[0].value
-            use_residual = features_options.children[1].value
-            use_ciou = features_options.children[2].value
-            num_repeats = features_options.children[3].value
+            if not features_options or not hasattr(features_options, 'children') or len(features_options.children) < 4:
+                use_attention = MODEL_CONFIGS[model_type]['use_attention']
+                use_residual = MODEL_CONFIGS[model_type]['use_residual']
+                use_ciou = MODEL_CONFIGS[model_type]['use_ciou']
+                num_repeats = MODEL_CONFIGS[model_type]['num_repeats']
+            else:
+                use_attention = features_options.children[0].value
+                use_residual = features_options.children[1].value
+                use_ciou = features_options.children[2].value
+                num_repeats = features_options.children[3].value
             
             # Get layer config
             layer_config = ui_components['layer_config']
             layers = {}
             layer_names = ['banknote', 'nominal', 'security']
             
-            for i, layer_name in enumerate(layer_names):
-                if i < len(layer_config.children):
-                    layer_row = layer_config.children[i]
-                    if len(layer_row.children) >= 2:
-                        layers[layer_name] = {
-                            'enabled': layer_row.children[0].value,
-                            'threshold': layer_row.children[1].value
-                        }
+            if layer_config and hasattr(layer_config, 'children'):
+                for i, layer_name in enumerate(layer_names):
+                    if i < len(layer_config.children):
+                        layer_row = layer_config.children[i]
+                        if hasattr(layer_row, 'children') and len(layer_row.children) >= 2:
+                            layers[layer_name] = {
+                                'enabled': layer_row.children[0].value,
+                                'threshold': layer_row.children[1].value
+                            }
+            else:
+                # Fallback untuk layer config
+                for layer_name in layer_names:
+                    layers[layer_name] = default_config['layers'].get(layer_name, 
+                                                                     {'enabled': True, 'threshold': 0.25})
             
             # Memastikan model config ada
             if 'model' not in current_config:
@@ -220,8 +243,14 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
             
             # Update model type dropdown
             model_options = ui_components['model_options']
+            if not model_options or not hasattr(model_options, 'children') or len(model_options.children) < 1:
+                return
+                
             model_dropdown = model_options.children[0]
             
+            if not hasattr(model_dropdown, 'options'):
+                return
+                
             for i, option in enumerate(model_dropdown.options):
                 if option.startswith(model_type):
                     model_dropdown.index = i
@@ -235,12 +264,15 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                 layer_config = ui_components['layer_config']
                 layer_names = ['banknote', 'nominal', 'security']
                 
+                if not layer_config or not hasattr(layer_config, 'children'):
+                    return
+                    
                 for i, layer_name in enumerate(layer_names):
                     if layer_name in layer_cfg and i < len(layer_config.children):
                         layer_row = layer_config.children[i]
                         layer_settings = layer_cfg[layer_name]
                         
-                        if len(layer_row.children) >= 2:
+                        if hasattr(layer_row, 'children') and len(layer_row.children) >= 2:
                             # Set enabled & threshold
                             layer_row.children[0].value = layer_settings.get('enabled', True)
                             layer_row.children[1].value = layer_settings.get('threshold', 0.25)
@@ -333,30 +365,49 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
             reset_config(ui_components, config, default_config, update_ui_from_config, "Konfigurasi Model")
         
         # Register event handlers
-        model_dropdown = ui_components['model_options'].children[0]
-        model_dropdown.observe(on_model_type_change, names='value')
+        model_dropdown = ui_components.get('model_options', {}).children[0] if (
+            'model_options' in ui_components and 
+            hasattr(ui_components['model_options'], 'children') and 
+            len(ui_components['model_options'].children) > 0
+        ) else None
+            
+        if model_dropdown:
+            model_dropdown.observe(on_model_type_change, names='value')
             
         # Register callbacks untuk save/reset buttons
-        ui_components['save_button'].on_click(on_save_click)
-        ui_components['reset_button'].on_click(on_reset_click)
+        if 'save_button' in ui_components:
+            ui_components['save_button'].on_click(on_save_click)
+        if 'reset_button' in ui_components:
+            ui_components['reset_button'].on_click(on_reset_click)
         
         # Register change listeners untuk layer updates
-        for layer_row in ui_components['layer_config'].children:
-            for control in layer_row.children[:2]:  # Cukup observe 2 kontrol pertama
-                control.observe(lambda change: update_layer_summary() if change['name'] == 'value' else None, names='value')
+        layer_config = ui_components.get('layer_config')
+        if layer_config and hasattr(layer_config, 'children'):
+            for layer_row in layer_config.children:
+                if hasattr(layer_row, 'children'):
+                    for control in layer_row.children[:2]:  # Cukup observe 2 kontrol pertama
+                        control.observe(
+                            lambda change: update_layer_summary() if change['name'] == 'value' else None, 
+                            names='value'
+                        )
         
         # Initialize UI dari config
         update_ui_from_config()
         
         # Fungsi cleanup yang sederhana
         def cleanup():
-            model_dropdown = ui_components['model_options'].children[0]
-            model_dropdown.unobserve(on_model_type_change, names='value')
-                
-            for layer_row in ui_components['layer_config'].children:
-                for control in layer_row.children[:2]:
-                    if hasattr(control, 'unobserve_all'):
-                        control.unobserve_all()
+            if 'model_options' in ui_components and hasattr(ui_components['model_options'], 'children'):
+                model_dropdown = ui_components['model_options'].children[0]
+                if model_dropdown:
+                    model_dropdown.unobserve(on_model_type_change, names='value')
+                    
+            layer_config = ui_components.get('layer_config')
+            if layer_config and hasattr(layer_config, 'children'):
+                for layer_row in layer_config.children:
+                    if hasattr(layer_row, 'children'):
+                        for control in layer_row.children[:2]:
+                            if hasattr(control, 'unobserve_all'):
+                                control.unobserve_all()
                     
             if logger:
                 logger.info("✅ Backbone handler cleaned up")

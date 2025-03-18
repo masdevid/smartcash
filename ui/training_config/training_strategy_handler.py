@@ -28,13 +28,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
         # Default config (lebih ringkas)
         default_config = {
             'training': {
-                'augmentation': {
-                    'enabled': True,
-                    'mosaic': 0.5,
-                    'fliplr': 0.5,
-                    'scale': 0.3,
-                    'mixup': 0.0
-                },
                 'optimization': {
                     'mixed_precision': True,
                     'ema': True,
@@ -60,17 +53,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
             # Ensure training section exists
             if 'training' not in current_config:
                 current_config['training'] = {}
-                
-            # Get augmentation config
-            aug_opts = ui_components.get('augmentation_options')
-            if aug_opts and hasattr(aug_opts, 'children') and len(aug_opts.children) >= 5:
-                current_config['training']['augmentation'] = {
-                    'enabled': aug_opts.children[0].value,
-                    'mosaic': aug_opts.children[1].value,
-                    'fliplr': aug_opts.children[2].value,
-                    'scale': aug_opts.children[3].value,
-                    'mixup': 1.0 if aug_opts.children[4].value else 0.0
-                }
             
             # Get optimization config
             opt_opts = ui_components.get('optimization_options')
@@ -107,7 +89,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
             
             try:
                 # Get config sections
-                aug_config = config['training'].get('augmentation', {})
                 opt_config = config['training'].get('optimization', {})
                 policy_config = config['training'].get('policy', {})
                 
@@ -119,15 +100,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                         if logger:
                             logger.debug(f"⚠️ Error update widget: {e}")
                 
-                # Update augmentation options
-                aug_opts = ui_components.get('augmentation_options')
-                if aug_opts and hasattr(aug_opts, 'children') and len(aug_opts.children) >= 5:
-                    safe_update(aug_opts.children[0], aug_config.get('enabled', True))
-                    safe_update(aug_opts.children[1], aug_config.get('mosaic', 0.5))
-                    safe_update(aug_opts.children[2], aug_config.get('fliplr', 0.5))
-                    safe_update(aug_opts.children[3], aug_config.get('scale', 0.3))
-                    safe_update(aug_opts.children[4], aug_config.get('mixup', 0) > 0)
-                    
                 # Update optimization options
                 opt_opts = ui_components.get('optimization_options')
                 if opt_opts and hasattr(opt_opts, 'children') and len(opt_opts.children) >= 5:
@@ -165,7 +137,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                 
                 try:
                     # Config sections
-                    aug_config = config.get('training', {}).get('augmentation', {})
                     opt_config = config.get('training', {}).get('optimization', {})
                     policy_config = config.get('training', {}).get('policy', {})
                     
@@ -175,18 +146,6 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                         <h4 style="margin-top:0">📊 Training Strategy Overview</h4>
                         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px">
                     """
-                    
-                    # Augmentation
-                    html += """
-                        <div style="border:1px solid #ddd; border-radius:5px; padding:10px">
-                            <h5 style="margin-top:0">🔄 Augmentation</h5>
-                            <ul style="margin:0; padding-left:20px">
-                    """
-                    html += f"<li><b>Status:</b> {'Enabled' if aug_config.get('enabled', True) else 'Disabled'}</li>"
-                    html += f"<li><b>Mosaic:</b> {aug_config.get('mosaic', 0.5) * 100:.0f}%</li>"
-                    html += f"<li><b>Flip Rate:</b> {aug_config.get('fliplr', 0.5) * 100:.0f}%</li>"
-                    html += f"<li><b>Mixup:</b> {'Enabled' if aug_config.get('mixup', 0) > 0 else 'Disabled'}</li>"
-                    html += "</ul></div>"
                     
                     # Optimization
                     html += """
@@ -216,7 +175,7 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
                     html += """
                         </div>
                         <div style="margin-top:10px; padding:8px; background-color:#d1ecf1; border-radius:4px; color:#0c5460">
-                            <p style="margin:0"><b>💡 Tip:</b> Cosine scheduler dengan EMA dan mixed precision optimal untuk sebagian besar kasus.</p>
+                            <p style="margin:0"><b>💡 Tip:</b> Cosine scheduler dengan EMA dan mixed precision optimal untuk model deteksi objek.</p>
                         </div>
                     </div>
                     """
@@ -245,7 +204,7 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
         ui_components['reset_button'].on_click(on_reset_click)
         
         # Register observer untuk semua komponen UI
-        for section in ['augmentation_options', 'optimization_options', 'policy_options']:
+        for section in ['optimization_options', 'policy_options']:
             component = ui_components.get(section)
             if component and hasattr(component, 'children'):
                 for child in component.children:
@@ -257,7 +216,7 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
         # Cleanup function yang ringkas
         def cleanup():
             try:
-                for section in ['augmentation_options', 'optimization_options', 'policy_options']:
+                for section in ['optimization_options', 'policy_options']:
                     component = ui_components.get(section)
                     if component and hasattr(component, 'children'):
                         for child in component.children:

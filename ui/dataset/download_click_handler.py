@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_click_handler.py
-Deskripsi: Handler untuk tombol download dataset tanpa fallback berlebihan
+Deskripsi: Handler untuk tombol download dataset tanpa fallback berlebihan - diperbaiki untuk mencegah index out of range
 """
 
 import os
@@ -32,7 +32,12 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             ui_components['progress_bar'].value = 0
             
         try:
-            download_option = ui_components['download_options'].value
+            # Periksa dahulu apakah komponen UI ada sebelum mengaksesnya
+            download_option = ui_components.get('download_options', None)
+            if download_option is None:
+                raise ValueError("Komponen download_options tidak ditemukan")
+                
+            download_option_value = download_option.value
             
             # Notify event if observer manager available
             if 'observer_manager' in ui_components:
@@ -41,17 +46,17 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                     EventDispatcher.notify(
                         event_type="DOWNLOAD_START",
                         sender="download_handler",
-                        message=f"Memulai download dataset dari {download_option}"
+                        message=f"Memulai download dataset dari {download_option_value}"
                     )
                 except ImportError:
                     pass
             
             # Execute download based on option
-            if download_option == 'Roboflow (Online)':
+            if download_option_value == 'Roboflow (Online)':
                 # Import handler on-demand untuk mengurangi dependencies
                 from smartcash.ui.dataset.roboflow_download_handler import download_from_roboflow
                 download_from_roboflow(ui_components, env, config)
-            elif download_option == 'Local Data (Upload)':
+            elif download_option_value == 'Local Data (Upload)':
                 from smartcash.ui.dataset.local_upload_handler import process_local_upload
                 process_local_upload(ui_components, env, config)
                 
@@ -99,7 +104,8 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         ui_components = setup_confirmation_handlers(ui_components, env, config)
     except ImportError:
         # Fallback ke handler langsung jika tidak ada confirmation handler
-        ui_components['download_button'].on_click(on_download_click)
+        if 'download_button' in ui_components:
+            ui_components['download_button'].on_click(on_download_click)
     
     # Tambahkan fungsi ke ui_components
     ui_components['on_download_click'] = on_download_click

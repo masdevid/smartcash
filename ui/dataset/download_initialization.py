@@ -1,15 +1,28 @@
 """
 File: smartcash/ui/dataset/download_initialization.py
-Deskripsi: Inisialisasi komponen untuk download dataset dengan ui_helpers untuk konsistensi
+Deskripsi: Inisialisasi komponen download dataset dengan error handling terpadu
 """
 
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
+import ipywidgets as widgets
 
-# Import dari ui_helpers untuk konsistensi
-from smartcash.ui.utils.ui_helpers import create_info_alert
+try:
+    from smartcash.ui.utils.fallback import create_status_message, handle_download_status
+    from smartcash.ui.utils.constants import ICONS, COLORS
+except ImportError:
+    # Fallback imports
+    def create_status_message(message, status_type='info', **kwargs):
+        return f"📢 {message}"
+    
+    def handle_download_status(ui_components, message, status_type='info', **kwargs):
+        print(f"{status_type.upper()}: {message}")
 
-def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+def setup_initialization(
+    ui_components: Dict[str, Any], 
+    env=None, 
+    config=None
+) -> Dict[str, Any]:
     """
     Inisialisasi komponen download dataset.
     
@@ -22,142 +35,97 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         Dictionary UI components yang telah diupdate
     """
     try:
-        from smartcash.ui.utils.constants import COLORS, ICONS
-        
-        # Cek API key dari Google Colab Secret
-        api_key_info = HTML(create_info_alert(
-            f"{ICONS['warning']} API Key diperlukan untuk download dari Roboflow",
-            "warning"
-        ).value)
-        
-        # Inisialisasi data directory
+        # Dapatkan direktori data
         data_dir = config.get('data', {}).get('dir', 'data')
-        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
+        
+        # Gunakan Google Drive jika tersedia
+        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
             data_dir = str(env.drive_path / 'data')
             
             # Log penggunaan Google Drive
             if 'logger' in ui_components:
-                ui_components['logger'].info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}")
-                
-            # Update status panel jika tersedia
-            if 'status_panel' in ui_components:
-                ui_components['status_panel'].value = create_info_alert(
-                    f"{ICONS['info']} Dataset akan disimpan di Google Drive: {data_dir}",
-                    "info"
-                ).value
-        
-        # Try to get API key from Google Colab Secret
-        try:
-            from google.colab import userdata
-            roboflow_api_key = userdata.get('ROBOFLOW_API_KEY')
-            if roboflow_api_key and 'roboflow_settings' in ui_components:
-                api_settings = ui_components['roboflow_settings'].children
-                api_settings[0].value = roboflow_api_key
-                
-                api_key_info = HTML(create_info_alert(
-                    f"{ICONS['info']} API Key Roboflow tersedia dari Google Secret.",
-                    "info"
-                ).value)
-                
-                if 'logger' in ui_components:
-                    ui_components['logger'].info(f"{ICONS['success']} API Key Roboflow ditemukan dari Google Secret")
-        except:
-            pass
-        
-        # Update UI with config if available
-        if config and 'data' in config and 'roboflow' in config['data']:
-            roboflow_config = config['data']['roboflow']
-            if 'roboflow_settings' in ui_components:
-                api_settings = ui_components['roboflow_settings'].children
-                
-                # Jangan override API key jika sudah ada
-                api_key = api_settings[0].value
-                if not api_key and 'api_key' in roboflow_config:
-                    api_settings[0].value = roboflow_config['api_key']
-                    
-                # Update nilai lainnya
-                api_settings[1].value = roboflow_config.get('workspace', 'smartcash-wo2us')
-                api_settings[2].value = roboflow_config.get('project', 'rupiah-emisi-2022')
-                api_settings[3].value = str(roboflow_config.get('version', '3'))
-        
-        # Cek dataset yang sudah ada
-        try:
-            from smartcash.ui.dataset.download_confirmation_handler import check_existing_dataset, get_dataset_stats
+                ui_components['logger'].info(
+                    f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}"
+                )
             
-            if check_existing_dataset(data_dir):
-                stats = get_dataset_stats(data_dir)
-                
-                # Update message status dengan info dataset
-                api_key_info = HTML(create_info_alert(
-                    f"{ICONS['info']} Dataset terdeteksi: {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']})",
-                    "info"
-                ).value)
-                
-                # Update status panel
-                if 'status_panel' in ui_components:
-                    ui_components['status_panel'].value = create_info_alert(
-                        f"{ICONS['success']} Dataset sudah tersedia dengan {stats['total_images']} gambar",
-                        "success"
-                    ).value
-        except Exception as e:
-            # Gagal memeriksa dataset, biarkan saja
-            pass
+            # Update status panel dengan fallback
+            handle_download_status(
+                ui_components, 
+                f"Dataset akan didownload dari sumber: {data_dir}", 
+                'info'
+            )
+        
+        # Cek ketersediaan API key untuk Roboflow
+        if 'roboflow_settings' in ui_components:
+            api_settings = ui_components['roboflow_settings'].children
+            workspace = api_settings[1].value
+            project = api_settings[2].value
             
-        # Initial UI setup
-        if 'download_settings_container' in ui_components:
-            ui_components['download_settings_container'].children = [
-                ui_components['roboflow_settings'], 
-                HTML(value=api_key_info.value)
-            ]
+            handle_download_status(
+                ui_components, 
+                f"Konfig Roboflow: {workspace}/{project}", 
+                'info'
+            )
         
-    except ImportError:
-        # Fallback jika components tidak tersedia
-        pass
+        # Tambahkan variabel tambahan ke ui_components
+        ui_components['data_dir'] = data_dir
         
+    except Exception as e:
+        # Tangani error dengan fallback
+        handle_download_status(
+            ui_components, 
+            f"Error inisialisasi: {str(e)}", 
+            'error'
+        )
+    
     return ui_components
 
-def get_api_key_from_secret():
-    """Dapatkan API key dari Google Colab Secret"""
-    try:
-        from google.colab import userdata
-        return userdata.get('ROBOFLOW_API_KEY')
-    except:
-        return None
-
-def update_status_panel(ui_components, status_type, message):
+def get_api_key_info(ui_components):
     """
-    Update status panel dengan pesan dan jenis status.
+    Dapatkan informasi API key dengan fallback.
     
     Args:
         ui_components: Dictionary komponen UI
-        status_type: Jenis status ('info', 'success', 'warning', 'error')
-        message: Pesan yang akan ditampilkan
+        
+    Returns:
+        widgets.HTML dengan informasi API key
     """
-    # Gunakan create_info_alert untuk konsistensi
     try:
-        from smartcash.ui.utils.ui_helpers import create_info_alert
+        # Cek API key dari komponen
+        api_settings = ui_components['roboflow_settings'].children
+        api_key = api_settings[0].value
         
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = create_info_alert(
-                message, 
-                status_type
-            ).value
-    except ImportError:
-        # Fallback jika ui_helpers tidak tersedia
-        from smartcash.ui.utils.constants import COLORS, ALERT_STYLES
+        if api_key:
+            return create_status_message(
+                "API Key Roboflow tersedia.", 
+                'success', 
+                as_widget=True
+            )
         
-        if 'status_panel' in ui_components:
-            # Gunakan ALERT_STYLES jika tersedia
-            style = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
-            bg_color = style['bg_color']
-            text_color = style['text_color']
-            border_color = style['border_color']
-            icon = style['icon']
+        # Coba dapatkan dari Google Secret
+        try:
+            from google.colab import userdata
+            secret_key = userdata.get('ROBOFLOW_API_KEY')
             
-            ui_components['status_panel'].value = f"""
-            <div style="padding: 10px; background-color: {bg_color}; 
-                        color: {text_color}; margin: 10px 0; border-radius: 4px; 
-                        border-left: 4px solid {border_color};">
-                <p style="margin:5px 0">{icon} {message}</p>
-            </div>
-            """
+            return create_status_message(
+                "API Key tersedia dari Google Secret.", 
+                'info', 
+                as_widget=True
+            ) if secret_key else create_status_message(
+                "API Key diperlukan untuk download.", 
+                'warning', 
+                as_widget=True
+            )
+        except ImportError:
+            return create_status_message(
+                "Tidak dapat memeriksa API Key.", 
+                'error', 
+                as_widget=True
+            )
+    
+    except Exception as e:
+        return create_status_message(
+            f"Error mendapatkan API Key: {str(e)}", 
+            'error', 
+            as_widget=True
+        )

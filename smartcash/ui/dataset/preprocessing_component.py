@@ -42,7 +42,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         widgets.IntSlider(
             value=640,
             min=320,
-            max=1280,
+            max=640,
             step=32,
             description='Image size:',
             style={'description_width': 'initial'},
@@ -177,7 +177,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Collapsible log output
     log_accordion = widgets.Accordion(
         children=[status],
-        selected_index=None,
+        selected_index=0,
         layout=widgets.Layout(margin='10px 0')
     )
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")

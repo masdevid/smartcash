@@ -192,3 +192,26 @@ def get_dataset_manager(config=None, logger=None):
         if logger:
             logger.warning(f"⚠️ DatasetManager tidak tersedia: {e}")
         return None
+def handle_download_status(
+    ui_components: Dict[str, Any], 
+    message: str, 
+    status_type: str = 'info', 
+    show_output: bool = True
+) -> None:
+    """
+    Handler status download dengan fallback aman.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan status
+        status_type: Tipe status
+        show_output: Tampilkan di output widget jika tersedia
+    """
+    # Update status panel
+    update_status_panel(ui_components, message, status_type)
+    
+    # Tampilkan di output widget jika diperlukan
+    if show_output and 'status' in ui_components:
+        status_widget = ui_components['status']
+        with status_widget:
+            display(create_status_message(message, status_type))

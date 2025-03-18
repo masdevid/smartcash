@@ -27,7 +27,7 @@ DEFAULT_MODEL_CONFIG = {
 # Pemetaan model_type ke konfigurasi backbone dan fitur
 MODEL_TYPE_CONFIGS = {
     'efficient_basic': {
-        'backbone': 'efficientnet_b0',
+        'backbone': 'efficientnet_b4',
         'use_attention': False,
         'use_residual': False,
         'use_ciou': False,
@@ -55,7 +55,7 @@ MODEL_TYPE_CONFIGS = {
         'num_repeats': 1
     },
     'efficient_experiment': {
-        'backbone': 'efficientnet_b5',
+        'backbone': 'efficientnet_b4',
         'use_attention': True,
         'use_residual': True,
         'use_ciou': True,

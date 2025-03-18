@@ -42,7 +42,6 @@ def get_observer_manager(logger=None):
         if logger:
             logger.warning(f"⚠️ ObserverManager tidak tersedia: {e}")
         return None
-
 def save_config(
     ui_components: Dict[str, Any],
     config: Dict[str, Any],
@@ -85,7 +84,7 @@ def save_config(
                         if 'backup' in sig.parameters:
                             success = config_manager.save_config(updated_config, config_path, backup=True)
                         else:
-                            success = config_manager.save_config(updated_config, config_path)
+                            success = config_manager.save_config(config_path, updated_config)
                     
                     msg = f"✅ {config_name} berhasil disimpan ke {config_path}"
                     if success:
@@ -119,6 +118,7 @@ def save_config(
             if not success:
                 try:
                     import yaml
+                    import shutil
                     # Pastikan direktori ada
                     config_dir = os.path.dirname(config_path)
                     os.makedirs(config_dir, exist_ok=True)

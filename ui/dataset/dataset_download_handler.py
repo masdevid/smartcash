@@ -44,15 +44,37 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
         
         # Handler untuk Roboflow download
         def on_download_click(b):
-            # Dapatkan semua parameter
-            api_key = ui_components.get('api_key_input').value
-            workspace = ui_components.get('workspace_input').value
-            project = ui_components.get('project_input').value
-            version = ui_components.get('version_input').value
+            # Periksa dan dapatkan komponen input dengan aman
+            status_widget = ui_components.get('status')
+            
+            # Cek apakah komponen input ada
+            required_inputs = ['api_key_input', 'workspace_input', 'project_input', 'version_input']
+            missing_inputs = [input_name for input_name in required_inputs if input_name not in ui_components]
+            
+            if missing_inputs:
+                error_msg = f"Komponen input tidak ditemukan: {', '.join(missing_inputs)}"
+                with status_widget:
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                                  color:{COLORS['alert_danger_text']}; 
+                                  border-radius:4px; margin:5px 0;">
+                            <p style="margin:5px 0">{ICONS['error']} {error_msg}</p>
+                            <p>Mohon periksa kembali struktur komponen UI.</p>
+                        </div>
+                    """))
+                if logger:
+                    logger.error(f"❌ {error_msg}")
+                return
+            
+            # Dapatkan nilai input dengan aman
+            api_key = ui_components['api_key_input'].value
+            workspace = ui_components['workspace_input'].value
+            project = ui_components['project_input'].value
+            version = ui_components['version_input'].value
             format_select = ui_components.get('format_select')
             
             # Validasi input
-            status_widget = ui_components.get('status')
             if not all([api_key, workspace, project, version]):
                 with status_widget:
                     clear_output(wait=True)
@@ -64,7 +86,7 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
             
             # Gunakan dataset_manager melalui download_from_roboflow function
             try:
-                download_format = format_select.value if format_select else "yolov5"
+                download_format = format_select.value if format_select and hasattr(format_select, 'value') else "yolov5pytorch"
                 download_from_roboflow(
                     ui_components,
                     api_key=api_key,
@@ -85,11 +107,32 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
         
         # Handler untuk local upload
         def on_upload_click(b):
+            # Dapatkan status widget dengan aman
+            status_widget = ui_components.get('status')
+            if not status_widget:
+                if logger:
+                    logger.error("❌ Status widget tidak ditemukan")
+                return
+                
             # Dapatkan file upload widget
             file_upload = ui_components.get('file_upload')
             
-            if not file_upload or not file_upload.value:
-                with ui_components.get('status'):
+            if not file_upload:
+                with status_widget:
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                                  color:{COLORS['alert_danger_text']}; 
+                                  border-radius:4px; margin:5px 0;">
+                            <p style="margin:5px 0">{ICONS['error']} Komponen file_upload tidak ditemukan</p>
+                        </div>
+                    """))
+                if logger:
+                    logger.error("❌ Komponen file_upload tidak ditemukan")
+                return
+                
+            if not hasattr(file_upload, 'value') or not file_upload.value:
+                with status_widget:
                     clear_output(wait=True)
                     display(create_info_alert(
                         "Mohon pilih file dataset terlebih dahulu!",
@@ -107,7 +150,7 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
                     
             except Exception as e:
                 # Tampilkan error
-                with ui_components.get('status'):
+                with status_widget:
                     clear_output(wait=True)
                     display(HTML(f"""
                         <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 

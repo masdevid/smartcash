@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer_component.py
-Deskripsi: Komponen UI untuk instalasi dependencies
+Deskripsi: Komponen UI untuk instalasi dependencies dengan layout checkbox yang lebih kompak
 """
 
 import ipywidgets as widgets
@@ -46,7 +46,7 @@ def create_dependency_installer_ui(env=None, config=None):
         </div>
     """)
     
-    # Buat UI untuk package groups
+    # Buat UI untuk package groups dengan layout yang lebih kompak
     package_section_widgets = []
     for group_name, packages in package_groups.items():
         # Header untuk grup
@@ -56,43 +56,49 @@ def create_dependency_installer_ui(env=None, config=None):
         </div>
         """)
         
-        # Checkbox untuk packages
+        # Buat checkboxes dengan layout grid untuk tampilan lebih kompak
         checkboxes = []
         for desc, key in packages:
             checkbox = widgets.Checkbox(
                 value=True, 
                 description=desc,
-                layout=widgets.Layout(padding='3px 0')
+                indent=False,
+                layout=widgets.Layout(padding='2px 0', width='100%')
             )
             checkboxes.append(checkbox)
         
-        # VBox untuk checkboxes
-        checkboxes_group = widgets.VBox(
+        # Gunakan GridBox untuk layout yang lebih kompak
+        checkboxes_group = widgets.GridBox(
             checkboxes,
-            layout=widgets.Layout(padding='5px 10px', width='32%', min_width='250px')
+            layout=widgets.Layout(
+                grid_template_columns='100%',
+                grid_gap='0px',
+                padding='0px 10px',
+                width='100%'
+            )
         )
         
         # Box untuk grup
         group_box = widgets.VBox(
             [group_header, checkboxes_group],
             layout=widgets.Layout(
-                margin='5px',
-                padding='10px',
+                margin='3px',
+                padding='5px',
                 border='1px solid #dee2e6',
                 border_radius='5px',
-                width='32%',
-                min_width='250px'
+                width='31%',
+                min_width='180px'
             )
         )
         package_section_widgets.append(group_box)
     
-    # Container untuk groups
+    # Container untuk groups dengan HBox (row layout)
     packages_container = widgets.HBox(
         package_section_widgets,
         layout=widgets.Layout(
             display='flex',
-            flex_flow='row',
-            justify_content='space-between',
+            flex_flow='row wrap',
+            justify_content='flex-start',
             width='100%'
         )
     )
@@ -122,41 +128,50 @@ def create_dependency_installer_ui(env=None, config=None):
         )
     )
     
-    # Tombol aksi
+    # Tombol aksi dalam grid layout untuk tampilan lebih kompak
+    button_layout = widgets.Layout(
+        width='auto',
+        margin='5px',
+        height='auto'
+    )
+
     check_all_button = widgets.Button(
         description='Check All', 
         button_style='info', 
         icon='check-square',
-        layout=widgets.Layout(margin='5px')
+        layout=button_layout
     )
     
     uncheck_all_button = widgets.Button(
         description='Uncheck All', 
         button_style='warning', 
         icon='square',
-        layout=widgets.Layout(margin='5px')
+        layout=button_layout
     )
     
     install_button = widgets.Button(
         description='Install Packages', 
         button_style='primary', 
         icon='download',
-        layout=widgets.Layout(margin='5px')
+        layout=button_layout
     )
     
     check_button = widgets.Button(
         description='Check Installations', 
         button_style='success', 
         icon='check',
-        layout=widgets.Layout(margin='5px')
+        layout=button_layout
     )
     
     buttons = widgets.HBox(
         [check_all_button, uncheck_all_button, install_button, check_button],
         layout=widgets.Layout(
             display='flex',
+            flex_flow='row wrap',
             justify_content='center',
-            margin='10px 0'
+            align_items='center',
+            margin='5px 0',
+            gap='5px'
         )
     )
     
@@ -219,7 +234,7 @@ def create_dependency_installer_ui(env=None, config=None):
         ],
         layout=widgets.Layout(
             width='100%',
-            padding='15px'
+            padding='10px'
         )
     )
     

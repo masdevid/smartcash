@@ -11,22 +11,18 @@ from IPython.display import display, clear_output
 # Import dari ui_helpers untuk konsistensi
 from smartcash.ui.utils.ui_helpers import create_status_indicator, update_output_area
 
-def get_config_manager(logger=None):
+def get_config_manager():
     """
     Dapatkan config manager dengan exception handling.
     
-    Args:
-        logger: Logger untuk log error
-        
     Returns:
         Config manager atau None jika tidak tersedia
     """
     try:
         from smartcash.common.config import get_config_manager
-        return get_config_manager(logger=logger)
+        return get_config_manager()
     except ImportError as e:
-        if logger:
-            logger.warning(f"⚠️ ConfigManager tidak tersedia: {e}")
+        print(f"⚠️ ConfigManager tidak tersedia: {e}")
         return None
 
 def get_observer_manager(logger=None):

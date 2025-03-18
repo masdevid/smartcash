@@ -28,7 +28,7 @@ def setup_hyperparameters_handlers(ui_components: Dict[str, Any], env=None, conf
         
         # Load config dari file jika training section tidak ada
         if 'training' not in config:
-            config_manager = get_config_manager(logger)
+            config_manager = get_config_manager()
             if config_manager:
                 try:
                     loaded_config = config_manager.load_config("configs/training_config.yaml")

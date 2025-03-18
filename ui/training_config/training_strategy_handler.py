@@ -1,242 +1,175 @@
 """
-File: smartcash/ui/training_config/training_strategy_handler.py
-Deskripsi: Handler yang dioptimalkan untuk konfigurasi strategi training model
+File: smartcash/ui/training_config/training_strategy_component.py
+Deskripsi: Komponen UI untuk konfigurasi strategi training model (tanpa augmentasi)
 """
 
-from IPython.display import display, HTML, clear_output
-from typing import Dict, Any, Optional
+import ipywidgets as widgets
+from typing import Dict, Any
 
-def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk komponen UI strategi training."""
-    try:
-        # Import dengan penanganan error minimal
-        from smartcash.ui.training_config.config_handler import save_config, reset_config, get_config_manager
-        from smartcash.ui.utils.ui_helpers import create_status_indicator, create_info_alert
+def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
+    """
+    Buat komponen UI untuk konfigurasi strategi training model.
+    
+    Args:
+        env: Environment manager
+        config: Konfigurasi aplikasi
         
-        # Dapatkan logger jika tersedia
-        logger = None
-        try:
-            from smartcash.common.logger import get_logger
-            logger = get_logger(ui_components.get('module_name', 'training_strategy'))
-        except ImportError:
-            pass
-        
-        # Validasi config
-        if config is None:
-            config = {}
-        
-        # Default config (lebih ringkas)
-        default_config = {
-            'training': {
-                'optimization': {
-                    'mixed_precision': True,
-                    'ema': True,
-                    'swa': False,
-                    'lr_schedule': 'cosine',
-                    'weight_decay': 0.01
-                },
-                'policy': {
-                    'save_best': True,
-                    'save_period': 5,
-                    'early_stopping_patience': 15,
-                    'validate_every_epoch': True,
-                    'log_tensorboard': True
-                }
-            }
-        }
-        
-        # Update config dari UI (diringkas)
-        def update_config_from_ui(current_config=None):
-            if current_config is None:
-                current_config = config
-                
-            # Ensure training section exists
-            if 'training' not in current_config:
-                current_config['training'] = {}
-            
-            # Get optimization config
-            opt_opts = ui_components.get('optimization_options')
-            if opt_opts and hasattr(opt_opts, 'children') and len(opt_opts.children) >= 5:
-                current_config['training']['optimization'] = {
-                    'mixed_precision': opt_opts.children[0].value,
-                    'ema': opt_opts.children[1].value,
-                    'swa': opt_opts.children[2].value,
-                    'lr_schedule': opt_opts.children[3].value,
-                    'weight_decay': opt_opts.children[4].value
-                }
-            
-            # Get policy config
-            policy_opts = ui_components.get('policy_options')
-            if policy_opts and hasattr(policy_opts, 'children') and len(policy_opts.children) >= 5:
-                current_config['training']['policy'] = {
-                    'save_best': policy_opts.children[0].value,
-                    'save_period': policy_opts.children[1].value,
-                    'early_stopping_patience': policy_opts.children[2].value,
-                    'validate_every_epoch': policy_opts.children[3].value,
-                    'log_tensorboard': policy_opts.children[4].value
-                }
-            
-            # Update strategy summary
-            update_strategy_summary()
-            
-            return current_config
-        
-        # Update UI dari config (diringkas)
-        def update_ui_from_config():
-            """Update komponen UI dari konfigurasi."""
-            if not config or 'training' not in config:
-                return
-            
-            try:
-                # Get config sections
-                opt_config = config['training'].get('optimization', {})
-                policy_config = config['training'].get('policy', {})
-                
-                # Helper untuk update widget value dengan aman
-                def safe_update(widget, value):
-                    try:
-                        widget.value = value
-                    except Exception as e:
-                        if logger:
-                            logger.debug(f"⚠️ Error update widget: {e}")
-                
-                # Update optimization options
-                opt_opts = ui_components.get('optimization_options')
-                if opt_opts and hasattr(opt_opts, 'children') and len(opt_opts.children) >= 5:
-                    safe_update(opt_opts.children[0], opt_config.get('mixed_precision', True))
-                    safe_update(opt_opts.children[1], opt_config.get('ema', True))
-                    safe_update(opt_opts.children[2], opt_config.get('swa', False))
-                    safe_update(opt_opts.children[3], opt_config.get('lr_schedule', 'cosine'))
-                    safe_update(opt_opts.children[4], opt_config.get('weight_decay', 0.01))
-                    
-                # Update policy options
-                policy_opts = ui_components.get('policy_options')
-                if policy_opts and hasattr(policy_opts, 'children') and len(policy_opts.children) >= 5:
-                    safe_update(policy_opts.children[0], policy_config.get('save_best', True))
-                    safe_update(policy_opts.children[1], policy_config.get('save_period', 5))
-                    safe_update(policy_opts.children[2], policy_config.get('early_stopping_patience', 15))
-                    safe_update(policy_opts.children[3], policy_config.get('validate_every_epoch', True))
-                    safe_update(policy_opts.children[4], policy_config.get('log_tensorboard', True))
-                    
-                # Update strategy summary
-                update_strategy_summary()
-                
-            except Exception as e:
-                if logger:
-                    logger.warning(f"⚠️ Error update UI: {e}")
-        
-        # Update strategy summary (lebih ringkas)
-        def update_strategy_summary():
-            """Buat rangkuman strategi yang ringkas."""
-            strategy_summary = ui_components.get('strategy_summary')
-            if not strategy_summary:
-                return
-                
-            with strategy_summary:
-                clear_output(wait=True)
-                
-                try:
-                    # Config sections
-                    opt_config = config.get('training', {}).get('optimization', {})
-                    policy_config = config.get('training', {}).get('policy', {})
-                    
-                    # Gunakan grid layout yang sederhana
-                    html = """
-                    <div style="background-color:#f8f9fa; padding:10px; border-radius:5px; color:#2c3e50">
-                        <h4 style="margin-top:0">📊 Training Strategy Overview</h4>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px">
-                    """
-                    
-                    # Optimization
-                    html += """
-                        <div style="border:1px solid #ddd; border-radius:5px; padding:10px">
-                            <h5 style="margin-top:0">⚙️ Optimization</h5>
-                            <ul style="margin:0; padding-left:20px">
-                    """
-                    html += f"<li><b>Precision:</b> {'Mixed (FP16)' if opt_config.get('mixed_precision', True) else 'Full (FP32)'}</li>"
-                    html += f"<li><b>Scheduler:</b> {opt_config.get('lr_schedule', 'cosine').capitalize()}</li>"
-                    html += f"<li><b>EMA:</b> {'Enabled' if opt_config.get('ema', True) else 'Disabled'}</li>"
-                    html += f"<li><b>SWA:</b> {'Enabled' if opt_config.get('swa', False) else 'Disabled'}</li>"
-                    html += "</ul></div>"
-                    
-                    # Policy
-                    html += """
-                        <div style="border:1px solid #ddd; border-radius:5px; padding:10px">
-                            <h5 style="margin-top:0">📋 Training Policy</h5>
-                            <ul style="margin:0; padding-left:20px">
-                    """
-                    html += f"<li><b>Save Best:</b> {'Yes' if policy_config.get('save_best', True) else 'No'}</li>"
-                    html += f"<li><b>Save Every:</b> {policy_config.get('save_period', 5)} epochs</li>"
-                    html += f"<li><b>Early Stop:</b> {policy_config.get('early_stopping_patience', 15)} epochs</li>"
-                    html += f"<li><b>TensorBoard:</b> {'Enabled' if policy_config.get('log_tensorboard', True) else 'Disabled'}</li>"
-                    html += "</ul></div>"
-                    
-                    # Tip box
-                    html += """
-                        </div>
-                        <div style="margin-top:10px; padding:8px; background-color:#d1ecf1; border-radius:4px; color:#0c5460">
-                            <p style="margin:0"><b>💡 Tip:</b> Cosine scheduler dengan EMA dan mixed precision optimal untuk model deteksi objek.</p>
-                        </div>
-                    </div>
-                    """
-                    
-                    display(HTML(html))
-                    
-                except Exception as e:
-                    if logger:
-                        logger.error(f"❌ Error update summary: {e}")
-                    display(HTML(f"<p style='color:red'>❌ Error update summary: {str(e)}</p>"))
-        
-        # Handler buttons sederhana
-        def on_save_click(b):
-            save_config(ui_components, config, "configs/training_config.yaml", update_config_from_ui, "Strategi Training")
-        
-        def on_reset_click(b):
-            reset_config(ui_components, config, default_config, update_ui_from_config, "Strategi Training")
-        
-        # Handler untuk perubahan komponen
-        def on_component_change(change):
-            if change['name'] == 'value':
-                update_config_from_ui()
-        
-        # Register handlers
-        ui_components['save_button'].on_click(on_save_click)
-        ui_components['reset_button'].on_click(on_reset_click)
-        
-        # Register observer untuk semua komponen UI
-        for section in ['optimization_options', 'policy_options']:
-            component = ui_components.get(section)
-            if component and hasattr(component, 'children'):
-                for child in component.children:
-                    child.observe(on_component_change, names='value')
-        
-        # Inisialisasi UI dari config
-        update_ui_from_config()
-        
-        # Cleanup function yang ringkas
-        def cleanup():
-            try:
-                for section in ['optimization_options', 'policy_options']:
-                    component = ui_components.get(section)
-                    if component and hasattr(component, 'children'):
-                        for child in component.children:
-                            child.unobserve(on_component_change, names='value')
-                            
-                if logger:
-                    logger.info("✅ Training strategy handlers cleaned up")
-            except Exception as e:
-                if logger:
-                    logger.warning(f"⚠️ Error cleanup: {e}")
-        
-        # Tambahkan cleanup function
-        ui_components['cleanup'] = cleanup
-        
-    except Exception as e:
-        # Fallback sederhana jika terjadi error
-        if 'status' in ui_components:
-            with ui_components['status']:
-                display(HTML(f"<p style='color:red'>❌ Error setup strategy handler: {str(e)}</p>"))
-        else:
-            print(f"❌ Error setup strategy handler: {str(e)}")
+    Returns:
+        Dictionary berisi widget UI
+    """
+    # Import komponen UI
+    from smartcash.ui.components.headers import create_header
+    from smartcash.ui.components.alerts import create_info_box
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    
+    # Header
+    header = create_header(
+        f"{ICONS['training']} Training Strategy",
+        "Konfigurasi strategi dan teknik optimasi untuk training model SmartCash"
+    )
+    
+    # Optimization strategy section
+    optimization_section = widgets.HTML(
+        f"<h3 style='color: #000000; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Optimization Strategy</h3>"
+    )
+    
+    optimization_options = widgets.VBox([
+        widgets.Checkbox(
+            value=True,
+            description='Use mixed precision (FP16)',
+            style={'description_width': 'initial'}
+        ),
+        widgets.Checkbox(
+            value=True,
+            description='Use Exponential Moving Average (EMA)',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(margin='10px 0')
+        ),
+        widgets.Checkbox(
+            value=False,
+            description='Use Stochastic Weight Averaging (SWA)',
+            style={'description_width': 'initial'}
+        ),
+        widgets.Dropdown(
+            options=['cosine', 'linear', 'step', 'constant'],
+            value='cosine',
+            description='LR schedule:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='60%', margin='10px 0')
+        ),
+        widgets.FloatText(
+            value=0.01,
+            description='Weight decay:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='50%')
+        )
+    ])
+    
+    # Training policy section
+    policy_section = widgets.HTML(
+        f"<h3 style='color: #000000; margin-top: 15px; margin-bottom: 10px;'>{ICONS['tools']} Training Policy</h3>"
+    )
+    
+    policy_options = widgets.VBox([
+        widgets.Checkbox(
+            value=True,
+            description='Save best model only',
+            style={'description_width': 'initial'}
+        ),
+        widgets.IntSlider(
+            value=5,
+            min=1,
+            max=10,
+            description='Save every N epochs:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%')
+        ),
+        widgets.IntSlider(
+            value=15,
+            min=5,
+            max=30,
+            description='Early stopping patience:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%')
+        ),
+        widgets.Checkbox(
+            value=True,
+            description='Validate every epoch',
+            style={'description_width': 'initial'}
+        ),
+        widgets.Checkbox(
+            value=True,
+            description='Log to TensorBoard',
+            style={'description_width': 'initial'}
+        )
+    ])
+    
+    # Strategy summary
+    strategy_summary = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            margin='10px 0',
+            padding='10px',    
+            overflow='auto'
+        )
+    )
+    
+    # Tombol aksi
+    from smartcash.ui.training_config.config_buttons import create_config_buttons
+    buttons_container = create_config_buttons("Strategi Training")
+    
+    # Status output
+    status = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd',
+            min_height='100px',
+            max_height='300px',
+            margin='10px 0',
+            overflow='auto'
+        )
+    )
+    
+    # Info box with details
+    info_box = create_info_box(
+        "Tentang Strategi Training",
+        """
+        <p>Strategi training yang tepat dapat meningkatkan performa model secara signifikan:</p>
+        <ul>
+            <li><strong>Optimization</strong> - Teknik untuk mempercepat training dan mencapai konvergensi lebih baik</li>
+            <li><strong>Training Policy</strong> - Pengaturan untuk proses dan monitoring training</li>
+        </ul>
+        <p><strong>Rekomendasi:</strong> Gunakan EMA dan cosine scheduler untuk kasus SmartCash. Augmentasi dataset harus dikonfigurasi pada bagian dataset preparation.</p>
+        """,
+        'info',
+        collapsed=True
+    )
+    
+    # Rakit komponen UI
+    ui = widgets.VBox([
+        header,
+        optimization_section,
+        optimization_options,
+        policy_section,
+        policy_options,
+        strategy_summary,
+        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
+        buttons_container,
+        status,
+        info_box
+    ])
+    
+    # Dictionary untuk akses ke komponen dari luar
+    ui_components = {
+        'ui': ui,
+        'header': header,
+        'optimization_options': optimization_options,
+        'policy_options': policy_options,
+        'strategy_summary': strategy_summary,
+        'save_button': buttons_container.children[0],
+        'reset_button': buttons_container.children[1],
+        'status': status,
+        'module_name': 'training_strategy'
+    }
     
     return ui_components

@@ -1,99 +1,77 @@
 """
 File: smartcash/ui/dataset/download_confirmation_handler.py
-Deskripsi: Handler untuk menampilkan dialog konfirmasi sebelum download dataset dengan validasi callbacks
+Deskripsi: Handler untuk menampilkan dialog konfirmasi di atas output box
 """
 
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
 from IPython.display import display, HTML
 
 def check_existing_dataset(data_dir: str = "data") -> bool:
-    """
-    Cek apakah dataset sudah ada di direktori data
-    
-    Args:
-        data_dir: Direktori data
-        
-    Returns:
-        Boolean menunjukkan keberadaan dataset
-    """
+    """Cek apakah dataset sudah ada di direktori data"""
     required_dirs = [
         os.path.join(data_dir, split, folder)
         for split in ['train', 'valid', 'test']
         for folder in ['images', 'labels']
     ]
     
-    # Dataset dianggap ada jika minimal 4 dari 6 folder yang dibutuhkan ada
     existing_dirs = sum(1 for dir_path in required_dirs if os.path.isdir(dir_path))
     return existing_dirs >= 4
 
 def get_dataset_stats(data_dir: str = "data") -> Dict[str, Any]:
-    """
-    Dapatkan statistik dataset yang ada
-    
-    Args:
-        data_dir: Direktori data
-        
-    Returns:
-        Dictionary berisi statistik dataset
-    """
+    """Dapatkan statistik dataset yang ada"""
     stats = {'total_images': 0, 'train': 0, 'valid': 0, 'test': 0}
     
     for split in ['train', 'valid', 'test']:
         img_dir = os.path.join(data_dir, split, 'images')
         if os.path.isdir(img_dir):
             image_count = len([f for f in os.listdir(img_dir) 
-                             if os.path.isfile(os.path.join(img_dir, f)) and 
-                             f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))])
+                              if os.path.isfile(os.path.join(img_dir, f)) and 
+                              f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))])
             stats[split] = image_count
             stats['total_images'] += image_count
     
     return stats
 
 def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """
-    Setup handler untuk konfirmasi download dan pengecekan dataset
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        env: Environment manager
-        config: Konfigurasi aplikasi
-        
-    Returns:
-        Dictionary UI components yang telah diupdate
-    """
+    """Setup handler untuk konfirmasi download"""
     try:
+        import ipywidgets as widgets
         from smartcash.ui.components.alerts import create_status_indicator
         from smartcash.ui.utils.constants import ICONS, COLORS
-        from smartcash.ui.components.helpers import create_confirmation_dialog
-    except ImportError:
-        # Fallback tanpa komponen UI
-        def create_status_indicator(status, message):
-            icons = {'success': '✅', 'warning': '⚠️', 'error': '❌', 'info': 'ℹ️'}
-            icon = icons.get(status, 'ℹ️')
-            return HTML(f"<div style='padding:8px'>{icon} {message}</div>")
+        
+        # Buat container untuk dialog konfirmasi di atas output
+        if 'confirmation_container' not in ui_components:
+            ui_components['confirmation_container'] = widgets.Box(
+                layout=widgets.Layout(
+                    display='none',
+                    flex_flow='column',
+                    border='1px solid #ddd',
+                    margin='10px 0',
+                    padding='10px',
+                    border_radius='5px',
+                    background_color='#f8f9fa'
+                )
+            )
             
-        ICONS = {
-            'warning': '⚠️',
-            'success': '✅',
-            'info': 'ℹ️',
-            'folder': '📁',
-            'download': '📥'
-        }
-        
-        COLORS = {
-            'success': '#28a745',
-            'warning': '#ffc107',
-            'danger': '#dc3545',
-            'info': '#17a2b8'
-        }
-        
-        def create_confirmation_dialog(title, message, on_confirm, on_cancel=None, 
-                                     confirm_label="Konfirmasi", cancel_label="Batal"):
-            # Fallback tanpa dialog konfirmasi
-            on_confirm()
-            return None
+            # Tambahkan ke UI utama, pastikan ada di atas output box
+            if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+                # Cari posisi output box
+                output_index = -1
+                for i, child in enumerate(ui_components['ui'].children):
+                    if child is ui_components.get('status'):
+                        output_index = i
+                        break
+                
+                # Tambahkan dialog container sebelum output
+                if output_index > 0:
+                    children_list = list(ui_components['ui'].children)
+                    children_list.insert(output_index, ui_components['confirmation_container'])
+                    ui_components['ui'].children = tuple(children_list)
+    except ImportError:
+        # Fallback jika ipywidgets tidak tersedia
+        pass
     
     # Cek apakah kita memiliki fungsi asli download dari click handler
     original_click_handler = None
@@ -113,33 +91,47 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
         if existing_dataset:
             # Dataset sudah ada, tampilkan konfirmasi
             stats = get_dataset_stats(data_dir)
-            with ui_components['status']:
-                display(create_status_indicator("info", 
-                    f"{ICONS['folder']} Dataset sudah ada dengan {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']})"))
             
-            def on_confirm_redownload():
-                # Jalankan download original
+            try:
+                import ipywidgets as widgets
+                # Buat dialog konfirmasi
+                confirmation_title = widgets.HTML(f"<h3 style='margin-top:0'>{ICONS['warning']} Konfirmasi Download Ulang</h3>")
+                confirmation_msg = widgets.HTML(f"<p>Dataset sudah tersedia dengan {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']}). Apakah Anda yakin ingin mendownload ulang?</p>")
+                
+                # Tombol aksi
+                btn_cancel = widgets.Button(description='Batal', button_style='warning', layout=widgets.Layout(margin='5px'))
+                btn_confirm = widgets.Button(description='Ya, Download Ulang', button_style='danger', layout=widgets.Layout(margin='5px'))
+                btn_container = widgets.HBox([btn_cancel, btn_confirm])
+                
+                # Fungsi aksi
+                def on_confirm(b):
+                    # Sembunyikan dialog
+                    ui_components['confirmation_container'].layout.display = 'none'
+                    # Jalankan download
+                    if original_click_handler:
+                        original_click_handler(b)
+                    elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
+                        ui_components['on_download_click'](b)
+                
+                def on_cancel(b):
+                    # Sembunyikan dialog
+                    ui_components['confirmation_container'].layout.display = 'none'
+                    # Tampilkan pesan dibatalkan
+                    with ui_components['status']:
+                        display(create_status_indicator("info", f"{ICONS['info']} Download dibatalkan"))
+                
+                # Register handler
+                btn_confirm.on_click(on_confirm)
+                btn_cancel.on_click(on_cancel)
+                
+                # Tampilkan dialog di container
+                ui_components['confirmation_container'].children = [confirmation_title, confirmation_msg, btn_container]
+                ui_components['confirmation_container'].layout.display = 'flex'
+                
+            except (ImportError, AttributeError):
+                # Fallback ke tampilan di output
                 if original_click_handler:
                     original_click_handler(b)
-                elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
-                    ui_components['on_download_click'](b)
-            
-            def on_cancel_download():
-                with ui_components['status']:
-                    display(create_status_indicator("info", f"{ICONS['info']} Download dibatalkan"))
-            
-            # Tampilkan dialog konfirmasi
-            confirmation_dialog = create_confirmation_dialog(
-                "Konfirmasi Download Ulang",
-                f"Dataset sudah tersedia dengan {stats['total_images']} gambar. Apakah Anda yakin ingin mendownload ulang?",
-                on_confirm_redownload,
-                on_cancel_download,
-                "Ya, Download Ulang",
-                "Batal"
-            )
-            
-            with ui_components['status']:
-                display(confirmation_dialog)
         else:
             # Dataset belum ada, langsung download
             with ui_components['status']:
@@ -151,16 +143,16 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
             elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
                 ui_components['on_download_click'](b)
     
-    # Update handler untuk tombol download dengan validasi
+    # Update handler untuk tombol download
     if 'download_button' in ui_components:
-        # Hapus semua handler yang ada
+        # Hapus handler yang ada dengan aman
         if hasattr(ui_components['download_button'], '_click_handlers'):
             try:
                 ui_components['download_button']._click_handlers.callbacks.clear()
             except (AttributeError, IndexError):
                 pass
             
-        # Registrasi handler baru dengan konfirmasi
+        # Registrasi handler baru
         ui_components['download_button'].on_click(on_download_click_with_confirmation)
     
     # Tambahkan fungsi utilitas ke ui_components

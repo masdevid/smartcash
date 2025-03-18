@@ -71,79 +71,52 @@ def save_config(
             # Update config dengan nilai UI terbaru
             updated_config = update_func(config)
             
-            # Simpan ke file
-            config_manager = get_config_manager()
-            success = False
-            
-            if config_manager:
-                try:
-                    # Cek parameter yang didukung oleh save_config
-                    if hasattr(config_manager, 'save_config'):
-                        import inspect
-                        sig = inspect.signature(config_manager.save_config)
-                        if 'backup' in sig.parameters:
-                            success = config_manager.save_config(updated_config, config_path, backup=True)
-                        else:
-                            success = config_manager.save_config(config_path, updated_config)
-                    
-                    msg = f"✅ {config_name} berhasil disimpan ke {config_path}"
-                    if success:
-                        display(create_status_indicator("success", msg))
+            # Fallback yang langsung menyimpan ke file YAML
+            try:
+                import yaml
+                import shutil
+                # Pastikan direktori ada
+                config_dir = os.path.dirname(config_path)
+                os.makedirs(config_dir, exist_ok=True)
+                
+                # Buat backup manual jika diperlukan
+                if os.path.exists(config_path):
+                    import time
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    backup_path = f"{config_path}.{timestamp}.backup"
+                    try:
+                        shutil.copy2(config_path, backup_path)
+                    except Exception:
+                        pass  # Abaikan error backup
+                
+                # Simpan file baru
+                with open(config_path, 'w') as f:
+                    yaml.dump(updated_config, f, default_flow_style=False)
+                
+                display(create_status_indicator("success", f"✅ {config_name} berhasil disimpan ke {config_path}"))
+                
+                # Notifikasi observer jika tersedia
+                observer_manager = get_observer_manager()
+                if observer_manager:
+                    try:
+                        from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
+                        from smartcash.components.observer.event_topics_observer import EventTopics
                         
-                        # Notifikasi observer jika tersedia
-                        observer_manager = get_observer_manager()
-                        if observer_manager:
-                            try:
-                                from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-                                from smartcash.components.observer.event_topics_observer import EventTopics
-                                
-                                EventDispatcher.notify(
-                                    event_type=EventTopics.CONFIG_UPDATED,
-                                    sender=ui_components.get('module_name', 'config_handler'),
-                                    message=f"{config_name} diperbarui",
-                                    config_path=config_path
-                                )
-                            except ImportError:
-                                pass
-                    else:
-                        display(create_status_indicator(
-                            "warning", 
-                            f"⚠️ {config_name} diupdate dalam memori, tetapi gagal menyimpan ke file"
-                        ))
-                except Exception as e:
-                    display(create_status_indicator("error", f"❌ Error saat menyimpan config: {str(e)}"))
-                    success = False
-            
-            # Fallback manual jika config_manager tidak tersedia atau gagal
-            if not success:
-                try:
-                    import yaml
-                    import shutil
-                    # Pastikan direktori ada
-                    config_dir = os.path.dirname(config_path)
-                    os.makedirs(config_dir, exist_ok=True)
-                    
-                    # Buat backup manual jika diperlukan
-                    if os.path.exists(config_path):
-                        import time
-                        timestamp = time.strftime("%Y%m%d_%H%M%S")
-                        backup_path = f"{config_path}.{timestamp}.backup"
-                        try:
-                            shutil.copy2(config_path, backup_path)
-                        except Exception:
-                            pass  # Abaikan error backup
-                    
-                    # Simpan file baru
-                    with open(config_path, 'w') as f:
-                        yaml.dump(updated_config, f, default_flow_style=False)
-                    
-                    display(create_status_indicator("success", f"✅ {config_name} berhasil disimpan ke {config_path}"))
-                except Exception as e:
-                    display(create_status_indicator("error", f"❌ Error menyimpan file: {str(e)}"))
+                        EventDispatcher.notify(
+                            event_type=EventTopics.CONFIG_UPDATED,
+                            sender=ui_components.get('module_name', 'config_handler'),
+                            message=f"{config_name} diperbarui",
+                            config_path=config_path
+                        )
+                    except ImportError:
+                        pass
+                
+            except Exception as e:
+                display(create_status_indicator("error", f"❌ Error menyimpan file: {str(e)}"))
                 
         except Exception as e:
             display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-
+            
 def reset_config(
     ui_components: Dict[str, Any],
     config: Dict[str, Any],

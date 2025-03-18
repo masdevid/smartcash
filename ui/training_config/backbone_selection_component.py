@@ -50,10 +50,9 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='80%')
         ),
-        widgets.HTML(
-            value="""<div style="padding: 10px; background-color: #e3f2fd; border-radius: 5px; margin: 10px 0;">
-                    <p><b>💡 Catatan:</b> Pemilihan model akan menentukan backbone dan fitur optimasi secara otomatis.</p>
-                    </div>"""
+        create_info_box(
+            "Pemilihan model akan menentukan backbone dan fitur optimasi secara otomatis.",
+            icon=ICONS['info']
         )
     ])
     

@@ -1355,21 +1355,6 @@
   - `create_button_group(buttons, layout)`: Buat grup tombol dengan layout konsisten
   - `create_confirmation_dialog(title, message, on_confirm, on_cancel, confirm_label, cancel_label)`: Buat dialog konfirmasi
 
-#### Widget Layouts (smartcash/components/shared/widget_layouts.py)
-- **Fungsi**: Layout standar untuk widgets UI dengan pendekatan factory
-- **Konstanta Utama**:
-  - `CONTAINER_LAYOUTS`: Layout untuk containers (main, card, section, sidebar)
-  - `CONTENT_LAYOUTS`: Layout untuk content (output, status, log)
-  - `INPUT_LAYOUTS`: Layout untuk input (text, textarea, dropdown, slider, checkbox, radio)
-  - `BUTTON_LAYOUTS`: Layout untuk buttons (standard, small, hidden, inline)
-  - `GROUP_LAYOUTS`: Layout untuk grup (horizontal, vertical, grid)
-  - `COMPONENT_LAYOUTS`: Layout untuk komponen (tabs, accordion, progress, divider)
-- **Metode Utama**:
-  - `create_layout(width, height, margin, padding, border, display, **kwargs)`: Factory untuk membuat layout
-  - `create_divider()`: Buat divider horizontal
-  - `create_spacing(height)`: Buat elemen spacing
-  - `create_grid_layout(nrows, ncols, layout_kwargs)`: Buat layout grid
-
 #### Validators (smartcash/components/shared/validators.py)
 - **Fungsi**: Utilitas validasi untuk input UI dan form handling
 - **Metode Utama**:

@@ -320,8 +320,7 @@ smartcash/ui/
 │   ├── helpers.py              # Fungsi helper untuk UI
 │   ├── layouts.py              # Layout standar untuk widget
 │   ├── metrics.py              # Komponen untuk menampilkan metrik
-│   ├── validators.py           # Validasi input dan form
-│   └── widget_layouts.py       # Factory untuk membuat layout widget
+│   └── validators.py           # Validasi input dan form
 │
 ├── handlers/                   # Handler untuk berbagai event dan error
 │   ├── __init__.py

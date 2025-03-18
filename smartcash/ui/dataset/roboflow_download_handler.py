@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow yang diperbaiki untuk mencegah index out of range
+Deskripsi: Handler untuk download dataset dari Roboflow dengan pengecekan indeks yang aman
 """
 
 from pathlib import Path
@@ -98,12 +98,11 @@ def get_roboflow_settings(ui_components):
         with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} Konfigurasi Roboflow tidak lengkap"))
         return None
     
-    # Get settings dengan aman
-    api_settings = roboflow_settings.children
-    api_key = api_settings[0].value if len(api_settings) > 0 else ""
-    workspace = api_settings[1].value if len(api_settings) > 1 else "smartcash-wo2us"
-    project = api_settings[2].value if len(api_settings) > 2 else "rupiah-emisi-2022"
-    version = api_settings[3].value if len(api_settings) > 3 else "3"
+    # Get settings dengan aman - perbaikan akses list index yang lebih aman
+    api_key = roboflow_settings.children[0].value if len(roboflow_settings.children) > 0 else ""
+    workspace = roboflow_settings.children[1].value if len(roboflow_settings.children) > 1 else "smartcash-wo2us"
+    project = roboflow_settings.children[2].value if len(roboflow_settings.children) > 2 else "rupiah-emisi-2022"
+    version = roboflow_settings.children[3].value if len(roboflow_settings.children) > 3 else "3"
     
     # Try to get API key from Google Secret if not provided
     if not api_key:
@@ -111,8 +110,8 @@ def get_roboflow_settings(ui_components):
             from google.colab import userdata
             api_key = userdata.get('ROBOFLOW_API_KEY')
             if api_key:
-                if len(api_settings) > 0:
-                    api_settings[0].value = api_key
+                if len(roboflow_settings.children) > 0:
+                    roboflow_settings.children[0].value = api_key
             else:
                 with ui_components['status']: display(create_status_indicator("error", f"{ICONS['error']} API Key Roboflow tidak tersedia"))
                 return None

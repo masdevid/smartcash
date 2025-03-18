@@ -13,22 +13,11 @@ try:
     ui_components = setup_ui_component(env, config, "backbone_selection")
     
     # Setup handler secara manual
-    try:
-        from smartcash.ui.training_config.backbone_selection_handler import setup_backbone_selection_handlers
-        ui_components = setup_backbone_selection_handlers(ui_components, env, config)
-    except ImportError as e:
-        print(f"⚠️ Tidak dapat setup handler backbone_selection: {e}")
+    from smartcash.ui.training_config.backbone_selection_handler import setup_backbone_selection_handlers
+    ui_components = setup_backbone_selection_handlers(ui_components, env, config)
         
     # Tampilkan UI
     display_ui(ui_components)
 
 except ImportError as e:
-    # Fallback sederhana satu baris jika modul tidak tersedia
-    print(f"⚠️ Error: {e}")
-    display(HTML("""
-    <div style="border:1px solid #ffc107; border-radius:5px; padding:15px; margin:10px 0; background:#fff3cd">
-        <h3 style="margin-top:0">⚠️ Mode Terbatas</h3>
-        <p>Komponen UI untuk pemilihan backbone tidak dapat dimuat.</p>
-        <p>Pastikan repository SmartCash telah di-clone dengan benar dan semua dependencies telah diinstall.</p>
-    </div>
-    """))
+    display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))

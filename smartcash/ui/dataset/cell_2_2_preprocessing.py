@@ -26,10 +26,4 @@ try:
     
 except ImportError as e:
     from IPython.display import HTML
-    display(HTML(f"""
-    <div style="padding:10px; background:#f8d7da; color:#721c24; border-radius:5px; margin:10px 0">
-        <h3 style="margin-top:0">❌ Error Inisialisasi</h3>
-        <p>{str(e)}</p>
-        <p>Pastikan repository SmartCash telah di-clone dengan benar.</p>
-    </div>
-    """))
+    display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))

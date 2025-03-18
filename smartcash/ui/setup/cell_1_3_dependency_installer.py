@@ -3,29 +3,21 @@ File: smartcash/ui/setup/cell_1_3_dependency_installer.py
 Deskripsi: Cell instalasi dependencies untuk SmartCash dengan pendekatan modular
 """
 
-from IPython.display import display
+from IPython.display import display, HTML
+import sys
+if '.' not in sys.path: sys.path.append('.')
 
-def run_cell():
-    """Runner utama untuk cell instalasi dependencies"""
-    try:
-        from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
-        from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
-    except ImportError as e:
-        from IPython.display import HTML
-        display(HTML(f"<div style='color:red'>❌ Error: {str(e)}</div>"))
-        display(HTML("<div style='color:orange'>⚠️ Pastikan repository SmartCash sudah di-clone dengan benar</div>"))
-        return
-
-    try:
-        # Coba dapatkan environment manager dan config
-        from smartcash.common.environment import get_environment_manager
-        from smartcash.common.config import get_config_manager
-        env = get_environment_manager()
-        config_manager = get_config_manager()
-        config = config_manager.config
-    except ImportError:
-        env, config = None, {}
+try:
+    from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
+    from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
+   
+    # Coba dapatkan environment manager dan config
+    from smartcash.common.environment import get_environment_manager
+    from smartcash.common.config import get_config_manager
+    env = get_environment_manager()
+    config_manager = get_config_manager()
+    config = config_manager.config
 
     # Buat komponen UI
     ui_components = create_dependency_installer_ui(env, config)
@@ -41,7 +33,5 @@ def run_cell():
     # Tampilkan UI - Pastikan hanya menampilkan widget UI, bukan dictionary UI components
     display(ui_components['ui'])
     
-    return ui_components
-
-# Jalankan cell dan simpan hasil tanpa menampilkannya
-ui_components = run_cell()
+except ImportError as e:
+    display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))

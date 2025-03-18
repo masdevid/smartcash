@@ -14,7 +14,6 @@ def setup_environment_config():
     from smartcash.ui.setup.env_config_component import create_env_config_ui
     from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
     from smartcash.ui.utils.ui_helpers import inject_css_styles
-    from smartcash.ui.handlers.error_handler import setup_error_handlers
     from smartcash.ui.handlers.observer_handler import setup_observer_handlers
     
     try:
@@ -42,7 +41,6 @@ def setup_environment_config():
     ui_components = create_env_config_ui(env, config)
     
     # Setup handlers untuk error dan observer
-    ui_components = setup_error_handlers(ui_components)
     ui_components = setup_observer_handlers(ui_components, "env_config_observers")
     
     # Setup handlers spesifik untuk env config

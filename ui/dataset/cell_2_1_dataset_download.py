@@ -42,6 +42,16 @@ except ImportError as e:
         logger.warning(f"⚠️ Tidak dapat menggunakan DatasetManager: {str(e)}")
         logger.info("ℹ️ Beberapa fitur mungkin tidak tersedia")
 
+# Lakukan validasi struktur dataset yang sudah ada
+try:
+    if 'validate_dataset_structure' in ui_components and callable(ui_components['validate_dataset_structure']):
+        data_dir = config.get('data', {}).get('dir', 'data')
+        ui_components['validate_dataset_structure'](data_dir)
+except Exception as e:
+    if logger:
+        logger.warning(f"⚠️ Tidak dapat memvalidasi dataset: {str(e)}")
+
+ui_components = setup_ui_handlers(ui_components, env, config)
 # Tampilkan UI
 display_ui(ui_components)
 

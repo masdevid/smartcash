@@ -50,7 +50,7 @@ class DatasetManager:
         
         # Default config
         self.config = {
-            'dataset_dir': 'data/dataset',
+            'dataset_dir': 'data/',
             'img_size': (640, 640),
             'batch_size': 16,
             'num_workers': 4,
@@ -63,7 +63,7 @@ class DatasetManager:
             'use_preprocessed': True,  # Gunakan dataset yang sudah di-preprocess
             'img_size': (640, 640),
             'preprocessed_dir': 'data/preprocessed',
-            'raw_dataset_dir': 'data/dataset'
+            'raw_dataset_dir': 'data/'
         }
         
         # Update config dari parameter
@@ -82,6 +82,7 @@ class DatasetManager:
         self._services = {}
         
         self.logger.info(f"📊 DatasetManager diinisialisasi (dataset_dir: {self.config['dataset_dir']})")
+        self.logger.info(f"📊 Pre-processing (preprocessed_dir: {self.config['preprocessed_dir']}); use_preprocessed: {self.preprocess_config['use_preprocessed']}")
     
     def get_service(self, service_name: str) -> Any:
         """

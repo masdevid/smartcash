@@ -3,129 +3,100 @@ File: smartcash/ui/dataset/download_initialization.py
 Deskripsi: Inisialisasi komponen download dataset dengan error handling terpadu
 """
 
-from typing import Dict, Any, Optional
-from IPython.display import display, HTML
+from typing import Dict, Any
+from IPython.display import HTML
 import ipywidgets as widgets
 
 try:
-    from smartcash.ui.utils.fallback import create_status_message, handle_download_status
-    from smartcash.ui.utils.constants import ICONS, COLORS
+    from smartcash.ui.utils.constants import ICONS, COLORS, ALERT_STYLES
 except ImportError:
-    # Fallback imports
-    def create_status_message(message, status_type='info', **kwargs):
-        return f"📢 {message}"
-    
-    def handle_download_status(ui_components, message, status_type='info', **kwargs):
-        print(f"{status_type.upper()}: {message}")
+    ICONS = {'info': 'ℹ️', 'folder': '📁', 'success': '✅', 'warning': '⚠️', 'error': '❌'}
+    COLORS = {'alert_info_bg': '#d1ecf1', 'alert_info_text': '#0c5460'}
+    ALERT_STYLES = {'info': {'bg_color': '#d1ecf1', 'text_color': '#0c5460', 'icon': 'ℹ️'}}
 
-def setup_initialization(
-    ui_components: Dict[str, Any], 
-    env=None, 
-    config=None
-) -> Dict[str, Any]:
-    """
-    Inisialisasi komponen download dataset.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        env: Environment manager
-        config: Konfigurasi aplikasi
-        
-    Returns:
-        Dictionary UI components yang telah diupdate
-    """
+def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """Inisialisasi komponen download dataset."""
     try:
         # Dapatkan direktori data
-        data_dir = config.get('data', {}).get('dir', 'data')
+        data_dir = config.get('data', {}).get('dir', 'data') if config else 'data'
         
         # Gunakan Google Drive jika tersedia
-        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
+        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
             data_dir = str(env.drive_path / 'data')
             
             # Log penggunaan Google Drive
             if 'logger' in ui_components:
-                ui_components['logger'].info(
-                    f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}"
-                )
+                ui_components['logger'].info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}")
             
-            # Update status panel dengan fallback
-            handle_download_status(
-                ui_components, 
-                f"Dataset akan didownload dari sumber: {data_dir}", 
-                'info'
-            )
+            # Update status panel
+            update_status_panel(ui_components, "info", f"Dataset akan didownload ke: {data_dir}")
         
         # Cek ketersediaan API key untuk Roboflow
-        if 'roboflow_settings' in ui_components:
+        if 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
             api_settings = ui_components['roboflow_settings'].children
-            workspace = api_settings[1].value
-            project = api_settings[2].value
-            
-            handle_download_status(
-                ui_components, 
-                f"Konfig Roboflow: {workspace}/{project}", 
-                'info'
-            )
+            if len(api_settings) > 1:  # Pastikan ada minimal 2 elemen
+                workspace = api_settings[1].value
+                # Hindari index out of range dengan menggunakan default
+                project = api_settings[2].value if len(api_settings) > 2 else "rupiah-emisi-2022"
+                
+                update_status_panel(ui_components, "info", f"Konfig Roboflow: {workspace}/{project}")
         
         # Tambahkan variabel tambahan ke ui_components
         ui_components['data_dir'] = data_dir
         
     except Exception as e:
         # Tangani error dengan fallback
-        handle_download_status(
-            ui_components, 
-            f"Error inisialisasi: {str(e)}", 
-            'error'
-        )
+        update_status_panel(ui_components, "error", f"Error inisialisasi: {str(e)}")
     
     return ui_components
 
 def get_api_key_info(ui_components):
-    """
-    Dapatkan informasi API key dengan fallback.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        widgets.HTML dengan informasi API key
-    """
+    """Dapatkan informasi API key dengan fallback."""
     try:
         # Cek API key dari komponen
-        api_settings = ui_components['roboflow_settings'].children
-        api_key = api_settings[0].value
-        
-        if api_key:
-            return create_status_message(
-                "API Key Roboflow tersedia.", 
-                'success', 
-                as_widget=True
-            )
+        if 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
+            api_settings = ui_components['roboflow_settings'].children
+            
+            # Pastikan ada minimal 1 elemen sebelum mengakses
+            api_key = api_settings[0].value if len(api_settings) > 0 else ""
+            
+            if api_key:
+                return widgets.HTML(value=create_status_message("API Key Roboflow tersedia.", 'success'))
         
         # Coba dapatkan dari Google Secret
         try:
             from google.colab import userdata
             secret_key = userdata.get('ROBOFLOW_API_KEY')
             
-            return create_status_message(
-                "API Key tersedia dari Google Secret.", 
-                'info', 
-                as_widget=True
-            ) if secret_key else create_status_message(
-                "API Key diperlukan untuk download.", 
-                'warning', 
-                as_widget=True
-            )
+            return widgets.HTML(value=create_status_message(
+                "API Key tersedia dari Google Secret." if secret_key else "API Key diperlukan untuk download.", 
+                'info' if secret_key else 'warning'
+            ))
         except ImportError:
-            return create_status_message(
-                "Tidak dapat memeriksa API Key.", 
-                'error', 
-                as_widget=True
-            )
+            return widgets.HTML(value=create_status_message("Tidak dapat memeriksa API Key.", 'warning'))
     
     except Exception as e:
-        return create_status_message(
-            f"Error mendapatkan API Key: {str(e)}", 
-            'error', 
-            as_widget=True
-        )
+        return widgets.HTML(value=create_status_message(f"Error mendapatkan API Key: {str(e)}", 'error'))
+
+def create_status_message(message, status_type='info'):
+    """Buat pesan status dalam format HTML."""
+    style = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
+    return f"""
+    <div style="padding:8px 12px; background-color:{style.get('bg_color', '#d1ecf1')}; 
+              color:{style.get('text_color', '#0c5460')}; border-radius:4px; margin:5px 0;
+              border-left:4px solid {style.get('text_color', '#0c5460')};">
+        <p style="margin:3px 0">{style.get('icon', 'ℹ️')} {message}</p>
+    </div>
+    """
+
+def update_status_panel(ui_components, status_type, message):
+    """Update status panel dengan pesan dan jenis status."""
+    if 'status_panel' not in ui_components:
+        return
+        
+    try:
+        from smartcash.ui.utils.ui_helpers import create_info_alert
+        ui_components['status_panel'].value = create_info_alert(message, status_type).value
+    except ImportError:
+        # Fallback jika create_info_alert tidak tersedia
+        ui_components['status_panel'].value = create_status_message(message, status_type)

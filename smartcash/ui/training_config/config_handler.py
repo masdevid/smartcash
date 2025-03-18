@@ -100,13 +100,25 @@ def save_config(
                         from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
                         from smartcash.components.observer.event_topics_observer import EventTopics
                         
-                        EventDispatcher.notify(
-                            event_type=EventTopics.CONFIG_UPDATED,
-                            sender=ui_components.get('module_name', 'config_handler'),
-                            message=f"{config_name} diperbarui",
-                            config_path=config_path
-                        )
-                    except ImportError:
+                        # Pastikan EventTopics.CONFIG_UPDATED tersedia
+                        if hasattr(EventTopics, 'CONFIG_UPDATED'):
+                            EventDispatcher.notify(
+                                event_type=EventTopics.CONFIG_UPDATED,
+                                sender=ui_components.get('module_name', 'config_handler'),
+                                message=f"{config_name} diperbarui",
+                                config_path=config_path
+                            )
+                        else:
+                            # Fallback jika CONFIG_UPDATED tidak tersedia
+                            EventDispatcher.notify(
+                                event_type="config.updated",  # Hardcoded string sebagai fallback
+                                sender=ui_components.get('module_name', 'config_handler'),
+                                message=f"{config_name} diperbarui",
+                                config_path=config_path
+                            )
+                    except (ImportError, AttributeError) as e:
+                        if logger:
+                            logger.warning(f"⚠️ Error notifikasi observer: {str(e)}")
                         pass
                 
             except Exception as e:

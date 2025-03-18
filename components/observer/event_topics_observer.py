@@ -17,6 +17,7 @@ class EventTopics:
     DOWNLOAD = "download"
     DATASET = "dataset"
     AUGMENTATION = "augmentation"
+    CONFIG = "config"  # Tambahkan kategori config
     
     # Training events
     TRAINING_START = "training.start"
@@ -88,6 +89,12 @@ class EventTopics:
     DOWNLOAD_PROGRESS = "download.progress"
     DOWNLOAD_ERROR = "download.error"
     DOWNLOAD_COMPLETE = "download.complete"
+    
+    # Config events
+    CONFIG_UPDATED = "config.updated"  # Tambahkan event untuk update konfigurasi
+    CONFIG_LOADED = "config.loaded"
+    CONFIG_RESET = "config.reset"
+    CONFIG_ERROR = "config.error"
     
     @classmethod
     def get_all_topics(cls):

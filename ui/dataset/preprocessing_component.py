@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_component.py
-Deskripsi: Komponen UI untuk preprocessing dataset SmartCash dengan clean separation of concerns
+Deskripsi: Komponen UI untuk preprocessing dataset SmartCash dengan accordion terbuka dan opsi yang sesuai
 """
 
 import ipywidgets as widgets
@@ -37,12 +37,12 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         </div>
     """)
     
-    # Preprocessing options
+    # Preprocessing options (sesuaikan dengan parameter dataset manager)
     preprocess_options = widgets.VBox([
         widgets.IntSlider(
             value=640,
             min=320,
-            max=640,
+            max=1280,
             step=32,
             description='Image size:',
             style={'description_width': 'initial'},
@@ -174,10 +174,10 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Collapsible log output
+    # Collapsible log output - Sekarang default terbuka (selected_index=0)
     log_accordion = widgets.Accordion(
         children=[status],
-        selected_index=None,
+        selected_index=0,  # Set terbuka secara default
         layout=widgets.Layout(margin='10px 0')
     )
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_click_handler.py
-Deskripsi: Handler untuk tombol download dataset
+Deskripsi: Handler untuk tombol download dataset dengan dukungan dialog konfirmasi
 """
 
 import os
@@ -26,6 +26,8 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         from smartcash.ui.dataset.download_initialization import update_status_panel
         from smartcash.ui.dataset.roboflow_download_handler import download_from_roboflow
         from smartcash.ui.dataset.local_upload_handler import process_local_upload
+        # Import confirmation handler
+        from smartcash.ui.dataset.download_confirmation_handler import setup_confirmation_handlers
     except ImportError:
         # Fallback jika module tidak tersedia
         def create_status_indicator(status, message):
@@ -106,8 +108,19 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 display(create_status_indicator("warning", 
                     f"{ICONS['warning']} Struktur dataset belum lengkap: {', '.join(missing_parts)} tidak ditemukan"))
     
-    # Register handler dan tambahkan ke UI components
-    ui_components['download_button'].on_click(on_download_click)
+    # Tambahkan handler download asli ke UI components
+    ui_components['on_download_click'] = on_download_click
+    
+    # Tambahkan fungsi validasi ke UI components
     ui_components['validate_dataset_structure'] = validate_dataset_structure
+    
+    # Setup handler konfirmasi
+    try:
+        ui_components = setup_confirmation_handlers(ui_components, env, config)
+    except Exception as e:
+        # Jika gagal setup confirmation handler, gunakan handler langsung
+        ui_components['download_button'].on_click(on_download_click)
+        if 'logger' in ui_components:
+            ui_components['logger'].warning(f"⚠️ Gagal setup dialog konfirmasi: {str(e)}")
     
     return ui_components

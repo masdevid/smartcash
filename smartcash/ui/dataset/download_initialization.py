@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_initialization.py
-Deskripsi: Inisialisasi komponen untuk download dataset
+Deskripsi: Inisialisasi komponen untuk download dataset dengan pengecekan dataset yang sudah ada
 """
 
 from typing import Dict, Any, Optional
@@ -20,7 +20,7 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
     """
     try:
         from smartcash.ui.utils.constants import COLORS, ICONS
-        from smartcash.ui.components.alerts import create_info_alert
+        from smartcash.ui.components.alerts import create_info_alert, create_status_indicator
         
         # Cek API key dari Google Colab Secret
         api_key_info = HTML(
@@ -30,6 +30,25 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                     <p style="margin:5px 0"><i>{ICONS['warning']} API Key diperlukan untuk download dari Roboflow</i></p>
                 </div>"""
         )
+        
+        # Inisialisasi data directory
+        data_dir = config.get('data', {}).get('dir', 'data')
+        if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
+            data_dir = str(env.drive_path / 'data')
+            
+            # Log penggunaan Google Drive
+            if 'logger' in ui_components:
+                ui_components['logger'].info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}")
+                
+            # Update status panel jika tersedia
+            if 'status_panel' in ui_components:
+                ui_components['status_panel'].value = f"""
+                <div style="padding: 10px; background-color: {COLORS['alert_info_bg']}; 
+                          color: {COLORS['alert_info_text']}; margin: 10px 0; border-radius: 4px; 
+                          border-left: 4px solid {COLORS['alert_info_text']};">
+                    <p style="margin:5px 0">{ICONS['info']} Dataset akan disimpan di Google Drive: {data_dir}</p>
+                </div>
+                """
         
         # Try to get API key from Google Colab Secret
         try:
@@ -68,6 +87,35 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                 api_settings[2].value = roboflow_config.get('project', 'rupiah-emisi-2022')
                 api_settings[3].value = str(roboflow_config.get('version', '3'))
         
+        # Cek dataset yang sudah ada
+        try:
+            from smartcash.ui.dataset.download_confirmation_handler import check_existing_dataset, get_dataset_stats
+            
+            if check_existing_dataset(data_dir):
+                stats = get_dataset_stats(data_dir)
+                
+                # Update message status dengan info dataset
+                api_key_info = HTML(
+                    f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_info_text']}; 
+                         color: {COLORS['alert_info_text']}; margin: 5px 0; 
+                         border-radius: 4px; background-color: {COLORS['alert_info_bg']}">
+                        <p style="margin:5px 0"><i>{ICONS['info']} Dataset terdeteksi: {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']})</i></p>
+                    </div>"""
+                )
+                
+                # Update status panel
+                if 'status_panel' in ui_components:
+                    ui_components['status_panel'].value = f"""
+                    <div style="padding: 10px; background-color: {COLORS['alert_success_bg']}; 
+                              color: {COLORS['alert_success_text']}; margin: 10px 0; border-radius: 4px; 
+                              border-left: 4px solid {COLORS['alert_success_text']};">
+                        <p style="margin:5px 0">{ICONS['success']} Dataset sudah tersedia dengan {stats['total_images']} gambar</p>
+                    </div>
+                    """
+        except Exception as e:
+            # Gagal memeriksa dataset, biarkan saja
+            pass
+            
         # Initial UI setup
         if 'download_settings_container' in ui_components:
             ui_components['download_settings_container'].children = [

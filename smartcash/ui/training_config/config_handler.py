@@ -25,23 +25,21 @@ def get_config_manager():
         print(f"⚠️ ConfigManager tidak tersedia: {e}")
         return None
 
-def get_observer_manager(logger=None):
+def get_observer_manager():
     """
     Dapatkan observer manager dengan exception handling.
     
-    Args:
-        logger: Logger untuk log error
-        
     Returns:
         Observer manager atau None jika tidak tersedia
     """
     try:
         from smartcash.components.observer.manager_observer import ObserverManager
-        return ObserverManager.get_instance(logger=logger)
+        # Buat instance baru jika tidak ada method get_instance
+        return ObserverManager()
     except ImportError as e:
-        if logger:
-            logger.warning(f"⚠️ ObserverManager tidak tersedia: {e}")
+        print(f"⚠️ ObserverManager tidak tersedia: {e}")
         return None
+
 def save_config(
     ui_components: Dict[str, Any],
     config: Dict[str, Any],
@@ -116,7 +114,7 @@ def save_config(
                 
         except Exception as e:
             display(create_status_indicator("error", f"❌ Error: {str(e)}"))
-            
+
 def reset_config(
     ui_components: Dict[str, Any],
     config: Dict[str, Any],

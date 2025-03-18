@@ -1,12 +1,14 @@
 """
 File: smartcash/ui/dataset/preprocessing_cleanup_handler.py
-Deskripsi: Handler untuk membersihkan data hasil preprocessing
+Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing
 """
 
 from typing import Dict, Any
-from IPython.display import display, HTML, clear_output
+from IPython.display import display, clear_output
 import shutil
 from pathlib import Path
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -20,29 +22,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    try:
-        from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
-        from smartcash.ui.utils.constants import ICONS
-        from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
-    except ImportError:
-        def create_status_indicator(status, message):
-            icons = {'success': '✅', 'warning': '⚠️', 'error': '❌', 'info': 'ℹ️'}
-            icon = icons.get(status, 'ℹ️')
-            return HTML(f"<div style='padding:8px'>{icon} {message}</div>")
-        
-        def create_info_alert(message, alert_type='info', icon=None):
-            return HTML(f"<div style='padding:8px'>{icon or '🔍'} {message}</div>")
-            
-        def update_status_panel(ui_components, status_type, message):
-            pass
-            
-        ICONS = {
-            'trash': '🗑️',
-            'success': '✅',
-            'error': '❌',
-            'warning': '⚠️',
-            'info': 'ℹ️'
-        }
+    logger = ui_components.get('logger')
     
     # Konfirmasi dialog untuk cleanup
     def create_cleanup_confirmation():
@@ -68,7 +48,6 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 "Batal"
             )
         except ImportError:
-            # Fallback jika tidak dapat membuat dialog konfirmasi
             return None
     
     # Perform cleanup
@@ -83,14 +62,14 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 display(create_status_indicator("info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing..."))
             
             # Update status panel
+            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
             update_status_panel(ui_components, "info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing...")
             
             # Pembersihan dengan dataset manager jika tersedia
             dataset_manager = ui_components.get('dataset_manager')
             if dataset_manager and hasattr(dataset_manager, 'clean_preprocessed'):
                 # Bersihkan semua split
-                splits = ['train', 'valid', 'test']
-                for split in splits:
+                for split in ['train', 'valid', 'test']:
                     dataset_manager.clean_preprocessed(split)
                 
                 # Status berhasil
@@ -110,52 +89,41 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 return
             
             # Fallback manual jika dataset manager tidak tersedia
-            try:
-                path = Path(preprocessed_dir)
-                if path.exists():
-                    # Hapus direktori
-                    shutil.rmtree(path)
-                    
-                    # Buat direktori baru
-                    path.mkdir(parents=True, exist_ok=True)
-                    
-                    # Status berhasil
-                    with ui_components['status']:
-                        display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Data preprocessing berhasil dibersihkan"))
-                    
-                    # Update status panel
-                    update_status_panel(ui_components, "success", f"{ICONS.get('success', '✅')} Data preprocessing berhasil dibersihkan")
-                    
-                    # Sembunyikan tombol cleanup
-                    ui_components['cleanup_button'].layout.display = 'none'
-                    
-                    # Sembunyikan summary container
-                    if 'summary_container' in ui_components:
-                        ui_components['summary_container'].layout.display = 'none'
-                else:
-                    with ui_components['status']:
-                        display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Direktori preprocessing tidak ditemukan: {preprocessed_dir}"))
-            except Exception as e:
+            path = Path(preprocessed_dir)
+            if path.exists():
+                # Hapus direktori
+                shutil.rmtree(path)
+                
+                # Buat direktori baru
+                path.mkdir(parents=True, exist_ok=True)
+                
+                # Status berhasil
                 with ui_components['status']:
-                    display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
+                    display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Data preprocessing berhasil dibersihkan"))
                 
                 # Update status panel
-                update_status_panel(ui_components, "error", f"{ICONS.get('error', '❌')} Gagal membersihkan data: {str(e)}")
+                update_status_panel(ui_components, "success", f"{ICONS.get('success', '✅')} Data preprocessing berhasil dibersihkan")
                 
-                # Log error
-                if 'logger' in ui_components:
-                    ui_components['logger'].error(f"{ICONS.get('error', '❌')} Error saat membersihkan data preprocessing: {str(e)}")
+                # Sembunyikan tombol cleanup
+                ui_components['cleanup_button'].layout.display = 'none'
                 
+                # Sembunyikan summary container
+                if 'summary_container' in ui_components:
+                    ui_components['summary_container'].layout.display = 'none'
+            else:
+                with ui_components['status']:
+                    display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Direktori preprocessing tidak ditemukan: {preprocessed_dir}"))
+                    
         except Exception as e:
             with ui_components['status']:
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
             
             # Update status panel
+            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
             update_status_panel(ui_components, "error", f"{ICONS.get('error', '❌')} Gagal membersihkan data: {str(e)}")
             
             # Log error
-            if 'logger' in ui_components:
-                ui_components['logger'].error(f"{ICONS.get('error', '❌')} Error saat membersihkan data preprocessing: {str(e)}")
+            if logger: logger.error(f"{ICONS.get('error', '❌')} Error saat membersihkan data preprocessing: {str(e)}")
     
     # Handler untuk tombol cleanup
     def on_cleanup_click(b):

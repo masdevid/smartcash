@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/training_config/backbone_selection_handler.py
-Deskripsi: Handler yang dioptimalkan untuk pemilihan backbone dan konfigurasi layer
+Deskripsi: Handler yang dioptimalkan untuk pemilihan model dan konfigurasi layer yang sesuai dengan ModelManager
 """
 
 from IPython.display import display, HTML, clear_output
@@ -21,13 +21,16 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
         except ImportError:
             pass
         
-        # Dapatkan layer config manager jika tersedia
-        layer_config_manager = None
+        # Coba dapatkan model manager untuk akses ke model types jika tersedia
+        model_manager = None
         try:
-            from smartcash.common.layer_config import get_layer_config_manager
-            layer_config_manager = get_layer_config_manager()
+            from smartcash.model.manager import ModelManager
+            # Hanya untuk definisi tipe model, tidak perlu instance sebenarnya
+            model_manager = ModelManager
         except ImportError:
-            pass
+            # Mode fallback jika model_manager tidak tersedia
+            if logger:
+                logger.warning("⚠️ ModelManager tidak tersedia, menggunakan definisi model tetap")
         
         # Validasi config
         if config is None:
@@ -36,9 +39,14 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
         # Default config (sederhana)
         default_config = {
             'model': {
+                'model_type': 'efficient_optimized',
                 'backbone': 'efficientnet_b4',
                 'pretrained': True,
-                'freeze_backbone': True
+                'freeze_backbone': True,
+                'use_attention': True,
+                'use_residual': False,
+                'use_ciou': False,
+                'num_repeats': 3
             },
             'layers': {
                 'banknote': {'enabled': True, 'threshold': 0.25},
@@ -47,17 +55,121 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
             }
         }
         
-        # Fungsi update config & UI (diringkas)
+        # Pemetaan model_type ke konfigurasi backbone dan fitur
+        MODEL_CONFIGS = {
+            'efficient_basic': {
+                'backbone': 'efficientnet_b4',
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False,
+                'num_repeats': 1
+            },
+            'efficient_optimized': {
+                'backbone': 'efficientnet_b4',
+                'use_attention': True,
+                'use_residual': False,
+                'use_ciou': False,
+                'num_repeats': 1
+            },
+            'efficient_advanced': {
+                'backbone': 'efficientnet_b4',
+                'use_attention': True,
+                'use_residual': True,
+                'use_ciou': True,
+                'num_repeats': 3
+            },
+            'yolov5s': {
+                'backbone': 'cspdarknet_s',
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False,
+                'num_repeats': 1
+            },
+            'efficient_experiment': {
+                'backbone': 'efficientnet_b4',
+                'use_attention': True,
+                'use_residual': True,
+                'use_ciou': True,
+                'num_repeats': 3
+            }
+        }
+        
+        # Fungsi update config & UI (untuk pembaruan model_type)
+        def on_model_type_change(change):
+            """Handler untuk perubahan model type."""
+            if change['name'] != 'value':
+                return
+                
+            # Parse model type dari pilihan dropdown
+            model_option = change['new']
+            model_type = model_option.split(' - ')[0].strip()
+            
+            # Dapatkan konfigurasi model
+            model_config = MODEL_CONFIGS.get(model_type, MODEL_CONFIGS['efficient_optimized'])
+            
+            # Update backbone dropdown
+            backbone_options = ui_components['backbone_options']
+            if backbone_options and hasattr(backbone_options, 'children') and len(backbone_options.children) > 0:
+                backbone_dropdown = backbone_options.children[0]
+                
+                for i, option in enumerate(backbone_dropdown.options):
+                    if option.startswith(model_config['backbone']):
+                        backbone_dropdown.index = i
+                        break
+            
+            # Update fitur options
+            features_options = ui_components['features_options']
+            if features_options and hasattr(features_options, 'children') and len(features_options.children) >= 4:
+                # Update attention, residual, ciou checkboxes dan num_repeats slider
+                features_options.children[0].value = model_config['use_attention']
+                features_options.children[1].value = model_config['use_residual']
+                features_options.children[2].value = model_config['use_ciou']
+                features_options.children[3].value = model_config['num_repeats']
+                
+                # Aktifkan/nonaktifkan num_repeats berdasarkan use_residual
+                features_options.children[3].disabled = not model_config['use_residual']
+            
+            # Update konfigurasi
+            if 'model' not in config:
+                config['model'] = {}
+                
+            config['model']['model_type'] = model_type
+            config['model'].update(model_config)
+            
+            # Update summary
+            update_layer_summary()
+            
+            # Tampilkan info perubahan
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("info", 
+                    f"ℹ️ Model diubah ke {model_type}. Backbone dan fitur diupdate otomatis."))
+        
         def update_config_from_ui(current_config=None):
             if current_config is None:
                 current_config = config
                 
+            # Get model type
+            model_options = ui_components['model_options']
+            model_dropdown = model_options.children[0]
+            model_option = model_dropdown.value
+            model_type = model_option.split(' - ')[0].strip()
+            
             # Get backbone config
             backbone_options = ui_components['backbone_options']
-            backbone_selection = backbone_options.children[0].value
-            backbone_type = 'efficientnet_b4' if 'EfficientNet' in backbone_selection else 'cspdarknet'
+            backbone_dropdown = backbone_options.children[0]
+            backbone_option = backbone_dropdown.options[backbone_dropdown.index]
+            backbone_type = backbone_option.split(' - ')[0].strip()
+            
             pretrained = backbone_options.children[1].value
             freeze_backbone = backbone_options.children[2].value
+            
+            # Get features config
+            features_options = ui_components['features_options']
+            use_attention = features_options.children[0].value
+            use_residual = features_options.children[1].value
+            use_ciou = features_options.children[2].value
+            num_repeats = features_options.children[3].value
             
             # Get layer config
             layer_config = ui_components['layer_config']
@@ -73,16 +185,23 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                             'threshold': layer_row.children[1].value
                         }
             
-            # Ensure model config exists
+            # Memastikan model config ada
             if 'model' not in current_config:
                 current_config['model'] = {}
             
-            # Update model & layer settings
+            # Update model & settings
             current_config['model'].update({
+                'model_type': model_type,
                 'backbone': backbone_type,
                 'pretrained': pretrained,
-                'freeze_backbone': freeze_backbone
+                'freeze_backbone': freeze_backbone,
+                'use_attention': use_attention,
+                'use_residual': use_residual,
+                'use_ciou': use_ciou,
+                'num_repeats': num_repeats
             })
+            
+            # Update layer config
             current_config['layers'] = layers
             
             # Update layer summary
@@ -91,26 +210,25 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
             return current_config
         
         def update_ui_from_config():
+            """Update UI dari konfigurasi."""
             # Check if config exists
             if not config or not isinstance(config, dict):
                 return
                 
-            # Update backbone settings
-            if 'model' in config:
-                model_cfg = config['model']
-                backbone_options = ui_components['backbone_options']
-                
-                # Set backbone, pretrained & freeze options
-                if 'backbone' in model_cfg and backbone_options.children:
-                    backbone_type = model_cfg['backbone']
-                    backbone_options.children[0].value = 'EfficientNet-B4 (Recommended)' if backbone_type == 'efficientnet_b4' else 'CSPDarknet'
-                    
-                if len(backbone_options.children) > 1:
-                    backbone_options.children[1].value = model_cfg.get('pretrained', True)
-                
-                if len(backbone_options.children) > 2:
-                    backbone_options.children[2].value = model_cfg.get('freeze_backbone', True)
+            model_cfg = config.get('model', {})
+            model_type = model_cfg.get('model_type', 'efficient_optimized')
             
+            # Update model type dropdown
+            model_options = ui_components['model_options']
+            model_dropdown = model_options.children[0]
+            
+            for i, option in enumerate(model_dropdown.options):
+                if option.startswith(model_type):
+                    model_dropdown.index = i
+                    break
+                    
+            # Backbone settings sudah otomatis diupdate oleh model type change handler
+                    
             # Update layer settings
             if 'layers' in config:
                 layer_cfg = config['layers']
@@ -127,7 +245,7 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                             layer_row.children[0].value = layer_settings.get('enabled', True)
                             layer_row.children[1].value = layer_settings.get('threshold', 0.25)
             
-            # Update layer summary
+            # Update summary
             update_layer_summary()
         
         # Fungsi update layer summary (diringkas)
@@ -142,8 +260,35 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                 try:
                     current_config = update_config_from_ui({})
                     
-                    # Buat tabular summary yang lebih sederhana
-                    html = "<h4 style='margin-top:0; color:#2c3e50'>📋 Layer Configuration Summary</h4>"
+                    # Dapatkan model type dan backbone
+                    model_type = current_config['model'].get('model_type', 'efficient_optimized')
+                    backbone_type = current_config['model'].get('backbone', 'efficientnet_b4')
+                    
+                    # Dapatkan status fitur
+                    use_attention = current_config['model'].get('use_attention', False)
+                    use_residual = current_config['model'].get('use_residual', False)
+                    use_ciou = current_config['model'].get('use_ciou', False)
+                    num_repeats = current_config['model'].get('num_repeats', 1)
+                    
+                    # Buat HTML summary yang informatif
+                    html = "<h4 style='margin-top:0; color:#2c3e50'>📋 Model & Layer Configuration</h4>"
+                    
+                    # Tampilkan model info
+                    html += f"""
+                    <div style="margin-bottom:15px; padding:10px; background:#f8f9fa; border-radius:5px; color:#2c3e50">
+                        <p><b>🧠 Model:</b> {model_type}</p>
+                        <p><b>⚙️ Backbone:</b> {backbone_type}</p>
+                        <p><b>🔌 Features:</b> 
+                            {'Attention' if use_attention else ''} 
+                            {' + Residual' if use_residual else ''} 
+                            {' + CIoU' if use_ciou else ''}
+                            {' (None)' if not any([use_attention, use_residual, use_ciou]) else ''}
+                        </p>
+                        {f'<p><b>🔄 Residual Blocks:</b> {num_repeats}</p>' if use_residual else ''}
+                    </div>
+                    """
+                    
+                    # Tampilkan tabel untuk layer
                     html += "<table style='width:100%; border-collapse:collapse; margin-top:10px;'>"
                     html += "<tr style='background:#f2f2f2'><th>Layer</th><th>Status</th><th>Threshold</th></tr>"
                     
@@ -163,15 +308,13 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
                     
                     html += "</table>"
                     
-                    # Info model & backbone
-                    backbone_type = current_config['model'].get('backbone', 'efficientnet_b4')
-                    pretrained = current_config['model'].get('pretrained', True)
-                    freeze = current_config['model'].get('freeze_backbone', True)
+                    # Tampilkan enabled layers
+                    enabled_layers = [name.capitalize() for name, settings in current_config['layers'].items() 
+                                     if settings.get('enabled', False)]
                     
                     html += f"""
                     <div style="margin-top:15px; padding:10px; background:#f8f9fa; border-radius:5px; color:#2c3e50">
-                    <p><b>🧠 Backbone:</b> {backbone_type} {'(pretrained)' if pretrained else ''} {'(frozen)' if freeze else ''}</p>
-                    <p><b>Enabled Layers:</b> {', '.join([name.capitalize() for name, settings in current_config['layers'].items() if settings.get('enabled', False)])}</p>
+                    <p><b>✓ Layer Aktif:</b> {', '.join(enabled_layers) if enabled_layers else 'Tidak ada layer aktif'}</p>
                     </div>
                     """
                     
@@ -189,41 +332,36 @@ def setup_backbone_selection_handlers(ui_components: Dict[str, Any], env=None, c
         def on_reset_click(b):
             reset_config(ui_components, config, default_config, update_ui_from_config, "Konfigurasi Model")
         
-        # Handler perubahan untuk update summary
-        def on_component_change(change):
-            if change['name'] == 'value':
-                update_layer_summary()
-        
-        # Register callbacks
+        # Register event handlers
+        model_dropdown = ui_components['model_options'].children[0]
+        model_dropdown.observe(on_model_type_change, names='value')
+            
+        # Register callbacks untuk save/reset buttons
         ui_components['save_button'].on_click(on_save_click)
         ui_components['reset_button'].on_click(on_reset_click)
         
-        # Register change listeners untuk summary updates
-        for child in ui_components['backbone_options'].children:
-            child.observe(on_component_change, names='value')
-        
+        # Register change listeners untuk layer updates
         for layer_row in ui_components['layer_config'].children:
             for control in layer_row.children[:2]:  # Cukup observe 2 kontrol pertama
-                control.observe(on_component_change, names='value')
+                control.observe(lambda change: update_layer_summary() if change['name'] == 'value' else None, names='value')
         
-        # Inisialisasi UI dari config
+        # Initialize UI dari config
         update_ui_from_config()
         
-        # Fungsi cleanup yang lebih sederhana
+        # Fungsi cleanup yang sederhana
         def cleanup():
-            for child in ui_components['backbone_options'].children:
-                if hasattr(child, 'unobserve'):
-                    child.unobserve(on_component_change, names='value')
-            
+            model_dropdown = ui_components['model_options'].children[0]
+            model_dropdown.unobserve(on_model_type_change, names='value')
+                
             for layer_row in ui_components['layer_config'].children:
                 for control in layer_row.children[:2]:
-                    if hasattr(control, 'unobserve'):
-                        control.unobserve(on_component_change, names='value')
-                        
+                    if hasattr(control, 'unobserve_all'):
+                        control.unobserve_all()
+                    
             if logger:
                 logger.info("✅ Backbone handler cleaned up")
         
-        # Tambahkan fungsi cleanup ke ui_components
+        # Assign cleanup function
         ui_components['cleanup'] = cleanup
         
     except Exception as e:

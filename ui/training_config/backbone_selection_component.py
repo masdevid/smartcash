@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/training_config/backbone_selection_component.py
-Deskripsi: Komponen UI untuk pemilihan backbone dan layer model
+Deskripsi: Komponen UI untuk pemilihan backbone dan layer model yang kompatibel dengan ModelManager
 """
 
 import ipywidgets as widgets
@@ -24,21 +24,62 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Header
     header = create_header(
-        f"{ICONS['model']} Backbone & Layer Selection",
-        "Pemilihan arsitektur backbone dan konfigurasi layer model SmartCash"
+        f"{ICONS['model']} Backbone & Model Configuration",
+        "Pemilihan model, arsitektur backbone dan konfigurasi layer untuk SmartCash"
     )
     
-    # Backbone selection section
+    # Model type selection section 
+    model_section = widgets.HTML(
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Model Selection</h3>"
+    )
+    
+    # Mendapatkan opsi model dari ModelManager
+    model_options_list = [
+        'efficient_basic - Model dasar tanpa optimasi khusus',
+        'efficient_optimized - Model dengan EfficientNet-B4 dan FeatureAdapter',
+        'efficient_advanced - Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
+        'yolov5s - YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)',
+        'efficient_experiment - Model penelitian dengan konfigurasi khusus'
+    ]
+    
+    model_options = widgets.VBox([
+        widgets.Dropdown(
+            options=model_options_list,
+            value=model_options_list[1],  # Default: efficient_optimized
+            description='Model Type:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='80%')
+        ),
+        widgets.HTML(
+            value="""<div style="padding: 10px; background-color: #e3f2fd; border-radius: 5px; margin: 10px 0;">
+                    <p><b>💡 Catatan:</b> Pemilihan model akan menentukan backbone dan fitur optimasi secara otomatis.</p>
+                    </div>"""
+        )
+    ])
+    
+    # Backbone options section
     backbone_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Backbone Selection</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Backbone Settings</h3>"
     )
     
     backbone_options = widgets.VBox([
-        widgets.RadioButtons(
-            options=['EfficientNet-B4 (Recommended)', 'CSPDarknet'],
-            value='EfficientNet-B4 (Recommended)',
+        widgets.Dropdown(
+            options=[
+                'efficientnet_b0 - Versi ringan',
+                'efficientnet_b1 - Ukuran kecil',
+                'efficientnet_b2 - Ukuran sedang',
+                'efficientnet_b3 - Keseimbangan performa',
+                'efficientnet_b4 - Rekomendasi SmartCash',
+                'efficientnet_b5 - Performa tinggi',
+                'cspdarknet_s - YOLOv5s',
+                'cspdarknet_m - YOLOv5m',
+                'cspdarknet_l - YOLOv5l'
+            ],
+            value='efficientnet_b4 - Rekomendasi SmartCash',
             description='Backbone:',
             style={'description_width': 'initial'},
+            layout=widgets.Layout(width='80%'),
+            disabled=True  # Disabled karena dipilih otomatis oleh model type
         ),
         widgets.Checkbox(
             value=True,
@@ -49,6 +90,41 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
             value=True,
             description='Freeze backbone initially',
             style={'description_width': 'initial'}
+        )
+    ])
+    
+    # Advanced features section
+    features_section = widgets.HTML(
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Features</h3>"
+    )
+    
+    features_options = widgets.VBox([
+        widgets.Checkbox(
+            value=True,
+            description='Gunakan FeatureAdapter/Attention Mechanism',
+            style={'description_width': 'initial'},
+            disabled=True  # Disabled karena ditentukan oleh model type
+        ),
+        widgets.Checkbox(
+            value=False,
+            description='Gunakan ResidualAdapter untuk fitur yang lebih baik',
+            style={'description_width': 'initial'},
+            disabled=True  # Disabled karena ditentukan oleh model type
+        ),
+        widgets.Checkbox(
+            value=False,
+            description='Gunakan CIoU Loss untuk deteksi yang lebih akurat',
+            style={'description_width': 'initial'},
+            disabled=True  # Disabled karena ditentukan oleh model type
+        ),
+        widgets.IntSlider(
+            value=3,
+            min=1,
+            max=5,
+            description='Jumlah Residual Blocks:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%'),
+            disabled=True  # Disabled karena ditentukan oleh model type
         )
     ])
     
@@ -126,7 +202,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Tombol aksi
     from smartcash.ui.training_config.config_buttons import create_config_buttons
-    buttons_container = create_config_buttons("Konfigurasi Backbone")
+    buttons_container = create_config_buttons("Konfigurasi Model")
     
     # Status output
     status = widgets.Output(
@@ -141,25 +217,29 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Info box with additional details
     info_box = create_info_box(
-        "Model Architecture Details",
+        "Model & Backbone Details",
         """
-        <p><strong>EfficientNet-B4</strong> adalah model arsitektur CNN yang menggunakan:</p>
+        <p><strong>Tipe Model SmartCash:</strong></p>
         <ul>
-            <li>Compound Scaling untuk optimasi ukuran dan akurasi</li>
-            <li>Mobile Inverted Bottleneck Convolution (MBConv) blocks</li>
-            <li>Squeeze-and-Excitation blocks untuk attention</li>
+            <li><strong>efficient_basic</strong>: Model dasar dengan backbone EfficientNet</li>
+            <li><strong>efficient_optimized</strong>: Model dengan EfficientNet-B4 dan FeatureAdapter untuk performa lebih baik</li>
+            <li><strong>efficient_advanced</strong>: Model dengan semua optimasi termasuk ResidualAdapter dan CIoU Loss</li>
+            <li><strong>yolov5s</strong>: Model bawaan YOLOv5s dengan CSPDarknet sebagai baseline perbandingan</li>
+            <li><strong>efficient_experiment</strong>: Model penelitian dengan konfigurasi khusus</li>
         </ul>
-        <p><strong>CSPDarknet</strong> adalah backbone original dari YOLOv5 dengan fitur:</p>
+        
+        <p><strong>Fitur EfficientNet:</strong></p>
         <ul>
-            <li>Cross Stage Partial Networks (CSP) untuk mengurangi bottlenecks</li>
-            <li>Fast processing untuk real-time detection</li>
-            <li>Memory efficient dengan parameter yang lebih sedikit</li>
+            <li><strong>FeatureAdapter</strong>: Meningkatkan kualitas fitur dengan mekanisme attention</li>
+            <li><strong>ResidualAdapter</strong>: Menambahkan koneksi residual untuk training yang lebih stabil</li>
+            <li><strong>CIoU Loss</strong>: Complete-IoU loss yang memperhitungkan aspect ratio dan alignment</li>
         </ul>
-        <p><strong>Layer Configuration</strong> memungkinkan model mendeteksi:</p>
+        
+        <p><strong>Layer Deteksi:</strong></p>
         <ul>
-            <li>Banknote: Deteksi uang kertas utuh</li>
-            <li>Nominal: Deteksi area nominal pada uang</li>
-            <li>Security: Deteksi fitur keamanan uang</li>
+            <li><strong>Banknote</strong>: Deteksi uang kertas utuh</li>
+            <li><strong>Nominal</strong>: Deteksi area nominal pada uang</li>
+            <li><strong>Security</strong>: Deteksi fitur keamanan uang</li>
         </ul>
         """,
         'info',
@@ -169,8 +249,12 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     # Rakit komponen UI
     ui = widgets.VBox([
         header,
+        model_section,
+        model_options,
         backbone_section,
         backbone_options,
+        features_section,
+        features_options,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
         layer_section,
         layer_config,
@@ -185,7 +269,9 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     ui_components = {
         'ui': ui,
         'header': header,
+        'model_options': model_options,
         'backbone_options': backbone_options,
+        'features_options': features_options,
         'layer_config': layer_config,
         'layer_summary': layer_summary,
         'save_button': buttons_container.children[0],

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/training_config/cell_3_1_backbone_selection.py
-Deskripsi: Cell untuk pemilihan backbone dan konfigurasi layer model SmartCash dengan fallback sederhana
+Deskripsi: Cell untuk pemilihan model, backbone dan konfigurasi layer SmartCash dengan yang kompatibel dengan ModelManager
 """
 
 # Import dari utility cell

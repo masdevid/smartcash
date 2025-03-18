@@ -1,10 +1,13 @@
 """
 File: smartcash/ui/dataset/download_ui_handler.py
-Deskripsi: Handler untuk UI events pada download dataset
+Deskripsi: Handler untuk UI events pada download dataset dengan ui_helpers
 """
 
 from typing import Dict, Any
 from IPython.display import display, HTML
+
+# Import dari ui_helpers untuk konsistensi
+from smartcash.ui.utils.ui_helpers import create_info_alert, update_output_area
 
 def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -18,22 +21,6 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    try:
-        from smartcash.ui.utils.constants import COLORS, ICONS, ALERT_STYLES
-        from smartcash.ui.components.alerts import create_status_indicator
-    except ImportError:
-        # Fallback jika constants tidak tersedia
-        COLORS = {
-            'alert_info_bg': '#d1ecf1',
-            'alert_info_text': '#0c5460',
-            'alert_warning_bg': '#fff3cd',
-            'alert_warning_text': '#856404'
-        }
-        ICONS = {
-            'info': 'ℹ️',
-            'warning': '⚠️'
-        }
-    
     # Helper untuk update progress bar
     def update_progress(progress, total, message=None):
         if 'progress_bar' in ui_components:
@@ -42,15 +29,7 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
             ui_components['progress_bar'].description = f"{progress_pct}%"
         
         if message and 'status' in ui_components:
-            # Import in function to avoid circular import
-            try:
-                from smartcash.ui.components.alerts import create_status_indicator
-                with ui_components['status']:
-                    display(create_status_indicator("info", message))
-            except ImportError:
-                # Fallback
-                with ui_components['status']:
-                    display(HTML(f"<div style='padding:5px'><span>ℹ️ {message}</span></div>"))
+            update_output_area(ui_components['status'], message, "info")
     
     # Store helpers in ui_components for other modules to use
     ui_components['update_progress'] = update_progress
@@ -71,9 +50,34 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
         api_key = api_settings[0].value
         
         try:
-            # Gunakan konstanta jika tersedia
-            from smartcash.ui.utils.constants import COLORS, ICONS
+            # Gunakan fungsi create_info_alert untuk konsistensi
+            from smartcash.ui.utils.constants import ICONS
             
+            if api_key:
+                return create_info_alert(
+                    f"{ICONS['info']} API Key Roboflow tersedia.",
+                    "info"
+                ).value
+            else:
+                try:
+                    # Try to check if available from Secret
+                    from google.colab import userdata
+                    api_key = userdata.get('ROBOFLOW_API_KEY')
+                    if api_key:
+                        return create_info_alert(
+                            f"{ICONS['info']} API Key Roboflow tersedia dari Google Secret.",
+                            "info"
+                        ).value
+                except:
+                    pass
+                    
+                return create_info_alert(
+                    f"{ICONS['warning']} API Key diperlukan untuk download dari Roboflow",
+                    "warning"
+                ).value
+        except ImportError:
+            # Fallback tanpa menggunakan create_info_alert
+            from smartcash.ui.utils.constants import COLORS, ICONS
             if api_key:
                 return f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_info_text']}; 
                          color: {COLORS['alert_info_text']}; margin: 5px 0; 
@@ -82,7 +86,6 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
                     </div>"""
             else:
                 try:
-                    # Try to check if available from Secret
                     from google.colab import userdata
                     api_key = userdata.get('ROBOFLOW_API_KEY')
                     if api_key:
@@ -93,34 +96,11 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
                         </div>"""
                 except:
                     pass
-                    
+                
                 return f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_warning_text']}; 
                          color: {COLORS['alert_warning_text']}; margin: 5px 0; 
                          border-radius: 4px; background-color: {COLORS['alert_warning_bg']}">
                         <p style="margin:5px 0"><i>{ICONS['warning']} API Key diperlukan untuk download dari Roboflow</i></p>
-                    </div>"""
-        except ImportError:
-            # Fallback tanpa konstanta
-            if api_key:
-                return """<div style="padding: 10px; border-left: 4px solid #0c5460; 
-                         color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
-                        <p style="margin:5px 0"><i>ℹ️ API Key Roboflow tersedia.</i></p>
-                    </div>"""
-            else:
-                try:
-                    from google.colab import userdata
-                    api_key = userdata.get('ROBOFLOW_API_KEY')
-                    if api_key:
-                        return """<div style="padding: 10px; border-left: 4px solid #0c5460; 
-                             color: #0c5460; margin: 5px 0; border-radius: 4px; background-color: #d1ecf1">
-                            <p style="margin:5px 0"><i>ℹ️ API Key Roboflow tersedia dari Google Secret.</i></p>
-                        </div>"""
-                except:
-                    pass
-                
-                return """<div style="padding: 10px; border-left: 4px solid #856404; 
-                         color: #856404; margin: 5px 0; border-radius: 4px; background-color: #fff3cd">
-                        <p style="margin:5px 0"><i>⚠️ API Key diperlukan untuk download dari Roboflow</i></p>
                     </div>"""
     
     # Register UI event handler

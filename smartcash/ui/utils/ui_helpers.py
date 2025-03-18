@@ -1,20 +1,41 @@
 """
 File: smartcash/ui/utils/ui_helpers.py
-Deskripsi: Fungsi helper untuk komponen UI dan integrasi dengan notebook dengan styling yang lebih baik
+Deskripsi: Fungsi helper terstandarisasi untuk komponen UI dan integrasi dengan notebook
 """
 
 import ipywidgets as widgets
-from IPython.display import display, HTML, clear_output
-from typing import Callable, Any, Optional, Dict, List, Union, Tuple
+from IPython.display import display, clear_output, HTML
+from typing import Dict, Any, List, Optional, Union, Tuple, Callable
 import time
 from pathlib import Path
 import datetime
+import re
 
-from smartcash.ui.utils.constants import COLORS, ICONS, FILE_SIZE_UNITS
-from smartcash.ui.components.widget_layouts import (
-    BUTTON_LAYOUTS, GROUP_LAYOUTS, CONTAINER_LAYOUTS, CONTENT_LAYOUTS
-)
+from smartcash.ui.utils.constants import COLORS, BUTTON_STYLES, ICONS, ALERT_STYLES
 
+# Standarisasi Layout Import - Pastikan tersedia
+try:
+    from smartcash.ui.components.widget_layouts import (
+        CONTAINER_LAYOUTS, CONTENT_LAYOUTS, INPUT_LAYOUTS,
+        BUTTON_LAYOUTS, GROUP_LAYOUTS, COMPONENT_LAYOUTS
+    )
+except ImportError:
+    # Fallback layouts dasar
+    BUTTON_LAYOUTS = {
+        'standard': widgets.Layout(width='auto', margin='10px 0'),
+        'small': widgets.Layout(width='auto', margin='5px')
+    }
+    GROUP_LAYOUTS = {
+        'horizontal': widgets.Layout(display='flex', flex_flow='row wrap', align_items='center')
+    }
+    CONTAINER_LAYOUTS = {
+        'card': widgets.Layout(border='1px solid #ddd', border_radius='4px', padding='15px')
+    }
+    CONTENT_LAYOUTS = {
+        'output': widgets.Layout(border='1px solid #ddd', min_height='100px', padding='10px')
+    }
+
+# Pengaturan Tema
 def set_active_theme(theme_name: str = 'default') -> bool:
     """
     Set tema aktif untuk UI komponen.
@@ -140,138 +161,169 @@ def inject_css_styles() -> None:
     
     display(HTML(css))
 
-def format_file_size(size_bytes: int) -> str:
+# Header Components
+def create_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """
-    Format ukuran file menjadi string yang mudah dibaca.
+    Buat komponen header dengan style konsisten.
     
     Args:
-        size_bytes: Ukuran file dalam bytes
+        title: Judul header
+        description: Deskripsi opsional
+        icon: Emoji icon opsional
         
     Returns:
-        String berisi ukuran file dengan unit yang sesuai
+        Widget HTML berisi header
     """
-    if size_bytes == 0:
-        return "0B"
+    # Tambahkan ikon jika disediakan
+    title_with_icon = f"{icon} {title}" if icon else title
     
-    i = 0
-    while size_bytes >= 1024 and i < len(FILE_SIZE_UNITS) - 1:
-        size_bytes /= 1024
-        i += 1
+    header_html = f"""
+    <div style="background-color: {COLORS['header_bg']}; padding: 15px; color: black; 
+            border-radius: 5px; margin-bottom: 15px; border-left: 5px solid {COLORS['primary']};">
+        <h2 style="color: {COLORS['dark']}; margin-top: 0;">{title_with_icon}</h2>
+    """
     
-    return f"{size_bytes:.2f}{FILE_SIZE_UNITS[i]}"
+    if description:
+        header_html += f'<p style="color: {COLORS["dark"]}; margin-bottom: 0;">{description}</p>'
+    
+    header_html += "</div>"
+    
+    return widgets.HTML(value=header_html)
 
-def run_task(task_func, with_output=None):
+def create_section_title(title: str, icon: Optional[str] = "") -> widgets.HTML:
     """
-    Eksekusi fungsi tugas dan tangani error.
+    Buat judul section dengan style konsisten.
     
     Args:
-        task_func: Fungsi task yang akan dijalankan
-        with_output: Widget output untuk menampilkan error
+        title: Judul section
+        icon: Emoji icon opsional
         
     Returns:
-        Hasil dari task_func atau None jika terjadi error
+        Widget HTML berisi judul section
     """
-    try:
-        # Run task langsung
-        return task_func()
-    except Exception as e:
-        # Handle error
-        if with_output:
-            from smartcash.ui.components.alerts import create_status_indicator
-            with with_output:
-                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-        # Re-raise exception untuk penanganan lebih lanjut jika diperlukan
-        raise
+    return widgets.HTML(f"""
+    <h3 style="color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;">
+        {icon} {title}
+    </h3>
+    """)
 
-def create_confirmation_dialog(title, message, on_confirm, on_cancel=None, 
-                             confirm_label="Konfirmasi", cancel_label="Batal"):
+# Alert Components
+def create_status_indicator(status: str, message: str) -> HTML:
     """
-    Buat dialog konfirmasi.
+    Buat indikator status dengan style yang sesuai.
     
     Args:
-        title: Judul dialog
-        message: Pesan dialog
-        on_confirm: Callback saat dikonfirmasi
-        on_cancel: Callback saat dibatalkan
-        confirm_label: Label tombol konfirmasi
-        cancel_label: Label tombol batal
+        status: Jenis status ('info', 'success', 'warning', 'error')
+        message: Pesan status
         
     Returns:
-        Widget VBox berisi dialog konfirmasi
+        HTML berisi indikator status
     """
-    # Dialog content
-    content = widgets.VBox([
-        widgets.HTML(f"""
-        <div style="padding:15px; background-color:{COLORS['alert_warning_bg']}; 
-                     color:{COLORS['alert_warning_text']}; 
-                     border-left:4px solid {COLORS['alert_warning_text']}; 
-                     border-radius:4px; margin:10px 0;">
-            <h4 style="margin-top:0; font-family:{FONTS['header']};">{ICONS['warning']} {title}</h4>
-            <p style="margin-bottom:0;">{message}</p>
+    style_config = ALERT_STYLES.get(status, ALERT_STYLES['info'])
+    
+    return HTML(f"""
+    <div style="margin: 5px 0; padding: 8px 12px; 
+                border-radius: 4px; background-color: {COLORS['light']};">
+        <span style="color: {style_config['text_color']}; font-weight: bold;"> 
+            {style_config['icon']} {message}
+        </span>
+    </div>
+    """)
+
+def create_info_alert(message: str, alert_type: str = 'info', icon: Optional[str] = None) -> widgets.HTML:
+    """
+    Buat alert box dengan style yang sesuai.
+    
+    Args:
+        message: Pesan alert
+        alert_type: Jenis alert ('info', 'success', 'warning', 'error')
+        icon: Emoji icon opsional, jika tidak diisi akan menggunakan icon default
+        
+    Returns:
+        Widget HTML berisi alert
+    """
+    style_config = ALERT_STYLES.get(alert_type, ALERT_STYLES['info'])
+    icon_str = icon if icon else style_config['icon']
+    
+    alert_html = f"""
+    <div style="padding: 10px; 
+                background-color: {style_config['bg_color']}; 
+                color: {style_config['text_color']}; 
+                border-left: 4px solid {style_config['border_color']}; 
+                border-radius: 5px; 
+                margin: 10px 0;">
+        <div style="display: flex; align-items: flex-start;">
+            <div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>
+            <div>{message}</div>
         </div>
-        """),
-        widgets.HBox([
-            widgets.Button(
-                description=cancel_label,
-                button_style="warning",
-                icon='times',
-                layout=BUTTON_LAYOUTS['small'],
-                tooltip="Batalkan operasi"
-            ),
-            widgets.Button(
-                description=confirm_label,
-                button_style="danger",
-                icon='check',
-                layout=BUTTON_LAYOUTS['small'],
-                tooltip="Konfirmasi operasi"
-            )
-        ], layout=GROUP_LAYOUTS['horizontal'])
-    ], layout=CONTAINER_LAYOUTS['card'])
-    
-    # Set callbacks
-    content.children[1].children[0].on_click(
-        lambda b: on_cancel() if on_cancel else None
-    )
-    content.children[1].children[1].on_click(
-        lambda b: on_confirm()
-    )
-    
-    return content
-
-def create_button_group(buttons, layout=None):
+    </div>
     """
-    Buat group tombol dengan layout konsisten.
+    
+    return widgets.HTML(value=alert_html)
+
+def create_info_box(title: str, content: str, style: str = 'info', 
+                  icon: Optional[str] = None, collapsed: bool = False) -> Union[widgets.HTML, widgets.Accordion]:
+    """
+    Buat info box yang dapat di-collapse.
     
     Args:
-        buttons: List of tuples (label, style, icon, callback)
-        layout: Layout opsional untuk container
+        title: Judul info box
+        content: Konten HTML info box
+        style: Jenis style ('info', 'success', 'warning', 'error')
+        icon: Emoji icon opsional
+        collapsed: Apakah info box collapsed secara default
         
     Returns:
-        Widget HBox berisi tombol-tombol
+        Widget HTML atau Accordion berisi info box
     """
-    from smartcash.ui.utils.constants import BUTTON_STYLES
+    style_config = ALERT_STYLES.get(style, ALERT_STYLES['info'])
+    icon_to_use = icon if icon else style_config['icon']
+    title_with_icon = f"{icon_to_use} {title}"
     
-    btn_widgets = []
-    
-    for label, style, icon, callback in buttons:
-        btn = widgets.Button(
-            description=label,
-            button_style=BUTTON_STYLES.get(style, ''),
-            icon=icon,
-            layout=BUTTON_LAYOUTS['small'],
-            tooltip=label
-        )
-        
-        if callback:
-            btn.on_click(callback)
-            
-        btn_widgets.append(btn)
-    
-    return widgets.HBox(
-        btn_widgets, 
-        layout=layout or GROUP_LAYOUTS['horizontal']
-    )
+    if collapsed:
+        # Gunakan Accordion jika perlu collapsible
+        content_widget = widgets.HTML(value=content)
+        accordion = widgets.Accordion([content_widget])
+        accordion.set_title(0, title_with_icon)
+        accordion.selected_index = None
+        return accordion
+    else:
+        # Gunakan HTML biasa jika tidak perlu collapsible
+        box_html = f"""
+        <div style="padding: 10px; background-color: {style_config['bg_color']}; 
+                 border-left: 4px solid {style_config['border_color']}; 
+                 color: {style_config['text_color']}; margin: 10px 0; border-radius: 4px;">
+            <h4 style="margin-top: 0; color: inherit;">{title_with_icon}</h4>
+            {content}
+        </div>
+        """
+        return widgets.HTML(value=box_html)
 
+# Tab Creation
+def create_tab_view(tabs: Dict[str, widgets.Widget]) -> widgets.Tab:
+    """
+    Buat komponen Tab dengan konfigurasi otomatis.
+    
+    Args:
+        tabs: Dictionary berisi {nama_tab: widget_konten}
+        
+    Returns:
+        Widget Tab yang dikonfigurasi
+    """
+    # Buat tab
+    tab = widgets.Tab(children=list(tabs.values()))
+    try:
+        tab.layout = COMPONENT_LAYOUTS['tabs']
+    except (NameError, KeyError):
+        tab.layout = widgets.Layout(width='100%', margin='10px 0')
+    
+    # Set judul tab
+    for i, title in enumerate(tabs.keys()):
+        tab.set_title(i, title)
+    
+    return tab
+
+# Loading indicators
 def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBox, Callable]:
     """
     Buat indikator loading dengan callback untuk show/hide.
@@ -305,6 +357,97 @@ def create_loading_indicator(message: str = "Memproses...") -> Tuple[widgets.HBo
     
     return loading, toggle_loading
 
+# Output area updates
+def update_output_area(output_widget: widgets.Output, message: str, status: str = 'info', clear: bool = False):
+    """
+    Update area output dengan status baru.
+    
+    Args:
+        output_widget: Widget output untuk diupdate
+        message: Pesan untuk ditampilkan
+        status: Jenis status ('info', 'success', 'warning', 'error')
+        clear: Apakah perlu clear output sebelumnya
+    """
+    with output_widget:
+        if clear:
+            clear_output(wait=True)
+        display(create_status_indicator(status, message))
+
+# Observer registration
+def register_observer_callback(observer_manager, event_type, output_widget, 
+                            group_name="ui_observer_group"):
+    """
+    Register callback untuk observer events.
+    
+    Args:
+        observer_manager: ObserverManager instance
+        event_type: Tipe event untuk di-observe
+        output_widget: Widget output untuk menampilkan updates
+        group_name: Nama group untuk observer
+    """
+    if observer_manager:
+        def update_ui_callback(event_type, sender, message=None, **kwargs):
+            if message:
+                status = kwargs.get('status', 'info')
+                with output_widget:
+                    display(create_status_indicator(status, message))
+        
+        # Register observer
+        observer_manager.create_simple_observer(
+            event_type=event_type,
+            callback=update_ui_callback,
+            name=f"UI_{event_type}_Observer",
+            group=group_name
+        )
+
+# File display
+def display_file_info(file_path: str, description: Optional[str] = None) -> widgets.HTML:
+    """
+    Tampilkan informasi file dalam box informatif.
+    
+    Args:
+        file_path: Path ke file
+        description: Deskripsi opsional
+        
+    Returns:
+        Widget HTML berisi info file
+    """
+    # Ambil info file
+    path = Path(file_path)
+    if path.exists():
+        file_size = path.stat().st_size
+        file_time = path.stat().st_mtime
+        
+        # Format ukuran file
+        if file_size < 1024:
+            size_str = f"{file_size} bytes"
+        elif file_size < 1024 * 1024:
+            size_str = f"{file_size/1024:.1f} KB"
+        else:
+            size_str = f"{file_size/(1024*1024):.1f} MB"
+        
+        # Format waktu
+        time_str = datetime.datetime.fromtimestamp(file_time).strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Buat HTML
+        html = f"""
+        <div style="padding: 10px; background-color: {COLORS['light']}; border-radius: 5px; margin: 10px 0;">
+            <p><strong>{ICONS['file']} File:</strong> {path.name}</p>
+            <p><strong>{ICONS['folder']} Path:</strong> {path.parent}</p>
+            <p><strong>📏 Size:</strong> {size_str}</p>
+            <p><strong>{ICONS['time']} Modified:</strong> {time_str}</p>
+        """
+        
+        if description:
+            html += f"<p><strong>📝 Description:</strong> {description}</p>"
+        
+        html += "</div>"
+        
+        return widgets.HTML(value=html)
+    else:
+        return widgets.HTML(value=f"<p>{ICONS['warning']} File tidak ditemukan: {file_path}</p>")
+
+# Progress updater
 def create_progress_updater(progress_bar: widgets.IntProgress) -> Callable:
     """
     Buat fungsi updater untuk progress bar.
@@ -324,105 +467,135 @@ def create_progress_updater(progress_bar: widgets.IntProgress) -> Callable:
         if message:
             progress_bar.description = message
         else:
-            progress_pct = min(100, int(value * 100 / total) if total > 0 else 0)
+            # Update persentase
+            progress_pct = int(value * 100 / total) if total > 0 else 0
             progress_bar.description = f"{progress_pct}%"
     
     return update_progress
 
-def display_file_info(file_path: str, description: Optional[str] = None) -> widgets.HTML:
+# Task execution
+def run_task(task_func, on_complete=None, on_error=None, with_output=None):
     """
-    Tampilkan informasi file.
+    Jalankan task secara langsung dengan penanganan callback.
     
     Args:
-        file_path: Path ke file
-        description: Deskripsi opsional
+        task_func: Fungsi task yang akan dijalankan
+        on_complete: Callback saat task selesai
+        on_error: Callback saat task error
+        with_output: Widget output untuk menampilkan error
         
     Returns:
-        Widget HTML berisi info file
+        Hasil dari task_func atau None jika terjadi error
     """
-    # Ambil info file
-    path = Path(file_path)
-    if path.exists():
-        file_size = path.stat().st_size
-        file_time = path.stat().st_mtime
+    try:
+        # Run task langsung
+        result = task_func()
         
-        # Format ukuran file
-        formatted_size = format_file_size(file_size)
+        # Handle completion
+        if on_complete:
+            on_complete(result)
+            
+        return result
+    except Exception as e:
+        # Handle error
+        if on_error:
+            on_error(e)
+        elif with_output:
+            with with_output:
+                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
         
-        # Format waktu
-        time_str = datetime.datetime.fromtimestamp(file_time).strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Buat HTML
-        html = f"""
-        <div style="padding: 15px; background-color: {COLORS['light']}; 
-                  border-radius: 5px; margin: 10px 0; 
-                  border: 1px solid {COLORS['border']};">
-            <p><strong>{ICONS['file']} File:</strong> {path.name}</p>
-            <p><strong>{ICONS['folder']} Path:</strong> {path.parent}</p>
-            <p><strong>📏 Size:</strong> {formatted_size}</p>
-            <p><strong>{ICONS['time']} Modified:</strong> {time_str}</p>
-        """
-        
-        if description:
-            html += f"<p><strong>📝 Description:</strong> {description}</p>"
-        
-        html += "</div>"
-        
-        return widgets.HTML(value=html)
-    else:
-        return widgets.HTML(value=f"""
-        <div style="padding: 10px; background-color: {COLORS['alert_warning_bg']}; 
-                  color: {COLORS['alert_warning_text']}; border-radius: 5px; margin: 10px 0;
-                  border-left: 4px solid {COLORS['alert_warning_text']};">
-            <p>{ICONS['warning']} File tidak ditemukan: {file_path}</p>
-        </div>
-        """)
+        # Re-raise exception untuk penanganan lebih lanjut jika diperlukan
+        raise
 
-def update_output_area(output_widget: widgets.Output, message: str, status: str = 'info', clear: bool = False):
+# Button groups
+def create_button_group(buttons, layout=None):
     """
-    Update area output dengan status baru.
+    Buat group tombol dengan layout konsisten.
     
     Args:
-        output_widget: Widget output untuk diupdate
-        message: Pesan untuk ditampilkan
-        status: Jenis status ('info', 'success', 'warning', 'error')
-        clear: Apakah perlu clear output sebelumnya
-    """
-    from smartcash.ui.components.alerts import create_status_indicator
-    
-    with output_widget:
-        if clear:
-            clear_output(wait=True)
-        display(create_status_indicator(status, message))
-
-def register_observer_callback(observer_manager, event_type, output_widget, 
-                            group_name="ui_observer_group"):
-    """
-    Register callback untuk observer events.
-    
-    Args:
-        observer_manager: ObserverManager instance
-        event_type: Tipe event untuk di-observe
-        output_widget: Widget output untuk menampilkan updates
-        group_name: Nama group untuk observer
-    """
-    if observer_manager:
-        from smartcash.ui.components.alerts import create_status_indicator
+        buttons: List of tuples (label, style, icon, callback)
+        layout: Layout opsional untuk container
         
-        def update_ui_callback(event_type, sender, message=None, **kwargs):
-            if message:
-                status = kwargs.get('status', 'info')
-                with output_widget:
-                    display(create_status_indicator(status, message))
-        
-        # Register observer
-        observer_manager.create_simple_observer(
-            event_type=event_type,
-            callback=update_ui_callback,
-            name=f"UI_{event_type}_Observer",
-            group=group_name
+    Returns:
+        Widget HBox berisi tombol-tombol
+    """
+    btn_widgets = []
+    
+    for label, style, icon, callback in buttons:
+        btn = widgets.Button(
+            description=label,
+            button_style=BUTTON_STYLES.get(style, ''),
+            icon=icon,
+            layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px'))
         )
+        
+        if callback:
+            btn.on_click(callback)
+            
+        btn_widgets.append(btn)
+    
+    return widgets.HBox(
+        btn_widgets, 
+        layout=layout or GROUP_LAYOUTS.get('horizontal', widgets.Layout(display='flex'))
+    )
 
+# Confirmation dialog
+def create_confirmation_dialog(title, message, on_confirm, on_cancel=None, 
+                             confirm_label="Konfirmasi", cancel_label="Batal"):
+    """
+    Buat dialog konfirmasi.
+    
+    Args:
+        title: Judul dialog
+        message: Pesan dialog
+        on_confirm: Callback saat dikonfirmasi
+        on_cancel: Callback saat dibatalkan
+        confirm_label: Label tombol konfirmasi
+        cancel_label: Label tombol batal
+        
+    Returns:
+        Widget VBox berisi dialog konfirmasi
+    """
+    # Dialog content
+    content = widgets.VBox([
+        widgets.HTML(f"""
+        <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                     color:{COLORS['alert_warning_text']}; 
+                     border-left:4px solid {COLORS['alert_warning_text']}; 
+                     border-radius:4px; margin:10px 0;">
+            <h4 style="margin-top:0; font-family:{FONTS['header']};">{ICONS['warning']} {title}</h4>
+            <p style="margin-bottom:0;">{message}</p>
+        </div>
+        """),
+        widgets.HBox([
+            widgets.Button(
+                description=cancel_label,
+                button_style="warning",
+                icon='times',
+                layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px')),
+                tooltip="Batalkan operasi"
+            ),
+            widgets.Button(
+                description=confirm_label,
+                button_style="danger",
+                icon='check',
+                layout=BUTTON_LAYOUTS.get('small', widgets.Layout(margin='5px')),
+                tooltip="Konfirmasi operasi"
+            )
+        ], layout=GROUP_LAYOUTS.get('horizontal', widgets.Layout(display='flex')))
+    ], layout=CONTAINER_LAYOUTS.get('card', widgets.Layout(padding='15px')))
+    
+    # Set callbacks
+    content.children[1].children[0].on_click(
+        lambda b: on_cancel() if on_cancel else None
+    )
+    content.children[1].children[1].on_click(
+        lambda b: on_confirm()
+    )
+    
+    return content
+
+# UI Elements
 def create_divider() -> widgets.HTML:
     """Buat divider horizontal."""
     return widgets.HTML(f"<hr style='margin: 15px 0; border: 0; border-top: 1px solid {COLORS['border']};'>")
@@ -430,3 +603,24 @@ def create_divider() -> widgets.HTML:
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""
     return widgets.HTML(f"<div style='height: {height};'></div>")
+
+def format_file_size(size_bytes: int) -> str:
+    """
+    Format ukuran file menjadi string yang mudah dibaca.
+    
+    Args:
+        size_bytes: Ukuran file dalam bytes
+        
+    Returns:
+        String berisi ukuran file dengan unit yang sesuai
+    """
+    if size_bytes == 0:
+        return "0B"
+    
+    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    i = 0
+    while size_bytes >= 1024 and i < len(units) - 1:
+        size_bytes /= 1024
+        i += 1
+    
+    return f"{size_bytes:.2f}{units[i]}"

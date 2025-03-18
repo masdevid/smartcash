@@ -311,112 +311,94 @@ smartcash/model/
 ## 6. Domain UI (Tidak Berubah)
 
 ```
-smartcash/
-└── ui/
-    ├── __init__.py                 # Ekspor komponen UI
-    ├── components/              # Komponen UI yang reusable
-    │   ├── __init__.py             # Ekspor komponen UI dengan __all__
-    │   ├── setup/                # Komponen UI untuk setup
-    │   │   ├── __init__.py
-    │   │   ├── environment_config.py    # EnvironmentConfig: Komponen lingkungan
-    │   │   └── dependency_installation.py # DependencyInstallation: Komponen dependencies
-    │   ├── dataset/                # Komponen UI untuk dataset
-    │   │   ├── __init__.py
-    │   │   ├── download.py         # DatasetDownload: Komponen download dataset
-    │   │   ├── preprocessing.py    # DatasetPreprocessing: Komponen preprocessing
-    │   │   ├── split.py            # DatasetSplit: Komponen split dataset
-    │   │   └── augmentation.py     # DatasetAugmentation: Komponen augmentasi
-    │   ├── training_config/        # Komponen UI untuk konfigurasi training
-    │   │   ├── __init__.py
-    │   │   ├── backbone_selection.py # BackboneSelection: Komponen pemilihan backbone
-    │   │   ├── hyperparameters.py  # Hyperparameters: Komponen setting hyperparameter
-    │   │   ├── training_strategy.py # TrainingStrategy: Komponen strategi training
-    │   │   └── layer_config.py     # LayerConfig: Komponen konfigurasi layer
-    │   ├── training_execution/     # Komponen UI untuk eksekusi training
-    │   │   ├── __init__.py
-    │   │   ├── model_training.py   # ModelTraining: Komponen pelatihan model
-    │   │   ├── performance_tracking.py # PerformanceTracking: Komponen tracking performa
-    │   │   └── checkpoint_management.py # CheckpointManagement: Komponen manajemen checkpoint
-    │   ├── model_evaluation/       # Komponen UI untuk evaluasi model
-    │   │   ├── __init__.py
-    │   │   ├── performance_metrics.py # PerformanceMetrics: Komponen metrik performa
-    │   │   ├── comparative_analysis.py # ComparativeAnalysis: Komponen analisis komparatif
-    │   │   └── visualization.py    # Visualization: Komponen visualisasi hasil
-    │   └── shared/                 # Komponen UI shared
-    │       ├── __init__.py
-    │       ├── headers.py          # Headers: Komponen header dan judul
-    │       ├── alerts.py           # Alerts: Komponen alerts dan notifikasi
-    │       ├── layouts.py          # Layout: Layout komponen
-    │       ├── metrics.py          # Metrics: Display komponen metrik
-    │       ├── helpers.py          # Helpers: Helper widgets
-    │       ├── widget_layouts.py   # WidgetLayouts: Layout untuk widgets
-    │       └── validators.py       # Validators: Validasi form
-    │
-    ├── handlers/                # Logic handlers untuk UI components
-    │   ├── __init__.py             # Ekspor handlers dengan __all__
-    │   ├── dataset/                # Handlers untuk dataset
-    │   │   ├── __init__.py
-    │   │   ├── download_handler.py # DatasetDownloadHandler: Handler download dataset
-    │   │   ├── preprocessing_handler.py # DatasetPreprocessingHandler: Handler preprocessing
-    │   │   ├── split_handler.py    # DatasetSplitHandler: Handler split dataset
-    │   │   └── augmentation_handler.py # DatasetAugmentationHandler: Handler augmentasi
-    │   ├── training_config/        # Handlers untuk training config
-    │   │   ├── __init__.py
-    │   │   ├── backbone_handler.py # BackboneHandler: Handler backbone
-    │   │   ├── hyperparameters_handler.py # HyperparametersHandler: Handler hyperparameter
-    │   │   ├── training_strategy_handler.py # TrainingStrategyHandler: Handler strategi training
-    │   │   └── layer_config_handler.py # LayerConfigHandler: Handler konfigurasi layer
-    │   ├── training_execution/     # Handlers untuk training execution
-    │   │   ├── __init__.py
-    │   │   ├── model_training_handler.py # ModelTrainingHandler: Handler pelatihan model
-    │   │   ├── performance_tracking_handler.py # PerformanceTrackingHandler: Handler tracking performa
-    │   │   └── checkpoint_handler.py # CheckpointHandler: Handler checkpoint
-    │   ├── model_evaluation/       # Handlers untuk model evaluation
-    │   │   ├── __init__.py
-    │   │   ├── performance_metrics_handler.py # PerformanceMetricsHandler: Handler metrik performa
-    │   │   ├── comparative_analysis_handler.py # ComparativeAnalysisHandler: Handler analisis komparatif
-    │   │   └── visualization_handler.py # VisualizationHandler: Handler visualisasi
-    │   └── shared/                 # Handlers untuk shared components
-    │       ├── __init__.py
-    │       ├── config_handler.py   # ConfigHandler: Handler konfigurasi
-    │       ├── observer_handler.py # ObserverHandler: Handler observer
-    │       └── error_handler.py    # ErrorHandler: Handler error
-    │
-    ├── utils/                      # Utilitas untuk UI
-    │   ├── __init__.py
-    │   ├── constants.py            # Constants: Konstanta UI (warna, icons, dll)
-    │   ├── ui_utils.py             # UIUtils: Utilitas general untuk UI
-    │   ├── file_utils.py           # FileUtils: Utilitas file untuk UI
-    │   └── visualization_utils.py  # VisualizationUtils: Utilitas visualisasi untuk UI
-    │
-    └── cells/                  # Notebook cells yang telah disederhanakan
-        ├── setup/                  # Setup cells
-        │   ├── __init__.py
-        │   ├── cell_1_1_repository_clone.py      # Clone repositori
-        │   ├── cell_1_2_environment_config.py    # Konfigurasi lingkungan
-        │   └── cell_1_3_dependency_installation.py # Instalasi dependencies
-        ├── dataset/                # Dataset cells
-        │   ├── __init__.py
-        │   ├── cell_2_1_dataset_download.py      # Download dataset
-        │   ├── cell_2_2_preprocessing.py         # Preprocessing dataset
-        │   ├── cell_2_3_split_config.py          # Konfigurasi split
-        │   └── cell_2_4_augmentation.py          # Augmentasi dataset
-        ├── training_config/        # Training config cells
-        │   ├── __init__.py
-        │   ├── cell_3_1_backbone_selection.py    # Pemilihan backbone
-        │   ├── cell_3_2_hyperparameters.py       # Setting hyperparameter
-        │   ├── cell_3_3_training_strategy.py     # Strategi training
-        │   └── cell_3_4_layer_config.py          # Konfigurasi layer deteksi
-        ├── training_execution/     # Training execution cells
-        │   ├── __init__.py
-        │   ├── cell_4_1_model_training.py        # Pelatihan model
-        │   ├── cell_4_2_performance_tracking.py  # Tracking performa
-        │   └── cell_4_3_checkpoint_management.py # Manajemen checkpoint
-        └── model_evaluation/       # Model evaluation cells
-            ├── __init__.py
-            ├── cell_5_1_performance_metrics.py   # Metrik performa
-            ├── cell_5_2_comparative_analysis.py  # Analisis komparatif
-            └── cell_5_3_visualization.py         # Visualisasi hasil
+smartcash/ui/
+├── __init__.py                 # Ekspor komponen UI utama
+├── components/                 # Komponen UI yang dapat digunakan kembali
+│   ├── __init__.py
+│   ├── alerts.py               # Komponen alert dan status
+│   ├── headers.py              # Komponen header dan judul
+│   ├── helpers.py              # Fungsi helper untuk UI
+│   ├── layouts.py              # Layout standar untuk widget
+│   ├── metrics.py              # Komponen untuk menampilkan metrik
+│   ├── validators.py           # Validasi input dan form
+│   └── widget_layouts.py       # Factory untuk membuat layout widget
+│
+├── handlers/                   # Handler untuk berbagai event dan error
+│   ├── __init__.py
+│   ├── error_handler.py        # Penanganan error di UI
+│   └── observer_handler.py     # Handler untuk observer events
+│
+├── utils/                      # Utilitas umum untuk UI
+│   ├── __init__.py
+│   ├── cell_utils.py           # Utilitas untuk cell notebook
+│   ├── constants.py            # Konstanta untuk UI (warna, ikon)
+│   ├── file_utils.py           # Utilitas file untuk UI
+│   ├── logging_utils.py        # Logging terintegrasi dengan UI
+│   ├── ui_helpers.py           # Helper generik untuk UI
+│   └── visualization_utils.py  # Utilitas visualisasi
+│
+├── setup/                      # Komponen UI untuk setup proyek
+│   ├── __init__.py
+│   ├── cell_1_1_repo_clone.py  # Cell untuk clone repository
+│   ├── cell_1_2_env_config.py  # Cell konfigurasi environment
+│   ├── cell_1_3_dependency_installer.py  # Cell instalasi dependencies
+│   ├── dependency_installer_component.py
+│   ├── dependency_installer_config.py
+│   ├── dependency_installer_handler.py
+│   ├── directory_handler.py
+│   ├── drive_handler.py
+│   ├── env_config.py
+│   ├── env_config_component.py
+│   ├── env_config_handler.py
+│   └── env_detection.py
+│
+├── dataset/                    # Komponen UI untuk manajemen dataset
+│   ├── __init__.py
+│   ├── cell_2_1_dataset_download.py  # Cell download dataset
+│   ├── dataset_download_component.py
+│   ├── dataset_download_handler.py
+│   ├── download_click_handler.py
+│   ├── download_confirmation_handler.py
+│   ├── download_initialization.py
+│   ├── download_ui_handler.py
+│   ├── local_upload_handler.py
+│   ├── roboflow_download_handler.py
+│   └── download_ui_handler.py
+│
+├── training_config/            # Komponen UI untuk konfigurasi training
+│   ├── __init__.py
+│   ├── cell_3_1_backbone_selection.py  # Cell seleksi backbone
+│   ├── cell_3_2_hyperparameters.py     # Cell hyperparameter
+│   ├── cell_3_3_training_strategy.py   # Cell strategi training
+│   ├── backbone_selection_component.py
+│   ├── backbone_selection_handler.py
+│   ├── config_buttons.py
+│   ├── config_handler.py
+│   ├── hyperparameters_component.py
+│   ├── hyperparameters_handler.py
+│   ├── training_strategy_component.py
+│   └── training_strategy_handler.py
+│
+├── training_execution/         # Komponen UI untuk eksekusi training
+│   ├── __init__.py
+│   ├── cell_4_1_model_training.py
+│   ├── model_training_component.py
+│   ├── model_training_handler.py
+│   ├── performance_tracking_component.py
+│   ├── performance_tracking_handler.py
+│   ├── checkpoint_management_component.py
+│   └── checkpoint_management_handler.py
+│
+└── evaluation/                 # Komponen UI untuk evaluasi model
+    ├── __init__.py
+    ├── cell_5_1_performance_metrics.py
+    ├── cell_5_2_model_comparison.py
+    ├── performance_metrics_component.py
+    ├── performance_metrics_handler.py
+    ├── model_comparison_component.py
+    ├── model_comparison_handler.py
+    ├── visualization_component.py
+    └── visualization_handler.py
 
 ```
 

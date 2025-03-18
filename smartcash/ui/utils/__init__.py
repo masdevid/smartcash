@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/__init__.py
-Deskripsi: Utilitas dasar untuk komponen UI dan notebook
+Deskripsi: Utilitas dasar untuk komponen UI dan notebook dengan integrasi logging dan cell yang ditingkatkan
 """
 
 from smartcash.ui.utils.cell_utils import (
@@ -8,6 +8,7 @@ from smartcash.ui.utils.cell_utils import (
     setup_ui_component, 
     create_default_ui_components,
     cleanup_resources,
+    register_cleanup_resource,
     display_ui
 )
 from smartcash.ui.utils.logging_utils import (
@@ -57,6 +58,7 @@ __all__ = [
     'setup_ui_component',
     'create_default_ui_components',
     'cleanup_resources',
+    'register_cleanup_resource',
     'display_ui',
     
     # Logging Utils

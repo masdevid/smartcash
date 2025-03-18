@@ -1,10 +1,13 @@
 """
 File: smartcash/ui/dataset/download_initialization.py
-Deskripsi: Inisialisasi komponen untuk download dataset dengan pengecekan dataset yang sudah ada
+Deskripsi: Inisialisasi komponen untuk download dataset dengan ui_helpers untuk konsistensi
 """
 
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
+
+# Import dari ui_helpers untuk konsistensi
+from smartcash.ui.utils.ui_helpers import create_info_alert
 
 def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -20,16 +23,12 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
     """
     try:
         from smartcash.ui.utils.constants import COLORS, ICONS
-        from smartcash.ui.components.alerts import create_info_alert, create_status_indicator
         
         # Cek API key dari Google Colab Secret
-        api_key_info = HTML(
-            f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_warning_text']}; 
-                        color: {COLORS['alert_warning_text']}; margin: 5px 0; 
-                        border-radius: 4px; background-color: {COLORS['alert_warning_bg']}">
-                    <p style="margin:5px 0"><i>{ICONS['warning']} API Key diperlukan untuk download dari Roboflow</i></p>
-                </div>"""
-        )
+        api_key_info = HTML(create_info_alert(
+            f"{ICONS['warning']} API Key diperlukan untuk download dari Roboflow",
+            "warning"
+        ).value)
         
         # Inisialisasi data directory
         data_dir = config.get('data', {}).get('dir', 'data')
@@ -42,13 +41,10 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                 
             # Update status panel jika tersedia
             if 'status_panel' in ui_components:
-                ui_components['status_panel'].value = f"""
-                <div style="padding: 10px; background-color: {COLORS['alert_info_bg']}; 
-                          color: {COLORS['alert_info_text']}; margin: 10px 0; border-radius: 4px; 
-                          border-left: 4px solid {COLORS['alert_info_text']};">
-                    <p style="margin:5px 0">{ICONS['info']} Dataset akan disimpan di Google Drive: {data_dir}</p>
-                </div>
-                """
+                ui_components['status_panel'].value = create_info_alert(
+                    f"{ICONS['info']} Dataset akan disimpan di Google Drive: {data_dir}",
+                    "info"
+                ).value
         
         # Try to get API key from Google Colab Secret
         try:
@@ -58,13 +54,10 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                 api_settings = ui_components['roboflow_settings'].children
                 api_settings[0].value = roboflow_api_key
                 
-                api_key_info = HTML(
-                    f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_info_text']}; 
-                         color: {COLORS['alert_info_text']}; margin: 5px 0; 
-                         border-radius: 4px; background-color: {COLORS['alert_info_bg']}">
-                        <p style="margin:5px 0"><i>{ICONS['info']} API Key Roboflow tersedia dari Google Secret.</i></p>
-                    </div>"""
-                )
+                api_key_info = HTML(create_info_alert(
+                    f"{ICONS['info']} API Key Roboflow tersedia dari Google Secret.",
+                    "info"
+                ).value)
                 
                 if 'logger' in ui_components:
                     ui_components['logger'].info(f"{ICONS['success']} API Key Roboflow ditemukan dari Google Secret")
@@ -95,23 +88,17 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                 stats = get_dataset_stats(data_dir)
                 
                 # Update message status dengan info dataset
-                api_key_info = HTML(
-                    f"""<div style="padding: 10px; border-left: 4px solid {COLORS['alert_info_text']}; 
-                         color: {COLORS['alert_info_text']}; margin: 5px 0; 
-                         border-radius: 4px; background-color: {COLORS['alert_info_bg']}">
-                        <p style="margin:5px 0"><i>{ICONS['info']} Dataset terdeteksi: {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']})</i></p>
-                    </div>"""
-                )
+                api_key_info = HTML(create_info_alert(
+                    f"{ICONS['info']} Dataset terdeteksi: {stats['total_images']} gambar (Train: {stats['train']}, Valid: {stats['valid']}, Test: {stats['test']})",
+                    "info"
+                ).value)
                 
                 # Update status panel
                 if 'status_panel' in ui_components:
-                    ui_components['status_panel'].value = f"""
-                    <div style="padding: 10px; background-color: {COLORS['alert_success_bg']}; 
-                              color: {COLORS['alert_success_text']}; margin: 10px 0; border-radius: 4px; 
-                              border-left: 4px solid {COLORS['alert_success_text']};">
-                        <p style="margin:5px 0">{ICONS['success']} Dataset sudah tersedia dengan {stats['total_images']} gambar</p>
-                    </div>
-                    """
+                    ui_components['status_panel'].value = create_info_alert(
+                        f"{ICONS['success']} Dataset sudah tersedia dengan {stats['total_images']} gambar",
+                        "success"
+                    ).value
         except Exception as e:
             # Gagal memeriksa dataset, biarkan saja
             pass
@@ -146,7 +133,17 @@ def update_status_panel(ui_components, status_type, message):
         status_type: Jenis status ('info', 'success', 'warning', 'error')
         message: Pesan yang akan ditampilkan
     """
+    # Gunakan create_info_alert untuk konsistensi
     try:
+        from smartcash.ui.utils.ui_helpers import create_info_alert
+        
+        if 'status_panel' in ui_components:
+            ui_components['status_panel'].value = create_info_alert(
+                message, 
+                status_type
+            ).value
+    except ImportError:
+        # Fallback jika ui_helpers tidak tersedia
         from smartcash.ui.utils.constants import COLORS, ALERT_STYLES
         
         if 'status_panel' in ui_components:
@@ -161,32 +158,6 @@ def update_status_panel(ui_components, status_type, message):
             <div style="padding: 10px; background-color: {bg_color}; 
                         color: {text_color}; margin: 10px 0; border-radius: 4px; 
                         border-left: 4px solid {border_color};">
-                <p style="margin:5px 0">{icon} {message}</p>
-            </div>
-            """
-    except ImportError:
-        # Fallback jika constants tidak tersedia
-        color_mapping = {
-            'info': ('#d1ecf1', '#0c5460'),    # Background, Text
-            'success': ('#d4edda', '#155724'),
-            'warning': ('#fff3cd', '#856404'),
-            'error': ('#f8d7da', '#721c24')
-        }
-        icons = {
-            'info': 'ℹ️',
-            'success': '✅',
-            'warning': '⚠️',
-            'error': '❌'
-        }
-        
-        colors = color_mapping.get(status_type, color_mapping['info'])
-        icon = icons.get(status_type, icons['info'])
-        
-        if 'status_panel' in ui_components:
-            ui_components['status_panel'].value = f"""
-            <div style="padding: 10px; background-color: {colors[0]}; 
-                        color: {colors[1]}; margin: 10px 0; border-radius: 4px; 
-                        border-left: 4px solid {colors[1]};">
                 <p style="margin:5px 0">{icon} {message}</p>
             </div>
             """

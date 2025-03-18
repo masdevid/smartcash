@@ -1,32 +1,35 @@
 """
-File: smartcash/ui/dataset/cell_2_2_preprocessing.py
-Deskripsi: Cell untuk preprocessing dataset SmartCash
+File: cell_2_2_preprocessing.py
+Deskripsi: Cell untuk preprocessing dataset SmartCash dengan kode minimal
 """
 
-# Import komponen UI dari smartcash
 from IPython.display import display
+import sys
+if '.' not in sys.path: sys.path.append('.')
 
-# Import dari utility cell
-from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui, cleanup_resources
-
-# Setup environment dan load config
-env, config = setup_notebook_environment(
-    cell_name="preprocessing",
-    config_path="configs/preprocessing_config.yaml"
-)
-
-# Setup komponen UI dan handler
-ui_components = setup_ui_component(env, config, "preprocessing")
-
-# Setup handler secara manual jika tidak otomatis
 try:
+    # Import utilitas cell dan komponen UI
+    from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
+    
+    # Setup environment dan load config
+    env, config = setup_notebook_environment("preprocessing", "configs/preprocessing_config.yaml")
+    
+    # Setup komponen UI
+    ui_components = setup_ui_component(env, config, "preprocessing")
+    
+    # Setup handler
     from smartcash.ui.dataset.preprocessing_handler import setup_preprocessing_handlers
     ui_components = setup_preprocessing_handlers(ui_components, env, config)
-except ImportError as e:
-    print(f"⚠️ Tidak dapat setup handler preprocessing: {e}")
     
-# Tampilkan UI
-display_ui(ui_components)
-
-# Untuk cleanup resources ketika selesai:
-# cleanup_resources(ui_components)
+    # Tampilkan UI
+    display_ui(ui_components)
+    
+except ImportError as e:
+    from IPython.display import HTML
+    display(HTML(f"""
+    <div style="padding:10px; background:#f8d7da; color:#721c24; border-radius:5px; margin:10px 0">
+        <h3 style="margin-top:0">❌ Error Inisialisasi</h3>
+        <p>{str(e)}</p>
+        <p>Pastikan repository SmartCash telah di-clone dengan benar.</p>
+    </div>
+    """))

@@ -1,10 +1,12 @@
 """
 File: smartcash/ui/dataset/preprocessing_progress_handler.py
-Deskripsi: Handler untuk progress tracking preprocessing dataset
+Deskripsi: Handler untuk progress tracking preprocessing dataset yang disederhanakan
 """
 
-from typing import Dict, Any, Optional, Union, Callable
+from typing import Dict, Any, Optional
 from IPython.display import display
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.components.alerts import create_status_indicator
 
 def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -18,12 +20,15 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    logger = ui_components.get('logger')
+    
     # Coba setup observer jika tersedia
+    observer_setup_success = False
     try:
-        from smartcash.ui.handlers.observer_handler import create_progress_observer
         from smartcash.components.observer.event_topics_observer import EventTopics
+        from smartcash.ui.handlers.observer_handler import create_progress_observer
         
-        # Setup observer untuk progress bars
+        # Progress bar utama
         create_progress_observer(
             ui_components=ui_components,
             event_type=[
@@ -38,7 +43,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             observer_group='preprocessing_observers'
         )
         
-        # Setup observer untuk current progress
+        # Progress current task
         create_progress_observer(
             ui_components=ui_components,
             event_type=EventTopics.PREPROCESSING_CURRENT_PROGRESS,
@@ -48,100 +53,84 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             observer_group='preprocessing_observers'
         )
         
-        if 'logger' in ui_components:
-            ui_components['logger'].info("✅ Observers untuk progress tracking berhasil disetup")
-    except (ImportError, AttributeError) as e:
-        # Fallback to manual progress update
-        if 'logger' in ui_components:
-            ui_components['logger'].warning(f"⚠️ Tidak dapat setup observers: {str(e)}")
-            ui_components['logger'].info("ℹ️ Menggunakan manual progress tracking")
+        observer_setup_success = True
         
-        # Create manual progress updater
-        def update_progress(progress: int, total: int, message: Optional[str] = None) -> None:
-            """Update progress bar."""
+        if logger:
+            logger.info(f"{ICONS['success']} Progress tracking terintegrasi berhasil setup")
+            
+    except (ImportError, AttributeError):
+        observer_setup_success = False
+    
+    # Jika observer gagal, gunakan manual progress tracking yang sederhana
+    if not observer_setup_success:
+        # Define simple progress functions
+        def update_progress(progress, total, message=None):
+            """Update progress bar utama."""
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].max = total
                 ui_components['progress_bar'].value = progress
-            
-            if message and 'status' in ui_components:
-                from smartcash.ui.components.alerts import create_status_indicator
-                with ui_components['status']:
-                    display(create_status_indicator("info", message))
+                
+                # Update pesan jika ada
+                if message and 'status' in ui_components:
+                    with ui_components['status']:
+                        display(create_status_indicator("info", message))
         
-        def update_current_progress(progress: int, total: int) -> None:
-            """Update current progress bar."""
+        def update_current_progress(progress, total):
+            """Update progress task saat ini."""
             if 'current_progress' in ui_components:
                 ui_components['current_progress'].max = total
                 ui_components['current_progress'].value = progress
         
-        # Add progress updaters to ui_components
+        # Register ke UI components
         ui_components['update_progress'] = update_progress
         ui_components['update_current_progress'] = update_current_progress
-    
-    # Add callback registration function
-    def register_progress_callback(dataset_manager: Any) -> None:
-        """
-        Register callback untuk progress tracking ke dataset manager.
         
-        Args:
-            dataset_manager: Dataset manager
-        """
-        if not dataset_manager:
-            return
-            
-        # Check if dataset manager has register_progress_callback method
-        if hasattr(dataset_manager, 'register_progress_callback'):
-            try:
-                # Create progress callback
-                def progress_callback(progress: int, total: int, message: Optional[str] = None, 
-                                     status: str = 'info', current_progress: Optional[int] = None, 
-                                     current_total: Optional[int] = None):
-                    """
-                    Callback untuk progress update dari dataset manager.
-                    
-                    Args:
-                        progress: Nilai progress overall
-                        total: Nilai total overall
-                        message: Pesan progress (opsional)
-                        status: Status message (info, success, warning, error)
-                        current_progress: Nilai progress current task (opsional)
-                        current_total: Nilai total current task (opsional)
-                    """
-                    # Check if preprocessing is still running
-                    if not ui_components.get('preprocessing_running', True):
-                        return
-                        
-                    # Update overall progress
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].max = total
-                        ui_components['progress_bar'].value = progress
-                    
-                    # Update current task progress
-                    if current_progress is not None and current_total is not None and 'current_progress' in ui_components:
-                        ui_components['current_progress'].max = current_total
-                        ui_components['current_progress'].value = current_progress
-                    
-                    # Update status message
-                    if message and 'status' in ui_components:
-                        from smartcash.ui.components.alerts import create_status_indicator
-                        with ui_components['status']:
-                            display(create_status_indicator(status, message))
-                
-                # Register callback to dataset manager
-                dataset_manager.register_progress_callback(progress_callback)
-                
-                if 'logger' in ui_components:
-                    ui_components['logger'].info("✅ Progress callback berhasil diregistrasi")
-            except Exception as e:
-                if 'logger' in ui_components:
-                    ui_components['logger'].warning(f"⚠️ Gagal register progress callback: {str(e)}")
+        if logger:
+            logger.info(f"{ICONS['info']} Menggunakan manual progress tracking sederhana")
     
-    # Add register_progress_callback to ui_components
+    # Registrasi callback ke dataset manager
+    def register_progress_callback(dataset_manager):
+        """Register callback ke dataset manager."""
+        if not dataset_manager or not hasattr(dataset_manager, 'register_progress_callback'):
+            return False
+            
+        try:
+            def progress_callback(progress, total, message=None, status='info', 
+                                 current_progress=None, current_total=None):
+                """Progress callback dari dataset manager."""
+                # Skip jika preprocessing sudah dihentikan
+                if not ui_components.get('preprocessing_running', True):
+                    return
+                    
+                # Update progress bar utama
+                if 'progress_bar' in ui_components:
+                    ui_components['progress_bar'].max = total
+                    ui_components['progress_bar'].value = progress
+                
+                # Update current progress jika tersedia
+                if current_progress is not None and current_total is not None and 'current_progress' in ui_components:
+                    ui_components['current_progress'].max = current_total
+                    ui_components['current_progress'].value = current_progress
+                
+                # Update pesan jika ada
+                if message and 'status' in ui_components:
+                    with ui_components['status']:
+                        display(create_status_indicator(status, message))
+            
+            # Register callback
+            dataset_manager.register_progress_callback(progress_callback)
+            return True
+            
+        except Exception as e:
+            if logger:
+                logger.warning(f"{ICONS['warning']} Gagal register progress callback: {str(e)}")
+            return False
+    
+    # Tambahkan register_progress_callback ke UI components
     ui_components['register_progress_callback'] = register_progress_callback
     
-    # Try to register callback if dataset_manager already available
-    dataset_manager = ui_components.get('dataset_manager')
-    if dataset_manager:
-        register_progress_callback(dataset_manager)
+    # Register callback jika dataset_manager sudah tersedia
+    if 'dataset_manager' in ui_components:
+        register_progress_callback(ui_components['dataset_manager'])
     
     return ui_components

@@ -1,130 +1,140 @@
 """
-File: smartcash/ui/handlers/error_handler.py
-Deskripsi: Handler untuk penanganan error di komponen UI tanpa ThreadPool
+File: smartcash/ui/utils/error_handler.py
+Deskripsi: Utilitas penanganan error pada UI yang lebih sederhana dan konsisten
 """
 
+from IPython.display import display, HTML
+from typing import Dict, Any, Optional, Callable, Union
 import traceback
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-from typing import Any, Callable, Dict, Optional
+from smartcash.ui.utils.constants import ICONS, ALERT_STYLES
 
-def create_status_indicator(status: str, message: str) -> widgets.HTML:
+def create_error_message(error_type: str, message: str, detail: Optional[str] = None) -> str:
     """
-    Buat indikator status dengan style yang sesuai.
+    Buat pesan error dengan format konsisten.
     
     Args:
-        status: Jenis status ('info', 'success', 'warning', 'error')
-        message: Pesan status
+        error_type: Tipe error ('error', 'warning', 'info')
+        message: Pesan utama
+        detail: Detail tambahan error (opsional)
         
     Returns:
-        Widget HTML berisi indikator status
+        HTML string berisi pesan error
     """
-    from smartcash.ui.utils.constants import ALERT_STYLES, COLORS
+    # Dapatkan style dari ALERT_STYLES
+    style = ALERT_STYLES.get(error_type, ALERT_STYLES['error'])
+    emoji = style['icon']
+    bg_color = style['bg_color']
+    text_color = style['text_color']
     
-    style_config = ALERT_STYLES.get(status, ALERT_STYLES['info'])
+    # Buat pesan HTML
+    html = f"""
+    <div style="padding:10px; background-color:{bg_color}; 
+               color:{text_color}; border-radius:4px; margin:5px 0;
+               border-left:4px solid {text_color};">
+        <p style="margin:5px 0">{emoji} {message}</p>
+    """
     
-    return widgets.HTML(f"""
-    <div style="margin: 5px 0; padding: 8px 12px; 
-                border-radius: 4px; background-color: {COLORS['light']};">
-        <span style="color: {style_config['text_color']}; font-weight: bold;"> 
-            {style_config['icon']} {message}
-        </span>
-    </div>
-    """)
+    # Tambahkan detail jika ada
+    if detail:
+        html += f"""
+        <details style="margin-top:10px;">
+            <summary style="cursor:pointer;">Lihat detail error</summary>
+            <pre style="margin-top:5px; white-space:pre-wrap; overflow-x:auto; 
+                     font-size:0.9em; background:#f8f9fa; padding:8px; 
+                     border-radius:3px;">{detail}</pre>
+        </details>
+        """
+    
+    html += "</div>"
+    return html
 
-def setup_error_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def handle_ui_error(
+    error: Exception, 
+    output_widget: Any = None,
+    show_traceback: bool = True,
+    message: Optional[str] = None
+) -> None:
     """
-    Setup handler untuk error di UI components.
-    
-    Args:
-        ui_components: Dictionary berisi widget UI
-        
-    Returns:
-        Dictionary UI components yang telah ditambahkan error handler
-    """
-    # Tambahkan error handler jika belum ada
-    if 'handle_error' not in ui_components:
-        # Temukan output widget untuk error messages
-        error_output = ui_components.get('status', None)
-        if not error_output and 'output' in ui_components:
-            error_output = ui_components['output']
-            
-        # Jika tidak ada output widget, gunakan widget pertama yang ditemukan
-        if not error_output:
-            for key, widget in ui_components.items():
-                if isinstance(widget, widgets.Output):
-                    error_output = widget
-                    break
-        
-        # Tambahkan handler error ke ui_components
-        ui_components['handle_error'] = create_error_handler(error_output)
-        
-    return ui_components
-
-def handle_error(error: Exception, ui_output: Optional[widgets.Output] = None, clear: bool = True) -> None:
-    """
-    Handle error dan tampilkan di UI output.
+    Tangani error dan tampilkan pada widget output jika tersedia.
     
     Args:
         error: Exception yang terjadi
-        ui_output: Widget output untuk menampilkan error
-        clear: Apakah perlu clear output sebelumnya
+        output_widget: Widget output untuk menampilkan error
+        show_traceback: Apakah perlu menampilkan traceback
+        message: Pesan error kustom (jika tidak diisi, gunakan error message)
     """
     error_type = type(error).__name__
-    error_msg = str(error)
-    trace = traceback.format_exc()
+    error_msg = message or str(error)
+    detail = None
     
-    if ui_output:
-        with ui_output:
-            if clear:
-                clear_output(wait=True)
-            display(create_status_indicator("error", f"❌ {error_type}: {error_msg}"))
-            
-            # Tampilkan traceback dalam collapsed HTML
-            if trace and trace != "NoneType: None":
-                display(widgets.HTML(
-                    f"""<details>
-                        <summary style="cursor: pointer; color: #721c24;">Lihat detail error</summary>
-                        <pre style="background: #f8f9fa; padding: 10px; border-radius: 4px; 
-                                    color: #721c24; margin-top: 10px; font-size: 0.9em; 
-                                    white-space: pre-wrap; overflow-x: auto;">{trace}</pre>
-                    </details>"""
-                ))
+    if show_traceback:
+        detail = traceback.format_exc()
+    
+    error_html = create_error_message('error', f"{error_type}: {error_msg}", detail)
+    
+    if output_widget and hasattr(output_widget, 'clear_output'):
+        with output_widget:
+            display(HTML(error_html))
     else:
-        # Fallback ke print
-        print(f"❌ {error_type}: {error_msg}")
+        # Fallback ke print jika tidak ada widget
+        print(f"{ICONS['error']} {error_type}: {error_msg}")
+        if show_traceback:
+            print(traceback.format_exc())
 
-def create_error_handler(ui_output: Optional[widgets.Output] = None) -> Callable:
+def show_ui_message(
+    message: str,
+    message_type: str = 'info',
+    output_widget: Any = None
+) -> None:
     """
-    Buat error handler function untuk callbacks.
+    Tampilkan pesan pada widget output dengan styling yang sesuai.
     
     Args:
-        ui_output: Widget output untuk menampilkan error
-        
-    Returns:
-        Function untuk handling error
+        message: Pesan yang akan ditampilkan
+        message_type: Tipe pesan ('info', 'success', 'warning', 'error')
+        output_widget: Widget output untuk menampilkan pesan
     """
-    def error_handler(error: Exception, clear: bool = True) -> None:
-        handle_error(error, ui_output, clear)
+    message_html = create_error_message(message_type, message)
     
-    return error_handler
+    if output_widget and hasattr(output_widget, 'clear_output'):
+        with output_widget:
+            display(HTML(message_html))
+    else:
+        # Fallback ke print jika tidak ada widget
+        emoji = ICONS.get(message_type, ICONS['info'])
+        print(f"{emoji} {message}")
 
-def try_except_decorator(ui_output: Optional[widgets.Output] = None):
+def try_except_decorator(output_widget: Any = None, show_traceback: bool = True):
     """
     Decorator untuk menambahkan try-except pada fungsi.
     
     Args:
-        ui_output: Widget output untuk menampilkan error
+        output_widget: Widget output untuk menampilkan error
+        show_traceback: Apakah perlu menampilkan traceback
         
     Returns:
-        Decorator function
+        Decorated function
     """
     def decorator(func):
         def wrapper(*args, **kwargs):
             try:
                 return func(*args, **kwargs)
             except Exception as e:
-                handle_error(e, ui_output)
+                handle_ui_error(e, output_widget, show_traceback)
                 return None
         return wrapper
     return decorator
+
+def get_ui_component(ui_components: Dict[str, Any], key: str, default: Any = None) -> Any:
+    """
+    Dapatkan komponen UI dengan aman.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        key: Kunci komponen yang dicari
+        default: Nilai default jika tidak ditemukan
+        
+    Returns:
+        Komponen UI atau nilai default
+    """
+    return ui_components.get(key, default)

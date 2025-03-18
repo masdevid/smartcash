@@ -108,9 +108,8 @@ def process_data():
 ## Catatan Penting
 
 1. **Konsistensi**: Selalu gunakan fungsi dari `ui_helpers.py` daripada mengimplementasikan ulang
-2. **Fallback**: Jika perlu fallback, tetap ikuti pola styling yang sama
+2. **Fallback**: Jika perlu fallback, cukup buat elemen UI dengan HTML sederhana satu baris.
 3. **Backward Compatibility**: Gunakan alias jika perlu untuk mempertahankan compatibility
-4. **Layout**: Gunakan layout standar dari `widget_layouts.py` untuk konsistensi
 
 ## Contoh Implementasi Lengkap
 

@@ -124,8 +124,8 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                     display(create_status_indicator('warning', f"{display_name} tidak terinstall"))
 
     def _update_status_panel(status_message, status_type='info'):
-        """Update status panel menggunakan _create_status_message."""
-        ui_components['status_panel'].value = _create_status_message(
+        """Update status panel menggunakan create_status_indicator."""
+        ui_components['status_panel'].value = create_status_indicator(
             message=status_message,
             alert_type=status_type
         ).value
@@ -213,10 +213,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             # Tampilkan failed packages jika ada
             if failed_packages:
                 failed_list = "<br>".join([f"❌ {pkg}" for pkg in failed_packages])
-                display(_create_status_message(
-                    f"<h3>Package Gagal Diinstall</h3><div>{failed_list}</div>", 
-                    'error'
-                ))
+                display(_create_status_message(f"<h3>Package Gagal Diinstall</h3><div>{failed_list}</div>", 'error'))
 
     def _on_check_installations(b):
         """Handler untuk tombol cek instalasi."""

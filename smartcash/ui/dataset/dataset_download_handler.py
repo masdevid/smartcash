@@ -4,7 +4,6 @@ Deskripsi: Handler utama untuk download dataset SmartCash yang disederhanakan
 """
 
 from typing import Dict, Any
-import logging
 from smartcash.ui.utils.constants import ICONS
 
 def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -13,7 +12,7 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
     logger = None
     try:
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging(ui_components, "dataset_download", log_level=logging.INFO)
+        logger = setup_ipython_logging(ui_components, "dataset_download", redirect_root=True)
         if logger: 
             ui_components['logger'] = logger
             logger.info(f"{ICONS['info']} Download dataset handler diinisialisasi")

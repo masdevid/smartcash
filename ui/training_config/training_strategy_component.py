@@ -24,13 +24,13 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Header
     header = create_header(
-        f"<h3 style='color: black; margin-top: 15px; margin-bottom: 10px;'>{ICONS['chart']} Training Strategy</h3>",
+        f"<h3 style='color:{COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['chart']} Training Strategy</h3>",
         "Konfigurasi strategi dan teknik optimasi untuk training model SmartCash"
     )
     
     # Optimization strategy section
     optimization_section = widgets.HTML(
-        f"<h3 style='color: black; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Optimization Strategy</h3>"
+        f"<h3 style='color:{COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Optimization Strategy</h3>"
     )
     
     optimization_options = widgets.VBox([

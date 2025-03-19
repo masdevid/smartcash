@@ -107,7 +107,7 @@ def initialize_ui(ui_components: Dict[str, Any], config: Dict[str, Any], env=Non
             get_dataset_stats,
             update_stats_cards,
             get_class_distribution,
-            show_class_distribution_visualization
+            show_distribution_visualization
         )
         
         # Update statistik dataset

@@ -30,7 +30,7 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Basic hyperparameters section
     basic_section = widgets.HTML(
-        f"<h3 style='color: #000000; margin-top: 15px; margin-bottom: 10px;'>{ICONS['chart']} Basic Hyperparameters</h3>"
+        f"<h3 style='color:{COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['chart']} Basic Hyperparameters</h3>"
     )
     
     basic_params = widgets.VBox([
@@ -73,7 +73,7 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Advanced parameters section
     advanced_section = widgets.HTML(
-        f"<h3 style='color: #000000; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Parameters</h3>"
+        f"<h3 style='color:{COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Parameters</h3>"
     )
     
     # Tab komponen untuk parameter lanjutan

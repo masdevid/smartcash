@@ -27,8 +27,8 @@ def get_dataset_paths(config: Dict[str, Any], env=None) -> Tuple[str, str]:
         drive_mounted = True
     
     # Ambil path dari config atau gunakan default
-    dataset_path = config.get('data', {}).get('dataset_path', '/content/drive/MyDrive/SmartCash' if drive_mounted else 'data')
-    preprocessed_path = config.get('data', {}).get('preprocessed_path', '/content/drive/MyDrive/SmartCash/preprocessed' if drive_mounted else 'data/preprocessed')
+    dataset_path = config.get('data', {}).get('dataset_path', '/content/drive/MyDrive/SmartCash/data' if drive_mounted else 'data')
+    preprocessed_path = config.get('data', {}).get('preprocessed_path', '/content/drive/MyDrive/SmartCash/data/preprocessed' if drive_mounted else 'data/preprocessed')
     
     return dataset_path, preprocessed_path
 
@@ -135,8 +135,8 @@ def get_class_distribution(dataset_dir: str, logger=None) -> Dict[str, Dict[str,
             
             # Coba dapatkan nama kelas jika tersedia
             try:
-                from smartcash.common.layer_config import get_layer_config_manager
-                lcm = get_layer_config_manager()
+                from smartcash.common.layer_config import LayerConfigManager
+                lcm = LayerConfigManager()
                 if lcm:
                     class_map = lcm.get_class_map()
                     named_classes = {}

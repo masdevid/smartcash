@@ -7,7 +7,6 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
-
 def check_existing_dataset(data_dir: str = "data") -> bool:
     """
     Cek apakah dataset sudah ada di direktori data dengan validasi lebih baik.
@@ -122,7 +121,6 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
                 btn_container = widgets.HBox([btn_cancel, btn_confirm])
                 
                 # Fungsi aksi
-                # Fungsi aksi dalam on_confirm
                 def on_confirm(b):
                     # Sembunyikan dialog
                     ui_components['confirmation_container'].layout.display = 'none'

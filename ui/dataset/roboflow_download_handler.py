@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/roboflow_download_handler.py (perbaikan Google Secret API key)
-Deskripsi: Mengembalikan fitur cek API key dari Google Secret dan sembunyikan field API jika tersedia
+File: smartcash/ui/dataset/roboflow_download_handler.py
+Deskripsi: Handler untuk download dataset dari Roboflow menggunakan DatasetManager
 """
 
 from typing import Dict, Any, Optional
@@ -29,7 +29,6 @@ def download_from_roboflow(
         DatasetError: Jika terjadi error saat download
     """
     status_widget = ui_components.get('status')
-    logger = ui_components.get('logger')
     
     try:
         # Ekstrak parameter dari UI components
@@ -50,30 +49,11 @@ def download_from_roboflow(
         format = "yolov5pytorch"  # Default format
         
         # Cek API key dari Google Secret jika tidak diisi
-        secret_api_key = None
         if not api_key:
             try:
                 from google.colab import userdata
-                secret_api_key = userdata.get('ROBOFLOW_API_KEY')
-                if secret_api_key:
-                    if logger:
-                        logger.info(f"🔑 Menggunakan API key dari Google Secret")
-                    
-                    # Sembunyikan field API key dan tampilkan pesan bahwa sudah menggunakan secret
-                    settings[0].layout.display = 'none'
-                    
-                    # Tambahkan pesan informasi tentang penggunaan secret
-                    if 'status_panel' in ui_components:
-                        ui_components['status_panel'].value = f"""
-                        <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                                  color:{COLORS['alert_info_text']}; margin:10px 0; border-radius:4px; 
-                                  border-left:4px solid {COLORS['alert_info_text']};">
-                            <p style="margin:5px 0">{ICONS['info']} Menggunakan API key dari Google Secret. Workspace: {workspace}, Project: {project}</p>
-                        </div>
-                        """
-                    
-                    api_key = secret_api_key
-                else:
+                api_key = userdata.get('ROBOFLOW_API_KEY')
+                if not api_key:
                     raise DatasetError("API Key Roboflow diperlukan. Isi field API Key atau tambahkan sebagai Google Secret.")
             except ImportError:
                 # Tidak berjalan di Google Colab
@@ -102,20 +82,16 @@ def download_from_roboflow(
             from smartcash.dataset.manager import DatasetManager
             # Gunakan config dari parameter jika ada
             dataset_manager = DatasetManager(config=config)
-            ui_components['dataset_manager'] = dataset_manager
             
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 30
         
         # Tentukan output_dir
-        output_dir = ui_components.get('data_dir', 'data/')
+        output_dir = ui_components.get('data_dir')
         
-        # Dapatkan downloader service
-        downloader = dataset_manager.get_service('downloader')
-        
-        # Download dataset
-        result = downloader.download_dataset(
+        # Download menggunakan dataset_manager
+        result = dataset_manager.download_from_roboflow(
             api_key=api_key,
             workspace=workspace,
             project=project,
@@ -159,7 +135,7 @@ def download_from_roboflow(
             except ImportError:
                 pass
         
-        return {"status": "success", "result": result}
+        return result
         
     except DatasetError as e:
         # Dataset manager sudah menangani banyak exceptions dengan DatasetError

@@ -136,7 +136,7 @@ def update_layer_summary(ui_components: Dict[str, Any], config: Dict[str, Any]) 
             
             # Tampilkan model info
             html += f"""
-            <div style="margin-bottom:15px; padding:10px; background:#f8f9fa; border-radius:5px; color:{COLORS['dark']}">
+            <div style="margin-bottom:15px; padding:10px; background:#f8f9fa; border-radius:5px; color: black">
                 <p><b>🧠 Model:</b> {model_type}</p>
                 <p><b>⚙️ Backbone:</b> {backbone_type}</p>
                 <p><b>🔌 Features:</b> 
@@ -151,7 +151,7 @@ def update_layer_summary(ui_components: Dict[str, Any], config: Dict[str, Any]) 
             
             # Tampilkan tabel untuk layer
             html += "<table style='width:100%; border-collapse:collapse; margin-top:10px;'>"
-            html += "<tr style='background:#f2f2f2'><th>Layer</th><th>Status</th><th>Threshold</th></tr>"
+            html += "<tr style='background:#f2f2f2; color: black;'><th>Layer</th><th>Status</th><th>Threshold</th></tr>"
             
             for name in ['banknote', 'nominal', 'security']:
                 settings = config.get('layers', {}).get(name, {})

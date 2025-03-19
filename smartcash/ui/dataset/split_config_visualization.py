@@ -207,7 +207,7 @@ def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, 
         split_color = colors['success'] if data.get('valid', False) else colors['danger']
         html += f"""
             <div style="padding:5px; margin:2px; border-radius:3px; background-color:{colors['light']}; border:1px solid {split_color}">
-                <strong style="color:{split_color}">{split.capitalize()}</strong>: {data.get('images', 0)}
+                <strong style="color:{split_color}">{split.capitalize()}</strong>: <span style="color: #3795BD">{data.get('images', 0)}</span>
             </div>
         """
     

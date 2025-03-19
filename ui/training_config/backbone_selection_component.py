@@ -30,7 +30,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Model type selection section 
     model_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['black']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Model Selection</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Model Selection</h3>"
     )
     
     # Mendapatkan opsi model dari ModelManager
@@ -59,7 +59,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Backbone options section
     backbone_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['black']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Backbone Settings</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Backbone Settings</h3>"
     )
     
     backbone_options = widgets.VBox([
@@ -95,7 +95,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Advanced features section
     features_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['black']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Features</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Features</h3>"
     )
     
     features_options = widgets.VBox([
@@ -130,7 +130,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Layer configuration section
     layer_section = widgets.HTML(
-        f"<h3 style='color: {COLORS['black']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Layer Configuration</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Layer Configuration</h3>"
     )
     
     layer_config = widgets.VBox([

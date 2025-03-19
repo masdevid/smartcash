@@ -150,7 +150,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any]):
     
     with ui_components['status']:
         display(HTML(f"""
-            <div style="margin-top:10px">
+            <div style="margin-top:10px; background-color: #{COLORS['alert_info_bg']}">
                 <h3 style="color:{COLORS['secondary']}; margin:5px 0">🔗 Membuat Symlinks</h3>
             </div>
         """))
@@ -200,7 +200,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
     
     with ui_components['status']:
         display(HTML(f"""
-            <div style="margin-top:10px">
+            <div style="margin-top:10px; background-color: #{COLORS['alert_info_bg']}">
                 <h3 style="color:{COLORS['secondary']}; margin:5px 0">{ICONS['processing']} Sinkronisasi Konfigurasi</h3>
             </div>
         """))

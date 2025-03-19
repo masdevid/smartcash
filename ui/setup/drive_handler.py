@@ -224,7 +224,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
             if local_file and filename not in drive_map:
                 shutil.copy2(local_file, drive_configs / filename)
                 display(HTML(f"""
-                    <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                    <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                         <p style="margin:5px 0">⬆️ File lokal disalin ke Drive: {filename}</p>
                     </div>
                 """))
@@ -233,7 +233,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
             elif drive_file and filename not in local_map:
                 shutil.copy2(drive_file, local_configs / filename)
                 display(HTML(f"""
-                    <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                    <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                         <p style="margin:5px 0">⬇️ File Drive disalin ke lokal: {filename}</p>
                     </div>
                 """))
@@ -244,7 +244,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
                 try:
                     if os.path.samefile(local_file, drive_file):
                         display(HTML(f"""
-                            <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                            <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                                 <p style="margin:5px 0">ℹ️ File sudah sinkron (symlink): {filename}</p>
                             </div>
                         """))
@@ -260,26 +260,26 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
                     if local_time > drive_time:
                         shutil.copy2(local_file, drive_file)
                         display(HTML(f"""
-                            <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                            <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                                 <p style="margin:5px 0">⬆️ File lokal lebih baru, disalin ke Drive: {filename}</p>
                             </div>
                         """))
                     else:
                         shutil.copy2(drive_file, local_file)
                         display(HTML(f"""
-                            <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                            <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                                 <p style="margin:5px 0">⬇️ File Drive lebih baru, disalin ke lokal: {filename}</p>
                             </div>
                         """))
                 except shutil.SameFileError:
                     display(HTML(f"""
-                        <div style="padding:4px; color:{COLORS['alert_info_text']};">
+                        <div style="padding:4px; color:{COLORS['alert_info_text']}; background-color: {COLORS['alert_info_bg']}">
                             <p style="margin:5px 0">ℹ️ File sudah sinkron (symlink): {filename}</p>
                         </div>
                     """))
                 except Exception as e:
                     display(HTML(f"""
-                        <div style="padding:4px; color:{COLORS['alert_warning_text']};">
+                        <div style="padding:4px; color:{COLORS['alert_warning_text']}; background-color: {COLORS['alert_warning_bg']}">
                             <p style="margin:5px 0">{ICONS['warning']} Error saat sinkronisasi {filename}: {str(e)}</p>
                         </div>
                     """))

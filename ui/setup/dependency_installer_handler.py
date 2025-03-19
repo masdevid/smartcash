@@ -183,6 +183,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Update progress bar
                 progress_bar.update(1)
                 ui_components['install_progress'].value = progress_bar.n
+                ui_components['install_progress'].description = f"Instalasi Paket: {progress_bar.n}"
             
             # Tutup progress bar
             progress_bar.close()

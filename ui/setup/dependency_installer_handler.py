@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
-
+from smartcash.ui.utils.constants import ALERT_STYLES
 from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
 from smartcash.ui.components.metrics import create_metric_display
 

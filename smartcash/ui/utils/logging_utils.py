@@ -1,11 +1,12 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Utilitas untuk logging di notebook dengan tampilan berbasis UI alerts
+Deskripsi: Utilitas untuk logging di notebook dengan tampilan berbasis UI alerts dan penangkapan semua output logging
 """
 
 import logging
 import sys
-from typing import Dict, Any, Optional
+import io
+from typing import Dict, Any, Optional, List
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
@@ -24,6 +25,8 @@ class UILogHandler(logging.Handler):
         super().__init__()
         self.output_widget = output_widget
         self.setFormatter(logging.Formatter('%(message)s'))
+        # Set level paling rendah agar semua log tertangkap
+        self.setLevel(logging.DEBUG)
     
     def emit(self, record):
         """Tampilkan log di widget output dengan styling alert."""
@@ -46,6 +49,11 @@ class UILogHandler(logging.Handler):
                 logging.CRITICAL: ICONS.get('error', '❌'),
             }
             
+            # Ignore logs dari beberapa modul yang terlalu verbose
+            ignored_modules = ['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets']
+            if record.name and any(record.name.startswith(mod) for mod in ignored_modules):
+                return
+            
             style = level_to_style.get(record.levelno, 'info')
             alert_style = ALERT_STYLES.get(style, ALERT_STYLES['info'])
             icon = level_to_icon.get(record.levelno, ICONS.get('info', 'ℹ️'))
@@ -67,8 +75,9 @@ class UILogHandler(logging.Handler):
             with self.output_widget:
                 display(HTML(log_html))
                 
-        except Exception:
+        except Exception as e:
             # Fallback ke default behavior
+            print(f"Error in UILogHandler: {str(e)}")
             super().emit(record)
 
 class UILogger(logging.Logger):
@@ -88,11 +97,36 @@ class UILogger(logging.Logger):
                 msg = f"✅ {msg}"
             self._log(logging.INFO, msg, args, **kwargs)
 
+def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]:
+    """
+    Redirect semua output logging Python ke widget output.
+    
+    Args:
+        output_widget: Widget output untuk menampilkan log
+        
+    Returns:
+        List handler yang telah ditambahkan
+    """
+    # Simpan referensi ke root logger dan handler yang telah ditambahkan
+    root_logger = logging.getLogger()
+    added_handlers = []
+    
+    # Buat dan tambahkan UI handler ke root logger
+    ui_handler = UILogHandler(output_widget)
+    root_logger.addHandler(ui_handler)
+    added_handlers.append(ui_handler)
+    
+    # Set level root logger ke debug agar semua log tertangkap
+    root_logger.setLevel(logging.DEBUG)
+    
+    return added_handlers
+
 def setup_ipython_logging(
     ui_components: Dict[str, Any],
     logger_name: str = 'ui_logger',
     log_level: int = logging.INFO,
-    clear_existing_handlers: bool = True
+    clear_existing_handlers: bool = True,
+    redirect_root: bool = True
 ) -> Optional[logging.Logger]:
     """
     Setup logger untuk notebook dengan output ke widget.
@@ -102,6 +136,7 @@ def setup_ipython_logging(
         logger_name: Nama logger
         log_level: Level logging
         clear_existing_handlers: Hapus handler yang sudah ada
+        redirect_root: Redirect juga root logger ke widget output
         
     Returns:
         Logger instance atau None jika gagal
@@ -119,7 +154,7 @@ def setup_ipython_logging(
     if not output_widget:
         return None
     
-    # Dapatkan logger
+    # Setup logger module-level
     logger = logging.getLogger(logger_name)
     logger.setLevel(log_level)
     
@@ -132,10 +167,30 @@ def setup_ipython_logging(
     ui_handler.setLevel(log_level)
     logger.addHandler(ui_handler)
     
-    # Disable propagation ke root logger agar tidak muncul di console
+    # Nonaktifkan propagasi agar tidak muncul di console selama masih ada di modul
     logger.propagate = False
     
+    # Jika diminta, redirect juga root logger ke widget output
+    if redirect_root:
+        root_handlers = redirect_all_logging(output_widget)
+        ui_components['root_log_handlers'] = root_handlers
+    
     return logger
+
+def reset_logging():
+    """
+    Reset konfigurasi logging ke default (untuk testing atau reset).
+    """
+    # Reset root logger
+    root_logger = logging.getLogger()
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    # Tambahkan kembali handler ke console
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+    root_logger.addHandler(console_handler)
+    root_logger.setLevel(logging.WARNING)  # Default level
 
 def create_dummy_logger() -> logging.Logger:
     """

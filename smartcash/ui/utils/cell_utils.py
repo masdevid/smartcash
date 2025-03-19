@@ -153,8 +153,8 @@ def setup_ui_component(
     # Buat default UI components
     ui_components = create_default_ui_components(component_name)
     
-    # Setup logger yang terintegrasi dengan UI
-    logger = setup_ipython_logging(ui_components, f"cell_{component_name}")
+    # Setup logger yang terintegrasi dengan UI dan redirect semua output logging
+    logger = setup_ipython_logging(ui_components, f"cell_{component_name}", redirect_root=True)
     if logger:
         ui_components['logger'] = logger
         logger.info(f"🚀 Inisialisasi komponen UI '{component_name}'")

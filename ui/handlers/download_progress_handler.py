@@ -10,6 +10,7 @@ from typing import Dict, Any, Optional, Callable
 from smartcash.common.logger import get_logger
 from smartcash.components.observer import notify, EventTopics
 
+from smartcash.ui.utils.logging_utils import setup_ipython_logging
 
 class DownloadProgressHandler:
     """
@@ -29,7 +30,7 @@ class DownloadProgressHandler:
             logger: Logger kustom (opsional)
         """
         self.ui_components = ui_components
-        self.logger = logger or get_logger("download_progress_handler")
+        self.logger = setup_ipython_logging(ui_components, "dependency_installer")
         
         # Setup observer_manager
         try:

@@ -30,6 +30,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].description = 'Download: 0%'
             
         try:
             # Periksa dahulu apakah komponen UI ada sebelum mengaksesnya

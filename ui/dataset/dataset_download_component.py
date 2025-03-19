@@ -105,15 +105,18 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         value=0,
         min=0,
         max=100,
-        description='Progres:',
+        description='Download: 0%',
         bar_style='',
         orientation='horizontal',
-        layout=widgets.Layout(width='70%')
+        style={'margin-top': '10px'},
+        layout=widgets.Layout(
+            width='80%',
+            margin='10px 0'
+        )
     )
     
     # Label untuk progress
     progress_label = widgets.Label('Siap untuk download dataset')
-    
     # Status output
     status = widgets.Output(
         layout=widgets.Layout(

@@ -81,6 +81,7 @@ def download_from_roboflow(
         # Update progress bar jika ada
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 10
+            ui_components['progress_bar'].description = 'Download: 10%'
         
         # Dapatkan dataset_manager, prioritaskan yang sudah ada
         dataset_manager = ui_components.get('dataset_manager')
@@ -95,6 +96,7 @@ def download_from_roboflow(
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 30
+            ui_components['progress_bar'].description = 'Download: 30%'
         
         # Mendapatkan download_service dari dataset_manager
         try:
@@ -116,6 +118,7 @@ def download_from_roboflow(
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 40
+            ui_components['progress_bar'].description = 'Download: 40%'
             
         # Download menggunakan download_service dengan parameter backup_existing
         result = download_service.download_from_roboflow(
@@ -133,6 +136,7 @@ def download_from_roboflow(
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 80
+            ui_components['progress_bar'].description = 'Download: 80%'
             
         # Export ke struktur lokal standar (dengan backup optional)
         export_result = download_service.export_to_local(
@@ -144,6 +148,7 @@ def download_from_roboflow(
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 90
+            ui_components['progress_bar'].description = 'Download: 90%'
             
         # Tampilkan hasil sukses
         if status_widget:
@@ -164,6 +169,7 @@ def download_from_roboflow(
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 100
+            ui_components['progress_bar'].description = 'Download: 100%'
             
         # Notifikasi selesai jika ada observer
         if 'observer_manager' in ui_components:

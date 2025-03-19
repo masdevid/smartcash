@@ -111,6 +111,10 @@ def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]
     root_logger = logging.getLogger()
     added_handlers = []
     
+    # Hapus semua handler yang sudah ada
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
     # Buat dan tambahkan UI handler ke root logger
     ui_handler = UILogHandler(output_widget)
     root_logger.addHandler(ui_handler)
@@ -118,6 +122,11 @@ def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]
     
     # Set level root logger ke debug agar semua log tertangkap
     root_logger.setLevel(logging.DEBUG)
+    
+    # Hentikan propagasi untuk semua logger yang sudah ada
+    for name in logging.root.manager.loggerDict:
+        logger = logging.getLogger(name)
+        logger.propagate = False
     
     return added_handlers
 
@@ -167,11 +176,18 @@ def setup_ipython_logging(
     ui_handler.setLevel(log_level)
     logger.addHandler(ui_handler)
     
-    # Nonaktifkan propagasi agar tidak muncul di console selama masih ada di modul
+    # Nonaktifkan propagasi ke root logger agar tidak muncul di console
     logger.propagate = False
     
-    # Jika diminta, redirect juga root logger ke widget output
+    # Hapus semua handler console dari logging module untuk memastikan tidak ada log yang muncul di console
     if redirect_root:
+        # Hapus handler lama dari root logger
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers[:]:
+            if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
+                root_logger.removeHandler(handler)
+        
+        # Redirect root logger ke UI widget
         root_handlers = redirect_all_logging(output_widget)
         ui_components['root_log_handlers'] = root_handlers
     
@@ -191,6 +207,10 @@ def reset_logging():
     console_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
     root_logger.addHandler(console_handler)
     root_logger.setLevel(logging.WARNING)  # Default level
+    
+    # Reset propagation untuk semua logger
+    for name in logging.root.manager.loggerDict:
+        logging.getLogger(name).propagate = True
 
 def create_dummy_logger() -> logging.Logger:
     """

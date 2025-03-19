@@ -158,7 +158,7 @@ def create_header(title: str, description: Optional[str] = None, icon: Optional[
     header_html = f"""
     <div style="background-color: {COLORS['header_bg']}; padding: 15px; color: black; 
             border-radius: 5px; margin-bottom: 15px; border-left: 5px solid {COLORS['primary']};">
-        <h2 style="color: {COLORS['dark']}; margin-top: 0;">{title_with_icon}</h2>
+        <h2 style="color:black; margin-top: 0;">{title_with_icon}</h2>
     """
     
     if description:

@@ -156,9 +156,6 @@ def setup_ui_component(
     if logger:
         ui_components['logger'] = logger
         logger.info(f"🚀 Inisialisasi komponen UI '{component_name}'")
-        if config:
-            config_path = config.get('config_path') or 'Konfigurasi default'
-            logger.info(f"📄 Konfigurasi: {config_path}")
     
     # Import komponen UI dengan fallback, termasuk pencarian di subdirektori
     try:

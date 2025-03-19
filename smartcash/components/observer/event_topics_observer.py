@@ -1,6 +1,6 @@
 """
 File: smartcash/components/observer/event_topics_observer.py
-Deskripsi: Definisi topik event standar
+Deskripsi: Definisi topik event standar dengan penambahan event untuk download, backup dan ZIP processing
 """
 
 class EventTopics:
@@ -17,7 +17,11 @@ class EventTopics:
     DOWNLOAD = "download"
     DATASET = "dataset"
     AUGMENTATION = "augmentation"
-    CONFIG = "config"  # Tambahkan kategori config
+    CONFIG = "config"
+    BACKUP = "backup"               # Kategori baru
+    ZIP_PROCESSING = "zip"          # Kategori baru
+    EXPORT = "export"               # Kategori baru
+    RESTORE = "restore"             # Kategori baru
     
     # Training events
     TRAINING_START = "training.start"
@@ -35,6 +39,7 @@ class EventTopics:
     TRAINING_EPOCH_END = "training.epoch.end"
     TRAINING_BATCH_END = "training.batch.end"
     TRAINING_ERROR = "training.error"
+    
     # Evaluation events
     EVALUATION_START = "evaluation.start"
     EVALUATION_END = "evaluation.end"
@@ -83,15 +88,52 @@ class EventTopics:
     UI_REFRESH = "ui.refresh"
     PROGRESS_UPDATE = "ui.progress.update"
     
-    # Download events
+    # Download events (perluasan)
     DOWNLOAD_START = "download.start"
     DOWNLOAD_END = "download.end"
     DOWNLOAD_PROGRESS = "download.progress"
     DOWNLOAD_ERROR = "download.error"
     DOWNLOAD_COMPLETE = "download.complete"
     
+    # Export events (baru)
+    EXPORT_START = "export.start"
+    EXPORT_PROGRESS = "export.progress"
+    EXPORT_COMPLETE = "export.complete"
+    EXPORT_ERROR = "export.error"
+    
+    # Backup events (baru)
+    BACKUP_START = "backup.start"
+    BACKUP_PROGRESS = "backup.progress"
+    BACKUP_COMPLETE = "backup.complete"
+    BACKUP_ERROR = "backup.error"
+    
+    # Restore events (baru)
+    RESTORE_START = "restore.start"
+    RESTORE_PROGRESS = "restore.progress"
+    RESTORE_COMPLETE = "restore.complete"
+    RESTORE_ERROR = "restore.error"
+    
+    # ZIP processing events (baru)
+    ZIP_PROCESSING_START = "zip_processing.start"
+    ZIP_PROCESSING_PROGRESS = "zip_processing.progress"
+    ZIP_PROCESSING_COMPLETE = "zip_processing.complete"
+    ZIP_PROCESSING_ERROR = "zip_processing.error"
+    ZIP_EXTRACT_PROGRESS = "zip_processing.extract.progress"
+    
+    # ZIP import events (baru)
+    ZIP_IMPORT_START = "zip_import.start"
+    ZIP_IMPORT_PROGRESS = "zip_import.progress"
+    ZIP_IMPORT_COMPLETE = "zip_import.complete"
+    ZIP_IMPORT_ERROR = "zip_import.error"
+    
+    # Pull dataset events (baru)
+    PULL_DATASET_START = "pull_dataset.start"
+    PULL_DATASET_PROGRESS = "pull_dataset.progress"
+    PULL_DATASET_COMPLETE = "pull_dataset.complete"
+    PULL_DATASET_ERROR = "pull_dataset.error"
+    
     # Config events
-    CONFIG_UPDATED = "config.updated"  # Tambahkan event untuk update konfigurasi
+    CONFIG_UPDATED = "config.updated"
     CONFIG_LOADED = "config.loaded"
     CONFIG_RESET = "config.reset"
     CONFIG_ERROR = "config.error"

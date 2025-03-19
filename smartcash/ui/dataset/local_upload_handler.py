@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/local_upload_handler.py
-Deskripsi: Handler untuk upload dataset lokal (ZIP/folder) memanfaatkan DownloadService
+Deskripsi: Handler untuk upload dataset lokal (ZIP/folder) memanfaatkan DownloadService dengan penyesuaian terbaru
 """
 
 import os
@@ -97,12 +97,12 @@ def process_local_upload(
             
         # Proses file ZIP atau folder dataset
         if file_name.lower().endswith('.zip'):
-            # Gunakan process_zip_file dari download_service
-            result = download_service.process_zip_file(
-                zip_path=file_path,
-                output_dir=output_dir,
-                extract_only=False,
-                validate_after=True
+            # Gunakan import_from_zip dari download_service
+            result = download_service.import_from_zip(
+                zip_file=file_path,
+                target_dir=output_dir,
+                remove_zip=True,
+                show_progress=True
             )
             
             # Update progress indicator

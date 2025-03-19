@@ -122,5 +122,7 @@ pretrained/
 # Model Metadata
 *.index
 backup/
+!dataset/services/backup/
+!smartcash/dataset/services/backup/
 *.pt
 .windsurfrules

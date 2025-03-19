@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/downloader/roboflow_downloader.py
-Deskripsi: Komponen untuk download dataset dari Roboflow dengan dukungan resume dan progress tracking
+Deskripsi: Komponen untuk download dataset dari Roboflow dengan dukungan resume dan progress tracking yang disempurnakan
 """
 
 import os
@@ -117,6 +117,15 @@ class RoboflowDownloader:
                 
             return metadata
             
+        except requests.exceptions.HTTPError as e:
+            self.logger.error(f"❌ HTTP Error saat mendapatkan metadata: {e.response.status_code} - {e.response.text}")
+            raise
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"❌ Error koneksi saat mendapatkan metadata: {str(e)}")
+            raise
+        except ValueError as e:
+            self.logger.error(f"❌ Error format metadata: {str(e)}")
+            raise
         except Exception as e:
             self.logger.error(f"❌ Gagal mendapatkan metadata: {str(e)}")
             raise
@@ -151,20 +160,34 @@ class RoboflowDownloader:
             download_success = self._download_with_progress(download_url, zip_path, show_progress)
             
             if not download_success:
+                self.logger.error(f"❌ Download dataset gagal")
                 return False
             
             # Verifikasi ukuran file zip
-            if not zip_path.exists() or zip_path.stat().st_size < 1000:
-                self.logger.error(f"❌ File ZIP tidak valid: {zip_path}")
+            if not zip_path.exists():
+                self.logger.error(f"❌ File ZIP tidak ditemukan setelah download: {zip_path}")
+                return False
+                
+            file_size = zip_path.stat().st_size
+            if file_size < 1000:
+                self.logger.error(f"❌ File ZIP tidak valid (terlalu kecil): {file_size} bytes")
                 return False
             
             # Ekstrak file zip
-            self.logger.info(f"📦 Mengekstrak dataset...")
+            self.logger.info(f"📦 Mengekstrak dataset ({file_size / (1024*1024):.2f} MB)...")
             extract_success = self._extract_zip(zip_path, output_path, remove_zip=True, show_progress=show_progress)
             
             if not extract_success:
+                self.logger.error(f"❌ Ekstraksi dataset gagal")
                 return False
             
+            # Verifikasi hasil ekstraksi
+            extracted_files = list(output_path.glob('**/*'))
+            if not extracted_files:
+                self.logger.error(f"❌ Tidak ada file yang diekstrak")
+                return False
+                
+            self.logger.success(f"✅ Download dan ekstraksi berhasil dengan {len(extracted_files)} file")
             return True
             
         except Exception as e:
@@ -228,7 +251,7 @@ class RoboflowDownloader:
                     return True
                 
                 # Jika resume, tambahkan existing_size ke total_size
-                if existing_size > 0:
+                if existing_size > 0 and 'Content-Range' in response.headers:
                     total_size += existing_size
                 
                 # Setup progress bar
@@ -265,9 +288,6 @@ class RoboflowDownloader:
                 return True
                 
             except requests.exceptions.RequestException as e:
-                if progress:
-                    progress.close()
-                
                 if attempt < self.retry_limit:
                     wait_time = self.retry_delay * attempt
                     self.logger.warning(f"⚠️ Download error (attempt {attempt}/{self.retry_limit}): {str(e)}")
@@ -276,6 +296,10 @@ class RoboflowDownloader:
                 else:
                     self.logger.error(f"❌ Download gagal setelah {self.retry_limit} percobaan: {str(e)}")
                     return False
+            finally:
+                # Pastikan progress bar ditutup di semua kasus
+                if 'progress' in locals() and progress:
+                    progress.close()
         
         return False
     
@@ -355,35 +379,13 @@ class RoboflowDownloader:
             self.logger.success(f"✅ Ekstraksi selesai: {output_dir}")
             return True
             
+        except zipfile.BadZipFile as e:
+            self.logger.error(f"❌ File ZIP rusak: {str(e)}")
+            return False
         except Exception as e:
             self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
             return False
-    
-    def _download_with_progress(
-        self,
-        url: str,
-        output_path: Path,
-        show_progress: bool = True
-    ) -> bool:
-        """
-        Download file dengan progress tracking dan dukungan resume.
-        
-        Args:
-            url: URL file yang akan didownload
-            output_path: Path untuk menyimpan file
-            show_progress: Tampilkan progress bar
-            
-        Returns:
-            Sukses atau tidak
-        """
-        # Header untuk request
-        headers = {}
-        existing_size = 0
-        
-        # Cek apakah file sudah ada (untuk resume)
-        if output_path.exists():
-            existing_size = output_path.stat().st_size
-            
-            if existing_size > 0:
-                headers['Range'] = f'bytes={existing_size}-'
-                self.logger.info(f"🔄 Melanjutkan download dari {existing_size / (1024*1024):.2f} MB")
+        finally:
+            # Pastikan progress bar ditutup
+            if 'progress' in locals() and progress:
+                progress.close()

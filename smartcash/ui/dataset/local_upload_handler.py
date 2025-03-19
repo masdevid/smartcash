@@ -97,8 +97,8 @@ def process_local_upload(
             
         # Proses file ZIP atau folder dataset
         if file_name.lower().endswith('.zip'):
-            # Gunakan process_zip_file dari processor milik download_service
-            result = download_service.processor.process_zip_file(
+            # Gunakan process_zip_file dari download_service
+            result = download_service.process_zip_file(
                 zip_path=file_path,
                 output_dir=output_dir,
                 extract_only=False,

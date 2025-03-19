@@ -12,7 +12,7 @@ from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
 
-from smartcash.ui.components.alerts import create_status_indicator, _create_status_message
+from smartcash.ui.components.alerts import create_status_indicator
 from smartcash.ui.components.metrics import create_metric_display
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):

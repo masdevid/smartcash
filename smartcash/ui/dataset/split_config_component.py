@@ -188,8 +188,8 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         <h4>{ICONS['folder']} Lokasi Dataset</h4>
         <p>Data mentah dan data terpreprocessing akan diambil dari lokasi yang dikonfigurasi:</p>
         <ul>
-            <li>Dataset mentah: <code>/content/drive/MyDrive/SmartCash</code></li>
-            <li>Dataset preprocessed: <code>/content/drive/MyDrive/SmartCash/preprocessed</code></li>
+            <li>Dataset mentah: <code>/content/drive/MyDrive/SmartCash/data</code></li>
+            <li>Dataset preprocessed: <code>/content/drive/MyDrive/SmartCash/data/preprocessed</code></li>
         </ul>
         """,
         'info',

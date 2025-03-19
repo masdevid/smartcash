@@ -219,7 +219,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4>{ICONS['settings']} Preprocessing Settings</h4>"),
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
         preprocess_options,
         split_selector,
         advanced_accordion,

@@ -13,7 +13,7 @@ COLORS = {
     'danger': '#dc3545',
     'info': '#17a2b8',
     'light': '#f8f9fa',
-    'dark': '#2A004E',
+    'dark': '#2F58CD',
     'muted': '#6c757d',
     'highlight': '#e65100',
     'background': '#ffffff',

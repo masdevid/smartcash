@@ -6,7 +6,7 @@ Deskripsi: Pembaruan UI konfigurasi model dan visualisasi summary
 from IPython.display import display, HTML, clear_output
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
-
+from smartcash.ui.utils.constants import COLORS
 from smartcash.ui.training_config.model_config_definitions import get_model_config
 
 def update_ui_for_model_type(ui_components: Dict[str, Any], model_type: str, config: Dict[str, Any]) -> None:
@@ -132,11 +132,11 @@ def update_layer_summary(ui_components: Dict[str, Any], config: Dict[str, Any]) 
             num_repeats = model_cfg.get('num_repeats', 1)
             
             # Buat HTML summary yang informatif
-            html = "<h4 style='margin-top:0; color:#2c3e50'>📋 Model & Layer Configuration</h4>"
+            html = f"<h4 style='margin-top:0; color:{COLORS['dark']}; margin-bottom:10px;'>📋 Model & Layer Configuration</h4>"
             
             # Tampilkan model info
             html += f"""
-            <div style="margin-bottom:15px; padding:10px; background:#f8f9fa; border-radius:5px; color:#2c3e50">
+            <div style="margin-bottom:15px; padding:10px; background:#f8f9fa; border-radius:5px; color:{COLORS['dark']}">
                 <p><b>🧠 Model:</b> {model_type}</p>
                 <p><b>⚙️ Backbone:</b> {backbone_type}</p>
                 <p><b>🔌 Features:</b> 

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow menggunakan DatasetManager
+Deskripsi: Handler untuk download dataset dari Roboflow yang disesuaikan untuk menggunakan output_dir
 """
 
 from typing import Dict, Any, Optional
@@ -78,32 +78,65 @@ def download_from_roboflow(
         
         # Dapatkan dataset_manager, prioritaskan yang sudah ada
         dataset_manager = ui_components.get('dataset_manager')
+        
         if not dataset_manager:
             from smartcash.dataset.manager import DatasetManager
             # Gunakan config dari parameter jika ada
             dataset_manager = DatasetManager(config=config)
-            
+            # Tambahkan ke ui_components untuk penggunaan berikutnya
+            ui_components['dataset_manager'] = dataset_manager
+        
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 30
         
-        # Tentukan output_dir
-        output_dir = ui_components.get('data_dir')
+        # Mendapatkan download_service dari dataset_manager
+        try:
+            download_service = dataset_manager.get_service('downloader')
+        except Exception as e:
+            # Jika gagal mendapatkan download_service dari manager, buat langsung
+            from smartcash.dataset.services.downloader.download_service import DownloadService
+            
+            # Dapatkan output_dir dari ui_components
+            output_dir = ui_components.get('data_dir', 'data/')
+            
+            # Gunakan parameter 'output_dir' bukan 'data_dir'
+            download_service = DownloadService(
+                output_dir=output_dir,
+                config=config,
+                logger=dataset_manager.logger if hasattr(dataset_manager, 'logger') else None
+            )
         
-        # Download menggunakan dataset_manager
-        result = dataset_manager.download_from_roboflow(
+        # Update progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 40
+            
+        # Download menggunakan download_service
+        result = download_service.download_from_roboflow(
             api_key=api_key,
             workspace=workspace,
             project=project,
             version=version,
-            format=format,
+            format=format
+        )
+        
+        # Export ke folder data standar
+        output_dir = ui_components.get('data_dir', 'data/')
+        
+        # Update progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 80
+            
+        # Export ke struktur lokal standar
+        export_result = download_service.export_to_local(
+            source_dir=result['output_dir'],
             output_dir=output_dir
         )
         
         # Update progress bar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 90
-        
+            
         # Tampilkan hasil sukses
         if status_widget:
             with status_widget:
@@ -115,7 +148,8 @@ def download_from_roboflow(
                         <p style="margin:5px 0">{ICONS['success']} Dataset berhasil didownload!</p>
                         <p>Project: {project} (v{version}) dari workspace {workspace}</p>
                         <p>Format: {format}</p>
-                        <p>Output: {output_dir or 'data/'}</p>
+                        <p>Output: {output_dir}</p>
+                        <p>Files: {export_result.get('copied', 0)} file disalin</p>
                     </div>
                 """))
         
@@ -135,7 +169,16 @@ def download_from_roboflow(
             except ImportError:
                 pass
         
-        return result
+        # Update status panel jika tersedia
+        from smartcash.ui.dataset.download_initialization import update_status_panel
+        update_status_panel(ui_components, "success", f"✅ Dataset berhasil didownload ke {output_dir}")
+        
+        return {
+            'status': 'success',
+            'download_result': result,
+            'export_result': export_result,
+            'output_dir': output_dir
+        }
         
     except DatasetError as e:
         # Dataset manager sudah menangani banyak exceptions dengan DatasetError
@@ -149,6 +192,14 @@ def download_from_roboflow(
                         <p style="margin:5px 0">{ICONS['error']} {str(e)}</p>
                     </div>
                 """))
+                
+        # Update status panel jika tersedia
+        try:
+            from smartcash.ui.dataset.download_initialization import update_status_panel
+            update_status_panel(ui_components, "error", f"❌ Error: {str(e)}")
+        except ImportError:
+            pass
+            
         raise
         
     except Exception as e:
@@ -164,4 +215,12 @@ def download_from_roboflow(
                         <p style="margin:5px 0">{ICONS['error']} {error_message}</p>
                     </div>
                 """))
+                
+        # Update status panel jika tersedia
+        try:
+            from smartcash.ui.dataset.download_initialization import update_status_panel
+            update_status_panel(ui_components, "error", f"❌ Error: {error_message}")
+        except ImportError:
+            pass
+            
         raise DatasetError(error_message)

@@ -30,7 +30,7 @@ def create_backbone_selection_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Model type selection section 
     model_section = widgets.HTML(
-        f"<h3 style='color: #000000; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Model Selection</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['folder']} Model Selection</h3>"
     )
     
     # Mendapatkan opsi model dari ModelManager

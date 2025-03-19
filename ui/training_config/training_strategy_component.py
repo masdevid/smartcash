@@ -67,7 +67,7 @@ def create_training_strategy_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Training policy section
     policy_section = widgets.HTML(
-        f"<h3 style='color: black; margin-top: 15px; margin-bottom: 10px;'>{ICONS['tools']} Training Policy</h3>"
+        f"<h3 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['tools']} Training Policy</h3>"
     )
     
     policy_options = widgets.VBox([

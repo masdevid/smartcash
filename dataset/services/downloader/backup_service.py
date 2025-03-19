@@ -31,10 +31,10 @@ class BackupService:
         self.backup_dir = Path(backup_dir or "data/backups")
         os.makedirs(self.backup_dir, exist_ok=True)
         
-        # Setup observer manager untuk tracking
+        # Setup observer manager untuk tracking - PERBAIKAN: Ubah dari get_instance() ke inisialisasi langsung
         try:
             from smartcash.components.observer.manager_observer import ObserverManager
-            self.observer_manager = ObserverManager.get_instance()
+            self.observer_manager = ObserverManager()
         except (ImportError, AttributeError):
             self.observer_manager = None
         
@@ -74,15 +74,13 @@ class BackupService:
         self.logger.info(f"📦 Membuat backup dataset: {src_path} → {zip_path}")
         
         # Notifikasi backup dimulai
-        if self.observer_manager:
-            self.observer_manager.notify(
-                EventTopics.BACKUP_START,
-                self,
-                message=f"Membuat backup dataset ke {zip_path.name}",
-                source=str(src_path),
-                destination=str(zip_path),
-                status="info"
-            )
+        self._notify(
+            EventTopics.BACKUP_START,
+            message=f"Membuat backup dataset ke {zip_path.name}",
+            source=str(src_path),
+            destination=str(zip_path),
+            status="info"
+        )
         
         try:
             # Hitung file untuk progress bar
@@ -104,10 +102,9 @@ class BackupService:
                         pbar.update(1)
                         
                         # Notifikasi progress setiap 5% atau 20 file
-                        if i % max(1, min(20, total_files // 20)) == 0 and self.observer_manager:
-                            self.observer_manager.notify(
+                        if i % max(1, min(20, total_files // 20)) == 0:
+                            self._notify(
                                 EventTopics.BACKUP_PROGRESS,
-                                self,
                                 progress=i,
                                 total=total_files,
                                 percentage=int((i / total_files) * 100),
@@ -121,16 +118,14 @@ class BackupService:
             compression_ratio = (1 - (backup_size / total_size)) * 100 if total_size > 0 else 0
             
             # Notifikasi selesai
-            if self.observer_manager:
-                self.observer_manager.notify(
-                    EventTopics.BACKUP_COMPLETE,
-                    self,
-                    message=f"Backup selesai: {backup_size_mb:.2f} MB (rasio kompresi: {compression_ratio:.1f}%)",
-                    size_mb=backup_size_mb,
-                    file_count=total_files,
-                    duration=elapsed_time,
-                    status="success"
-                )
+            self._notify(
+                EventTopics.BACKUP_COMPLETE,
+                message=f"Backup selesai: {backup_size_mb:.2f} MB (rasio kompresi: {compression_ratio:.1f}%)",
+                size_mb=backup_size_mb,
+                file_count=total_files,
+                duration=elapsed_time,
+                status="success"
+            )
             
             self.logger.success(
                 f"✅ Backup selesai ({elapsed_time:.1f}s)\n"
@@ -152,13 +147,11 @@ class BackupService:
             
         except Exception as e:
             # Notifikasi error dan hapus backup tidak lengkap
-            if self.observer_manager:
-                self.observer_manager.notify(
-                    EventTopics.BACKUP_ERROR,
-                    self,
-                    message=f"Error saat backup dataset: {str(e)}",
-                    status="error"
-                )
+            self._notify(
+                EventTopics.BACKUP_ERROR,
+                message=f"Error saat backup dataset: {str(e)}",
+                status="error"
+            )
                 
             self.logger.error(f"❌ Error saat backup dataset: {str(e)}")
             
@@ -171,6 +164,11 @@ class BackupService:
                 
             raise DatasetError(f"Error saat backup dataset: {str(e)}")
     
+    def _notify(self, event_type, **kwargs):
+        """Helper untuk mengirimkan notifikasi observer dengan one-liner."""
+        if self.observer_manager:
+            self.observer_manager.notify(event_type, self, **kwargs)
+            
     def list_backups(self, filter_pattern: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """
         Daftar semua backup ZIP yang tersedia.

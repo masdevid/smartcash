@@ -48,9 +48,12 @@ class DownloadService:
         self.processor = FileProcessor(logger=self.logger, num_workers=self.num_workers)
         self.backup_service = BackupService(logger=self.logger)
         
-        # Untuk tracking progress menggunakan observer
-        from smartcash.components.observer.manager_observer import ObserverManager
-        self.observer_manager = ObserverManager.get_instance()
+        # Untuk tracking progress menggunakan observer - PERBAIKAN: Ubah dari get_instance() ke inisialisasi langsung
+        try:
+            from smartcash.components.observer.manager_observer import ObserverManager
+            self.observer_manager = ObserverManager()  # Perbaikan disini!
+        except ImportError:
+            self.observer_manager = None
         
         self.logger.info(f"📥 DatasetDownloadService diinisialisasi dengan {num_workers} workers\n"
                         f"   • Data dir: {self.data_dir}\n"

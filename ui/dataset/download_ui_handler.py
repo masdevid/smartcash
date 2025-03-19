@@ -39,7 +39,7 @@ class DownloadProgressHandler:
         """
         self.ui_components = ui_components
         self.logger = logger or get_logger("download_progress_handler")
-        self.observer_manager = ObserverManager.get_instance()
+        self.observer_manager = ObserverManager()
         
         # Status handler
         self.is_downloading = False

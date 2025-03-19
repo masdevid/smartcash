@@ -35,10 +35,11 @@ class FileProcessor:
         if self.observer_manager is None:
             try:
                 from smartcash.components.observer.manager_observer import ObserverManager
-                self.observer_manager = ObserverManager.get_instance()
+                self.observer_manager = ObserverManager()  # Perbaikan: Hapus get_instance()
             except (ImportError, AttributeError):
                 pass
     
+    # Sisanya tidak perlu diubah
     def process_zip_file(
         self,
         zip_path: Union[str, Path],

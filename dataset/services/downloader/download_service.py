@@ -25,23 +25,23 @@ class DownloadService:
     Mendukung download dari Roboflow, import dari zip, dan validasi dataset.
     """
     
-    def __init__(self, output_dir: str = "data", config: Optional[Dict] = None, logger=None, num_workers: int = 4):
+    def __init__(self, config: Dict, data_dir: str, logger=None, num_workers: int = 4):
         """
         Inisialisasi DownloadService.
         
         Args:
-            output_dir: Direktori data output
-            config: Konfigurasi aplikasi (opsional)
+            config: Konfigurasi aplikasi
+            data_dir: Direktori data
             logger: Logger kustom (opsional)
             num_workers: Jumlah worker untuk proses paralel
         """
-        self.config = config or {}
-        self.data_dir = Path(output_dir)
+        self.config = config
+        self.data_dir = Path(data_dir)
         self.logger = logger or get_logger("download_service")
         self.num_workers = num_workers
         
         # Setup utils
-        self.utils = DatasetUtils(self.config, output_dir, logger)
+        self.utils = DatasetUtils(config, data_dir, logger)
         
         # Setup direktori temp dan downloads
         self.temp_dir = self.data_dir / ".temp"

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download_initialization.py
-Deskripsi: Inisialisasi komponen download dataset dengan error handling terpadu
+Deskripsi: Perbaikan pada inisialisasi komponen download untuk sembunyikan field API key jika tersedia dari Google Secret
 """
 
 from typing import Dict, Any
@@ -31,8 +31,45 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
             # Update status panel
             update_status_panel(ui_components, "info", f"Dataset akan didownload ke: {data_dir}")
         
+        # Cek ketersediaan API key dari Google Secret
+        secret_api_key = None
+        try:
+            from google.colab import userdata
+            secret_api_key = userdata.get('ROBOFLOW_API_KEY')
+            
+            if secret_api_key and 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
+                # Ada API key, sembunyikan field API key
+                api_settings = ui_components['roboflow_settings'].children
+                if len(api_settings) > 0:
+                    # Sembunyikan field API key
+                    api_settings[0].layout.display = 'none'
+                    
+                    # Tampilkan informasi menggunakan API key dari secret
+                    update_status_panel(
+                        ui_components,
+                        "info",
+                        f"{ICONS['info']} Menggunakan API key dari Google Secret"
+                    )
+                    
+                    if 'logger' in ui_components:
+                        ui_components['logger'].info(f"{ICONS['info']} Menggunakan API key dari Google Secret")
+                
+                # Keluarkan juga informasi workspace dan project
+                if len(api_settings) > 2:
+                    workspace = api_settings[1].value
+                    project = api_settings[2].value
+                    
+                    update_status_panel(
+                        ui_components,
+                        "info",
+                        f"{ICONS['info']} Menggunakan API key dari Google Secret | Project: {project} di workspace: {workspace}"
+                    )
+        except ImportError:
+            # Bukan di Colab, tidak perlu menyembunyikan field
+            pass
+        
         # Cek ketersediaan API key untuk Roboflow
-        if 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
+        if not secret_api_key and 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
             api_settings = ui_components['roboflow_settings'].children
             if len(api_settings) > 1:  # Pastikan ada minimal 2 elemen
                 workspace = api_settings[1].value
@@ -53,8 +90,23 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
 def get_api_key_info(ui_components):
     """Dapatkan informasi API key dengan fallback."""
     try:
-        # Cek API key dari komponen
-        if 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
+        # Cek API key dari Google Secret terlebih dahulu
+        secret_key = None
+        try:
+            from google.colab import userdata
+            secret_key = userdata.get('ROBOFLOW_API_KEY')
+            
+            if secret_key:
+                return widgets.HTML(value=create_status_message(
+                    "API Key tersedia dari Google Secret." if secret_key else "API Key diperlukan untuk download.", 
+                    'success' if secret_key else 'warning'
+                ))
+        except ImportError:
+            # Bukan di Colab
+            pass
+        
+        # Cek API key dari komponen jika tidak ada secret
+        if not secret_key and 'roboflow_settings' in ui_components and hasattr(ui_components['roboflow_settings'], 'children'):
             api_settings = ui_components['roboflow_settings'].children
             
             # Pastikan ada minimal 1 elemen sebelum mengakses
@@ -62,18 +114,10 @@ def get_api_key_info(ui_components):
             
             if api_key:
                 return widgets.HTML(value=create_status_message("API Key Roboflow tersedia.", 'success'))
+            else:
+                return widgets.HTML(value=create_status_message("API Key diperlukan untuk download.", 'warning'))
         
-        # Coba dapatkan dari Google Secret
-        try:
-            from google.colab import userdata
-            secret_key = userdata.get('ROBOFLOW_API_KEY')
-            
-            return widgets.HTML(value=create_status_message(
-                "API Key tersedia dari Google Secret." if secret_key else "API Key diperlukan untuk download.", 
-                'info' if secret_key else 'warning'
-            ))
-        except ImportError:
-            return widgets.HTML(value=create_status_message("Tidak dapat memeriksa API Key.", 'warning'))
+        return widgets.HTML(value=create_status_message("Tidak dapat memeriksa API Key.", 'warning'))
     
     except Exception as e:
         return widgets.HTML(value=create_status_message(f"Error mendapatkan API Key: {str(e)}", 'error'))

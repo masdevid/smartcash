@@ -91,16 +91,16 @@ class DatasetManager:
         
         Args:
             service_name: Nama service
-            
+                
         Returns:
             Instance service
-            
+                
         Raises:
             DatasetError: Jika service_name tidak valid
         """
         if service_name in self._services:
             return self._services[service_name]
-            
+                
         # Inisialisasi service sesuai permintaan
         try:
             if service_name == 'loader':
@@ -117,27 +117,33 @@ class DatasetManager:
                 )
             elif service_name == 'augmentor':
                 service = AugmentationService(
-                    dataset_dir=self.config['dataset_dir'],
+                    config=self.config,
+                    data_dir=self.config['dataset_dir'],
                     logger=self.logger
                 )
             elif service_name == 'explorer':
                 service = ExplorerService(
-                    dataset_dir=self.config['dataset_dir'],
+                    config=self.config,
+                    data_dir=self.config['dataset_dir'],
                     logger=self.logger
                 )
             elif service_name == 'balancer':
                 service = BalanceService(
-                    dataset_dir=self.config['dataset_dir'],
+                    config=self.config,
+                    data_dir=self.config['dataset_dir'],
                     logger=self.logger
                 )
             elif service_name == 'reporter':
                 service = ReportService(
-                    dataset_dir=self.config['dataset_dir'],
+                    config=self.config,
+                    data_dir=self.config['dataset_dir'],
                     logger=self.logger
                 )
             elif service_name == 'downloader':
+                # Perbaikan disini, mengubah output_dir menjadi data_dir sesuai dengan definisi DownloadService
                 service = DownloadService(
-                    output_dir=self.config['dataset_dir'],
+                    config=self.config,
+                    data_dir=self.config['dataset_dir'],
                     logger=self.logger
                 )
             else:
@@ -146,7 +152,7 @@ class DatasetManager:
             raise DatasetError(f"💥 Gagal mengimpor module untuk service '{service_name}': {str(e)}")
         except Exception as e:
             raise DatasetError(f"💥 Gagal menginisialisasi service '{service_name}': {str(e)}")
-            
+                
         # Simpan instance untuk penggunaan berikutnya
         self._services[service_name] = service
         return service

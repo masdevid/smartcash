@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/services/downloader/file_processor.py
-Deskripsi: Komponen untuk memproses file dataset seperti ekstraksi, konversi dan strukturisasi
+Deskripsi: Perbaikan komponen untuk memproses file dataset dengan penanganan direktori target yang lebih baik
 """
 
 import os
 import shutil
 import zipfile
 from pathlib import Path
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Optional
 from concurrent.futures import ThreadPoolExecutor
 from tqdm.auto import tqdm
 
@@ -99,7 +99,8 @@ class FileProcessor:
         source_dir: Union[str, Path],
         target_dir: Union[str, Path],
         show_progress: bool = True,
-        num_workers: int = None
+        num_workers: int = None,
+        clear_target: bool = True
     ) -> Dict[str, int]:
         """
         Export dataset dari struktur Roboflow ke struktur lokal standar.
@@ -109,6 +110,7 @@ class FileProcessor:
             target_dir: Direktori target
             show_progress: Tampilkan progress bar
             num_workers: Jumlah worker untuk proses paralel
+            clear_target: Hapus file yang sudah ada di direktori target
             
         Returns:
             Dictionary berisi statistik export
@@ -122,6 +124,10 @@ class FileProcessor:
         # Gunakan num_workers instance jika tidak ada parameter
         if num_workers is None:
             num_workers = self.num_workers
+        
+        # Bersihkan direktori target jika diminta
+        if clear_target:
+            self._clean_target_directory(target_path)
             
         # Inisialisasi statistik
         stats = {'copied': 0, 'errors': 0}
@@ -187,3 +193,161 @@ class FileProcessor:
             self.logger.success(f"✅ Export selesai: {stats['copied']} file berhasil disalin")
         
         return stats
+    
+    def _clean_target_directory(self, target_path: Path) -> None:
+        """
+        Bersihkan direktori target sebelum export.
+        
+        Args:
+            target_path: Path direktori target
+        """
+        # Hanya hapus direktori split yang tepat untuk keamanan
+        for split in DEFAULT_SPLITS:
+            split_path = target_path / split
+            if split_path.exists():
+                # Hapus gambar
+                img_dir = split_path / 'images'
+                if img_dir.exists():
+                    if self.logger:
+                        self.logger.info(f"🧹 Membersihkan direktori gambar: {img_dir}")
+                    
+                    # Hapus file-file gambar
+                    for img_file in img_dir.glob('*.*'):
+                        try:
+                            img_file.unlink()
+                        except Exception as e:
+                            if self.logger:
+                                self.logger.debug(f"⚠️ Gagal menghapus file {img_file}: {str(e)}")
+                
+                # Hapus label
+                label_dir = split_path / 'labels'
+                if label_dir.exists():
+                    if self.logger:
+                        self.logger.info(f"🧹 Membersihkan direktori label: {label_dir}")
+                    
+                    # Hapus file-file label
+                    for label_file in label_dir.glob('*.*'):
+                        try:
+                            label_file.unlink()
+                        except Exception as e:
+                            if self.logger:
+                                self.logger.debug(f"⚠️ Gagal menghapus file {label_file}: {str(e)}")
+                
+                # Buat direktori jika belum ada
+                img_dir.mkdir(parents=True, exist_ok=True)
+                label_dir.mkdir(parents=True, exist_ok=True)
+                
+                if self.logger:
+                    self.logger.debug(f"✅ Direktori {split_path} dibersihkan")
+    
+    def fix_dataset_structure(self, dataset_dir: Union[str, Path]) -> bool:
+        """
+        Memperbaiki struktur dataset agar sesuai dengan format YOLOv5 yang standar.
+        
+        Args:
+            dataset_dir: Direktori dataset
+            
+        Returns:
+            Boolean menunjukkan keberhasilan perbaikan
+        """
+        dataset_path = Path(dataset_dir)
+        
+        # Cek dan perbaiki struktur dataset
+        is_fixed = False
+        
+        # Struktur yang diharapkan: train/images, train/labels, valid/images, valid/labels, test/images, test/labels
+        
+        # Cek struktur yang sudah benar
+        standard_structure = True
+        for split in DEFAULT_SPLITS:
+            if not (dataset_path / split / 'images').exists() or not (dataset_path / split / 'labels').exists():
+                standard_structure = False
+                break
+                
+        if standard_structure:
+            if self.logger:
+                self.logger.info("✅ Struktur dataset sudah sesuai standar YOLO")
+            return True
+            
+        # Cek struktur alternatif 1: train/, valid/, test/ tanpa subdirektori images/labels
+        alt_structure_1 = True
+        for split in DEFAULT_SPLITS:
+            if not (dataset_path / split).exists():
+                alt_structure_1 = False
+                break
+                
+        if alt_structure_1:
+            if self.logger:
+                self.logger.info("🔄 Menata ulang struktur dataset ke format standar YOLO")
+                
+            for split in DEFAULT_SPLITS:
+                split_dir = dataset_path / split
+                img_dir = split_dir / 'images'
+                label_dir = split_dir / 'labels'
+                
+                # Buat direktori
+                img_dir.mkdir(exist_ok=True)
+                label_dir.mkdir(exist_ok=True)
+                
+                # Pindahkan file
+                for file in split_dir.glob('*.jpg'):
+                    shutil.move(file, img_dir / file.name)
+                    
+                for file in split_dir.glob('*.txt'):
+                    # Skip file teks yang bukan label
+                    if file.stem.lower() in ['readme', 'classes', 'data']:
+                        continue
+                    shutil.move(file, label_dir / file.name)
+                    
+            is_fixed = True
+            
+        # Cek struktur alternatif 2: images/ dan labels/ di root
+        elif (dataset_path / 'images').exists() and (dataset_path / 'labels').exists():
+            if self.logger:
+                self.logger.info("🔄 Memigrasikan struktur flat ke struktur split")
+                
+            # Buat direktori split
+            for split in DEFAULT_SPLITS:
+                os.makedirs(dataset_path / split / 'images', exist_ok=True)
+                os.makedirs(dataset_path / split / 'labels', exist_ok=True)
+                
+            # Untuk kasus ini, tempatkan semua file di 'train'
+            for file in (dataset_path / 'images').glob('*.jpg'):
+                shutil.copy2(file, dataset_path / 'train' / 'images' / file.name)
+                
+            for file in (dataset_path / 'labels').glob('*.txt'):
+                # Skip file teks yang bukan label
+                if file.stem.lower() in ['readme', 'classes', 'data']:
+                    continue
+                shutil.copy2(file, dataset_path / 'train' / 'labels' / file.name)
+                
+            is_fixed = True
+            
+        else:
+            if self.logger:
+                self.logger.warning("⚠️ Tidak dapat mengenali struktur dataset")
+            return False
+            
+        if is_fixed and self.logger:
+            self.logger.success("✅ Struktur dataset berhasil diperbaiki")
+            
+        return is_fixed
+    
+    def copy_dataset_to_data_dir(
+        self, 
+        source_dir: Union[str, Path], 
+        data_dir: Union[str, Path],
+        clear_target: bool = True
+    ) -> Dict[str, int]:
+        """
+        Salin dataset dari direktori sumber ke direktori data.
+        
+        Args:
+            source_dir: Direktori sumber
+            data_dir: Direktori data
+            clear_target: Hapus file yang sudah ada di direktori target
+            
+        Returns:
+            Dictionary berisi statistik penyalinan
+        """
+        return self.export_to_local(source_dir, data_dir, True, self.num_workers, clear_target)

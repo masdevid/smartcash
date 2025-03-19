@@ -1,13 +1,7 @@
 """
-File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow menggunakan DatasetManager
+File: smartcash/ui/dataset/roboflow_download_handler.py (perbaikan)
+Deskripsi: Memperbaiki pemanggilan download_from_roboflow pada dataset_manager
 """
-
-from typing import Dict, Any, Optional
-from IPython.display import display, HTML, clear_output
-
-from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.common.exceptions import DatasetError
 
 def download_from_roboflow(
     ui_components: Dict[str, Any],
@@ -90,8 +84,11 @@ def download_from_roboflow(
         # Tentukan output_dir
         output_dir = ui_components.get('data_dir')
         
-        # Download menggunakan dataset_manager
-        result = dataset_manager.download_from_roboflow(
+        # Dapatkan downloader service
+        downloader = dataset_manager.get_service('downloader')
+        
+        # Download dataset
+        result = downloader.download_dataset(
             api_key=api_key,
             workspace=workspace,
             project=project,
@@ -135,7 +132,7 @@ def download_from_roboflow(
             except ImportError:
                 pass
         
-        return result
+        return {"status": "success", "result": result}
         
     except DatasetError as e:
         # Dataset manager sudah menangani banyak exceptions dengan DatasetError

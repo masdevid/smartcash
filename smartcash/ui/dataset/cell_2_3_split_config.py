@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/cell_2_3_split_config.py
-Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan struktur modular yang lebih baik
+Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan struktur modular
 """
 
 # Import dasar
@@ -18,7 +18,7 @@ try:
     # Setup komponen UI
     ui_components = setup_ui_component(env, config, "split_config")
     
-    # Setup split handler yang menggunakan komponen modular
+    # Setup split handler
     from smartcash.ui.dataset.split_config_handler import setup_split_config_handlers
     ui_components = setup_split_config_handlers(ui_components, env, config)
     

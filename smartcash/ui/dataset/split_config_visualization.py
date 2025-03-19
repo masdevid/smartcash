@@ -1,32 +1,55 @@
 """
 File: smartcash/ui/dataset/split_config_visualization.py
-Deskripsi: Visualisasi dataset untuk komponen konfigurasi split
+Deskripsi: Visualisasi dataset untuk komponen konfigurasi split dengan dukungan Google Drive
 """
 
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-from typing import Dict, Any, Optional, List
-from IPython.display import display, HTML, clear_output
-from pathlib import Path
 import os
+from pathlib import Path
+from typing import Dict, Any, Optional
+from IPython.display import display, HTML, clear_output
+from smartcash.ui.utils.constants import ICONS
 
-def get_data_dir(config: Dict[str, Any], env=None) -> str:
-    """Mendapatkan direktori data dari konfigurasi/environment."""
-    data_dir = config.get('data', {}).get('dir', 'data')
-    if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
-        data_dir = str(env.drive_path / 'data')
-    return data_dir
+def get_dataset_dir(config: Dict[str, Any], env=None, logger=None) -> str:
+    """Mendapatkan direktori dataset aktif (drive atau lokal)."""
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env_manager = env or get_environment_manager()
+        
+        # Cek apakah menggunakan drive
+        if config.get('data', {}).get('use_drive', False):
+            # Jika sync aktif, gunakan lokal clone
+            local_clone = config.get('data', {}).get('local_clone_path', 'data_local')
+            if local_clone and os.path.exists(local_clone):
+                if logger: logger.info(f"📁 Menggunakan dataset dari clone lokal: {local_clone}")
+                return local_clone
+            
+            # Jika tidak, gunakan drive langsung lewat environment manager
+            if env_manager.is_drive_mounted:
+                drive_path = env_manager.get_path(config.get('data', {}).get('drive_path', 'data'))
+                if os.path.exists(drive_path):
+                    if logger: logger.info(f"📁 Menggunakan dataset dari Google Drive: {drive_path}")
+                    return drive_path
+        
+        # Default: gunakan lokasi data standard dari environment manager
+        data_dir = env_manager.get_path(config.get('data', {}).get('dir', 'data'))
+        if logger: logger.info(f"📁 Menggunakan dataset dari lokal: {data_dir}")
+        return data_dir
+        
+    except ImportError:
+        # Fallback jika environment manager tidak tersedia
+        data_dir = config.get('data', {}).get('dir', 'data')
+        if logger: logger.info(f"📁 Menggunakan dataset dari lokal: {data_dir}")
+        return data_dir
 
 def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """Mendapatkan statistik dataset dari DatasetManager atau direktori langsung."""
     try:
-        data_dir = get_data_dir(config, env)
+        data_dir = get_dataset_dir(config, env, logger)
         
-        # Coba gunakan DatasetManager jika tersedia
+        # Coba gunakan DatasetManager
         try:
             from smartcash.dataset.manager import DatasetManager
-            dataset_manager = DatasetManager(config)
+            dataset_manager = DatasetManager(config, data_dir=data_dir)
             stats = dataset_manager.get_split_statistics()
             if logger: logger.info(f"✅ Statistik dataset berhasil dimuat dari DatasetManager")
             return stats
@@ -35,15 +58,11 @@ def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str
             stats = {}
             for split in ['train', 'valid', 'test']:
                 split_dir = Path(data_dir) / split
-                if not split_dir.exists():
-                    stats[split] = {'images': 0, 'labels': 0, 'status': 'missing'}
-                    continue
-                    
-                images_dir = split_dir / 'images'
-                labels_dir = split_dir / 'labels'
+                images_dir = split_dir / 'images' if split_dir.exists() else None
+                labels_dir = split_dir / 'labels' if split_dir.exists() else None
                 
-                img_count = len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
-                label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
+                img_count = len(list(images_dir.glob('*.*'))) if images_dir and images_dir.exists() else 0
+                label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir and labels_dir.exists() else 0
                 
                 stats[split] = {
                     'images': img_count,
@@ -57,13 +76,15 @@ def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str
         if logger: logger.error(f"❌ Error saat mendapatkan statistik dataset: {str(e)}")
         return {}
 
-def get_class_distribution(config: Dict[str, Any], logger=None) -> Dict[str, Dict[str, int]]:
+def get_class_distribution(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Dict[str, int]]:
     """Mendapatkan distribusi kelas dari dataset."""
     try:
-        # Coba gunakan DatasetManager jika tersedia
+        data_dir = get_dataset_dir(config, env, logger)
+        
+        # Coba gunakan DatasetManager
         try:
             from smartcash.dataset.manager import DatasetManager
-            dataset_manager = DatasetManager(config)
+            dataset_manager = DatasetManager(config, data_dir=data_dir)
             
             # Mendapatkan distribusi kelas dari manager
             class_stats = {}
@@ -71,12 +92,14 @@ def get_class_distribution(config: Dict[str, Any], logger=None) -> Dict[str, Dic
                 try:
                     split_stats = dataset_manager.explore_class_distribution(split)
                     class_stats[split] = split_stats
-                except:
+                except Exception as e:
+                    if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas untuk {split}: {str(e)}")
                     class_stats[split] = {}
             
             if logger: logger.info(f"✅ Distribusi kelas berhasil dimuat dari DatasetManager")
             return class_stats
-        except:
+        except Exception as e:
+            if logger: logger.warning(f"⚠️ DatasetManager tidak tersedia: {str(e)}")
             # Fallback ke data simulasi
             class_stats = {
                 'train': {'Rp1000': 350, 'Rp2000': 320, 'Rp5000': 380, 'Rp10000': 390, 'Rp20000': 360, 'Rp50000': 340, 'Rp100000': 370},
@@ -90,65 +113,9 @@ def get_class_distribution(config: Dict[str, Any], logger=None) -> Dict[str, Dic
         if logger: logger.error(f"❌ Error saat mendapatkan distribusi kelas: {str(e)}")
         return {}
 
-def create_distribution_plot(df: pd.DataFrame, colors: Dict[str, str]) -> None:
-    """Membuat plot distribusi kelas."""
-    try:
-        from smartcash.ui.utils.visualization_utils import create_class_distribution_plot
-        # Plot menggunakan utility
-        fig = create_class_distribution_plot(
-            {cls: df[['Train', 'Valid', 'Test']].loc[i].to_dict() for i, cls in enumerate(df['Class'])},
-            title='Distribusi Kelas per Split',
-            figsize=(10, 6),
-            sort_by='name'
-        )
-        plt.figure(fig)
-        plt.show()
-    except ImportError:
-        # Plot visualization manual
-        plt.figure(figsize=(10, 6))
-        ax = plt.subplot(111)
-        
-        # Set width of bar
-        barWidth = 0.25
-        
-        # Set positions of bars on X axis
-        r1 = np.arange(len(df))
-        r2 = [x + barWidth for x in r1]
-        r3 = [x + barWidth for x in r2]
-        
-        # Create bars
-        ax.bar(r1, df['Train'], width=barWidth, label='Train', color=colors['primary'])
-        ax.bar(r2, df['Valid'], width=barWidth, label='Valid', color=colors['success'])
-        ax.bar(r3, df['Test'], width=barWidth, label='Test', color=colors['warning'])
-        
-        # Add labels and title
-        plt.xlabel('Kelas')
-        plt.ylabel('Jumlah Sampel')
-        plt.title('Distribusi Kelas per Split')
-        plt.xticks([r + barWidth for r in range(len(df))], df['Class'])
-        plt.legend()
-        
-        plt.tight_layout()
-        plt.show()
-
-def create_class_stats_dataframe(class_stats: Dict[str, Dict[str, int]]) -> pd.DataFrame:
-    """Membuat DataFrame untuk visualisasi dari statistik kelas."""
-    all_classes = set()
-    for split_stats in class_stats.values():
-        all_classes.update(split_stats.keys())
-        
-    df_data = []
-    for cls in sorted(all_classes):
-        row = {'Class': cls}
-        for split in ['train', 'valid', 'test']:
-            row[split.capitalize()] = class_stats[split].get(cls, 0)
-        df_data.append(row)
-        
-    return pd.DataFrame(df_data)
-
-def show_class_distribution_visualization(output_box, class_stats: Dict[str, Dict[str, int]], colors: Dict[str, str]) -> None:
-    """Tampilkan visualisasi distribusi kelas di output box."""
-    from smartcash.ui.utils.constants import ICONS
+def show_class_distribution_visualization(output_box, class_stats: Dict[str, Dict[str, int]], colors: Dict[str, str], logger=None) -> None:
+    """Tampilkan visualisasi distribusi kelas menggunakan visualization_utils."""
+    from smartcash.ui.utils.constants import ICONS, COLORS
     
     with output_box:
         clear_output(wait=True)
@@ -159,25 +126,122 @@ def show_class_distribution_visualization(output_box, class_stats: Dict[str, Dic
             display(HTML(f"""<div style="padding:10px; background-color:{colors['alert_warning_bg']}; 
                           border-left:4px solid {colors['alert_warning_text']}; 
                           color:{colors['alert_warning_text']}; border-radius:4px;">
-                    <p>{ICONS['warning']} Dataset tidak ditemukan di <code>{data_dir}</code>. Pastikan dataset sudah didownload.</p>
+                    <p>{ICONS['warning']} Dataset tidak ditemukan atau tidak lengkap. Pastikan dataset sudah didownload.</p>
                 </div>"""))
             return
         
-        # Buat DataFrame untuk visualisasi
-        df = create_class_stats_dataframe(class_stats)
-        
-        # Buat dan tampilkan visualisasi
-        create_distribution_plot(df, colors)
-        
-        # Tampilkan tabel distribusi
-        display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas per Split</h3>"))
-        display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
-        
-        # Tampilkan info simpan konfigurasi
-        display(HTML(f"""<div style="margin-top:20px; padding:10px; background-color:{colors['alert_info_bg']}; 
-                   color:{colors['alert_info_text']}; border-radius:4px;">
-            <p>{ICONS['save']} Klik tombol <strong>Simpan Konfigurasi</strong> untuk menyimpan pengaturan ke configs/dataset_config.yaml</p>
-        </div>"""))
+        try:
+            # Buat DataFrame untuk visualisasi
+            import pandas as pd
+            
+            # Kumpulkan semua kelas
+            all_classes = set()
+            for split_stats in class_stats.values():
+                all_classes.update(split_stats.keys())
+                
+            # Buat DataFrame
+            df_data = []
+            for cls in sorted(all_classes):
+                row = {'Class': cls}
+                for split in ['train', 'valid', 'test']:
+                    row[split.capitalize()] = class_stats[split].get(cls, 0)
+                df_data.append(row)
+                
+            df = pd.DataFrame(df_data)
+            
+            # Gunakan visualization_utils
+            try:
+                from smartcash.ui.utils.visualization_utils import create_class_distribution_plot, create_metrics_dashboard
+                
+                # Konversi data ke format yang sesuai
+                plot_data = {}
+                for i, row in df.iterrows():
+                    plot_data[row['Class']] = {
+                        'Train': row['Train'],
+                        'Valid': row['Valid'],
+                        'Test': row['Test']
+                    }
+                
+                # Buat visualisasi
+                display(HTML(f"<h3>{ICONS['chart']} Distribusi Kelas per Split</h3>"))
+                fig = create_class_distribution_plot(
+                    plot_data,
+                    title='Distribusi Kelas per Split',
+                    figsize=(10, 6),
+                    sort_by='name'
+                )
+                display(fig)
+                
+                # Buat dashboard metrik
+                metrics = {
+                    f"Total Train": sum(df['Train']),
+                    f"Total Valid": sum(df['Valid']),
+                    f"Total Test": sum(df['Test']),
+                    f"Jumlah Kelas": len(df),
+                    f"Rasio Valid/Train": sum(df['Valid'])/sum(df['Train']) if sum(df['Train']) > 0 else 0,
+                    f"Rasio Test/Train": sum(df['Test'])/sum(df['Train']) if sum(df['Train']) > 0 else 0
+                }
+                
+                display(HTML(f"<h3>{ICONS['stats']} Metrik Dataset</h3>"))
+                display(create_metrics_dashboard(
+                    metrics,
+                    "Statistik Dataset",
+                    "Metrik utama dataset yang digunakan"
+                ))
+                
+                # Tampilkan tabel distribusi
+                display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas per Split</h3>"))
+                display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
+                
+            except ImportError as e:
+                if logger: logger.warning(f"⚠️ Tidak dapat menggunakan visualization_utils: {str(e)}")
+                import matplotlib.pyplot as plt
+                import numpy as np
+                
+                # Fallback ke matplotlib dasar
+                plt.figure(figsize=(10, 6))
+                ax = plt.subplot(111)
+                
+                # Set width of bar
+                barWidth = 0.25
+                
+                # Set positions of bars on X axis
+                r1 = np.arange(len(df))
+                r2 = [x + barWidth for x in r1]
+                r3 = [x + barWidth for x in r2]
+                
+                # Create bars
+                ax.bar(r1, df['Train'], width=barWidth, label='Train', color=colors['primary'])
+                ax.bar(r2, df['Valid'], width=barWidth, label='Valid', color=colors['success'])
+                ax.bar(r3, df['Test'], width=barWidth, label='Test', color=colors['warning'])
+                
+                # Add labels and title
+                plt.xlabel('Kelas')
+                plt.ylabel('Jumlah Sampel')
+                plt.title('Distribusi Kelas per Split')
+                plt.xticks([r + barWidth for r in range(len(df))], df['Class'])
+                plt.legend()
+                
+                plt.tight_layout()
+                plt.show()
+                
+                # Tampilkan tabel distribusi
+                display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas per Split</h3>"))
+                display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
+                
+            # Tampilkan info simpan konfigurasi
+            display(HTML(f"""<div style="margin-top:20px; padding:10px; background-color:{colors['alert_info_bg']}; 
+                       color:{colors['alert_info_text']}; border-radius:4px;">
+                <p>{ICONS['save']} Klik tombol <strong>Simpan Konfigurasi</strong> untuk menyimpan pengaturan</p>
+            </div>"""))
+            
+        except Exception as e:
+            if logger: logger.error(f"❌ Error saat membuat visualisasi: {str(e)}")
+            display(HTML(f"""<div style="padding:10px; background-color:{colors['alert_danger_bg']}; 
+                          border-left:4px solid {colors['alert_danger_text']}; 
+                          color:{colors['alert_danger_text']}; border-radius:4px;">
+                    <p>{ICONS['error']} Error membuat visualisasi: {str(e)}</p>
+                </div>"""))
 
 def update_stats_cards(html_component, stats: Dict[str, Dict[str, Any]], colors: Dict[str, str]) -> None:
     """Update komponen HTML dengan statistik distribusi dataset dalam bentuk cards."""

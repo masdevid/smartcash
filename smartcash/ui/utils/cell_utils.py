@@ -350,8 +350,8 @@ def cleanup_resources(ui_components: Dict[str, Any]) -> None:
     
     # Cleanup observer jika ada
     try:
-        from smartcash.components.observer import ObserverManager
-        observer_manager = ObserverManager.get_instance()
+        from smartcash.components.observer.manager_observer import ObserverManager
+        observer_manager = ObserverManager()
         if observer_manager:
             group_name = ui_components.get('observer_group', 'cell_observers')
             observer_manager.unregister_group(group_name)

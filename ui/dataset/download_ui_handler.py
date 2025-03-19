@@ -10,8 +10,7 @@ import threading
 import time
 
 from smartcash.common.logger import get_logger
-from smartcash.components.observer.event_topics_observer import EventTopics
-from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer import notify, EventTopics
 from smartcash.ui.utils.ui_helpers import (
     create_status_indicator, 
     create_info_alert, 
@@ -39,7 +38,16 @@ class DownloadProgressHandler:
         """
         self.ui_components = ui_components
         self.logger = logger or get_logger("download_progress_handler")
-        self.observer_manager = ObserverManager()
+        
+        # Setup observer_manager dan event_dispatcher
+        try:
+            from smartcash.components.observer.manager_observer import ObserverManager
+            from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
+            self.observer_manager = ObserverManager()
+            self.event_dispatcher = EventDispatcher
+        except (ImportError, AttributeError):
+            self.observer_manager = None
+            self.event_dispatcher = None
         
         # Status handler
         self.is_downloading = False
@@ -54,12 +62,14 @@ class DownloadProgressHandler:
         # Register observer untuk tracking download
         self._register_download_observers()
         
-        self.logger.info("🖥️ DownloadProgressHandler diinisialisasi")
+        if self.logger:
+            self.logger.info(f"🖥️ DownloadProgressHandler diinisialisasi")
     
     def _register_download_observers(self):
         """Register observers untuk berbagai events download/import."""
         if not self.observer_manager:
-            self.logger.warning("⚠️ Observer manager tidak tersedia, progress tracking tidak akan berfungsi")
+            if self.logger:
+                self.logger.warning("⚠️ Observer manager tidak tersedia, progress tracking tidak akan berfungsi")
             return
         
         # Register observer untuk download
@@ -99,8 +109,9 @@ class DownloadProgressHandler:
             EventTopics.PULL_DATASET_ERROR
         ]
         
-        # Register untuk semua events
+        # Register untuk semua events dengan ObserverManager, bukan EventDispatcher
         for event in events:
+            # Gunakan create_simple_observer dari ObserverManager
             self.observer_manager.create_simple_observer(
                 event_type=event,
                 callback=self._handle_download_event,
@@ -108,7 +119,8 @@ class DownloadProgressHandler:
                 group="download_ui_observer"
             )
             
-        self.logger.info(f"✅ Observer untuk {len(events)} events berhasil didaftarkan")
+        if self.logger:
+            self.logger.info(f"✅ Observer untuk {len(events)} events berhasil didaftarkan")
     
     def _handle_download_event(
         self, 

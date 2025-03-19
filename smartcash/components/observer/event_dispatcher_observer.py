@@ -66,7 +66,7 @@ class EventDispatcher:
             priority: Prioritas opsional (jika None, gunakan prioritas observer)
         """
         # Validasi observer secara eksplisit
-        from smartcash.common.observer.base_observer import BaseObserver
+        from smartcash.components.observer.base_observer import BaseObserver
         if not isinstance(observer, BaseObserver):
             raise TypeError(f"Observer harus merupakan instance dari BaseObserver, bukan {type(observer)}")
         

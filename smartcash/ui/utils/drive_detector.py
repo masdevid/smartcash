@@ -1,22 +1,65 @@
 """
 File: smartcash/ui/utils/drive_detector.py
-Deskripsi: Utilitas deteksi dan pengelolaan koneksi Google Drive untuk dataset SmartCash
+Deskripsi: Utilitas deteksi dan pengelolaan koneksi Google Drive untuk dataset SmartCash dengan exception handling
 """
 
 import os
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
-import threading
+import time
+
+def detect_drive_mount() -> Tuple[bool, Optional[str]]:
+    """
+    Deteksi apakah Google Drive terpasang di sistem.
+    
+    Returns:
+        Tuple (drive_mounted, drive_path)
+    """
+    # Cek path standar di Colab
+    drive_paths = [
+        '/content/drive/MyDrive',
+        '/content/drive',
+        '/gdrive',
+        '/mnt/drive'
+    ]
+    
+    for path in drive_paths:
+        if os.path.exists(path) and os.path.isdir(path):
+            return True, path
+    
+    # Coba cek melalui environment manager
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        if hasattr(env_manager, 'is_drive_mounted') and env_manager.is_drive_mounted:
+            return True, str(env_manager.drive_path) if hasattr(env_manager, 'drive_path') else None
+    except ImportError:
+        pass
+    except Exception:
+        pass
+    
+    return False, None
 
 def sync_drive_to_local(
     config: Dict[str, Any], 
     env=None, 
     logger=None, 
-    callback: Optional[callable] = None
+    callback: Optional[Callable[[str, str], None]] = None
 ) -> bool:
-    """Sinkronkan data dari Google Drive ke lokal."""
+    """
+    Sinkronkan data dari Google Drive ke lokal.
+    
+    Args:
+        config: Konfigurasi aplikasi
+        env: Environment manager
+        logger: Logger untuk logging
+        callback: Callback function untuk update status
+        
+    Returns:
+        Boolean menunjukkan keberhasilan sinkronisasi
+    """
     # Gunakan environment manager untuk akses drive
     try:
         from smartcash.common.environment import get_environment_manager
@@ -30,8 +73,8 @@ def sync_drive_to_local(
         if logger: logger.info(f"🔄 Memulai sinkronisasi drive...")
         if callback: callback("info", "Memulai sinkronisasi dari Google Drive ke lokal")
         
-        # Dapatkan path drive dan lokal dari environment manager
-        if not env_manager.is_drive_mounted:
+        # Dapatkan path drive dan lokal
+        if not hasattr(env_manager, 'is_drive_mounted') or not env_manager.is_drive_mounted:
             if logger: logger.error(f"❌ Google Drive tidak ter-mount")
             if callback: callback("error", "Google Drive tidak ter-mount")
             return False
@@ -100,13 +143,24 @@ def sync_drive_to_local(
             if callback: callback("error", f"Error saat sinkronisasi: {str(e)}")
             return False
             
-    except ImportError:
-        if logger: logger.error(f"❌ Tidak dapat mengakses environment manager")
-        if callback: callback("error", "Tidak dapat mengakses environment manager")
+    except ImportError as e:
+        if logger: logger.error(f"❌ Tidak dapat mengakses environment manager: {str(e)}")
+        if callback: callback("error", f"Tidak dapat mengakses environment manager: {str(e)}")
+        return False
+    except Exception as e:
+        if logger: logger.error(f"❌ Error tidak terduga saat sinkronisasi: {str(e)}")
+        if callback: callback("error", f"Error tidak terduga saat sinkronisasi: {str(e)}")
         return False
 
 def _copy_directory(src_dir: Path, dst_dir: Path, logger=None) -> None:
-    """Helper untuk menyalin direktori dengan ThreadPoolExecutor."""
+    """
+    Helper untuk menyalin direktori dengan ThreadPoolExecutor.
+    
+    Args:
+        src_dir: Direktori sumber
+        dst_dir: Direktori tujuan
+        logger: Logger untuk logging
+    """
     try:
         # Hapus target jika sudah ada
         if dst_dir.exists():
@@ -121,9 +175,20 @@ def async_sync_drive(
     config: Dict[str, Any], 
     env=None, 
     logger=None, 
-    callback: Optional[callable] = None
+    callback: Optional[Callable[[str, str], None]] = None
 ):
-    """Jalankan sinkronisasi drive secara asynchronous dengan ThreadPoolExecutor."""
+    """
+    Jalankan sinkronisasi drive secara asynchronous dengan ThreadPoolExecutor.
+    
+    Args:
+        config: Konfigurasi aplikasi
+        env: Environment manager
+        logger: Logger untuk logging
+        callback: Callback function untuk update status
+        
+    Returns:
+        Future yang dapat digunakan untuk memeriksa status
+    """
     executor = ThreadPoolExecutor(max_workers=1)
     future = executor.submit(
         sync_drive_to_local,

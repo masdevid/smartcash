@@ -109,11 +109,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         bar_style='',
         orientation='horizontal',
         style={'margin-top': '10px'},
-        layout=widgets.Layout(
-            width='80%',
-            margin='10px 0'
-        )
-    )
+        layout=widgets.Layout(width='75%'))
     
     # Label untuk progress
     progress_label = widgets.Label('Siap untuk download dataset')
@@ -183,7 +179,7 @@ data/
         download_settings_container,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
         download_button,
-        widgets.HBox([progress_bar, progress_label], layout=widgets.Layout(width='100%')),
+        widgets.HBox([progress_bar, progress_label], layout=widgets.Layout(width='100%', margin='10px 0')),
         status,
         help_panel
     ])

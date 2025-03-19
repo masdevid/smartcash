@@ -39,12 +39,11 @@ def setup_notebook_environment(
         
     # Import dependencies dengan fallback
     try:
-        from smartcash.common.logger import get_logger
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
         
         # Setup komponen
-        logger = get_logger(f"cell_{cell_name}")
+        logger = setup_ipython_logging(None, f"cell_{cell_name}")
         logger.info(f"🚀 Inisialisasi cell '{cell_name}'")
         
         env_manager = get_environment_manager()
@@ -154,7 +153,7 @@ def setup_ui_component(
     ui_components = create_default_ui_components(component_name)
     
     # Setup logger yang terintegrasi dengan UI dan redirect semua output logging
-    logger = setup_ipython_logging(ui_components, f"cell_{component_name}", redirect_root=True)
+    logger = setup_ipython_logging(ui_components, f"cell_{component_name}")
     if logger:
         ui_components['logger'] = logger
         logger.info(f"🚀 Inisialisasi komponen UI '{component_name}'")

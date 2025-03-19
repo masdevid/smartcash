@@ -13,7 +13,8 @@ from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
-from smartcash.components.observer.event_topics_observer import EventTopics
+from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer import notify, EventTopics
 
 
 class BackupService:
@@ -33,7 +34,6 @@ class BackupService:
         
         # Setup observer manager untuk tracking - PERBAIKAN: Ubah dari get_instance() ke inisialisasi langsung
         try:
-            from smartcash.components.observer.manager_observer import ObserverManager
             self.observer_manager = ObserverManager()
         except (ImportError, AttributeError):
             self.observer_manager = None
@@ -166,8 +166,7 @@ class BackupService:
     
     def _notify(self, event_type, **kwargs):
         """Helper untuk mengirimkan notifikasi observer dengan one-liner."""
-        if self.observer_manager:
-            self.observer_manager.notify(event_type, self, **kwargs)
+        if self.observer_manager: notify(event_type, self, **kwargs)
             
     def list_backups(self, filter_pattern: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """

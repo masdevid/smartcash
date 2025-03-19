@@ -14,7 +14,6 @@ from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 
-
 class RoboflowDownloader:
     """Komponen untuk download dataset dari Roboflow."""
     

@@ -13,7 +13,8 @@ from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS
-
+from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer import notify, EventTopics
 
 class FileProcessor:
     """Processor untuk operasi file dataset dengan dukungan ZIP dan restrukturisasi."""
@@ -34,8 +35,7 @@ class FileProcessor:
         # Coba dapatkan observer_manager jika tidak disediakan
         if self.observer_manager is None:
             try:
-                from smartcash.components.observer.manager_observer import ObserverManager
-                self.observer_manager = ObserverManager()  # Perbaikan: Hapus get_instance()
+                self.observer_manager = ObserverManager() 
             except (ImportError, AttributeError):
                 pass
     
@@ -465,14 +465,9 @@ class FileProcessor:
             event_type: Tipe event
             **kwargs: Parameter tambahan untuk event
         """
-        if not self.observer_manager:
-            return
-            
+        if not self.observer_manager: return
         try:
-            from smartcash.components.observer.event_topics_observer import EventTopics
             event_const = getattr(EventTopics, event_type, None)
-            
-            if event_const:
-                self.observer_manager.notify(event_const, self, **kwargs)
+            if event_const: notify(event_const, self, **kwargs)
         except (ImportError, AttributeError):
             pass

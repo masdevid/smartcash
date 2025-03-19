@@ -11,13 +11,14 @@ from datetime import datetime
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
 from smartcash.dataset.utils.dataset_utils import DatasetUtils, DEFAULT_SPLITS
-from smartcash.components.observer.event_topics_observer import EventTopics
 
 # Import layanan-layanan khusus
 from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
 from smartcash.dataset.services.downloader.download_validator import DownloadValidator
 from smartcash.dataset.services.downloader.file_processor import FileProcessor
 from smartcash.dataset.services.downloader.backup_service import BackupService
+from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer import notify, EventTopics
 
 
 class DownloadService:
@@ -50,8 +51,7 @@ class DownloadService:
         
         # Untuk tracking progress menggunakan observer - PERBAIKAN: Ubah dari get_instance() ke inisialisasi langsung
         try:
-            from smartcash.components.observer.manager_observer import ObserverManager
-            self.observer_manager = ObserverManager()  # Perbaikan disini!
+            self.observer_manager = ObserverManager()
         except ImportError:
             self.observer_manager = None
         
@@ -61,7 +61,7 @@ class DownloadService:
     
     def _notify(self, event_type, **kwargs):
         """Helper untuk mengirimkan notifikasi observer dengan one-liner."""
-        if self.observer_manager: self.observer_manager.notify(event_type, self, **kwargs)
+        if self.observer_manager: notify(event_type, self, **kwargs)
             
     def download_from_roboflow(self, api_key: Optional[str] = None, workspace: Optional[str] = None,
                               project: Optional[str] = None, version: Optional[str] = None,

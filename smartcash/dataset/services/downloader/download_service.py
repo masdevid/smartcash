@@ -17,6 +17,10 @@ from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
 from smartcash.dataset.utils.dataset_utils import DatasetUtils, DEFAULT_SPLITS
 from smartcash.common.exceptions import DatasetError
+# Import komponen yang diperlukan di awal untuk menghindari circular import
+from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
+from smartcash.dataset.services.downloader.download_validator import DownloadValidator
+from smartcash.dataset.services.downloader.file_processor import FileProcessor
 
 
 class DownloadService:
@@ -25,23 +29,23 @@ class DownloadService:
     Mendukung download dari Roboflow, import dari zip, dan validasi dataset.
     """
     
-    def __init__(self, config: Dict, data_dir: str, logger=None, num_workers: int = 4):
+    def __init__(self, output_dir: str = "data", config: Optional[Dict] = None, logger=None, num_workers: int = 4):
         """
         Inisialisasi DownloadService.
         
         Args:
-            config: Konfigurasi aplikasi
-            data_dir: Direktori data
+            output_dir: Direktori data output
+            config: Konfigurasi aplikasi (opsional)
             logger: Logger kustom (opsional)
             num_workers: Jumlah worker untuk proses paralel
         """
-        self.config = config
-        self.data_dir = Path(data_dir)
+        self.config = config or {}
+        self.data_dir = Path(output_dir)
         self.logger = logger or get_logger("download_service")
         self.num_workers = num_workers
         
         # Setup utils
-        self.utils = DatasetUtils(config, data_dir, logger)
+        self.utils = DatasetUtils(self.config, output_dir, logger)
         
         # Setup direktori temp dan downloads
         self.temp_dir = self.data_dir / ".temp"
@@ -58,8 +62,22 @@ class DownloadService:
         self.project = rf_config.get('project', 'rupiah-emisi-2022')
         self.version = rf_config.get('version', '3')
         
-        # Inisialisasi komponen-komponen
-        self._init_components()
+        # Inisialisasi komponen-komponen langsung di constructor
+        self.roboflow_downloader = RoboflowDownloader(
+            logger=self.logger,
+            timeout=30,
+            chunk_size=8192,
+            retry_limit=3
+        )
+        
+        self.validator = DownloadValidator(
+            logger=self.logger
+        )
+        
+        self.processor = FileProcessor(
+            logger=self.logger,
+            num_workers=self.num_workers
+        )
         
         self.logger.info(
             f"📥 DownloadService diinisialisasi dengan {num_workers} workers\n"
@@ -377,3 +395,267 @@ class DownloadService:
                 
             self.logger.error(f"❌ Error memproses file ZIP: {str(e)}")
             raise DatasetError(f"Error memproses file ZIP: {str(e)}")
+    
+    def import_from_zip(
+        self,
+        zip_path: Union[str, Path],
+        target_dir: Optional[Union[str, Path]] = None,
+        remove_zip: bool = False,
+        show_progress: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Import dataset dari file zip.
+        
+        Args:
+            zip_path: Path ke file zip
+            target_dir: Direktori tujuan (opsional)
+            remove_zip: Apakah file zip dihapus setelah ekstraksi
+            show_progress: Tampilkan progress bar
+            
+        Returns:
+            Dictionary berisi hasil import
+        """
+        # Delegasikan ke method process_zip_file yang lebih robust
+        try:
+            self.logger.info(f"📦 Importing dataset dari {zip_path}...")
+            
+            # Verifikasi file zip
+            zip_path = Path(zip_path)
+            if not zip_path.exists():
+                raise DatasetError(f"❌ File zip tidak ditemukan: {zip_path}")
+                
+            if not zipfile.is_zipfile(zip_path):
+                raise DatasetError(f"❌ File bukan format ZIP yang valid: {zip_path}")
+                
+            # Setup target dir
+            target_dir = Path(target_dir) if target_dir else self.data_dir / zip_path.stem
+            
+            # Panggil method process_zip_file
+            result = self.process_zip_file(
+                zip_path=zip_path,
+                output_dir=target_dir,
+                extract_only=False,
+                validate_after=True
+            )
+            
+            # Jika target dir berbeda dengan data_dir, copy ke data_dir
+            if target_dir != self.data_dir:
+                self.logger.info(f"🔄 Menyalin dataset ke {self.data_dir}...")
+                copy_result = self.processor.copy_dataset_to_data_dir(target_dir, self.data_dir)
+                
+                self.logger.info(
+                    f"   • Files disalin: {copy_result['copied']}\n"
+                    f"   • Errors: {copy_result['errors']}"
+                )
+                
+                # Tambahkan hasil copy ke result
+                result['copied_to_data_dir'] = copy_result
+            
+            # Hapus file zip jika diminta
+            if remove_zip and zip_path.exists():
+                zip_path.unlink()
+                self.logger.info(f"🗑️ File ZIP dihapus: {zip_path}")
+                result['zip_removed'] = True
+            
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error import dataset: {str(e)}")
+            raise DatasetError(f"Error import dataset: {str(e)}")
+    
+    def pull_dataset(
+        self, 
+        format: str = "yolov5pytorch", 
+        api_key: Optional[str] = None,
+        workspace: Optional[str] = None,
+        project: Optional[str] = None,
+        version: Optional[str] = None,
+        show_progress: bool = True,
+        force_download: bool = False
+    ) -> Dict[str, Any]:
+        """
+        One-step untuk download dan setup dataset siap pakai.
+        
+        Args:
+            format: Format dataset ('yolov5pytorch', 'coco', etc)
+            api_key: Roboflow API key (opsional)
+            workspace: Roboflow workspace (opsional)
+            project: Roboflow project (opsional)
+            version: Roboflow version (opsional)
+            show_progress: Tampilkan progress bar
+            force_download: Paksa download ulang meskipun dataset sudah ada
+            
+        Returns:
+            Dictionary berisi paths dan info dataset
+        """
+        start_time = time.time()
+        
+        # Cek apakah dataset sudah tersedia
+        if not force_download and self.validator.is_dataset_available(self.data_dir, verify_content=True):
+            self.logger.info("✅ Dataset sudah tersedia di lokal")
+            
+            # Return info
+            stats = self.validator.get_local_stats(self.data_dir)
+            return {
+                'status': 'local',
+                'paths': {split: str(self.data_dir / split) for split in DEFAULT_SPLITS},
+                'data_dir': str(self.data_dir),
+                'stats': stats,
+                'duration': 0
+            }
+        
+        # Dataset belum tersedia atau force download, download dari Roboflow
+        if force_download:
+            self.logger.info("🔄 Memulai download ulang dataset dari Roboflow...")
+        else:
+            self.logger.info("🔄 Dataset belum tersedia atau tidak lengkap, mendownload dari Roboflow...")
+        
+        try:
+            # Download dataset
+            download_result = self.download_from_roboflow(
+                api_key=api_key,
+                workspace=workspace,
+                project=project,
+                version=version,
+                format=format,
+                show_progress=show_progress
+            )
+            
+            download_dir = download_result.get('output_dir')
+            
+            # Export ke struktur lokal
+            export_result = self.export_to_local(download_dir, self.data_dir, show_progress)
+            
+            elapsed_time = time.time() - start_time
+            
+            # Return info
+            return {
+                'status': 'downloaded',
+                'paths': export_result['paths'],
+                'data_dir': str(self.data_dir),
+                'download_dir': download_dir,
+                'export_result': export_result,
+                'download_result': download_result,
+                'stats': self.validator.get_local_stats(self.data_dir),
+                'duration': elapsed_time
+            }
+            
+        except Exception as e:
+            self.logger.error(f"❌ Error saat pull dataset: {str(e)}")
+            # Cek apakah dataset masih tersedia meskipun error
+            if self.validator.is_dataset_available(self.data_dir, verify_content=False):
+                self.logger.warning("⚠️ Download gagal tetapi dataset masih tersedia di lokal (mungkin tidak lengkap)")
+                stats = self.validator.get_local_stats(self.data_dir)
+                return {
+                    'status': 'partial',
+                    'paths': {split: str(self.data_dir / split) for split in DEFAULT_SPLITS},
+                    'data_dir': str(self.data_dir),
+                    'stats': stats,
+                    'error': str(e)
+                }
+            
+            raise DatasetError(f"Error pull dataset: {str(e)}")
+    
+    def get_dataset_info(self) -> Dict[str, Any]:
+        """
+        Dapatkan informasi dataset dari konfigurasi dan status lokal.
+        
+        Returns:
+            Dictionary berisi info dataset
+        """
+        is_available = self.validator.is_dataset_available(self.data_dir)
+        local_stats = self.validator.get_local_stats(self.data_dir) if is_available else {}
+        
+        info = {
+            'name': self.project,
+            'workspace': self.workspace,
+            'version': self.version,
+            'is_available_locally': is_available,
+            'local_stats': local_stats,
+            'data_dir': str(self.data_dir)
+        }
+        
+        # Log informasi
+        if is_available:
+            # Tambahkan statistik ukuran dataset
+            total_images = sum(local_stats.get(split, 0) for split in DEFAULT_SPLITS)
+            
+            self.logger.info(
+                f"🔍 Dataset (Lokal): {info['name']} v{info['version']} | "
+                f"Total: {total_images} gambar | "
+                f"Train: {local_stats.get('train', 0)}, "
+                f"Valid: {local_stats.get('valid', 0)}, "
+                f"Test: {local_stats.get('test', 0)}"
+            )
+        else:
+            self.logger.info(
+                f"🔍 Dataset (akan didownload): {info['name']} "
+                f"v{info['version']} dari {info['workspace']}"
+            )
+        
+        # Tambahkan detail API key tersedia atau tidak
+        has_api_key = bool(self.api_key)
+        info['has_api_key'] = has_api_key
+        
+        if not has_api_key:
+            self.logger.warning(f"⚠️ API key untuk Roboflow tidak tersedia")
+        
+        return info
+    
+    def check_dataset_structure(self) -> Dict[str, Any]:
+        """
+        Periksa struktur dataset dan tampilkan laporan.
+        
+        Returns:
+            Dictionary berisi status struktur dataset
+        """
+        result = {
+            'data_dir': str(self.data_dir),
+            'is_valid': False,
+            'splits': {}
+        }
+        
+        self.logger.info(f"🔍 Memeriksa struktur dataset di {self.data_dir}...")
+        
+        # Periksa struktur folder
+        for split in DEFAULT_SPLITS:
+            split_dir = self.data_dir / split
+            images_dir = split_dir / 'images'
+            labels_dir = split_dir / 'labels'
+            
+            split_info = {
+                'exists': split_dir.exists(),
+                'has_images_dir': images_dir.exists(),
+                'has_labels_dir': labels_dir.exists(),
+                'image_count': 0,
+                'label_count': 0,
+                'valid': False
+            }
+            
+            if split_info['has_images_dir'] and split_info['has_labels_dir']:
+                # Hitung file
+                image_files = list(images_dir.glob('*.*'))
+                label_files = list(labels_dir.glob('*.txt'))
+                
+                split_info['image_count'] = len(image_files)
+                split_info['label_count'] = len(label_files)
+                split_info['valid'] = len(image_files) > 0 and len(label_files) > 0
+                
+                self.logger.info(
+                    f"   • {split}: {'✅' if split_info['valid'] else '❌'} "
+                    f"({split_info['image_count']} gambar, {split_info['label_count']} label)"
+                )
+            else:
+                self.logger.warning(f"   • {split}: ❌ Struktur direktori tidak lengkap")
+            
+            result['splits'][split] = split_info
+            
+        # Validasi keseluruhan
+        result['is_valid'] = all(info['valid'] for info in result['splits'].values())
+        
+        if result['is_valid']:
+            self.logger.success(f"✅ Struktur dataset valid di {self.data_dir}")
+        else:
+            self.logger.warning(f"⚠️ Struktur dataset tidak valid atau tidak lengkap di {self.data_dir}")
+        
+        return result

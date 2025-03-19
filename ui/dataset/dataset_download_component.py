@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/dataset_download_component.py
-Deskripsi: Komponen UI untuk download dataset SmartCash dengan pendekatan modular yang konsisten
+Deskripsi: Komponen UI untuk download dataset SmartCash dengan pendekatan modular yang konsisten dan opsi backup
 """
 
 import ipywidgets as widgets
@@ -44,7 +44,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         style={'description_width': 'initial'}
     )
     
-    # Roboflow settings
+    # Roboflow settings with backup checkbox
     roboflow_settings = widgets.VBox([
         widgets.Password(
             value='',
@@ -66,10 +66,15 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             description='Version:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='40%')
+        ),
+        widgets.Checkbox(
+            value=False,
+            description='Backup dataset lama (opsional)',
+            indent=False
         )
     ])
     
-    # Local upload widget
+    # Local upload widget with backup checkbox
     local_upload = widgets.VBox([
         widgets.FileUpload(
             description='Upload ZIP:',
@@ -80,6 +85,11 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             value='data/uploaded',
             description='Target dir:',
             style={'description_width': 'initial'}
+        ),
+        widgets.Checkbox(
+            value=False,
+            description='Backup dataset lama (opsional)',
+            indent=False
         )
     ])
     
@@ -95,11 +105,14 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         value=0,
         min=0,
         max=100,
-        description='0%',
+        description='Overall Progress:',
         bar_style='',
         orientation='horizontal',
-        layout=widgets.Layout(width='100%')  # Set layout width 100%
+        layout=widgets.Layout(width='70%')
     )
+    
+    # Label untuk progress
+    progress_label = widgets.Label('Siap untuk download dataset')
     
     # Status output
     status = widgets.Output(
@@ -136,6 +149,8 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             <li><b>Input Manual:</b> Masukkan API key secara langsung pada field yang tersedia</li>
             <li><b>Config File:</b> Tambahkan ke <code>configs/base_config.yaml</code></li>
         </ol>
+        <h4>Backup Dataset</h4>
+        <p>Jika opsi backup diaktifkan, dataset yang ada akan dibackup ke file ZIP sebelum diubah. File ZIP akan disimpan di direktori <code>data/backups</code>.</p>
         <h4>Struktur Dataset YOLOv5</h4>
         <pre>
 data/
@@ -165,7 +180,7 @@ data/
         download_settings_container,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
         download_button,
-        progress_bar,
+        widgets.HBox([progress_bar, progress_label], layout=widgets.Layout(width='100%')),
         status,
         help_panel
     ])
@@ -181,7 +196,9 @@ data/
         'download_settings_container': download_settings_container,
         'download_button': download_button,
         'progress_bar': progress_bar,
+        'progress_label': progress_label,
         'status': status,
+        'status_output': status,  # Alias untuk kompatibilitas
         'help_panel': help_panel,
         'module_name': 'dataset_download'
     }

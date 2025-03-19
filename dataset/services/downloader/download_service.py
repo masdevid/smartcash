@@ -5,7 +5,7 @@ Deskripsi: Layanan utama untuk mengelola download dataset dengan implementasi on
 
 import os, time, shutil
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Tuple
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
@@ -67,7 +67,7 @@ class DownloadService:
                               project: Optional[str] = None, version: Optional[str] = None,
                               format: str = "yolov5pytorch", output_dir: Optional[str] = None,
                               show_progress: bool = True, verify_integrity: bool = True,
-                              backup_existing: bool = True) -> Dict[str, Any]:
+                              backup_existing: bool = False) -> Dict[str, Any]:
         """Download dataset dari Roboflow."""
         start_time = time.time()
         
@@ -87,10 +87,12 @@ class DownloadService:
         
         try:
             # Backup existing dataset if needed
+            backup_path = None
             if backup_existing and output_path.exists() and any(output_path.iterdir()):
                 self._notify(EventTopics.DOWNLOAD_PROGRESS, step="backup", message="Backup dataset yang ada",
                          progress=1, total_steps=5, current_step=1, status="info")
                 backup_result = self.backup_service.backup_dataset(output_path, show_progress=show_progress)
+                backup_path = backup_result.get('backup_path')
             
             # Prepare temporary directory
             if temp_download_path.exists(): shutil.rmtree(temp_download_path)
@@ -152,8 +154,8 @@ class DownloadService:
                     "format": format, "output_dir": output_dir, "stats": stats, "duration": elapsed_time}
             
             # Add backup info if applicable
-            if backup_existing and 'backup_result' in locals():
-                result['backup_path'] = backup_result.get('backup_dir')
+            if backup_existing and backup_path:
+                result['backup_path'] = backup_path
                 
             return result
             
@@ -165,7 +167,7 @@ class DownloadService:
             raise DatasetError(f"Error download dataset: {str(e)}")
     
     def export_to_local(self, source_dir: Union[str, Path], output_dir: Optional[Union[str, Path]] = None,
-                       show_progress: bool = True, backup_existing: bool = True) -> Dict[str, Any]:
+                       show_progress: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
         """Export dataset dari format Roboflow ke struktur folder lokal standar."""
         start_time = time.time()
         self._notify(EventTopics.EXPORT_START, message="Memulai ekspor dataset ke struktur lokal",
@@ -183,7 +185,7 @@ class DownloadService:
             self._notify(EventTopics.EXPORT_PROGRESS, step="backup", message="Backup data sebelumnya",
                      progress=1, total_steps=3, current_step=1, status="info")
             backup_result = self.backup_service.backup_dataset(dst_path, show_progress=show_progress)
-            backup_path = backup_result['backup_dir']
+            backup_path = backup_result.get('backup_path')
         
         # Export the dataset
         self._notify(EventTopics.EXPORT_PROGRESS, step="export", message=f"Mengekspor dataset ke {dst_path}",
@@ -237,7 +239,7 @@ class DownloadService:
     
     def pull_dataset(self, format: str = "yolov5pytorch", api_key: Optional[str] = None, workspace: Optional[str] = None,
                    project: Optional[str] = None, version: Optional[str] = None, show_progress: bool = True,
-                   force_download: bool = False, backup_existing: bool = True) -> Dict[str, Any]:
+                   force_download: bool = False, backup_existing: bool = False) -> Dict[str, Any]:
         """One-step untuk download dan setup dataset siap pakai."""
         start_time = time.time()
         self._notify(EventTopics.PULL_DATASET_START, message="Memulai persiapan dataset", status="info")
@@ -307,7 +309,7 @@ class DownloadService:
             raise DatasetError(f"Error pull dataset: {str(e)}")
     
     def import_from_zip(self, zip_file: Union[str, Path], target_dir: Optional[Union[str, Path]] = None,
-                      remove_zip: bool = False, show_progress: bool = True, backup_existing: bool = True) -> Dict[str, Any]:
+                      remove_zip: bool = False, show_progress: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
         """Import dataset dari file ZIP."""
         start_time = time.time()
         zip_path, target_path = Path(zip_file), Path(target_dir) if target_dir else self.data_dir
@@ -321,7 +323,7 @@ class DownloadService:
             backup_path = None
             if backup_existing and target_path.exists() and any(target_path.iterdir()):
                 backup_result = self.backup_service.backup_dataset(target_path, show_progress=show_progress)
-                backup_path = backup_result.get('backup_dir')
+                backup_path = backup_result.get('backup_path')
             
             # Process the ZIP file
             result = self.processor.process_zip_file(

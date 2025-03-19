@@ -1,13 +1,13 @@
 """
 File: smartcash/dataset/services/downloader/backup_service.py
-Deskripsi: Layanan backup dataset ringkas dengan fitur kompres ke ZIP
+Deskripsi: Layanan backup dataset ringkas dengan fitur kompres ke ZIP dan opsi untuk menonaktifkan backup
 """
 
 import os
 import time
 import zipfile
 from pathlib import Path
-from typing import Dict, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Tuple
 from datetime import datetime
 from tqdm.auto import tqdm
 

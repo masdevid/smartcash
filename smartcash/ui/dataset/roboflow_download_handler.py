@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow yang disesuaikan untuk menggunakan output_dir
+Deskripsi: Handler untuk download dataset dari Roboflow yang disesuaikan untuk menggunakan output_dir dan opsi backup opsional
 """
 
 from typing import Dict, Any, Optional
@@ -48,6 +48,11 @@ def download_from_roboflow(
         version = settings[3].value
         format = "yolov5pytorch"  # Default format
         
+        # Cek apakah backup diaktifkan (defaultnya False)
+        backup_enabled = False
+        if len(settings) > 4 and hasattr(settings[4], 'value'):
+            backup_enabled = settings[4].value
+        
         # Cek API key dari Google Secret jika tidak diisi
         if not api_key:
             try:
@@ -69,6 +74,7 @@ def download_from_roboflow(
                               border-radius:4px; margin:5px 0;">
                         <p style="margin:5px 0">{ICONS['download']} Memulai download dataset dari Roboflow...</p>
                         <p style="margin:5px 0">Workspace: {workspace}, Project: {project}, Version: {version}</p>
+                        <p style="margin:5px 0">Backup: {'Aktif' if backup_enabled else 'Tidak aktif'}</p>
                     </div>
                 """))
         
@@ -111,13 +117,14 @@ def download_from_roboflow(
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 40
             
-        # Download menggunakan download_service
+        # Download menggunakan download_service dengan parameter backup_existing
         result = download_service.download_from_roboflow(
             api_key=api_key,
             workspace=workspace,
             project=project,
             version=version,
-            format=format
+            format=format,
+            backup_existing=backup_enabled
         )
         
         # Export ke folder data standar
@@ -127,10 +134,11 @@ def download_from_roboflow(
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 80
             
-        # Export ke struktur lokal standar
+        # Export ke struktur lokal standar (dengan backup optional)
         export_result = download_service.export_to_local(
             source_dir=result['output_dir'],
-            output_dir=output_dir
+            output_dir=output_dir,
+            backup_existing=backup_enabled
         )
         
         # Update progress bar

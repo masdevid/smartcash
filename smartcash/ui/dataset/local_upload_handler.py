@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/local_upload_handler.py
-Deskripsi: Handler untuk upload dataset lokal (ZIP/folder) memanfaatkan DownloadService dengan penyesuaian terbaru
+Deskripsi: Handler untuk upload dataset lokal (ZIP/folder) memanfaatkan DownloadService dengan opsi backup opsional
 """
 
 import os
@@ -43,6 +43,11 @@ def process_local_upload(
         raise DatasetError("Tidak ada file yang dipilih")
         
     try:
+        # Cek apakah backup diaktifkan (defaultnya False)
+        backup_enabled = False
+        if len(local_upload.children) > 2 and hasattr(local_upload.children[2], 'value'):
+            backup_enabled = local_upload.children[2].value
+        
         # Tampilkan status loading
         if status_widget:
             with status_widget:
@@ -52,6 +57,7 @@ def process_local_upload(
                               color:{COLORS['alert_info_text']}; 
                               border-radius:4px; margin:5px 0;">
                         <p style="margin:5px 0">{ICONS['upload']} Memproses file dataset...</p>
+                        <p style="margin:5px 0">Backup: {'Aktif' if backup_enabled else 'Tidak aktif'}</p>
                     </div>
                 """))
         
@@ -94,20 +100,27 @@ def process_local_upload(
         # Update progress indicator
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 50
+        
+        if 'progress_label' in ui_components:
+            ui_components['progress_label'].value = "Memproses upload dataset..."
             
         # Proses file ZIP atau folder dataset
         if file_name.lower().endswith('.zip'):
-            # Gunakan import_from_zip dari download_service
+            # Gunakan import_from_zip dari download_service dengan opsi backup
             result = download_service.import_from_zip(
                 zip_file=file_path,
                 target_dir=output_dir,
                 remove_zip=True,
-                show_progress=True
+                show_progress=True,
+                backup_existing=backup_enabled
             )
             
             # Update progress indicator
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].value = 90
+                
+            if 'progress_label' in ui_components:
+                ui_components['progress_label'].value = "Finalisasi dataset..."
         else:
             # Jika bukan ZIP, coba gunakan fungsi lain yang tersedia
             # atau langsung copy file ke direktori output
@@ -127,6 +140,7 @@ def process_local_upload(
                         <p style="margin:5px 0">{ICONS['success']} Dataset berhasil diproses!</p>
                         <p>File: {file_name}</p>
                         <p>Output: {output_dir}</p>
+                        <p>Backup: {'Ya' if backup_enabled else 'Tidak'}</p>
                     </div>
                 """))
         
@@ -137,6 +151,9 @@ def process_local_upload(
         # Update progress indicator
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 100
+            
+        if 'progress_label' in ui_components:
+            ui_components['progress_label'].value = "Dataset siap digunakan"
             
         # Notifikasi selesai jika ada observer
         if 'observer_manager' in ui_components:
@@ -164,6 +181,14 @@ def process_local_upload(
                         <p style="margin:5px 0">{ICONS['error']} {str(e)}</p>
                     </div>
                 """))
+        
+        # Reset progress indicator
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 0
+            
+        if 'progress_label' in ui_components:
+            ui_components['progress_label'].value = "Error: proses dibatalkan"
+                
         raise
         
     except Exception as e:
@@ -179,4 +204,19 @@ def process_local_upload(
                         <p style="margin:5px 0">{ICONS['error']} {error_message}</p>
                     </div>
                 """))
+                
+        # Reset progress indicator
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 0
+            
+        if 'progress_label' in ui_components:
+            ui_components['progress_label'].value = "Error: proses dibatalkan"
+            
+        # Update status panel jika tersedia
+        try:
+            from smartcash.ui.dataset.download_initialization import update_status_panel
+            update_status_panel(ui_components, "error", f"❌ Error: {error_message}")
+        except ImportError:
+            pass
+            
         raise DatasetError(error_message)

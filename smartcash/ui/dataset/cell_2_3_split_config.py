@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/cell_2_3_split_config.py
-Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan penekanan pada konfigurasi
+Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan struktur modular yang lebih baik
 """
 
 # Import dasar
@@ -13,12 +13,12 @@ try:
     from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
     
     # Setup environment dan load config
-    env, config = setup_notebook_environment("split_config", "configs/colab_config.yaml")
+    env, config = setup_notebook_environment("split_config", "configs/dataset_config.yaml")
     
     # Setup komponen UI
     ui_components = setup_ui_component(env, config, "split_config")
     
-    # Setup split handler
+    # Setup split handler yang menggunakan komponen modular
     from smartcash.ui.dataset.split_config_handler import setup_split_config_handlers
     ui_components = setup_split_config_handlers(ui_components, env, config)
     

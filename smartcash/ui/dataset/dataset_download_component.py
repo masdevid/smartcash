@@ -127,7 +127,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Panel info bantuan
     help_panel = create_info_box(
-        f"{ICONS['info']} Panduan Download Dataset",
+        f"Panduan Download Dataset",
         f"""
         <h4>Cara Download Dataset</h4>
         <ol>

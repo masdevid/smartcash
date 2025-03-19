@@ -194,7 +194,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Info box
     help_panel = create_info_box(
-        f"{ICONS['info']} Tentang Preprocessing",
+        f"Tentang Preprocessing",
         """
         <p>Preprocessing meliputi beberapa langkah penting:</p>
         <ul>

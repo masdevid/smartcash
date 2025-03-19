@@ -10,6 +10,7 @@ def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
 
     from smartcash.ui.components.headers import create_header
+    from smartcash.ui.components.alerts import create_info_box
     
     # Header 
     header = create_header(
@@ -201,25 +202,21 @@ def create_dependency_installer_ui(env=None, config=None):
         )
     )
     
-    # Info box - Gunakan widgets.HTML bukan create_info_box yang mungkin mengembalikan HTML
-    info_box = widgets.Accordion(
-        children=[widgets.HTML("""
-            <div style="padding: 10px;">
-                <p>Package diurutkan instalasi dari kecil ke besar:</p>
-                <ol>
-                    <li>Notebook tools (ipywidgets, tqdm)</li>
-                    <li>Utility packages (pyyaml, termcolor)</li>
-                    <li>Data processing (matplotlib, pandas)</li>
-                    <li>Computer vision (OpenCV, Albumentations)</li>
-                    <li>Machine learning (PyTorch)</li>
-                </ol>
-            </div>
-        """)],
-        layout=widgets.Layout(width='100%', margin='10px 0')
+    info_box = create_info_box(
+        f"Tentang Package Installation",
+        """
+        <p>Package diurutkan instalasi dari kecil ke besar:</p>
+        <ol>
+            <li>Notebook tools (ipywidgets, tqdm)</li>
+            <li>Utility packages (pyyaml, termcolor)</li>
+            <li>Data processing (matplotlib, pandas)</li>
+            <li>Computer vision (OpenCV, Albumentations)</li>
+            <li>Machine learning (PyTorch)</li>
+        </ol>
+        """,
+        'info',
+        collapsed=True
     )
-    info_box.set_title(0, "Tentang Package Installation")
-    info_box.selected_index = None  # Initially collapsed
-    
     # Container utama
     main = widgets.VBox(
         [

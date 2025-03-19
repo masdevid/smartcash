@@ -12,7 +12,7 @@ from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
 
-from smartcash.ui.components.alerts import create_status_indicator
+from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
 from smartcash.ui.components.metrics import create_metric_display
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):
@@ -124,8 +124,8 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                     display(create_status_indicator('warning', f"{display_name} tidak terinstall"))
 
     def _update_status_panel(status_message, status_type='info'):
-        """Update status panel menggunakan create_status_indicator."""
-        ui_components['status_panel'].value = create_status_indicator(
+        """Update status panel menggunakan create_info_alert."""
+        ui_components['status_panel'].value = create_info_alert(
             message=status_message,
             alert_type=status_type
         ).value

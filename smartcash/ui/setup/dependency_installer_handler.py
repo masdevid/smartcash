@@ -100,16 +100,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         except Exception as e:
             return False, str(e)
     
-    def _create_status_message(message, status_type='info'):
-        """Buat pesan status dalam format HTML."""
-        style = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
-        return f"""
-        <div style="padding:8px 12px; background-color:{style.get('bg_color', '#d1ecf1')}; 
-                color:{style.get('text_color', '#0c5460')}; border-radius:4px; margin:5px 0;
-                border-left:4px solid {style.get('text_color', '#0c5460')};">
-            <p style="margin:3px 0">{style.get('icon', 'ℹ️')} {message}</p>
-        </div>
-        """
+   
     def _check_package_status(package_checks: List[Tuple[str, str]]) -> None:
         """Periksa status paket yang terinstall."""
         for display_name, import_name in package_checks:
@@ -156,7 +147,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             
             if not packages_to_install:
                 _update_status_panel("Tidak ada package yang dipilih", 'warning')
-                display(_create_status_message("Tidak ada package yang dipilih", 'warning'))
+                display(create_info_alert("Tidak ada package yang dipilih", 'warning'))
                 return
             
             # Siapkan progress bar
@@ -176,7 +167,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             failed_packages = []
             
             for pkg in packages_to_install:
-                display(_create_status_message(f"📦 Memulai instalasi: {pkg}", 'info'))
+                display(create_info_alert(f"Memulai instalasi: {pkg}", 'info', '📦'))
                 
                 # Jalankan instalasi
                 success, error_msg = _run_pip_install([pkg])
@@ -184,10 +175,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Update progress
                 if success:
                     installed_count += 1
-                    display(_create_status_message(f"✅ {pkg} berhasil diinstall", 'success'))
+                    display(create_info_alert(f"{pkg} berhasil diinstall", 'success', '✅'))
                 else:
                     failed_packages.append(pkg)
-                    display(_create_status_message(f"❌ Gagal install {pkg}: {error_msg}", 'error'))
+                    display(create_info_alert(f"Gagal install {pkg}: {error_msg}", 'error','❌'))
                 
                 # Update progress bar
                 progress_bar.update(1)
@@ -213,13 +204,13 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             # Tampilkan failed packages jika ada
             if failed_packages:
                 failed_list = "<br>".join([f"❌ {pkg}" for pkg in failed_packages])
-                display(_create_status_message(f"<h3>Package Gagal Diinstall</h3><div>{failed_list}</div>", 'error'))
+                display(create_info_alert(f"<h3>Package Gagal Diinstall</h3><div>{failed_list}</div>", 'error', '❌'))
 
     def _on_check_installations(b):
         """Handler untuk tombol cek instalasi."""
         with ui_components['status']:
             clear_output()
-            display(_create_status_message("🔍 Memeriksa Status Instalasi", 'info'))
+            display(create_info_alert("Memeriksa Status Instalasi", 'info', '🔍'))
             _check_package_status(PACKAGE_CHECKS)
 
     def _on_check_all(b):

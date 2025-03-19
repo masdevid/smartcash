@@ -105,7 +105,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         value=0,
         min=0,
         max=100,
-        description='Overall Progress:',
+        description='Progres:',
         bar_style='',
         orientation='horizontal',
         layout=widgets.Layout(width='70%')

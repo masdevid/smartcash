@@ -9,15 +9,30 @@ from typing import Dict, Any, Optional
 from IPython.display import display, HTML
 
 def check_existing_dataset(data_dir: str = "data") -> bool:
-    """Cek apakah dataset sudah ada di direktori data"""
-    required_dirs = [
-        os.path.join(data_dir, split, folder)
-        for split in ['train', 'valid', 'test']
-        for folder in ['images', 'labels']
-    ]
+    """
+    Cek apakah dataset sudah ada di direktori data dengan validasi lebih baik.
     
+    Args:
+        data_dir: Path direktori data
+        
+    Returns:
+        bool: True jika dataset terdeteksi
+    """
+    required_dirs = [os.path.join(data_dir, split, folder) for split in ['train', 'valid', 'test'] for folder in ['images', 'labels']]
+    
+    # Tentukan minimal 4 folder yang harus ada untuk mendeteksi dataset
     existing_dirs = sum(1 for dir_path in required_dirs if os.path.isdir(dir_path))
-    return existing_dirs >= 4
+    
+    # Cek juga apakah ada file gambar di salah satu folder images
+    has_images = False
+    for split in ['train', 'valid', 'test']:
+        img_dir = os.path.join(data_dir, split, 'images')
+        if os.path.isdir(img_dir):
+            files = [f for f in os.listdir(img_dir) if os.path.isfile(os.path.join(img_dir, f)) and f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+            if files: has_images = True; break
+    
+    # Dataset dianggap valid jika minimal 4 folder ada dan minimal ada 1 file gambar
+    return existing_dirs >= 4 and has_images
 
 def get_dataset_stats(data_dir: str = "data") -> Dict[str, Any]:
     """Dapatkan statistik dataset yang ada"""
@@ -78,6 +93,9 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
     if 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
         original_click_handler = ui_components['on_download_click']
     
+    # Simpan handler asli ke UI components agar dapat diakses oleh handler lain
+    ui_components['original_download_handler'] = original_click_handler
+    
     # Handler untuk download button dengan konfirmasi
     def on_download_click_with_confirmation(b):
         # Dapatkan lokasi data
@@ -104,14 +122,33 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
                 btn_container = widgets.HBox([btn_cancel, btn_confirm])
                 
                 # Fungsi aksi
+                # Fungsi aksi dalam on_confirm
                 def on_confirm(b):
                     # Sembunyikan dialog
                     ui_components['confirmation_container'].layout.display = 'none'
-                    # Jalankan download
-                    if original_click_handler:
-                        original_click_handler(b)
-                    elif 'on_download_click' in ui_components and callable(ui_components['on_download_click']):
-                        ui_components['on_download_click'](b)
+                    
+                    # Progress bar sebaiknya reset dulu
+                    if 'progress_bar' in ui_components: ui_components['progress_bar'].value = 0
+                    
+                    # Tentukan option yang dipilih
+                    download_option = ui_components.get('download_options').value
+                    
+                    # Jalankan handler yang sesuai berdasarkan option yang dipilih
+                    try:
+                        if download_option == 'Roboflow (Online)':
+                            from smartcash.ui.dataset.roboflow_download_handler import download_from_roboflow
+                            download_from_roboflow(ui_components, env, config)
+                        elif download_option == 'Local Data (Upload)':
+                            from smartcash.ui.dataset.local_upload_handler import process_local_upload
+                            process_local_upload(ui_components, env, config)
+                    except Exception as e:
+                        with ui_components['status']:
+                            from smartcash.ui.components.alerts import create_status_indicator
+                            display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+                            
+                        # Log error
+                        if 'logger' in ui_components:
+                            ui_components['logger'].error(f"{ICONS['error']} Error saat download dataset: {str(e)}")
                 
                 def on_cancel(b):
                     # Sembunyikan dialog

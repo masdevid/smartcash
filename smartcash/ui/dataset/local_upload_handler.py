@@ -13,7 +13,8 @@ from smartcash.common.exceptions import DatasetError
 
 def process_local_upload(
     ui_components: Dict[str, Any],
-    env=None
+    env=None,
+    config=None
 ) -> Dict[str, Any]:
     """
     Proses upload dataset lokal menggunakan DatasetManager dan DownloadService.
@@ -21,6 +22,7 @@ def process_local_upload(
     Args:
         ui_components: Dictionary berisi widget UI
         env: Environment manager
+        config: Konfigurasi aplikasi
         
     Returns:
         Dictionary berisi informasi hasil proses upload
@@ -29,9 +31,15 @@ def process_local_upload(
         DatasetError: Jika terjadi error saat proses file
     """
     status_widget = ui_components.get('status')
-    file_upload = ui_components.get('file_upload')
     
-    if not file_upload or not file_upload.value:
+    # Validasi: mendapatkan file upload widget dari local_upload
+    local_upload = ui_components.get('local_upload')
+    if not local_upload or not hasattr(local_upload, 'children') or len(local_upload.children) < 1:
+        raise DatasetError("Komponen local_upload tidak ditemukan atau tidak valid")
+        
+    file_upload = local_upload.children[0]  # FileUpload widget seharusnya di indeks 0
+    
+    if not file_upload or not hasattr(file_upload, 'value') or not file_upload.value:
         raise DatasetError("Tidak ada file yang dipilih")
         
     try:
@@ -50,11 +58,13 @@ def process_local_upload(
         # Dapatkan dataset_manager dan download_service
         from smartcash.dataset.manager import DatasetManager
         
-        # Coba dapatkan config dari UI components atau gunakan default
-        config = ui_components.get('config', {})
-        
-        # Buat instance DatasetManager
-        dataset_manager = DatasetManager(config=config)
+        # Gunakan dataset_manager yang sudah ada atau buat baru
+        dataset_manager = ui_components.get('dataset_manager')
+        if not dataset_manager:
+            # Buat instance DatasetManager
+            dataset_manager = DatasetManager(config=config)
+            # Tambahkan ke ui_components untuk penggunaan berikutnya
+            ui_components['dataset_manager'] = dataset_manager
         
         # Dapatkan download_service langsung dari manager
         download_service = dataset_manager.get_service('downloader')
@@ -72,11 +82,19 @@ def process_local_upload(
         with open(file_path, 'wb') as f:
             f.write(file_content)
         
-        # Dapatkan output_dir dari config atau UI components
-        output_dir = config.get('dataset_dir', 'data/')
-        if 'output_dir_input' in ui_components and hasattr(ui_components['output_dir_input'], 'value'):
-            output_dir = ui_components['output_dir_input'].value or output_dir
+        # Dapatkan output_dir dari UI components, config, atau dari local_upload
+        output_dir = ui_components.get('data_dir', 'data/')
         
+        # Jika ada di local_upload child ke-1 (target_dir), gunakan itu
+        if len(local_upload.children) > 1 and hasattr(local_upload.children[1], 'value'):
+            target_dir_input = local_upload.children[1]
+            if target_dir_input.value:
+                output_dir = target_dir_input.value
+        
+        # Update progress indicator
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 50
+            
         # Proses file ZIP atau folder dataset
         if file_name.lower().endswith('.zip'):
             # Gunakan process_zip_file dari download_service
@@ -86,6 +104,10 @@ def process_local_upload(
                 extract_only=False,
                 validate_after=True
             )
+            
+            # Update progress indicator
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 90
         else:
             # Jika bukan ZIP, coba gunakan fungsi lain yang tersedia
             # atau langsung copy file ke direktori output
@@ -111,6 +133,22 @@ def process_local_upload(
         # Bersihkan file sementara
         os.remove(file_path)
         os.rmdir(temp_dir)
+        
+        # Update progress indicator
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 100
+            
+        # Notifikasi selesai jika ada observer
+        if 'observer_manager' in ui_components:
+            try:
+                from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
+                EventDispatcher.notify(
+                    event_type="UPLOAD_COMPLETE",
+                    sender="upload_handler",
+                    message=f"File dataset {file_name} berhasil diproses ke {output_dir}"
+                )
+            except ImportError:
+                pass
         
         return result
         

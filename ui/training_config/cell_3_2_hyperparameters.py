@@ -1,23 +1,10 @@
 """
 File: smartcash/ui/training_config/cell_3_2_hyperparameters.py
-Deskripsi: Cell untuk konfigurasi hyperparameter training model SmartCash dengan fallback sederhana
+Deskripsi: Cell untuk konfigurasi hyperparameter training model SmartCash dengan memanfaatkan skeleton
 """
 
-# Import dari utility cell
-from IPython.display import display, HTML
+# Import dan jalankan skeleton cell dengan parameter yang sesuai
+from smartcash.ui.training_config.cell_skeleton import run_cell
 
-# Setup environment dan load config dengan error handling sederhana
-try:
-    from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
-    env, config = setup_notebook_environment("hyperparameters", "configs/training_config.yaml")
-    ui_components = setup_ui_component(env, config, "hyperparameters")
-    
-    # Setup handler secara manual
-    from smartcash.ui.training_config.hyperparameters_handler import setup_hyperparameters_handlers
-    ui_components = setup_hyperparameters_handlers(ui_components, env, config)
-    
-    # Tampilkan UI
-    display_ui(ui_components)
-
-except ImportError as e:
-    display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))
+# Jalankan cell dengan parameter konfigurasi
+ui_components = run_cell("hyperparameters", "configs/training_config.yaml")

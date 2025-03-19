@@ -1,6 +1,6 @@
 """
 Cell 1.1 - Repository Clone
-File: smartcash/ui/01_setup/repo_clone_cell.py
+File: smartcash/ui/cells/setup/cell_1_1_repository_clone.py
 Deskripsi: Clone/update repository YOLOv5 dan SmartCash dengan pilihan branch
 """
 
@@ -13,7 +13,7 @@ import os
 if not os.path.exists('/content/drive/MyDrive'):
   from google.colab import drive
   drive.mount('/content/drive')
-  
+
 def create_alert(msg, type='info'): return HTML(f"""<div style="padding:10px;margin:10px;background-color:{'#d4edda' if type=='success' else '#fff3cd' if type=='warning' else '#f8d7da' if type=='error' else '#d1ecf1'};color:{'#155724' if type=='success' else '#856404' if type=='warning' else '#721c24' if type=='error' else '#0c5460'};border-radius:4px">{"✅ " if type=='success' else "⚠️ " if type=='warning' else "❌ " if type=='error' else "📘 "}{msg}</div>""")
 
 def clone_or_update_repos(b):
@@ -21,7 +21,7 @@ def clone_or_update_repos(b):
         clear_output()
         if not url_input.value.strip(): return display(create_alert("URL repository tidak boleh kosong", "warning"))
         display(HTML("<h2 style='margin:15px;'>🚀 Clone/Update Repository</h2>"))
-        
+
         # YOLOv5 repository
         try:
             if not Path("yolov5").exists():
@@ -31,7 +31,7 @@ def clone_or_update_repos(b):
                 subprocess.run(["git", "pull"], cwd="yolov5", check=True, capture_output=True)
                 display(create_alert("YOLOv5 berhasil di-update", "success"))
         except Exception as e: display(create_alert(f"Gagal {'clone' if not Path('yolov5').exists() else 'update'} YOLOv5: {str(e)}", "error")); return
-        
+
         # SmartCash repository
         sc_path, branch = url_input.value.split("/")[-1].replace(".git", ""), branch_dropdown.value
         branch_info = f" (branch: {branch})" if branch != "main" else ""
@@ -43,7 +43,7 @@ def clone_or_update_repos(b):
                 subprocess.run(["git", "pull"], cwd=sc_path, check=True, capture_output=True)
             display(create_alert(f"SmartCash{branch_info} berhasil di-{'clone' if not Path(sc_path).exists() else 'update'}", "success"))
         except Exception as e: display(create_alert(f"Gagal {'clone' if not Path(sc_path).exists() else 'update'} SmartCash{branch_info}: {str(e)}", "error")); return
-        
+
         display(HTML("""<div style="padding:15px;margin:10px;background-color:#2c3e50;border-left:5px solid #2ecc71;"><h3>🔄 Langkah Selanjutnya</h3><ol><li>Klik <b>Runtime</b> di menu atas</li><li>Pilih <b>Restart runtime</b></li><li>Klik <b>Yes</b> pada konfirmasi</li></ol></div>"""))
 
 # UI components with repo input and branch dropdown inline
@@ -55,9 +55,11 @@ output = widgets.Output(layout={'width': '100%', 'border': '1px solid #ddd', 'mi
 
 clone_button.on_click(clone_or_update_repos)
 display(widgets.VBox([
-    title, 
-    widgets.HBox([url_input, branch_dropdown]), 
-    clone_button, 
+    title,
+    widgets.HBox([url_input, branch_dropdown]),
+    clone_button,
     output
 ], layout={'width': '100%', 'padding': '15px'}))
-# !pip install -q ipywidgets tqdm pyyaml matplotlib seaborn
+
+
+# !pip install -q ipywidgets tqdm pyyaml #silent install top priority packages.

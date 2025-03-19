@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/cell_2_2_split_config.py
+File: smartcash/ui/dataset/cell_2_3_split_config.py
 Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan penekanan pada konfigurasi
 """
 

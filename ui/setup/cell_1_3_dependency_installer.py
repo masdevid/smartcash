@@ -11,7 +11,7 @@ try:
     from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
     from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
     from smartcash.ui.utils.logging_utils import setup_ipython_logging
-   
+
     # Coba dapatkan environment manager dan config
     from smartcash.common.environment import get_environment_manager
     from smartcash.common.config import get_config_manager
@@ -21,17 +21,17 @@ try:
 
     # Buat komponen UI
     ui_components = create_dependency_installer_ui(env, config)
-    
+
     # Setup handlers
     ui_components = setup_dependency_installer_handlers(ui_components, config)
-    
+
     # Setup ipython logging menggunakan utilitas yang sudah ada
     logger = setup_ipython_logging(ui_components, "dependency_installer")
     if logger:
         logger.info("🚀 Cell dependency_installer diinisialisasi")
-    
+
     # Tampilkan UI - Pastikan hanya menampilkan widget UI, bukan dictionary UI components
     display(ui_components['ui'])
-    
+
 except ImportError as e:
     display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))

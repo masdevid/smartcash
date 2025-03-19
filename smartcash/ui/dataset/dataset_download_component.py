@@ -90,14 +90,15 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         icon='download'
     )
     
-    # Progress bar
+    # Progress bar - Ubah ke full width
     progress_bar = widgets.IntProgress(
         value=0,
         min=0,
         max=100,
         description='0%',
         bar_style='',
-        orientation='horizontal'
+        orientation='horizontal',
+        layout=widgets.Layout(width='100%')  # Set layout width 100%
     )
     
     # Status output

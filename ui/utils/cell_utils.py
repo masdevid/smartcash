@@ -39,12 +39,12 @@ def setup_notebook_environment(
         
     # Import dependencies dengan fallback
     try:
+        from smartcash.common.logger import get_logger
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
         
         # Setup komponen
-        logger = setup_ipython_logging(None, f"cell_{cell_name}")
-        logger.info(f"🚀 Inisialisasi cell '{cell_name}'")
+        logger = get_logger(f"cell_{cell_name}")
         
         env_manager = get_environment_manager()
         config_manager = get_config_manager()
@@ -54,7 +54,6 @@ def setup_notebook_environment(
             config_path = Path(config_path)
             if config_path.exists():
                 config = config_manager.load_config(str(config_path))
-                logger.info(f"🔄 Berhasil memuat konfigurasi dari {config_path}")
             else:
                 config = config_manager.config
                 logger.warning(f"⚠️ File konfigurasi {config_path} tidak ditemukan, menggunakan konfigurasi default")
@@ -157,6 +156,9 @@ def setup_ui_component(
     if logger:
         ui_components['logger'] = logger
         logger.info(f"🚀 Inisialisasi komponen UI '{component_name}'")
+        if config:
+            config_path = config.get('config_path') or 'Konfigurasi default'
+            logger.info(f"📄 Konfigurasi: {config_path}")
     
     # Import komponen UI dengan fallback, termasuk pencarian di subdirektori
     try:

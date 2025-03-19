@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/split_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi pembagian dataset dengan dukungan Google Drive yang lebih terintegrasi dan ringan
+Deskripsi: Komponen UI untuk konfigurasi pembagian dataset yang disederhanakan dengan dukungan visualisasi
 """
 
 import ipywidgets as widgets
@@ -10,7 +10,7 @@ from pathlib import Path
 
 def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi split dataset.
+    Buat komponen UI untuk konfigurasi split dataset yang disederhanakan.
     
     Args:
         env: Environment manager
@@ -24,7 +24,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.alerts import create_info_box, create_info_alert
     from smartcash.ui.utils.constants import COLORS, ICONS
     
-    # Deteksi drive dan status
+    # Deteksi status drive
     is_colab = 'google.colab' in str(globals())
     drive_mounted = False
     drive_path = None
@@ -32,11 +32,11 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     # Cek drive dari environment manager
     if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
         drive_mounted = True
-        drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else None
+        drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else '/content/drive/MyDrive'
     
     # Header
     header = create_header(f"{ICONS['dataset']} Konfigurasi Split Dataset", 
-                         "Konfigurasi pembagian dataset untuk training, validation, dan testing")
+                         "Konfigurasi dan visualisasi dataset untuk training, validation, dan testing")
     
     # Status panel
     status_panel = widgets.HTML(value=f"""
@@ -59,7 +59,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Current statistics container
+    # Current statistics panel
     current_stats_html = widgets.HTML(
         value=f"""<div style="text-align:center; padding:15px;">
                 <p style="color:{COLORS['muted']};">{ICONS['processing']} Memuat statistik dataset...</p>
@@ -124,79 +124,32 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         )
     ])
     
-    # Google Drive options panel jika diperlukan
-    drive_options = None
-    if is_colab or drive_mounted:
-        use_drive_checkbox = widgets.Checkbox(
-            value=drive_mounted,
-            description='Gunakan Google Drive untuk dataset',
+    # Pathways configuration
+    data_paths = widgets.VBox([
+        widgets.HTML(f"<h3 style='color:{COLORS['dark']}; margin-top:10px; margin-bottom:10px;'>{ICONS['folder']} Lokasi Dataset</h3>"),
+        widgets.Text(
+            value='/content/drive/MyDrive/SmartCash' if drive_mounted else 'data',
+            description='Dataset Path:',
             style={'description_width': 'initial'},
-            disabled=not drive_mounted
-        )
-        
-        drive_path_input = widgets.Text(
-            value='MyDrive/smartcash/data' if drive_mounted else '',
-            description='Path ke data di drive:',
+            layout=widgets.Layout(width='70%')
+        ),
+        widgets.Text(
+            value='/content/drive/MyDrive/SmartCash/preprocessed' if drive_mounted else 'data/preprocessed',
+            description='Preprocessed:',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%'),
-            disabled=not drive_mounted
+            layout=widgets.Layout(width='70%')
         )
-        
-        local_path_input = widgets.Text(
-            value='data_local',
-            description='Path lokal untuk clone:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%'),
-            disabled=not drive_mounted
-        )
-        
-        sync_checkbox = widgets.Checkbox(
-            value=True,
-            description='Sinkronisasi otomatis pada perubahan',
-            style={'description_width': 'initial'},
-            disabled=not drive_mounted
-        )
-        
-        sync_button = widgets.Button(
-            description='Sinkronisasi Sekarang',
-            button_style='info',
-            icon='sync',
-            disabled=not drive_mounted,
-            layout=widgets.Layout(width='auto', margin='10px 0')
-        )
-        
-        drive_status_html = widgets.HTML(
-            value=f"""<div style="padding:8px; margin-top:5px; background-color:{COLORS['alert_info_bg']}; 
-                    color:{COLORS['alert_info_text']}; border-radius:4px; font-size:0.9em;">
-                <p><strong>{ICONS['info']} Status Drive:</strong> {"Terhubung 🟢" if drive_mounted else "Tidak terhubung 🔴"}</p>
-                {f"<p><strong>Path:</strong> {drive_path}</p>" if drive_mounted else ""}
-                {f"<p>Aktifkan opsi ini untuk menggunakan dataset dari Google Drive dan clone ke lokal.</p>" if drive_mounted else
-                 f"<p>Google Drive tidak terdeteksi. Gunakan <code>drive.mount('/content/drive')</code> untuk menghubungkan Drive.</p>"}
-            </div>"""
-        )
-        
-        drive_options = widgets.VBox([
-            use_drive_checkbox, drive_path_input, local_path_input, 
-            sync_checkbox, sync_button, drive_status_html
-        ])
+    ])
     
-    # Advanced settings accordion with drive options
-    accordion_children = [advanced_options]
-    accordion_titles = [f"{ICONS['settings']} Pengaturan Lanjutan"]
+    # Advanced settings accordion
+    advanced_accordion = widgets.Accordion(children=[advanced_options, data_paths], selected_index=None)
+    advanced_accordion.set_title(0, f"{ICONS['settings']} Pengaturan Lanjutan")
+    advanced_accordion.set_title(1, f"{ICONS['folder']} Lokasi Dataset")
     
-    # Tambahkan opsi drive jika tersedia
-    if drive_options:
-        accordion_children.append(drive_options)
-        accordion_titles.append(f"{ICONS['folder']} Opsi Google Drive")
-    
-    advanced_accordion = widgets.Accordion(children=accordion_children, selected_index=None)
-    for i, title in enumerate(accordion_titles):
-        advanced_accordion.set_title(i, title)
-    
-    # Notification
+    # Info notice
     split_notice = create_info_alert(
         f"Perlu diperhatikan bahwa split dataset sudah dilakukan melalui Roboflow. " +
-        f"Pengaturan ini hanya digunakan untuk konfigurasi dan visualisasi.",
+        f"Pengaturan ini hanya digunakan untuk konfigurasi dan visualisasi distribusi dataset.",
         "info"
     )
     
@@ -232,9 +185,12 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         </ul>
         <p>Gunakan <strong>stratified split</strong> untuk memastikan distribusi kelas tetap seimbang di semua subset.</p>
         
-        <h4>{ICONS['folder']} Opsi Google Drive</h4>
-        <p>Jika dataset berada di Google Drive, aktifkan opsi Google Drive dan tentukan path ke dataset.</p>
-        <p>Data akan di-clone ke path lokal untuk mempercepat akses dan menghindari kendala batas penggunaan Drive.</p>
+        <h4>{ICONS['folder']} Lokasi Dataset</h4>
+        <p>Data mentah dan data terpreprocessing akan diambil dari lokasi yang dikonfigurasi:</p>
+        <ul>
+            <li>Dataset mentah: <code>/content/drive/MyDrive/SmartCash</code></li>
+            <li>Dataset preprocessed: <code>/content/drive/MyDrive/SmartCash/preprocessed</code></li>
+        </ul>
         """,
         'info',
         collapsed=True
@@ -254,22 +210,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         info_box
     ])
     
-    # Pastikan buttons dapat diakses meskipun fallback
-    if isinstance(buttons_container, widgets.HBox):
-        save_button = buttons_container.children[0]
-        reset_button = buttons_container.children[1]
-    else:
-        # Extract buttons dari komponen lain
-        save_button = None
-        reset_button = None
-        for child in buttons_container.children:
-            if isinstance(child, widgets.Button):
-                if child.description == 'Simpan Konfigurasi':
-                    save_button = child
-                elif child.description == 'Reset ke Default':
-                    reset_button = child
-    
-    # Dictionary untuk akses komponen dengan memastikan path yang tepat
+    # Dictionary untuk akses komponen
     ui_components = {
         'ui': ui,
         'header': header,
@@ -280,14 +221,22 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         'split_sliders': [train_slider, valid_slider, test_slider],
         'stratified': stratified_checkbox,
         'advanced_options': advanced_options,
-        'save_button': save_button,
-        'reset_button': reset_button,
+        'data_paths': data_paths,
+        'buttons_container': buttons_container,
         'module_name': 'split_config'
     }
     
-    # Tambahkan komponen Drive jika ada
-    if drive_options:
-        ui_components['drive_options'] = drive_options
-        ui_components['drive_sync_button'] = drive_options.children[4]  # sync_button
+    # Pastikan buttons dapat diakses
+    if isinstance(buttons_container, widgets.HBox):
+        ui_components['save_button'] = buttons_container.children[0]
+        ui_components['reset_button'] = buttons_container.children[1]
+    else:
+        # Extract buttons jika menggunakan create_config_buttons
+        for child in buttons_container.children:
+            if isinstance(child, widgets.Button):
+                if child.description == 'Simpan Konfigurasi':
+                    ui_components['save_button'] = child
+                elif child.description == 'Reset ke Default':
+                    ui_components['reset_button'] = child
     
     return ui_components

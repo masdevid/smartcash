@@ -1,66 +1,68 @@
 """
 File: smartcash/ui/dataset/split_config_visualization.py
-Deskripsi: Visualisasi dataset untuk komponen konfigurasi split dengan optimasi dan error handling yang lebih baik
+Deskripsi: Komponen visualisasi dataset untuk split config yang menampilkan data mentah dan preprocessed
 """
 
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, List, Tuple, Optional, Union
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
 
-def get_dataset_dir(config: Dict[str, Any], env=None, logger=None) -> str:
+def get_dataset_paths(config: Dict[str, Any], env=None) -> Tuple[str, str]:
     """
-    Mendapatkan direktori dataset aktif (drive atau lokal) dengan validasi.
+    Mendapatkan path dataset mentah dan preprocessed.
     
     Args:
         config: Konfigurasi aplikasi
         env: Environment manager
-        logger: Logger untuk logging
         
     Returns:
-        String path direktori dataset
+        Tuple (raw_path, preprocessed_path)
     """
-    try:
-        # Coba gunakan environment manager
-        try:
-            from smartcash.common.environment import get_environment_manager
-            env_manager = env or get_environment_manager()
-            
-            # Cek apakah menggunakan drive
-            if config.get('data', {}).get('use_drive', False):
-                # Jika sync aktif, gunakan lokal clone
-                local_clone = config.get('data', {}).get('local_clone_path', 'data_local')
-                if local_clone and os.path.exists(local_clone):
-                    if logger: logger.info(f"📁 Menggunakan dataset dari clone lokal: {local_clone}")
-                    return local_clone
-                
-                # Jika tidak, gunakan drive langsung lewat environment manager
-                if hasattr(env_manager, 'is_drive_mounted') and env_manager.is_drive_mounted:
-                    drive_path = env_manager.get_path(config.get('data', {}).get('drive_path', 'data'))
-                    if os.path.exists(drive_path):
-                        if logger: logger.info(f"📁 Menggunakan dataset dari Google Drive: {drive_path}")
-                        return drive_path
-            
-            # Default: gunakan lokasi data standard dari environment manager
-            data_dir = env_manager.get_path(config.get('data', {}).get('dir', 'data'))
-            if logger: logger.info(f"📁 Menggunakan dataset dari lokal: {data_dir}")
-            return data_dir
-            
-        except ImportError:
-            # Fallback jika environment manager tidak tersedia
-            pass
-    except Exception as e:
-        if logger: logger.warning(f"⚠️ Error saat menentukan direktori dataset: {str(e)}")
+    drive_mounted = False
     
-    # Default fallback
-    data_dir = config.get('data', {}).get('dir', 'data')
-    if logger: logger.info(f"📁 Menggunakan dataset dari lokal (fallback): {data_dir}")
-    return data_dir
+    # Cek drive dari environment manager
+    if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
+        drive_mounted = True
+    
+    # Ambil path dari config atau gunakan default
+    dataset_path = config.get('data', {}).get('dataset_path', '/content/drive/MyDrive/SmartCash' if drive_mounted else 'data')
+    preprocessed_path = config.get('data', {}).get('preprocessed_path', '/content/drive/MyDrive/SmartCash/preprocessed' if drive_mounted else 'data/preprocessed')
+    
+    return dataset_path, preprocessed_path
+
+def count_dataset_files(dataset_dir: str) -> Dict[str, Dict[str, int]]:
+    """
+    Menghitung jumlah file dalam dataset di struktur YOLO.
+    
+    Args:
+        dataset_dir: Path direktori dataset
+        
+    Returns:
+        Dictionary dengan statistik file per split
+    """
+    stats = {}
+    
+    for split in ['train', 'valid', 'test']:
+        split_dir = Path(dataset_dir) / split
+        images_dir = split_dir / 'images'
+        labels_dir = split_dir / 'labels'
+        
+        img_count = len(list(images_dir.glob('*.*'))) if images_dir.exists() else 0
+        label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
+        
+        stats[split] = {
+            'images': img_count,
+            'labels': label_count,
+            'valid': img_count > 0 and label_count > 0
+        }
+    
+    return stats
 
 def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """
-    Mendapatkan statistik dataset dari DatasetManager atau direktori langsung.
+    Mendapatkan statistik dataset untuk raw dan preprocessed.
     
     Args:
         config: Konfigurasi aplikasi
@@ -71,298 +73,313 @@ def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str
         Dictionary berisi statistik dataset
     """
     try:
-        # Dapatkan direktori dataset
-        data_dir = get_dataset_dir(config, env, logger)
+        # Dapatkan path dataset
+        dataset_path, preprocessed_path = get_dataset_paths(config, env)
         
-        # Coba gunakan DatasetManager
-        try:
-            from smartcash.dataset.manager import DatasetManager
-            dataset_manager = DatasetManager(config, logger=logger)
-            stats = dataset_manager.get_split_statistics()
-            if logger: logger.info(f"✅ Statistik dataset berhasil dimuat dari DatasetManager")
-            return stats
-        except ImportError:
-            if logger: logger.warning(f"⚠️ DatasetManager tidak tersedia, menggunakan fallback")
-        except Exception as e:
-            if logger: logger.warning(f"⚠️ Error DatasetManager: {str(e)}, menggunakan fallback")
-            
-        # Fallback ke pembacaan direktori langsung
-        stats = {}
-        for split in ['train', 'valid', 'test']:
-            split_dir = Path(data_dir) / split
-            images_dir = split_dir / 'images' if split_dir.exists() else None
-            labels_dir = split_dir / 'labels' if split_dir.exists() else None
-            
-            img_count = len(list(images_dir.glob('*.*'))) if images_dir and images_dir.exists() else 0
-            label_count = len(list(labels_dir.glob('*.txt'))) if labels_dir and labels_dir.exists() else 0
-            
-            stats[split] = {
-                'images': img_count,
-                'labels': label_count,
-                'status': 'valid' if img_count > 0 and label_count > 0 else 'empty'
-            }
+        # Hitung statistik untuk dataset mentah
+        raw_stats = {"exists": os.path.exists(dataset_path), "stats": {}}
+        if raw_stats["exists"]:
+            raw_stats["stats"] = count_dataset_files(dataset_path)
+            if logger: logger.info(f"📊 Statistik dataset mentah berhasil dihitung: {dataset_path}")
         
-        if logger: logger.info(f"✅ Statistik dataset berhasil dimuat dari direktori {data_dir}")
-        return stats
+        # Hitung statistik untuk dataset preprocessed
+        preprocessed_stats = {"exists": os.path.exists(preprocessed_path), "stats": {}}
+        if preprocessed_stats["exists"]:
+            preprocessed_stats["stats"] = count_dataset_files(preprocessed_path)
+            if logger: logger.info(f"📊 Statistik dataset preprocessed berhasil dihitung: {preprocessed_path}")
+        
+        return {
+            "raw": raw_stats,
+            "preprocessed": preprocessed_stats
+        }
     except Exception as e:
-        if logger: logger.error(f"❌ Error saat mendapatkan statistik dataset: {str(e)}")
-        return {}
+        if logger: logger.error(f"❌ Error mendapatkan statistik dataset: {str(e)}")
+        return {
+            "raw": {"exists": False, "stats": {}},
+            "preprocessed": {"exists": False, "stats": {}}
+        }
 
-def get_class_distribution(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Dict[str, int]]:
+def get_class_distribution(dataset_dir: str, logger=None) -> Dict[str, Dict[str, int]]:
     """
-    Mendapatkan distribusi kelas dari dataset dengan fallback ke data simulasi.
+    Mendapatkan distribusi kelas dari dataset dengan pembacaan file label.
     
     Args:
-        config: Konfigurasi aplikasi
-        env: Environment manager
+        dataset_dir: Path direktori dataset
         logger: Logger untuk logging
         
     Returns:
         Dictionary berisi distribusi kelas per split
     """
+    class_stats = {}
+    
     try:
-        # Dapatkan direktori dataset
-        data_dir = get_dataset_dir(config, env, logger)
-        
-        # Coba gunakan DatasetManager
-        try:
-            from smartcash.dataset.manager import DatasetManager
-            dataset_manager = DatasetManager(config, logger=logger)
+        for split in ['train', 'valid', 'test']:
+            labels_dir = Path(dataset_dir) / split / 'labels'
+            if not labels_dir.exists():
+                class_stats[split] = {}
+                continue
             
-            # Mendapatkan distribusi kelas dari manager
-            class_stats = {}
-            for split in ['train', 'valid', 'test']:
+            # Dictionary untuk menyimpan jumlah kelas
+            split_classes = {}
+            
+            # Baca semua file label
+            for label_file in labels_dir.glob('*.txt'):
                 try:
-                    split_stats = dataset_manager.explore_class_distribution(split)
-                    class_stats[split] = split_stats
+                    with open(label_file, 'r') as f:
+                        for line in f:
+                            if line.strip():
+                                class_id = int(line.split()[0])
+                                split_classes[class_id] = split_classes.get(class_id, 0) + 1
                 except Exception as e:
-                    if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas untuk {split}: {str(e)}")
-                    class_stats[split] = {}
+                    if logger: logger.debug(f"⚠️ Error membaca label {label_file}: {str(e)}")
             
-            if logger: logger.info(f"✅ Distribusi kelas berhasil dimuat dari DatasetManager")
+            # Coba dapatkan nama kelas jika tersedia
+            try:
+                from smartcash.common.layer_config import get_layer_config_manager
+                lcm = get_layer_config_manager()
+                if lcm:
+                    class_map = lcm.get_class_map()
+                    named_classes = {}
+                    for class_id, count in split_classes.items():
+                        class_name = class_map.get(class_id, f"Class {class_id}")
+                        named_classes[class_name] = count
+                    split_classes = named_classes
+            except ImportError:
+                # Jika tidak ada layer_config_manager, gunakan ID sebagai nama
+                named_classes = {}
+                for class_id, count in split_classes.items():
+                    named_classes[f"Class {class_id}"] = count
+                split_classes = named_classes
             
-            # Validasi data - pastikan semua split memiliki data
-            if all(len(stats) > 0 for split, stats in class_stats.items()):
-                return class_stats
-            
-            if logger: logger.warning(f"⚠️ Data distribusi kelas tidak lengkap, menggunakan data simulasi")
-        except Exception as e:
-            if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas: {str(e)}, menggunakan data simulasi")
-            
-        # Fallback ke data simulasi
-        class_stats = {
-            'train': {'Rp1000': 350, 'Rp2000': 320, 'Rp5000': 380, 'Rp10000': 390, 'Rp20000': 360, 'Rp50000': 340, 'Rp100000': 370},
-            'valid': {'Rp1000': 50, 'Rp2000': 45, 'Rp5000': 55, 'Rp10000': 60, 'Rp20000': 55, 'Rp50000': 48, 'Rp100000': 52},
-            'test': {'Rp1000': 50, 'Rp2000': 45, 'Rp5000': 55, 'Rp10000': 55, 'Rp20000': 50, 'Rp50000': 47, 'Rp100000': 53}
-        }
+            class_stats[split] = split_classes
         
-        if logger: logger.warning(f"⚠️ Menggunakan data simulasi untuk distribusi kelas")
+        if logger: logger.info(f"📊 Distribusi kelas berhasil dianalisis")
         return class_stats
     except Exception as e:
-        if logger: logger.error(f"❌ Error saat mendapatkan distribusi kelas: {str(e)}")
+        if logger: logger.error(f"❌ Error menganalisis distribusi kelas: {str(e)}")
         
-        # Fallback ke data simulasi minimal
+        # Fallback ke data dummy
         return {
-            'train': {'Rp1000': 100, 'Rp10000': 100, 'Rp100000': 100},
-            'valid': {'Rp1000': 20, 'Rp10000': 20, 'Rp100000': 20},
-            'test': {'Rp1000': 20, 'Rp10000': 20, 'Rp100000': 20}
+            'train': {'Rp1000': 120, 'Rp2000': 110, 'Rp5000': 130, 'Rp10000': 140, 'Rp20000': 125, 'Rp50000': 115, 'Rp100000': 135},
+            'valid': {'Rp1000': 30, 'Rp2000': 25, 'Rp5000': 35, 'Rp10000': 40, 'Rp20000': 35, 'Rp50000': 28, 'Rp100000': 32},
+            'test': {'Rp1000': 30, 'Rp2000': 25, 'Rp5000': 35, 'Rp10000': 35, 'Rp20000': 30, 'Rp50000': 27, 'Rp100000': 33}
         }
 
-def show_class_distribution_visualization(output_box, class_stats: Dict[str, Dict[str, int]], colors: Dict[str, str], logger=None) -> None:
+def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, str]) -> None:
     """
-    Tampilkan visualisasi distribusi kelas menggunakan visualization_utils dengan fallback.
-    
-    Args:
-        output_box: Widget output untuk menampilkan visualisasi
-        class_stats: Dictionary distribusi kelas per split
-        colors: Konfigurasi warna
-        logger: Logger untuk logging
-    """
-    from smartcash.ui.utils.constants import ICONS
-    
-    with output_box:
-        clear_output(wait=True)
-        
-        # Cek apakah ada data untuk ditampilkan
-        if not class_stats or not all(split in class_stats for split in ['train', 'valid', 'test']):
-            data_dir = os.environ.get('DATA_DIR', 'data')
-            display(HTML(f"""<div style="padding:10px; background-color:{colors['alert_warning_bg']}; 
-                          border-left:4px solid {colors['alert_warning_text']}; 
-                          color:{colors['alert_warning_text']}; border-radius:4px;">
-                    <p>{ICONS['warning']} Dataset tidak ditemukan atau tidak lengkap. Pastikan dataset sudah didownload.</p>
-                </div>"""))
-            return
-        
-        try:
-            # Buat DataFrame untuk visualisasi
-            import pandas as pd
-            
-            # Kumpulkan semua kelas
-            all_classes = set()
-            for split_stats in class_stats.values():
-                all_classes.update(split_stats.keys())
-                
-            # Buat DataFrame
-            df_data = []
-            for cls in sorted(all_classes):
-                row = {'Class': cls}
-                for split in ['train', 'valid', 'test']:
-                    row[split.capitalize()] = class_stats[split].get(cls, 0)
-                df_data.append(row)
-                
-            df = pd.DataFrame(df_data)
-            
-            # Gunakan visualization_utils
-            try:
-                from smartcash.ui.utils.visualization_utils import create_class_distribution_plot, create_metrics_dashboard
-                
-                # Konversi data ke format yang sesuai
-                plot_data = {}
-                for i, row in df.iterrows():
-                    plot_data[row['Class']] = {
-                        'Train': row['Train'],
-                        'Valid': row['Valid'],
-                        'Test': row['Test']
-                    }
-                
-                # Buat visualisasi
-                display(HTML(f"<h3>{ICONS['chart']} Distribusi Kelas per Split</h3>"))
-                fig = create_class_distribution_plot(
-                    plot_data,
-                    title='Distribusi Kelas per Split',
-                    figsize=(10, 6),
-                    sort_by='name'
-                )
-                display(fig)
-                
-                # Buat dashboard metrik
-                metrics = {
-                    f"Total Train": df['Train'].sum(),
-                    f"Total Valid": df['Valid'].sum(),
-                    f"Total Test": df['Test'].sum(),
-                    f"Jumlah Kelas": len(df),
-                    f"Rasio Valid/Train": df['Valid'].sum() / df['Train'].sum() if df['Train'].sum() > 0 else 0,
-                    f"Rasio Test/Train": df['Test'].sum() / df['Train'].sum() if df['Train'].sum() > 0 else 0
-                }
-                
-                display(HTML(f"<h3>{ICONS['stats']} Metrik Dataset</h3>"))
-                display(create_metrics_dashboard(
-                    metrics,
-                    "Statistik Dataset",
-                    "Metrik utama dataset yang digunakan"
-                ))
-                
-                # Tampilkan tabel distribusi
-                display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas per Split</h3>"))
-                display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
-                
-            except ImportError as e:
-                if logger: logger.warning(f"⚠️ Tidak dapat menggunakan visualization_utils: {str(e)}")
-                
-                # Fallback ke matplotlib dasar
-                try:
-                    import matplotlib.pyplot as plt
-                    import numpy as np
-                    
-                    plt.figure(figsize=(10, 6))
-                    ax = plt.subplot(111)
-                    
-                    # Set width of bar
-                    barWidth = 0.25
-                    
-                    # Set positions of bars on X axis
-                    r1 = np.arange(len(df))
-                    r2 = [x + barWidth for x in r1]
-                    r3 = [x + barWidth for x in r2]
-                    
-                    # Create bars
-                    ax.bar(r1, df['Train'], width=barWidth, label='Train', color=colors['primary'])
-                    ax.bar(r2, df['Valid'], width=barWidth, label='Valid', color=colors['success'])
-                    ax.bar(r3, df['Test'], width=barWidth, label='Test', color=colors['warning'])
-                    
-                    # Add labels and title
-                    plt.xlabel('Kelas')
-                    plt.ylabel('Jumlah Sampel')
-                    plt.title('Distribusi Kelas per Split')
-                    plt.xticks([r + barWidth for r in range(len(df))], df['Class'])
-                    plt.legend()
-                    
-                    plt.tight_layout()
-                    plt.show()
-                    
-                    # Tampilkan tabel distribusi
-                    display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas per Split</h3>"))
-                    display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
-                except Exception as e:
-                    if logger: logger.error(f"❌ Error saat membuat visualisasi fallback: {str(e)}")
-                    display(HTML(f"""<div style="padding:10px; background-color:{colors['alert_danger_bg']}; 
-                                  color:{colors['alert_danger_text']}; border-radius:4px;">
-                            <p>{ICONS['error']} Tidak dapat membuat visualisasi, error: {str(e)}</p>
-                        </div>"""))
-                
-            # Tampilkan info simpan konfigurasi
-            display(HTML(f"""<div style="margin-top:20px; padding:10px; background-color:{colors['alert_info_bg']}; 
-                       color:{colors['alert_info_text']}; border-radius:4px;">
-                <p>{ICONS['save']} Klik tombol <strong>Simpan Konfigurasi</strong> untuk menyimpan pengaturan</p>
-            </div>"""))
-            
-        except Exception as e:
-            if logger: logger.error(f"❌ Error saat membuat visualisasi: {str(e)}")
-            display(HTML(f"""<div style="padding:10px; background-color:{colors['alert_danger_bg']}; 
-                          border-left:4px solid {colors['alert_danger_text']}; 
-                          color:{colors['alert_danger_text']}; border-radius:4px;">
-                    <p>{ICONS['error']} Error membuat visualisasi: {str(e)}</p>
-                </div>"""))
-
-def update_stats_cards(html_component, stats: Dict[str, Dict[str, Any]], colors: Dict[str, str]) -> None:
-    """
-    Update komponen HTML dengan statistik distribusi dataset dalam bentuk cards.
+    Update komponen HTML dengan statistik dataset dalam bentuk cards.
     
     Args:
         html_component: Komponen HTML untuk diupdate
-        stats: Statistik dataset per split
+        stats: Statistik dataset
         colors: Konfigurasi warna
     """
     from smartcash.ui.utils.constants import ICONS
     
-    # Hitung total dan persentase
-    total_images = sum(split_data.get('images', 0) for split_data in stats.values())
+    # Mendapatkan statistik raw dan preprocessed
+    raw_stats = stats.get("raw", {"exists": False, "stats": {}})
+    preprocessed_stats = stats.get("preprocessed", {"exists": False, "stats": {}})
     
-    if total_images == 0:
-        data_dir = os.environ.get('DATA_DIR', 'data') 
-        html_component.value = f"""<div style="padding:10px; background-color:{colors['alert_warning_bg']}; 
-                  border-left:4px solid {colors['alert_warning_text']}; 
-                  color:{colors['alert_warning_text']}; border-radius:4px;">
-            <p>{ICONS['warning']} Dataset tidak ditemukan di <code>{data_dir}</code> atau kosong.</p>
-        </div>"""
-        return
+    # Hitung total untuk raw
+    raw_images = sum(split.get('images', 0) for split in raw_stats.get('stats', {}).values())
+    raw_labels = sum(split.get('labels', 0) for split in raw_stats.get('stats', {}).values())
+    
+    # Hitung total untuk preprocessed
+    preprocessed_images = sum(split.get('images', 0) for split in preprocessed_stats.get('stats', {}).values())
+    preprocessed_labels = sum(split.get('labels', 0) for split in preprocessed_stats.get('stats', {}).values())
     
     # Create HTML untuk cards distributions
     html = f"""
-    <h3 style="margin-top:0; color:{colors['dark']}">{ICONS['dataset']} Distribusi Dataset Saat Ini</h3>
+    <h3 style="margin-top:10px; margin-bottom:10px; color:{colors['dark']}">{ICONS['dataset']} Statistik Dataset</h3>
     <div style="display:flex; flex-wrap:wrap; gap:15px; margin-bottom:15px">
+    
+        <!-- Raw Dataset Card -->
+        <div style="flex:1; min-width:220px; border:1px solid {colors['primary']}; border-radius:5px; padding:10px; background-color:{colors['light']}">
+            <h4 style="margin-top:0; color:{colors['primary']}">{ICONS['folder']} Dataset Mentah</h4>
+            <p style="margin:5px 0; font-weight:bold; font-size:1.2em; color:{colors['dark']}">
+                {raw_images} gambar / {raw_labels} label
+            </p>
+            <div style="display:flex; flex-wrap:wrap; gap:5px;">
     """
     
-    for split in ['train', 'valid', 'test']:
-        split_data = stats.get(split, {})
-        images = split_data.get('images', 0)
-        labels = split_data.get('labels', 0)
-        status = split_data.get('status', 'valid')
-        percentage = (images / total_images * 100) if total_images > 0 else 0
-        
-        # Pick color based on status
-        color = colors['primary'] if status == 'valid' else colors['danger']
-        
+    # Tambahkan detail untuk tiap split di raw dataset
+    for split, data in raw_stats.get('stats', {}).items():
+        split_color = colors['success'] if data.get('valid', False) else colors['danger']
         html += f"""
-        <div style="flex:1; min-width:150px; border:1px solid {color}; border-radius:5px; padding:10px; background-color:{colors['light']}">
-            <h4 style="margin-top:0; color:{color}">{split.capitalize()}</h4>
-            <p style="margin:5px 0; font-weight:bold; font-size:1.2em; color:{colors['dark']}">{percentage:.1f}%</p>
-            <p style="margin:5px 0; color:{colors['dark']}"><strong>Images:</strong> {images}</p>
-            <p style="margin:5px 0; color:{colors['dark']}"><strong>Labels:</strong> {labels}</p>
-        </div>
+            <div style="padding:5px; margin:2px; border-radius:3px; background-color:{colors['light']}; border:1px solid {split_color}">
+                <strong style="color:{split_color}">{split.capitalize()}</strong>: {data.get('images', 0)}
+            </div>
         """
     
-    html += "</div>"
+    html += f"""
+            </div>
+        </div>
+        
+        <!-- Preprocessed Dataset Card -->
+        <div style="flex:1; min-width:220px; border:1px solid {colors['secondary']}; border-radius:5px; padding:10px; background-color:{colors['light']}">
+            <h4 style="margin-top:0; color:{colors['secondary']}">{ICONS['processing']} Dataset Preprocessed</h4>
+            <p style="margin:5px 0; font-weight:bold; font-size:1.2em; color:{colors['dark']}">
+                {preprocessed_images} gambar / {preprocessed_labels} label
+            </p>
+            <div style="display:flex; flex-wrap:wrap; gap:5px;">
+    """
+    
+    # Tambahkan detail untuk tiap split di preprocessed dataset
+    for split, data in preprocessed_stats.get('stats', {}).items():
+        split_color = colors['success'] if data.get('valid', False) else colors['danger']
+        html += f"""
+            <div style="padding:5px; margin:2px; border-radius:3px; background-color:{colors['light']}; border:1px solid {split_color}">
+                <strong style="color:{split_color}">{split.capitalize()}</strong>: {data.get('images', 0)}
+            </div>
+        """
+    
+    html += """
+            </div>
+        </div>
+    </div>
+    """
     
     # Update HTML component
     html_component.value = html
+
+def show_distribution_visualization(output_widget, config: Dict[str, Any], env=None, logger=None) -> None:
+    """
+    Menampilkan visualisasi distribusi kelas dataset.
+    
+    Args:
+        output_widget: Widget output untuk visualisasi
+        config: Konfigurasi aplikasi
+        env: Environment manager
+        logger: Logger untuk logging
+    """
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    
+    with output_widget:
+        clear_output(wait=True)
+        
+        try:
+            # Dapatkan path dataset
+            dataset_path, preprocessed_path = get_dataset_paths(config, env)
+            
+            # Cek keberadaan dataset
+            if not os.path.exists(dataset_path):
+                display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                              border-left:4px solid {COLORS['alert_warning_text']}; 
+                              color:{COLORS['alert_warning_text']}; border-radius:4px;">
+                        <p>{ICONS['warning']} Dataset tidak ditemukan di: {dataset_path}</p>
+                        <p>Pastikan dataset sudah didownload atau path benar.</p>
+                    </div>"""))
+                return
+            
+            # Dapatkan distribusi kelas
+            class_distribution = get_class_distribution(dataset_path, logger)
+            
+            # Tampilkan visualisasi distribusi
+            try:
+                import pandas as pd
+                import matplotlib.pyplot as plt
+                
+                # Kumpulkan semua kelas
+                all_classes = set()
+                for split_stats in class_distribution.values():
+                    all_classes.update(split_stats.keys())
+                    
+                # Buat DataFrame
+                df_data = []
+                for cls in sorted(all_classes):
+                    row = {'Class': cls}
+                    for split in ['train', 'valid', 'test']:
+                        row[split.capitalize()] = class_distribution.get(split, {}).get(cls, 0)
+                    df_data.append(row)
+                    
+                df = pd.DataFrame(df_data)
+                
+                # Buat visualisasi dengan matplotlib
+                plt.figure(figsize=(12, 6))
+                
+                # Setup bar chart
+                import numpy as np
+                
+                # Set width of bar
+                barWidth = 0.25
+                
+                # Set positions of bars on X axis
+                r1 = np.arange(len(df))
+                r2 = [x + barWidth for x in r1]
+                r3 = [x + barWidth for x in r2]
+                
+                # Buat bars
+                plt.bar(r1, df['Train'], width=barWidth, label='Train', color=COLORS['primary'])
+                plt.bar(r2, df['Valid'], width=barWidth, label='Valid', color=COLORS['success'])
+                plt.bar(r3, df['Test'], width=barWidth, label='Test', color=COLORS['warning'])
+                
+                # Tambahkan labels dan info
+                plt.xlabel('Kelas')
+                plt.ylabel('Jumlah Sampel')
+                plt.title('Distribusi Kelas per Split Dataset')
+                plt.xticks([r + barWidth for r in range(len(df))], df['Class'], rotation=45, ha='right')
+                plt.legend()
+                
+                plt.tight_layout()
+                plt.show()
+                
+                # Tambahkan deskripsi
+                display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                              color:{COLORS['alert_info_text']}; border-radius:4px; margin-top:15px;">
+                    <p>{ICONS['info']} <strong>Informasi Dataset:</strong> Visualisasi di atas menunjukkan distribusi kelas untuk setiap split dataset.</p>
+                    <p>Dataset path: <code>{dataset_path}</code></p>
+                </div>"""))
+                
+                # Tampilkan tabel juga
+                display(HTML(f"<h3>{ICONS['chart']} Tabel Distribusi Kelas</h3>"))
+                display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
+                
+            except Exception as e:
+                if logger: logger.error(f"❌ Error membuat visualisasi: {str(e)}")
+                display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                              color:{COLORS['alert_danger_text']}; border-radius:4px;">
+                        <p>{ICONS['error']} Error membuat visualisasi: {str(e)}</p>
+                    </div>"""))
+        except Exception as e:
+            if logger: logger.error(f"❌ Error saat visualisasi distribusi: {str(e)}")
+            display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                          color:{COLORS['alert_danger_text']}; border-radius:4px;">
+                    <p>{ICONS['error']} Error saat visualisasi: {str(e)}</p>
+                </div>"""))
+
+def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
+    """
+    Load statistik dataset dan tampilkan di UI.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        config: Konfigurasi aplikasi
+        env: Environment manager
+        logger: Logger untuk logging
+    """
+    try:
+        # Dapatkan statistik dataset
+        stats = get_dataset_stats(config, env, logger)
+        
+        # Update cards
+        if 'current_stats_html' in ui_components:
+            from smartcash.ui.utils.constants import COLORS
+            update_stats_cards(ui_components['current_stats_html'], stats, COLORS)
+            
+        # Tampilkan visualisasi di output box
+        if 'output_box' in ui_components:
+            show_distribution_visualization(ui_components['output_box'], config, env, logger)
+            
+        if logger: logger.info(f"✅ Statistik dan visualisasi dataset berhasil ditampilkan")
+    except Exception as e:
+        if logger: logger.error(f"❌ Error saat menampilkan statistik dataset: {str(e)}")
+        
+        # Tampilkan error di output box
+        if 'output_box' in ui_components:
+            with ui_components['output_box']:
+                from smartcash.ui.utils.constants import ICONS, COLORS
+                clear_output(wait=True)
+                display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                              color:{COLORS['alert_danger_text']}; border-radius:4px;">
+                        <p>{ICONS['error']} Error menampilkan statistik dataset: {str(e)}</p>
+                    </div>"""))

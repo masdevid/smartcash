@@ -2,6 +2,7 @@
 File: smartcash/dataset/services/downloader/download_service.py
 Deskripsi: Layanan utama untuk mengelola download dataset dari berbagai sumber
 """
+
 import os
 import json
 import time
@@ -15,8 +16,6 @@ from datetime import datetime
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
 from smartcash.dataset.utils.dataset_utils import DatasetUtils, DEFAULT_SPLITS
-
-# Sisa kode tidak berubah
 
 
 class DownloadService:
@@ -66,6 +65,104 @@ class DownloadService:
             f"   • Data dir: {self.data_dir}\n"
             f"   • Default sumber: {self.workspace}/{self.project}:{self.version}"
         )
+    
+    def download_from_roboflow(
+        self,
+        api_key: Optional[str] = None,
+        workspace: Optional[str] = None,
+        project: Optional[str] = None,
+        version: Optional[str] = None,
+        format: str = "yolov5pytorch",
+        output_dir: Optional[str] = None,
+        show_progress: bool = True,
+        verify_integrity: bool = True
+    ) -> str:
+        """
+        Download dataset dari Roboflow.
+        
+        Args:
+            api_key: Roboflow API key (opsional, default dari config)
+            workspace: Roboflow workspace (opsional)
+            project: Roboflow project (opsional)
+            version: Roboflow version (opsional)
+            format: Format dataset ('yolov5pytorch', 'coco', etc)
+            output_dir: Directory untuk menyimpan dataset (opsional)
+            show_progress: Tampilkan progress bar
+            verify_integrity: Verifikasi integritas dataset setelah download
+            
+        Returns:
+            Path ke direktori dataset
+        """
+        # Gunakan nilai config jika parameter tidak diberikan
+        api_key = api_key or self.api_key
+        workspace = workspace or self.workspace
+        project = project or self.project
+        version = version or self.version
+        
+        # Validasi
+        if not api_key:
+            raise ValueError("🔑 API key tidak tersedia. Berikan api_key melalui parameter atau config.")
+        if not workspace or not project or not version:
+            raise ValueError("📋 Workspace, project, dan version diperlukan untuk download dataset.")
+        
+        # Setup direktori output
+        if not output_dir:
+            output_dir = str(self.downloads_dir / f"{workspace}_{project}_{version}")
+            
+        output_path = Path(output_dir)
+        
+        # Hapus download sebelumnya jika ada
+        if output_path.exists():
+            self.logger.info(f"🧹 Menghapus direktori download sebelumnya: {output_path}")
+            shutil.rmtree(output_path)
+            
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Notifikasi start download
+        self.logger.info(f"🚀 Memulai download dataset {workspace}/{project} versi {version}")
+        
+        try:
+            # Download metadata terlebih dahulu
+            metadata = self.roboflow_downloader.get_roboflow_metadata(
+                workspace, project, version, api_key, format, self.temp_dir
+            )
+            
+            # Dapatkan link download
+            download_url = metadata['export']['link']
+            file_size_mb = metadata.get('export', {}).get('size', 0)
+            
+            if file_size_mb > 0:
+                self.logger.info(f"📦 Ukuran dataset: {file_size_mb:.2f} MB")
+            
+            # Lakukan download dataset
+            download_success = self.roboflow_downloader.process_roboflow_download(
+                download_url, output_path, show_progress=show_progress
+            )
+            
+            if not download_success:
+                raise ValueError("Proses download dan ekstraksi gagal")
+            
+            # Verifikasi hasil download
+            if verify_integrity:
+                valid = self.validator.verify_download(output_dir, metadata)
+                
+                if not valid:
+                    self.logger.warning("⚠️ Verifikasi dataset gagal, namun download selesai")
+            
+            # Tampilkan statistik download
+            stats = self.validator.get_dataset_stats(output_dir)
+            self.logger.success(
+                f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir}\n"
+                f"   • Ukuran: {file_size_mb:.2f} MB\n"
+                f"   • Gambar: {stats.get('total_images', 0)} file\n"
+                f"   • Label: {stats.get('total_labels', 0)} file"
+            )
+            
+            return output_dir
+        
+        except Exception as e:
+            self.logger.error(f"❌ Error download dataset: {str(e)}")
+            raise
     
     def export_to_local(
         self,

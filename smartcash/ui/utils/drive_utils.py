@@ -18,10 +18,8 @@ def detect_drive_mount() -> Tuple[bool, Optional[str]]:
     """
     # Cek path standar di Colab
     drive_paths = [
+        '/content/drive/MyDrive/SmartCash',
         '/content/drive/MyDrive',
-        '/content/drive',
-        '/gdrive',
-        '/mnt/drive'
     ]
     
     for path in drive_paths:

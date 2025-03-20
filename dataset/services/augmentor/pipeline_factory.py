@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/pipeline_factory.py
-Deskripsi: Factory untuk membuat pipeline augmentasi dengan konfigurasi yang disesuaikan
+Deskripsi: Factory untuk membuat pipeline augmentasi dengan konfigurasi yang disesuaikan dan validasi parameter
 """
 
 import cv2
@@ -101,15 +101,17 @@ class AugmentationPipelineFactory:
         # Buat list transformasi
         transforms = []
         
+        # Fix parameter ResizedCrop untuk albumentations >= 0.7.0
+        # Albumentations requires dict for scale parameter
+        resize_crop_params = {
+            'height': int(img_size[1]), 
+            'width': int(img_size[0]), 
+            'scale': (0.9 if 'crop' in augmentation_types else 0.95, 1.0), 
+            'p': 1.0
+        }
+        
         # Tambahkan random crop resize sebagai base transform
-        transforms.append(
-            A.RandomResizedCrop(
-                height=img_size[1], 
-                width=img_size[0], 
-                scale=(0.9 if 'crop' in augmentation_types else 0.95, 1.0), 
-                p=1.0
-            )
-        )
+        transforms.append(A.RandomResizedCrop(**resize_crop_params))
         
         # Sesuaikan parameter berdasarkan intensitas
         params = self._adjust_params_by_intensity(intensity, **kwargs)
@@ -133,9 +135,9 @@ class AugmentationPipelineFactory:
         if 'hsv' in augmentation_types:
             transforms.append(
                 A.HueSaturationValue(
-                    hue_shift_limit=params['hue'] * 360,
-                    sat_shift_limit=params['saturation'] * 255,
-                    val_shift_limit=params['lightness'] * 255,
+                    hue_shift_limit=int(params['hue'] * 360),
+                    sat_shift_limit=int(params['saturation'] * 255),
+                    val_shift_limit=int(params['lightness'] * 255),
                     p=0.5 * params['p_factor']
                 )
             )
@@ -259,7 +261,7 @@ class AugmentationPipelineFactory:
                 A.ShiftScaleRotate(
                     shift_limit=params.get('translate', 0.1),
                     scale_limit=params.get('scale', 0.1),
-                    rotate_limit=params.get('degrees', 15),
+                    rotate_limit=int(params.get('degrees', 15)),
                     p=0.7 * params.get('p_factor', 1.0),
                     border_mode=cv2.BORDER_CONSTANT
                 )
@@ -314,9 +316,9 @@ class AugmentationPipelineFactory:
         if params.get('saturation', 0) > 0:
             transforms.append(
                 A.RGBShift(
-                    r_shift_limit=10 * params.get('saturation', 0.2),
-                    g_shift_limit=10 * params.get('saturation', 0.2),
-                    b_shift_limit=10 * params.get('saturation', 0.2),
+                    r_shift_limit=int(10 * params.get('saturation', 0.2)),
+                    g_shift_limit=int(10 * params.get('saturation', 0.2)),
+                    b_shift_limit=int(10 * params.get('saturation', 0.2)),
                     p=0.3 * params.get('p_factor', 1.0)
                 )
             )
@@ -346,7 +348,7 @@ class AugmentationPipelineFactory:
             
         # Blur
         if params.get('blur_prob', 0) > 0:
-            blur_limit = max(1, params.get('blur_limit', 3))
+            blur_limit = max(1, int(params.get('blur_limit', 3)))
             transforms.append(
                 A.Blur(
                     blur_limit=blur_limit,
@@ -356,10 +358,12 @@ class AugmentationPipelineFactory:
             
         # JPEG Compression
         if params.get('jpeg_prob', 0) > 0:
+            quality_lower = int(params.get('jpeg_quality', (80, 100))[0])
+            quality_upper = int(params.get('jpeg_quality', (80, 100))[1])
             transforms.append(
                 A.ImageCompression(
-                    quality_lower=params.get('jpeg_quality', (80, 100))[0],
-                    quality_upper=params.get('jpeg_quality', (80, 100))[1],
+                    quality_lower=quality_lower,
+                    quality_upper=quality_upper,
                     p=params.get('jpeg_prob', 0.1)
                 )
             )
@@ -457,7 +461,7 @@ class AugmentationPipelineFactory:
         """
         return A.Compose(
             [
-                A.Resize(height=img_size[1], width=img_size[0], p=1.0),
+                A.Resize(height=int(img_size[1]), width=int(img_size[0]), p=1.0),
                 A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], p=1.0)
             ],
             bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels'])

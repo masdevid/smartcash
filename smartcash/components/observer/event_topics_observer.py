@@ -83,6 +83,10 @@ class EventTopics:
     AUGMENTATION_END = "augmentation.end"
     AUGMENTATION_PROGRESS = "augmentation.progress"
     AUGMENTATION_ERROR = "augmentation.error"
+    AUGMENTATION_CURRENT_PROGRESS = "augmentation.current_progress"
+    AUGMENTATION_CLEANUP_START = "augmentation.cleanup.start"
+    AUGMENTATION_CLEANUP_END = "augmentation.cleanup.end"
+    AUGMENTATION_CLEANUP_ERROR = "augmentation.cleanup.error"
     
     # Checkpoint events
     CHECKPOINT_SAVE = "checkpoint.save"

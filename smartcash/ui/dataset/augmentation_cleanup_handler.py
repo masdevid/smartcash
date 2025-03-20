@@ -5,7 +5,7 @@ Deskripsi: Handler untuk membersihkan data hasil augmentasi dengan pattern yang 
 
 from typing import Dict, Any
 from IPython.display import display, clear_output
-import shutil, time, re, glob
+import shutil, time, re, glob, os
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
@@ -32,14 +32,16 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 from smartcash.ui.helpers.ui_helpers import create_confirmation_dialog
                 
                 def on_confirm_cleanup():
-                    with ui_components['status']: clear_output(wait=True)
+                    with ui_components['status']: 
+                        clear_output(wait=True)
                     perform_cleanup()
                 
                 def on_cancel_cleanup():
                     with ui_components['status']: 
+                        clear_output(wait=True)
                         display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
                 
-                dialog = create_confirmation_dialog(
+                confirmation_dialog = create_confirmation_dialog(
                     "Konfirmasi Pembersihan Data",
                     "Apakah Anda yakin ingin menghapus semua data hasil augmentasi? Tindakan ini tidak dapat dibatalkan.",
                     on_confirm_cleanup, on_cancel_cleanup, "Ya, Hapus Data", "Batal"
@@ -47,12 +49,13 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 
                 with ui_components['status']:
                     clear_output(wait=True)
-                    display(dialog)
+                    display(confirmation_dialog)
                 return
                 
             except ImportError:
                 # Lanjutkan tanpa konfirmasi jika fungsi tidak tersedia
                 with ui_components['status']: 
+                    clear_output(wait=True)
                     display(create_info_alert(
                         "Konfirmasi: Anda akan menghapus semua data hasil augmentasi. Lanjutkan?",
                         "warning", ICONS['warning']
@@ -62,21 +65,27 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     confirm_btn = widgets.Button(description="Ya, Hapus Data", button_style="danger", icon="trash")
                     cancel_btn = widgets.Button(description="Batal", button_style="info", icon="times")
                     
-                    confirm_btn.on_click(lambda b: perform_cleanup())
-                    cancel_btn.on_click(lambda b: cancel_cleanup())
+                    # Definisi handler untuk tombol konfirmasi/batal
+                    def on_confirm(b):
+                        with ui_components['status']: clear_output(wait=True)
+                        perform_cleanup()
                     
-                    display(widgets.HBox([confirm_btn, cancel_btn], layout=widgets.Layout(justify_content="center", margin="10px 0")))
+                    def on_cancel(b):
+                        with ui_components['status']: 
+                            clear_output(wait=True)
+                            display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+                    
+                    confirm_btn.on_click(on_confirm)
+                    cancel_btn.on_click(on_cancel)
+                    
+                    buttons_box = widgets.HBox([confirm_btn, cancel_btn], 
+                                             layout=widgets.Layout(justify_content="center", margin="10px 0"))
+                    display(buttons_box)
                 return
                 
         except Exception as e:
             with ui_components['status']: 
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
-    
-    # Fungsi untuk membatalkan cleanup
-    def cancel_cleanup():
-        with ui_components['status']: 
-            clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
     
     # Fungsi untuk melakukan cleanup sebenarnya dengan proteksi data preprocessing
     def perform_cleanup():
@@ -173,9 +182,10 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 if images_dir.exists() and labels_dir.exists():
                     for pattern in augmentation_patterns:
                         # Hapus file gambar
-                        for img_file in images_dir.glob('*'):
+                        for img_file in list(images_dir.glob('*')):
                             if re.match(pattern, img_file.name):
                                 try:
+                                    # Hapus file gambar
                                     img_file.unlink()
                                     deleted_count += 1
                                     
@@ -187,6 +197,11 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                                 except Exception as e:
                                     if logger: logger.warning(f"⚠️ Gagal menghapus {img_file}: {e}")
                     
+                    # Cek jika folder kosong dan hapus jika perlu
+                    if not any(images_dir.iterdir()) and not any(labels_dir.iterdir()):
+                        shutil.rmtree(path, ignore_errors=True)
+                        deleted_count += 2  # Directories
+                    
                     # Log hasil penghapusan
                     with ui_components['status']:
                         display(create_status_indicator(
@@ -195,7 +210,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                         ))
                 else:
                     # Hapus keseluruhan direktori jika tidak memiliki struktur standar
-                    shutil.rmtree(path)
+                    shutil.rmtree(path, ignore_errors=True)
                 
                 success = True
                 duration = time.time() - start_time
@@ -239,6 +254,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 
         except Exception as e:
             with ui_components['status']:
+                clear_output(wait=True)
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
             
             update_status_panel(ui_components, "error", 
@@ -258,14 +274,32 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             except ImportError:
                 pass
     
+    # Periksa apakah folder augmentasi sudah ada dan berisi data
+    def check_augmentation_exists():
+        augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
+        path = Path(augmented_dir)
+        
+        # Cek jika direktori images ada dan memiliki file
+        images_dir = path / 'images'
+        has_files = images_dir.exists() and any(images_dir.glob('*'))
+        
+        # Tampilkan/sembunyikan tombol cleanup berdasarkan kondisi
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].layout.display = 'inline-block' if has_files else 'none'
+            
+        return has_files
+    
     # Register handler
     ui_components['cleanup_button'].on_click(on_cleanup_click)
+    
+    # Set tombol cleanup visibility berdasarkan kondisi folder
+    check_augmentation_exists()
     
     # Tambahkan fungsi ke ui_components
     ui_components.update({
         'on_cleanup_click': on_cleanup_click,
         'perform_cleanup': perform_cleanup,
-        'cancel_cleanup': cancel_cleanup
+        'check_augmentation_exists': check_augmentation_exists
     })
     
     return ui_components

@@ -4,7 +4,7 @@ Deskripsi: Handler terintegrasi untuk augmentasi dataset yang menggabungkan semu
 """
 
 from typing import Dict, Any, Optional
-import time, os
+import time, os, sys
 from pathlib import Path
 from IPython.display import display, clear_output
 
@@ -26,6 +26,53 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     from smartcash.ui.dataset.augmentation_cleanup_handler import setup_cleanup_handler
     
     try:
+        # Redirect stdout dan stderr ke output widget untuk tangkap semua log
+        if 'status' in ui_components:
+            class OutputWidgetWriter:
+                def __init__(self, output_widget):
+                    self.output_widget = output_widget
+                    self.buffer = ""
+                
+                def write(self, text):
+                    self.buffer += text
+                    if '\n' in self.buffer:
+                        with self.output_widget:
+                            display(HTML(f"<pre>{self.buffer}</pre>"))
+                        self.buffer = ""
+                    return len(text)
+                
+                def flush(self):
+                    if self.buffer:
+                        with self.output_widget:
+                            display(HTML(f"<pre>{self.buffer}</pre>"))
+                        self.buffer = ""
+            
+            # Simpan referensi stdout dan stderr asli
+            original_stdout = sys.stdout
+            original_stderr = sys.stderr
+            
+            # Redirect ke output widget
+            output_writer = OutputWidgetWriter(ui_components['status'])
+            sys.stdout = output_writer
+            sys.stderr = output_writer
+            
+            # Tambahkan handler untuk restore stdout/stderr pada cleanup
+            def restore_outputs():
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
+            
+            # Tambahkan ke cleanup handlers
+            if 'cleanup' in ui_components and callable(ui_components['cleanup']):
+                original_cleanup = ui_components['cleanup']
+                
+                def enhanced_cleanup():
+                    restore_outputs()
+                    original_cleanup()
+                
+                ui_components['cleanup'] = enhanced_cleanup
+            else:
+                ui_components['cleanup'] = restore_outputs
+        
         # Inisialisasi dan deteksi state augmentasi
         ui_components = detect_augmentation_state(ui_components, env, config)
         
@@ -65,6 +112,9 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         ui_components['summary_container'].layout.display = 'none'
         ui_components['visualization_container'].layout.display = 'none'
         ui_components['visualization_buttons'].layout.display = 'none'
+        
+        # Tampilkan Log accordion terbuka secara default
+        ui_components['log_accordion'].selected_index = 0
         
         # Callback untuk update summary setelah augmentasi
         def update_summary(result: Dict[str, Any]):
@@ -106,6 +156,11 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
             
             # Reset flags
             ui_components['augmentation_running'] = False
+            
+            # Restore stdout/stderr
+            if 'status' in ui_components:
+                sys.stdout = original_stdout
+                sys.stderr = original_stderr
         
         # Register cleanup function
         ui_components['cleanup'] = cleanup_resources
@@ -115,6 +170,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     except Exception as e:
         # Tangani error inisialisasi
         with ui_components['status']:
+            clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error inisialisasi handler: {str(e)}"))
         
         # Log error jika logger tersedia
@@ -145,6 +201,7 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
         # Update UI
         if success:
             with ui_components['status']:
+                clear_output(wait=True)
                 display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Konfigurasi berhasil disimpan"))
             
             # Update status panel
@@ -159,11 +216,13 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
             if logger: logger.success(f"{ICONS.get('success', '✅')} Konfigurasi augmentasi berhasil disimpan")
         else:
             with ui_components['status']:
+                clear_output(wait=True)
                 display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Gagal menyimpan konfigurasi"))
             
             if logger: logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyimpan konfigurasi")
     except Exception as e:
         with ui_components['status']:
+            clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
         
         if logger: logger.error(f"{ICONS.get('error', '❌')} Error menyimpan konfigurasi: {str(e)}")

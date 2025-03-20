@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_component.py
-Deskripsi: Komponen UI untuk augmentasi dataset dengan integrasi UI utils standar dan perbaikan warna header
+Deskripsi: Komponen UI untuk augmentasi dataset dengan integrasi UI utils standar dan perbaikan layout
 """
 
 import ipywidgets as widgets
@@ -32,6 +32,23 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     status_panel = widgets.HTML(
         value=create_info_alert("Konfigurasi augmentasi dataset", "info").value
     )
+    
+    # Path setting dengan opsi untuk mengubah lokasi dataset
+    location_container = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin:5px 0'>{ICONS['folder']} Lokasi Dataset</h4>"),
+        widgets.Text(
+            value='data',
+            description='Data Dir:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%', margin='5px 0')
+        ),
+        widgets.Text(
+            value='data/augmented',
+            description='Output Dir:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%', margin='5px 0')
+        )
+    ])
     
     # Augmentation options dengan struktur yang lebih ringkas
     aug_options = widgets.VBox([
@@ -65,12 +82,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
             value=True,
             description='Validate results',
             style={'description_width': 'initial'}
-        ),
-        widgets.Checkbox(
-            value=True,
-            description='Resume if interrupted',
-            style={'description_width': 'initial'}
         )
+        # Removed "Resume if interrupted" option
     ])
     
     # Position parameters in accordion
@@ -207,13 +220,14 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     augment_button = widgets.Button(description='Run Augmentation', button_style='primary', icon='random')
     stop_button = widgets.Button(description='Stop', button_style='danger', icon='stop', 
                                layout=widgets.Layout(display='none'))
+    reset_button = widgets.Button(description='Reset', button_style='warning', icon='refresh')
     cleanup_button = widgets.Button(description='Clean Augmented Data', button_style='danger', icon='trash')
     save_button = widgets.Button(description='Simpan Konfigurasi', button_style='success', icon='save')
     
-    # Container tombol utama
+    # Container tombol utama (menggunakan layout biasa, bukan space-between)
     button_container = widgets.HBox([
-        augment_button, stop_button, save_button, cleanup_button
-    ], layout=widgets.Layout(margin='10px 0', display='flex', justify_content='space-between'))
+        augment_button, stop_button, reset_button, save_button, cleanup_button
+    ], layout=widgets.Layout(margin='10px 0', gap='10px'))
     
     # Progress tracking dengan styling standar
     progress_bar = widgets.IntProgress(value=0, min=0, max=100, description='Overall:',
@@ -252,7 +266,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     visualization_buttons = widgets.HBox([
         widgets.Button(description='Tampilkan Sampel', button_style='info', icon='image'),
         widgets.Button(description='Bandingkan Hasil', button_style='info', icon='columns')
-    ], layout=widgets.Layout(margin='10px 0', display='none'))
+    ], layout=widgets.Layout(margin='10px 0', display='none', gap='10px'))
     
     # Summary container
     summary_container = widgets.Output(
@@ -274,6 +288,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         status_panel,
+        location_container,  # Added location container
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
         aug_options,
         advanced_accordion,
@@ -292,6 +307,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
+        'data_dir_input': location_container.children[1],  # Data dir input
+        'output_dir_input': location_container.children[2],  # Output dir input
         'aug_options': aug_options,
         'position_options': position_options,
         'lighting_options': lighting_options,
@@ -300,6 +317,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_accordion': advanced_accordion,
         'augment_button': augment_button,
         'stop_button': stop_button,
+        'reset_button': reset_button,  # Added reset button
         'cleanup_button': cleanup_button,
         'save_button': save_button,
         'progress_bar': progress_bar,

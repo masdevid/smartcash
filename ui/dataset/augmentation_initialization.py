@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_initialization.py
-Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan path handling dan perbaikan warna header
+Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan path handling dan tampilan lokasi dataset
 """
 
 from typing import Dict, Any
@@ -40,12 +40,18 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
         # Konversi ke path absolut untuk ditampilkan
         abs_data_dir = os.path.abspath(data_dir)
         abs_augmented_dir = os.path.abspath(augmented_dir)
+        
+        # Update input values dengan locations aktual
+        if 'data_dir_input' in ui_components:
+            ui_components['data_dir_input'].value = data_dir
+        if 'output_dir_input' in ui_components:
+            ui_components['output_dir_input'].value = augmented_dir
             
         # Update status panel dengan utils standar
         update_status_panel(
             ui_components, 
             "info", 
-            f"Dataset akan diaugmentasi dari sumber: <strong>{abs_data_dir}</strong>"
+            f"Dataset akan diaugmentasi dari sumber: <strong>{abs_data_dir}</strong> ke <strong>{abs_augmented_dir}</strong>"
         )
         
         # Cek status augmented data yang sudah ada

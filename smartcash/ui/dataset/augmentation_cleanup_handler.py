@@ -1,19 +1,18 @@
 """
 File: smartcash/ui/dataset/augmentation_cleanup_handler.py
-Deskripsi: Handler untuk membersihkan data hasil augmentasi dengan EventTopics yang diperbarui
+Deskripsi: Handler untuk membersihkan data hasil augmentasi dengan pattern yang diperbarui
 """
 
 from typing import Dict, Any
 from IPython.display import display, clear_output
-import shutil
-import time
+import shutil, time, re, glob
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup handler untuk tombol cleanup augmentasi data.
+    Setup handler untuk tombol cleanup augmentasi data dengan pattern yang ditingkatkan.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -79,7 +78,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
     
-    # Fungsi untuk melakukan cleanup sebenarnya
+    # Fungsi untuk melakukan cleanup sebenarnya dengan proteksi data preprocessing
     def perform_cleanup():
         augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
         from smartcash.ui.dataset.augmentation_initialization import update_status_panel
@@ -105,37 +104,99 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             except ImportError:
                 pass
             
+            # Dapatkan augmentation pattern dari config
+            augmentation_patterns = []
+            cleanup_config = config.get('cleanup', {})
+            
+            # Fallback pattern jika tidak ada dalam config
+            default_patterns = ['aug_.*', '.*_augmented.*', '.*_modified.*']
+            
+            # Cek source config untuk patterns
+            if 'augmentation_patterns' in cleanup_config:
+                augmentation_patterns = cleanup_config['augmentation_patterns']
+            else:
+                # Coba ambil dari configurasi lama
+                augmentation_patterns = cleanup_config.get('patterns', default_patterns)
+                
+            # Pastikan selalu ada pattern default
+            if not augmentation_patterns:
+                augmentation_patterns = default_patterns
+            
+            # Get current output prefix from UI
+            current_prefix = ""
+            if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2:
+                current_prefix = ui_components['aug_options'].children[2].value
+                if current_prefix and current_prefix not in augmentation_patterns:
+                    augmentation_patterns.append(f"{current_prefix}_.*")
+                    
             path = Path(augmented_dir)
+            
             if path.exists():
                 import time
                 start_time = time.time()
                 
                 # Backup sebelum hapus jika diinginkan
-                backup_dir = config.get('cleanup', {}).get('backup_dir', 'data/backup/augmentation')
-                backup_path = Path(backup_dir)
-                backup_path.mkdir(parents=True, exist_ok=True)
+                backup_enabled = cleanup_config.get('backup_enabled', True)
+                backup_dir = cleanup_config.get('backup_dir', 'data/backup/augmentation')
                 
-                # Timestamp untuk backup
-                timestamp = time.strftime("%Y%m%d_%H%M%S")
-                backup_target = backup_path / f"augmented_{timestamp}"
+                if backup_enabled:
+                    backup_path = Path(backup_dir)
+                    backup_path.mkdir(parents=True, exist_ok=True)
+                    
+                    # Timestamp untuk backup
+                    timestamp = time.strftime("%Y%m%d_%H%M%S")
+                    backup_target = backup_path / f"augmented_{timestamp}"
+                    
+                    # Copy ke backup (hanya jika direktori memiliki konten)
+                    if list(path.glob('**/*')):
+                        try:
+                            shutil.copytree(path, backup_target)
+                            with ui_components['status']:
+                                display(create_status_indicator(
+                                    "info", 
+                                    f"📦 Data augmentasi di-backup ke: {backup_target}"
+                                ))
+                        except Exception as e:
+                            with ui_components['status']:
+                                display(create_status_indicator(
+                                    "warning", 
+                                    f"⚠️ Gagal membuat backup: {str(e)}"
+                                ))
                 
-                # Copy ke backup
-                try:
-                    shutil.copytree(path, backup_target)
+                # Jika ada subdirectory images dan labels, hapus file yang sesuai pattern
+                images_dir = path / 'images'
+                labels_dir = path / 'labels'
+                
+                deleted_count = 0
+                
+                # Hapus files berdasarkan pattern, bukan seluruh direktori
+                if images_dir.exists() and labels_dir.exists():
+                    for pattern in augmentation_patterns:
+                        # Hapus file gambar
+                        for img_file in images_dir.glob('*'):
+                            if re.match(pattern, img_file.name):
+                                try:
+                                    img_file.unlink()
+                                    deleted_count += 1
+                                    
+                                    # Hapus label yang bersesuaian jika ada
+                                    label_file = labels_dir / f"{img_file.stem}.txt"
+                                    if label_file.exists():
+                                        label_file.unlink()
+                                        deleted_count += 1
+                                except Exception as e:
+                                    if logger: logger.warning(f"⚠️ Gagal menghapus {img_file}: {e}")
+                    
+                    # Log hasil penghapusan
                     with ui_components['status']:
                         display(create_status_indicator(
                             "info", 
-                            f"📦 Data augmentasi di-backup ke: {backup_target}"
+                            f"🗑️ {deleted_count} file berhasil dihapus sesuai pattern augmentasi"
                         ))
-                except Exception as e:
-                    with ui_components['status']:
-                        display(create_status_indicator(
-                            "warning", 
-                            f"⚠️ Gagal membuat backup: {str(e)}"
-                        ))
+                else:
+                    # Hapus keseluruhan direktori jika tidak memiliki struktur standar
+                    shutil.rmtree(path)
                 
-                # Hapus direktori augmentasi
-                shutil.rmtree(path)
                 success = True
                 duration = time.time() - start_time
                 

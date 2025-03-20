@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan pengelompokan tombol yang lebih baik
+Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan penanganan reset dan lokasi yang diperbarui
 """
 
 import subprocess
@@ -26,6 +26,11 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Persiapkan augmentasi dengan utilitas UI standar
         from smartcash.ui.dataset.augmentation_initialization import update_status_panel
         from smartcash.ui.utils.alert_utils import create_status_indicator
+
+        # Update paths dari input
+        if 'data_dir_input' in ui_components and 'output_dir_input' in ui_components:
+            ui_components['data_dir'] = ui_components['data_dir_input'].value
+            ui_components['augmented_dir'] = ui_components['output_dir_input'].value
 
         # Update UI untuk menunjukkan proses dimulai
         with ui_components['status']:
@@ -91,7 +96,6 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         prefix = ui_components['aug_options'].children[2].value
         process_bboxes = ui_components['aug_options'].children[3].value
         validate = ui_components['aug_options'].children[4].value
-        resume = ui_components['aug_options'].children[5].value
         
         # Register progress callback jika tersedia
         if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
@@ -114,7 +118,8 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                     num_variations=variations,
                     output_prefix=prefix,
                     validate_results=validate,
-                    resume=resume,
+                    resume=False,  # Tidak menggunakan resume
+                    process_bboxes=process_bboxes,
                     output_dir=output_dir
                 )
                 
@@ -139,6 +144,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                                 <li><b>Total file:</b> {result.get('total_files', 0)}</li>
                                 <li><b>Durasi:</b> {result.get('duration', 0):.2f} detik</li>
                                 <li><b>Jenis augmentasi:</b> {', '.join(aug_types)}</li>
+                                <li><b>Lokasi output:</b> {output_dir}</li>
                             </ul>
                             </div>"""
                         ))
@@ -246,9 +252,35 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Reset UI
         cleanup_ui()
     
+    # Handler untuk tombol reset
+    def on_reset_click(b):
+        """Handler untuk reset UI ke kondisi awal."""
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state
+
+        # Reset UI ke kondisi awal
+        reset_ui()
+        
+        # Reset config ke default
+        try:
+            # Load konfigurasi default
+            from smartcash.ui.dataset.augmentation_config_handler import load_augmentation_config, update_ui_from_config
+            default_config = load_augmentation_config()
+            update_ui_from_config(ui_components, default_config)
+            
+            # Re-detect state
+            detect_augmentation_state(ui_components, env, config)
+            
+            # Tampilkan pesan sukses
+            with ui_components['status']:
+                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset"))
+        except Exception as e:
+            with ui_components['status']:
+                display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
+    
     # Function untuk cleanup UI setelah augmentasi
     def cleanup_ui():
-        """Kembalikan UI ke kondisi awal setelah augmentasi."""
+        """Kembalikan UI ke kondisi operasional setelah augmentasi."""
         ui_components['augment_button'].layout.display = 'block'
         ui_components['stop_button'].layout.display = 'none'
         
@@ -262,18 +294,54 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             ui_components['current_progress'].value = 0
             ui_components['current_progress'].layout.visibility = 'hidden'
     
+    # Function untuk reset komplet UI
+    def reset_ui():
+        """Reset UI ke kondisi default total, termasuk semua panel."""
+        # Reset tombol dan progress
+        cleanup_ui()
+        
+        # Reset summary
+        if 'summary_container' in ui_components:
+            ui_components['summary_container'].layout.display = 'none'
+            with ui_components['summary_container']:
+                clear_output()
+        
+        # Reset visualisasi
+        if 'visualization_container' in ui_components:
+            ui_components['visualization_container'].layout.display = 'none'
+            with ui_components['visualization_container']:
+                clear_output()
+                
+        # Sembunyikan tombol visualisasi dan cleanup
+        if 'visualization_buttons' in ui_components:
+            ui_components['visualization_buttons'].layout.display = 'none'
+        
+        # Reset logs
+        if 'status' in ui_components:
+            with ui_components['status']:
+                clear_output()
+            
+        # Reset accordion
+        if 'log_accordion' in ui_components:
+            ui_components['log_accordion'].selected_index = None
+    
     # Register handlers untuk tombol-tombol
     if 'augment_button' in ui_components:
         ui_components['augment_button'].on_click(on_augment_click)
     
     if 'stop_button' in ui_components:
         ui_components['stop_button'].on_click(on_stop_click)
+        
+    if 'reset_button' in ui_components:
+        ui_components['reset_button'].on_click(on_reset_click)
     
     # Tambahkan referensi ke handlers di ui_components
     ui_components.update({
         'on_augment_click': on_augment_click,
         'on_stop_click': on_stop_click,
+        'on_reset_click': on_reset_click,
         'cleanup_ui': cleanup_ui,
+        'reset_ui': reset_ui,
         'augmentation_running': False
     })
     

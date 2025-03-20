@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_handler.py
-Deskripsi: Handler terintegrasi untuk augmentasi dataset yang menggabungkan semua proses (inisialisasi, progress, visualisasi, config, dan cleanup)
+Deskripsi: Handler terintegrasi untuk augmentasi dataset yang menggabungkan semua proses dengan perbaikan lokasi dan reset
 """
 
 from typing import Dict, Any, Optional
@@ -46,10 +46,6 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         if saved_config:
             ui_components = update_ui_from_config(ui_components, saved_config)
             if logger: logger.info(f"{ICONS['success']} Konfigurasi augmentasi dimuat")
-        
-        # Update konfigurasi dari UI dan simpan ke file
-        if 'save_button' in ui_components:
-            ui_components['save_button'].on_click(lambda b: save_config_handler(ui_components, config))
         
         # Setup observer integration jika tersedia
         try:
@@ -135,6 +131,11 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
     from smartcash.ui.dataset.augmentation_config_handler import update_config_from_ui, save_augmentation_config
     
     try:
+        # Update lokasi dari input jika tersedia
+        if 'data_dir_input' in ui_components and 'output_dir_input' in ui_components:
+            ui_components['data_dir'] = ui_components['data_dir_input'].value
+            ui_components['augmented_dir'] = ui_components['output_dir_input'].value
+            
         # Update konfigurasi dari UI
         updated_config = update_config_from_ui(ui_components, config)
         

@@ -45,7 +45,7 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         update_status_panel(
             ui_components, 
             "info", 
-            f"{ICONS['info']} Dataset akan dipreprocessing dari sumber: {abs_data_dir}"
+            f"Dataset akan dipreprocessing dari sumber: <strong> {abs_data_dir}</strong>"
         )
         
         # Update input fields dengan nilai dari config

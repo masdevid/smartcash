@@ -27,7 +27,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Konfigurasi path - ditampilkan sebagai info panel
     path_info = widgets.HTML(
         value=f"""<div style="padding:10px; margin:10px 0; background-color:{COLORS['light']}; 
-                border-radius:5px; border-left:4px solid {COLORS['primary']};">
+                border-radius:5px; border-left:4px solid {COLORS['primary']}; color: {COLORS['primary']}">
             <h4 style="color:inherit; margin-top:0;">📂 Lokasi Dataset</h4>
             <p><strong>Data Source:</strong> <span id="data-source-path">...</span></p>
             <p><strong>Preprocessed:</strong> <span id="preprocessed-path">...</span></p>
@@ -68,7 +68,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Preprocessing options dengan struktur yang lebih ringkas
     preprocess_options = widgets.VBox([
-        widgets.IntSlider(value=640, min=320, max=1280, step=32, description='Image size:',
+        widgets.IntSlider(value=640, min=320, max=640, step=32, description='Image size:',
                          style={'description_width': 'initial'}, layout=widgets.Layout(width='70%')),
         widgets.Checkbox(value=True, description='Enable normalization', style={'description_width': 'initial'}),
         widgets.Checkbox(value=True, description='Preserve aspect ratio', style={'description_width': 'initial'}),

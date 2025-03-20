@@ -206,7 +206,7 @@ def sync_config_with_drive(
 
 def sync_all_configs(
     drive_configs_dir: Optional[str] = None,
-    local_configs_dir: str = 'configs',
+    local_configs_dir: Optional[str] = None,
     sync_strategy: str = 'drive_priority',
     create_backup: bool = True,
     logger = None
@@ -224,54 +224,62 @@ def sync_all_configs(
     Returns:
         Dictionary berisi hasil sinkronisasi
     """
-    # Debug print untuk lingkungan
-    print(f"🔍 Debug Sinkronisasi Konfigurasi:")
-    print(f"Direktori Lokal: {local_configs_dir}")
-    print(f"Direktori Drive: {drive_configs_dir}")
-    
     # Dapatkan drive path jika tidak disediakan
     if not drive_configs_dir:
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             if not env_manager.is_drive_mounted:
-                print("❌ Google Drive tidak terpasang")
-                if logger:
+                if logger and hasattr(logger, 'warning'):
                     logger.warning("⚠️ Google Drive tidak terpasang, tidak dapat sinkronisasi")
                 return {"error": "Google Drive tidak terpasang"}
-            drive_configs_dir = str(env_manager.drive_path / 'configs')
-            print(f"Path Drive terdeteksi: {drive_configs_dir}")
+            drive_configs_dir = str(env_manager.drive_path / 'SmartCash/configs')
         except Exception as e:
-            print(f"❌ Error mendapatkan path Drive: {str(e)}")
-            if logger:
+            if logger and hasattr(logger, 'error'):
                 logger.error(f"❌ Error mendapatkan path Drive: {str(e)}")
             return {"error": f"Tidak dapat menentukan drive path: {str(e)}"}
+    
+    # Tentukan direktori lokal konfigurasi
+    if not local_configs_dir:
+        # Coba beberapa lokasi potensial
+        potential_dirs = [
+            'configs',
+            '/content/configs',
+            '/content/smartcash/configs'
+        ]
+        
+        for dir_path in potential_dirs:
+            if os.path.exists(dir_path):
+                local_configs_dir = dir_path
+                break
+        
+        # Jika tidak ditemukan, gunakan default
+        if not local_configs_dir:
+            local_configs_dir = 'configs'
+            os.makedirs(local_configs_dir, exist_ok=True)
     
     # Pastikan direktori ada
     os.makedirs(drive_configs_dir, exist_ok=True)
     os.makedirs(local_configs_dir, exist_ok=True)
     
-    # Debug: List file di direktori
-    print("\n📋 File di Direktori Lokal:")
-    local_files = os.listdir(local_configs_dir)
-    print(local_files)
-    
-    print("\n📋 File di Direktori Drive:")
-    drive_files = os.listdir(drive_configs_dir)
-    print(drive_files)
-    
     # Cari semua file YAML
     yaml_files = set()
-    for ext in ['.yaml', '.yml']:
-        for file in os.listdir(local_configs_dir):
-            if file.endswith(ext):
-                yaml_files.add(file)
-        for file in os.listdir(drive_configs_dir):
-            if file.endswith(ext):
-                yaml_files.add(file)
     
-    print("\n🔍 File YAML yang akan disinkronkan:")
-    print(yaml_files)
+    # Fungsi untuk mencari file YAML di direktori
+    def find_yaml_files(directory):
+        files = set()
+        for ext in ['.yaml', '.yml']:
+            try:
+                for filename in os.listdir(directory):
+                    if filename.endswith(ext):
+                        files.add(filename)
+            except Exception:
+                pass
+        return files
+    
+    # Gabungkan file dari direktori lokal dan Drive
+    yaml_files.update(find_yaml_files(local_configs_dir))
+    yaml_files.update(find_yaml_files(drive_configs_dir))
     
     # Hasil sinkronisasi
     results = {
@@ -285,11 +293,9 @@ def sync_all_configs(
             drive_path = os.path.join(drive_configs_dir, config_file)
             local_path = os.path.join(local_configs_dir, config_file)
             
-            print(f"\n🔄 Memproses file: {config_file}")
-            print(f"Path Lokal: {local_path}")
-            print(f"Path Drive: {drive_path}")
-            print(f"Lokal Exists: {os.path.exists(local_path)}")
-            print(f"Drive Exists: {os.path.exists(drive_path)}")
+            # Pastikan logger bisa dipanggil
+            if logger and not hasattr(logger, 'error'):
+                logger = None
             
             success, message, _ = sync_config_with_drive(
                 config_file=config_file,
@@ -302,38 +308,31 @@ def sync_all_configs(
             
             result = {
                 "file": config_file,
-                "message": message,
-                "local_path": local_path,
-                "drive_path": drive_path
+                "message": message
             }
             
             if success:
                 results["success"].append(result)
-                print(f"✅ Sinkronisasi berhasil: {config_file}")
             else:
                 results["failure"].append(result)
-                print(f"❌ Sinkronisasi gagal: {config_file}")
-                print(f"Pesan: {message}")
                 
         except Exception as e:
-            error_details = {
+            error_message = f"❌ Error total saat sinkronisasi {config_file}: {str(e)}"
+            
+            # Cetak error untuk debug
+            print(error_message)
+            
+            # Log error jika logger tersedia
+            if logger and hasattr(logger, 'error'):
+                logger.error(error_message)
+            
+            results["failure"].append({
                 "file": config_file,
-                "message": f"Error: {str(e)}",
-                "local_path": local_path,
-                "drive_path": drive_path,
-                "exception": str(e)
-            }
-            results["failure"].append(error_details)
-            print(f"❌ Error total saat sinkronisasi {config_file}: {str(e)}")
-            if logger:
-                logger.error(f"❌ Error saat sinkronisasi {config_file}: {str(e)}")
+                "message": error_message
+            })
     
     # Log summary
-    print("\n📊 Ringkasan Sinkronisasi:")
-    print(f"Berhasil: {len(results['success'])}")
-    print(f"Gagal: {len(results['failure'])}")
-    
-    if logger:
+    if logger and hasattr(logger, 'info'):
         logger.info(f"🔄 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
     
     return results

@@ -19,7 +19,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
     from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
     from smartcash.ui.utils.metric_utils import create_metric_display
     from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-    from smartcash.ui.handlers.error_handler import try_except_decorator, show_ui_message
+    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+    from smartcash.ui.utils.metric_utils import create_metric_display
+    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+    from smartcash.ui.utils.fallback_utils import update_status_panel
     from smartcash.ui.utils.fallback_utils import update_status_panel
     
     # Setup observer handlers
@@ -103,7 +106,6 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         except Exception as e:
             return False, str(e)
     
-    @try_except_decorator
     def _check_package_status(package_checks: List[Tuple[str, str]], output_widget=None) -> None:
         """
         Periksa status paket yang terinstall.
@@ -126,7 +128,6 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 except ImportError:
                     display(create_status_indicator('warning', f"{display_name} tidak terinstall"))
 
-    @try_except_decorator
     def _on_install_packages(b):
         """Handler untuk tombol install packages dengan progress tracking."""
         with ui_components['status']:
@@ -231,8 +232,26 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         update_status_panel(ui_components, "⚠️ Semua package tidak dipilih", 'warning')
 
     # Registrasi event handlers
-    ui_components['install_button'].on_click(_on_install_packages)
-    ui_components['check_button'].on_click(lambda b: _check_package_status(PACKAGE_CHECKS, ui_components['status']))
+    def on_install_packages_wrapped(b):
+        """Wrapper dengan error handling untuk on_install_packages."""
+        try:
+            _on_install_packages(b)
+        except Exception as e:
+            with ui_components['status']:
+                clear_output()
+                display(create_status_indicator('error', f"❌ Error instalasi: {str(e)}"))
+                
+    ui_components['install_button'].on_click(on_install_packages_wrapped)
+    def on_check_installations(b):
+        """Handler untuk tombol cek instalasi dengan error handling."""
+        try:
+            _check_package_status(PACKAGE_CHECKS, ui_components['status'])
+        except Exception as e:
+            with ui_components['status']:
+                clear_output()
+                display(create_status_indicator('error', f"❌ Error cek instalasi: {str(e)}"))
+    
+    ui_components['check_button'].on_click(on_check_installations)
     ui_components['check_all_button'].on_click(_on_check_all)
     ui_components['uncheck_all_button'].on_click(_on_uncheck_all)
     

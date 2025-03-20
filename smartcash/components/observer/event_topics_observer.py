@@ -58,6 +58,7 @@ class EventTopics:
     PREPROCESSING_PROGRESS = "preprocessing.progress"
     PREPROCESSING_CURRENT_PROGRESS = "preprocessing.current_progress"
     PREPROCESSING_STEP_PROGRESS = "preprocessing.step_progress"
+    PREPROCESSING_STEP_CHANGE = "preprocessing.step_change"
     PREPROCESSING_END = "preprocessing.end"
     PREPROCESSING_ERROR = "preprocessing.error"
     

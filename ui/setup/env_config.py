@@ -14,41 +14,34 @@ def initialize_drive_sync(ui_components=None):
     Args:
         ui_components: Dictionary komponen UI yang akan diupdate (opsional)
     """
-    status_output = None
-    progress_bar = None
-    progress_message = None
+    # Pastikan output tersedia
+    if not ui_components or 'status' not in ui_components:
+        print("Error: Output widget tidak tersedia")
+        return
     
-    # Cek komponen UI yang tersedia
-    if ui_components:
-        if 'status' in ui_components:
-            status_output = ui_components['status']
-        if 'progress_bar' in ui_components:
-            progress_bar = ui_components['progress_bar']
-        if 'progress_message' in ui_components:
-            progress_message = ui_components['progress_message']
+    # Gunakan output widget untuk semua log
+    status_output = ui_components['status']
+    progress_bar = ui_components.get('progress_bar')
+    progress_message = ui_components.get('progress_message')
     
-    # Inisialisasi progress tracking
-    total_steps = 4  # Detect, Mount, Create Default Config, Sync
-    current_step = 0
+    # Fungsi log yang mengarahkan ke output widget
+    def log(message, status_type="info"):
+        with status_output:
+            from smartcash.ui.utils.alert_utils import create_info_alert
+            display(create_info_alert(message, status_type))
     
-    def update_progress(step, message, status_type="info"):
-        nonlocal current_step
-        current_step = step
+    # Fungsi update progress
+    def update_progress(step, message, status_type="info", total_steps=4):
+        log(message, status_type)
         
-        # Update progress bar
+        # Update progress bar jika tersedia
         if progress_bar:
             progress_bar.value = step
             progress_bar.max = total_steps
-            
-        # Update message
+        
+        # Update progress message jika tersedia
         if progress_message:
             progress_message.value = message
-            
-        # Tampilkan di output
-        if status_output:
-            with status_output:
-                from smartcash.ui.utils.alert_utils import create_info_alert
-                display(create_info_alert(message, status_type))
     
     try:
         import os, sys
@@ -60,7 +53,7 @@ def initialize_drive_sync(ui_components=None):
         drive_mounted = os.path.exists('/content/drive/MyDrive')
         
         if not is_colab:
-            update_progress(total_steps, "Bukan lingkungan Google Colab, lewati sinkronisasi Drive", "info")
+            update_progress(4, "Bukan lingkungan Google Colab, lewati sinkronisasi Drive", "info")
             return
         
         # Step 2: Pastikan config default ada
@@ -71,11 +64,11 @@ def initialize_drive_sync(ui_components=None):
             configs_created = ensure_all_configs_exist()
             
             if configs_created:
-                update_progress(2, "File konfigurasi default berhasil dibuat", "success")
+                log("File konfigurasi default berhasil dibuat", "success")
             else:
-                update_progress(2, "File konfigurasi default sudah tersedia", "info")
+                log("File konfigurasi default sudah tersedia", "info")
         except Exception as e:
-            update_progress(2, f"Gagal membuat konfigurasi default: {str(e)}", "warning")
+            log(f"Gagal membuat konfigurasi default: {str(e)}", "warning")
         
         # Step 3: Mount Drive jika perlu
         if not drive_mounted:
@@ -87,15 +80,15 @@ def initialize_drive_sync(ui_components=None):
                 drive_mounted = os.path.exists('/content/drive/MyDrive')
                 
                 if not drive_mounted:
-                    update_progress(3, "Gagal mounting Google Drive", "error")
+                    update_progress(4, "Gagal mounting Google Drive", "error")
                     return
                 
-                update_progress(3, "Google Drive berhasil dimount", "success")
+                log("Google Drive berhasil dimount", "success")
             except Exception as e:
-                update_progress(3, f"Error saat mounting Google Drive: {str(e)}", "error")
+                update_progress(4, f"Error saat mounting Google Drive: {str(e)}", "error")
                 return
         else:
-            update_progress(3, "Google Drive sudah terhubung", "success")
+            log("Google Drive sudah terhubung", "success")
         
         # Step 4: Sinkronisasi konfigurasi
         update_progress(4, "Sinkronisasi konfigurasi dengan Drive...", "info")
@@ -108,17 +101,14 @@ def initialize_drive_sync(ui_components=None):
             failure_count = len(results.get("failure", []))
             
             if failure_count == 0:
-                update_progress(total_steps, f"Sinkronisasi berhasil: {success_count} file ✓", "success")
+                log(f"Sinkronisasi berhasil: {success_count} file ✓", "success")
             else:
-                update_progress(total_steps, f"Sinkronisasi: {success_count} berhasil, {failure_count} gagal", "warning")
+                log(f"Sinkronisasi: {success_count} berhasil, {failure_count} gagal", "warning")
         except ImportError:
-            update_progress(total_steps, "Modul config_sync tidak tersedia, lewati sinkronisasi", "warning")
+            log("Modul config_sync tidak tersedia, lewati sinkronisasi", "warning")
         
     except Exception as e:
-        if status_output:
-            with status_output:
-                from smartcash.ui.utils.alert_utils import create_info_alert
-                display(create_info_alert(f"Error: {str(e)}", "error"))
+        log(f"Error: {str(e)}", "error")
 
 def setup_environment_config():
     """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
@@ -172,23 +162,31 @@ def setup_environment_config():
         
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, "env_config")
-        if logger:
-            ui_components['logger'] = logger
-            logger.info("🚀 Modul environment config berhasil dimuat")
+        
+        # Fungsi log ke output widget
+        def log_to_output(message, status_type="info"):
+            if 'status' in ui_components:
+                with ui_components['status']:
+                    from smartcash.ui.utils.alert_utils import create_info_alert
+                    display(create_info_alert(message, status_type))
         
         # Inisialisasi drive dengan komponen UI yang baru dibuat
         initialize_drive_sync(ui_components)
         
         # Setup handlers untuk UI
-        ui_components = setup_env_config_handlers(ui_components, env, config)
+        try:
+            ui_components = setup_env_config_handlers(ui_components, env, config)
+            log_to_output("🚀 Handlers environment config berhasil dimuat", "success")
+        except Exception as e:
+            log_to_output(f"❌ Gagal memuat handlers: {str(e)}", "error")
         
         # Cek fungsionalitas drive_handler
         try:
             from smartcash.ui.setup.drive_handler import setup_drive_handler
             ui_components = setup_drive_handler(ui_components, env, config, auto_connect=True)
+            log_to_output("🔗 Drive handler berhasil diinisialisasi", "success")
         except ImportError as e:
-            if logger:
-                logger.debug(f"Module drive_handler tidak tersedia: {str(e)}")
+            log_to_output(f"⚠️ Module drive_handler tidak tersedia: {str(e)}", "warning")
         
     except ImportError as e:
         # Fallback jika modules tidak tersedia

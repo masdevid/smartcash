@@ -94,13 +94,13 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     ui_components = {
         'ui': ui,
         'header': header,
-        'progress_bar': progress_bar,
-        'progress_message': progress_message,
         'colab_panel': colab_panel,
-        'help_panel': help_box,
         'drive_button': button_group.children[0],
         'directory_button': button_group.children[1],
-        'status': status
+        'progress_bar': progress_bar,
+        'progress_message': progress_message,
+        'status': status,
+        'help_panel': help_box
     }
     
     return ui_components

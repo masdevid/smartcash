@@ -1,0 +1,280 @@
+"""
+File: smartcash/ui/dataset/augmentation_click_handler.py
+Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan pengelompokan tombol yang lebih baik
+"""
+
+import subprocess
+from typing import Dict, Any
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+
+def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """Setup handler untuk tombol UI augmentasi dengan pengelompokan yang lebih baik."""
+    
+    logger = ui_components.get('logger')
+    from smartcash.ui.utils.constants import ICONS
+    
+    # Penanganan error dengan decorator
+    from smartcash.ui.handlers.error_handler import try_except_decorator
+    
+    @try_except_decorator(ui_components.get('status'))
+    def on_augment_click(b):
+        """Handler tombol augmentasi dengan error handling standar."""
+        # Dapatkan augmentation types dari UI
+        aug_types_widgets = ui_components['aug_options'].children[0].value
+        
+        # Persiapkan augmentasi dengan utilitas UI standar
+        from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+
+        # Update UI untuk menunjukkan proses dimulai
+        with ui_components['status']:
+            clear_output(wait=True)
+            display(create_status_indicator("info", f"{ICONS['processing']} Memulai augmentasi dataset..."))
+        
+        # Tampilkan log panel
+        ui_components['log_accordion'].selected_index = 0  # Expand log
+        
+        # Update UI: sembunyikan tombol augment, tampilkan tombol stop
+        ui_components['augment_button'].layout.display = 'none'
+        ui_components['stop_button'].layout.display = 'block'
+        ui_components['progress_bar'].layout.visibility = 'visible'
+        ui_components['current_progress'].layout.visibility = 'visible'
+        
+        # Update konfigurasi dari UI
+        try:
+            from smartcash.ui.dataset.augmentation_config_handler import update_config_from_ui, save_augmentation_config
+            updated_config = update_config_from_ui(ui_components, config)
+            save_augmentation_config(updated_config)
+            if logger: logger.info(f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan")
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
+        
+        # Map UI types to config format
+        type_map = {
+            'Combined (Recommended)': 'combined',
+            'Position Variations': 'position',
+            'Lighting Variations': 'lighting',
+            'Extreme Rotation': 'extreme_rotation'
+        }
+        aug_types = [type_map.get(t, 'combined') for t in aug_types_widgets]
+        
+        # Update status panel
+        update_status_panel(
+            ui_components, 
+            "info", 
+            f"{ICONS['processing']} Augmentasi dataset dengan jenis: {', '.join(aug_types)}..."
+        )
+        
+        # Notifikasi observer tentang mulai augmentasi
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            notify(
+                event_type=EventTopics.AUGMENTATION_START,
+                sender="augmentation_handler",
+                message=f"Memulai augmentasi dataset dengan jenis: {', '.join(aug_types)}"
+            )
+        except ImportError:
+            pass
+        
+        # Dapatkan augmentation manager
+        augmentation_manager = ui_components.get('augmentation_manager')
+        if not augmentation_manager:
+            with ui_components['status']:
+                display(create_status_indicator("error", f"{ICONS['error']} AugmentationManager tidak tersedia"))
+            cleanup_ui()
+            return
+        
+        # Dapatkan opsi dari UI
+        variations = ui_components['aug_options'].children[1].value
+        prefix = ui_components['aug_options'].children[2].value
+        process_bboxes = ui_components['aug_options'].children[3].value
+        validate = ui_components['aug_options'].children[4].value
+        resume = ui_components['aug_options'].children[5].value
+        
+        # Register progress callback jika tersedia
+        if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
+            ui_components['register_progress_callback'](augmentation_manager)
+        
+        # Tandai augmentasi sedang berjalan
+        ui_components['augmentation_running'] = True
+        
+        # Jalankan augmentasi dalam thread terpisah
+        def run_augmentation():
+            try:
+                # Ambil data_dir dan output_dir dari ui_components
+                data_dir = ui_components.get('data_dir', 'data')
+                output_dir = ui_components.get('augmented_dir', 'data/augmented')
+                
+                # Jalankan augmentasi
+                result = augmentation_manager.augment_dataset(
+                    split='train',  # Augmentasi untuk train split
+                    augmentation_types=aug_types,
+                    num_variations=variations,
+                    output_prefix=prefix,
+                    validate_results=validate,
+                    resume=resume,
+                    output_dir=output_dir
+                )
+                
+                # Update UI dengan hasil
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator("success", f"{ICONS['success']} Augmentasi dataset selesai"))
+                
+                # Update summary jika fungsi tersedia
+                if 'update_summary' in ui_components and callable(ui_components['update_summary']):
+                    ui_components['update_summary'](result)
+                else:
+                    # Fallback - tampilkan summary sederhana
+                    with ui_components['summary_container']:
+                        clear_output(wait=True)
+                        display(widgets.HTML(
+                            f"""<div style="padding:10px;">
+                            <h4>📊 Hasil Augmentasi</h4>
+                            <ul>
+                                <li><b>File asli:</b> {result.get('original', 0)}</li>
+                                <li><b>File augmentasi:</b> {result.get('generated', 0)}</li>
+                                <li><b>Total file:</b> {result.get('total_files', 0)}</li>
+                                <li><b>Durasi:</b> {result.get('duration', 0):.2f} detik</li>
+                                <li><b>Jenis augmentasi:</b> {', '.join(aug_types)}</li>
+                            </ul>
+                            </div>"""
+                        ))
+                    
+                    # Tampilkan summary container
+                    ui_components['summary_container'].layout.display = 'block'
+                
+                # Update status panel
+                update_status_panel(
+                    ui_components, 
+                    "success", 
+                    f"{ICONS['success']} Augmentasi dataset berhasil dengan {result.get('generated', 0)} gambar baru"
+                )
+                
+                # Tampilkan tombol visualisasi
+                ui_components['visualization_buttons'].layout.display = 'flex'
+                
+                # Tampilkan tombol cleanup
+                ui_components['cleanup_button'].layout.display = 'inline-block'
+                
+                # Notifikasi observer tentang selesai augmentasi
+                try:
+                    from smartcash.components.observer import notify
+                    from smartcash.components.observer.event_topics_observer import EventTopics
+                    notify(
+                        event_type=EventTopics.AUGMENTATION_END,
+                        sender="augmentation_handler",
+                        message=f"Augmentasi dataset selesai dengan {result.get('generated', 0)} gambar baru",
+                        result=result
+                    )
+                except ImportError:
+                    pass
+                
+            except Exception as e:
+                # Tangani error
+                with ui_components['status']:
+                    display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+                
+                # Update status panel
+                update_status_panel(
+                    ui_components, 
+                    "error", 
+                    f"{ICONS['error']} Augmentasi gagal: {str(e)}"
+                )
+                
+                # Notifikasi observer tentang error
+                try:
+                    from smartcash.components.observer import notify
+                    from smartcash.components.observer.event_topics_observer import EventTopics
+                    notify(
+                        event_type=EventTopics.AUGMENTATION_ERROR,
+                        sender="augmentation_handler",
+                        message=f"Error saat augmentasi: {str(e)}"
+                    )
+                except ImportError:
+                    pass
+                
+                # Log error
+                if logger: logger.error(f"{ICONS['error']} Error saat augmentasi dataset: {str(e)}")
+            
+            finally:
+                # Tandai augmentasi selesai
+                ui_components['augmentation_running'] = False
+                
+                # Restore UI
+                cleanup_ui()
+        
+        # Jalankan proses augmentasi secara asynchronous
+        import multiprocessing
+        augmentation_process = multiprocessing.Process(target=run_augmentation)
+        augmentation_process.daemon = True
+        augmentation_process.start()
+    
+    # Handler untuk tombol stop
+    def on_stop_click(b):
+        """Handler untuk menghentikan augmentasi."""
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+        
+        ui_components['augmentation_running'] = False
+        
+        # Tampilkan pesan di status
+        with ui_components['status']:
+            display(create_status_indicator("warning", f"{ICONS['warning']} Menghentikan augmentasi..."))
+        
+        # Update status panel
+        update_status_panel(
+            ui_components, 
+            "warning", 
+            f"{ICONS['warning']} Augmentasi dihentikan oleh pengguna"
+        )
+        
+        # Notifikasi observer
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            notify(
+                event_type=EventTopics.AUGMENTATION_END,
+                sender="augmentation_handler",
+                message=f"Augmentasi dihentikan oleh pengguna"
+            )
+        except ImportError:
+            pass
+        
+        # Reset UI
+        cleanup_ui()
+    
+    # Function untuk cleanup UI setelah augmentasi
+    def cleanup_ui():
+        """Kembalikan UI ke kondisi awal setelah augmentasi."""
+        ui_components['augment_button'].layout.display = 'block'
+        ui_components['stop_button'].layout.display = 'none'
+        
+        # Reset progress bar
+        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+            ui_components['reset_progress_bar']()
+        else:
+            # Fallback jika fungsi reset tidak tersedia
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].layout.visibility = 'hidden'
+            ui_components['current_progress'].value = 0
+            ui_components['current_progress'].layout.visibility = 'hidden'
+    
+    # Register handlers untuk tombol-tombol
+    if 'augment_button' in ui_components:
+        ui_components['augment_button'].on_click(on_augment_click)
+    
+    if 'stop_button' in ui_components:
+        ui_components['stop_button'].on_click(on_stop_click)
+    
+    # Tambahkan referensi ke handlers di ui_components
+    ui_components.update({
+        'on_augment_click': on_augment_click,
+        'on_stop_click': on_stop_click,
+        'cleanup_ui': cleanup_ui,
+        'augmentation_running': False
+    })
+    
+    return ui_components

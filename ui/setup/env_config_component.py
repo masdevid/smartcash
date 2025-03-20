@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan memanfaatkan ui_helpers
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan progress tracker
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk environment config dengan styling standar dari ui_helpers.
+    Buat komponen UI untuk environment config dengan styling standar dari ui_helpers dan progress tracker.
     
     Args:
         env: Environment manager
@@ -27,6 +27,18 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         "⚙️ Konfigurasi Environment", 
         "Setup environment untuk project SmartCash"
     )
+    
+    # Progress tracker components
+    progress_bar = widgets.IntProgress(
+        value=0,
+        min=0,
+        max=3,
+        description='Progress:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%', margin='10px 0')
+    )
+    
+    progress_message = widgets.HTML("Mempersiapkan environment...")
     
     # Panel status Colab/Drive
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
@@ -66,7 +78,15 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Container utama
     ui = widgets.VBox(
-        [header, colab_panel, help_box, divider, button_group, status],
+        [
+            header,
+            widgets.VBox([progress_bar, progress_message], layout=widgets.Layout(margin='10px 0')),
+            colab_panel, 
+            help_box, 
+            divider, 
+            button_group, 
+            status
+        ],
         layout=widgets.Layout(width='100%', padding='10px')
     )
     
@@ -74,6 +94,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     ui_components = {
         'ui': ui,
         'header': header,
+        'progress_bar': progress_bar,
+        'progress_message': progress_message,
         'colab_panel': colab_panel,
         'help_panel': help_box,
         'drive_button': button_group.children[0],

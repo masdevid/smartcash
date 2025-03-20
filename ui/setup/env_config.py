@@ -4,38 +4,115 @@ Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan inte
 """
 
 import ipywidgets as widgets
-from IPython.display import display
+from IPython.display import display, clear_output
 from typing import Dict, Any, Optional
 
-def initialize_drive_sync():
-    """Inisialisasi dan sinkronisasi Google Drive sebelum setup environment"""
-    try:
-        # Coba gunakan colab_initializer jika tersedia
-        from smartcash.ui.setup.colab_initializer import initialize_environment
-        initialize_environment()
-    except ImportError:
-        # Fallback minimal: mount drive & buat direktori
-        import os, sys
+def initialize_drive_sync(ui_components=None):
+    """
+    Inisialisasi dan sinkronisasi Google Drive dengan progress tracking
+    
+    Args:
+        ui_components: Dictionary komponen UI yang akan diupdate (opsional)
+    """
+    status_output = None
+    progress_bar = None
+    progress_message = None
+    
+    # Cek komponen UI yang tersedia
+    if ui_components:
+        if 'status' in ui_components:
+            status_output = ui_components['status']
+        if 'progress_bar' in ui_components:
+            progress_bar = ui_components['progress_bar']
+        if 'progress_message' in ui_components:
+            progress_message = ui_components['progress_message']
+    
+    # Inisialisasi progress tracking
+    total_steps = 3  # Detect, Mount, Sync
+    current_step = 0
+    
+    def update_progress(step, message, status_type="info"):
+        nonlocal current_step
+        current_step = step
         
-        # Install package dasar jika perlu
-        try:
-            import yaml, tqdm, ipywidgets
-        except ImportError:
-            import subprocess
-            subprocess.run([sys.executable, "-m", "pip", "install", "-q", "ipywidgets", "tqdm", "pyyaml"])
-        
-        # Mount Drive jika di Google Colab
-        if 'google.colab' in sys.modules and not os.path.exists('/content/drive/MyDrive'):
-            from google.colab import drive
-            drive.mount('/content/drive')
+        # Update progress bar
+        if progress_bar:
+            progress_bar.value = step
             
-            # Buat direktori dasar di Drive jika belum ada
-            drive_dir = '/content/drive/MyDrive/SmartCash'
-            if not os.path.exists(drive_dir):
-                os.makedirs(f"{drive_dir}/configs", exist_ok=True)
-                os.makedirs(f"{drive_dir}/data", exist_ok=True)
-                os.makedirs(f"{drive_dir}/runs", exist_ok=True)
-                os.makedirs(f"{drive_dir}/logs", exist_ok=True)
+        # Update message
+        if progress_message:
+            progress_message.value = message
+            
+        # Tampilkan di output
+        if status_output:
+            with status_output:
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                display(create_info_alert(message, status_type))
+    
+    try:
+        import os, sys
+        from smartcash.ui.utils.constants import ICONS
+        
+        # Step 1: Deteksi environment
+        update_progress(1, "Mendeteksi environment Google Drive...")
+        is_colab = 'google.colab' in sys.modules
+        drive_mounted = os.path.exists('/content/drive/MyDrive')
+        
+        if not is_colab:
+            update_progress(3, "Bukan lingkungan Google Colab, lewati sinkronisasi Drive", "info")
+            return
+        
+        # Step 2: Mount Drive jika perlu
+        if not drive_mounted:
+            update_progress(1, "Mounting Google Drive...", "info")
+            
+            try:
+                from google.colab import drive
+                drive.mount('/content/drive')
+                drive_mounted = os.path.exists('/content/drive/MyDrive')
+                
+                if not drive_mounted:
+                    update_progress(1, "Gagal mounting Google Drive", "error")
+                    return
+                
+                update_progress(2, "Google Drive berhasil dimount", "success")
+            except Exception as e:
+                update_progress(1, f"Error saat mounting Google Drive: {str(e)}", "error")
+                return
+        else:
+            update_progress(2, "Google Drive sudah terhubung", "success")
+        
+        # Buat direktori di Drive
+        drive_dir = '/content/drive/MyDrive/SmartCash'
+        if not os.path.exists(drive_dir):
+            update_progress(2, "Membuat direktori SmartCash di Drive...", "info")
+            os.makedirs(f"{drive_dir}/configs", exist_ok=True)
+            os.makedirs(f"{drive_dir}/data", exist_ok=True)
+            os.makedirs(f"{drive_dir}/runs", exist_ok=True)
+            os.makedirs(f"{drive_dir}/logs", exist_ok=True)
+        
+        # Step 3: Sinkronisasi konfigurasi
+        update_progress(2, "Sinkronisasi konfigurasi dengan Drive...", "info")
+        
+        try:
+            from smartcash.common.config_sync import sync_all_configs
+            results = sync_all_configs(sync_strategy='drive_priority')
+            
+            success_count = len(results.get("success", []))
+            failure_count = len(results.get("failure", []))
+            
+            if failure_count == 0:
+                update_progress(3, f"Sinkronisasi berhasil: {success_count} file ✓", "success")
+            else:
+                update_progress(3, f"Sinkronisasi: {success_count} berhasil, {failure_count} gagal", "warning")
+        except ImportError:
+            update_progress(3, "Modul config_sync tidak tersedia, lewati sinkronisasi", "warning")
+        
+    except Exception as e:
+        if status_output:
+            with status_output:
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                display(create_info_alert(f"Error: {str(e)}", "error"))
 
 def setup_environment_config():
     """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
@@ -53,41 +130,55 @@ def setup_environment_config():
         # Buat komponen UI dengan helpers
         ui_components = create_env_config_ui(env, config)
         
+        # Tambahkan progress tracker jika belum ada
+        if 'progress_bar' not in ui_components:
+            ui_components['progress_bar'] = widgets.IntProgress(
+                value=0,
+                min=0,
+                max=3,
+                description='Progress:',
+                style={'description_width': 'initial'},
+                layout=widgets.Layout(width='50%', margin='10px 0')
+            )
+            ui_components['progress_message'] = widgets.HTML("Mempersiapkan environment...")
+            
+            # Tambahkan ke UI
+            if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+                # Cari posisi setelah header
+                children = list(ui_components['ui'].children)
+                header_pos = 0
+                for i, child in enumerate(children):
+                    if child == ui_components.get('header'):
+                        header_pos = i
+                        break
+                
+                # Tambahkan progress components setelah header
+                tracker_box = widgets.VBox([
+                    ui_components['progress_bar'],
+                    ui_components['progress_message']
+                ])
+                children.insert(header_pos + 1, tracker_box)
+                ui_components['ui'].children = children
+        
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, "env_config")
         if logger:
             ui_components['logger'] = logger
             logger.info("🚀 Modul environment config berhasil dimuat")
         
+        # Inisialisasi drive dengan komponen UI yang baru dibuat
+        initialize_drive_sync(ui_components)
+        
         # Setup handlers untuk UI
         ui_components = setup_env_config_handlers(ui_components, env, config)
         
-        # Cek fungsionalitas drive_handler yang juga berhubungan dengan sinkronisasi konfigurasi
+        # Cek fungsionalitas drive_handler
         try:
-            from smartcash.ui.setup.drive_handler import setup_drive_handler, handle_drive_connection
+            from smartcash.ui.setup.drive_handler import setup_drive_handler
             ui_components = setup_drive_handler(ui_components, env, config, auto_connect=True)
         except ImportError as e:
             if logger:
                 logger.debug(f"Module drive_handler tidak tersedia: {str(e)}")
-                
-        # Cek juga fungsionalitas config_sync
-        try:
-            from smartcash.common.config_sync import sync_all_configs
-            from smartcash.common.environment import get_environment_manager
-            
-            env_manager = get_environment_manager()
-            if env_manager.is_drive_mounted:
-                if logger:
-                    logger.info("🔄 Sinkronisasi konfigurasi dengan Google Drive...")
-                results = sync_all_configs(sync_strategy='drive_priority')
-                
-                success_count = len(results.get("success", []))
-                failure_count = len(results.get("failure", []))
-                if logger:
-                    logger.info(f"✅ Sinkronisasi selesai: {success_count} berhasil, {failure_count} gagal")
-        except ImportError:
-            if logger:
-                logger.debug("Module config_sync tidak tersedia")
         
     except ImportError as e:
         # Fallback jika modules tidak tersedia
@@ -103,6 +194,20 @@ def setup_environment_config():
         
         # Buat UI components
         ui_components = create_env_config_ui(env, config)
+        
+        # Tambahkan progress tracker
+        ui_components['progress_bar'] = widgets.IntProgress(
+            value=0, min=0, max=3, description='Progress:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='50%', margin='10px 0')
+        )
+        ui_components['progress_message'] = widgets.HTML("Mempersiapkan environment...")
+        
+        # Coba inisialisasi drive dengan komponen UI fallback
+        try:
+            initialize_drive_sync(ui_components)
+        except Exception:
+            pass
         
         # Tampilkan pesan error
         show_status(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}", "warning", ui_components)

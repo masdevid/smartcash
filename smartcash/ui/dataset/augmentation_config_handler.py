@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_config_handler.py
-Deskripsi: Handler konfigurasi augmentasi dengan penanganan lokasi dataset
+Deskripsi: Handler konfigurasi augmentasi yang disederhanakan dengan fokus pada parameter utama
 """
 
 from typing import Dict, Any, Optional
@@ -41,21 +41,13 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         'output_prefix': ui_components['aug_options'].children[2].value,
         'process_bboxes': ui_components['aug_options'].children[3].value if len(ui_components['aug_options'].children) > 3 else True,
         'validate_results': ui_components['aug_options'].children[4].value if len(ui_components['aug_options'].children) > 4 else True,
-        'resume': False,  # Selalu false karena opsi ini dihilangkan
+        'resume': False,
         'output_dir': rel_augmented_dir
     })
     
     # Update data directory
     config['data'] = config.get('data', {})
     config['data']['dir'] = os.path.relpath(data_dir, os.getcwd()) if os.path.isabs(data_dir) else data_dir
-    
-    # Update advanced options jika tersedia
-    if (pos := ui_components.get('position_options')) and hasattr(pos, 'children') and len(pos.children) >= 6:
-        config['augmentation']['position'] = {k: pos.children[i].value for i, k in enumerate(['fliplr', 'flipud', 'degrees', 'translate', 'scale', 'shear'])}
-    if (light := ui_components.get('lighting_options')) and hasattr(light, 'children') and len(light.children) >= 6:
-        config['augmentation']['lighting'] = {k: light.children[i].value for i, k in enumerate(['hsv_h', 'hsv_s', 'hsv_v', 'contrast', 'brightness', 'compress'])}
-    if (ext := ui_components.get('extreme_options')) and hasattr(ext, 'children') and len(ext.children) >= 3:
-        config['augmentation']['extreme'] = {k: ext.children[i].value for i, k in enumerate(['rotation_min', 'rotation_max', 'probability'])}
     
     return config
 
@@ -112,10 +104,7 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
             "output_dir": "data/augmented",
             "validate_results": True,
             "resume": False,
-            "types": ["combined", "position", "lighting"],
-            "position": {"fliplr": 0.5, "flipud": 0.0, "degrees": 15, "translate": 0.1, "scale": 0.1, "shear": 0.0},
-            "lighting": {"hsv_h": 0.015, "hsv_s": 0.7, "hsv_v": 0.4, "contrast": 0.3, "brightness": 0.3, "compress": 0.0},
-            "extreme": {"rotation_min": 30, "rotation_max": 90, "probability": 0.3}
+            "types": ["combined", "position", "lighting"]
         }
     }
 
@@ -148,7 +137,6 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
                                                          if t in type_map.keys()]
         
         # Update inputs dengan values dari config
-        # Define field mappings
         options_map = {
             1: 'num_variations',
             2: 'output_prefix',
@@ -160,27 +148,6 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         for idx, field in options_map.items():
             if idx < len(ui_components['aug_options'].children) and field in aug_config:
                 ui_components['aug_options'].children[idx].value = aug_config[field]
-        
-        # Update position options
-        if 'position' in aug_config and 'position_options' in ui_components:
-            pos_fields = ['fliplr', 'flipud', 'degrees', 'translate', 'scale', 'shear']
-            for idx, field in enumerate(pos_fields):
-                if idx < len(ui_components['position_options'].children) and field in aug_config['position']:
-                    ui_components['position_options'].children[idx].value = aug_config['position'][field]
-        
-        # Update lighting options
-        if 'lighting' in aug_config and 'lighting_options' in ui_components:
-            light_fields = ['hsv_h', 'hsv_s', 'hsv_v', 'contrast', 'brightness', 'compress']
-            for idx, field in enumerate(light_fields):
-                if idx < len(ui_components['lighting_options'].children) and field in aug_config['lighting']:
-                    ui_components['lighting_options'].children[idx].value = aug_config['lighting'][field]
-        
-        # Update extreme options
-        if 'extreme' in aug_config and 'extreme_options' in ui_components:
-            ext_fields = ['rotation_min', 'rotation_max', 'probability']
-            for idx, field in enumerate(ext_fields):
-                if idx < len(ui_components['extreme_options'].children) and field in aug_config['extreme']:
-                    ui_components['extreme_options'].children[idx].value = aug_config['extreme'][field]
                     
     except Exception as e:
         # Log error jika tersedia

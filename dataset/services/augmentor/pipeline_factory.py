@@ -101,21 +101,19 @@ class AugmentationPipelineFactory:
         # Buat list transformasi
         transforms = []
         
-        # Fix parameter ResizedCrop untuk albumentations >= 0.7.0
-        # Albumentations menganggap parameter scale sebagai dict dengan keys min/max atau tuple sebagai (min, max)
+        # Dapatkan dimensi gambar
         height, width = int(img_size[1]), int(img_size[0])
-        scale = (0.9 if 'crop' in augmentation_types else 0.95, 1.0)
         
-        # Parameter untuk RandomResizedCrop yang kompatibel dengan Albumentations versi baru
-        resize_crop_params = {
-            'height': height, 
-            'width': width,
-            'scale': scale,  # Format yang diharapkan: tuple (min, max) atau dict {'min': min_val, 'max': max_val}
-            'p': 1.0
-        }
+        # Gunakan A.Resize sebagai pengganti RandomResizedCrop untuk menghindari masalah
+        transforms.append(A.Resize(height=height, width=width, p=1.0))
         
-        # Tambahkan random crop resize sebagai base transform
-        transforms.append(A.RandomResizedCrop(**resize_crop_params))
+        # Random crop jika diinginkan
+        if 'crop' in augmentation_types:
+            # Tambahkan transform untuk cropping
+            scale = (0.9, 1.0)
+            transforms.append(A.RandomCrop(height=int(height*0.9), width=int(width*0.9), p=0.5))
+            # Tambahkan resize lagi untuk memastikan ukuran konsisten
+            transforms.append(A.Resize(height=height, width=width, p=1.0))
         
         # Sesuaikan parameter berdasarkan intensitas
         params = self._adjust_params_by_intensity(intensity, **kwargs)

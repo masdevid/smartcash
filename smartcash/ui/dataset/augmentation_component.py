@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_component.py
-Deskripsi: Komponen UI untuk augmentasi dataset dengan integrasi UI utils standar dan perbaikan layout
+Deskripsi: Komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana dan fokus pada konfigurasi utama
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk augmentasi dataset dengan memanfaatkan UI utils standar.
+    Buat komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana.
     
     Args:
         env: Environment manager
@@ -83,140 +83,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
             description='Validate results',
             style={'description_width': 'initial'}
         )
-        # Removed "Resume if interrupted" option
     ])
     
-    # Position parameters in accordion
-    position_options = widgets.VBox([
-        widgets.FloatSlider(
-            value=0.5, min=0, max=1, step=0.05, 
-            description='Flip prob:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.0, min=0, max=1, step=0.05, 
-            description='Flipud prob:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.IntSlider(
-            value=15, min=0, max=90, 
-            description='Degrees:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.1, min=0, max=0.5, step=0.05, 
-            description='Translate:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.1, min=0, max=0.5, step=0.05, 
-            description='Scale:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.0, min=0, max=20, step=1.0, 
-            description='Shear:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        )
-    ])
-    
-    # Lighting parameters in accordion
-    lighting_options = widgets.VBox([
-        widgets.FloatSlider(
-            value=0.015, min=0, max=0.1, step=0.005, 
-            description='HSV Hue:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.7, min=0, max=1, step=0.05, 
-            description='HSV Sat:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.4, min=0, max=1, step=0.05, 
-            description='HSV Value:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.3, min=0, max=1, step=0.05, 
-            description='Contrast:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.3, min=0, max=1, step=0.05, 
-            description='Brightness:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.0, min=0, max=1, step=0.05, 
-            description='Compress:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        )
-    ])
-    
-    # Extreme options in accordion
-    extreme_options = widgets.VBox([
-        widgets.IntSlider(
-            value=30, min=10, max=90, 
-            description='Min rotation:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.IntSlider(
-            value=90, min=30, max=180, 
-            description='Max rotation:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        ),
-        widgets.FloatSlider(
-            value=0.3, min=0, max=1, step=0.05, 
-            description='Probability:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        )
-    ])
-    
-    # Tambahkan validation options yang lebih lengkap
-    validation_options = widgets.VBox([
-        widgets.Checkbox(
-            value=True,
-            description='Check bounding boxes',
-            style={'description_width': 'initial'}
-        ),
-        widgets.Checkbox(
-            value=True,
-            description='Fix truncated boxes',
-            style={'description_width': 'initial'}
-        ),
-        widgets.FloatSlider(
-            value=0.3, min=0, max=1, step=0.05, 
-            description='Min visibility:', 
-            style={'description_width': 'initial'}, 
-            layout=widgets.Layout(width='60%')
-        )
-    ])
-    
-    # Advanced settings accordion
-    advanced_accordion = widgets.Accordion(children=[position_options, lighting_options, extreme_options, validation_options])
-    advanced_accordion.set_title(0, f"{ICONS['settings']} Position Parameters")
-    advanced_accordion.set_title(1, f"{ICONS['settings']} Lighting Parameters")
-    advanced_accordion.set_title(2, f"{ICONS['settings']} Extreme Parameters")
-    advanced_accordion.set_title(3, f"{ICONS['settings']} Validation Parameters")
-    advanced_accordion.selected_index = None  # Collapsed by default
-    
-    # Tombol-tombol preprocessing dengan styling standar
+    # Tombol-tombol dengan styling standar
     augment_button = widgets.Button(description='Run Augmentation', button_style='primary', icon='random')
     stop_button = widgets.Button(description='Stop', button_style='danger', icon='stop', 
                                layout=widgets.Layout(display='none'))
@@ -224,7 +93,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     cleanup_button = widgets.Button(description='Clean Augmented Data', button_style='danger', icon='trash')
     save_button = widgets.Button(description='Simpan Konfigurasi', button_style='success', icon='save')
     
-    # Container tombol utama (menggunakan layout biasa, bukan space-between)
+    # Container tombol utama
     button_container = widgets.HBox([
         augment_button, stop_button, reset_button, save_button, cleanup_button
     ], layout=widgets.Layout(margin='10px 0', gap='10px'))
@@ -288,10 +157,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         status_panel,
-        location_container,  # Added location container
+        location_container,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
         aug_options,
-        advanced_accordion,
         create_divider(),
         button_container,
         progress_container,
@@ -307,17 +175,12 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
-        'data_dir_input': location_container.children[1],  # Data dir input
-        'output_dir_input': location_container.children[2],  # Output dir input
+        'data_dir_input': location_container.children[1],
+        'output_dir_input': location_container.children[2],
         'aug_options': aug_options,
-        'position_options': position_options,
-        'lighting_options': lighting_options,
-        'extreme_options': extreme_options,
-        'validation_options': validation_options,
-        'advanced_accordion': advanced_accordion,
         'augment_button': augment_button,
         'stop_button': stop_button,
-        'reset_button': reset_button,  # Added reset button
+        'reset_button': reset_button,
         'cleanup_button': cleanup_button,
         'save_button': save_button,
         'progress_bar': progress_bar,

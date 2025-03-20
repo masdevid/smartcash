@@ -156,11 +156,11 @@ def download_from_roboflow(
         )
         
         # Export ke folder data standar
-        output_dir = ui_components.get('data_dir', 'data/')
+        output_dir = ui_components.get('dir', 'data/')
         
         # Update progress dengan utils standar
         if 'progress_handler' in ui_components:
-                ui_components['progress_handler'].update_progress_bar(80, 100, "Mengekspor dataset...")
+            ui_components['progress_handler'].update_progress_bar(80, 100, "Mengekspor dataset...")
         else:
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].value = 80

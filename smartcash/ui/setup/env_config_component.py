@@ -43,13 +43,17 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         style="info",
         collapsed=True
     )
-    
+    button_layout = widgets.Layout(
+        width='auto',
+        margin_right='5px 5px 5px 0',
+        height='auto'
+    )
     # Tombol aksi dengan styling default
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
         button_style='primary',
         icon='link',
-        miidth='200px',
+        layout=button_layout,
         tooltip='Mount Google Drive dan siapkan struktur direktori'
     )
     
@@ -57,7 +61,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         description='Setup Direktori Lokal',
         button_style='info',
         icon='folder-plus',
-        min_width='200px',
+        layout=button_layout,
         tooltip='Buat struktur direktori lokal'
     )
     

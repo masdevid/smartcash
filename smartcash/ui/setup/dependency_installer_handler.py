@@ -183,8 +183,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                 # Update progress bar
                 progress_bar.update(1)
                 ui_components['install_progress'].value = progress_bar.n
-                percentage = progress_bar.n / packages_to_install * 100
-                ui_components['install_progress'].description = f"Proses: {percentage:.2f}%"
+
+                percentage = (progress_bar.n / len(packages_to_install)) * 100  # Ensure correct division
+                ui_components['install_progress'].description = f"Proses: {percentage:.2f}%"  # Format percentage to 2 decimal places
+
             
             # Tutup progress bar
             progress_bar.close()

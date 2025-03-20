@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/utils/__init__.py
-Deskripsi: Utilitas dasar untuk komponen UI dan notebook dengan integrasi logging dan cell yang ditingkatkan
+Deskripsi: Import utilitas dasar untuk komponen UI dan notebook dengan integrasi logging dan cell yang ditingkatkan
 """
 
 from smartcash.ui.utils.cell_utils import (
@@ -51,6 +51,22 @@ from smartcash.ui.utils.ui_helpers import (
     create_divider,
     create_spacing,
 )
+from smartcash.ui.utils.drive_detector import (
+    detect_drive_mount,
+    sync_drive_to_local,
+    async_sync_drive
+)
+from smartcash.ui.utils.fallback import (
+    import_with_fallback,
+    get_logger_safely,
+    get_status_widget,
+    create_status_message,
+    show_status,
+    update_status_panel,
+    load_config_safely,
+    get_dataset_manager,
+    handle_download_status
+)
 
 __all__ = [
     # Cell Utils
@@ -100,4 +116,20 @@ __all__ = [
     'update_output_area',
     'create_divider',
     'create_spacing',
+    
+    # Drive Detector
+    'detect_drive_mount',
+    'sync_drive_to_local',
+    'async_sync_drive',
+    
+    # Fallback Utilities
+    'import_with_fallback',
+    'get_logger_safely',
+    'get_status_widget',
+    'create_status_message',
+    'show_status',
+    'update_status_panel',
+    'load_config_safely',
+    'get_dataset_manager',
+    'handle_download_status'
 ]

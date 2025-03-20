@@ -1723,170 +1723,144 @@
   - Setup UI component dengan `setup_ui_component()`
   - Display UI dengan `display_ui()`
 
-# SmartCash v2 - Pemetaan Kelas dan Metode Domain UI
+# Pemetaan Kelas dan Fungsi Domain UI
 
-## Domain UI
+## Utilitas UI (smartcash/ui/utils/)
 
-### UIHelpers (ui/utils/ui_helpers.py)
-- **Fungsi**: Utilitas standar untuk komponen UI dengan integrasi notebook
-- **Metode Utama**:
-  - `set_active_theme()`: Atur tema aktif UI
-  - `inject_css_styles()`: Tambahkan style CSS global
-  - `create_header()`: Buat komponen header
-  - `create_section_title()`: Buat judul section
-  - `create_status_indicator()`: Buat indikator status
-  - `create_info_alert()`: Buat alert box
-  - `create_info_box()`: Buat info box yang dapat di-collapse
-  - `create_tab_view()`: Buat komponen tab
-  - `update_output_area()`: Update area output
-  - `create_loading_indicator()`: Buat indikator loading
-  - `register_observer_callback()`: Register callback observer
-  - `display_file_info()`: Tampilkan informasi file
-  - `create_progress_updater()`: Buat fungsi updater progress
-  - `run_task()`: Jalankan task dengan penanganan callback
-  - `create_button_group()`: Buat group tombol
-  - `create_confirmation_dialog()`: Buat dialog konfirmasi
+### Cell Utils (cell_utils.py)
+- **Fungsi Utama**:
+  - `setup_notebook_environment(cell_name, config_path)`: Siapkan lingkungan notebook
+  - `setup_ui_component(env, config, component_name)`: Setup komponen UI
+  - `create_default_ui_components(cell_name)`: Buat komponen UI default
+  - `display_ui(ui_components)`: Tampilkan komponen UI
+  - `register_cleanup_resource(ui_components, resource, cleanup_func)`: Registrasi resource untuk dibersihkan
+  - `cleanup_resources(ui_components)`: Bersihkan resources yang digunakan
 
-### CellUtils (ui/utils/cell_utils.py)
-- **Fungsi**: Utilitas untuk cell notebook dengan integrasi logging
-- **Metode Utama**:
-  - `setup_notebook_environment()`: Setup environment notebook
-  - `setup_ui_component()`: Setup komponen UI
-  - `create_default_ui_components()`: Buat komponen UI default
-  - `display_ui()`: Tampilkan komponen UI
-  - `register_cleanup_resource()`: Registrasi resource untuk dibersihkan
-  - `cleanup_resources()`: Bersihkan resources
-
-### LoggingUtils (ui/utils/logging_utils.py)
-- **Fungsi**: Utilitas logging untuk notebook dengan alert berbasis UI
-- **Metode Utama**:
-  - `setup_ipython_logging()`: Setup logger terintegrasi dengan UI
-  - `UILogger`: Kelas logger khusus UI
-  - `UILogHandler`: Handler log untuk tampilan alert
+### Logging Utils (logging_utils.py)
+- **Kelas**:
+  - `UILogHandler`: Handler logging khusus UI
+  - `UILogger`: Logger dengan metode tambahan
+- **Fungsi Utama**:
+  - `setup_ipython_logging(ui_components, logger_name)`: Setup logging untuk notebook
+  - `redirect_all_logging(output_widget)`: Redirect logging Python ke widget
   - `create_dummy_logger()`: Buat logger dummy
-  - `log_to_ui()`: Log langsung ke UI
+  - `log_to_ui(ui_components, message, level)`: Log pesan langsung ke UI
 
-### FileUtils (ui/utils/file_utils.py)
-- **Fungsi**: Utilitas file untuk komponen UI
-- **Metode Utama**:
-  - `format_file_size()`: Format ukuran file
-  - `display_file_info()`: Tampilkan informasi file
-  - `directory_tree()`: Buat representasi tree direktori
-  - `create_file_upload_widget()`: Buat widget upload file
-  - `save_uploaded_file()`: Simpan file yang diupload
-  - `create_file_browser()`: Buat file browser sederhana
-  - `backup_file()`: Backup file
-  - `list_files()`: Daftar file dalam direktori
-  - `is_image_file()`: Cek apakah file gambar
-  - `is_video_file()`: Cek apakah file video
-  - `get_file_info()`: Dapatkan informasi lengkap file
-  - `create_file_download_link()`: Buat link download file
-
-### VisualizationUtils (ui/utils/visualization_utils.py)
-- **Fungsi**: Utilitas visualisasi untuk komponen UI
-- **Metode Utama**:
+### Visualization Utils (visualization_utils.py)
+- **Fungsi Utama Visualisasi**:
   - `create_class_distribution_plot()`: Plot distribusi kelas
   - `create_confusion_matrix_plot()`: Plot confusion matrix
-  - `create_metrics_history_plot()`: Plot history metrik
+  - `create_metrics_history_plot()`: Plot history metrik training
   - `create_model_comparison_plot()`: Plot perbandingan model
   - `create_metric_display()`: Buat display metrik
   - `create_metrics_dashboard()`: Buat dashboard metrik
 
-### ConfigHandler (ui/training_config/config_handler.py)
-- **Fungsi**: Handler bersama untuk operasi konfigurasi
-- **Metode Utama**:
-  - `get_config_manager()`: Dapatkan config manager
-  - `get_observer_manager()`: Dapatkan observer manager
-  - `save_config()`: Simpan konfigurasi
-  - `reset_config()`: Reset konfigurasi ke default
+### File Utils (file_utils.py)
+- **Fungsi Utama**:
+  - `format_file_size()`: Format ukuran file
+  - `display_file_info()`: Tampilkan informasi file
+  - `directory_tree()`: Buat representasi struktur direktori
+  - `create_file_upload_widget()`: Buat widget upload file
+  - `save_uploaded_file()`: Simpan file yang diupload
+  - `create_file_browser()`: Buat file browser
+  - `backup_file()`: Backup file
+  - `list_files()`: Daftar file dalam direktori
 
-## Handler Utama
+### UI Helpers (ui_helpers.py)
+- **Fungsi Utama**:
+  - Tema dan Styling:
+    - `set_active_theme()`: Set tema UI
+    - `inject_css_styles()`: Inject CSS styles
+  - Komponen UI:
+    - `create_header()`: Buat header
+    - `create_section_title()`: Buat judul section
+    - `create_status_indicator()`: Buat indikator status
+    - `create_info_alert()`: Buat alert box
+    - `create_info_box()`: Buat info box yang dapat di-collapse
+  - Interaksi UI:
+    - `create_tab_view()`: Buat komponen tab
+    - `create_loading_indicator()`: Buat indikator loading
+    - `update_output_area()`: Update area output
+    - `create_button_group()`: Buat group tombol
+    - `create_confirmation_dialog()`: Buat dialog konfirmasi
 
-### ErrorHandler (ui/handlers/error_handler.py)
-- **Fungsi**: Penanganan error di komponen UI
-- **Metode Utama**:
-  - `create_status_indicator()`: Buat indikator status error
-  - `setup_error_handlers()`: Setup handler error
-  - `handle_error()`: Tangani dan tampilkan error
-  - `create_error_handler()`: Buat fungsi handler error
+### Error Handler (error_handler.py)
+- **Fungsi Utama**:
+  - `create_error_message()`: Buat pesan error terformat
+  - `handle_ui_error()`: Tangani error di UI
+  - `show_ui_message()`: Tampilkan pesan dengan styling
   - `try_except_decorator()`: Decorator untuk penanganan error
+  - `get_ui_component()`: Dapatkan komponen UI dengan aman
 
-### ObserverHandler (ui/handlers/observer_handler.py)
-- **Fungsi**: Handler untuk sistem observer dengan integrasi UI
-- **Metode Utama**:
+## Komponen UI (smartcash/ui/components/)
+
+### Alerts (alerts.py)
+- **Fungsi Utama**:
+  - `create_status_indicator()`: Buat indikator status
+  - `create_info_alert()`: Buat alert box
+  - `create_info_box()`: Buat info box yang dapat di-collapse
+
+### Headers (headers.py)
+- **Fungsi Utama**:
+  - `create_header()`: Buat header
+  - `create_component_header()`: Alias untuk create_header
+  - `create_section_title()`: Buat judul section
+
+### Helpers (helpers.py)
+- **Fungsi Utama**:
+  - Alias untuk fungsi dari ui_helpers
+  - `run_task_with_progress()`: Alias untuk run_task
+
+### Layouts (layouts.py)
+- **Konstanta Layout**:
+  - `STANDARD_LAYOUTS`: Layout standar untuk berbagai komponen
+  - `MAIN_CONTAINER`: Layout container utama
+  - `OUTPUT_WIDGET`: Layout widget output
+  - `BUTTON`, `HIDDEN_BUTTON`: Layout tombol
+  - `TEXT_INPUT`, `TEXT_AREA`: Layout input text
+  - `HORIZONTAL_GROUP`, `VERTICAL_GROUP`: Layout group widget
+  - `CARD`, `TABS`, `ACCORDION`: Layout container
+
+### Metrics (metrics.py)
+- **Fungsi Utama**:
+  - `create_metric_display()`: Buat display metrik
+  - `create_result_table()`: Tampilkan tabel hasil
+  - `plot_statistics()`: Plot statistik data
+  - `styled_html()`: Buat HTML dengan styling kustom
+
+### Validators (validators.py)
+- **Fungsi Validasi**:
+  - Validasi dasar: `validate_required()`, `validate_numeric()`, `validate_integer()`
+  - Validasi nilai: `validate_min_value()`, `validate_max_value()`, `validate_range()`
+  - Validasi panjang: `validate_min_length()`, `validate_max_length()`
+  - Validasi format: `validate_regex()`, `validate_email()`, `validate_url()`
+  - Validasi file: `validate_file_exists()`, `validate_directory_exists()`, `validate_file_extension()`
+  - Validasi khusus: `validate_api_key()`
+  - Fungsi tambahan: `create_validation_message()`, `show_validation_message()`, `clear_validation_messages()`
+
+## Handler UI (smartcash/ui/handlers/)
+
+### Error Handler (error_handler.py)
+- **Fungsi Utama**:
+  - `create_error_message()`: Buat pesan error
+  - `handle_ui_error()`: Tangani error di UI
+  - `show_ui_message()`: Tampilkan pesan
+  - `try_except_decorator()`: Decorator penanganan error
+  - `get_ui_component()`: Dapatkan komponen UI
+
+### Observer Handler (observer_handler.py)
+- **Fungsi Utama**:
   - `setup_observer_handlers()`: Setup handler observer
   - `register_ui_observer()`: Register observer untuk update UI
   - `create_progress_observer()`: Buat observer untuk progress bar
 
-## Komponen Setup
-
-### EnvironmentConfig (ui/setup/env_config_component.py)
-- **Fungsi**: Komponen UI untuk konfigurasi environment
-- **Metode Utama**:
-  - `create_env_config_ui()`: Buat UI konfigurasi environment
-  - Deteksi lingkungan Colab/Drive
-  - Konfigurasi direktori dan integrasi
-
-### DriveHandler (ui/setup/drive_handler.py)
-- **Fungsi**: Handler untuk koneksi Google Drive
-- **Metode Utama**:
-  - `handle_drive_connection()`: Hubungkan ke Google Drive
-  - `mount_google_drive()`: Mount drive
-  - `create_symlinks()`: Buat symlink direktori
-  - `sync_configs()`: Sinkronisasi konfigurasi
-
-### DirectoryHandler (ui/setup/directory_handler.py)
-- **Fungsi**: Setup struktur direktori proyek
-- **Metode Utama**:
-  - `handle_directory_setup()`: Setup direktori standar
-  - `setup_directory_structure()`: Buat struktur direktori
-  - `display_directory_tree()`: Tampilkan struktur direktori
-
-## Komponen Dataset
-
-### DatasetDownloadComponent (ui/dataset/dataset_download_component.py)
-- **Fungsi**: Komponen UI untuk download dataset
-- **Metode Utama**:
-  - `create_dataset_download_ui()`: Buat UI download dataset
-  - Konfigurasi download Roboflow/lokal
-  - Manajemen API key dan opsi download
-
-### RoboflowDownloadHandler (ui/dataset/roboflow_download_handler.py)
-- **Fungsi**: Handler download dataset dari Roboflow
-- **Metode Utama**:
-  - `download_from_roboflow()`: Download dataset dari Roboflow
-  - `get_roboflow_settings()`: Ambil pengaturan download
-  - `handle_successful_download()`: Tangani download berhasil
-  - `handle_download_error()`: Tangani error download
-
-### LocalUploadHandler (ui/dataset/local_upload_handler.py)
-- **Fungsi**: Handler upload dataset lokal
-- **Metode Utama**:
-  - `process_local_upload()`: Proses upload file lokal
-  - `save_uploaded_file()`: Simpan file yang diupload
-  - `extract_dataset()`: Ekstrak dataset dari file ZIP
-  - `handle_successful_upload()`: Tangani upload berhasil
-
-## Komponen Training Config
-
-### BackboneSelectionComponent (ui/training_config/backbone_selection_component.py)
-- **Fungsi**: Komponen UI untuk pemilihan backbone dan konfigurasi layer
-- **Metode Utama**:
-  - `create_backbone_selection_ui()`: Buat UI pemilihan backbone
-  - Konfigurasi backbone (EfficientNet/CSPDarknet)
-  - Konfigurasi layer deteksi
-
-### HyperparametersComponent (ui/training_config/hyperparameters_component.py)
-- **Fungsi**: Komponen UI untuk konfigurasi hyperparameter
-- **Metode Utama**:
-  - `create_hyperparameters_ui()`: Buat UI hyperparameter
-  - Konfigurasi training dasar
-  - Konfigurasi scheduler dan early stopping
-
-### TrainingStrategyComponent (ui/training_config/training_strategy_component.py)
-- **Fungsi**: Komponen UI untuk konfigurasi strategi training
-- **Metode Utama**:
-  - `create_training_strategy_ui()`: Buat UI strategi training
-  - Konfigurasi augmentasi
-  - Konfigurasi optimasi
-  - Konfigurasi policy training
+### Download Progress Handler (download_progress_handler.py)
+- **Kelas**: `DownloadProgressHandler`
+  - Metode Utama:
+    - `_register_download_observers()`: Register observer untuk event download
+    - `_handle_download_event()`: Handler untuk berbagai event download
+    - `_handle_start_event()`: Handler untuk event mulai
+    - `_handle_progress_event()`: Handler untuk event progress
+    - `_handle_complete_event()`: Handler untuk event selesai
+    - `_handle_error_event()`: Handler untuk event error
+    - `reset_ui()`: Reset komponen UI

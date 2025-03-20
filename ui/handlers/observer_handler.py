@@ -25,7 +25,6 @@ def setup_observer_handlers(
         from smartcash.components.observer.manager_observer import ObserverManager
         
         # Dapatkan observer manager
-        # Ubah dari .get_instance() ke cara inisialisasi yang benar
         observer_manager = ObserverManager()
         if observer_manager:
             # Unregister group yang lama jika ada
@@ -95,7 +94,7 @@ def register_ui_observer(
             if message:
                 status = kwargs.get('status', 'info')
                 with output_widget:
-                    from smartcash.ui.handlers.error_handler import create_status_indicator
+                    from smartcash.ui.components.alerts import create_status_indicator
                     display(create_status_indicator(status, message))
         
         # Register observer
@@ -149,7 +148,6 @@ def create_progress_observer(
         if not observer_manager:
             try:
                 from smartcash.components.observer.manager_observer import ObserverManager
-                # Ubah dari .get_instance() ke cara inisialisasi yang benar
                 observer_manager = ObserverManager()
             except ImportError:
                 return False
@@ -180,7 +178,7 @@ def create_progress_observer(
             if message and output_widget:
                 status = kwargs.get('status', 'info')
                 with output_widget:
-                    from smartcash.ui.handlers.error_handler import create_status_indicator
+                    from smartcash.ui.components.alerts import create_status_indicator
                     display(create_status_indicator(status, message))
         
         # Register observer

@@ -19,8 +19,8 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Import komponen UI
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.info_boxes.download_info import get_download_info
     
     # Header
     header = create_header(
@@ -126,48 +126,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     )
     
     # Panel info bantuan
-    help_panel = create_info_box(
-        f"Panduan Download Dataset",
-        f"""
-        <h4>Cara Download Dataset</h4>
-        <ol>
-            <li><b>Roboflow:</b> Masukkan API key Roboflow dan konfigurasi workspace/project</li>
-            <li><b>Local:</b> Upload file ZIP yang berisi dataset dalam format YOLOv5</li>
-        </ol>
-        <h4>Setup API Key Roboflow</h4>
-        <p>Anda memiliki beberapa cara untuk menyediakan API key Roboflow:</p>
-        <ol>
-            <li><b>Google Secret (untuk Colab):</b>
-                <ul>
-                    <li>Klik ikon kunci {ICONS['settings']} di sidebar kiri</li>
-                    <li>Tambahkan secret baru dengan nama <code>ROBOFLOW_API_KEY</code></li>
-                    <li>Masukkan API key Roboflow Anda sebagai nilai</li>
-                    <li>Klik "Save". API key akan diambil otomatis</li>
-                </ul>
-            </li>
-            <li><b>Input Manual:</b> Masukkan API key secara langsung pada field yang tersedia</li>
-            <li><b>Config File:</b> Tambahkan ke <code>configs/base_config.yaml</code></li>
-        </ol>
-        <h4>Backup Dataset</h4>
-        <p>Jika opsi backup diaktifkan, dataset yang ada akan dibackup ke file ZIP sebelum diubah. File ZIP akan disimpan di direktori <code>data/backups</code>.</p>
-        <h4>Struktur Dataset YOLOv5</h4>
-        <pre>
-data/
-  ├── train/
-  │   ├── images/
-  │   └── labels/
-  ├── valid/
-  │   ├── images/
-  │   └── labels/
-  └── test/
-      ├── images/
-      └── labels/
-        </pre>
-        """,
-        'info',
-        collapsed=True
-    )
-    
+    help_panel = get_download_info()
     # Container untuk download settings (akan berubah berdasarkan pilihan)
     download_settings_container = widgets.VBox([roboflow_settings])
     

@@ -19,8 +19,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     """
     # Import komponen UI
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
     
     # Header
     header = create_header(
@@ -193,24 +193,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Info box
-    help_panel = create_info_box(
-        f"Tentang Preprocessing",
-        """
-        <p>Preprocessing meliputi beberapa langkah penting:</p>
-        <ul>
-            <li><strong>Resize</strong>: Ubah ukuran gambar menjadi ukuran yang seragam</li>
-            <li><strong>Normalization</strong>: Normalisasi pixel values untuk training yang lebih stabil</li>
-            <li><strong>Caching</strong>: Simpan gambar yang sudah diproses untuk mempercepat loading</li>
-            <li><strong>Validation</strong>: Validasi integritas dataset, cek label dan gambar rusak</li>
-        </ul>
-        <p><strong>📝 Konfigurasi</strong> akan otomatis disimpan ke <code>configs/preprocessing_config.yaml</code></p>
-        
-        <p><strong>Catatan:</strong> Gambar yang telah dipreprocessing akan disimpan di direktori 
-        <code>data/preprocessed/[split]</code> untuk penggunaan berikutnya.</p>
-        """,
-        'info',
-        collapsed=True
-    )
+    help_panel = get_preprocessing_info()
     
     # Cleanup container
     cleanup_container = widgets.HBox([cleanup_button], layout=widgets.Layout(margin='10px 0'))

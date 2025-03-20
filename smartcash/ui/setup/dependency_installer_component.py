@@ -133,8 +133,6 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Tombol aksi menggunakan komponen button_group dari ui_helpers
-    button_layout = widgets.Layout(width='auto', margin='5px', height='auto')
-    
     buttons = [
         ("Check All", "info", "check-square", None),
         ("Uncheck All", "warning", "square", None),

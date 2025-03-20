@@ -4,22 +4,12 @@ Deskripsi: Konten info box untuk instalasi dependencies
 """
 
 import ipywidgets as widgets
-from typing import Optional
-
 from smartcash.ui.utils.info_utils import create_info_accordion
 
+TITLE = "Tentang Package Installation"
 def get_dependencies_info(open_by_default: bool = False) -> widgets.Accordion:
-    """
-    Dapatkan info box untuk instalasi dependencies.
-    
-    Args:
-        open_by_default: Buka accordion secara default
-        
-    Returns:
-        Widget accordion berisi info instalasi dependencies
-    """
     content = """
-    <h3 style="margin-top:0">Instalasi Dependencies</h3>
+    <h3 style="margin-top:0">{TITLE}</h3>
     
     <p>SmartCash memerlukan beberapa package untuk berjalan dengan optimal. Package diurutkan instalasi dari kecil ke besar:</p>
     
@@ -41,10 +31,4 @@ def get_dependencies_info(open_by_default: bool = False) -> widgets.Accordion:
     <p><strong>⚠️ Catatan:</strong> Instalasi PyTorch mungkin memerlukan waktu lebih lama, terutama di lingkungan dengan koneksi lambat.</p>
     """
     
-    return create_info_accordion(
-        "Tentang Package Installation",
-        content,
-        "info",
-        "📦",
-        open_by_default
-    )
+    return create_info_accordion(TITLE, content, "info", "📦", open_by_default)

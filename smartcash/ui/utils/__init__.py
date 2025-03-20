@@ -61,7 +61,7 @@ from smartcash.ui.utils.fallback_utils import (
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert, create_info_box
 from smartcash.ui.utils.header_utils import create_header, create_section_title
 
-from smartcash.ui.utils.layouts import (
+from smartcash.ui.utils.layout_utils import (
     STANDARD_LAYOUTS, MAIN_CONTAINER, OUTPUT_WIDGET, BUTTON,
     HIDDEN_BUTTON, TEXT_INPUT, TEXT_AREA, SELECTION,
     HORIZONTAL_GROUP, VERTICAL_GROUP, DIVIDER, CARD,

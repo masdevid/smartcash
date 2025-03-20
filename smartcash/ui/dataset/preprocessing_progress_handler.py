@@ -3,7 +3,7 @@ File: smartcash/ui/dataset/preprocessing_progress_handler.py
 Deskripsi: Handler progress tracking preprocessing dataset dengan perbaikan perhitungan progress keseluruhan dan saat ini
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
 from IPython.display import display
 from smartcash.ui.utils.constants import ICONS
 

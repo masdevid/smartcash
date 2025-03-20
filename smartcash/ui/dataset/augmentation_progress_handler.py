@@ -30,27 +30,29 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         if not ui_components.get('augmentation_running', True): return
         
         # Update progress bar utama dengan validasi
-        if progress is not None and total is not None and 'progress_bar' in ui_components:
+        if progress is not None and total is not None and total > 0 and 'progress_bar' in ui_components:
             ui_components['progress_bar'].max = total
-            ui_components['progress_bar'].value = progress
+            ui_components['progress_bar'].value = min(progress, total)  # Ensure progress <= total
             ui_components['progress_bar'].description = f"{int(progress/total*100) if total > 0 else 0}%"
+            ui_components['progress_bar'].layout.visibility = 'visible'
         
         # Update current progress jika tersedia dengan validasi
-        if current_progress is not None and current_total is not None and 'current_progress' in ui_components:
+        if current_progress is not None and current_total is not None and current_total > 0 and 'current_progress' in ui_components:
             ui_components['current_progress'].max = current_total
-            ui_components['current_progress'].value = current_progress
+            ui_components['current_progress'].value = min(current_progress, current_total)  # Ensure progress <= total
             ui_components['current_progress'].description = f"Step: {current_progress}/{current_total}"
+            ui_components['current_progress'].layout.visibility = 'visible'
         
         # Notifikasi observer dengan observer standar jika progress signifikan
         try:
             from smartcash.components.observer import notify
             from smartcash.components.observer.event_topics_observer import EventTopics
             
-            if progress is not None and total is not None and progress % 10 == 0:
+            if progress is not None and total is not None and (progress % max(1, total//10) == 0 or progress == total):
                 notify(
                     event_type=EventTopics.AUGMENTATION_PROGRESS, 
                     sender="augmentation_handler",
-                    message=message or f"Augmentasi progress: {int(progress/total*100)}%",
+                    message=message or f"Augmentasi progress: {int(progress/total*100) if total > 0 else 0}%",
                     progress=progress,
                     total=total
                 )
@@ -99,7 +101,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         
         if logger: logger.info(f"{ICONS['success']} Progress tracking terintegrasi berhasil setup")
     except (ImportError, AttributeError) as e:
-        if logger: logger.warning(f"{ICONS['warning']} Observer progress tidak tersedia: {str(e)}")
+        if logger: logger.debug(f"{ICONS['info']} Observer progress tidak tersedia: {str(e)}")
     
     # Helper utility untuk memudahkan update progress
     def update_progress_bar(progress, total, message=None):
@@ -111,16 +113,21 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             total: Nilai maksimal progress
             message: Pesan opsional
         """
+        # Skip jika augmentasi sudah dihentikan
+        if not ui_components.get('augmentation_running', True): return
+        
         # Update progress bar
-        if 'progress_bar' in ui_components:
+        if 'progress_bar' in ui_components and total > 0:
             ui_components['progress_bar'].max = total
-            ui_components['progress_bar'].value = progress
+            ui_components['progress_bar'].value = min(progress, total)
             percentage = int((progress / total) * 100) if total > 0 else 0
             ui_components['progress_bar'].description = f"Progress: {percentage}%"
+            ui_components['progress_bar'].layout.visibility = 'visible'
         
         # Update message jika ada
         if message and 'current_progress' in ui_components:
             ui_components['current_progress'].description = message
+            ui_components['current_progress'].layout.visibility = 'visible'
             
         # Notify observer
         try:

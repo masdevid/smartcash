@@ -136,7 +136,7 @@ __all__ = [
     'create_status_indicator', 'create_info_alert', 'create_info_box',
     
     # Headers
-    'create_header', 'create_component_header', 'create_section_title',
+    'create_header', 'create_section_title',
     
     # Layouts
     'STANDARD_LAYOUTS', 'MAIN_CONTAINER', 'OUTPUT_WIDGET', 'BUTTON',

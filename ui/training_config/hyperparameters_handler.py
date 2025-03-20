@@ -195,47 +195,7 @@ def setup_hyperparameters_handlers(ui_components: Dict[str, Any], env=None, conf
             set_value('loss_params', 1, training.get('obj_loss_weight', 0.5))
             set_value('loss_params', 2, training.get('cls_loss_weight', 0.5))
             
-            # Update visualisasi
-            update_lr_visualization(training.get('scheduler', 'cosine'))
-        
-        # Visualisasi Learning Rate (diringkas)
-        def update_lr_visualization(scheduler_type):
-            visualization_output = ui_components.get('visualization_output')
-            if not visualization_output:
-                return
-                
-            with visualization_output:
-                clear_output(wait=True)
-                
-                # Dapatkan nilai learning rate
-                lr0 = config.get('training', {}).get('lr0', 0.01)
-                lrf = config.get('training', {}).get('lrf', 0.01)
-                final_lr = lr0 * lrf
-                
-                # Deskripsi per jenis scheduler
-                descriptions = {
-                    'cosine': f"Cosine scheduler: LR menurun halus dari {lr0} ke {final_lr} mengikuti kurva cosine.",
-                    'linear': f"Linear scheduler: LR menurun linear dari {lr0} ke {final_lr}.",
-                    'step': "Step scheduler: LR diturunkan dengan faktor tertentu setiap n epoch.",
-                    'OneCycleLR': "OneCycle: LR meningkat lalu menurun kembali dengan pola tertentu.",
-                    'none': "No scheduler: LR tetap konstan selama training."
-                }
-                
-                description = descriptions.get(scheduler_type, f"Learning rate scheduler: {scheduler_type}")
-                
-                # Tampilkan info
-                try:
-                    from smartcash.ui.helpers.ui_helpers import create_info_alert
-                    display(create_info_alert(f"📝 Learning Rate Schedule: {scheduler_type}\n\n{description}", "info"))
-                except ImportError:
-                    # Fallback sederhana
-                    display(HTML(f"""
-                    <div style="padding:10px; background:#e3f2fd; border-left:4px solid #2196F3; margin:10px 0;">
-                        <h4 style="margin-top:0">📝 Learning Rate Schedule: {scheduler_type}</h4>
-                        <p>{description}</p>
-                    </div>
-                    """))
-        
+       
         # Handler untuk save/reset buttons
         def on_save_click(b):
             save_config(ui_components, config, "configs/training_config.yaml", update_config_from_ui, "Hyperparameters")

@@ -235,16 +235,6 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_tabs.set_title(2, 'Advanced')
     advanced_tabs.set_title(3, 'Loss Weights')
 
-    # Visualization output area
-    visualization_output = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd',
-            min_height='100px',
-            max_height='300px',
-            margin='10px 0',
-            overflow='auto'
-        )
-    )
     
     # Tombol aksi
     from smartcash.ui.training_config.config_buttons import create_config_buttons
@@ -286,7 +276,6 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
         basic_params,
         advanced_section,
         advanced_tabs,
-        visualization_output,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
         buttons_container,
         status,
@@ -303,7 +292,6 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_params': advanced_params,
         'loss_params': loss_params,
         'advanced_tabs': advanced_tabs,
-        'visualization_output': visualization_output,
         'save_button': buttons_container.children[0],
         'reset_button': buttons_container.children[1],
         'status': status,

@@ -12,6 +12,7 @@ from smartcash.ui.helpers.ui_helpers import (
     create_tab_view as ui_helpers_create_tab_view
 )
 
+
 def create_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:
     """
     Buat komponen header dengan style konsisten.
@@ -24,11 +25,22 @@ def create_header(title: str, description: Optional[str] = None, icon: Optional[
     Returns:
         Widget HTML berisi header
     """
-    return ui_helpers_create_header(title, description, icon)
+    # Tambahkan ikon jika disediakan
+    title_with_icon = f"{icon} {title}" if icon else title
+    
+    header_html = f"""
+    <div style="background-color: {COLORS['header_bg']}; padding: 15px; color: black; 
+            border-radius: 5px; margin-bottom: 15px; border-left: 5px solid {COLORS['primary']};">
+        <h2 style="color: {COLORS['dark']}; margin-top: 0;">{title_with_icon}</h2>
+    """
+    
+    if description:
+        header_html += f'<p style="color: black; margin-bottom: 0;">{description}</p>'
+    
+    header_html += "</div>"
+    
+    return widgets.HTML(value=header_html)
 
-def create_component_header(title, description="", icon="🔧"):
-    """Alias untuk create_header dengan parameter yang dibalik untuk backward compatibility."""
-    return create_header(title, description, icon)
 
 def create_section_title(title: str, icon: Optional[str] = "") -> widgets.HTML:
     """
@@ -41,7 +53,8 @@ def create_section_title(title: str, icon: Optional[str] = "") -> widgets.HTML:
     Returns:
         Widget HTML berisi judul section
     """
-    return ui_helpers_create_section_title(title, icon)
-
-# Alias untuk backward compatibility
-create_section_header = create_section_title
+    return widgets.HTML(f"""
+    <h3 style="color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;">
+        {icon} {title}
+    </h3>
+    """)

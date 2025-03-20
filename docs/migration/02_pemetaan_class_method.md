@@ -1312,7 +1312,6 @@
 - **Metode Utama**:
   - `create_header(title, description, icon)`: Buat komponen header dengan style konsisten
   - `create_section_title(title, icon)`: Buat judul section dengan style konsisten
-  - `create_component_header(title, description, icon)`: Alias untuk create_header untuk backward compatibility
 
 #### Alerts (smartcash/components/shared/alerts.py)
 - **Fungsi**: Komponen alerts, info boxes, dan status indicators
@@ -1803,7 +1802,6 @@
 ### Headers (headers.py)
 - **Fungsi Utama**:
   - `create_header()`: Buat header
-  - `create_component_header()`: Alias untuk create_header
   - `create_section_title()`: Buat judul section
 
 ### Helpers (helpers.py)

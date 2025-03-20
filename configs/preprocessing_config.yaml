@@ -1,18 +1,18 @@
 # File: configs/preprocessing_config.yaml
 # Author: Alfrida Sabar (direvisi)
-# Deskripsi: Konfigurasi khusus untuk preprocessing dataset dengan opsi yang lebih lengkap
+# Deskripsi: Konfigurasi khusus untuk preprocessing dataset yang konsisten dengan base_config
 
 # Inherit dari base_config.yaml
 _base_: 'base_config.yaml'
 
-# Konfigurasi preprocessing yang lebih lengkap
+# Konfigurasi preprocessing yang diselaraskan
 preprocessing:
-  output_dir: '/content/data/preprocessed'  # Direktori output yang terpisah
+  output_dir: 'data/preprocessed'  # Path relatif standar
   save_visualizations: true
-  vis_dir: '/content/data/visualizations/preprocessing'
+  vis_dir: 'visualizations/preprocessing'  # Path relatif standar
   sample_size: 500  # Jumlah sampel maksimum untuk analisis (0 = semua)
   
-  # Rename dari 'validation' ke 'validate' agar konsisten dengan base_config
+  # Validasi dataset selama preprocessing
   validate:
     enabled: true
     fix_issues: true
@@ -31,7 +31,7 @@ preprocessing:
     normalize_pixel_values: true
     pixel_range: [0, 1]  # Range normalisasi pixel
 
-  # Opsi analisis
+  # Opsi analisis dataset
   analysis:
     enabled: true
     class_balance: true
@@ -50,10 +50,10 @@ preprocessing:
     min_samples_per_class: 100
     max_samples_per_class: 1000
 
-# Konfigurasi augmentasi di sini diselaraskan dengan base_config
+# Konfigurasi augmentasi diselaraskan, dengan variasi spesifik untuk preprocessing
 augmentation:
   enabled: true
-  num_variations: 3
+  num_variations: 3  # Lebih banyak variasi untuk preprocessing
   output_prefix: 'aug'
   types:
     - 'position'
@@ -64,7 +64,6 @@ augmentation:
     degrees: 15
     translate: 0.15
     scale: 0.15
-    # Dokumentasi properti baru
     rotate_max: 15    # Alias untuk degrees
     shear_max: 10     # Derajat maksimum untuk shear
     translate_max: 0.15  # Alias untuk translate
@@ -78,11 +77,8 @@ augmentation:
     blur: 0.2
     noise: 0.1
     compress: 0.2
-  combined:
-    enabled: true
-    prob: 0.5
 
-# Konfigurasi cleanup dengan opsi yang lebih jelas
+# Konfigurasi cleanup dengan path relatif standar
 cleanup:
   augmentation_patterns:
     - 'aug_.*'
@@ -94,12 +90,11 @@ cleanup:
     - '.*\.gitkeep'
     - '.*\.DS_Store'
     - '.*\.gitignore'
-  backup_dir: '/content/data/backup/preprocessing'
+  backup_dir: 'data/backup/preprocessing'  # Path relatif standar
   backup_enabled: true
   auto_cleanup_preprocessed: false  # Jangan otomatis hapus hasil preprocessing
 
 # Pengaturan performa preprocessing (tambahan)
-# Dokumentasi: Pengaturan kinerja untuk proses preprocessing
 performance:
   num_workers: 8
   batch_size: 32

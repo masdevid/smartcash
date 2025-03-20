@@ -7,8 +7,10 @@ from typing import Dict, Any, Optional
 from IPython.display import display, clear_output, HTML
 import time
 from pathlib import Path
+import ipywidgets as widgets
 
 from smartcash.ui.utils.constants import COLORS, ICONS
+
 
 def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """

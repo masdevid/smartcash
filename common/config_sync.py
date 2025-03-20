@@ -1,6 +1,6 @@
 """
 File: smartcash/common/config_sync.py
-Deskripsi: Utilitas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan strategi resolusi konflik
+Deskripsi: Utilitas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan strategi resolusi konflik yang lebih komprehensif
 """
 
 import os

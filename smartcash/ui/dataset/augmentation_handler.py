@@ -26,52 +26,19 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     from smartcash.ui.dataset.augmentation_cleanup_handler import setup_cleanup_handler
     
     try:
-        # Redirect stdout dan stderr ke output widget untuk tangkap semua log
-        if 'status' in ui_components:
-            class OutputWidgetWriter:
-                def __init__(self, output_widget):
-                    self.output_widget = output_widget
-                    self.buffer = ""
-                
-                def write(self, text):
-                    self.buffer += text
-                    if '\n' in self.buffer:
-                        with self.output_widget:
-                            display(HTML(f"<pre>{self.buffer}</pre>"))
-                        self.buffer = ""
-                    return len(text)
-                
-                def flush(self):
-                    if self.buffer:
-                        with self.output_widget:
-                            display(HTML(f"<pre>{self.buffer}</pre>"))
-                        self.buffer = ""
+        # Setup logging ke output widget
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
+        
+        # Jika belum ada logger, setup ke output widget
+        if 'logger' not in ui_components and 'status' in ui_components:
+            ui_components['logger'] = setup_ipython_logging(ui_components, "augmentation_handler")
             
-            # Simpan referensi stdout dan stderr asli
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-            
-            # Redirect ke output widget
-            output_writer = OutputWidgetWriter(ui_components['status'])
-            sys.stdout = output_writer
-            sys.stderr = output_writer
-            
-            # Tambahkan handler untuk restore stdout/stderr pada cleanup
-            def restore_outputs():
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-            
-            # Tambahkan ke cleanup handlers
-            if 'cleanup' in ui_components and callable(ui_components['cleanup']):
-                original_cleanup = ui_components['cleanup']
-                
-                def enhanced_cleanup():
-                    restore_outputs()
-                    original_cleanup()
-                
-                ui_components['cleanup'] = enhanced_cleanup
+        # Buat fungsi log helper untuk lebih mudah
+        def log_message(message, level="info"):
+            if 'logger' in ui_components and ui_components['logger']:
+                getattr(ui_components['logger'], level)(message)
             else:
-                ui_components['cleanup'] = restore_outputs
+                log_to_ui(ui_components, message, level)
         
         # Inisialisasi dan deteksi state augmentasi
         ui_components = detect_augmentation_state(ui_components, env, config)
@@ -142,6 +109,9 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         # Tambahkan update_summary ke UI components
         ui_components['update_summary'] = update_summary
         
+        # Tambahkan helper log ke UI components
+        ui_components['log_message'] = log_message
+        
         # Cleanup function untuk dijalankan saat cell di-reset
         def cleanup_resources():
             """Bersihkan resources yang digunakan oleh augmentation handler."""
@@ -156,11 +126,6 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
             
             # Reset flags
             ui_components['augmentation_running'] = False
-            
-            # Restore stdout/stderr
-            if 'status' in ui_components:
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
         
         # Register cleanup function
         ui_components['cleanup'] = cleanup_resources

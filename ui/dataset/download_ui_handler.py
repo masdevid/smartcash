@@ -19,12 +19,9 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
         from smartcash.ui.handlers.error_handler import handle_ui_error
         
         if not isinstance(ui_components.get('download_options'), widgets.RadioButtons):
-            from smartcash.ui.utils.fallback_utils import update_status_panel
+            from smartcash.ui.dataset.download_initialization import update_status_panel
             update_status_panel(ui_components, "error", "Download options widget tidak valid")
             return ui_components
-        
-        # Cek apakah sudah ada API key dari Google Secret dengan utils yang terintegrasi
-        from smartcash.ui.utils.fallback_utils import import_with_fallback
         
         # Definisikan handler perubahan opsi download yang lebih terstruktur
         def on_download_option_change(change):
@@ -32,11 +29,11 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
             if change['name'] != 'value':
                 return
                 
-            # Import komponen API key info dari utils
+            # Import fungsi API key info yang sudah diperbaiki
             from smartcash.ui.dataset.download_initialization import get_api_key_info, update_status_panel
                 
             if change['new'] == 'Roboflow (Online)':
-                # Dapatkan info API key dengan utils standar
+                # Dapatkan info API key dengan fungsi yang sudah diperbaiki
                 api_key_info = get_api_key_info(ui_components)
                 
                 # Update container dengan settings Roboflow
@@ -47,13 +44,8 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
                     ]
                     
                     # Jika ada secret key, pastikan field API tetap disembunyikan
-                    try:
-                        from google.colab import userdata
-                        secret_key = userdata.get('ROBOFLOW_API_KEY')
-                        if secret_key and hasattr(ui_components['roboflow_settings'], 'children') and len(ui_components['roboflow_settings'].children) > 0:
-                            ui_components['roboflow_settings'].children[0].layout.display = 'none'
-                    except ImportError:
-                        pass
+                    if ui_components.get('api_key_available', False) and hasattr(ui_components['roboflow_settings'], 'children') and len(ui_components['roboflow_settings'].children) > 0:
+                        ui_components['roboflow_settings'].children[0].layout.display = 'none'
                 
                 update_status_panel(ui_components, "info", f"{ICONS['info']} Mempersiapkan download dari Roboflow")
             

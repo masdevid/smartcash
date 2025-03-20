@@ -4,6 +4,7 @@ Deskripsi: Komponen header dan section title yang menggunakan ui_helpers untuk k
 """
 from typing import Optional
 import ipywidgets as widgets
+from smartcash.ui.utils.constants import COLORS, ICONS
 
 
 def create_header(title: str, description: Optional[str] = None, icon: Optional[str] = None) -> widgets.HTML:

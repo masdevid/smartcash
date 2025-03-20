@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config.py
-Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash yang terintegrasi dengan tema dan komponen UI
+Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan integrasi utils, helpers dan handlers
 """
 
 import ipywidgets as widgets
@@ -8,47 +8,47 @@ from IPython.display import display
 from typing import Dict, Any, Optional
 
 def setup_environment_config():
-    """Setup dan jalankan konfigurasi environment dengan integrasi tema"""
+    """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
     
-    # Import komponen
+    # Import komponen dengan pendekatan konsolidasi
     from smartcash.ui.setup.env_config_component import create_env_config_ui
     from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-    from smartcash.ui.helpers.ui_helpers import inject_css_styles
-    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+    from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
     
     try:
-        # Coba mendapatkan environment manager
-        from smartcash.common.environment import get_environment_manager
-        from smartcash.common.logger import get_logger
-        env = get_environment_manager()
-        logger = get_logger("env_config")
-    except ImportError:
-        env = None
-        logger = None
-    
-    try:
-        # Coba membaca konfigurasi
-        from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager()
-        config = config_manager.config
-    except ImportError:
+        # Setup notebook environment
+        env, config = setup_notebook_environment("env_config")
+        
+        # Buat komponen UI dengan helpers
+        ui_components = create_env_config_ui(env, config)
+        
+        # Setup logging untuk UI
+        logger = setup_ipython_logging(ui_components, "env_config")
+        if logger:
+            ui_components['logger'] = logger
+            logger.info("🚀 Modul environment config berhasil dimuat")
+        
+        # Setup handlers untuk UI
+        ui_components = setup_env_config_handlers(ui_components, env, config)
+        
+    except ImportError as e:
+        # Fallback jika modules tidak tersedia
+        from smartcash.ui.utils.fallback_utils import import_with_fallback, show_status
+        
+        # Fallback environment setup
+        env = type('DummyEnv', (), {
+            'is_colab': 'google.colab' in __import__('sys').modules,
+            'base_dir': __import__('os').getcwd(),
+            'is_drive_mounted': False,
+        })
         config = {}
-    
-    # Inject CSS styles untuk konsistensi
-    inject_css_styles()
-    
-    # Buat komponen UI
-    ui_components = create_env_config_ui(env, config)
-    
-    # Setup handlers untuk error dan observer
-    ui_components = setup_observer_handlers(ui_components, "env_config_observers")
-    
-    # Setup handlers spesifik untuk env config
-    ui_components = setup_env_config_handlers(ui_components, env, config)
-    
-    # Tambahkan logger ke ui_components jika tersedia
-    if logger:
-        ui_components['logger'] = logger
+        
+        # Buat UI components
+        ui_components = create_env_config_ui(env, config)
+        
+        # Tampilkan pesan error
+        show_status(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}", "warning", ui_components)
     
     # Tampilkan UI
     display(ui_components['ui'])

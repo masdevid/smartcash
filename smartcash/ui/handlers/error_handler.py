@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/utils/error_handler.py
+File: smartcash/ui/handlers/error_handler.py
 Deskripsi: Utilitas penanganan error pada UI yang lebih sederhana dan konsisten
 """
 

@@ -192,6 +192,7 @@ def get_dataset_manager(config=None, logger=None):
         if logger:
             logger.warning(f"⚠️ DatasetManager tidak tersedia: {e}")
         return None
+
 def handle_download_status(
     ui_components: Dict[str, Any], 
     message: str, 

@@ -1,15 +1,14 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan styling default widget
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan memanfaatkan ui_helpers
 """
 
-from turtle import width
 import ipywidgets as widgets
 from typing import Dict, Any
 
 def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk environment config dengan styling default widget.
+    Buat komponen UI untuk environment config dengan styling standar dari ui_helpers.
     
     Args:
         env: Environment manager
@@ -18,10 +17,11 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary berisi widget UI
     """
-    # Import komponen UI
+    # Import komponen UI dari ui_helpers
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.alert_utils import create_info_box
-    from smartcash.ui.utils.constants import ICONS
+    from smartcash.ui.utils.constants import ICONS, COLORS
+    from smartcash.ui.helpers.ui_helpers import create_button_group, create_divider
     
     # Header
     header = create_header(
@@ -32,7 +32,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Panel status Colab/Drive
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
     
-    # Panel info bantuan
+    # Panel info bantuan dengan menggunakan komponen standar
     help_box = create_info_box(
         "Informasi Konfigurasi", 
         """<p>Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
@@ -43,32 +43,15 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         style="info",
         collapsed=True
     )
-    button_layout = widgets.Layout(
-        width='auto',
-        margin_right='5px 5px 5px 0',
-        height='auto'
-    )
-    # Tombol aksi dengan styling default
-    drive_button = widgets.Button(
-        description='Hubungkan Google Drive',
-        button_style='primary',
-        icon='link',
-        layout=button_layout,
-        tooltip='Mount Google Drive dan siapkan struktur direktori'
-    )
     
-    directory_button = widgets.Button(
-        description='Setup Direktori Lokal',
-        button_style='info',
-        icon='folder-plus',
-        layout=button_layout,
-        tooltip='Buat struktur direktori lokal'
-    )
+    # Gunakan create_button_group dari ui_helpers
+    buttons = [
+        ("Hubungkan Google Drive", "primary", "link", None),  # callback akan ditambahkan di handler
+        ("Setup Direktori Lokal", "info", "folder-plus", None)
+    ]
     
-    # Kelompokkan tombol dalam grup horizontal dengan spacing
-    button_group = widgets.HBox(
-        [drive_button, directory_button],
-        layout=widgets.Layout(
+    button_group = create_button_group(buttons, 
+        widgets.Layout(
             display='flex',
             flex_flow='row wrap',
             gap='10px',
@@ -88,8 +71,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     
-    # Divider
-    divider = widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>")
+    # Gunakan divider dari ui_helpers
+    divider = create_divider()
     
     # Container utama
     ui = widgets.VBox(
@@ -103,8 +86,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'header': header,
         'colab_panel': colab_panel,
         'help_panel': help_box,
-        'drive_button': drive_button,
-        'directory_button': directory_button,
+        'drive_button': button_group.children[0],
+        'directory_button': button_group.children[1],
         'status': status
     }
     

@@ -23,4 +23,4 @@ try:
     # Tampilkan UI
     display_ui(ui_components)
 
-except ImportError as e: err_alert(e)
+except ImportError as e: create_alert(e, 'error')

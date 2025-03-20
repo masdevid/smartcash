@@ -9,5 +9,10 @@ if '.' not in sys.path: sys.path.append('.')
 try:
     # Import komponen UI environment config dengan tema terintegrasi
     from smartcash.ui.setup.env_config import setup_environment_config
-    setup_environment_config()
-except ImportError as e: err_alert(e)
+    
+    # Panggil fungsi koordinator yang sudah terintegrasi
+    ui_components = setup_environment_config()
+    
+    # Tampilkan UI
+    display_ui(ui_components)
+except ImportError as e: create_alert(e, 'error')

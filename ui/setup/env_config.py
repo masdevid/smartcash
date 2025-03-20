@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config.py
-Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan integrasi sinkronisasi Drive
+Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan integrasi sinkronisasi Drive dan pembuatan config otomatis
 """
 
 import ipywidgets as widgets
@@ -28,7 +28,7 @@ def initialize_drive_sync(ui_components=None):
             progress_message = ui_components['progress_message']
     
     # Inisialisasi progress tracking
-    total_steps = 3  # Detect, Mount, Sync
+    total_steps = 4  # Detect, Mount, Create Default Config, Sync
     current_step = 0
     
     def update_progress(step, message, status_type="info"):
@@ -38,6 +38,7 @@ def initialize_drive_sync(ui_components=None):
         # Update progress bar
         if progress_bar:
             progress_bar.value = step
+            progress_bar.max = total_steps
             
         # Update message
         if progress_message:
@@ -59,12 +60,26 @@ def initialize_drive_sync(ui_components=None):
         drive_mounted = os.path.exists('/content/drive/MyDrive')
         
         if not is_colab:
-            update_progress(3, "Bukan lingkungan Google Colab, lewati sinkronisasi Drive", "info")
+            update_progress(total_steps, "Bukan lingkungan Google Colab, lewati sinkronisasi Drive", "info")
             return
         
-        # Step 2: Mount Drive jika perlu
+        # Step 2: Pastikan config default ada
+        update_progress(2, "Memastikan file konfigurasi default tersedia...", "info")
+        try:
+            # Import modul untuk membuat config default
+            from smartcash.common.default_config import ensure_all_configs_exist
+            configs_created = ensure_all_configs_exist()
+            
+            if configs_created:
+                update_progress(2, "File konfigurasi default berhasil dibuat", "success")
+            else:
+                update_progress(2, "File konfigurasi default sudah tersedia", "info")
+        except Exception as e:
+            update_progress(2, f"Gagal membuat konfigurasi default: {str(e)}", "warning")
+        
+        # Step 3: Mount Drive jika perlu
         if not drive_mounted:
-            update_progress(1, "Mounting Google Drive...", "info")
+            update_progress(3, "Mounting Google Drive...", "info")
             
             try:
                 from google.colab import drive
@@ -72,27 +87,18 @@ def initialize_drive_sync(ui_components=None):
                 drive_mounted = os.path.exists('/content/drive/MyDrive')
                 
                 if not drive_mounted:
-                    update_progress(1, "Gagal mounting Google Drive", "error")
+                    update_progress(3, "Gagal mounting Google Drive", "error")
                     return
                 
-                update_progress(2, "Google Drive berhasil dimount", "success")
+                update_progress(3, "Google Drive berhasil dimount", "success")
             except Exception as e:
-                update_progress(1, f"Error saat mounting Google Drive: {str(e)}", "error")
+                update_progress(3, f"Error saat mounting Google Drive: {str(e)}", "error")
                 return
         else:
-            update_progress(2, "Google Drive sudah terhubung", "success")
+            update_progress(3, "Google Drive sudah terhubung", "success")
         
-        # Buat direktori di Drive
-        drive_dir = '/content/drive/MyDrive/SmartCash'
-        if not os.path.exists(drive_dir):
-            update_progress(2, "Membuat direktori SmartCash di Drive...", "info")
-            os.makedirs(f"{drive_dir}/configs", exist_ok=True)
-            os.makedirs(f"{drive_dir}/data", exist_ok=True)
-            os.makedirs(f"{drive_dir}/runs", exist_ok=True)
-            os.makedirs(f"{drive_dir}/logs", exist_ok=True)
-        
-        # Step 3: Sinkronisasi konfigurasi
-        update_progress(2, "Sinkronisasi konfigurasi dengan Drive...", "info")
+        # Step 4: Sinkronisasi konfigurasi
+        update_progress(4, "Sinkronisasi konfigurasi dengan Drive...", "info")
         
         try:
             from smartcash.common.config_sync import sync_all_configs
@@ -102,11 +108,11 @@ def initialize_drive_sync(ui_components=None):
             failure_count = len(results.get("failure", []))
             
             if failure_count == 0:
-                update_progress(3, f"Sinkronisasi berhasil: {success_count} file ✓", "success")
+                update_progress(total_steps, f"Sinkronisasi berhasil: {success_count} file ✓", "success")
             else:
-                update_progress(3, f"Sinkronisasi: {success_count} berhasil, {failure_count} gagal", "warning")
+                update_progress(total_steps, f"Sinkronisasi: {success_count} berhasil, {failure_count} gagal", "warning")
         except ImportError:
-            update_progress(3, "Modul config_sync tidak tersedia, lewati sinkronisasi", "warning")
+            update_progress(total_steps, "Modul config_sync tidak tersedia, lewati sinkronisasi", "warning")
         
     except Exception as e:
         if status_output:
@@ -127,6 +133,10 @@ def setup_environment_config():
         # Setup notebook environment
         env, config = setup_notebook_environment("env_config")
         
+        # Pastikan konfigurasi default tersedia
+        from smartcash.common.default_config import ensure_all_configs_exist
+        ensure_all_configs_exist()
+        
         # Buat komponen UI dengan helpers
         ui_components = create_env_config_ui(env, config)
         
@@ -135,7 +145,7 @@ def setup_environment_config():
             ui_components['progress_bar'] = widgets.IntProgress(
                 value=0,
                 min=0,
-                max=3,
+                max=4,
                 description='Progress:',
                 style={'description_width': 'initial'},
                 layout=widgets.Layout(width='50%', margin='10px 0')
@@ -184,6 +194,10 @@ def setup_environment_config():
         # Fallback jika modules tidak tersedia
         from smartcash.ui.utils.fallback_utils import import_with_fallback, show_status
         
+        # Pastikan konfigurasi default tersedia
+        from smartcash.common.default_config import ensure_all_configs_exist
+        ensure_all_configs_exist()
+        
         # Fallback environment setup
         env = type('DummyEnv', (), {
             'is_colab': 'google.colab' in __import__('sys').modules,
@@ -197,7 +211,7 @@ def setup_environment_config():
         
         # Tambahkan progress tracker
         ui_components['progress_bar'] = widgets.IntProgress(
-            value=0, min=0, max=3, description='Progress:',
+            value=0, min=0, max=4, description='Progress:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='50%', margin='10px 0')
         )

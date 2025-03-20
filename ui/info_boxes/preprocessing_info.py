@@ -7,9 +7,10 @@ import ipywidgets as widgets
 from smartcash.ui.utils.info_utils import create_info_accordion
 
 TITLE = "Tentang Preprocessing"
+
 def get_preprocessing_info(open_by_default: bool = False) -> widgets.Accordion:
-    content = """
-    <h3 style="margin-top:0">{TITLE}</h3>
+    content = f"""
+    <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
    
     <p>Preprocessing meliputi beberapa langkah penting:</p>
     <ul>

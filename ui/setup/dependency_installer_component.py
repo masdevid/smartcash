@@ -10,6 +10,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     """Buat komponen UI untuk instalasi dependencies dengan ui_helpers."""
     
     # Import komponen dari ui_helpers untuk konsistensi
+    from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.helpers.ui_helpers import create_button_group, create_spacing

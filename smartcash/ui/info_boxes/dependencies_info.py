@@ -7,9 +7,10 @@ import ipywidgets as widgets
 from smartcash.ui.utils.info_utils import create_info_accordion
 
 TITLE = "Tentang Package Installation"
+
 def get_dependencies_info(open_by_default: bool = False) -> widgets.Accordion:
-    content = """
-    <h3 style="margin-top:0">{TITLE}</h3>
+    content = f"""
+    <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
     
     <p>SmartCash memerlukan beberapa package untuk berjalan dengan optimal. Package diurutkan instalasi dari kecil ke besar:</p>
     
@@ -21,7 +22,7 @@ def get_dependencies_info(open_by_default: bool = False) -> widgets.Accordion:
         <li>Machine learning (PyTorch)</li>
     </ol>
     
-    <h4>Kategori Package</h4>
+    <h4 style="color:inherit">Kategori Package</h4>
     <ul>
         <li><strong>Core Packages</strong>: YOLOv5 requirements, SmartCash utils, Notebook tools</li>
         <li><strong>ML Packages</strong>: PyTorch, OpenCV, Albumentations</li>

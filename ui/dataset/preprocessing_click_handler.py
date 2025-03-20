@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan pengelompokan tombol yang lebih baik
+Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan integrasi progress tracking yang ditingkatkan
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import ipywidgets as widgets
 
 def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk tombol UI preprocessing dengan pengelompokan yang lebih baik."""
+    """Setup handler untuk tombol UI preprocessing dengan integrasi progress tracking yang ditingkatkan."""
     
     logger = ui_components.get('logger')
     from smartcash.ui.utils.constants import ICONS
@@ -18,7 +18,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     
     @try_except_decorator(ui_components.get('status'))
     def on_preprocess_click(b):
-        """Handler tombol preprocessing dengan error handling standar."""
+        """Handler tombol preprocessing dengan konfigurasi progress steps yang lebih akurat."""
         # Dapatkan split dari UI
         split_option = ui_components['split_selector'].value if 'split_selector' in ui_components else 'All Splits'
         split_map = {'All Splits': None, 'Train Only': 'train', 'Validation Only': 'valid', 'Test Only': 'test'}
@@ -78,12 +78,34 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         normalize = ui_components['preprocess_options'].children[1].value if len(ui_components['preprocess_options'].children) > 1 else True
         preserve_aspect_ratio = ui_components['preprocess_options'].children[2].value if len(ui_components['preprocess_options'].children) > 2 else True
         
+        # Konfigurasi langkah-langkah progress tracking
+        if 'configure_progress_steps' in ui_components and callable(ui_components['configure_progress_steps']):
+            # Tentukan langkah-langkah preprocessing
+            steps = 3  # Persiapan, Pemrosesan, Finalisasi
+            
+            # Konfigurasi bobot setiap langkah (total harus 1.0)
+            step_weights = [0.1, 0.8, 0.1]  # 10% Persiapan, 80% Pemrosesan, 10% Finalisasi
+            
+            # Nama langkah untuk display
+            step_names = {
+                0: "Persiapan dataset",
+                1: "Preprocessing gambar",
+                2: "Penyimpanan hasil"
+            }
+            
+            # Konfigurasi steps di progress handler
+            ui_components['configure_progress_steps'](steps, step_weights, step_names)
+        
         # Register progress callback jika tersedia
         if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
             ui_components['register_progress_callback'](dataset_manager)
         
         # Tandai preprocessing sedang berjalan
         ui_components['preprocessing_running'] = True
+        
+        # Advance ke langkah pertama (persiapan)
+        if 'advance_to_step' in ui_components and callable(ui_components['advance_to_step']):
+            ui_components['advance_to_step'](0, "Persiapan dataset", "Mempersiapkan dataset untuk preprocessing...")
         
         # Jalankan preprocessing - Gunakan path dari UI components yang sudah diupdate
         try:
@@ -104,6 +126,10 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 if preprocessed_dir: dataset_manager.preprocess_config['preprocessed_dir'] = preprocessed_dir
                 if data_dir: dataset_manager.preprocess_config['raw_dataset_dir'] = data_dir
             
+            # Advance ke langkah pemrosesan gambar
+            if 'advance_to_step' in ui_components and callable(ui_components['advance_to_step']):
+                ui_components['advance_to_step'](1, "Preprocessing gambar", "Mulai memproses gambar...")
+            
             # Jalankan preprocessing dengan parameter yang benar - tidak perlu lagi mengirim img_size
             preprocess_result = dataset_manager.preprocess_dataset(
                 split=split, 
@@ -111,6 +137,10 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 normalize=normalize,
                 preserve_aspect_ratio=preserve_aspect_ratio
             )
+            
+            # Advance ke langkah finalisasi
+            if 'advance_to_step' in ui_components and callable(ui_components['advance_to_step']):
+                ui_components['advance_to_step'](2, "Finalisasi hasil", "Menyimpan hasil dan membersihkan resources...")
             
             # Setelah selesai, update UI dengan status sukses
             with ui_components['status']:

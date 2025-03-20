@@ -74,17 +74,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             cleanup_ui()
             return
         
-        # Dapatkan opsi preprocessing dari UI dengan one-liner untuk efisiensi
-        options = {
-            'img_size': [ui_components['preprocess_options'].children[0].value]*2,
-            'normalize': ui_components['preprocess_options'].children[1].value if len(ui_components['preprocess_options'].children) > 1 else True,
-            'preserve_aspect_ratio': ui_components['preprocess_options'].children[2].value if len(ui_components['preprocess_options'].children) > 2 else True,
-            'cache': ui_components['preprocess_options'].children[3].value if len(ui_components['preprocess_options'].children) > 3 else True,
-            'num_workers': ui_components['preprocess_options'].children[4].value if len(ui_components['preprocess_options'].children) > 4 else 4,
-            'validate': ui_components['validation_options'].children[0].value if ui_components.get('validation_options') and len(ui_components['validation_options'].children) > 0 else True,
-            'fix_issues': ui_components['validation_options'].children[1].value if ui_components.get('validation_options') and len(ui_components['validation_options'].children) > 1 else True,
-            'move_invalid': ui_components['validation_options'].children[2].value if ui_components.get('validation_options') and len(ui_components['validation_options'].children) > 2 else True
-        }
+        # Dapatkan opsi preprocessing dari UI
+        normalize = ui_components['preprocess_options'].children[1].value if len(ui_components['preprocess_options'].children) > 1 else True
+        preserve_aspect_ratio = ui_components['preprocess_options'].children[2].value if len(ui_components['preprocess_options'].children) > 2 else True
         
         # Register progress callback jika tersedia
         if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
@@ -112,8 +104,13 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 if preprocessed_dir: dataset_manager.preprocess_config['preprocessed_dir'] = preprocessed_dir
                 if data_dir: dataset_manager.preprocess_config['raw_dataset_dir'] = data_dir
             
-            # Jalankan preprocessing
-            preprocess_result = dataset_manager.preprocess_dataset(split=split, force_reprocess=True, **options)
+            # Jalankan preprocessing dengan parameter yang benar - tidak perlu lagi mengirim img_size
+            preprocess_result = dataset_manager.preprocess_dataset(
+                split=split, 
+                force_reprocess=True,
+                normalize=normalize,
+                preserve_aspect_ratio=preserve_aspect_ratio
+            )
             
             # Setelah selesai, update UI dengan status sukses
             with ui_components['status']:

@@ -96,9 +96,9 @@ def initialize_config() -> Tuple[bool, Dict[str, Any]]:
                 success = config_manager.use_drive_as_source_of_truth()
                 
                 if success:
-                    logger.success(f"✅ Konfigurasi berhasil disinkronisasi dengan Drive")
+                    logger.success(f"Konfigurasi berhasil disinkronisasi dengan Drive")
                 else:
-                    logger.warning(f"⚠️ Beberapa file konfigurasi gagal disinkronisasi")
+                    logger.warning(f"Beberapa file konfigurasi gagal disinkronisasi")
             else:
                 # Fallback: Gunakan sync_config_with_drive untuk file konfigurasi utama
                 try:

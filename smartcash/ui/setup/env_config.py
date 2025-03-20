@@ -13,7 +13,7 @@ def setup_environment_config():
     # Import komponen
     from smartcash.ui.setup.env_config_component import create_env_config_ui
     from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-    from smartcash.ui.utils.ui_helpers import inject_css_styles
+    from smartcash.ui.helpers.ui_helpers import inject_css_styles
     from smartcash.ui.handlers.observer_handler import setup_observer_handlers
     
     try:

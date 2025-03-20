@@ -6,7 +6,7 @@ Deskripsi: Handler yang disederhanakan untuk progress tracking preprocessing dat
 from typing import Dict, Any
 from IPython.display import display
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.alerts import create_status_indicator
+from smartcash.ui.utils.alerts import create_status_indicator
 
 def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """

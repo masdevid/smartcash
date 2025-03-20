@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/components/layouts.py
+File: smartcash/ui/utils/layouts.py
 Deskripsi: Definisi layout standar untuk widgets UI
 """
 

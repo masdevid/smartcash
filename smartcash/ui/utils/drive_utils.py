@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/utils/drive_detector.py
+File: smartcash/ui/utils/drive_utils.py
 Deskripsi: Utilitas deteksi dan pengelolaan koneksi Google Drive untuk dataset SmartCash dengan exception handling
 """
 
@@ -8,7 +8,6 @@ import shutil
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
-import time
 
 def detect_drive_mount() -> Tuple[bool, Optional[str]]:
     """

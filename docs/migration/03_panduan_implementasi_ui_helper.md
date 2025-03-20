@@ -50,7 +50,7 @@ File `smartcash/ui/utils/ui_helpers.py` berisi kumpulan fungsi helper yang dista
 
 ```python
 # Import semua helper yang diperlukan
-from smartcash.ui.utils.ui_helpers import (
+from smartcash.ui.helpers.ui_helpers import (
     create_header,
     create_status_indicator,
     update_output_area,

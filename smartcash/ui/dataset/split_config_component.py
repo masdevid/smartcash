@@ -20,8 +20,8 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         Dictionary berisi widget UI
     """
     # Import komponen UI standar
-    from smartcash.ui.components.headers import create_header
-    from smartcash.ui.components.alerts import create_info_box, create_info_alert
+    from smartcash.ui.utils.headers import create_header
+    from smartcash.ui.utils.alerts import create_info_box, create_info_alert
     from smartcash.ui.utils.constants import COLORS, ICONS
     
     # Deteksi status drive

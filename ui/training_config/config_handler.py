@@ -8,8 +8,8 @@ from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 from IPython.display import display, clear_output
 
-# Import dari ui_helpers untuk konsistensi
-from smartcash.ui.utils.ui_helpers import create_status_indicator, update_output_area
+from smartcash.ui.utils.alerts import create_status_indicator
+from smartcash.ui.helpers.ui_helpers import update_output_area
 
 def get_config_manager():
     """

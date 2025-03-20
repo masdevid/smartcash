@@ -161,7 +161,7 @@ def setup_ui_component(
     try:
         # Import alert components untuk pesan error/warning
         try:
-            from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
+            from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
             ui_components['create_status_indicator'] = create_status_indicator
             ui_components['create_info_alert'] = create_info_alert
         except ImportError:
@@ -172,8 +172,8 @@ def setup_ui_component(
             f"smartcash.ui.setup.{component_name}_component",
             f"smartcash.ui.dataset.{component_name}_component",
             f"smartcash.ui.training_config.{component_name}_component",
-            f"smartcash.ui.training_execution.{component_name}_component",
-            f"smartcash.ui.model_evaluation.{component_name}_component",
+            f"smartcash.ui.training.{component_name}_component",
+            f"smartcash.ui.evaluation.{component_name}_component",
             f"smartcash.ui.detection.{component_name}_component"
         ]
         
@@ -234,9 +234,12 @@ def setup_ui_component(
     # Setup handler jika tersedia
     try:
         handler_locations = [
-            f"smartcash.ui.handlers.{component_name}",
             f"smartcash.ui.{component_name.split('_')[0]}.{component_name}_handler",
-            f"smartcash.ui_handlers.{component_name}"
+            f"smartcash.ui.setup.{component_name.split('_')[0]}.{component_name}_handler",
+            f"smartcash.ui.training_config.{component_name.split('_')[0]}.{component_name}_handler",
+            f"smartcash.ui.training.{component_name.split('_')[0]}.{component_name}_handler",
+            f"smartcash.ui.evaluation.{component_name.split('_')[0]}.{component_name}_handler",
+            f"smartcash.ui.detection.{component_name.split('_')[0]}.{component_name}_handler"
         ]
         
         handler_loaded = False

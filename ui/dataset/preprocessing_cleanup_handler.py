@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import shutil
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.alerts import create_status_indicator, create_info_alert
+from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -29,7 +29,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         try:
             # Buat dialog konfirmasi jika tersedia
             try:
-                from smartcash.ui.components.helpers import create_confirmation_dialog
+                from smartcash.ui.helpers.ui_helpers import create_confirmation_dialog
                 
                 def on_confirm_cleanup():
                     with ui_components['status']: clear_output(wait=True)

@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/components/metrics.py
+File: smartcash/ui/utils/metrics.py
 Deskripsi: Komponen UI untuk menampilkan metrik dengan styling konsisten
 """
 

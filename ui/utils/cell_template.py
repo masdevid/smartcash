@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/components/cell_template.py
+File: smartcash/ui/utils/cell_template.py
 Deskripsi: Template cell sederhana untuk notebook SmartCash dengan pemisahan UI dan logika
 """
 

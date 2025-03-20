@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/components/validators.py
+File: smartcash/ui/utils/validators.py
 Deskripsi: Utilitas validasi untuk input UI dan form handling
 """
 

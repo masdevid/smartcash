@@ -18,7 +18,7 @@ def run_cell(cell_name, config_path):
     """
     try:
         # Tambahkan CSS styles untuk UI yang konsisten
-        from smartcash.ui.utils.ui_helpers import inject_css_styles
+        from smartcash.ui.helpers.ui_helpers import inject_css_styles
         inject_css_styles()
         
         # Setup environment dan load config

@@ -9,8 +9,8 @@ from typing import Dict, Any, Optional
 def create_dependency_installer_ui(env=None, config=None):
     """Buat komponen UI untuk instalasi dependencies."""
 
-    from smartcash.ui.components.headers import create_header
-    from smartcash.ui.components.alerts import create_info_box
+    from smartcash.ui.utils.headers import create_header
+    from smartcash.ui.utils.alerts import create_info_box
     
     # Header 
     header = create_header(

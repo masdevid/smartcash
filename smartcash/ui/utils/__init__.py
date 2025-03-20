@@ -40,23 +40,13 @@ from smartcash.ui.utils.file_utils import (
     get_file_info,
     create_file_download_link
 )
-from smartcash.ui.utils.ui_helpers import (
-    set_active_theme,
-    inject_css_styles,
-    create_loading_indicator,
-    create_confirmation_dialog,
-    create_button_group,
-    create_progress_updater,
-    update_output_area,
-    create_divider,
-    create_spacing,
-)
-from smartcash.ui.utils.drive_detector import (
+
+from smartcash.ui.utils.drive_utils import (
     detect_drive_mount,
     sync_drive_to_local,
     async_sync_drive
 )
-from smartcash.ui.utils.fallback import (
+from smartcash.ui.utils.fallback_utils import (
     import_with_fallback,
     get_logger_safely,
     get_status_widget,
@@ -68,6 +58,26 @@ from smartcash.ui.utils.fallback import (
     handle_download_status
 )
 
+from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert, create_info_box
+from smartcash.ui.utils.headers import create_header, create_component_header, create_section_title
+
+from smartcash.ui.utils.layouts import (
+    STANDARD_LAYOUTS, MAIN_CONTAINER, OUTPUT_WIDGET, BUTTON,
+    HIDDEN_BUTTON, TEXT_INPUT, TEXT_AREA, SELECTION,
+    HORIZONTAL_GROUP, VERTICAL_GROUP, DIVIDER, CARD,
+    TABS, ACCORDION, create_divider
+)
+from smartcash.ui.utils.metrics import (
+    create_metric_display, create_result_table, plot_statistics, styled_html
+)
+from smartcash.ui.utils.validators import (
+    create_validation_message, show_validation_message, clear_validation_messages,
+    validate_required, validate_numeric, validate_integer, validate_min_value,
+    validate_max_value, validate_range, validate_min_length, validate_max_length,
+    validate_regex, validate_email, validate_url, validate_file_exists,
+    validate_directory_exists, validate_file_extension, validate_api_key,
+    validate_form, create_validator, combine_validators
+)
 __all__ = [
     # Cell Utils
     'setup_notebook_environment',
@@ -106,17 +116,6 @@ __all__ = [
     'get_file_info',
     'create_file_download_link',
     
-    # UI Helpers
-    'set_active_theme',
-    'inject_css_styles',
-    'create_loading_indicator',
-    'create_confirmation_dialog',
-    'create_button_group',
-    'create_progress_updater',
-    'update_output_area',
-    'create_divider',
-    'create_spacing',
-    
     # Drive Detector
     'detect_drive_mount',
     'sync_drive_to_local',
@@ -132,4 +131,27 @@ __all__ = [
     'load_config_safely',
     'get_dataset_manager',
     'handle_download_status'
+
+    # Alerts
+    'create_status_indicator', 'create_info_alert', 'create_info_box',
+    
+    # Headers
+    'create_header', 'create_component_header', 'create_section_title',
+    
+    # Layouts
+    'STANDARD_LAYOUTS', 'MAIN_CONTAINER', 'OUTPUT_WIDGET', 'BUTTON',
+    'HIDDEN_BUTTON', 'TEXT_INPUT', 'TEXT_AREA', 'SELECTION',
+    'HORIZONTAL_GROUP', 'VERTICAL_GROUP', 'DIVIDER', 'CARD',
+    'TABS', 'ACCORDION', 'create_divider',
+    
+    # Metrics
+    'create_metric_display', 'create_result_table', 'plot_statistics', 'styled_html',
+    
+    # Validators
+    'create_validation_message', 'show_validation_message', 'clear_validation_messages',
+    'validate_required', 'validate_numeric', 'validate_integer', 'validate_min_value',
+    'validate_max_value', 'validate_range', 'validate_min_length', 'validate_max_length',
+    'validate_regex', 'validate_email', 'validate_url', 'validate_file_exists',
+    'validate_directory_exists', 'validate_file_extension', 'validate_api_key',
+    'validate_form', 'create_validator', 'combine_validators',
 ]

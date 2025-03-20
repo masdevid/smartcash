@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/utils/fallback.py
+File: smartcash/ui/utils/fallback_utils.py
 Deskripsi: Utilitas untuk mengurangi duplikasi code fallback pada UI components
 """
 

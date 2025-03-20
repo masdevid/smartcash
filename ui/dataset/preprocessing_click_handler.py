@@ -145,14 +145,14 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Setelah selesai, update UI dengan status sukses
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} Preprocessing dataset selesai"))
+                display(create_status_indicator("success", f"Preprocessing dataset selesai"))
             
             # Update summary jika function tersedia
             if 'update_summary' in ui_components and callable(ui_components['update_summary']):
                 ui_components['update_summary'](preprocess_result)
             
             # Update status panel dan UI elements
-            update_status_panel(ui_components, "success", f"{ICONS['success']} Preprocessing dataset berhasil")
+            update_status_panel(ui_components, "success", f"Preprocessing dataset berhasil")
             
             # Tampilkan tombol visualisasi dan cleanup
             if 'visualization_buttons' in ui_components:

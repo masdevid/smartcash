@@ -39,11 +39,11 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             ui_components['current_progress'].max = current_total
             ui_components['current_progress'].value = current_progress
         
-        # Update pesan jika ada dengan utilitas alert standar
-        if message and 'status' in ui_components:
-            with ui_components['status']:
-                from smartcash.ui.utils.alert_utils import create_status_indicator
-                display(create_status_indicator(status, message))
+        # # Update pesan jika ada dengan utilitas alert standar
+        # if message and 'status' in ui_components:
+        #     with ui_components['status']:
+        #         from smartcash.ui.utils.alert_utils import create_status_indicator
+        #         display(create_status_indicator(status, message))
                 
         # Notifikasi observer dengan observer standar jika progress signifikan
         try:

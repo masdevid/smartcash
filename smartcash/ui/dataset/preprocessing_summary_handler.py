@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from IPython.display import display, clear_output, HTML
 import time
 from pathlib import Path
-
+from ipywidgets import widgets
 from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -47,7 +47,7 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             
             # Header
             display(styled_html(
-                f"<h3 style='margin-top:0'>{ICONS.get('stats', '📊')} Hasil Preprocessing</h3>", 
+                f"<h3 style='margin-top:0; color: black;'>{ICONS.get('stats', '📊')} Hasil Preprocessing</h3>", 
                 bg_color=COLORS['light'], text_color=COLORS['dark'], 
                 border_color=COLORS['primary']
             ))

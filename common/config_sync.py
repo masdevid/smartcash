@@ -81,7 +81,6 @@ def deep_merge_configs(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[st
             result[key] = copy.deepcopy(value)
     
     return result
-
 def sync_config_with_drive(
     config_file: str,
     drive_path: Optional[str] = None,
@@ -92,118 +91,130 @@ def sync_config_with_drive(
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Sinkronisasi file konfigurasi antara lokal dan Google Drive.
-    
-    Args:
-        config_file: Nama file konfigurasi (mis. 'base_config.yaml')
-        drive_path: Path di Drive (default: 'SmartCash/configs/{config_file}')
-        local_path: Path lokal (default: 'configs/{config_file}')
-        sync_strategy: Strategi sinkronisasi:
-            - 'drive_priority': Config Drive menang
-            - 'local_priority': Config lokal menang
-            - 'newest': Config terbaru menang
-            - 'merge': Gabungkan config dengan strategi smart
-        create_backup: Buat backup sebelum update
-        logger: Logger untuk logging (opsional)
-        
-    Returns:
-        Tuple (success, message, merged_config)
     """
-    # Validasi drive path
+    # Print debug info
+    print(f"\n🔄 Sinkronisasi file: {config_file}")
+    print(f"   Strategi: {sync_strategy}")
+    
+    # Tambahan pengecekan dan konversi logger
+    if logger is not None:
+        try:
+            # Pastikan logger memiliki method yang bisa dipanggil
+            if not callable(getattr(logger, 'info', None)):
+                logger = None
+        except Exception:
+            logger = None
+    
+    # Dapatkan drive path jika tidak disediakan
     if not drive_path:
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             if not env_manager.is_drive_mounted:
+                print("❌ Google Drive tidak terpasang")
                 return False, "Google Drive tidak terpasang", {}
-            drive_path = str(env_manager.drive_path / 'configs' / config_file)
-        except Exception:
-            return False, "Tidak dapat menentukan drive path", {}
+            drive_path = str(env_manager.drive_path / 'SmartCash/configs' / config_file)
+        except Exception as e:
+            print(f"❌ Error mendapatkan path Drive: {str(e)}")
+            return False, f"Tidak dapat menentukan drive path: {str(e)}", {}
     
     # Validasi local path
     if not local_path:
         local_path = os.path.join('configs', config_file)
     
+    # Cetak path untuk debug
+    print(f"   Path Lokal: {local_path}")
+    print(f"   Path Drive: {drive_path}")
+    
     # Cek keberadaan file
     drive_exists = os.path.exists(drive_path)
     local_exists = os.path.exists(local_path)
     
-    if not drive_exists and not local_exists:
-        return False, f"Tidak ada file konfigurasi ditemukan untuk {config_file}", {}
+    print(f"   File Lokal Ada: {local_exists}")
+    print(f"   File Drive Ada: {drive_exists}")
     
-    # Jika hanya satu file ada, salin ke yang lain
-    if drive_exists and not local_exists:
-        # Buat direktori lokal jika perlu
-        os.makedirs(os.path.dirname(local_path), exist_ok=True)
-        shutil.copy2(drive_path, local_path)
-        config = load_yaml_config(local_path)
-        return True, f"File konfigurasi dari Drive disalin ke lokal: {config_file}", config
+    if not local_exists:
+        print("❌ File lokal tidak ditemukan")
+        return False, f"File lokal tidak ditemukan: {local_path}", {}
     
-    if local_exists and not drive_exists:
-        # Buat direktori Drive jika perlu
-        os.makedirs(os.path.dirname(drive_path), exist_ok=True)
-        shutil.copy2(local_path, drive_path)
-        config = load_yaml_config(drive_path)
-        return True, f"File konfigurasi lokal disalin ke Drive: {config_file}", config
+    # Jika file drive tidak ada, salin dari lokal
+    if not drive_exists:
+        try:
+            # Buat direktori drive jika belum ada
+            os.makedirs(os.path.dirname(drive_path), exist_ok=True)
+            
+            # Salin file dari lokal ke drive
+            shutil.copy2(local_path, drive_path)
+            
+            print(f"✅ Menyalin file dari lokal ke Drive: {config_file}")
+            
+            # Baca konfigurasi
+            config = load_yaml_config(local_path)
+            return True, f"File konfigurasi lokal disalin ke Drive: {config_file}", config
+        except Exception as e:
+            print(f"❌ Gagal menyalin file: {str(e)}")
+            return False, f"Gagal menyalin file: {str(e)}", {}
     
-    # Kedua file ada, terapkan strategi sinkronisasi
-    # Dapatkan timestamp dan load config
-    drive_time = get_modified_time(drive_path)
-    local_time = get_modified_time(local_path)
+    # Baca konfigurasi
     drive_config = load_yaml_config(drive_path)
     local_config = load_yaml_config(local_path)
     
     # Buat backup jika diperlukan
     if create_backup:
-        if drive_exists:
-            drive_backup = create_backup(drive_path)
-            if logger and drive_backup:
-                logger.info(f"📦 Backup Drive config: {drive_backup}")
-        if local_exists:
-            local_backup = create_backup(local_path)
-            if logger and local_backup:
-                logger.info(f"📦 Backup local config: {local_backup}")
+        try:
+            backup_drive = create_backup(drive_path)
+            backup_local = create_backup(local_path)
+            print(f"📦 Backup Drive: {backup_drive}")
+            print(f"📦 Backup Lokal: {backup_local}")
+        except Exception as e:
+            print(f"⚠️ Gagal membuat backup: {str(e)}")
     
     # Terapkan strategi sinkronisasi
-    result_config = {}
-    message = ""
-    
-    if sync_strategy == 'drive_priority':
-        result_config = drive_config
-        shutil.copy2(drive_path, local_path)
-        message = f"Konfigurasi Drive diterapkan ke lokal: {config_file}"
-    
-    elif sync_strategy == 'local_priority':
-        result_config = local_config
-        shutil.copy2(local_path, drive_path)
-        message = f"Konfigurasi lokal diterapkan ke Drive: {config_file}"
-    
-    elif sync_strategy == 'newest':
-        if drive_time > local_time:
+    try:
+        if sync_strategy == 'drive_priority':
             result_config = drive_config
             shutil.copy2(drive_path, local_path)
-            message = f"Konfigurasi Drive (lebih baru) diterapkan ke lokal: {config_file}"
-        else:
+            message = f"Konfigurasi Drive diterapkan ke lokal: {config_file}"
+        
+        elif sync_strategy == 'local_priority':
             result_config = local_config
             shutil.copy2(local_path, drive_path)
-            message = f"Konfigurasi lokal (lebih baru) diterapkan ke Drive: {config_file}"
-    
-    elif sync_strategy == 'merge':
-        # Merge dengan drive sebagai overlay
-        result_config = deep_merge_configs(local_config, drive_config)
+            message = f"Konfigurasi lokal diterapkan ke Drive: {config_file}"
         
-        # Simpan hasil merge ke kedua tempat
-        save_yaml_config(result_config, local_path)
-        save_yaml_config(result_config, drive_path)
-        message = f"Konfigurasi berhasil digabungkan: {config_file}"
+        elif sync_strategy == 'newest':
+            # Dapatkan waktu modifikasi
+            drive_time = os.path.getmtime(drive_path)
+            local_time = os.path.getmtime(local_path)
+            
+            if drive_time > local_time:
+                result_config = drive_config
+                shutil.copy2(drive_path, local_path)
+                message = f"Konfigurasi Drive (lebih baru) diterapkan ke lokal: {config_file}"
+            else:
+                result_config = local_config
+                shutil.copy2(local_path, drive_path)
+                message = f"Konfigurasi lokal (lebih baru) diterapkan ke Drive: {config_file}"
+        
+        elif sync_strategy == 'merge':
+            # Merge konfigurasi
+            result_config = deep_merge_configs(local_config, drive_config)
+            
+            # Simpan hasil merge ke kedua tempat
+            save_yaml_config(result_config, local_path)
+            save_yaml_config(result_config, drive_path)
+            message = f"Konfigurasi berhasil digabungkan: {config_file}"
+        
+        else:
+            return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}
+        
+        print(f"✅ {message}")
+        return True, message, result_config
     
-    else:
-        return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}
-    
-    if logger:
-        logger.info(f"✅ {message}")
-    
-    return True, message, result_config
-
+    except Exception as e:
+        print(f"❌ Error saat sinkronisasi: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False, f"Error sinkronisasi: {str(e)}", {}
 def sync_all_configs(
     drive_configs_dir: Optional[str] = None,
     local_configs_dir: Optional[str] = None,
@@ -213,39 +224,31 @@ def sync_all_configs(
 ) -> Dict[str, List[Dict[str, Any]]]:
     """
     Sinkronisasi semua file konfigurasi YAML.
-    
-    Args:
-        drive_configs_dir: Direktori konfigurasi di Drive
-        local_configs_dir: Direktori konfigurasi lokal
-        sync_strategy: Strategi sinkronisasi
-        create_backup: Buat backup sebelum update
-        logger: Logger untuk logging
-        
-    Returns:
-        Dictionary berisi hasil sinkronisasi
     """
+    # Print debug info
+    print("🔍 Memulai sinkronisasi konfigurasi...")
+    
     # Dapatkan drive path jika tidak disediakan
     if not drive_configs_dir:
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             if not env_manager.is_drive_mounted:
-                if logger and hasattr(logger, 'warning'):
-                    logger.warning("⚠️ Google Drive tidak terpasang, tidak dapat sinkronisasi")
+                print("⚠️ Google Drive tidak terpasang")
                 return {"error": "Google Drive tidak terpasang"}
             drive_configs_dir = str(env_manager.drive_path / 'SmartCash/configs')
         except Exception as e:
-            if logger and hasattr(logger, 'error'):
-                logger.error(f"❌ Error mendapatkan path Drive: {str(e)}")
+            print(f"❌ Error mendapatkan path Drive: {str(e)}")
             return {"error": f"Tidak dapat menentukan drive path: {str(e)}"}
     
     # Tentukan direktori lokal konfigurasi
     if not local_configs_dir:
         # Coba beberapa lokasi potensial
         potential_dirs = [
-            'configs',
+            os.path.join(os.getcwd(), 'configs'),
             '/content/configs',
-            '/content/smartcash/configs'
+            '/content/smartcash/configs',
+            os.path.join(os.getcwd(), 'smartcash/configs')
         ]
         
         for dir_path in potential_dirs:
@@ -262,24 +265,24 @@ def sync_all_configs(
     os.makedirs(drive_configs_dir, exist_ok=True)
     os.makedirs(local_configs_dir, exist_ok=True)
     
-    # Cari semua file YAML
-    yaml_files = set()
+    # Print direktori yang digunakan
+    print(f"📁 Direktori Lokal: {local_configs_dir}")
+    print(f"📁 Direktori Drive: {drive_configs_dir}")
     
-    # Fungsi untuk mencari file YAML di direktori
+    # Cari semua file YAML di direktori lokal
     def find_yaml_files(directory):
-        files = set()
-        for ext in ['.yaml', '.yml']:
-            try:
-                for filename in os.listdir(directory):
-                    if filename.endswith(ext):
-                        files.add(filename)
-            except Exception:
-                pass
-        return files
+        yaml_files = set()
+        try:
+            for filename in os.listdir(directory):
+                if filename.lower().endswith(('.yaml', '.yml')):
+                    yaml_files.add(filename)
+        except Exception as e:
+            print(f"❌ Error membaca direktori {directory}: {str(e)}")
+        return yaml_files
     
-    # Gabungkan file dari direktori lokal dan Drive
-    yaml_files.update(find_yaml_files(local_configs_dir))
-    yaml_files.update(find_yaml_files(drive_configs_dir))
+    # Temukan file YAML di direktori lokal
+    local_yaml_files = find_yaml_files(local_configs_dir)
+    print(f"🔎 File YAML di {local_configs_dir}: {local_yaml_files}")
     
     # Hasil sinkronisasi
     results = {
@@ -288,16 +291,25 @@ def sync_all_configs(
     }
     
     # Proses setiap file
-    for config_file in yaml_files:
+    for config_file in local_yaml_files:
         try:
             drive_path = os.path.join(drive_configs_dir, config_file)
             local_path = os.path.join(local_configs_dir, config_file)
             
+            print(f"\n🔄 Memproses file: {config_file}")
+            print(f"   Lokal: {local_path}")
+            print(f"   Drive: {drive_path}")
+            
             # Pastikan logger bisa dipanggil
-            if logger and not hasattr(logger, 'error'):
+            if logger and not callable(getattr(logger, 'error', None)):
                 logger = None
             
-            success, message, _ = sync_config_with_drive(
+            # Baca konten file lokal untuk debugging
+            with open(local_path, 'r') as f:
+                local_content = f.read()
+                print(f"   Konten Lokal (pratinjau):\n{local_content[:500]}...")
+            
+            success, message, merged_config = sync_config_with_drive(
                 config_file=config_file,
                 drive_path=drive_path,
                 local_path=local_path,
@@ -313,14 +325,18 @@ def sync_all_configs(
             
             if success:
                 results["success"].append(result)
+                print(f"✅ Sinkronisasi {config_file} berhasil")
             else:
                 results["failure"].append(result)
+                print(f"❌ Sinkronisasi {config_file} gagal")
                 
         except Exception as e:
             error_message = f"❌ Error total saat sinkronisasi {config_file}: {str(e)}"
             
             # Cetak error untuk debug
             print(error_message)
+            import traceback
+            traceback.print_exc()
             
             # Log error jika logger tersedia
             if logger and hasattr(logger, 'error'):
@@ -331,8 +347,7 @@ def sync_all_configs(
                 "message": error_message
             })
     
-    # Log summary
-    if logger and hasattr(logger, 'info'):
-        logger.info(f"🔄 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
+    # Print summary
+    print(f"\n📊 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
     
     return results

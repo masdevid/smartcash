@@ -7,6 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 import os
 from pathlib import Path
+from smartcash.common.constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH
 
 def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     """
@@ -128,13 +129,13 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     data_paths = widgets.VBox([
         widgets.HTML(f"<h3 style='color:{COLORS['dark']}; margin-top:10px; margin-bottom:10px;'>{ICONS['folder']} Lokasi Dataset</h3>"),
         widgets.Text(
-            value='/content/drive/MyDrive/SmartCash/data' if drive_mounted else 'data',
+            value=DRIVE_DATASET_PATH if drive_mounted else 'data',
             description='Dataset Path:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='70%')
         ),
         widgets.Text(
-            value='/content/drive/MyDrive/SmartCash/data/preprocessed' if drive_mounted else 'data/preprocessed',
+            value=DRIVE_PREPROCESSED_PATH if drive_mounted else 'data/preprocessed',
             description='Preprocessed:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='70%')

@@ -3,11 +3,12 @@ File: smartcash/ui/dataset/split_config_utils.py
 Deskripsi: Utilitas untuk konfigurasi split dataset termasuk event handlers dan inisialisasi
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import yaml
 import os
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
+from smartcash.common.constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH
 
 def load_dataset_config(config_path: str = 'configs/dataset_config.yaml') -> Dict[str, Any]:
     """
@@ -26,8 +27,8 @@ def load_dataset_config(config_path: str = 'configs/dataset_config.yaml') -> Dic
             'random_seed': 42,
             'backup_before_split': True,
             'backup_dir': 'data/splits_backup',
-            'dataset_path': '/content/drive/MyDrive/SmartCash',
-            'preprocessed_path': '/content/drive/MyDrive/SmartCash/preprocessed'
+            'dataset_path': DRIVE_DATASET_PATH,
+            'preprocessed_path': DRIVE_PREPROCESSED_PATH
         }
     }
     
@@ -185,8 +186,8 @@ def initialize_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]
             drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else '/content/drive/MyDrive'
         
         if 'data_paths' in ui_components and hasattr(ui_components['data_paths'], 'children') and len(ui_components['data_paths'].children) >= 3:
-            dataset_path = config.get('data', {}).get('dataset_path', '/content/drive/MyDrive/SmartCash' if drive_mounted else 'data')
-            preprocessed_path = config.get('data', {}).get('preprocessed_path', '/content/drive/MyDrive/SmartCash/preprocessed' if drive_mounted else 'data/preprocessed')
+            dataset_path = config.get('data', {}).get('dataset_path', DRIVE_DATASET_PATH if drive_mounted else 'data')
+            preprocessed_path = config.get('data', {}).get('preprocessed_path', DRIVE_PREPROCESSED_PATH if drive_mounted else 'data/preprocessed')
             
             ui_components['data_paths'].children[1].value = dataset_path
             ui_components['data_paths'].children[2].value = preprocessed_path

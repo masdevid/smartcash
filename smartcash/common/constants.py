@@ -20,6 +20,8 @@ DEFAULT_LOGS_DIR = "logs"
 
 # Google Drive paths (for Colab)
 DRIVE_BASE_PATH = "/content/drive/MyDrive/SmartCash"
+DRIVE_DATASET_PATH = f"{DRIVE_BASE_PATH}/data"
+DRIVE_PREPROCESSED_PATH = f"{DRIVE_BASE_PATH}/data/preprocessed"
 
 # Layer detection
 class DetectionLayer(Enum):

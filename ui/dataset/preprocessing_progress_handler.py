@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_progress_handler.py
-Deskripsi: Handler progress tracking preprocessing dataset yang terintegrasi dengan observer dan UI utils standar
+Deskripsi: Handler progress tracking preprocessing dataset dengan EventTopics yang diperbarui
 """
 
 from typing import Dict, Any
@@ -48,9 +48,11 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         # Notifikasi observer dengan observer standar jika progress signifikan
         try:
             from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            
             if progress is not None and total is not None and progress % 10 == 0:
                 notify(
-                    event_type="PREPROCESSING_PROGRESS", 
+                    event_type=EventTopics.PREPROCESSING_PROGRESS, 
                     sender="preprocessing_handler",
                     message=message or f"Preprocessing progress: {int(progress/total*100)}%",
                     progress=progress,
@@ -127,8 +129,9 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         # Notify observer
         try:
             from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
             notify(
-                event_type="PREPROCESSING_PROGRESS", 
+                event_type=EventTopics.PREPROCESSING_PROGRESS, 
                 sender="preprocessing_handler",
                 message=message or f"Preprocessing progress: {int(progress/total*100)}%",
                 progress=progress,

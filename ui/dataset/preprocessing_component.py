@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_component.py
-Deskripsi: Komponen UI untuk preprocessing dataset dengan memanfaatkan helper dan utilitas UI standar
+Deskripsi: Komponen UI untuk preprocessing dataset dengan path input untuk Google Drive
 """
 
 import ipywidgets as widgets
@@ -16,6 +16,26 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
     from smartcash.ui.utils.alert_utils import create_info_alert
     
+    # Deteksi Google Drive
+    drive_mounted = False
+    drive_path = None
+    smartcash_dir = None
+    
+    # Cek drive dari environment manager
+    if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted:
+        drive_mounted = True
+        drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else '/content/drive/MyDrive'
+        smartcash_dir = f"{drive_path}/SmartCash"
+    
+    # Path default untuk dataset
+    data_dir = smartcash_dir + "/data" if smartcash_dir else "data"
+    preprocessed_dir = smartcash_dir + "/data/preprocessed" if smartcash_dir else "data/preprocessed"
+    
+    # Path dari config jika tersedia
+    if config:
+        data_dir = config.get('data', {}).get('dir', data_dir)
+        preprocessed_dir = config.get('preprocessing', {}).get('output_dir', preprocessed_dir)
+    
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
                           "Preprocessing dataset untuk training model SmartCash")
@@ -24,6 +44,37 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     status_panel = widgets.HTML(
         value=create_info_alert("Konfigurasi preprocessing dataset", "info").value
     )
+    
+    # Input paths
+    path_input = widgets.Text(
+        value=data_dir,
+        description='Data Dir:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='70%', margin='5px 0')
+    )
+    
+    preprocessed_input = widgets.Text(
+        value=preprocessed_dir,
+        description='Preprocessed Dir:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='70%', margin='5px 0')
+    )
+    
+    # Update path button
+    update_path_button = widgets.Button(
+        description='Update Paths',
+        button_style='info',
+        icon='refresh',
+        layout=widgets.Layout(width='auto', margin='5px 0')
+    )
+    
+    # Path container
+    path_container = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin:10px 0'>{ICONS['folder']} Data Paths</h4>"),
+        path_input,
+        preprocessed_input,
+        update_path_button
+    ])
     
     # Preprocessing options dengan struktur yang lebih ringkas
     preprocess_options = widgets.VBox([
@@ -121,6 +172,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         status_panel,
+        path_container, # Tambahkan path container di sini
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
         preprocess_options,
         split_selector,
@@ -140,6 +192,12 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
+        'data_dir': data_dir,
+        'preprocessed_dir': preprocessed_dir,
+        'path_input': path_input,
+        'preprocessed_input': preprocessed_input,
+        'update_path_button': update_path_button,
+        'path_container': path_container,
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
         'split_selector': split_selector,

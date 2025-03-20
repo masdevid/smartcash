@@ -55,9 +55,17 @@ class EventTopics:
     
     # Preprocessing events
     PREPROCESSING_START = "preprocessing.start"
-    PREPROCESSING_END = "preprocessing.end"
     PREPROCESSING_PROGRESS = "preprocessing.progress"
+    PREPROCESSING_CURRENT_PROGRESS = "preprocessing.current_progress"
+    PREPROCESSING_END = "preprocessing.end"
     PREPROCESSING_ERROR = "preprocessing.error"
+    
+    # Preprocessing cleanup events
+    PREPROCESSING_CLEANUP_START = "preprocessing.cleanup.start"
+    PREPROCESSING_CLEANUP_END = "preprocessing.cleanup.end"
+    PREPROCESSING_CLEANUP_ERROR = "preprocessing.cleanup.error"
+    
+    # Validation events
     VALIDATION_EVENT = "preprocessing.validation"
     AUGMENTATION_EVENT = "preprocessing.augmentation"
     

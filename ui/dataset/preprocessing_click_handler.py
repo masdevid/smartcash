@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_click_handler.py
-Deskripsi: Handler untuk tombol UI preprocessing dengan integrasi utils standar
+Deskripsi: Handler untuk tombol UI preprocessing dengan integrasi utils standar dan event topics yang diperbarui
 """
 
 from typing import Dict, Any
@@ -53,8 +53,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Notifikasi observer tentang mulai preprocessing
         try:
             from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
             notify(
-                event_type="PREPROCESSING_START",
+                event_type=EventTopics.PREPROCESSING_START,
                 sender="preprocessing_handler",
                 message=f"Memulai preprocessing dataset {split or 'All Splits'}"
             )
@@ -88,8 +89,26 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Tandai preprocessing sedang berjalan
         ui_components['preprocessing_running'] = True
         
-        # Jalankan preprocessing
+        # Jalankan preprocessing - Pastikan menggunakan path dari UI
         try:
+            # Gunakan path yang telah diupdate di UI jika tersedia
+            data_dir = ui_components.get('data_dir')
+            preprocessed_dir = ui_components.get('preprocessed_dir')
+            
+            # Update konfigurasi dataset manager dengan path baru
+            if hasattr(dataset_manager, 'config'):
+                if data_dir:
+                    dataset_manager.config['dataset_dir'] = data_dir
+                if preprocessed_dir and 'preprocessing' in dataset_manager.config:
+                    dataset_manager.config['preprocessing']['output_dir'] = preprocessed_dir
+            
+            # Update konfigurasi preproc jika ada
+            if hasattr(dataset_manager, 'preprocess_config'):
+                if preprocessed_dir:
+                    dataset_manager.preprocess_config['preprocessed_dir'] = preprocessed_dir
+                if data_dir:
+                    dataset_manager.preprocess_config['raw_dataset_dir'] = data_dir
+            
             preprocess_result = dataset_manager.preprocess_dataset(
                 split=split, force_reprocess=True, **options
             )
@@ -112,8 +131,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Notifikasi observer
             try:
                 from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
                 notify(
-                    event_type="PREPROCESSING_END",
+                    event_type=EventTopics.PREPROCESSING_END,
                     sender="preprocessing_handler",
                     message=f"Preprocessing dataset {split or 'All Splits'} selesai"
                 )
@@ -131,8 +151,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Notifikasi observer
             try:
                 from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
                 notify(
-                    event_type="PREPROCESSING_ERROR",
+                    event_type=EventTopics.PREPROCESSING_ERROR,
                     sender="preprocessing_handler",
                     message=f"Error saat preprocessing: {str(e)}"
                 )
@@ -165,8 +186,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Notifikasi observer
         try:
             from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
             notify(
-                event_type="PREPROCESSING_END",
+                event_type=EventTopics.PREPROCESSING_END,
                 sender="preprocessing_handler",
                 message=f"Preprocessing dihentikan oleh pengguna"
             )

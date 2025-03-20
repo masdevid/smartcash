@@ -1,11 +1,12 @@
 """
 File: smartcash/ui/dataset/preprocessing_initialization.py
-Deskripsi: Inisialisasi komponen untuk preprocessing dataset dengan utilitas standar
+Deskripsi: Inisialisasi komponen untuk preprocessing dataset dengan utilitas standar dan path handling yang diperbaiki
 """
 
 from typing import Dict, Any
 from smartcash.ui.utils.constants import COLORS, ICONS, ALERT_STYLES
 from IPython.display import display, HTML
+import ipywidgets as widgets
 
 def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """Inisialisasi komponen preprocessing dataset dengan utilitas standar."""
@@ -23,10 +24,11 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         data_dir = config.get('data', {}).get('dir', 'data')
         preprocessed_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
         
-        # Gunakan Google Drive jika tersedia
+        # Gunakan Google Drive jika tersedia - FIXED: Tambahkan 'SmartCash' ke path
         if drive_mounted and drive_path:
-            data_dir = f"{drive_path}/data"
-            preprocessed_dir = f"{drive_path}/data/preprocessed"
+            smartcash_dir = f"{drive_path}/SmartCash"
+            data_dir = f"{smartcash_dir}/data"
+            preprocessed_dir = f"{smartcash_dir}/data/preprocessed"
             
             # Log penggunaan Google Drive jika logger tersedia
             if logger: logger.info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}")
@@ -37,6 +39,71 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
                 "info", 
                 f"{ICONS['info']} Dataset akan dipreprocessing dari sumber: {data_dir}"
             )
+        
+        # Tambahkan input untuk mengubah path jika perlu
+        path_input = widgets.Text(
+            value=data_dir,
+            description='Data Dir:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%', margin='5px 0')
+        )
+        
+        preprocessed_input = widgets.Text(
+            value=preprocessed_dir,
+            description='Preprocessed Dir:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%', margin='5px 0')
+        )
+        
+        # Tambahkan tombol update path
+        update_path_button = widgets.Button(
+            description='Update Paths',
+            button_style='info',
+            icon='refresh',
+            layout=widgets.Layout(width='auto', margin='5px 0')
+        )
+        
+        # Buat container untuk path inputs
+        path_container = widgets.VBox([
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin:10px 0'>{ICONS['folder']} Data Paths</h4>"),
+            path_input,
+            preprocessed_input,
+            update_path_button
+        ])
+        
+        # Tambahkan ke UI - jika ada data_paths di UI, update itu, jika tidak tambahkan ke UI utama
+        if 'data_paths' in ui_components:
+            ui_components['data_paths'].children = path_container.children
+        else:
+            # Tambahkan ke posisi tepat sebelum preprocessing options
+            if 'preprocess_options' in ui_components and 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+                children = list(ui_components['ui'].children)
+                for i, child in enumerate(children):
+                    if child == ui_components.get('preprocess_options'):
+                        children.insert(i, path_container)
+                        ui_components['ui'].children = children
+                        break
+        
+        # Handler untuk tombol update path
+        def on_update_path(b):
+            nonlocal data_dir, preprocessed_dir
+            data_dir = path_input.value
+            preprocessed_dir = preprocessed_input.value
+            
+            # Update ui_components dengan path baru
+            ui_components['data_dir'] = data_dir
+            ui_components['preprocessed_dir'] = preprocessed_dir
+            
+            # Update status panel
+            update_status_panel(
+                ui_components,
+                "success",
+                f"{ICONS['success']} Path dataset berhasil diperbarui: {data_dir}"
+            )
+            
+            if logger: logger.success(f"{ICONS['success']} Path dataset diperbarui: {data_dir}")
+        
+        update_path_button.on_click(on_update_path)
         
         # Update UI dari config
         if config and 'preprocessing' in config:
@@ -105,7 +172,12 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         # Store data directory di ui_components
         ui_components.update({
             'data_dir': data_dir,
-            'preprocessed_dir': preprocessed_dir
+            'preprocessed_dir': preprocessed_dir,
+            'path_input': path_input,
+            'preprocessed_input': preprocessed_input,
+            'update_path_button': update_path_button,
+            'path_container': path_container,
+            'on_update_path': on_update_path
         })
         
     except Exception as e:

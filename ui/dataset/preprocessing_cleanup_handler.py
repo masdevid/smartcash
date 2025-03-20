@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_cleanup_handler.py
-Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan konfirmasi
+Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan EventTopics yang diperbarui
 """
 
 from typing import Dict, Any
@@ -95,8 +95,9 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Notifikasi observer sebelum cleanup
             try:
                 from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
                 notify(
-                    event_type="PREPROCESSING_CLEANUP_START",
+                    event_type=EventTopics.PREPROCESSING_CLEANUP_START,
                     sender="preprocessing_handler",
                     message=f"Memulai pembersihan data preprocessing"
                 )
@@ -159,8 +160,9 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 # Notifikasi observer
                 try:
                     from smartcash.components.observer import notify
+                    from smartcash.components.observer.event_topics_observer import EventTopics
                     notify(
-                        event_type="PREPROCESSING_CLEANUP_END",
+                        event_type=EventTopics.PREPROCESSING_CLEANUP_END,
                         sender="preprocessing_handler",
                         message=f"Pembersihan data preprocessing selesai"
                     )
@@ -179,8 +181,9 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Notifikasi observer tentang error
             try:
                 from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
                 notify(
-                    event_type="PREPROCESSING_CLEANUP_ERROR",
+                    event_type=EventTopics.PREPROCESSING_CLEANUP_ERROR,
                     sender="preprocessing_handler",
                     message=f"Error saat pembersihan data: {str(e)}"
                 )

@@ -284,7 +284,7 @@ def create_confirmation_dialog(title, message, on_confirm, on_cancel=None,
                      color:{COLORS['alert_warning_text']}; 
                      border-left:4px solid {COLORS['alert_warning_text']}; 
                      border-radius:4px; margin:10px 0;">
-            <h4 style="margin-top:0; font-family:{FONTS['header']};">{ICONS['warning']} {title}</h4>
+            <h4 style="margin-top:0; color: inherit; font-family:{FONTS['header']};">{ICONS['warning']} {title}</h4>
             <p style="margin-bottom:0;">{message}</p>
         </div>
         """),

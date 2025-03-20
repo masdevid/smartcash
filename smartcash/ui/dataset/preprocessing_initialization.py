@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_initialization.py
-Deskripsi: Inisialisasi komponen untuk preprocessing dataset dengan path handling yang ditingkatkan
+Deskripsi: Inisialisasi komponen untuk preprocessing dataset dengan path handling yang ditingkatkan dan perbaikan warna header
 """
 
 from typing import Dict, Any
@@ -55,14 +55,14 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         if 'preprocessed_input' in ui_components:
             ui_components['preprocessed_input'].value = preprocessed_dir
         
-        # Update path info display
+        # Update path info display dengan warna teks yang terlihat
         if 'path_info' in ui_components:
             ui_components['path_info'].value = f"""
             <div style="padding:10px; margin:10px 0; background-color:{COLORS['light']}; 
                     border-radius:5px; border-left:4px solid {COLORS['primary']};">
                 <h4 style="color:inherit; margin-top:0;">📂 Lokasi Dataset</h4>
-                <p><strong>Data Source:</strong> <code>{abs_data_dir}</code></p>
-                <p><strong>Preprocessed:</strong> <code>{abs_preprocessed_dir}</code></p>
+                <p style="color:black;"><strong>Data Source:</strong> <code>{abs_data_dir}</code></p>
+                <p style="color:black;"><strong>Preprocessed:</strong> <code>{abs_preprocessed_dir}</code></p>
             </div>
             """
         
@@ -76,13 +76,13 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
             abs_local_data_dir = os.path.abspath(local_data_dir)
             abs_local_preprocessed_dir = os.path.abspath(local_preprocessed_dir)
             
-            # Update path info display
+            # Update path info display dengan warna yang terlihat
             ui_components['path_info'].value = f"""
             <div style="padding:10px; margin:10px 0; background-color:{COLORS['light']}; 
                     border-radius:5px; border-left:4px solid {COLORS['primary']};">
-                <h4 style="color:inherit; margin-top:0;">📂 Lokasi Dataset</h4>
-                <p><strong>Data Source:</strong> <code>{abs_local_data_dir}</code></p>
-                <p><strong>Preprocessed:</strong> <code>{abs_local_preprocessed_dir}</code></p>
+                <h4 style="color:{COLORS['dark']}; margin-top:0;">📂 Lokasi Dataset</h4>
+                <p style="color:black;"><strong>Data Source:</strong> <code>{abs_local_data_dir}</code></p>
+                <p style="color:black;"><strong>Preprocessed:</strong> <code>{abs_local_preprocessed_dir}</code></p>
             </div>
             """
             

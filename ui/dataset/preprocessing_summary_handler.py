@@ -1,13 +1,13 @@
 """
 File: smartcash/ui/dataset/preprocessing_summary_handler.py
-Deskripsi: Handler untuk menampilkan ringkasan dan statistik hasil preprocessing dengan komponen UI standar
+Deskripsi: Handler untuk menampilkan ringkasan dan statistik hasil preprocessing dengan komponen UI standar dan perbaikan warna header
 """
 
 from typing import Dict, Any, Optional
 from IPython.display import display, clear_output, HTML
 import time
 from pathlib import Path
-from ipywidgets import widgets
+
 from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -45,9 +45,9 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             from smartcash.ui.utils.metric_utils import styled_html, create_metric_display
             from smartcash.ui.utils.constants import COLORS, ICONS
             
-            # Header
+            # Header dengan warna yang terlihat
             display(styled_html(
-                f"<h3 style='margin-top:0; color: black;'>{ICONS.get('stats', '📊')} Hasil Preprocessing</h3>", 
+                f"<h3 style='margin-top:0; color:{COLORS['dark']}'>{ICONS.get('stats', '📊')} Hasil Preprocessing</h3>", 
                 bg_color=COLORS['light'], text_color=COLORS['dark'], 
                 border_color=COLORS['primary']
             ))
@@ -66,18 +66,18 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             ]
             
             display(metrics_container)
-            
             # Split stats jika tersedia
             if 'split_stats' in result:
                 # Buat tabel untuk split stats
-                split_stats_html = """
+                th_style = f"padding:8px; text-align:center; border:1px solid #ddd; color:#343a40;";
+                split_stats_html = f"""
                 <table style="width:100%; border-collapse:collapse; margin:10px 0; border:1px solid #ddd;">
                     <thead>
                         <tr style="background-color:#f8f9fa;">
-                            <th style="padding:8px; text-align:left; border:1px solid #ddd;">Split</th>
-                            <th style="padding:8px; text-align:center; border:1px solid #ddd;">Gambar</th>
-                            <th style="padding:8px; text-align:center; border:1px solid #ddd;">Label</th>
-                            <th style="padding:8px; text-align:center; border:1px solid #ddd;">Status</th>
+                            <th style="{th_style}">Split</th>
+                            <th style="{th_style}">Gambar</th>
+                            <th style="{th_style}">Label</th>
+                            <th style="{th_style}">Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -88,13 +88,14 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     status_color = COLORS['success'] if stats.get('complete', False) else COLORS['warning']
                     status_icon = ICONS['success'] if stats.get('complete', False) else ICONS['warning']
                     status_text = "Lengkap" if stats.get('complete', False) else "Tidak Lengkap"
+                    td_style = f"padding:8px; text-align:center; border:1px solid #ddd;"
                     
                     split_stats_html += f"""
                     <tr>
-                        <td style="padding:8px; border:1px solid #ddd;">{split.capitalize()}</td>
-                        <td style="padding:8px; text-align:center; border:1px solid #ddd;">{stats.get('images', 0)}</td>
-                        <td style="padding:8px; text-align:center; border:1px solid #ddd;">{stats.get('labels', 0)}</td>
-                        <td style="padding:8px; text-align:center; border:1px solid #ddd; color:{status_color}">
+                        <td style="{td_style} color:{COLORS['dark']}; border:1px solid #ddd; ">{split.capitalize()}</td>
+                        <td style="{td_style} color:{COLORS['dark']};">{stats.get('images', 0)}</td>
+                        <td style="{td_style} color:{COLORS['dark']};">{stats.get('labels', 0)}</td>
+                        <td style="{td_style} color:{status_color}">
                             {status_icon} {status_text}
                         </td>
                     </tr>
@@ -110,7 +111,7 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Info tambahan
             if 'output_dir' in result:
                 display(styled_html(
-                    f"<p><strong>Path Output:</strong> {result.get('output_dir', '')}</p>", 
+                    f"<p style='color:{COLORS['dark']};'><strong>Path Output:</strong> {result.get('output_dir', '')}</p>", 
                     bg_color=COLORS['light'], text_color=COLORS['dark']
                 ))
             

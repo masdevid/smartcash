@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_visualization_handler.py
-Deskripsi: Handler untuk visualisasi dataset preprocessing dengan integrasi standar
+Deskripsi: Handler untuk visualisasi dataset preprocessing dengan integrasi standar dan perbaikan warna teks
 """
 
 from typing import Dict, Any, Optional, List, Tuple
@@ -173,7 +173,11 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
                 
                 # Tampilkan gambar
                 axes[i].imshow(img)
-                axes[i].set_title(f"{img_path.stem}")
+                # Tampilkan nama file yang pendek
+                img_name = img_path.name
+                if len(img_name) > 10:
+                    img_name = f"...{img_name[-10:]}"
+                axes[i].set_title(f"{img_name}")
                 axes[i].axis('off')
             except Exception as e:
                 axes[i].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -191,7 +195,13 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
                 else:
                     img = cv2.imread(str(img_path))
                     h, w = img.shape[:2]
-                display(HTML(f"<p><strong>{img_path.name}</strong>: {w}x{h} piksel</p>"))
+                
+                # Tampilkan nama file yang pendek
+                img_name = img_path.name
+                if len(img_name) > 15:
+                    img_name = f"...{img_name[-10:]}"
+                
+                display(HTML(f"<p style='color:{COLORS['dark']}'><strong>{img_name}</strong>: {w}x{h} piksel</p>"))
             except Exception:
                 pass
 
@@ -284,13 +294,21 @@ def compare_raw_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, pre
                     proc_img = cv2.imread(str(proc_path))
                     proc_img = cv2.cvtColor(proc_img, cv2.COLOR_BGR2RGB)
                 
-                # Tampilkan gambar
+                # Tampilkan gambar dengan nama file pendek
+                raw_name = raw_path.name
+                if len(raw_name) > 10:
+                    raw_name = f"...{raw_name[-10:]}"
+                    
+                proc_name = proc_path.name
+                if len(proc_name) > 10:
+                    proc_name = f"...{proc_name[-10:]}"
+                
                 axes[i, 0].imshow(raw_img)
-                axes[i, 0].set_title(f"Mentah: {raw_path.name}")
+                axes[i, 0].set_title(f"Mentah: {raw_name}")
                 axes[i, 0].axis('off')
                 
                 axes[i, 1].imshow(proc_img)
-                axes[i, 1].set_title(f"Preprocessed: {proc_path.name}")
+                axes[i, 1].set_title(f"Preprocessed: {proc_name}")
                 axes[i, 1].axis('off')
                 
             except Exception as e:
@@ -314,11 +332,16 @@ def compare_raw_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, pre
                     proc_img = cv2.imread(str(proc_path))
                     proc_h, proc_w = proc_img.shape[:2]
                 
+                # Tampilkan nama file yang pendek
+                raw_name = raw_path.stem
+                if len(raw_name) > 10:
+                    raw_name = f"...{raw_name[-10:]}"
+                
                 display(HTML(f"""
                 <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
-                    <p><strong>{raw_path.stem}</strong></p>
-                    <p>Mentah: {raw_w}x{raw_h} piksel | Preprocessed: {proc_w}x{proc_h} piksel</p>
-                    <p>Rasio kompresi: {(proc_img.nbytes / raw_img.nbytes):.2f}x</p>
+                    <p style="color:{COLORS['dark']};"><strong>{raw_name}</strong></p>
+                    <p style="color:{COLORS['dark']};">Mentah: {raw_w}x{raw_h} piksel | Preprocessed: {proc_w}x{proc_h} piksel</p>
+                    <p style="color:{COLORS['dark']};">Rasio kompresi: {(proc_img.nbytes / raw_img.nbytes):.2f}x</p>
                 </div>
                 """))
             except Exception:

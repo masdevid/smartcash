@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_component.py
-Deskripsi: Komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan
+Deskripsi: Komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan dan perbaikan warna header
 """
 
 import ipywidgets as widgets
@@ -24,13 +24,13 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         value=create_info_alert("Konfigurasi preprocessing dataset", "info").value
     )
     
-    # Konfigurasi path - ditampilkan sebagai info panel
+    # Konfigurasi path - ditampilkan sebagai info panel dengan warna teks yang terlihat
     path_info = widgets.HTML(
         value=f"""<div style="padding:10px; margin:10px 0; background-color:{COLORS['light']}; 
-                border-radius:5px; border-left:4px solid {COLORS['primary']}; color: {COLORS['primary']}">
-            <h4 style="color:inherit; margin-top:0;">📂 Lokasi Dataset</h4>
-            <p><strong>Data Source:</strong> <span id="data-source-path">...</span></p>
-            <p><strong>Preprocessed:</strong> <span id="preprocessed-path">...</span></p>
+                border-radius:5px; border-left:4px solid {COLORS['primary']}; color: {COLORS['dark']}">
+            <h4 style="color:{COLORS['dark']}; margin-top:0;">📂 Lokasi Dataset</h4>
+            <p style="color:{COLORS['dark']};"><strong>Data Source:</strong> <span id="data-source-path">...</span></p>
+            <p style="color:{COLORS['dark']};"><strong>Preprocessed:</strong> <span id="preprocessed-path">...</span></p>
         </div>"""
     )
     
@@ -131,8 +131,11 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
                                         bar_style='info', orientation='horizontal',
                                         layout=widgets.Layout(visibility='hidden', width='100%'))
     
+    # Gunakan warna yang terlihat untuk header
     progress_container = widgets.VBox([
-        widgets.HTML(f"<h4>{ICONS['stats']} Progress</h4>"), progress_bar, current_progress
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
+        progress_bar, 
+        current_progress
     ])
     
     # Status output dengan layout standar
@@ -154,7 +157,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Layout UI dengan divider standar
     from smartcash.ui.utils.layout_utils import create_divider
     
-    # Rakit komponen UI
+    # Rakit komponen UI dengan header warna yang terlihat
     ui = widgets.VBox([
         header,
         status_panel,

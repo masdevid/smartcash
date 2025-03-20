@@ -245,10 +245,15 @@ class DatasetPreprocessor:
                 try:
                     # Update progress callback untuk current progress
                     if self._progress_callback:
+                        img_name = img_path.name
+                        # Potong nama file jika terlalu panjang (10 karakter terakhir)
+                        if len(img_name) > 15:
+                            img_name = f"...{img_name[-10:]}"
+                            
                         self._progress_callback(
                             progress=stats['processed'],
                             total=num_files,
-                            message=f"Preprocessing {split}: {i+1}/{num_files}",
+                            message=f"Preprocessing {split}: {i+1}/{num_files} - {img_name}",
                             status='info',
                             current_progress=i,
                             current_total=num_files
@@ -264,7 +269,12 @@ class DatasetPreprocessor:
                     else:
                         stats['skipped'] += 1
                 except Exception as e:
-                    self.logger.error(f"❌ Gagal memproses {img_path.name}: {str(e)}")
+                    # Tampilkan error dengan nama file terpotong agar tidak terlalu panjang
+                    img_name = img_path.name
+                    if len(img_name) > 15:
+                        img_name = f"...{img_name[-10:]}"
+                    
+                    self.logger.error(f"❌ Gagal memproses {img_name}: {str(e)}")
                     stats['failed'] += 1
                 
                 progress.update(1)
@@ -381,13 +391,22 @@ class DatasetPreprocessor:
                 'preprocessing_timestamp': time.time()
             }
             
-            # Simpan ke storage
-            self.storage.save_metadata(split=Path(target_images_dir).parent.name, image_id=img_id, metadata=metadata)
+            # Simpan ke storage - dengan penanganan error untuk backward compatibility
+            try:
+                self.storage.save_metadata(split=Path(target_images_dir).parent.name, image_id=img_id, metadata=metadata)
+            except (AttributeError, Exception) as e:
+                # Jika metode save_metadata tidak ada (backward compatibility)
+                self.logger.debug(f"⚠️ Storage tidak mendukung save_metadata: {str(e)}")
             
             return True
             
         except Exception as e:
-            self.logger.error(f"❌ Error saat preprocessing {img_id}: {str(e)}")
+            # Tampilkan pesan error dengan nama file yang terpotong
+            short_id = img_id
+            if len(short_id) > 15:
+                short_id = f"...{short_id[-10:]}"
+            
+            self.logger.error(f"❌ Error saat preprocessing {short_id}: {str(e)}")
             return False
     
     def clean_preprocessed(self, split: Optional[str] = None) -> None:

@@ -66,8 +66,9 @@ def sync_config_with_drive(
     local_path: Optional[str] = None,
     sync_strategy: str = 'drive_priority',
     create_backup: bool = True,
-    logger = None
-) -> Tuple[bool, str, Dict[str, Any]]:
+    logger = None,
+    force_sync: bool = False
+) -> Tuple[bool, str, Dict[str, Any], str]:
     """
     Sinkronisasi file konfigurasi antara lokal dan Google Drive.
     
@@ -82,9 +83,10 @@ def sync_config_with_drive(
             - 'merge': Gabungkan config dengan strategi smart
         create_backup: Buat backup sebelum update
         logger: Logger untuk logging (opsional)
+        force_sync: Paksa sinkronisasi meskipun file identik
         
     Returns:
-        Tuple (success, message, merged_config)
+        Tuple (success, message, merged_config, status) - status = "synced", "skipped", "failed"
     """
     # Validasi drive path
     if not drive_path:
@@ -102,7 +104,7 @@ def sync_config_with_drive(
     drive_exists = os.path.exists(drive_path)
     local_exists = os.path.exists(local_path)
     
-    if not drive_exists and not local_exists: return False, f"Tidak ada file konfigurasi ditemukan untuk {config_file}", {}
+    if not drive_exists and not local_exists: return False, f"Tidak ada file konfigurasi ditemukan untuk {config_file}", {}, "failed"
     
     # Jika hanya satu file ada, salin ke yang lain
     if drive_exists and not local_exists:
@@ -110,14 +112,14 @@ def sync_config_with_drive(
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
         shutil.copy2(drive_path, local_path)
         config = load_yaml_config(local_path)
-        return True, f"File konfigurasi dari Drive disalin ke lokal: {config_file}", config
+        return True, f"File konfigurasi dari Drive disalin ke lokal: {config_file}", config, "synced"
     
     if local_exists and not drive_exists:
         # Buat direktori Drive jika perlu
         os.makedirs(os.path.dirname(drive_path), exist_ok=True)
         shutil.copy2(local_path, drive_path)
         config = load_yaml_config(drive_path)
-        return True, f"File konfigurasi lokal disalin ke Drive: {config_file}", config
+        return True, f"File konfigurasi lokal disalin ke Drive: {config_file}", config, "synced"
     
     # Kedua file ada, terapkan strategi sinkronisasi
     # Dapatkan timestamp dan load config
@@ -135,9 +137,25 @@ def sync_config_with_drive(
             local_backup = create_backup(local_path)
             if logger and local_backup: logger.info(f"📦 Backup local config: {local_backup}")
     
+    # Cek apakah file sudah identik
+    import hashlib
+    def get_file_hash(file_path):
+        with open(file_path, 'rb') as f:
+            return hashlib.md5(f.read()).hexdigest()
+    
+    # Jika kedua file identik, tidak perlu sinkronisasi kecuali jika force_sync=True
+    try:
+        if not force_sync and get_file_hash(drive_path) == get_file_hash(local_path):
+            message = f"File konfigurasi sudah identik: {config_file}"
+            if logger: logger.debug(f"🔄 {message}")
+            return True, message, load_yaml_config(local_path), "skipped"
+    except Exception:
+        pass  # Lanjutkan jika terjadi error saat pengecekan hash
+    
     # Terapkan strategi sinkronisasi
     result_config = {}
     message = ""
+    sync_status = "synced"
     
     if sync_strategy == 'drive_priority':
         result_config = drive_config
@@ -168,11 +186,11 @@ def sync_config_with_drive(
         save_yaml_config(result_config, drive_path)
         message = f"Konfigurasi berhasil digabungkan: {config_file}"
     
-    else: return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}
+    else: return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}, "failed"
     
     if logger: logger.info(f"✅ {message}")
     
-    return True, message, result_config
+    return True, message, result_config, sync_status
 
 def sync_all_configs(
     drive_configs_dir: Optional[str] = None,
@@ -194,7 +212,7 @@ def sync_all_configs(
         logger: Logger untuk logging
         
     Returns:
-        Dictionary berisi hasil sinkronisasi
+        Dictionary berisi hasil sinkronisasi dengan kategori "success", "skipped", dan "failure"
     """
     # Dapatkan drive path jika tidak disediakan
     if not drive_configs_dir:
@@ -243,8 +261,9 @@ def sync_all_configs(
     
     # Hasil sinkronisasi
     results = {
-        "success": [],
-        "failure": []
+        "synced": [],  # File yang disinkronisasi
+        "skipped": [], # File yang sudah identik dan dilewati
+        "failed": []   # File yang gagal disinkronisasi
     }
     
     # Proses setiap file
@@ -267,7 +286,7 @@ def sync_all_configs(
                 shutil.copy2(additional_path, local_path)
                 if logger: logger.info(f"📋 Menyalin konfigurasi dari {additional_path} ke {local_path}")
             
-            success, message, _ = sync_config_with_drive(
+            success, message, _, status = sync_config_with_drive(
                 config_file=config_file,
                 drive_path=drive_path,
                 local_path=local_path,
@@ -281,17 +300,37 @@ def sync_all_configs(
                 "message": message
             }
             
-            if success: results["success"].append(result)
-            else: results["failure"].append(result)
+            if success:
+                if status == "synced":
+                    results["synced"].append(result)
+                elif status == "skipped":
+                    results["skipped"].append(result)
+                else:
+                    results["synced"].append(result)  # fallback jika status tidak dikenal tapi sukses
+            else: 
+                results["failed"].append(result)
                 
         except Exception as e:
             if logger: logger.error(f"❌ Error saat sinkronisasi {config_file}: {str(e)}")
-            results["failure"].append({
+            results["failed"].append({
                 "file": config_file,
                 "message": f"Error: {str(e)}"
             })
     
-    # Log summary
-    if logger: logger.info(f"🔄 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
+    # Log summary dengan pesan yang lebih informatif
+    total_processed = len(yaml_files)
+    if logger:
+        synced_count = len(results['synced'])
+        skipped_count = len(results['skipped'])
+        failed_count = len(results['failed'])
+        if total_processed > 0:
+            logger.info(f"🔄 Sinkronisasi selesai: {total_processed} file diproses - {synced_count} disinkronisasi, {skipped_count} dilewati (sudah identik), {failed_count} gagal")
+        else:
+            logger.info("🔄 Tidak ada file konfigurasi untuk disinkronisasi")
+    
+    # Update format output agar kompatibel dengan kode yang menggunakan fungsi ini
+    # Pindahkan 'skipped' ke 'success' agar tidak dianggap sebagai error
+    results["success"] = results["synced"] + results["skipped"]
+    results["failure"] = results["failed"]
     
     return results

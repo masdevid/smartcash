@@ -4,7 +4,7 @@ Deskripsi: Utilitas untuk membuat dan mengelola info box dengan accordion
 """
 
 import ipywidgets as widgets
-from typing import Optional, Union
+from typing import Optional, Union, Dict
 
 from smartcash.ui.utils.constants import ALERT_STYLES
 

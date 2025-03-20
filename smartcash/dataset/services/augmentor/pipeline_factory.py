@@ -102,11 +102,15 @@ class AugmentationPipelineFactory:
         transforms = []
         
         # Fix parameter ResizedCrop untuk albumentations >= 0.7.0
-        # Albumentations requires dict for scale parameter
+        # Albumentations menganggap parameter scale sebagai dict dengan keys min/max atau tuple sebagai (min, max)
+        height, width = int(img_size[1]), int(img_size[0])
+        scale = (0.9 if 'crop' in augmentation_types else 0.95, 1.0)
+        
+        # Parameter untuk RandomResizedCrop yang kompatibel dengan Albumentations versi baru
         resize_crop_params = {
-            'height': int(img_size[1]), 
-            'width': int(img_size[0]), 
-            'scale': (0.9 if 'crop' in augmentation_types else 0.95, 1.0), 
+            'height': height, 
+            'width': width,
+            'scale': scale,  # Format yang diharapkan: tuple (min, max) atau dict {'min': min_val, 'max': max_val}
             'p': 1.0
         }
         

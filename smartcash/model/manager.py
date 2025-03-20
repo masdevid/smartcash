@@ -67,6 +67,7 @@ class ModelManager:
         },
         'efficient_basic': {
             'description': 'Model dasar tanpa optimasi khusus',
+            'backbone': 'efficientnet_b4',
             'use_attention': False,
             'use_residual': False,
             'use_ciou': False

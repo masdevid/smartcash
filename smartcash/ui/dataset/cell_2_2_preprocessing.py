@@ -3,7 +3,6 @@ File: cell_2_2_preprocessing.py
 Deskripsi: Cell untuk preprocessing dataset SmartCash dengan kode minimal
 """
 
-from IPython.display import display
 import sys
 if '.' not in sys.path: sys.path.append('.')
 
@@ -24,6 +23,4 @@ try:
     # Tampilkan UI
     display_ui(ui_components)
 
-except ImportError as e:
-    from IPython.display import HTML
-    display(HTML(f"<div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'><h3>❌ Error Inisialisasi</h3><p>{str(e)}</p></div>"))
+except ImportError as e: err_alert(e)

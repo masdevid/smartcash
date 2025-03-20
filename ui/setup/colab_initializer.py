@@ -20,6 +20,18 @@ UI_COMPONENTS = {
     'container': None
 }
 
+def create_alert(msg: str, type: str = 'info') -> HTML:
+    """Membuat alert box dengan gaya yang konsisten."""
+    styles = {
+        'success': ('#d4edda', '#155724', '✅'), 
+        'warning': ('#fff3cd', '#856404', '⚠️'), 
+        'error': ('#f8d7da', '#721c24', '❌'), 
+        'info': ('#d1ecf1', '#0c5460', '📘')
+    }
+    bg, text, icon = styles.get(type, styles['info'])
+    return HTML(
+        f"<div style='padding:10px;margin:5px 0;background-color:{bg};color:{text};border-radius:4px'>{icon} {msg}</div>"
+    )
 
 def initialize_ui() -> Dict[str, Any]:
     """Inisialisasi komponen UI."""

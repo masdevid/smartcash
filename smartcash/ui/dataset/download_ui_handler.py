@@ -47,7 +47,7 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
                     if ui_components.get('api_key_available', False) and hasattr(ui_components['roboflow_settings'], 'children') and len(ui_components['roboflow_settings'].children) > 0:
                         ui_components['roboflow_settings'].children[0].layout.display = 'none'
                 
-                update_status_panel(ui_components, "info", f"{ICONS['info']} Mempersiapkan download dari Roboflow")
+                update_status_panel(ui_components, "info", f"Mempersiapkan download dari Roboflow")
             
             elif change['new'] == 'Local Data (Upload)':
                 # Ganti ke komponen upload lokal

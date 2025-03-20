@@ -233,7 +233,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     if 'path_info' in ui_components:
         ui_components['path_info'].value = f"""
         <div style="padding:10px; margin:10px 0; background-color:{COLORS['light']}; 
-                border-radius:5px; border-left:4px solid {COLORS['primary']};">
+                border-radius:5px; border-left:4px solid {COLORS['primary']}; color: black;">
             <h4 style="color:inherit; margin-top:0;">📂 Lokasi Dataset</h4>
             <p><strong>Data Source:</strong> <code>{abs_data_dir}</code></p>
             <p><strong>Preprocessed:</strong> <code>{abs_preprocessed_dir}</code></p>

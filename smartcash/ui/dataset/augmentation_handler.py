@@ -1,21 +1,20 @@
 """
 File: smartcash/ui/dataset/augmentation_handler.py
-Deskripsi: Handler terintegrasi untuk augmentasi dataset tanpa parameter detail dengan fokus hanya pada konfigurasi utama
+Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan logging yang disempurnakan
 """
 
 from typing import Dict, Any, Optional
 import time, os, sys
 from pathlib import Path
-from IPython.display import display, clear_output
+from IPython.display import display, clear_output, HTML
 
 def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """Setup semua handler terintegrasi untuk augmentasi dataset."""
     
-    logger = ui_components.get('logger')
-    
     # Import dan inisialisasi utilitas standar
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging, reset_logging
     
     # Import handlers terpisah yang dikonsolidasikan di sini
     from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state, update_status_panel
@@ -26,52 +25,8 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     from smartcash.ui.dataset.augmentation_cleanup_handler import setup_cleanup_handler
     
     try:
-        # Redirect stdout dan stderr ke output widget untuk tangkap semua log
-        if 'status' in ui_components:
-            class OutputWidgetWriter:
-                def __init__(self, output_widget):
-                    self.output_widget = output_widget
-                    self.buffer = ""
-                
-                def write(self, text):
-                    self.buffer += text
-                    if '\n' in self.buffer:
-                        with self.output_widget:
-                            display(HTML(f"<pre>{self.buffer}</pre>"))
-                        self.buffer = ""
-                    return len(text)
-                
-                def flush(self):
-                    if self.buffer:
-                        with self.output_widget:
-                            display(HTML(f"<pre>{self.buffer}</pre>"))
-                        self.buffer = ""
-            
-            # Simpan referensi stdout dan stderr asli
-            original_stdout = sys.stdout
-            original_stderr = sys.stderr
-            
-            # Redirect ke output widget
-            output_writer = OutputWidgetWriter(ui_components['status'])
-            sys.stdout = output_writer
-            sys.stderr = output_writer
-            
-            # Tambahkan handler untuk restore stdout/stderr pada cleanup
-            def restore_outputs():
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
-            
-            # Tambahkan ke cleanup handlers
-            if 'cleanup' in ui_components and callable(ui_components['cleanup']):
-                original_cleanup = ui_components['cleanup']
-                
-                def enhanced_cleanup():
-                    restore_outputs()
-                    original_cleanup()
-                
-                ui_components['cleanup'] = enhanced_cleanup
-            else:
-                ui_components['cleanup'] = restore_outputs
+        # Setup logging dengan integrasi UI
+        logger = setup_ipython_logging(ui_components, "augmentation_handler")
         
         # Inisialisasi dan deteksi state augmentasi
         ui_components = detect_augmentation_state(ui_components, env, config)
@@ -92,13 +47,13 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         saved_config = load_augmentation_config()
         if saved_config:
             ui_components = update_ui_from_config(ui_components, saved_config)
-            if logger: logger.info(f"{ICONS['success']} Konfigurasi augmentasi dimuat")
+            logger.info(f"{ICONS['success']} Konfigurasi augmentasi dimuat")
         
         # Setup observer integration jika tersedia
         try:
             from smartcash.ui.handlers.observer_handler import setup_observer_handlers
             ui_components = setup_observer_handlers(ui_components, "augmentation_observers")
-            if logger: logger.debug(f"{ICONS['info']} Observer berhasil diinisialisasi")
+            logger.debug(f"{ICONS['info']} Observer berhasil diinisialisasi")
         except ImportError:
             pass
             
@@ -150,41 +105,41 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
                 from smartcash.components.observer.manager_observer import ObserverManager
                 observer_manager = ObserverManager()
                 observer_manager.unregister_group("augmentation_observers")
-                if logger: logger.debug(f"{ICONS['cleanup']} Observer group berhasil dibersihkan")
+                logger.debug(f"{ICONS['cleanup']} Observer group berhasil dibersihkan")
             except ImportError:
                 pass
             
             # Reset flags
             ui_components['augmentation_running'] = False
             
-            # Restore stdout/stderr
-            if 'status' in ui_components:
-                sys.stdout = original_stdout
-                sys.stderr = original_stderr
+            # Kembalikan logging ke default
+            reset_logging()
         
         # Register cleanup function
         ui_components['cleanup'] = cleanup_resources
         
-        if logger: logger.info(f"{ICONS['success']} Augmentation handler berhasil diinisialisasi")
+        logger.info(f"{ICONS['success']} Augmentation handler berhasil diinisialisasi")
         
     except Exception as e:
-        # Tangani error inisialisasi
+        # Pastikan logging dikembalikan ke default
+        reset_logging()
+        
         with ui_components['status']:
             clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error inisialisasi handler: {str(e)}"))
         
-        # Log error jika logger tersedia
+        # Log error
         if logger: logger.error(f"{ICONS.get('error', '❌')} Error inisialisasi augmentation handler: {str(e)}")
     
     return ui_components
 
 def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None):
     """Handler untuk menyimpan konfigurasi dari UI ke file."""
-    logger = ui_components.get('logger')
-    
     from smartcash.ui.utils.constants import ICONS
     from smartcash.ui.utils.alert_utils import create_status_indicator
     from smartcash.ui.dataset.augmentation_config_handler import update_config_from_ui, save_augmentation_config
+    
+    logger = ui_components.get('logger')
     
     try:
         # Update lokasi dari input jika tersedia
@@ -229,8 +184,9 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
 
 def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Any:
     """Setup dan inisialisasi AugmentationManager."""
-    logger = ui_components.get('logger')
     from smartcash.ui.utils.constants import ICONS
+    
+    logger = ui_components.get('logger')
     
     try:
         # Import kelas augmentation service

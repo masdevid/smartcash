@@ -82,11 +82,7 @@ def display_directory_tree(ui_components: Dict[str, Any]):
         ui_components: Dictionary komponen UI
     """
     with ui_components['status']:
-        display(HTML(f"""
-            <div style="margin-top:15px">
-                <h3 style="color:{COLORS['secondary']}; margin:5px 0">📂 Struktur Direktori Project</h3>
-            </div>
-        """))
+        display(create_status_indicator('info', f'📂 Struktur Direktori Project'))
         
         try:
             # Dapatkan direktori project

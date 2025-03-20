@@ -195,7 +195,6 @@ def setup_hyperparameters_handlers(ui_components: Dict[str, Any], env=None, conf
             set_value('loss_params', 1, training.get('obj_loss_weight', 0.5))
             set_value('loss_params', 2, training.get('cls_loss_weight', 0.5))
             
-       
         # Handler untuk save/reset buttons
         def on_save_click(b):
             save_config(ui_components, config, "configs/training_config.yaml", update_config_from_ui, "Hyperparameters")

@@ -17,10 +17,6 @@ def run_cell(cell_name, config_path):
         config_path: Path ke file konfigurasi
     """
     try:
-        # Tambahkan CSS styles untuk UI yang konsisten
-        from smartcash.ui.helpers.ui_helpers import inject_css_styles
-        inject_css_styles()
-        
         # Setup environment dan load config
         from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
         env, config = setup_notebook_environment(cell_name, config_path)

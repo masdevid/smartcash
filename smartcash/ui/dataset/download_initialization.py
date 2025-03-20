@@ -139,7 +139,7 @@ def update_status_panel(ui_components, status_type, message):
         return
         
     try:
-        from smartcash.ui.helpers.ui_helpers import create_info_alert
+        from smartcash.ui.utils.alerts import create_info_alert
         ui_components['status_panel'].value = create_info_alert(message, status_type).value
     except ImportError:
         # Fallback jika create_info_alert tidak tersedia

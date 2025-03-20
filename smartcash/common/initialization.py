@@ -111,7 +111,8 @@ def initialize_config() -> Tuple[bool, Dict[str, Any]]:
                         "preprocessing_config.yaml",
                         "training_config.yaml",
                         "augmentation_config.yaml",
-                        "evaluation_config.yaml"
+                        "evaluation_config.yaml",
+                        "model_config.yaml"
                     ]
                     
                     for cfg_file in configs_to_sync:

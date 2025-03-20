@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_cleanup_handler.py
-Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing
+Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan konfirmasi
 """
 
 from typing import Dict, Any
@@ -52,12 +52,31 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 
             except ImportError:
                 # Lanjutkan tanpa konfirmasi jika fungsi tidak tersedia
-                with ui_components['status']: clear_output(wait=True)
-                perform_cleanup()
+                with ui_components['status']: 
+                    display(create_info_alert(
+                        "Konfirmasi: Anda akan menghapus semua data hasil preprocessing. Lanjutkan?",
+                        "warning", ICONS['warning']
+                    ))
+                    # Tambahkan tombol konfirmasi manual
+                    import ipywidgets as widgets
+                    confirm_btn = widgets.Button(description="Ya, Hapus Data", button_style="danger", icon="trash")
+                    cancel_btn = widgets.Button(description="Batal", button_style="info", icon="times")
+                    
+                    confirm_btn.on_click(lambda b: perform_cleanup())
+                    cancel_btn.on_click(lambda b: cancel_cleanup())
+                    
+                    display(widgets.HBox([confirm_btn, cancel_btn], layout=widgets.Layout(justify_content="center", margin="10px 0")))
+                return
                 
         except Exception as e:
             with ui_components['status']: 
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
+    
+    # Fungsi untuk membatalkan cleanup
+    def cancel_cleanup():
+        with ui_components['status']: 
+            clear_output(wait=True)
+            display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
     
     # Fungsi untuk melakukan cleanup sebenarnya
     def perform_cleanup():
@@ -67,24 +86,50 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         try:
             # Tampilkan status
             with ui_components['status']:
+                clear_output(wait=True)
                 display(create_status_indicator("info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing..."))
             
             # Update status panel
             update_status_panel(ui_components, "info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing...")
             
+            # Notifikasi observer sebelum cleanup
+            try:
+                from smartcash.components.observer import notify
+                notify(
+                    event_type="PREPROCESSING_CLEANUP_START",
+                    sender="preprocessing_handler",
+                    message=f"Memulai pembersihan data preprocessing"
+                )
+            except ImportError:
+                pass
+            
             # Pembersihan dengan dataset manager jika tersedia
             dataset_manager = ui_components.get('dataset_manager')
             if dataset_manager and hasattr(dataset_manager, 'clean_preprocessed'):
                 # Bersihkan semua split sekaligus
-                for split in ['train', 'valid', 'test']: dataset_manager.clean_preprocessed(split)
+                dataset_manager.clean_preprocessed(split='all')
                 success = True
             else:
                 # Fallback manual tanpa dataset manager
                 path = Path(preprocessed_dir)
                 if path.exists():
-                    shutil.rmtree(path)
-                    path.mkdir(parents=True, exist_ok=True)
-                    success = True
+                    import time
+                    start_time = time.time()
+                    
+                    # Coba gunakan storage preprocessed jika tersedia
+                    try:
+                        from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
+                        storage = PreprocessedStorage(preprocessed_dir, logger=logger)
+                        storage.clean_storage()
+                        success = True
+                    except ImportError:
+                        # Fallback: hapus direktori dan buat kembali
+                        shutil.rmtree(path)
+                        path.mkdir(parents=True, exist_ok=True)
+                        success = True
+                        
+                    duration = time.time() - start_time
+                    if logger: logger.info(f"{ICONS['success']} Pembersihan data selesai dalam {duration:.2f} detik")
                 else:
                     with ui_components['status']:
                         display(create_status_indicator("warning", 
@@ -104,6 +149,23 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 ui_components['cleanup_button'].layout.display = 'none'
                 if 'summary_container' in ui_components:
                     ui_components['summary_container'].layout.display = 'none'
+                if 'visualization_buttons' in ui_components:
+                    ui_components['visualization_buttons'].layout.display = 'none'
+                if 'visualize_button' in ui_components:
+                    ui_components['visualize_button'].layout.display = 'none'
+                if 'compare_button' in ui_components:
+                    ui_components['compare_button'].layout.display = 'none'
+                
+                # Notifikasi observer
+                try:
+                    from smartcash.components.observer import notify
+                    notify(
+                        event_type="PREPROCESSING_CLEANUP_END",
+                        sender="preprocessing_handler",
+                        message=f"Pembersihan data preprocessing selesai"
+                    )
+                except ImportError:
+                    pass
                 
         except Exception as e:
             with ui_components['status']:
@@ -113,6 +175,17 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 f"{ICONS.get('error', '❌')} Gagal membersihkan data: {str(e)}")
             
             if logger: logger.error(f"{ICONS.get('error', '❌')} Error saat membersihkan data: {str(e)}")
+            
+            # Notifikasi observer tentang error
+            try:
+                from smartcash.components.observer import notify
+                notify(
+                    event_type="PREPROCESSING_CLEANUP_ERROR",
+                    sender="preprocessing_handler",
+                    message=f"Error saat pembersihan data: {str(e)}"
+                )
+            except ImportError:
+                pass
     
     # Register handler
     ui_components['cleanup_button'].on_click(on_cleanup_click)
@@ -120,7 +193,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     # Tambahkan fungsi ke ui_components
     ui_components.update({
         'on_cleanup_click': on_cleanup_click,
-        'perform_cleanup': perform_cleanup
+        'perform_cleanup': perform_cleanup,
+        'cancel_cleanup': cancel_cleanup
     })
     
     return ui_components

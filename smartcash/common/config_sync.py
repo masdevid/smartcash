@@ -1,6 +1,6 @@
 """
 File: smartcash/common/config_sync.py
-Deskripsi: Utilitas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan strategi resolusi konflik
+Deskripsi: Utilitas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan strategi resolusi konflik dan dukungan pencarian tambahan
 """
 
 import os
@@ -25,26 +25,14 @@ def load_yaml_config(file_path: str) -> Dict[str, Any]:
 
 def save_yaml_config(config: Dict[str, Any], file_path: str) -> bool:
     """Simpan konfigurasi ke file YAML."""
-    try:
-        # Buat directori jika belum ada
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, 'w', encoding='utf-8') as f:
-            yaml.dump(config, f, default_flow_style=False)
-        return True
-    except Exception as e:
-        print(f"❌ Error saat menyimpan {file_path}: {str(e)}")
-        return False
+    try: os.makedirs(os.path.dirname(file_path), exist_ok=True); return yaml.dump(config, open(file_path, 'w', encoding='utf-8'), default_flow_style=False) or True
+    except Exception as e: print(f"❌ Error saat menyimpan {file_path}: {str(e)}"); return False
 
 def create_backup(file_path: str) -> str:
     """Buat backup file dengan timestamp."""
-    timestamp = time.strftime("%Y%m%d_%H%M%S")
-    backup_path = f"{file_path}.{timestamp}.bak"
-    try:
-        shutil.copy2(file_path, backup_path)
-        return backup_path
-    except Exception as e:
-        print(f"⚠️ Error saat backup {file_path}: {str(e)}")
-        return ""
+    timestamp = time.strftime("%Y%m%d_%H%M%S"); backup_path = f"{file_path}.{timestamp}.bak"
+    try: shutil.copy2(file_path, backup_path); return backup_path
+    except Exception as e: print(f"⚠️ Error saat backup {file_path}: {str(e)}"); return ""
 
 def deep_merge_configs(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -52,16 +40,8 @@ def deep_merge_configs(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[st
     - Untuk nested dicts, merge rekursif
     - Untuk list, gabungkan tanpa duplikat
     - Untuk nilai skalar, overlay menang
-    
-    Args:
-        base: Konfigurasi dasar
-        overlay: Konfigurasi yang akan di-overlay
-        
-    Returns:
-        Konfigurasi hasil merge
     """
-    import copy
-    result = copy.deepcopy(base)
+    import copy; result = copy.deepcopy(base)
     
     for key, value in overlay.items():
         # Jika overlay memiliki dict dan base juga, merge rekursif
@@ -74,11 +54,9 @@ def deep_merge_configs(base: Dict[str, Any], overlay: Dict[str, Any]) -> Dict[st
                 unique_items = list(set(result[key] + value))
                 result[key] = sorted(unique_items) if all(isinstance(x, (int, float, str)) for x in unique_items) else unique_items
             # Untuk list kompleks, gabungkan saja
-            else:
-                result[key] = result[key] + value
+            else: result[key] = result[key] + value
         # Selain itu, nilai overlay menang
-        else:
-            result[key] = copy.deepcopy(value)
+        else: result[key] = copy.deepcopy(value)
     
     return result
 
@@ -113,22 +91,18 @@ def sync_config_with_drive(
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
-            if not env_manager.is_drive_mounted:
-                return False, "Google Drive tidak terpasang", {}
+            if not env_manager.is_drive_mounted: return False, "Google Drive tidak terpasang", {}
             drive_path = str(env_manager.drive_path / 'configs' / config_file)
-        except Exception:
-            return False, "Tidak dapat menentukan drive path", {}
+        except Exception: return False, "Tidak dapat menentukan drive path", {}
     
     # Validasi local path
-    if not local_path:
-        local_path = os.path.join('configs', config_file)
+    if not local_path: local_path = os.path.join('configs', config_file)
     
     # Cek keberadaan file
     drive_exists = os.path.exists(drive_path)
     local_exists = os.path.exists(local_path)
     
-    if not drive_exists and not local_exists:
-        return False, f"Tidak ada file konfigurasi ditemukan untuk {config_file}", {}
+    if not drive_exists and not local_exists: return False, f"Tidak ada file konfigurasi ditemukan untuk {config_file}", {}
     
     # Jika hanya satu file ada, salin ke yang lain
     if drive_exists and not local_exists:
@@ -156,12 +130,10 @@ def sync_config_with_drive(
     if create_backup:
         if drive_exists:
             drive_backup = create_backup(drive_path)
-            if logger and drive_backup:
-                logger.info(f"📦 Backup Drive config: {drive_backup}")
+            if logger and drive_backup: logger.info(f"📦 Backup Drive config: {drive_backup}")
         if local_exists:
             local_backup = create_backup(local_path)
-            if logger and local_backup:
-                logger.info(f"📦 Backup local config: {local_backup}")
+            if logger and local_backup: logger.info(f"📦 Backup local config: {local_backup}")
     
     # Terapkan strategi sinkronisasi
     result_config = {}
@@ -196,17 +168,16 @@ def sync_config_with_drive(
         save_yaml_config(result_config, drive_path)
         message = f"Konfigurasi berhasil digabungkan: {config_file}"
     
-    else:
-        return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}
+    else: return False, f"Strategi sinkronisasi tidak dikenal: {sync_strategy}", {}
     
-    if logger:
-        logger.info(f"✅ {message}")
+    if logger: logger.info(f"✅ {message}")
     
     return True, message, result_config
 
 def sync_all_configs(
     drive_configs_dir: Optional[str] = None,
     local_configs_dir: str = 'configs',
+    additional_dirs: Optional[List[str]] = None,  # Parameter tambahan untuk direktori pencarian
     sync_strategy: str = 'drive_priority',
     create_backup: bool = True,
     logger = None
@@ -217,6 +188,7 @@ def sync_all_configs(
     Args:
         drive_configs_dir: Direktori konfigurasi di Drive
         local_configs_dir: Direktori konfigurasi lokal
+        additional_dirs: Direktori tambahan untuk mencari file konfigurasi
         sync_strategy: Strategi sinkronisasi
         create_backup: Buat backup sebelum update
         logger: Logger untuk logging
@@ -230,28 +202,44 @@ def sync_all_configs(
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             if not env_manager.is_drive_mounted:
-                if logger:
-                    logger.warning("⚠️ Google Drive tidak terpasang, tidak dapat sinkronisasi")
+                if logger: logger.warning("⚠️ Google Drive tidak terpasang, tidak dapat sinkronisasi")
                 return {"error": "Google Drive tidak terpasang"}
             drive_configs_dir = str(env_manager.drive_path / 'configs')
         except Exception as e:
-            if logger:
-                logger.error(f"❌ Error mendapatkan path Drive: {str(e)}")
+            if logger: logger.error(f"❌ Error mendapatkan path Drive: {str(e)}")
             return {"error": f"Tidak dapat menentukan drive path: {str(e)}"}
     
     # Pastikan direktori ada
     os.makedirs(drive_configs_dir, exist_ok=True)
     os.makedirs(local_configs_dir, exist_ok=True)
     
+    # Siapkan direktori tambahan untuk dicari
+    if additional_dirs is None: additional_dirs = []
+    
+    # Tambahkan direktori smartcash default jika ada
+    smartcash_configs = '/content/smartcash/configs'
+    if os.path.exists(smartcash_configs) and smartcash_configs not in additional_dirs:
+        additional_dirs.append(smartcash_configs)
+        if logger: logger.info(f"📂 Menambahkan direktori konfigurasi tambahan: {smartcash_configs}")
+    
     # Cari semua file YAML
     yaml_files = set()
     for ext in ['.yaml', '.yml']:
-        for file in os.listdir(local_configs_dir):
-            if file.endswith(ext):
-                yaml_files.add(file)
-        for file in os.listdir(drive_configs_dir):
-            if file.endswith(ext):
-                yaml_files.add(file)
+        # Cek di local_configs_dir
+        if os.path.exists(local_configs_dir):
+            for file in os.listdir(local_configs_dir):
+                if file.endswith(ext): yaml_files.add(file)
+        
+        # Cek di drive_configs_dir
+        if os.path.exists(drive_configs_dir):
+            for file in os.listdir(drive_configs_dir):
+                if file.endswith(ext): yaml_files.add(file)
+        
+        # Cek di direktori tambahan
+        for add_dir in additional_dirs:
+            if os.path.exists(add_dir):
+                for file in os.listdir(add_dir):
+                    if file.endswith(ext): yaml_files.add(file)
     
     # Hasil sinkronisasi
     results = {
@@ -264,6 +252,20 @@ def sync_all_configs(
         try:
             drive_path = os.path.join(drive_configs_dir, config_file)
             local_path = os.path.join(local_configs_dir, config_file)
+            
+            # Cek apakah file ada di direktori tambahan namun tidak ada di lokal
+            additional_path = None
+            for add_dir in additional_dirs:
+                test_path = os.path.join(add_dir, config_file)
+                if os.path.exists(test_path):
+                    additional_path = test_path
+                    break
+            
+            # Jika file tidak ada di direktori lokal tapi ada di direktori tambahan, salin dulu
+            if not os.path.exists(local_path) and additional_path:
+                os.makedirs(os.path.dirname(local_path), exist_ok=True)
+                shutil.copy2(additional_path, local_path)
+                if logger: logger.info(f"📋 Menyalin konfigurasi dari {additional_path} ke {local_path}")
             
             success, message, _ = sync_config_with_drive(
                 config_file=config_file,
@@ -279,21 +281,17 @@ def sync_all_configs(
                 "message": message
             }
             
-            if success:
-                results["success"].append(result)
-            else:
-                results["failure"].append(result)
+            if success: results["success"].append(result)
+            else: results["failure"].append(result)
                 
         except Exception as e:
-            if logger:
-                logger.error(f"❌ Error saat sinkronisasi {config_file}: {str(e)}")
+            if logger: logger.error(f"❌ Error saat sinkronisasi {config_file}: {str(e)}")
             results["failure"].append({
                 "file": config_file,
                 "message": f"Error: {str(e)}"
             })
     
     # Log summary
-    if logger:
-        logger.info(f"🔄 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
+    if logger: logger.info(f"🔄 Sinkronisasi selesai: {len(results['success'])} berhasil, {len(results['failure'])} gagal")
     
     return results

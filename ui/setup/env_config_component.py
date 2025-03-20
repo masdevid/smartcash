@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan progress tracker
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan urutan komponen yang dioptimalkan
 """
 
 import ipywidgets as widgets
@@ -76,19 +76,18 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Gunakan divider dari ui_helpers
     divider = create_divider()
     
-    # Container utama
-    ui = widgets.VBox(
-        [
-            header,
-            widgets.VBox([progress_bar, progress_message], layout=widgets.Layout(margin='10px 0')),
-            colab_panel, 
-            help_box, 
-            divider, 
-            button_group, 
-            status
-        ],
-        layout=widgets.Layout(width='100%', padding='10px')
-    )
+    # Container utama - dengan urutan diubah sesuai permintaan:
+    # 1. `help_panel` (help_box) diletakkan di paling bawah
+    # 2. `progress_bar` dan `progress_message` diletakkan di bawah `colab_panel`
+    ui = widgets.VBox([
+        header,
+        colab_panel,
+        widgets.VBox([progress_bar, progress_message], layout=widgets.Layout(margin='10px 0')),
+        divider, 
+        button_group, 
+        status,
+        help_box  # Posisikan help_box di paling bawah
+    ])
     
     # Komponen UI
     ui_components = {

@@ -115,8 +115,10 @@ def download_from_roboflow(
             # Fallback dengan utils standar jika gagal mendapatkan service
             from smartcash.dataset.services.downloader.download_service import DownloadService
             
-            # Dapatkan output_dir dari UI components
-            output_dir = ui_components.get('data_dir', '/content/data/')
+            # Updated code
+            output_dir = ui_components.get('data_dir', 'data/')
+            if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
+                output_dir = str(env.drive_path / 'SmartCash' / 'data')
             
             download_service = DownloadService(
                 output_dir=output_dir,

@@ -52,7 +52,7 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
     """Setup handler untuk konfirmasi download"""
     try:
         import ipywidgets as widgets
-        from smartcash.ui.utils.alerts import create_status_indicator
+        from smartcash.ui.utils.alert_utils import create_status_indicator
         from smartcash.ui.utils.constants import ICONS, COLORS
         
         # Buat container untuk dialog konfirmasi di atas output
@@ -141,7 +141,7 @@ def setup_confirmation_handlers(ui_components: Dict[str, Any], env=None, config=
                             process_local_upload(ui_components, env, config)
                     except Exception as e:
                         with ui_components['status']:
-                            from smartcash.ui.utils.alerts import create_status_indicator
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
                             display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
                             
                         # Log error

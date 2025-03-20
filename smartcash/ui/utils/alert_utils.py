@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/utils/alerts.py
+File: smartcash/ui/utils/alert_utils.py
 Deskripsi: Komponen UI untuk alerts, info boxes, dan status indicators
 """
 

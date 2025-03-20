@@ -7,7 +7,7 @@ from typing import Dict, Any
 from IPython.display import display, clear_output
 import subprocess
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alerts import create_status_indicator
+from smartcash.ui.utils.alert_utils import create_status_indicator
 
 def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """

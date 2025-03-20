@@ -161,7 +161,7 @@ def setup_ui_component(
     try:
         # Import alert components untuk pesan error/warning
         try:
-            from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
+            from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
             ui_components['create_status_indicator'] = create_status_indicator
             ui_components['create_info_alert'] = create_info_alert
         except ImportError:

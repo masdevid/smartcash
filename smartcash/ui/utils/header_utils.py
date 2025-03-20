@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/utils/headers.py
+File: smartcash/ui/utils/header_utils.py
 Deskripsi: Komponen header dan section title yang menggunakan ui_helpers untuk konsistensi
 """
 from typing import Optional

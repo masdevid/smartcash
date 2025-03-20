@@ -12,8 +12,8 @@ from typing import List, Tuple, Dict, Any
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
 from smartcash.ui.utils.constants import ALERT_STYLES
-from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
-from smartcash.ui.utils.metrics import create_metric_display
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+from smartcash.ui.utils.metric_utils import create_metric_display
 
 def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):
     """Setup handler untuk instalasi dependencies SmartCash."""

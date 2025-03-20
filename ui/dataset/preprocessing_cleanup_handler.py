@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import shutil
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """

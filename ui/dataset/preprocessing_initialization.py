@@ -135,7 +135,7 @@ def update_status_panel(ui_components, status_type, message):
         message: Pesan yang akan ditampilkan
     """
     try:
-        from smartcash.ui.utils.alerts import create_info_alert
+        from smartcash.ui.utils.alert_utils import create_info_alert
         
         if 'status_panel' in ui_components:
             ui_components['status_panel'].value = create_info_alert(message, status_type).value

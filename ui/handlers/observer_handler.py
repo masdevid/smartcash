@@ -94,7 +94,7 @@ def register_ui_observer(
             if message:
                 status = kwargs.get('status', 'info')
                 with output_widget:
-                    from smartcash.ui.utils.alerts import create_status_indicator
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
                     display(create_status_indicator(status, message))
         
         # Register observer
@@ -178,7 +178,7 @@ def create_progress_observer(
             if message and output_widget:
                 status = kwargs.get('status', 'info')
                 with output_widget:
-                    from smartcash.ui.utils.alerts import create_status_indicator
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
                     display(create_status_indicator(status, message))
         
         # Register observer

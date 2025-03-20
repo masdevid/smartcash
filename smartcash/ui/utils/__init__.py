@@ -58,8 +58,8 @@ from smartcash.ui.utils.fallback_utils import (
     handle_download_status
 )
 
-from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert, create_info_box
-from smartcash.ui.utils.headers import create_header, create_section_title
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert, create_info_box
+from smartcash.ui.utils.header_utils import create_header, create_section_title
 
 from smartcash.ui.utils.layouts import (
     STANDARD_LAYOUTS, MAIN_CONTAINER, OUTPUT_WIDGET, BUTTON,
@@ -67,10 +67,10 @@ from smartcash.ui.utils.layouts import (
     HORIZONTAL_GROUP, VERTICAL_GROUP, DIVIDER, CARD,
     TABS, ACCORDION, create_divider
 )
-from smartcash.ui.utils.metrics import (
+from smartcash.ui.utils.metric_utils import (
     create_metric_display, create_result_table, plot_statistics, styled_html
 )
-from smartcash.ui.utils.validators import (
+from smartcash.ui.utils.validator_utils import (
     create_validation_message, show_validation_message, clear_validation_messages,
     validate_required, validate_numeric, validate_integer, validate_min_value,
     validate_max_value, validate_range, validate_min_length, validate_max_length,

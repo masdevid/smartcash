@@ -12,7 +12,7 @@ def setup_hyperparameters_handlers(ui_components: Dict[str, Any], env=None, conf
     try:
         # Import dasar dengan penanganan error minimal
         from smartcash.ui.training_config.config_handler import save_config, reset_config, get_config_manager
-        from smartcash.ui.utils.alerts import create_status_indicator
+        from smartcash.ui.utils.alert_utils import create_status_indicator
         
         # Dapatkan logger jika tersedia
         logger = None

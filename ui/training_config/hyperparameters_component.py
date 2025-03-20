@@ -18,8 +18,8 @@ def create_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
         Dictionary berisi widget UI
     """
     # Import komponen UI
-    from smartcash.ui.utils.headers import create_header
-    from smartcash.ui.utils.alerts import create_info_box
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.constants import COLORS, ICONS
     
     # Header

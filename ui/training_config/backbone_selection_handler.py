@@ -6,7 +6,7 @@ Deskripsi: Handler utama untuk pemilihan model dan konfigurasi layer
 from IPython.display import display, HTML, clear_output
 from typing import Dict, Any, Optional
 
-from smartcash.ui.utils.alerts import create_status_indicator
+from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.training_config.model_config_definitions import get_default_config, get_model_config
 from smartcash.ui.training_config.model_ui_updater import update_ui_for_model_type, update_ui_from_config, update_layer_summary
 from smartcash.ui.training_config.model_config_extractor import extract_config_from_ui

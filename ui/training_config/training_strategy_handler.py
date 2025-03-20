@@ -11,7 +11,7 @@ def setup_training_strategy_handlers(ui_components: Dict[str, Any], env=None, co
     try:
         # Import dengan penanganan error minimal
         from smartcash.ui.training_config.config_handler import save_config, reset_config, get_config_manager
-        from smartcash.ui.utils.alerts import create_status_indicator, create_info_alert
+        from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
         # Dapatkan logger jika tersedia
         logger = None

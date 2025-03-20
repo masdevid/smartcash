@@ -225,7 +225,7 @@ def handle_save_config(b, ui_components: Dict[str, Any], config: Dict[str, Any],
         
     with ui_components['output_box']:
         clear_output(wait=True)
-        from smartcash.ui.utils.alerts import create_status_indicator
+        from smartcash.ui.utils.alert_utils import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
         display(create_status_indicator("info", f"{ICONS['save']} Menyimpan konfigurasi split..."))
         
@@ -286,7 +286,7 @@ def handle_reset_config(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         
     with ui_components['output_box']:
         clear_output(wait=True)
-        from smartcash.ui.utils.alerts import create_status_indicator
+        from smartcash.ui.utils.alert_utils import create_status_indicator
         from smartcash.ui.utils.constants import ICONS
         display(create_status_indicator("info", f"{ICONS['refresh']} Reset konfigurasi split ke default..."))
         

@@ -17,27 +17,28 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary berisi widget UI
     """
-    # Import komponen UI
+    # Import komponen UI yang terstandarisasi
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.info_boxes.download_info import get_download_info
+    from smartcash.ui.utils.layout_utils import MAIN_CONTAINER, OUTPUT_WIDGET, HORIZONTAL_GROUP
     
-    # Header
+    # Header menggunakan komponen standar
     header = create_header(
         f"{ICONS['dataset']} Download Dataset",
         "Download dan persiapan dataset untuk SmartCash"
     )
     
-    # Panel info status
-    status_panel = widgets.HTML(value=f"""
-        <div style="padding: 10px; background-color: {COLORS['alert_info_bg']}; 
-                    color: {COLORS['alert_info_text']}; margin: 10px 0; border-radius: 4px; 
-                    border-left: 4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} Pilih sumber dataset dan konfigurasi download</p>
-        </div>
-    """)
+    # Panel info status menggunakan fungsi standar dari utils
+    from smartcash.ui.utils.alert_utils import create_info_alert
+    status_panel = widgets.HTML(
+        value=create_info_alert(
+            f"Pilih sumber dataset dan konfigurasi download",
+            "info"
+        ).value
+    )
     
-    # Download options
+    # Download options lebih ringkas dengan style standar
     download_options = widgets.RadioButtons(
         options=['Roboflow (Online)', 'Local Data (Upload)'],
         description='Sumber:',
@@ -93,57 +94,60 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         )
     ])
     
-    # Tombol aksi
+    # Tombol aksi menggunakan helper standar
+    from smartcash.ui.helpers.ui_helpers import create_button_group
     download_button = widgets.Button(
         description='Download Dataset',
         button_style='primary',
         icon='download'
     )
     
-    # Progress bar - Ubah ke full width
+    # Progress container dengan layout standar
     progress_bar = widgets.IntProgress(
         value=0,
         min=0,
         max=100,
         description='Download: 0%',
-        bar_style='',
-        orientation='horizontal',
-        style={'margin-top': '10px'},
-        layout=widgets.Layout(width='75%'))
-    
-    # Label untuk progress
-    progress_label = widgets.Label('Siap untuk download dataset')
-    # Status output
-    status = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd',
-            min_height='100px',
-            max_height='300px',
-            margin='10px 0',
-            padding='10px',
-            overflow='auto'
-        )
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='75%', visibility='visible')
     )
     
-    # Panel info bantuan
+    progress_label = widgets.Label('Siap untuk download dataset')
+    progress_container = widgets.HBox(
+        [progress_bar, progress_label], 
+        layout=HORIZONTAL_GROUP
+    )
+    
+    # Status output dengan layout standar
+    status = widgets.Output(layout=OUTPUT_WIDGET)
+    
+    # Panel info bantuan dengan komponen standar
     help_panel = get_download_info()
-    # Container untuk download settings (akan berubah berdasarkan pilihan)
+    
+    # Container untuk download settings yang menggunakan styling konsisten
     download_settings_container = widgets.VBox([roboflow_settings])
     
-    # Rakit komponen UI
-    ui = widgets.VBox([
-        header,
-        status_panel,
-        download_options,
-        download_settings_container,
-        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
-        download_button,
-        widgets.HBox([progress_bar, progress_label], layout=widgets.Layout(width='100%', margin='10px 0')),
-        status,
-        help_panel
-    ])
+    # Tambahkan separator standar
+    from smartcash.ui.helpers.ui_helpers import create_divider
+    separator = create_divider()
     
-    # Komponen UI
+    # Rakit komponen UI dengan layout konsisten
+    ui = widgets.VBox(
+        [
+            header,
+            status_panel,
+            download_options,
+            download_settings_container,
+            separator,
+            download_button,
+            progress_container,
+            status,
+            help_panel
+        ],
+        layout=MAIN_CONTAINER
+    )
+    
+    # Komponen UI dengan penamaan konsisten
     ui_components = {
         'ui': ui,
         'header': header,
@@ -155,6 +159,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'download_button': download_button,
         'progress_bar': progress_bar,
         'progress_label': progress_label,
+        'progress_container': progress_container,
         'status': status,
         'status_output': status,  # Alias untuk kompatibilitas
         'help_panel': help_panel,

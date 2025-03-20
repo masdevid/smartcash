@@ -1,45 +1,45 @@
 """
 File: smartcash/ui/dataset/download_ui_handler.py
-Deskripsi: Handler UI untuk proses download dataset dengan pemisahan progress handler
+Deskripsi: Handler UI untuk proses download dataset dengan integrasi utils standar untuk observer dan progress
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
-from IPython.display import display, HTML
+from IPython.display import display
 
-from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
 
-
 def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk events UI download dataset."""
+    """Setup handler untuk events UI download dataset dengan utils standar."""
+    # Dapatkan logger dari UI components
+    logger = ui_components.get('logger')
+    
     try:
-        # Validasi input
+        # Validasi input dengan utils standar
+        from smartcash.ui.handlers.error_handler import handle_ui_error
+        
         if not isinstance(ui_components.get('download_options'), widgets.RadioButtons):
-            from smartcash.ui.dataset.download_initialization import update_status_panel
+            from smartcash.ui.utils.fallback_utils import update_status_panel
             update_status_panel(ui_components, "error", "Download options widget tidak valid")
             return ui_components
         
-        # Cek apakah sudah ada API key dari Google Secret
-        has_secret_key = False
-        try:
-            from google.colab import userdata
-            secret_key = userdata.get('ROBOFLOW_API_KEY')
-            has_secret_key = bool(secret_key)
-        except ImportError:
-            pass
+        # Cek apakah sudah ada API key dari Google Secret dengan utils yang terintegrasi
+        from smartcash.ui.utils.fallback_utils import import_with_fallback
         
+        # Definisikan handler perubahan opsi download yang lebih terstruktur
         def on_download_option_change(change):
-            """Handler untuk perubahan opsi download."""
+            """Handler untuk perubahan opsi download dengan utils standar."""
             if change['name'] != 'value':
                 return
                 
+            # Import komponen API key info dari utils
+            from smartcash.ui.dataset.download_initialization import get_api_key_info, update_status_panel
+                
             if change['new'] == 'Roboflow (Online)':
-                # Gunakan fungsi get_api_key_info untuk mendapatkan info API
-                from smartcash.ui.dataset.download_initialization import get_api_key_info
+                # Dapatkan info API key dengan utils standar
                 api_key_info = get_api_key_info(ui_components)
                 
-                # Update container dengan settings dan info API
+                # Update container dengan settings Roboflow
                 if 'download_settings_container' in ui_components and 'roboflow_settings' in ui_components:
                     ui_components['download_settings_container'].children = [
                         ui_components['roboflow_settings'], 
@@ -47,56 +47,63 @@ def setup_ui_handlers(ui_components: Dict[str, Any], env=None, config=None) -> D
                     ]
                     
                     # Jika ada secret key, pastikan field API tetap disembunyikan
-                    if has_secret_key and hasattr(ui_components['roboflow_settings'], 'children') and len(ui_components['roboflow_settings'].children) > 0:
-                        ui_components['roboflow_settings'].children[0].layout.display = 'none'
+                    try:
+                        from google.colab import userdata
+                        secret_key = userdata.get('ROBOFLOW_API_KEY')
+                        if secret_key and hasattr(ui_components['roboflow_settings'], 'children') and len(ui_components['roboflow_settings'].children) > 0:
+                            ui_components['roboflow_settings'].children[0].layout.display = 'none'
+                    except ImportError:
+                        pass
                 
-                from smartcash.ui.dataset.download_initialization import update_status_panel
-                if has_secret_key:
-                    update_status_panel(ui_components, "info", "Mempersiapkan download dari Roboflow dengan API key dari Google Secret")
-                else:
-                    update_status_panel(ui_components, "info", "Mempersiapkan download dari Roboflow")
+                update_status_panel(ui_components, "info", f"{ICONS['info']} Mempersiapkan download dari Roboflow")
             
             elif change['new'] == 'Local Data (Upload)':
                 # Ganti ke komponen upload lokal
                 if 'download_settings_container' in ui_components and 'local_upload' in ui_components:
-                    ui_components['download_settings_container'].children = [
-                        ui_components['local_upload']
-                    ]
+                    ui_components['download_settings_container'].children = [ui_components['local_upload']]
                 
-                from smartcash.ui.dataset.download_initialization import update_status_panel
-                update_status_panel(ui_components, "info", "Siap untuk upload dataset lokal")
+                update_status_panel(ui_components, "info", f"{ICONS['upload']} Siap untuk upload dataset lokal")
         
-        # Register event handler
+        # Register event handler dengan validasi
         if 'download_options' in ui_components:
             ui_components['download_options'].observe(on_download_option_change, names='value')
         
-        # Trigger initial event handler based on selected option
+        # Trigger inisialisasi awal berdasarkan opsi yang dipilih
         if ui_components.get('download_options') and ui_components['download_options'].value == 'Roboflow (Online)':
             on_download_option_change({'name': 'value', 'new': 'Roboflow (Online)'})
         
-        # Setup progress tracking with observer
-        # Periksa apakah komponen progress tersedia
-        has_progress_components = (
-            'progress_bar' in ui_components and 
-            'progress_label' in ui_components and
-            'status_output' in ui_components
-        )
+        # Setup event observers untuk tracking progress dengan utils standar
+        try:
+            # Setup observer standard di component handlers
+            from smartcash.ui.handlers.observer_handler import register_ui_observer
+            
+            # Register untuk berbagai event download
+            events = [
+                "DOWNLOAD_START", "DOWNLOAD_PROGRESS", "DOWNLOAD_COMPLETE", "DOWNLOAD_ERROR",
+                "EXPORT_START", "EXPORT_PROGRESS", "EXPORT_COMPLETE", "EXPORT_ERROR",
+                "UPLOAD_START", "UPLOAD_PROGRESS", "UPLOAD_COMPLETE", "UPLOAD_ERROR"
+            ]
+            
+            # Register observer untuk semua event
+            for event in events:
+                register_ui_observer(ui_components, event, 'status')
+                
+            if logger: logger.info(f"{ICONS['success']} Observer untuk {len(events)} events berhasil didaftarkan")
+        except ImportError as e:
+            if logger: logger.warning(f"{ICONS['warning']} Observer tidak tersedia: {str(e)}")
         
-        if has_progress_components:
-            # Inisialisasi progress handler yang sudah dipindahkan ke handler terpisah
+        # Setup progress handler dengan komponen standar jika belum ada
+        if 'progress_handler' not in ui_components:
             try:
                 from smartcash.ui.handlers.download_progress_handler import DownloadProgressHandler
-                progress_handler = DownloadProgressHandler(ui_components)
-                ui_components['progress_handler'] = progress_handler
-                
-                logger = ui_components.get('logger') or get_logger("download_ui_handler")
-                logger.info(f"{ICONS['success']} Handler progres download berhasil diinisialisasi")
+                ui_components['progress_handler'] = DownloadProgressHandler(ui_components)
+                if logger: logger.info(f"{ICONS['success']} Progress handler berhasil diinisialisasi")
             except ImportError as e:
-                logger = ui_components.get('logger') or get_logger("download_ui_handler")
-                logger.warning(f"{ICONS['warning']} Tidak dapat memuat DownloadProgressHandler: {str(e)}")
+                if logger: logger.warning(f"{ICONS['warning']} Progress handler tidak tersedia: {str(e)}")
             
     except Exception as e:
-        from smartcash.ui.dataset.download_initialization import update_status_panel
-        update_status_panel(ui_components, "error", f"Error setup UI handlers: {str(e)}")
+        # Handle error dengan komponen standar
+        from smartcash.ui.handlers.error_handler import handle_ui_error
+        handle_ui_error(e, ui_components.get('status'), True, "Error setup UI handlers")
     
     return ui_components

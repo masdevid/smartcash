@@ -1,12 +1,11 @@
 """
 File: smartcash/ui/dataset/roboflow_download_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow yang disesuaikan untuk menggunakan output_dir dan opsi backup opsional
+Deskripsi: Handler untuk download dataset dari Roboflow dengan integrasi utils standar dan dukungan backup opsional
 """
 
 from typing import Dict, Any, Optional
-from IPython.display import display, HTML, clear_output
+from IPython.display import display, clear_output
 
-from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.common.exceptions import DatasetError
 
 def download_from_roboflow(
@@ -15,7 +14,7 @@ def download_from_roboflow(
     config=None
 ) -> Dict[str, Any]:
     """
-    Download dataset dari Roboflow menggunakan DatasetManager.
+    Download dataset dari Roboflow menggunakan DatasetManager dan utils standar.
     
     Args:
         ui_components: Dictionary berisi widget UI
@@ -28,97 +27,123 @@ def download_from_roboflow(
     Raises:
         DatasetError: Jika terjadi error saat download
     """
+    # Import komponen UI standar
+    from smartcash.ui.utils.constants import ICONS
+    from smartcash.ui.utils.alert_utils import create_info_alert
+    from smartcash.ui.utils.fallback_utils import update_status_panel
+    from smartcash.ui.handlers.error_handler import handle_ui_error
+    
     status_widget = ui_components.get('status')
+    logger = ui_components.get('logger')
     
     try:
-        # Ekstrak parameter dari UI components
+        # Ekstrak parameter dari UI components dengan validasi standar
         if 'roboflow_settings' not in ui_components or not hasattr(ui_components['roboflow_settings'], 'children'):
             raise DatasetError("Komponen roboflow_settings tidak ditemukan")
             
         settings = ui_components['roboflow_settings'].children
         
-        # Memastikan indeks valid
+        # Memastikan indeks valid dengan utils standar
         if len(settings) < 4:
             raise DatasetError("Komponen roboflow_settings tidak lengkap")
             
-        # Ekstrak nilai dari komponen UI
-        api_key = settings[0].value
-        workspace = settings[1].value
-        project = settings[2].value
-        version = settings[3].value
+        # Ekstrak nilai dari komponen UI dengan validasi standar
+        api_key = settings[0].value if len(settings) > 0 else ""
+        workspace = settings[1].value if len(settings) > 1 else "smartcash-wo2us"
+        project = settings[2].value if len(settings) > 2 else "rupiah-emisi-2022"
+        version = settings[3].value if len(settings) > 3 else "3"
         format = "yolov5pytorch"  # Default format
         
-        # Cek apakah backup diaktifkan (defaultnya False)
+        # Cek apakah backup diaktifkan dengan standar
         backup_enabled = False
         if len(settings) > 4 and hasattr(settings[4], 'value'):
             backup_enabled = settings[4].value
         
-        # Cek API key dari Google Secret jika tidak diisi
+        # Cek API key dari Google Secret dengan utils standar
         if not api_key:
-            try:
-                from google.colab import userdata
-                api_key = userdata.get('ROBOFLOW_API_KEY')
-                if not api_key:
-                    raise DatasetError("API Key Roboflow diperlukan. Isi field API Key atau tambahkan sebagai Google Secret.")
-            except ImportError:
-                # Tidak berjalan di Google Colab
-                raise DatasetError("API Key Roboflow diperlukan")
+            from smartcash.ui.utils.fallback_utils import import_with_fallback
+            userdata_module = import_with_fallback('google.colab.userdata')
+            
+            if userdata_module:
+                api_key = userdata_module.get('ROBOFLOW_API_KEY')
+                
+            if not api_key:
+                raise DatasetError("API Key Roboflow diperlukan. Isi field API Key atau tambahkan sebagai Google Secret.")
         
-        # Tampilkan status loading
+        # Tampilkan status loading dengan utils standar
         if status_widget:
             with status_widget:
                 clear_output(wait=True)
-                display(HTML(f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                              color:{COLORS['alert_info_text']}; 
-                              border-radius:4px; margin:5px 0;">
-                        <p style="margin:5px 0">{ICONS['download']} Memulai download dataset dari Roboflow...</p>
-                        <p style="margin:5px 0">Workspace: {workspace}, Project: {project}, Version: {version}</p>
-                        <p style="margin:5px 0">Backup: {'Aktif' if backup_enabled else 'Tidak aktif'}</p>
-                    </div>
-                """))
+                display(create_info_alert(
+                    f"{ICONS['download']} Memulai download dataset dari Roboflow...\nWorkspace: {workspace}, Project: {project}, Version: {version}\nBackup: {'Aktif' if backup_enabled else 'Tidak aktif'}",
+                    "info"
+                ))
         
-        # Update progress bar jika ada
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 10
-            ui_components['progress_bar'].description = 'Download: 10%'
+        # Update status panel dengan utils standar 
+        update_status_panel(ui_components, "info", f"{ICONS['download']} Memulai download dari Roboflow ({project} v{version})")
         
-        # Dapatkan dataset_manager, prioritaskan yang sudah ada
-        dataset_manager = ui_components.get('dataset_manager')
+        # Update progress dengan progress handler atau langsung
+        if 'progress_handler' in ui_components:
+            ui_components['progress_handler'].update_progress_bar(10, 100, "Inisialisasi download...")
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 10
+                ui_components['progress_bar'].description = 'Download: 10%'
+        
+        # Dapatkan dataset_manager dengan utils standar
+        from smartcash.ui.utils.fallback_utils import get_dataset_manager
+        
+        dataset_manager = ui_components.get('dataset_manager') or get_dataset_manager(config, logger)
         
         if not dataset_manager:
             from smartcash.dataset.manager import DatasetManager
-            # Gunakan config dari parameter jika ada
             dataset_manager = DatasetManager(config=config)
-            # Tambahkan ke ui_components untuk penggunaan berikutnya
             ui_components['dataset_manager'] = dataset_manager
         
-        # Update progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 30
-            ui_components['progress_bar'].description = 'Download: 30%'
+        # Update progress dengan progress handler atau langsung
+        if 'progress_handler' in ui_components:
+            ui_components['progress_handler'].update_progress_bar(30, 100, "Mempersiapkan download...")
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 30
+                ui_components['progress_bar'].description = 'Download: 30%'
         
         # Mendapatkan download_service dari dataset_manager
         try:
             download_service = dataset_manager.get_service('downloader')
         except Exception as e:
-            # Jika gagal mendapatkan download_service dari manager, buat langsung
+            # Fallback dengan utils standar jika gagal mendapatkan service
             from smartcash.dataset.services.downloader.download_service import DownloadService
             
-            # Dapatkan output_dir dari ui_components
+            # Dapatkan output_dir dari UI components
             output_dir = ui_components.get('data_dir', 'data/')
             
-            # Gunakan parameter 'output_dir' bukan 'data_dir'
             download_service = DownloadService(
                 output_dir=output_dir,
                 config=config,
-                logger=dataset_manager.logger if hasattr(dataset_manager, 'logger') else None
+                logger=logger
             )
         
-        # Update progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 40
-            ui_components['progress_bar'].description = 'Download: 40%'
+        # Update progress dengan progress handler atau langsung
+        if 'progress_handler' in ui_components:
+            ui_components['progress_handler'].update_progress_bar(40, 100, "Mendownload dataset...")
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 40
+                ui_components['progress_bar'].description = 'Download: 40%'
+            
+        # Notifikasi observer dengan observer standar
+        try:
+            from smartcash.components.observer import notify
+            notify(
+                event_type="DOWNLOAD_PROGRESS",
+                sender="download_handler",
+                message=f"Mendownload dataset {project} (v{version})",
+                progress=40,
+                total=100
+            )
+        except ImportError:
+            pass
             
         # Download menggunakan download_service dengan parameter backup_existing
         result = download_service.download_from_roboflow(
@@ -133,10 +158,26 @@ def download_from_roboflow(
         # Export ke folder data standar
         output_dir = ui_components.get('data_dir', 'data/')
         
-        # Update progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 80
-            ui_components['progress_bar'].description = 'Download: 80%'
+        # Update progress dengan utils standar
+        if 'progress_handler' in ui_components:
+                ui_components['progress_handler'].update_progress_bar(80, 100, "Mengekspor dataset...")
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 80
+                ui_components['progress_bar'].description = 'Download: 80%'
+            
+        # Notifikasi observer dengan observer standar
+        try:
+            from smartcash.components.observer import notify
+            notify(
+                event_type="EXPORT_START",
+                sender="download_handler",
+                message=f"Mengekspor dataset {project} (v{version}) ke struktur lokal",
+                progress=80,
+                total=100
+            )
+        except ImportError:
+            pass
             
         # Export ke struktur lokal standar (dengan backup optional)
         export_result = download_service.export_to_local(
@@ -145,47 +186,36 @@ def download_from_roboflow(
             backup_existing=backup_enabled
         )
         
-        # Update progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 90
-            ui_components['progress_bar'].description = 'Download: 90%'
+        # Update progress dengan utils standar
+        if 'progress_handler' in ui_components:
+            ui_components['progress_handler'].update_progress_bar(100, 100, "Download selesai!")
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 100
+                ui_components['progress_bar'].description = 'Download: 100%'
             
-        # Tampilkan hasil sukses
+        # Tampilkan hasil sukses dengan utils standar
         if status_widget:
             with status_widget:
                 clear_output(wait=True)
-                display(HTML(f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
-                              color:{COLORS['alert_success_text']}; 
-                              border-radius:4px; margin:5px 0;">
-                        <p style="margin:5px 0">{ICONS['success']} Dataset berhasil didownload!</p>
-                        <p>Project: {project} (v{version}) dari workspace {workspace}</p>
-                        <p>Format: {format}</p>
-                        <p>Output: {output_dir}</p>
-                        <p>Files: {export_result.get('copied', 0)} file disalin</p>
-                    </div>
-                """))
+                display(create_info_alert(
+                    f"{ICONS['success']} Dataset berhasil didownload!\nProject: {project} (v{version}) dari workspace {workspace}\nFormat: {format}\nOutput: {output_dir}\nFiles: {export_result.get('copied', 0)} file disalin",
+                    "success"
+                ))
         
-        # Update progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_bar'].description = 'Download: 100%'
+        # Update status panel dengan utils standar
+        update_status_panel(ui_components, "success", f"{ICONS['success']} Dataset berhasil didownload ke {output_dir}")
             
-        # Notifikasi selesai jika ada observer
-        if 'observer_manager' in ui_components:
-            try:
-                from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-                EventDispatcher.notify(
-                    event_type="DOWNLOAD_COMPLETE",
-                    sender="download_handler",
-                    message=f"Download dataset dari Roboflow selesai: {project} (v{version})"
-                )
-            except ImportError:
-                pass
-        
-        # Update status panel jika tersedia
-        from smartcash.ui.dataset.download_initialization import update_status_panel
-        update_status_panel(ui_components, "success", f"✅ Dataset berhasil didownload ke {output_dir}")
+        # Notifikasi selesai dengan observer standar
+        try:
+            from smartcash.components.observer import notify
+            notify(
+                event_type="DOWNLOAD_COMPLETE",
+                sender="download_handler",
+                message=f"Download dataset dari Roboflow selesai: {project} (v{version})"
+            )
+        except ImportError:
+            pass
         
         return {
             'status': 'success',
@@ -195,45 +225,53 @@ def download_from_roboflow(
         }
         
     except DatasetError as e:
-        # Dataset manager sudah menangani banyak exceptions dengan DatasetError
+        # Dataset manager error dengan utils standar
         if status_widget:
             with status_widget:
                 clear_output(wait=True)
-                display(HTML(f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                              color:{COLORS['alert_danger_text']}; 
-                              border-radius:4px; margin:5px 0;">
-                        <p style="margin:5px 0">{ICONS['error']} {str(e)}</p>
-                    </div>
-                """))
+                display(create_info_alert(f"{ICONS['error']} {str(e)}", "error"))
+        
+        # Update status panel dengan utils standar
+        update_status_panel(ui_components, "error", f"{ICONS['error']} Error: {str(e)}")
+        
+        # Reset progress dengan utils standar
+        if 'progress_handler' in ui_components:
+            ui_components['progress_handler'].reset_progress_bar()
+        else:
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 0
                 
-        # Update status panel jika tersedia
+        # Notifikasi error dengan observer standar
         try:
-            from smartcash.ui.dataset.download_initialization import update_status_panel
-            update_status_panel(ui_components, "error", f"❌ Error: {str(e)}")
+            from smartcash.components.observer import notify
+            notify(
+                event_type="DOWNLOAD_ERROR",
+                sender="download_handler",
+                message=f"Error download dataset: {str(e)}"
+            )
         except ImportError:
             pass
             
         raise
         
     except Exception as e:
-        # Tangani exception lain
+        # Tangani exception lain dengan utils standar
         error_message = f"Error saat download dataset: {str(e)}"
-        if status_widget:
-            with status_widget:
-                clear_output(wait=True)
-                display(HTML(f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                              color:{COLORS['alert_danger_text']}; 
-                              border-radius:4px; margin:5px 0;">
-                        <p style="margin:5px 0">{ICONS['error']} {error_message}</p>
-                    </div>
-                """))
-                
-        # Update status panel jika tersedia
+        
+        # Handle error dengan utils standar
+        handle_ui_error(e, status_widget, True, error_message)
+        
+        # Update status panel dengan utils standar
+        update_status_panel(ui_components, "error", f"{ICONS['error']} Error: {error_message}")
+        
+        # Notifikasi error dengan observer standar
         try:
-            from smartcash.ui.dataset.download_initialization import update_status_panel
-            update_status_panel(ui_components, "error", f"❌ Error: {error_message}")
+            from smartcash.components.observer import notify
+            notify(
+                event_type="DOWNLOAD_ERROR",
+                sender="download_handler",
+                message=error_message
+            )
         except ImportError:
             pass
             

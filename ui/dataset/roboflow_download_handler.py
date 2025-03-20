@@ -118,7 +118,7 @@ def download_from_roboflow(
             # Updated code
             output_dir = ui_components.get('data_dir', 'data/')
             if env and hasattr(env, 'is_drive_mounted') and env.is_drive_mounted and hasattr(env, 'drive_path'):
-                output_dir = str(env.drive_path / 'SmartCash' / 'data')
+                output_dir = str(env.drive_path / 'data')
             
             download_service = DownloadService(
                 output_dir=output_dir,

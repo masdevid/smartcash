@@ -121,11 +121,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any]):
     }
     
     with ui_components['status']:
-        display(HTML(f"""
-            <div style="margin-top:10px;">
-                <h3 style="color:{COLORS['secondary']}; margin:5px 0">🔗 Membuat Symlinks</h3>
-            </div>
-        """))
+        display(create_status_indicator('info', '🔗 Membuat symlinks...'))
     
     for local_name, target_path in symlinks.items():
         with ui_components['status']:
@@ -163,11 +159,7 @@ def sync_configs(drive_path: Path, ui_components: Dict[str, Any]):
     drive_configs.mkdir(parents=True, exist_ok=True)
     
     with ui_components['status']:
-        display(HTML(f"""
-            <div style="margin-top:10px;">
-                <h3 style="color:{COLORS['secondary']}; margin:5px 0">{ICONS['processing']} Sinkronisasi Konfigurasi</h3>
-            </div>
-        """))
+        display(create_status_indicator('info', f'{ICONS["processing"]} Sinkronisasi Konfigurasi'))
     
     # Cek file YAML di lokal dan drive
     local_yamls = list(local_configs.glob('*.yaml')) + list(local_configs.glob('*.yml'))

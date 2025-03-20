@@ -205,7 +205,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             if failed_packages:
                 update_status_panel(ui_components, f"⚠️ Instalasi selesai dengan {len(failed_packages)} error", 'warning')
             else:
-                update_status_panel(ui_components, f"✅ Semua {installed_count} package berhasil diinstall", 'success')
+                update_status_panel(ui_components, f"Semua {installed_count} package berhasil diinstall", 'success')
             
             # Buat widget metrics untuk ringkasan
             display(create_metric_display("✅ Berhasil", installed_count, is_good=installed_count > 0))

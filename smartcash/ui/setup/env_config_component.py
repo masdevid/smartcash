@@ -19,9 +19,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Import komponen UI dari ui_helpers
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.alert_utils import create_info_box
-    from smartcash.ui.utils.constants import ICONS, COLORS
     from smartcash.ui.helpers.ui_helpers import create_button_group, create_divider
+    from smartcash.ui.info_boxes.environment_info import get_environment_info
     
     # Header
     header = create_header(
@@ -33,16 +32,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
     
     # Panel info bantuan dengan menggunakan komponen standar
-    help_box = create_info_box(
-        "Informasi Konfigurasi", 
-        """<p>Konfigurasi environment akan memastikan project SmartCash berjalan dengan baik di lingkungan saat ini.</p>
-        <ul>
-            <li>Di Google Colab: Sebaiknya hubungkan ke Google Drive untuk menyimpan dataset dan model</li>
-            <li>Di lingkungan lokal: Pastikan struktur direktori telah dibuat</li>
-        </ul>""",
-        style="info",
-        collapsed=True
-    )
+    help_box = get_environment_info()
     
     # Gunakan create_button_group dari ui_helpers
     buttons = [

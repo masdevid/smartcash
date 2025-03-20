@@ -11,9 +11,9 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Import komponen dari ui_helpers untuk konsistensi
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.helpers.ui_helpers import create_button_group, create_divider, create_spacing
+    from smartcash.ui.helpers.ui_helpers import create_button_group, create_spacing
+    from smartcash.ui.info_boxes.dependencies_info import get_dependencies_info
     
     # Header dengan komponen standar
     header = create_header(
@@ -181,22 +181,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Info box menggunakan komponen standar
-    info_box = create_info_box(
-        "Tentang Package Installation",
-        f"""
-        <p>Package diurutkan instalasi dari kecil ke besar:</p>
-        <ol>
-            <li>Notebook tools (ipywidgets, tqdm)</li>
-            <li>Utility packages (pyyaml, termcolor)</li>
-            <li>Data processing (matplotlib, pandas)</li>
-            <li>Computer vision (OpenCV, Albumentations)</li>
-            <li>Machine learning (PyTorch)</li>
-        </ol>
-        <p><strong>{ICONS.get('warning', '⚠️')} Catatan:</strong> Instalasi PyTorch mungkin memerlukan waktu lebih lama</p>
-        """,
-        'info',
-        collapsed=True
-    )
+    info_box = get_dependencies_info()
     
     # Gunakan komponen spacing dari ui_helpers
     spacing = create_spacing('15px')

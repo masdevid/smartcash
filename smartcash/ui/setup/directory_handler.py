@@ -76,7 +76,7 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
 
 def display_directory_tree(ui_components: Dict[str, Any]):
     """
-    Tampilkan struktur direktori dalam format tree dengan file_utils.
+    Tampilkan struktur direktori dalam format tree yang hanya menampilkan folder utama project.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -89,14 +89,63 @@ def display_directory_tree(ui_components: Dict[str, Any]):
         """))
         
         try:
-            # Gunakan utility directory_tree dari file_utils untuk menampilkan tree
+            # Dapatkan direktori project
             project_path = Path.cwd()
-            tree_html = directory_tree(
-                project_path, 
-                max_depth=2,
-                exclude_patterns=[r'\.git', r'\.vscode', r'__pycache__', r'\.ipynb_checkpoints'],
-                include_only=None
-            )
+            tree_html = create_project_tree(project_path)
             display(HTML(tree_html))
         except Exception as e:
             display(create_status_indicator('warning', f"Tidak dapat menampilkan struktur direktori: {str(e)}"))
+
+def create_project_tree(project_path: Path) -> str:
+    """
+    Buat struktur direktori yang hanya menampilkan folder utama project.
+    
+    Args:
+        project_path: Path direktori project
+        
+    Returns:
+        HTML string berisi tree direktori
+    """
+    tree = f"""<pre style="margin:0; padding:10px; background:{COLORS['light']}; 
+                        font-family:monospace; color:{COLORS['dark']}; 
+                        border-radius:4px; overflow:auto; border:1px solid {COLORS['border']}">
+"""
+    tree += f"<span style='color:{COLORS['primary']}; font-weight:bold;'>{project_path.name}/</span>\n"
+    
+    # Dapatkan folder-folder yang relevan
+    important_dirs = ["data", "configs", "runs", "logs", "exports", "checkpoints"]
+    
+    # Fungsi untuk mendapatkan simbol dan warna berdasarkan jenis direktori
+    def get_dir_symbol(dir_name):
+        if dir_name == "data":
+            return "📊", "#e91e63"  # Pink
+        elif dir_name == "configs":
+            return "⚙️", "#9c27b0"   # Purple
+        elif dir_name == "runs":
+            return "🏃", "#2196f3"   # Blue
+        elif dir_name == "logs":
+            return "📝", "#4caf50"   # Green
+        elif dir_name == "exports":
+            return "📦", "#ff9800"   # Orange
+        elif dir_name == "checkpoints":
+            return "💾", "#795548"   # Brown
+        else:
+            return "📁", COLORS['primary']
+    
+    # Tampilkan direktori penting terlebih dahulu
+    for dir_name in important_dirs:
+        dir_path = project_path / dir_name
+        if dir_path.exists() and dir_path.is_dir():
+            symbol, color = get_dir_symbol(dir_name)
+            tree += f"├─ <span style='color:{color}; font-weight:bold;'>{symbol} {dir_name}/</span>\n"
+    
+    # Tampilkan direktori lainnya
+    other_dirs = [d for d in project_path.iterdir() 
+                  if d.is_dir() and not d.name.startswith('.') and d.name not in important_dirs]
+    
+    for dir_path in sorted(other_dirs):
+        symbol, color = get_dir_symbol(dir_path.name)
+        tree += f"├─ <span style='color:{color};'>{symbol} {dir_path.name}/</span>\n"
+    
+    tree += "</pre>"
+    return tree

@@ -116,7 +116,7 @@ def download_from_roboflow(
             from smartcash.dataset.services.downloader.download_service import DownloadService
             
             # Dapatkan output_dir dari UI components
-            output_dir = ui_components.get('data_dir', 'data/')
+            output_dir = ui_components.get('data_dir', '/content/data/')
             
             download_service = DownloadService(
                 output_dir=output_dir,

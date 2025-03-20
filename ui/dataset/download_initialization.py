@@ -25,7 +25,7 @@ def setup_initialization(ui_components: Dict[str, Any], env=None, config=None) -
         
         # Gunakan drive path jika tersedia
         if drive_mounted and drive_path:
-            data_dir = f"{drive_path}/data"
+            data_dir = f"{drive_path}/SmartCash/data"
             if logger: logger.info(f"{ICONS['folder']} Menggunakan Google Drive untuk penyimpanan dataset: {data_dir}")
             update_status_panel(ui_components, "info", f"Dataset akan didownload ke: {data_dir}")
         

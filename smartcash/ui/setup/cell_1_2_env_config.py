@@ -13,6 +13,4 @@ try:
     # Panggil fungsi koordinator yang sudah terintegrasi
     ui_components = setup_environment_config()
     
-    # Tampilkan UI
-    display_ui(ui_components)
 except ImportError as e: create_alert(e, 'error')

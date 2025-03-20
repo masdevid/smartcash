@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/dependency_installer_handler.py
-Deskripsi: Handler untuk instalasi dependencies SmartCash dengan penggunaan komponen UI yang sudah ada
+Deskripsi: Handler untuk instalasi dependencies SmartCash dengan integrasi UI utils, handlers, dan helpers
 """
 
 import sys
@@ -8,15 +8,23 @@ import re
 import time
 import subprocess
 from pathlib import Path
-from typing import List, Tuple, Dict, Any
+from typing import List, Tuple, Dict, Any, Callable
 from IPython.display import display, clear_output
 from tqdm.auto import tqdm
-from smartcash.ui.utils.constants import ALERT_STYLES
-from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-from smartcash.ui.utils.metric_utils import create_metric_display
 
-def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None):
-    """Setup handler untuk instalasi dependencies SmartCash."""
+def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: Dict[Any, Any] = None) -> Dict[str, Any]:
+    """Setup handler untuk instalasi dependencies SmartCash dengan integrasi UI utils."""
+    
+    # Import utils dan handlers untuk konsistensi dan mengurangi duplikasi
+    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+    from smartcash.ui.utils.metric_utils import create_metric_display
+    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+    from smartcash.ui.handlers.error_handler import try_except_decorator, show_ui_message
+    from smartcash.ui.utils.fallback_utils import update_status_panel
+    
+    # Setup observer handlers
+    ui_components = setup_observer_handlers(ui_components, "dependency_installer_observers")
+    
     # Definisi package dan requirement
     PACKAGE_GROUPS = {
         'yolov5_req': lambda: _get_project_requirements('yolov5'),
@@ -25,7 +33,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         'notebook_req': ['ipywidgets', 'tqdm'],
         'smartcash_req': lambda: _get_project_requirements('smartcash'),
         'opencv_req': ['opencv-python'],
-        'matplotlib_req': ['matplotlib', 'seaborn'],
+        'matplotlib_req': ['matplotlib'],
         'pandas_req': ['pandas'],
         'seaborn_req': ['seaborn']
     }
@@ -41,7 +49,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
 
     def _get_project_requirements(project_name: str) -> List[str]:
         """
-        Dapatkan requirements untuk project tertentu.
+        Dapatkan requirements untuk project tertentu dengan membaca requirements.txt.
         
         Args:
             project_name: Nama project (e.g. 'smartcash', 'yolov5')
@@ -49,17 +57,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         Returns:
             List requirements terdeteksi
         """
+        # Default requirements jika file tidak ditemukan
         default_requirements = {
-            'smartcash': [
-                "pyyaml", "termcolor", "python-dotenv", 
-                "roboflow", "ultralytics", "matplotlib", 
-                "seaborn", "pandas"
-            ],
-            'yolov5': [
-                "matplotlib", "numpy", "opencv-python", 
-                "torch", "torchvision", "tqdm", "pillow", 
-                "requests", "scipy"
-            ]
+            'smartcash': ["pyyaml", "termcolor", "python-dotenv", "roboflow", "ultralytics", "matplotlib", "seaborn", "pandas"],
+            'yolov5': ["matplotlib", "numpy", "opencv-python", "torch", "torchvision", "tqdm", "pillow", "requests", "scipy"]
         }
         
         # Lokasi potensial file requirements
@@ -69,29 +70,31 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             Path.home() / f'{project_name}/requirements.txt'
         ]
         
-        def parse_requirements(file_path):
-            """Parse requirements dari file."""
-            try:
-                with open(file_path, 'r') as f:
-                    return [
-                        re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1)
-                        for line in f 
-                        if line.strip() and not line.startswith('#')
-                    ]
-            except Exception:
-                return []
-        
-        # Coba temukan dan parsing requirements
+        # Parse requirements dari file
         for path in potential_paths:
             if path.exists():
-                parsed_reqs = parse_requirements(path)
-                if parsed_reqs:
-                    return list(dict.fromkeys(parsed_reqs + default_requirements.get(project_name, [])))
+                try:
+                    with open(path, 'r') as f:
+                        parsed_reqs = [re.match(r'^([a-zA-Z0-9_\-]+)', line.strip()).group(1) 
+                                      for line in f if line.strip() and not line.startswith('#')]
+                        if parsed_reqs:
+                            # Gabungkan dengan default requirements dan remove duplikat
+                            return list(dict.fromkeys(parsed_reqs + default_requirements.get(project_name, [])))
+                except Exception:
+                    pass
         
         return default_requirements.get(project_name, [])
 
     def _run_pip_install(packages: List[str]) -> Tuple[bool, str]:
-        """Eksekusi instalasi package."""
+        """
+        Eksekusi instalasi package dengan pip.
+        
+        Args:
+            packages: List package yang akan diinstall
+            
+        Returns:
+            Tuple (success, error_message)
+        """
         try:
             # Gabungkan package ke dalam satu command
             cmd = f"{sys.executable} -m pip install {' '.join(packages)}"
@@ -100,35 +103,38 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
         except Exception as e:
             return False, str(e)
     
-   
-    def _check_package_status(package_checks: List[Tuple[str, str]]) -> None:
-        """Periksa status paket yang terinstall."""
-        for display_name, import_name in package_checks:
-            try:
-                module = __import__(import_name)
-                version = getattr(module, '__version__', 'Unknown')
-                version_display = f" (v{version})" if version != 'Unknown' else ''
-                with ui_components['status']:
+    @try_except_decorator
+    def _check_package_status(package_checks: List[Tuple[str, str]], output_widget=None) -> None:
+        """
+        Periksa status paket yang terinstall.
+        
+        Args:
+            package_checks: List tuple (display_name, import_name)
+            output_widget: Widget untuk menampilkan output
+        """
+        output_widget = output_widget or ui_components['status']
+        with output_widget:
+            clear_output()
+            display(create_info_alert("Memeriksa Status Instalasi", 'info', '🔍'))
+            
+            for display_name, import_name in package_checks:
+                try:
+                    module = __import__(import_name)
+                    version = getattr(module, '__version__', 'Unknown')
+                    version_display = f" (v{version})" if version != 'Unknown' else ''
                     display(create_status_indicator('success', f"{display_name}{version_display}"))
-            except ImportError:
-                with ui_components['status']:
+                except ImportError:
                     display(create_status_indicator('warning', f"{display_name} tidak terinstall"))
 
-    def _update_status_panel(status_message, status_type='info'):
-        """Update status panel menggunakan create_info_alert."""
-        ui_components['status_panel'].value = create_info_alert(
-            message=status_message,
-            alert_type=status_type
-        ).value
-
+    @try_except_decorator
     def _on_install_packages(b):
-        """Handler untuk tombol install packages."""
+        """Handler untuk tombol install packages dengan progress tracking."""
         with ui_components['status']:
             clear_output()
             start_time = time.time()
             
             # Update status panel
-            _update_status_panel("Memulai instalasi packages...")
+            update_status_panel(ui_components, "🚀 Memulai instalasi packages...", "info")
             
             # Dapatkan daftar package yang akan diinstall
             packages_to_install = []
@@ -142,11 +148,11 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             custom_packages = ui_components['custom_packages'].value.strip().split('\n')
             packages_to_install.extend([pkg.strip() for pkg in custom_packages if pkg.strip()])
             
-            # Hapus duplikat
-            packages_to_install = list(dict.fromkeys(packages_to_install))
+            # Hapus duplikat dan filter package kosong
+            packages_to_install = list(dict.fromkeys([p for p in packages_to_install if p]))
             
             if not packages_to_install:
-                _update_status_panel("Tidak ada package yang dipilih", 'warning')
+                update_status_panel(ui_components, "⚠️ Tidak ada package yang dipilih", 'warning')
                 display(create_info_alert("Tidak ada package yang dipilih", 'warning'))
                 return
             
@@ -167,6 +173,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
             failed_packages = []
             
             for pkg in packages_to_install:
+                # Tampilkan status dengan create_info_alert
                 display(create_info_alert(f"Memulai instalasi: {pkg}", 'info', '📦'))
                 
                 # Jalankan instalasi
@@ -177,70 +184,69 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
                     installed_count += 1
                     display(create_info_alert(f"{pkg} berhasil diinstall", 'success', '✅'))
                 else:
-                    failed_packages.append(pkg)
-                    display(create_info_alert(f"Gagal install {pkg}: {error_msg}", 'error','❌'))
+                    failed_packages.append((pkg, error_msg))
+                    display(create_info_alert(f"Gagal install {pkg}: {error_msg}", 'error', '❌'))
                 
                 # Update progress bar
                 progress_bar.update(1)
                 ui_components['install_progress'].value = progress_bar.n
-
-                percentage = (progress_bar.n / len(packages_to_install)) * 100  # Ensure correct division
-                ui_components['install_progress'].description = f"Proses: {percentage:.2f}%"  # Format percentage to 2 decimal places
-
+                percentage = int((progress_bar.n / len(packages_to_install)) * 100)
+                ui_components['install_progress'].description = f"Proses: {percentage}%"
             
             # Tutup progress bar
             progress_bar.close()
+            ui_components['install_progress'].layout.visibility = 'hidden'
             
             # Hitung durasi
             duration = time.time() - start_time
             
             # Update status panel berdasarkan hasil
             if failed_packages:
-                _update_status_panel(f"Instalasi selesai dengan {len(failed_packages)} error", 'warning')
+                update_status_panel(ui_components, f"⚠️ Instalasi selesai dengan {len(failed_packages)} error", 'warning')
             else:
-                _update_status_panel(f"Semua {installed_count} package berhasil diinstall", 'success')
+                update_status_panel(ui_components, f"✅ Semua {installed_count} package berhasil diinstall", 'success')
             
             # Buat widget metrics untuk ringkasan
-            display(create_metric_display("Berhasil", installed_count, is_good=installed_count > 0))
-            display(create_metric_display("Gagal", len(failed_packages), is_good=len(failed_packages) == 0))
-            display(create_metric_display("Waktu Instalasi", f"{duration:.2f} detik"))
+            display(create_metric_display("✅ Berhasil", installed_count, is_good=installed_count > 0))
+            display(create_metric_display("❌ Gagal", len(failed_packages), is_good=len(failed_packages) == 0))
+            display(create_metric_display("⏱️ Waktu", f"{duration:.2f} detik"))
             
             # Tampilkan failed packages jika ada
             if failed_packages:
-                failed_list = "<br>".join([f"❌ {pkg}" for pkg in failed_packages])
-                display(create_info_alert(f"<h3>Package Gagal Diinstall</h3><div>{failed_list}</div>", 'error', '❌'))
-
-    def _on_check_installations(b):
-        """Handler untuk tombol cek instalasi."""
-        with ui_components['status']:
-            clear_output()
-            display(create_info_alert("Memeriksa Status Instalasi", 'info', '🔍'))
-            _check_package_status(PACKAGE_CHECKS)
+                error_details = "<br>".join([f"❌ {pkg}: {err}" for pkg, err in failed_packages])
+                display(create_info_alert(f"<h3>Package Gagal Diinstall</h3><div>{error_details}</div>", 'error', '❌'))
 
     def _on_check_all(b):
-        """Handler untuk cek semua package."""
-        # Loop melalui daftar checkboxes di ui_components
+        """Handler untuk tombol check all packages."""
         for key, widget in ui_components.items():
-            # Pastikan hanya mengubah checkbox sesuai PACKAGE_GROUPS, bukan semua key yang ada
-            if key in PACKAGE_GROUPS and hasattr(widget, 'value') and hasattr(widget, 'description'):
+            if key in PACKAGE_GROUPS and hasattr(widget, 'value'):
                 widget.value = True
-        
-        _update_status_panel("Semua package dipilih", 'success')
+        update_status_panel(ui_components, "✅ Semua package dipilih", 'success')
 
     def _on_uncheck_all(b):
-        """Handler untuk uncheck semua package."""
-        # Loop melalui daftar checkboxes di ui_components
+        """Handler untuk tombol uncheck all packages."""
         for key, widget in ui_components.items():
-            # Pastikan hanya mengubah checkbox sesuai PACKAGE_GROUPS, bukan semua key yang ada
-            if key in PACKAGE_GROUPS and hasattr(widget, 'value') and hasattr(widget, 'description'):
+            if key in PACKAGE_GROUPS and hasattr(widget, 'value'):
                 widget.value = False
-        
-        _update_status_panel("Semua package tidak dipilih", 'warning')
+        update_status_panel(ui_components, "⚠️ Semua package tidak dipilih", 'warning')
 
     # Registrasi event handlers
     ui_components['install_button'].on_click(_on_install_packages)
-    ui_components['check_button'].on_click(_on_check_installations)
+    ui_components['check_button'].on_click(lambda b: _check_package_status(PACKAGE_CHECKS, ui_components['status']))
     ui_components['check_all_button'].on_click(_on_check_all)
     ui_components['uncheck_all_button'].on_click(_on_uncheck_all)
+    
+    # Register cleanup function
+    def cleanup():
+        """Cleanup resources."""
+        if 'observer_group' in ui_components:
+            try:
+                from smartcash.components.observer.manager_observer import ObserverManager
+                observer_manager = ObserverManager()
+                observer_manager.unregister_group(ui_components['observer_group'])
+            except ImportError:
+                pass
+    
+    ui_components['cleanup'] = cleanup
 
     return ui_components

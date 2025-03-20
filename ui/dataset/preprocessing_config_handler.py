@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan integrasi UI utils standar
+Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan integrasi path yang lebih baik
 """
 
 from typing import Dict, Any
@@ -11,7 +11,7 @@ from IPython.display import display
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Update konfigurasi preprocessing dari nilai UI dengan validasi.
+    Update konfigurasi preprocessing dari nilai UI dengan validasi path.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -69,9 +69,43 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         preproc_config['validate']['move_invalid'] = move_invalid
         preproc_config['validate']['invalid_dir'] = invalid_dir
     
-    # Pastikan output_dir ada
-    if 'output_dir' not in preproc_config:
-        preproc_config['output_dir'] = ui_components.get('preprocessed_dir', 'data/preprocessed')
+    # PENTING: Update path dari UI components, bukan dari widget input langsung
+    # Karena path di UI components sudah dalam format absolute yang benar
+    data_dir = ui_components.get('data_dir')
+    preprocessed_dir = ui_components.get('preprocessed_dir')
+    
+    # Update data_dir di config
+    if data_dir:
+        # Simpan sebagai path relatif jika path absolute diawali dengan Drive path
+        drive_mounted = False
+        drive_path = None
+        
+        # Coba dapatkan drive path untuk konversi ke relatif
+        try:
+            from smartcash.ui.utils.drive_utils import detect_drive_mount
+            drive_mounted, drive_path = detect_drive_mount()
+        except ImportError:
+            pass
+            
+        # Konversi ke path relatif jika diperlukan
+        rel_data_dir = data_dir
+        if drive_mounted and drive_path and data_dir.startswith(f"{drive_path}/SmartCash"):
+            rel_data_dir = os.path.relpath(data_dir, f"{drive_path}/SmartCash")
+        
+        # Update data_dir di config (gunakan path relatif)
+        if 'data' not in config:
+            config['data'] = {}
+        config['data']['dir'] = rel_data_dir
+    
+    # Update preprocessed_dir di config
+    if preprocessed_dir:
+        # Konversi ke path relatif jika diperlukan
+        rel_preprocessed_dir = preprocessed_dir
+        if drive_mounted and drive_path and preprocessed_dir.startswith(f"{drive_path}/SmartCash"):
+            rel_preprocessed_dir = os.path.relpath(preprocessed_dir, f"{drive_path}/SmartCash")
+        
+        # Update preprocessed_dir di config (gunakan path relatif)
+        preproc_config['output_dir'] = rel_preprocessed_dir
     
     # Ekstrak split selector jika tersedia
     split_selector = ui_components.get('split_selector')
@@ -105,7 +139,8 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
         if config_manager:
-            # Gunakan save_config yang sudah ada dengan backup otomatis
+            # Simpan konfigurasi menggunakan config_manager
+            config_manager.config = config  # Pastikan config manager memiliki konfigurasi terbaru
             config_manager.save_config(config_path, create_dirs=True)
             return True
     except ImportError:
@@ -228,6 +263,42 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         if 'move_invalid' in val_config and len(validation_options.children) > 2: validation_options.children[2].value = val_config['move_invalid']
         if 'invalid_dir' in val_config and len(validation_options.children) > 3: validation_options.children[3].value = val_config['invalid_dir']
     
+    # PENTING: Update komponen path input jika tersedia
+    path_input = ui_components.get('path_input')
+    preprocessed_input = ui_components.get('preprocessed_input')
+    
+    # Dapatkan path yang benar (absolute path)
+    drive_mounted = False
+    drive_path = None
+    smartcash_dir = None
+    
+    # Coba dapatkan informasi drive
+    try:
+        from smartcash.ui.utils.drive_utils import detect_drive_mount
+        drive_mounted, drive_path = detect_drive_mount()
+        if drive_mounted and drive_path:
+            smartcash_dir = f"{drive_path}/SmartCash"
+    except ImportError:
+        pass
+    
+    # Update path input dengan nilai absolute
+    if 'data' in config and 'dir' in config['data'] and path_input:
+        data_dir = config['data']['dir']
+        # Konversi ke absolute path jika relatif dan drive tersedia
+        if not os.path.isabs(data_dir) and drive_mounted and smartcash_dir:
+            data_dir = os.path.join(smartcash_dir, data_dir)
+        path_input.value = data_dir
+        ui_components['data_dir'] = data_dir
+    
+    # Update preprocessed input dengan nilai absolute
+    if 'output_dir' in preproc_config and preprocessed_input:
+        preprocessed_dir = preproc_config['output_dir']
+        # Konversi ke absolute path jika relatif dan drive tersedia
+        if not os.path.isabs(preprocessed_dir) and drive_mounted and smartcash_dir:
+            preprocessed_dir = os.path.join(smartcash_dir, preprocessed_dir)
+        preprocessed_input.value = preprocessed_dir
+        ui_components['preprocessed_dir'] = preprocessed_dir
+    
     # Update split selector jika ada
     split_selector = ui_components.get('split_selector')
     if split_selector and hasattr(split_selector, 'value') and 'splits' in preproc_config:
@@ -258,6 +329,7 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
         Dictionary UI components yang telah diupdate
     """
     logger = ui_components.get('logger')
+    from smartcash.ui.utils.constants import ICONS
     
     # Load config jika belum tersedia
     if not config:
@@ -270,7 +342,7 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
     if 'save_button' in ui_components:
         def on_save_config(b):
             from smartcash.ui.utils.alert_utils import create_status_indicator
-            from smartcash.ui.utils.constants import ICONS
+            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
             
             # Update config dari UI
             updated_config = update_config_from_ui(ui_components, config)
@@ -286,7 +358,6 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
                 ))
             
             # Update status panel
-            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
             update_status_panel(
                 ui_components,
                 'success' if success else 'error',
@@ -302,7 +373,8 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
         'update_config_from_ui': update_config_from_ui,
         'save_preprocessing_config': save_preprocessing_config,
         'load_preprocessing_config': load_preprocessing_config,
-        'update_ui_from_config': update_ui_from_config
+        'update_ui_from_config': update_ui_from_config,
+        'on_save_config': on_save_config
     })
     
     return ui_components

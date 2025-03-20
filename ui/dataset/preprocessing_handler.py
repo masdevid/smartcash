@@ -1,19 +1,21 @@
 """
 File: smartcash/ui/dataset/preprocessing_handler.py
-Deskripsi: Koordinator utama untuk handler preprocessing dataset dengan integrasi observer dan error handler
+Deskripsi: Koordinator handler preprocessing dengan integrasi inisialisasi path dan pengaturan UI yang ditingkatkan
 """
 
 from typing import Dict, Any
 import logging
-import ipywidgets as widgets
-from smartcash.ui.utils.constants import ICONS
+from IPython.display import display, clear_output
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler preprocessing dataset dengan integrasi observer dari handler standar."""
-    # Setup logger terintegrasi UI dengan utilitas standar
+    """Setup handler preprocessing dataset dengan integrasi komponen path dan pengaturan UI yang ditingkatkan."""
+    
+    # Setup logger terintegrasi UI
     logger = None
     try:
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        from smartcash.ui.utils.constants import ICONS
+        
         logger = setup_ipython_logging(ui_components, "preprocessing", log_level=logging.INFO)
         if logger: 
             ui_components['logger'] = logger
@@ -21,115 +23,79 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     except ImportError:
         pass
     
-    # Setup observer handlers untuk menangani event notification
+    # Inisialisasi dengan urutan yang benar: path setup dulu, baru handler lainnya
     try:
-        from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-        ui_components = setup_observer_handlers(ui_components, "preprocessing_observers")
-        if logger: logger.info(f"{ICONS['success']} Observer handlers berhasil diinisialisasi")
-    except ImportError as e:
-        if logger: logger.warning(f"{ICONS['warning']} Observer handlers tidak tersedia: {str(e)}")
-    
-    # Setup handlers komponen secara berurutan dengan pendekatan terpusat
-    try:
-        # Inisialisasi dengan utilitas standar
+        # Step 1: Inisialisasi path dan environment - PENTING: ini dilakukan pertama
         from smartcash.ui.dataset.preprocessing_initialization import setup_initialization
         ui_components = setup_initialization(ui_components, env, config)
         
-        # Tambahkan dataset manager jika belum ada dengan validasi
-        if 'dataset_manager' not in ui_components and config:
-            from smartcash.dataset.manager import DatasetManager
-            ui_components['dataset_manager'] = DatasetManager(config=config, logger=logger)
-            if logger: logger.info(f"{ICONS['success']} Dataset Manager berhasil diinisialisasi")
+        # Step 2: Setup observer handlers untuk notifikasi kemajuan
+        try:
+            from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+            ui_components = setup_observer_handlers(ui_components, "preprocessing_observers")
+            if logger: logger.info(f"{ICONS['success']} Observer handlers berhasil diinisialisasi")
+        except ImportError as e:
+            if logger: logger.debug(f"{ICONS['warning']} Observer handlers tidak tersedia: {str(e)}")
         
-        # Setup dengan standar error handling
+        # Step 3: Tambahkan dataset manager jika belum ada
+        if 'dataset_manager' not in ui_components and config:
+            try:
+                from smartcash.dataset.manager import DatasetManager
+                ui_components['dataset_manager'] = DatasetManager(config=config, logger=logger)
+                if logger: logger.info(f"{ICONS['success']} Dataset Manager berhasil diinisialisasi")
+            except ImportError as e:
+                if logger: logger.warning(f"{ICONS['warning']} Dataset Manager tidak tersedia: {str(e)}")
+        
+        # Step 4: Setup semua handler yang diperlukan dengan pendekatan terkonsolidasi
         from smartcash.ui.handlers.error_handler import try_except_decorator
         
-        # Setup handler dengan decorator error handling
         @try_except_decorator(ui_components.get('status'))
-        def setup_handlers_safely():
-            # Setup semua handler yang diperlukan dengan pendekatan terpusat
-            from smartcash.ui.dataset.preprocessing_progress_handler import setup_progress_handler
-            from smartcash.ui.dataset.preprocessing_click_handler import setup_click_handlers
-            from smartcash.ui.dataset.preprocessing_cleanup_handler import setup_cleanup_handler
-            from smartcash.ui.dataset.preprocessing_config_handler import setup_preprocessing_config_handler
-            from smartcash.ui.dataset.preprocessing_visualization_handler import setup_visualization_handler
-            from smartcash.ui.dataset.preprocessing_summary_handler import setup_summary_handler
+        def setup_all_handlers():
+            # Import semua handler yang diperlukan
+            handlers_to_setup = [
+                "preprocessing_progress_handler.setup_progress_handler",
+                "preprocessing_config_handler.setup_preprocessing_config_handler",
+                "preprocessing_click_handler.setup_click_handlers",
+                "preprocessing_cleanup_handler.setup_cleanup_handler",
+                "preprocessing_visualization_handler.setup_visualization_handler",
+                "preprocessing_summary_handler.setup_summary_handler"
+            ]
             
-            # Setup secara berurutan
-            ui_components.update(setup_progress_handler(ui_components, env, config))
-            ui_components.update(setup_preprocessing_config_handler(ui_components, config, env))
-            ui_components.update(setup_click_handlers(ui_components, env, config))
-            ui_components.update(setup_cleanup_handler(ui_components, env, config))
-            ui_components.update(setup_visualization_handler(ui_components, env, config))
-            ui_components.update(setup_summary_handler(ui_components, env, config))
+            # Setup semua handler secara berurutan
+            for handler_path in handlers_to_setup:
+                try:
+                    module_path, func_name = handler_path.rsplit('.', 1)
+                    module = __import__(f"smartcash.ui.dataset.{module_path}", fromlist=[func_name])
+                    setup_func = getattr(module, func_name)
+                    ui_components.update(setup_func(ui_components, env, config))
+                    if logger: logger.debug(f"✅ Handler {func_name} berhasil dimuat")
+                except (ImportError, AttributeError) as e:
+                    if logger: logger.debug(f"⚠️ Handler {handler_path} tidak tersedia: {str(e)}")
             
             return ui_components
         
-        # Jalankan setup dengan penanganan error
-        setup_handlers_safely()
+        # Jalankan setup semua handler
+        setup_all_handlers()
         
-        # Tambahkan tombol visualisasi dan komparasi jika belum ada
-        if 'visualize_button' not in ui_components and 'summary_container' in ui_components:
-            visualize_button = widgets.Button(
-                description='Visualisasi Sampel',
-                button_style='info',
-                icon='image',
-                layout=widgets.Layout(width='auto', margin='5px', display='none')
-            )
-            ui_components['visualize_button'] = visualize_button
-            
-            compare_button = widgets.Button(
-                description='Bandingkan Dataset',
-                button_style='info',
-                icon='columns',
-                layout=widgets.Layout(width='auto', margin='5px', display='none')
-            )
-            ui_components['compare_button'] = compare_button
-            
-            summary_button = widgets.Button(
-                description='Tampilkan Ringkasan',
-                button_style='info',
-                icon='list-alt',
-                layout=widgets.Layout(width='auto', margin='5px', display='none')
-            )
-            ui_components['summary_button'] = summary_button
-            
-            # Tambahkan ke container
-            buttons_container = widgets.HBox([
-                visualize_button, compare_button, summary_button
-            ], layout=widgets.Layout(margin='10px 0'))
-            
-            # Tambahkan ke summary container
-            with ui_components['summary_container']:
-                display(buttons_container)
-            
-            # Daftarkan handler untuk tombol-tombol baru
-            if 'on_visualize_click' in ui_components and callable(ui_components['on_visualize_click']):
-                visualize_button.on_click(ui_components['on_visualize_click'])
-            
-            if 'on_compare_click' in ui_components and callable(ui_components['on_compare_click']):
-                compare_button.on_click(ui_components['on_compare_click'])
-            
-            if 'on_summary_click' in ui_components and callable(ui_components['on_summary_click']):
-                summary_button.on_click(ui_components['on_summary_click'])
-        
-        # Cek direktori preprocessed, tampilkan tombol visualisasi jika tersedia
+        # Step 5: Aktifkan tampilan tombol visualisasi jika data preprocessed sudah ada
         preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
-        import os
         if os.path.exists(preprocessed_dir):
-            # Tampilkan tombol visualisasi dan komparasi
-            if 'visualize_button' in ui_components:
-                ui_components['visualize_button'].layout.display = 'inline-flex'
-            if 'compare_button' in ui_components:
-                ui_components['compare_button'].layout.display = 'inline-flex'
-            if 'summary_button' in ui_components:
-                ui_components['summary_button'].layout.display = 'inline-flex'
-            if 'cleanup_button' in ui_components:
-                ui_components['cleanup_button'].layout.display = 'block'
+            # Cek apakah ada file preprocessed
+            try:
+                if any(Path(preprocessed_dir).glob('**/images/*.jpg')):
+                    # Tampilkan tombol visualisasi dan cleanup
+                    if 'visualization_buttons' in ui_components:
+                        ui_components['visualization_buttons'].layout.display = 'flex'
+                    if 'cleanup_button' in ui_components:
+                        ui_components['cleanup_button'].layout.display = 'block'
+                    if logger: logger.info(f"📊 Dataset preprocessed terdeteksi, tombol visualisasi diaktifkan")
+            except Exception:
+                pass
     
     except Exception as e:
         # Gunakan handler error standar
         from smartcash.ui.handlers.error_handler import handle_ui_error
+        from smartcash.ui.utils.constants import ICONS
         handle_ui_error(e, ui_components.get('status'), True, f"{ICONS['error']} Error saat setup handlers preprocessing")
     
     # Register cleanup handler
@@ -148,3 +114,7 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     ui_components['cleanup'] = cleanup_resources
     
     return ui_components
+
+# Diperlukan import ini karena digunakan dalam fungsi
+import os
+from pathlib import Path

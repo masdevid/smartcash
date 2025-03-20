@@ -101,6 +101,12 @@ class EventTopics:
     EXPORT_COMPLETE = "export.complete"
     EXPORT_ERROR = "export.error"
     
+    # Upload events (baru)
+    UPLOAD_START = "upload.start"
+    UPLOAD_PROGRESS = "upload.progress"
+    UPLOAD_COMPLETE = "upload.complete"
+    UPLOAD_ERROR = "upload.error"
+    
     # Backup events (baru)
     BACKUP_START = "backup.start"
     BACKUP_PROGRESS = "backup.progress"

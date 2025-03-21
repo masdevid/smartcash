@@ -127,12 +127,12 @@ def load_default_augmentation_config() -> Dict[str, Any]:
                 "flipud": 0.0,
                 "degrees": 15,
                 "translate": 0.1,
-                "scale": 0.1,
+                "scale": 0.05,  # Dikurangi dari 0.1 menjadi 0.05 untuk batasi scaling
                 "shear": 0.0,
                 "rotation_prob": 0.5,
                 "max_angle": 15,
                 "flip_prob": 0.5,
-                "scale_ratio": 0.1
+                "scale_ratio": 0.05  # Dikurangi dari 0.1 menjadi 0.05
             },
             "lighting": {
                 "hsv_h": 0.015,

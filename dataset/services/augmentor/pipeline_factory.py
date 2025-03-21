@@ -247,7 +247,7 @@ class AugmentationPipelineFactory:
     
     def _get_position_transforms(self, params: Dict[str, Any]) -> List[A.BasicTransform]:
         """
-        Dapatkan transformasi posisi (rotate, scale, translate).
+        Dapatkan transformasi posisi (rotate, scale, translate) dengan batasan scaling minimum.
         
         Args:
             params: Parameter untuk transformasi
@@ -259,9 +259,15 @@ class AugmentationPipelineFactory:
         
         # Gunakan Affine untuk semua transformasi posisi
         if any(params.get(key, 0) > 0 for key in ['translate', 'scale', 'degrees', 'shear']):
+            # Batasi nilai scale untuk menghindari gambar menjadi terlalu kecil
+            scale = params.get('scale', 0.1)
+            # Ubah range scale dari simetris menjadi asimetris untuk mencegah pengecilan berlebihan
+            # Misalnya dari (0.9, 1.1) menjadi (0.95, 1.1) 
+            scale_range = (max(0.95, 1.0 - scale), 1.0 + scale)
+            
             transforms.append(
                 A.Affine(
-                    scale=params.get('scale', 0.1),
+                    scale=scale_range,  # Batasi pengecilan maksimal 5%
                     rotate=int(params.get('degrees', 15)),
                     translate_percent={
                         'x': params.get('translate', 0.1),

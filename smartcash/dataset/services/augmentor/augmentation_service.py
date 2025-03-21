@@ -486,9 +486,9 @@ class AugmentationService:
             return False
     
     def _augment_class(self, class_name: str, source_files: List[Tuple[Path, Path]], pipeline, count: int,
-                      output_images_dir: Path, output_labels_dir: Path, 
-                      pbar: Optional[tqdm] = None, output_prefix: str = 'aug') -> int:
-        """Lakukan augmentasi untuk satu kelas dengan naming yang konsisten dan UUID."""
+                    output_images_dir: Path, output_labels_dir: Path, 
+                    pbar: Optional[tqdm] = None, output_prefix: str = 'aug') -> int:
+        """Lakukan augmentasi untuk satu kelas dengan mempertahankan UUID asli."""
         import cv2
         
         generated = 0; iterations = 0; max_iterations = count * 3  # Batas iterasi untuk menghindari infinite loop
@@ -515,6 +515,8 @@ class AugmentationService:
                 
                 # Terapkan augmentasi
                 try:
+                    # Batasi perubahan skala untuk mencegah gambar menjadi terlalu kecil
+                    # Sesuaikan parameter scale untuk memastikan gambar tidak mengecil terlalu banyak
                     transformed = pipeline(image=img, bboxes=bboxes, class_labels=class_labels)
                     
                     aug_img = transformed['image']
@@ -522,10 +524,19 @@ class AugmentationService:
                     aug_labels = transformed['class_labels']
                     
                     if not aug_bboxes: continue  # Skip jika augmentasi menghilangkan semua bbox
+                    
+                    # Ekstrak UUID dari nama file asli untuk dipertahankan
+                    original_name_parts = img_path.stem.split('_')
+                    if len(original_name_parts) >= 3:
+                        # Ambil UUID dari file original (rp_class_uuid)
+                        uuid = original_name_parts[-1]
+                    else:
+                        # Fallback jika format nama tidak sesuai
+                        uuid = str(uuid.uuid4())[:8]
                         
-                    # Generate nama file baru dengan format {prefix}_{class_name}_{unique_id}
-                    unique_id = str(uuid.uuid4())[:8]  # 8 karakter pertama dari UUID
-                    new_stem = f"{output_prefix}_{class_name}_{unique_id}"
+                    # Generate nama file baru dengan format {prefix}_{class_name}_{uuid}
+                    # Menggunakan UUID yang sama dengan file original
+                    new_stem = f"{output_prefix}_{class_name}_{uuid}"
                     
                     # Simpan gambar baru
                     new_img_path = output_images_dir / f"{new_stem}.jpg"

@@ -11,6 +11,7 @@ import ipywidgets as widgets
 from IPython.display import display, HTML
 
 from smartcash.ui.utils.constants import ALERT_STYLES, ICONS
+from smartcash.ui.utils.alert_utils import create_info_alert
 
 class UILogHandler(logging.Handler):
     """Custom logging handler yang menampilkan log di UI output widget."""
@@ -225,46 +226,29 @@ def create_dummy_logger() -> logging.Logger:
     logger.propagate = False
     
     return logger
+def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
+    """
+    Log messages directly to UI without a logger.
 
-def log_to_ui(
-    ui_components: Dict[str, Any],
-    message: str,
-    level: str = 'info'
-) -> None:
-    """
-    Log pesan langsung ke UI tanpa logger.
-    
     Args:
-        ui_components: Dictionary berisi widget UI
-        message: Pesan yang akan ditampilkan
-        level: Level log ('info', 'success', 'warning', 'error')
+        ui_components: Dictionary containing UI widgets
+        message: Message to display
+        level: Log level ('info', 'success', 'warning', 'error')
     """
-    # Dapatkan output widget
-    output_widget = None
-    for key in ['status', 'log_output', 'output']:
-        if key in ui_components and isinstance(ui_components[key], widgets.Output):
-            output_widget = ui_components[key]
-            break
+    # Find output widget efficiently
+    output_widget = next(
+        (ui_components[key] for key in ('status', 'log_output', 'output')
+         if key in ui_components and isinstance(ui_components[key], widgets.Output)),
+        None
+    )
     
     if not output_widget:
         return
-    
-    # Maps level ke alert style
-    alert_style = ALERT_STYLES.get(level, ALERT_STYLES['info'])
-    icon = alert_style.get('icon', ICONS.get(level, ICONS.get('info', 'ℹ️')))
-    
-    # Format log message
-    log_html = f"""
-    <div style="padding: 5px; margin: 2px 0; 
-              background-color: {alert_style['bg_color']}; 
-              color: {alert_style['text_color']}; 
-              border-left: 4px solid {alert_style['border_color']}; 
-              border-radius: 4px;">
-        <span style="margin-right: 8px;">{icon}</span>
-        <span>{message}</span>
-    </div>
-    """
-    
-    # Display di output widget
+
+    # Get style and icon with fallback to 'info'
+    style = ALERT_STYLES.get(level, ALERT_STYLES['info'])
+    icon = style.get('icon', ICONS.get(level, ICONS['info']))
+
+    # Display using context manager
     with output_widget:
-        display(HTML(log_html))
+        display(create_info_alert(message, level, icon))

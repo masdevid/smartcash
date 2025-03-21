@@ -21,13 +21,12 @@ def initialize_drive_sync(ui_components=None):
         return
     
     # Gunakan output widget untuk semua log
-    status_output = ui_components['status']
     progress_bar = ui_components.get('progress_bar')
     progress_message = ui_components.get('progress_message')
     
     # Fungsi log yang mengarahkan ke output widget
     def log(message, status_type="info"):
-        log_to_ui(status_output, message, status_type)
+        log_to_ui(ui_components, message, status_type)
     
     # Fungsi update progress
     def update_progress(step, message, status_type="info", total_steps=4):
@@ -114,8 +113,8 @@ def setup_environment_config():
     # Import komponen dengan pendekatan konsolidasi
     from smartcash.ui.setup.env_config_component import create_env_config_ui
     from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-    from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component
-    from smartcash.ui.utils.logging_utils import setup_ipython_logging
+    from smartcash.ui.utils.cell_utils import setup_notebook_environment
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
     
     try:
         # Setup notebook environment
@@ -162,30 +161,24 @@ def setup_environment_config():
         logger = setup_ipython_logging(ui_components, "env_config")
         ui_components['logger'] = logger
         
-        # Fungsi log ke output widget
-        def log_to_output(message, status_type="info"):
-            if 'status' in ui_components:
-                with ui_components['status']:
-                    from smartcash.ui.utils.alert_utils import create_info_alert
-                    display(create_info_alert(message, status_type))
-        
-        # Inisialisasi drive dengan komponen UI yang baru dibuat
         initialize_drive_sync(ui_components)
-        
+
+        def log(message, status_type="info"):
+            log_to_ui(ui_components, message, status_type)
         # Setup handlers untuk UI
         try:
             ui_components = setup_env_config_handlers(ui_components, env, config)
-            log_to_output("🚀 Handlers environment config berhasil dimuat", "success")
+            log("🚀 Handlers environment config berhasil dimuat", "success")
         except Exception as e:
-            log_to_output(f"❌ Gagal memuat handlers: {str(e)}", "error")
+            log(f"❌ Gagal memuat handlers: {str(e)}", "error")
         
         # Cek fungsionalitas drive_handler
         try:
             from smartcash.ui.setup.drive_handler import setup_drive_handler
             ui_components = setup_drive_handler(ui_components, env, config, auto_connect=True)
-            log_to_output("🔗 Drive handler berhasil diinisialisasi", "success")
+            log("🔗 Drive handler berhasil diinisialisasi", "success")
         except ImportError as e:
-            log_to_output(f"⚠️ Module drive_handler tidak tersedia: {str(e)}", "warning")
+            log(f"⚠️ Module drive_handler tidak tersedia: {str(e)}", "warning")
         
     except ImportError as e:
         # Fallback jika modules tidak tersedia

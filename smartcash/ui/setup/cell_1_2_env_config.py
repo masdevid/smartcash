@@ -11,6 +11,6 @@ try:
     from smartcash.ui.setup.env_config import setup_environment_config
     
     # Setup dan tampilkan UI environment config (termasuk inisialisasi Drive)
-    ui_components = setup_environment_config()
+    setup_environment_config()
     
 except ImportError as e: create_alert(f"Error: {str(e)}", 'error')

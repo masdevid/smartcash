@@ -4,10 +4,12 @@ Deskripsi: Konten info box untuk konfigurasi split dataset
 """
 
 import ipywidgets as widgets
-from smartcash.ui.utils.info_utils import create_info_accordion
 
-TITLE = "Tentang Konfigurasi Split Dataset"
 def get_split_info(open_by_default: bool = False) -> widgets.Accordion:
+    from smartcash.ui.utils.info_utils import create_info_accordion
+    from smartcash.ui.utils.constants import ICONS
+    
+    TITLE = "Tentang Konfigurasi Split Dataset"
     content = f"""
     <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
     <p>Pembagian dataset menjadi 3 subset:</p>

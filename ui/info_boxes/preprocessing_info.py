@@ -4,11 +4,12 @@ Deskripsi: Konten info box untuk preprocessing
 """
 
 import ipywidgets as widgets
-from smartcash.ui.utils.info_utils import create_info_accordion
 
-TITLE = "Tentang Preprocessing"
 
 def get_preprocessing_info(open_by_default: bool = False) -> widgets.Accordion:
+    from smartcash.ui.utils.info_utils import create_info_accordion
+    
+    TITLE = "Tentang Preprocessing"
     content = f"""
     <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
    

@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/cells/setup/cell_1_1_repository_clone.py
+File: smartcash/ui/cells/cell_1_1_repo_clone.py
 Deskripsi: Clone/update repository YOLOv5 dan SmartCash dengan pilihan branch
 """
 

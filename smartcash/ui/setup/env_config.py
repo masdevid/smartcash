@@ -10,18 +10,20 @@ def setup_environment_config():
     """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
     try:
         # Import komponen dengan pendekatan konsolidasi
+        from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-        from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        # Setup notebook environment
-        env, config = setup_notebook_environment("env_config")
+
+        cell_name = "env_config"
+        # Setup environment dan load config dengan utils terstandarisasi
+        env, config = setup_notebook_environment(cell_name)
         
-        # Pastikan konfigurasi default tersedia
+        # Pastikan konfigurasi default tersedia dengan utils terstandarisasi
         from smartcash.common.default_config import ensure_all_configs_exist
         ensure_all_configs_exist()
         
-        # Buat komponen UI dengan helpers
+        # Buat komponen UI dengan utils terstandarisasi
         ui_components = create_env_config_ui(env, config)
         
         # Tambahkan progress tracker jika belum ada
@@ -55,7 +57,7 @@ def setup_environment_config():
                 ui_components['ui'].children = children
         
         # Setup logging untuk UI
-        logger = setup_ipython_logging(ui_components, "env_config")
+        logger = setup_ipython_logging(ui_components, cell_name)
         ui_components['logger'] = logger
 
         initialize_drive_sync(ui_components)
@@ -80,7 +82,7 @@ def setup_environment_config():
         if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
             cleanup = ui_components['cleanup']
             get_ipython().events.register('pre_run_cell', cleanup)
-            
+
     except ImportError as e:
         # Fallback jika modules tidak tersedia
         from smartcash.ui.utils.fallback_utils import show_status

@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/training_config/cell_3_3_training_strategy.py
+File: smartcash/ui/cells/cell_3_3_training_strategy.py
 Deskripsi: Cell untuk konfigurasi strategi training model SmartCash dengan memanfaatkan skeleton
 """
 

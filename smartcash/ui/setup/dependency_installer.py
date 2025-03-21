@@ -10,20 +10,24 @@ def setup_dependency_installer():
     """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
     try:
         # Import komponen dengan pendekatan konsolidasi
-        from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui  
-        from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
+        from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
+        from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
+
+        cell_name = 'dependency_installer'
+
+        # Setup environment dan load config
+        env, config = setup_notebook_environment(cell_name)
         
-        # Setup notebook environment
-        env, config = setup_notebook_environment("dependency_installer")
-        
-        # Buat komponen UI
+        # Setup komponen UI dengan utils terstandarisasi
         ui_components = create_dependency_installer_ui(env, config)
         
+        # Setup handler dengan utils terstandarisasi
         ui_components = setup_dependency_installer_handlers(ui_components, config)
+
         # Setup logging untuk UI
-        logger = setup_ipython_logging(ui_components, "dependency_installer")
+        logger = setup_ipython_logging(ui_components, cell_name)
         if logger:
             ui_components['logger'] = logger
             logger.info("🚀 Cell dependency_installer diinisialisasi")

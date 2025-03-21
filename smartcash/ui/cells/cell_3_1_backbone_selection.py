@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/training_config/cell_3_1_backbone_selection.py
+File: smartcash/ui/cells/cell_3_1_backbone_selection.py
 Deskripsi: Cell untuk pemilihan model, backbone dan konfigurasi layer SmartCash yang kompatibel dengan ModelManager
 """
 

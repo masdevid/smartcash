@@ -1,8 +1,9 @@
 """
-File: smartcash/ui/setup/cell_1_3_dependency_installer.py
-Deskripsi: Cell instalasi dependencies untuk SmartCash dengan pendekatan modular
+File: smartcash/ui/cells/cell_2_1_dataset_download.py
+Deskripsi: Cell untuk download dataset SmartCash dengan kode minimal
 """
 
+# Import dasar
 import sys
 if '.' not in sys.path: sys.path.append('.')
 
@@ -13,5 +14,4 @@ try:
     
     # Tampilkan UI
     display(ui_components['ui'])
-
 except ImportError as e: create_alert(e, 'error')

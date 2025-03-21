@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/training_config/cell_3_2_hyperparameters.py
+File: smartcash/ui/cells/cell_3_2_hyperparameters.py
 Deskripsi: Cell untuk konfigurasi hyperparameter training model SmartCash dengan memanfaatkan skeleton
 """
 

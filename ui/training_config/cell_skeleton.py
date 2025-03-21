@@ -43,7 +43,7 @@ def run_cell(cell_name, config_path):
             
             # Cek apakah handler berhasil setup
             if logger:
-                logger.info(f"✅ Handler {cell_name} berhasil diinisialisasi")
+                logger.info(f"✅ Cell {cell_name} berhasil diinisialisasi")
         except Exception as e:
             if 'status' in ui_components:
                 with ui_components['status']:
@@ -67,21 +67,8 @@ def run_cell(cell_name, config_path):
         return ui_components
 
     except ImportError as e:
-        display(HTML(f"""
-        <div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'>
-            <h3>❌ Error Import Module</h3>
-            <p>{str(e)}</p>
-        </div>
-        """))
+        from smartcash.ui.utils.fallback_utils import show_status
+        show_status(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}", 'warning', ui_components)
     except Exception as e:
-        display(HTML(f"""
-        <div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'>
-            <h3>❌ Error Inisialisasi</h3>
-            <p>{str(e)}</p>
-        </div>
-        """))
-        
-# Contoh penggunaan:
-# ui_components = run_cell("backbone_selection", "configs/model_config.yaml")
-# ui_components = run_cell("hyperparameters", "configs/training_config.yaml")
-# ui_components = run_cell("training_strategy", "configs/training_config.yaml")
+        from smartcash.ui.utils.fallback_utils import create_status_message
+        create_status_message(f"{str(e)}", 'Error Inisialisasi', 'error')

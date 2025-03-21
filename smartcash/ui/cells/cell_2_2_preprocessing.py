@@ -1,5 +1,5 @@
 """
-File: cell_2_2_preprocessing.py
+File: smartcash/ui/cells/cell_2_2_preprocessing.py
 Deskripsi: Cell minimal untuk preprocessing dataset SmartCash
 """
 

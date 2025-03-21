@@ -64,7 +64,7 @@ def get_status_widget(ui_components: Dict[str, Any]) -> Any:
             return ui_components[key]
     return None
 
-def create_status_message(message: str, status_type: str = 'info', show_icon: bool = True) -> str:
+def create_status_message(message: str, title: str='Status', status_type: str = 'info', show_icon: bool = True) -> str:
     """
     Buat HTML untuk pesan status.
     
@@ -90,7 +90,8 @@ def create_status_message(message: str, status_type: str = 'info', show_icon: bo
     <div style="padding:8px 12px; background-color:{bg_color}; 
                color:{text_color}; border-radius:4px; margin:5px 0;
                border-left:4px solid {text_color};">
-        <p style="margin:3px 0">{icon_html}{message}</p>
+        <h3 style="color:{text_color}">{icon_html} {title}</h3>
+        <p style="margin:3px 0">{message}</p>
     </div>
     """
 

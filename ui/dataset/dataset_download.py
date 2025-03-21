@@ -1,36 +1,32 @@
 """
-File: smartcash/ui/setup/dependency_installer.py
+File: smartcash/ui/dataset/dataset_download.py
 Deskripsi: Koordinator utama untuk instalasi dependency SmartCash
 """
 
-import ipywidgets as widgets
-from typing import Dict, Any, Optional
-
-def setup_dependency_installer():
-    """Koordinator utama setup dan konfigurasi environment dengan integrasi utilities"""
+def setup_dataset_download():
+    """Koordinator utama setup dan konfigurasi dataset download dengan integrasi utilities"""
     try:
         # Import komponen dengan pendekatan konsolidasi
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
-        from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
-        from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
+        from smartcash.ui.dataset.dataset_download_component import create_dataset_download_ui
+        from smartcash.ui.dataset.dataset_download_handler import setup_dataset_download_handlers
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
 
-        cell_name = 'dependency_installer'
-
+        cell_name = 'dataset_download'
         # Setup environment dan load config
         env, config = setup_notebook_environment(cell_name)
-        
+
         # Setup komponen UI dengan utils terstandarisasi
-        ui_components = create_dependency_installer_ui(env, config)
-        
-        # Setup handler dengan utils terstandarisasi
-        ui_components = setup_dependency_installer_handlers(ui_components, config)
+        ui_components = create_dataset_download_ui(env, config)
+
+        # Setup dataset handler dengan utils terstandarisasi
+        ui_components = setup_dataset_download_handlers(ui_components, env, config)
 
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, cell_name)
         if logger:
             ui_components['logger'] = logger
-            logger.info("🚀 Cell dependency_installer diinisialisasi")
+            logger.info("🚀 Cell dataset_download diinisialisasi")
             
         from IPython import get_ipython
         if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):

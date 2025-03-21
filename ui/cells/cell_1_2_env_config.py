@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/setup/cell_1_2_env_config.py
+File: smartcash/ui/cells/cell_1_2_env_config.py
 Deskripsi: Cell konfigurasi environment terintegrasi dengan sinkronisasi konfigurasi Drive
 """
 from IPython.display import display

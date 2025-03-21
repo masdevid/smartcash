@@ -1,5 +1,5 @@
 """
-File: cell_2_4_augmentation.py
+File: smartcash/ui/cells/cell_2_4_augmentation.py
 Deskripsi: Cell untuk augmentasi dataset SmartCash dengan kode minimal
 """
 

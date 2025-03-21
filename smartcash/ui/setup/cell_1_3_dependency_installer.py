@@ -11,7 +11,7 @@ try:
     # Setup dependency installer
     ui_components = setup_dependency_installer()
     
-    # Tampilkan UI - Pastikan hanya menampilkan widget UI, bukan dictionary UI components
+    # Tampilkan UI
     display(ui_components['ui'])
 
 except ImportError as e: create_alert(e, 'error')

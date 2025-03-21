@@ -27,7 +27,11 @@ def setup_dependency_installer():
         if logger:
             ui_components['logger'] = logger
             logger.info("🚀 Cell dependency_installer diinisialisasi")
-
+            
+        from IPython import get_ipython
+        if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
+            cleanup = ui_components['cleanup']
+            get_ipython().events.register('pre_run_cell', cleanup)
 
     except ImportError as e:
         # Fallback jika modules tidak tersedia

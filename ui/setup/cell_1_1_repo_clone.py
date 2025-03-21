@@ -6,7 +6,7 @@ Deskripsi: Clone/update repository YOLOv5 dan SmartCash dengan pilihan branch
 import subprocess, os; from pathlib import Path; from IPython.display import display, HTML, clear_output; import ipywidgets as widgets
 
 # Install packages and mount Drive in one-liners
-# subprocess.run(["pip", "install", "-q", "ipywidgets", "tqdm", "pyyaml"], check=True)
+subprocess.run(["pip", "install", "-q", "ipywidgets", "tqdm", "pyyaml"], check=True)
 # if not os.path.exists('/content/drive/MyDrive'): from google.colab import drive; drive.mount('/content/drive')
 
 def create_alert(msg, type='info'):

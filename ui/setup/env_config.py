@@ -76,6 +76,11 @@ def setup_environment_config():
         except ImportError as e:
             logger.warning(f"⚠️ Module drive_handler tidak tersedia: {str(e)}")
         
+        from IPython import get_ipython
+        if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
+            cleanup = ui_components['cleanup']
+            get_ipython().events.register('pre_run_cell', cleanup)
+            
     except ImportError as e:
         # Fallback jika modules tidak tersedia
         from smartcash.ui.utils.fallback_utils import show_status

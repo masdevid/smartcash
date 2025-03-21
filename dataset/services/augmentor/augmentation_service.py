@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan untuk augmentasi dataset dengan peningkatan balancing kelas dan integrasi dengan data preprocessed
+Deskripsi: Layanan untuk augmentasi dataset dengan peningkatan balancing kelas dan integrasi logging dengan UI
 """
 
 import os, time, random, shutil, numpy as np, uuid
@@ -10,6 +10,7 @@ from tqdm.auto import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 
+# PERUBAHAN: Import get_logger sebagai fallback jika logger tidak disediakan
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.components.observer import notify, EventTopics
@@ -20,7 +21,14 @@ class AugmentationService:
     def __init__(self, config: Dict, data_dir: str, logger=None, num_workers: int = 4):
         """Inisialisasi AugmentationService dengan progress tracking."""
         self.config = config; self.data_dir = Path(data_dir)
+        
+        # PERUBAHAN: Gunakan logger yang disediakan (UI logger) atau buat fallback
+        # Ini memastikan log tetap muncul di UI bahkan jika fallback logger yang digunakan
         self.logger = logger or get_logger("augmentation_service")
+        
+        # Log event inisialisasi
+        self.logger.info(f"🔄 AugmentationService diinisialisasi dengan {num_workers} workers")
+        
         self.num_workers = num_workers; self.utils = DatasetUtils(config, data_dir, logger)
         self._progress_callback = None; self._current_operation = ""; self._total_items = 0
         
@@ -35,6 +43,7 @@ class AugmentationService:
     def register_progress_callback(self, callback: Callable) -> None:
         """Register callback untuk melaporkan progress."""
         self._progress_callback = callback
+        self.logger.debug(f"👁️ Progress callback terdaftar")
     
     def _report_progress(self, progress: int, total: int, message: str, **kwargs) -> None:
         """
@@ -60,8 +69,40 @@ class AugmentationService:
                 notify(EventTopics.AUGMENTATION_PROGRESS, sender="augmentation_service", 
                     message=message, progress=progress, total=total, **kwargs)
             except (ImportError, AttributeError): 
-                pass
-
+                # Gunakan logger jika notify tidak tersedia
+                self.logger.info(f"🔄 {message} ({progress}/{total})")
+    
+    def _report_error(self, message: str) -> None:
+        """
+        Laporkan error ke observer system dan logging UI.
+        
+        Args:
+            message: Pesan error
+        """
+        # Catat ke logger terlebih dahulu untuk memastikan pesan muncul di UI
+        self.logger.error(f"❌ {message}")
+        
+        # Notifikasi via observer sebagai backup
+        try: 
+            notify(EventTopics.AUGMENTATION_ERROR, sender="augmentation_service", message=message)
+        except (ImportError, AttributeError): 
+            pass
+        
+    def _report_warning(self, message: str) -> None:
+        """
+        Laporkan warning ke observer system dan logging UI.
+        
+        Args:
+            message: Pesan warning
+        """
+        # Catat ke logger terlebih dahulu untuk memastikan pesan muncul di UI
+        self.logger.warning(f"⚠️ {message}")
+        
+        # Notifikasi via observer sebagai backup
+        try: 
+            notify(EventTopics.AUGMENTATION_WARNING, sender="augmentation_service", message=message)
+        except (ImportError, AttributeError): 
+            pass
     
     def augment_dataset(self, split: str = 'train', augmentation_types: List[str] = None, 
                         target_count: int = None, target_factor: float = None, target_balance: bool = False, 
@@ -75,7 +116,8 @@ class AugmentationService:
         start_time = time.time(); random.seed(random_seed); np.random.seed(random_seed)
         self._current_operation = "augmentation"; self._total_items = 0
         
-        # Notifikasi start augmentasi
+        # Notifikasi start augmentasi melalui logger dan observer
+        self.logger.info(f"🚀 Memulai augmentasi dataset {split}")
         try: notify(EventTopics.AUGMENTATION_START, sender="augmentation_service", message=f"Memulai augmentasi dataset {split}")
         except (ImportError, AttributeError): pass
         
@@ -106,8 +148,8 @@ class AugmentationService:
         images_dir, labels_dir = split_path / 'images', split_path / 'labels'
         
         if not (images_dir.exists() and labels_dir.exists()):
-            error_msg = f"❌ Direktori dataset tidak lengkap: {split_path}"
-            self.logger.error(error_msg); self._report_error(error_msg)
+            error_msg = f"Direktori dataset tidak lengkap: {split_path}"
+            self._report_error(error_msg)
             return {'status': 'error', 'message': error_msg}
         
         # Setup direktori temp output (augmented)
@@ -363,16 +405,6 @@ class AugmentationService:
                 if i % max(1, len(futures)//20) == 0:  # Report progress approximately every 5%
                     self._report_progress(copied, len(futures), f"Menyalin file original ({copied}/{len(futures)})")
     
-    def _report_error(self, message: str) -> None:
-        """Laporkan error ke observer system."""
-        try: notify(EventTopics.AUGMENTATION_ERROR, sender="augmentation_service", message=message)
-        except (ImportError, AttributeError): pass
-        
-    def _report_warning(self, message: str) -> None:
-        """Laporkan warning ke observer system."""
-        try: notify(EventTopics.AUGMENTATION_WARNING, sender="augmentation_service", message=message)
-        except (ImportError, AttributeError): pass
-        
     def _validate_augmentation_results(self, images_dir: Path, labels_dir: Path) -> None:
         """Validasi hasil augmentasi dengan reporting."""
         self.logger.info("🔍 Memvalidasi hasil augmentasi...")
@@ -524,19 +556,20 @@ class AugmentationService:
                     aug_labels = transformed['class_labels']
                     
                     if not aug_bboxes: continue  # Skip jika augmentasi menghilangkan semua bbox
-                    
+
                     # Ekstrak UUID dari nama file asli untuk dipertahankan
                     original_name_parts = img_path.stem.split('_')
                     if len(original_name_parts) >= 3:
                         # Ambil UUID dari file original (rp_class_uuid)
-                        uuid = original_name_parts[-1]
+                        uuid_str = original_name_parts[-1]
                     else:
                         # Fallback jika format nama tidak sesuai
-                        uuid = str(uuid.uuid4())[:8]
+                        import uuid as uuid_lib
+                        uuid_str = str(uuid_lib.uuid4())[:8]
                         
                     # Generate nama file baru dengan format {prefix}_{class_name}_{uuid}
                     # Menggunakan UUID yang sama dengan file original
-                    new_stem = f"{output_prefix}_{class_name}_{uuid}"
+                    new_stem = f"{output_prefix}_{class_name}_{uuid_str}"
                     
                     # Simpan gambar baru
                     new_img_path = output_images_dir / f"{new_stem}.jpg"

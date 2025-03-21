@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_handler.py
-Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan perbaikan num_workers dan deteksi data augmentasi
+Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan perbaikan num_workers dan integrasi logging
 """
 
 from typing import Dict, Any, Optional
@@ -27,25 +27,33 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     try:
         # Setup logging dengan integrasi UI
         logger = setup_ipython_logging(ui_components, "augmentation_handler")
+        ui_components['logger'] = logger  # Pastikan logger selalu tersedia di ui_components
+        
+        # Catat lokasi awal
+        if logger: logger.debug(f"Inisialisasi augmentation handler dengan cwd: {os.getcwd()}")
+        
+        # Load konfigurasi terlebih dahulu, sehingga UI dibuat dengan konfigurasi yang benar
+        saved_config = load_augmentation_config()
+        # Store config di ui_components agar bisa diakses oleh semua handler
+        ui_components['config'] = saved_config
         
         # Inisialisasi dan deteksi state augmentasi
-        ui_components = detect_augmentation_state(ui_components, env, config)
+        ui_components = detect_augmentation_state(ui_components, env, saved_config)
         
-        # Inisialisasi AugmentationManager
-        augmentation_manager = setup_augmentation_manager(ui_components, config)
+        # Inisialisasi AugmentationManager dengan config yang sudah diload
+        augmentation_manager = setup_augmentation_manager(ui_components, saved_config)
         ui_components['augmentation_manager'] = augmentation_manager
         
         # Setup handlers spesifik (dengan order yang benar untuk interdependensi)
-        ui_components = setup_progress_handler(ui_components, env, config)
-        ui_components = setup_click_handlers(ui_components, env, config)
-        ui_components = setup_visualization_handler(ui_components, env, config)
-        ui_components = setup_cleanup_handler(ui_components, env, config)
+        ui_components = setup_progress_handler(ui_components, env, saved_config)
+        ui_components = setup_click_handlers(ui_components, env, saved_config)
+        ui_components = setup_visualization_handler(ui_components, env, saved_config)
+        ui_components = setup_cleanup_handler(ui_components, env, saved_config)
         
         # Setup event handler untuk save button
-        ui_components['save_button'].on_click(lambda b: save_config_handler(ui_components, config))
+        ui_components['save_button'].on_click(lambda b: save_config_handler(ui_components, saved_config))
         
-        # Muat konfigurasi yang tersimpan dan update UI
-        saved_config = load_augmentation_config()
+        # Update UI dari konfigurasi yang telah dimuat
         if saved_config:
             ui_components = update_ui_from_config(ui_components, saved_config)
             logger.info(f"{ICONS['success']} Konfigurasi augmentasi dimuat")
@@ -148,28 +156,33 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
             ui_components['data_dir'] = ui_components['data_dir_input'].value
             ui_components['augmented_dir'] = ui_components['output_dir_input'].value
             
-        # Update konfigurasi dari UI
-        updated_config = update_config_from_ui(ui_components, config)
+        # Update konfigurasi dari UI dengan config yang sebelumnya diload
+        # Penting: Gunakan config yang sama dengan yang digunakan untuk load
+        updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
         
-        # Simpan konfigurasi ke file
-        success = save_augmentation_config(updated_config)
+        # Simpan konfigurasi yang sudah diupdate
+        config_path = "configs/augmentation_config.yaml"
+        success = save_augmentation_config(updated_config, config_path)
+        
+        # Simpan konfigurasi yang sudah diupdate ke ui_components
+        ui_components['config'] = updated_config
         
         # Update UI
         if success:
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Konfigurasi berhasil disimpan"))
+                display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Konfigurasi berhasil disimpan ke {config_path}"))
             
             # Update status panel
             from smartcash.ui.dataset.augmentation_initialization import update_status_panel
             update_status_panel(
                 ui_components, 
                 "success", 
-                f"{ICONS.get('success', '✅')} Konfigurasi augmentasi berhasil disimpan"
+                f"{ICONS.get('success', '✅')} Konfigurasi augmentasi berhasil disimpan ke {config_path}"
             )
             
             # Log
-            if logger: logger.success(f"{ICONS.get('success', '✅')} Konfigurasi augmentasi berhasil disimpan")
+            if logger: logger.success(f"{ICONS.get('success', '✅')} Konfigurasi augmentasi berhasil disimpan ke {config_path}")
         else:
             with ui_components['status']:
                 clear_output(wait=True)
@@ -184,7 +197,7 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
         if logger: logger.error(f"{ICONS.get('error', '❌')} Error menyimpan konfigurasi: {str(e)}")
 
 def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Any:
-    """Setup dan inisialisasi AugmentationManager dengan perbaikan parameter."""
+    """Setup dan inisialisasi AugmentationManager dengan perbaikan parameter dan logging."""
     from smartcash.ui.utils.constants import ICONS
     
     logger = ui_components.get('logger')
@@ -201,8 +214,11 @@ def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, 
         if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 5:
             num_workers = ui_components['aug_options'].children[5].value
         
-        # Buat instance AugmentationService dengan explicit parameter num_workers
-        augmentation_manager = AugmentationService(config, data_dir, logger, num_workers)
+        # PERBEDAAN UTAMA: Gunakan logger dari UI components untuk integrasi log
+        ui_logger = ui_components.get('logger')
+        
+        # Buat instance AugmentationService dengan explicit parameter num_workers dan logger UI
+        augmentation_manager = AugmentationService(config, data_dir, ui_logger, num_workers)
         
         # Simpan instance di ui_components
         ui_components['augmentation_manager'] = augmentation_manager

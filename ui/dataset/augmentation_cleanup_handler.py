@@ -1,10 +1,18 @@
 """
 File: smartcash/ui/dataset/augmentation_cleanup_handler.py
-Deskripsi: Perbaikan handler cleanup untuk mendukung lokasi augmentasi yang baru
+Deskripsi: Handler untuk membersihkan data augmentasi dengan progress tracking dan tanpa backup
 """
 
+from typing import Dict, Any
+from IPython.display import display, clear_output
+import shutil, os, glob
+from pathlib import Path
+from tqdm.auto import tqdm
+
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk tombol cleanup augmentasi data dengan progress tracking."""
     logger = ui_components.get('logger')
     
     def perform_cleanup():

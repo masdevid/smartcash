@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan untuk melakukan augmentasi dataset dengan penamaan file dan penanganan bbox yang ditingkatkan
+Deskripsi: Layanan untuk augmentasi dataset dengan peningkatan balancing kelas dan integrasi dengan data preprocessed
 """
 
 import os, time, random, shutil, numpy as np, uuid
@@ -15,7 +15,7 @@ from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.components.observer import notify, EventTopics
 
 class AugmentationService:
-    """Service untuk augmentasi dataset untuk meningkatkan variasi data dengan progress tracking terintegrasi."""
+    """Service untuk augmentasi dataset dengan dukungan balancing class distribution dan integrasi preprocessed."""
     
     def __init__(self, config: Dict, data_dir: str, logger=None, num_workers: int = 4):
         """Inisialisasi AugmentationService dengan progress tracking."""
@@ -23,7 +23,15 @@ class AugmentationService:
         self.logger = logger or get_logger("augmentation_service")
         self.num_workers = num_workers; self.utils = DatasetUtils(config, data_dir, logger)
         self._progress_callback = None; self._current_operation = ""; self._total_items = 0
-        self.logger.info(f"🔄 AugmentationService diinisialisasi dengan {num_workers} workers")
+        
+        # Default source adalah folder preprocessed
+        self.source_dir = self.config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed')
+        self.source_prefix = self.config.get('preprocessing', {}).get('file_prefix', 'rp')
+        
+        # Default output juga di folder preprocessed
+        self.output_dir = self.config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed')
+        
+        self.logger.info(f"🔄 AugmentationService diinisialisasi dengan {num_workers} workers dan source dari {self.source_dir}")
     
     def register_progress_callback(self, callback: Callable) -> None:
         """Register callback untuk melaporkan progress."""
@@ -37,10 +45,10 @@ class AugmentationService:
 
     def augment_dataset(self, split: str = 'train', augmentation_types: List[str] = None, 
                         target_count: int = None, target_factor: float = None, target_balance: bool = False, 
-                        class_list: List[str] = None, output_dir: Optional[str] = None, 
+                        class_list: List[str] = None, output_dir: Optional[str] = None, source_dir: Optional[str] = None,
                         num_variations: int = None, output_prefix: str = None, process_bboxes: bool = True, 
                         validate_results: bool = True, resume: bool = False, random_seed: int = 42, num_workers: int = 4) -> Dict[str, Any]:
-        """Augmentasi dataset dengan progress tracking terintegrasi dan penamaan file yang konsisten."""
+        """Augmentasi dataset dengan balancing class distribution berdasarkan data preprocessed."""
         self.num_workers = num_workers
         # Inisialisasi tracking dan parameter
         start_time = time.time(); random.seed(random_seed); np.random.seed(random_seed)
@@ -61,43 +69,40 @@ class AugmentationService:
         # Dapatkan pipeline augmentasi
         pipeline = self._get_augmentation_pipeline(augmentation_types)
         
-        # Setup direktori dan validasi
-        split_path = self.utils.get_split_path(split)
+        # Setup direktori dan validasi, jika disediakan gunakan itu, jika tidak gunakan default dari preprocessing
+        source_dir = source_dir or self.source_dir
+        output_path = Path(output_dir or self.output_dir)
+        
+        # Split path dari source dir
+        split_path = Path(source_dir) / split
         images_dir, labels_dir = split_path / 'images', split_path / 'labels'
+        
         if not (images_dir.exists() and labels_dir.exists()):
             error_msg = f"❌ Direktori dataset tidak lengkap: {split_path}"
             self.logger.error(error_msg); self._report_error(error_msg)
             return {'status': 'error', 'message': error_msg}
         
-        # Setup direktori output dengan fallback ke config
-        output_path = Path(output_dir or aug_config.get('output_dir', self.data_dir / f"{split}_augmented"))
-        output_images_dir, output_labels_dir = output_path / 'images', output_path / 'labels'
+        # Setup direktori output
+        output_images_dir, output_labels_dir = output_path / split / 'images', output_path / split / 'labels'
         output_images_dir.mkdir(parents=True, exist_ok=True); output_labels_dir.mkdir(parents=True, exist_ok=True)
         
+        # Analisis distribusi kelas untuk target balancing dengan mencari file dengan prefix
+        class_to_files = self._create_class_to_files_mapping_from_preprocessed(
+            images_dir, labels_dir, source_prefix=self.source_prefix
+        )
+        
+        # Log jumlah file per kelas yang ditemukan
+        self.logger.info(f"🔍 Ditemukan {sum(len(files) for files in class_to_files.values())} file dengan prefix {self.source_prefix} di {images_dir}")
+        for cls, files in class_to_files.items():
+            self.logger.info(f"   • Kelas {cls}: {len(files)} file")
+        
         # Analisis distribusi kelas untuk target balancing
-        class_distribution = {}
-        if target_balance or class_list:
-            try:
-                from smartcash.dataset.services.explorer.class_explorer import ClassExplorer
-                explorer = ClassExplorer(self.config, str(self.data_dir), self.logger, self.num_workers)
-                result = explorer.analyze_distribution(split)
-                if result['status'] == 'success':
-                    class_distribution = result['counts']
-                    class_distribution = {cls: count for cls, count in class_distribution.items() if not class_list or cls in class_list}
-            except ImportError: self.logger.warning("⚠️ ClassExplorer tidak tersedia, skip analisis distribusi kelas")
+        class_distribution = {cls: len(files) for cls, files in class_to_files.items()}
         
-        # Dapatkan semua file gambar valid
-        image_files = self.utils.find_image_files(images_dir)
-        if not image_files:
-            error_msg = f"⚠️ Tidak ada gambar ditemukan di {images_dir}"
-            self.logger.warning(error_msg); self._report_warning(error_msg)
-            return {'status': 'warning', 'message': error_msg}
-        
-        # Buat mapping file berdasarkan kelas
-        class_to_files = self._create_class_to_files_mapping(image_files, labels_dir)
-        
-        # Hitung target jumlah per kelas
-        targets = self._compute_augmentation_targets(class_distribution, class_to_files, target_count, target_factor, target_balance)
+        # Hitung target jumlah per kelas berdasarkan distribusi
+        targets = self._compute_augmentation_targets(
+            class_distribution, class_to_files, target_count, target_factor, target_balance
+        )
         
         # Log rencana augmentasi
         self._log_augmentation_plan(augmentation_types, targets, class_to_files)
@@ -129,7 +134,8 @@ class AugmentationService:
         elapsed_time = time.time() - start_time
         stats.update({
             'status': 'success', 'augmentation_types': augmentation_types, 'split': split,
-            'output_dir': str(output_path), 'duration': elapsed_time, 'total_files': stats['original'] + stats['generated']
+            'output_dir': str(output_path), 'duration': elapsed_time, 'total_files': stats['original'] + stats['generated'],
+            'class_distribution': class_distribution, 'balanced_targets': targets
         })
         
         # Log hasil
@@ -147,22 +153,52 @@ class AugmentationService:
         
         return stats
     
-    def _create_class_to_files_mapping(self, image_files: List[Path], labels_dir: Path) -> Dict[str, List[Tuple[Path, Path]]]:
-        """Buat mapping kelas ke file gambar dengan lebih efisien."""
+    def _create_class_to_files_mapping_from_preprocessed(self, images_dir: Path, labels_dir: Path, source_prefix: str = 'rp') -> Dict[str, List[Tuple[Path, Path]]]:
+        """Buat mapping kelas ke file gambar dari data preprocessed dengan filter prefix."""
         class_to_files = defaultdict(list)
         
-        for img_path in image_files:
-            label_path = labels_dir / f"{img_path.stem}.txt"
-            if not label_path.exists(): continue
+        # Filter gambar dengan prefix tertentu
+        preprocessed_images = [img for img in images_dir.glob(f"{source_prefix}_*.jpg")]
+        
+        # Metode 1: Ekstrak kelas dari nama file (format: {prefix}_{class}_{uuid})
+        for img_path in preprocessed_images:
+            # Parse nama file untuk mengekstrak kelas
+            img_name = img_path.stem
+            parts = img_name.split('_')
+            if len(parts) < 3 or parts[0] != source_prefix:
+                continue
+                
+            # Kelas ada di bagian tengah (prefix_class_uuid)
+            # Untuk format yang mungkin punya multiple underscore di nama kelas
+            # kita ambil semua bagian tengah kecuali bagian terakhir (uuid)
+            class_name = '_'.join(parts[1:-1])
             
-            # Parse label untuk menentukan kelas
-            bbox_data = self.utils.parse_yolo_label(label_path)
-            classes_in_image = {box.get('class_name', box.get('class_id', '')) for box in bbox_data}
+            # Cek file label yang sesuai
+            label_path = labels_dir / f"{img_name}.txt"
+            if not label_path.exists():
+                continue
+                
+            # Tambahkan ke mapping
+            class_to_files[class_name].append((img_path, label_path))
             
-            # Tambahkan file ke semua kelas yang ada di gambar
-            for class_name in classes_in_image:
-                if class_name and img_path not in [path for path, _ in class_to_files[class_name]]:
-                    class_to_files[class_name].append((img_path, label_path))
+        # Jika hasil masih kosong dan tidak ada file dengan format penamaan yang sesuai,
+        # fallback ke metode alternatif: baca langsung dari file label YOLO
+        if not class_to_files:
+            self.logger.warning(f"⚠️ Tidak ditemukan file dengan format penamaan {source_prefix}_class_uuid, mencoba metode alternatif")
+            for img_path in images_dir.glob('*.jpg'):
+                label_path = labels_dir / f"{img_path.stem}.txt"
+                if not label_path.exists():
+                    continue
+                
+                # Baca file label untuk menentukan kelas
+                try:
+                    with open(label_path, 'r') as f:
+                        label_content = f.readline().strip().split()
+                        if label_content:
+                            class_id = label_content[0]
+                            class_to_files[f"class{class_id}"].append((img_path, label_path))
+                except Exception:
+                    continue
         
         return dict(class_to_files)
     
@@ -279,7 +315,7 @@ class AugmentationService:
                                     target_count: Optional[int],
                                     target_factor: Optional[float],
                                     target_balance: bool) -> Dict[str, int]:
-        """Hitung jumlah target augmentasi untuk setiap kelas dengan one-liner style."""
+        """Hitung jumlah target augmentasi untuk balancing class distribution."""
         targets = {}
         
         # Jika tidak ada parameter, gunakan target_factor=2.0 sebagai default
@@ -287,14 +323,19 @@ class AugmentationService:
             target_factor = 2.0
             
         # Jika target balancing, gunakan kelas dengan jumlah sampel terbanyak
-        if target_balance and class_distribution: 
-            targets = {cls: max(class_distribution.values()) for cls in class_distribution}
+        if target_balance and class_distribution:
+            # Menggunakan kelas dengan jumlah terbanyak sebagai target semua kelas
+            max_class_count = max(class_distribution.values())
+            targets = {cls: max_class_count for cls in class_distribution}
+            self.logger.info(f"🎯 Target balancing: Semua kelas akan dibalancing ke {max_class_count} gambar")
         # Jika ada target count, gunakan itu
         elif target_count: 
             targets = {cls: target_count for cls in class_distribution or class_to_files.keys()}
+            self.logger.info(f"🎯 Target count: Semua kelas akan diaugmentasi ke {target_count} gambar")
         # Jika ada target factor, kalikan jumlah current
         elif target_factor: 
             targets = {cls: int(len(files) * target_factor) for cls, files in class_to_files.items()}
+            self.logger.info(f"🎯 Target factor: Semua kelas akan diaugmentasi dengan faktor {target_factor}x")
         # Fallback ke current count jika tidak ada target
         else: 
             targets = {cls: len(files) for cls, files in class_to_files.items()}

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_component.py
-Deskripsi: Komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana, slider workers dan perbaikan warna teks
+Deskripsi: Komponen UI untuk augmentasi dataset dengan fokus pada augmentasi dari data preprocessed
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any
 
 def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana.
+    Buat komponen UI untuk augmentasi dataset dengan fokus pada data preprocessed.
     
     Args:
         env: Environment manager
@@ -26,29 +26,12 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
-                          "Menambah variasi data dengan augmentasi untuk meningkatkan performa model")
+                          "Menambah variasi data dari hasil preprocessing untuk balancing distribusi kelas")
     
     # Panel info status dengan komponen standar
     status_panel = widgets.HTML(
-        value=create_info_alert("Konfigurasi augmentasi dataset", "info").value
+        value=create_info_alert("Konfigurasi augmentasi dataset dari data preprocessed", "info").value
     )
-    
-    # Path setting dengan opsi untuk mengubah lokasi dataset
-    location_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin:5px 0'>{ICONS['folder']} Lokasi Dataset</h4>"),
-        widgets.Text(
-            value='data',
-            description='Data Dir:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%', margin='5px 0')
-        ),
-        widgets.Text(
-            value='data/augmented',
-            description='Output Dir:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%', margin='5px 0')
-        )
-    ])
     
     # Augmentation options dengan struktur yang lebih ringkas dan slider workers
     aug_options = widgets.VBox([
@@ -91,6 +74,12 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
             description='Workers:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='70%')
+        ),
+        # Tambah checkbox untuk target balancing
+        widgets.Checkbox(
+            value=True,
+            description='Balance classes',
+            style={'description_width': 'initial'}
         )
     ])
     
@@ -166,7 +155,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         status_panel,
-        location_container,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
         aug_options,
         create_divider(),
@@ -184,8 +172,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
-        'data_dir_input': location_container.children[1],
-        'output_dir_input': location_container.children[2],
         'aug_options': aug_options,
         'augment_button': augment_button,
         'stop_button': stop_button,

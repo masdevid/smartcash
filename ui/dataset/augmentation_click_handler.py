@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan reset yang benar ke konfigurasi default
+Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan dukungan balancing kelas dan sumber dari preprocessed
 """
 
 from typing import Dict, Any
@@ -25,11 +25,6 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Persiapkan augmentasi dengan utilitas UI standar
         from smartcash.ui.dataset.augmentation_initialization import update_status_panel
         from smartcash.ui.utils.alert_utils import create_status_indicator
-
-        # Update paths dari input
-        if 'data_dir_input' in ui_components and 'output_dir_input' in ui_components:
-            ui_components['data_dir'] = ui_components['data_dir_input'].value
-            ui_components['augmented_dir'] = ui_components['output_dir_input'].value
 
         # Update UI untuk menunjukkan proses dimulai
         with ui_components['status']:
@@ -110,6 +105,11 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         process_bboxes = ui_components['aug_options'].children[3].value
         validate = ui_components['aug_options'].children[4].value
         
+        # Cek opsi balancing kelas (opsi baru)
+        target_balance = False
+        if len(ui_components['aug_options'].children) > 6:
+            target_balance = ui_components['aug_options'].children[6].value
+        
         # Register progress callback jika tersedia
         if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
             ui_components['register_progress_callback'](augmentation_manager)
@@ -119,11 +119,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         
         # Jalankan augmentasi langsung
         try:
-            # Ambil data_dir dan output_dir dari ui_components
-            data_dir = ui_components.get('data_dir', 'data')
-            output_dir = ui_components.get('augmented_dir', 'data/augmented')
-            
-            # Jalankan augmentasi
+            # Gunakan sumber data preprocessed dan balancing kelas
             result = augmentation_manager.augment_dataset(
                 split='train',  # Augmentasi untuk train split
                 augmentation_types=aug_types,
@@ -132,7 +128,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 validate_results=validate,
                 resume=False,  # Tidak menggunakan resume
                 process_bboxes=process_bboxes,
-                output_dir=output_dir,
+                target_balance=target_balance,  # Aktifkan balancing
                 num_workers=num_workers  # Gunakan jumlah workers dari UI
             )
             
@@ -143,29 +139,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                     clear_output(wait=True)
                     display(create_status_indicator("success", f"{ICONS['success']} Augmentasi dataset selesai"))
                 
-                # Update summary jika fungsi tersedia
+                # Update summary dengan hasil augmentasi
                 if 'update_summary' in ui_components and callable(ui_components['update_summary']):
                     ui_components['update_summary'](result)
-                else:
-                    # Fallback - tampilkan summary sederhana
-                    with ui_components['summary_container']:
-                        clear_output(wait=True)
-                        display(widgets.HTML(
-                            f"""<div style="padding:10px; color: black">
-                            <h4>📊 Hasil Augmentasi</h4>
-                            <ul>
-                                <li><b>File asli:</b> {result.get('original', 0)}</li>
-                                <li><b>File augmentasi:</b> {result.get('generated', 0)}</li>
-                                <li><b>Total file:</b> {result.get('total_files', 0)}</li>
-                                <li><b>Durasi:</b> {result.get('duration', 0):.2f} detik</li>
-                                <li><b>Jenis augmentasi:</b> {', '.join(aug_types)}</li>
-                                <li><b>Lokasi output:</b> {output_dir}</li>
-                            </ul>
-                            </div>"""
-                        ))
-                    
-                    # Tampilkan summary container
-                    ui_components['summary_container'].layout.display = 'block'
                 
                 # Update status panel
                 update_status_panel(

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/preprocessor/dataset_preprocessor.py
-Deskripsi: Layanan preprocessing dataset dan penyimpanan hasil untuk penggunaan berikutnya
+Deskripsi: Layanan preprocessing dataset dengan fitur penamaan file berdasarkan kelas dan ID unik
 """
 
 import os
@@ -11,6 +11,8 @@ from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 import cv2
 import numpy as np
 from tqdm.auto import tqdm
+import uuid
+import re
 
 from smartcash.common.exceptions import DatasetProcessingError
 from smartcash.dataset.services.preprocessor.pipeline import PreprocessingPipeline
@@ -18,7 +20,7 @@ from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
 from smartcash.components.observer import notify, EventTopics
 
 class DatasetPreprocessor:
-    """Layanan preprocessing dataset dan penyimpanan hasil untuk penggunaan berikutnya."""
+    """Layanan preprocessing dataset dengan penamaan file berdasarkan kelas dan ID unik."""
     
     def __init__(self, config, logger=None):
         """
@@ -38,6 +40,9 @@ class DatasetPreprocessor:
         # Setup direktori output
         output_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
         self.storage = PreprocessedStorage(output_dir, self.logger)
+        
+        # Prefix untuk penamaan file
+        self.file_prefix = config.get('preprocessing', {}).get('file_prefix', 'rp')
         
     def register_progress_callback(self, callback: Callable) -> None:
         """
@@ -193,6 +198,47 @@ class DatasetPreprocessor:
         except Exception as e:
             self.logger.error(f"❌ Gagal preprocessing split {split}: {str(e)}")
             return {'processed': 0, 'skipped': 0, 'failed': 1, 'success': False, 'error': str(e)}
+
+    def _extract_class_from_label(self, label_path: Path) -> Optional[str]:
+        """
+        Ekstrak kelas dari file label YOLO.
+        
+        Args:
+            label_path: Path ke file label
+            
+        Returns:
+            Nama kelas atau None jika tidak ditemukan
+        """
+        if not label_path.exists():
+            return None
+            
+        try:
+            # Baca file label
+            with open(label_path, 'r') as f:
+                label_lines = f.readlines()
+                
+            # Cek apakah ada isi label
+            if not label_lines:
+                return None
+                
+            # Ambil class ID dari line pertama
+            first_line = label_lines[0].strip().split()
+            if not first_line:
+                return None
+                
+            # Class ID ada di posisi pertama format YOLO
+            class_id = first_line[0]
+            
+            # Map class ID ke nama kelas jika tersedia
+            class_names = self.config.get('data', {}).get('class_names', {})
+            if class_names and class_id in class_names:
+                return class_names[class_id]
+                
+            # Fallback ke class ID jika nama kelas tidak tersedia
+            return f"class{class_id}"
+        except Exception as e:
+            self.logger.debug(f"⚠️ Gagal ekstrak kelas dari {label_path}: {str(e)}")
+            return None
     
     def _get_source_dir(self, split: str) -> str:
         """
@@ -218,7 +264,7 @@ class DatasetPreprocessor:
                               target_images_dir: Path, target_labels_dir: Path,
                               preprocessing_options: Dict[str, Any] = None) -> bool:
         """
-        Preprocess satu gambar dan label terkait, dan simpan hasilnya.
+        Preprocess satu gambar dan label terkait, dan simpan hasilnya dengan penamaan yang ditingkatkan.
         
         Args:
             img_path: Path ke file gambar
@@ -260,8 +306,17 @@ class DatasetPreprocessor:
             # Preprocess gambar
             processed_image = self.pipeline.process(image)
             
+            # Ekstrak kelas dari file label untuk penamaan file
+            banknote_class = self._extract_class_from_label(label_path)
+            
+            # Generate ID unik untuk file
+            unique_id = str(uuid.uuid4())[:8]  # 8 karakter pertama dari UUID
+            
+            # Generate nama file baru dengan format {prefix}_{class}_{unique_id}
+            new_filename = f"{self.file_prefix}_{banknote_class or 'unknown'}_{unique_id}"
+            
             # Simpan hasil gambar
-            output_path = target_images_dir / f"{img_id}.jpg"
+            output_path = target_images_dir / f"{new_filename}.jpg"
             
             # Normalisasi jika perlu sebelum menyimpan
             if normalize and processed_image.dtype == np.float32:
@@ -271,21 +326,25 @@ class DatasetPreprocessor:
                 
             cv2.imwrite(str(output_path), save_image)
             
-            # Salin file label tanpa preprocessing (format YOLO)
-            import shutil
-            shutil.copy2(label_path, target_labels_dir / f"{img_id}.txt")
+            # Salin file label dengan nama baru
+            with open(label_path, 'r') as src_file:
+                with open(target_labels_dir / f"{new_filename}.txt", 'w') as dst_file:
+                    dst_file.write(src_file.read())
             
             # Simpan metadata
             metadata = {
                 'original_path': str(img_path),
+                'original_id': img_id,
                 'original_size': (image.shape[1], image.shape[0]),  # width, height
                 'processed_size': (processed_image.shape[1], processed_image.shape[0]),
-                'preprocessing_timestamp': time.time()
+                'preprocessing_timestamp': time.time(),
+                'banknote_class': banknote_class,
+                'new_filename': new_filename
             }
             
             # Simpan ke storage - dengan penanganan error untuk backward compatibility
             try:
-                self.storage.save_metadata(split=Path(target_images_dir).parent.name, image_id=img_id, metadata=metadata)
+                self.storage.save_metadata(split=Path(target_images_dir).parent.name, image_id=new_filename, metadata=metadata)
             except (AttributeError, Exception) as e:
                 # Jika metode save_metadata tidak ada (backward compatibility)
                 self.logger.debug(f"⚠️ Storage tidak mendukung save_metadata: {str(e)}")

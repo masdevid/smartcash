@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_initialization.py
-Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan deteksi otomatis data augmentasi dan tampilan tombol visualisasi
+Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan fokus pada data preprocessed
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from IPython.display import display, HTML
 import ipywidgets as widgets
 
 def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Inisialisasi komponen augmentasi dataset dengan deteksi otomatis data augmentasi."""
+    """Inisialisasi komponen augmentasi dataset dengan deteksi data preprocessed."""
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.utils.alert_utils import create_info_alert
     
@@ -20,57 +20,49 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
         # Gunakan drive_utils standar untuk deteksi Google Drive
         from smartcash.ui.utils.drive_utils import detect_drive_mount
         
-        # Inisialisasi data directory dengan drive_utils standar
-        drive_mounted, drive_path = detect_drive_mount()
-        
-        # Dapatkan paths dari config dengan fallback ke default
-        default_data_dir = 'data'
-        default_augmented_dir = 'data/augmented'
+        # Default lokasi preprocessed dari config
+        preprocessed_dir = config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed')
+        file_prefix = config.get('preprocessing', {}).get('file_prefix', 'rp')
         
         # Gunakan Google Drive jika tersedia
+        drive_mounted, drive_path = detect_drive_mount()
         if drive_mounted and drive_path:
             smartcash_dir = f"{drive_path}/SmartCash"
-            default_data_dir = f"{smartcash_dir}/data"
-            default_augmented_dir = f"{smartcash_dir}/data/augmented"
-        
-        # Ekstrak paths dari config jika tersedia
-        data_dir = config.get('data', {}).get('dir', default_data_dir)
-        augmented_dir = config.get('augmentation', {}).get('output_dir', default_augmented_dir)
+            preprocessed_dir = f"{smartcash_dir}/{preprocessed_dir}"
         
         # Konversi ke path absolut untuk ditampilkan
-        abs_data_dir = os.path.abspath(data_dir)
-        abs_augmented_dir = os.path.abspath(augmented_dir)
+        abs_preprocessed_dir = os.path.abspath(preprocessed_dir)
         
-        # Update input values dengan locations aktual
-        if 'data_dir_input' in ui_components:
-            ui_components['data_dir_input'].value = data_dir
-        if 'output_dir_input' in ui_components:
-            ui_components['output_dir_input'].value = augmented_dir
-            
         # Update status panel dengan utils standar
         update_status_panel(
             ui_components, 
             "info", 
-            f"Dataset akan diaugmentasi dari sumber: <strong>{abs_data_dir}</strong> ke <strong>{abs_augmented_dir}</strong>"
+            f"Augmentasi akan dilakukan dari sumber: <strong>{abs_preprocessed_dir}</strong> menggunakan file dengan prefix <strong>{file_prefix}</strong>"
         )
         
         # Cek status augmented data yang sudah ada
-        augmented_path = Path(augmented_dir)
+        preprocessed_path = Path(preprocessed_dir)
         is_augmented = False
         
-        # Periksa apakah ada gambar augmentasi di direktori output
-        if augmented_path.exists() and (augmented_path/'images').exists():
-            # Cari file dengan pola augmentasi berdasarkan prefix dari config atau default 'aug'
-            aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
-            augmented_files = list((augmented_path/'images').glob(f"{aug_prefix}_*.*"))
-            is_augmented = len(augmented_files) > 0
+        # Periksa apakah ada gambar augmentasi di direktori preprocessed
+        aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+        
+        # Cek apakah ada file dengan prefix aug di direktori preprocessed
+        if preprocessed_path.exists():
+            for split in ['train', 'valid', 'test']:
+                images_dir = preprocessed_path / split / 'images'
+                if images_dir.exists():
+                    augmented_files = list(images_dir.glob(f"{aug_prefix}_*.*"))
+                    if augmented_files:
+                        is_augmented = True
+                        break
         
         if is_augmented:
             # Tampilkan informasi dengan utilitas standar
             update_status_panel(
                 ui_components,
                 "success",
-                f"Data teraugmentasi sudah tersedia di: {abs_augmented_dir}"
+                f"Data augmentasi sudah tersedia dengan prefix: {aug_prefix} di {abs_preprocessed_dir}"
             )
             
             # Tampilkan tombol cleanup dan visualisasi
@@ -80,13 +72,38 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
             if 'visualization_buttons' in ui_components:
                 ui_components['visualization_buttons'].layout.display = 'flex'
                 
-            if logger: logger.info(f"{ICONS['folder']} Data augmentasi terdeteksi di: {abs_augmented_dir}")
+            if logger: logger.info(f"{ICONS['folder']} Data augmentasi terdeteksi di: {abs_preprocessed_dir}")
         
-        # Store paths di ui_components
+        # Cari file preprocessed dengan prefix rp
+        preprocessed_found = False
+        if preprocessed_path.exists():
+            for split in ['train', 'valid', 'test']:
+                images_dir = preprocessed_path / split / 'images'
+                if images_dir.exists():
+                    rp_files = list(images_dir.glob(f"{file_prefix}_*.*"))
+                    if rp_files:
+                        preprocessed_found = True
+                        update_status_panel(
+                            ui_components,
+                            "info",
+                            f"Ditemukan {len(rp_files)} file sumber dengan prefix {file_prefix} di {split}"
+                        )
+                        if logger: logger.info(f"{ICONS['file']} Ditemukan {len(rp_files)} file sumber di {images_dir}")
+                        
+        if not preprocessed_found:
+            update_status_panel(
+                ui_components,
+                "warning",
+                f"Tidak ditemukan file sumber dengan prefix {file_prefix}. Jalankan preprocessing terlebih dahulu."
+            )
+            if logger: logger.warning(f"{ICONS['warning']} Tidak ditemukan file sumber dengan prefix {file_prefix}")
+        
+        # Store info di ui_components
         ui_components.update({
-            'data_dir': data_dir,
-            'augmented_dir': augmented_dir,
-            'is_augmented': is_augmented
+            'preprocessed_dir': preprocessed_dir,
+            'file_prefix': file_prefix,
+            'is_augmented': is_augmented,
+            'preprocessed_found': preprocessed_found
         })
         
     except Exception as e:

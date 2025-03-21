@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_config_handler.py
-Deskripsi: Handler konfigurasi augmentasi dengan implementasi default config untuk reset yang benar
+Deskripsi: Handler konfigurasi augmentasi dengan dukungan balancing kelas dan sumber preprocessed
 """
 
 from typing import Dict, Any, Optional
@@ -20,23 +20,15 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     # Get augmentation types from UI
     aug_types = [type_map.get(t, 'combined') for t in ui_components['aug_options'].children[0].value]
     
-    # Get directories from inputs
-    data_dir = ui_components.get('data_dir', 'data')
-    augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
-    
-    # Update dari input lokasi jika tersedia
-    if 'data_dir_input' in ui_components:
-        data_dir = ui_components['data_dir_input'].value
-    if 'output_dir_input' in ui_components:
-        augmented_dir = ui_components['output_dir_input'].value
-    
-    # Use relative paths for storage
-    rel_augmented_dir = os.path.relpath(augmented_dir, os.getcwd()) if os.path.isabs(augmented_dir) else augmented_dir
-    
     # Dapatkan jumlah workers dari UI jika tersedia
     num_workers = 4  # Default value
     if len(ui_components['aug_options'].children) > 5:
         num_workers = ui_components['aug_options'].children[5].value
+    
+    # Cek opsi balancing kelas (opsi baru)
+    target_balance = False
+    if len(ui_components['aug_options'].children) > 6:
+        target_balance = ui_components['aug_options'].children[6].value
     
     # Update config
     config['augmentation'].update({
@@ -46,14 +38,22 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         'output_prefix': ui_components['aug_options'].children[2].value,
         'process_bboxes': ui_components['aug_options'].children[3].value if len(ui_components['aug_options'].children) > 3 else True,
         'validate_results': ui_components['aug_options'].children[4].value if len(ui_components['aug_options'].children) > 4 else True,
-        'resume': False,
-        'output_dir': rel_augmented_dir,
-        'num_workers': num_workers
+        'num_workers': num_workers,
+        'target_balance': target_balance,
+        'resume': False
     })
     
-    # Update data directory
-    config['data'] = config.get('data', {})
-    config['data']['dir'] = os.path.relpath(data_dir, os.getcwd()) if os.path.isabs(data_dir) else data_dir
+    # Update preprocessing default lokasi untuk source_dir
+    if 'preprocessing' not in config:
+        config['preprocessing'] = {}
+    
+    # Pastikan source_dir tersedia di config
+    if 'preprocessed_dir' not in config['preprocessing']:
+        config['preprocessing']['preprocessed_dir'] = 'data/preprocessed'
+    
+    # Pastikan file_prefix untuk penamaan file preprocessed tersedia
+    if 'file_prefix' not in config['preprocessing']:
+        config['preprocessing']['file_prefix'] = 'rp'
     
     return config
 
@@ -105,8 +105,7 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
 
 def load_default_augmentation_config() -> Dict[str, Any]:
     """
-    Load konfigurasi default untuk augmentasi dataset.
-    Fungsi ini menyediakan nilai default yang konsisten untuk reset ke kondisi awal.
+    Load konfigurasi default untuk augmentasi dataset dengan support balancing dan sumber preprocessed.
     
     Returns:
         Dictionary konfigurasi default
@@ -121,8 +120,8 @@ def load_default_augmentation_config() -> Dict[str, Any]:
             "process_bboxes": True,
             "validate_results": True,
             "resume": False,
-            "output_dir": "data/augmented",
             "num_workers": 4,
+            "target_balance": True,
             "position": {
                 "fliplr": 0.5,
                 "flipud": 0.0,
@@ -153,50 +152,31 @@ def load_default_augmentation_config() -> Dict[str, Any]:
                 "probability": 0.3
             }
         },
-        "data": {
-            "dir": "data"
+        "preprocessing": {
+            "file_prefix": "rp",
+            "preprocessed_dir": "data/preprocessed"
         }
     }
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Update UI components dari konfigurasi."""
-    if not config or 'augmentation' not in config:
-        # Jika config tidak valid, gunakan default
-        config = load_default_augmentation_config()
-        
+    if not config or 'augmentation' not in config: config = load_default_augmentation_config()
     aug_config = config['augmentation']
     
-    # Update lokasi dataset jika tersedia
-    if 'data' in config and 'dir' in config['data']:
-        if 'data_dir_input' in ui_components:
-            ui_components['data_dir_input'].value = config['data']['dir']
-            ui_components['data_dir'] = config['data']['dir']
-    
-    # Update lokasi output
-    if 'output_dir' in aug_config:
-        if 'output_dir_input' in ui_components:
-            ui_components['output_dir_input'].value = aug_config['output_dir']
-            ui_components['augmented_dir'] = aug_config['output_dir']
-    
     try:
-        # Update augmentation types
+        # Update augmentation types dengan conversion map untuk UI
         if 'types' in aug_config:
             type_map = {'combined': 'Combined (Recommended)', 'position': 'Position Variations', 
-                      'lighting': 'Lighting Variations', 'extreme_rotation': 'Extreme Rotation'}
+                       'lighting': 'Lighting Variations', 'extreme_rotation': 'Extreme Rotation'}
             ui_components['aug_options'].children[0].value = [type_map.get(t, 'Combined (Recommended)') 
                                                          for t in aug_config['types'] 
                                                          if t in type_map.keys()]
         
-        # Update inputs dengan values dari config
-        options_map = {
-            1: 'num_variations',
-            2: 'output_prefix',
-            3: 'process_bboxes', 
-            4: 'validate_results',
-            5: 'num_workers'
-        }
+        # Update inputs dengan values dari config dengan mapping field-index
+        options_map = {1: 'num_variations', 2: 'output_prefix', 3: 'process_bboxes', 
+                      4: 'validate_results', 5: 'num_workers', 6: 'target_balance'}
         
-        # Update aug_options
+        # Update semua fields berdasarkan mapping
         for idx, field in options_map.items():
             if idx < len(ui_components['aug_options'].children) and field in aug_config:
                 ui_components['aug_options'].children[idx].value = aug_config[field]

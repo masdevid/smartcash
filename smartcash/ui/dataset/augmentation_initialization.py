@@ -12,8 +12,7 @@ import ipywidgets as widgets
 
 def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """Inisialisasi komponen augmentasi dataset dengan deteksi multi-lokasi."""
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.utils.alert_utils import create_info_alert
+    from smartcash.ui.utils.constants import ICONS
     
     logger = ui_components.get('logger')
     
@@ -101,17 +100,17 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
                 update_status_panel(
                     ui_components,
                     "info",
-                    f"Ditemukan {rp_files_count} file sumber dengan prefix {file_prefix} di split train"
+                    f"Ditemukan {rp_files_count} file sumber dengan prefix <strong>{file_prefix}_**</strong> di split train"
                 )
                 if logger: logger.info(f"{ICONS['file']} Ditemukan {rp_files_count} file sumber di {train_images_dir}")
-                        
+                
         if not preprocessed_found:
             update_status_panel(
                 ui_components,
                 "warning",
-                f"Tidak ditemukan file sumber dengan prefix {file_prefix} di split train. Jalankan preprocessing terlebih dahulu."
+                f"Tidak ditemukan file sumber dengan prefix <strong>{file_prefix}_**</strong> di split train. Jalankan preprocessing terlebih dahulu."
             )
-            if logger: logger.warning(f"{ICONS['warning']} Tidak ditemukan file sumber dengan prefix {file_prefix} di split train")
+            if logger: logger.warning(f"{ICONS['warning']} Tidak ditemukan file sumber dengan prefix <strong>{file_prefix}_**</strong> di split train")
         
         # Store info di ui_components
         ui_components.update({

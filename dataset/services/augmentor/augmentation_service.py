@@ -31,7 +31,6 @@ class AugmentationService:
         # Default output juga di folder preprocessed
         self.output_dir = self.config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed')
         
-        self.logger.info(f"🔄 AugmentationService diinisialisasi dengan {num_workers} workers dan source dari {self.source_dir}")
     
     def register_progress_callback(self, callback: Callable) -> None:
         """Register callback untuk melaporkan progress."""

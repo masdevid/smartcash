@@ -13,12 +13,12 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     
     # Import dan inisialisasi utilitas standar
     from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+    from smartcash.ui.utils.alert_utils import create_status_indicator
     from smartcash.ui.utils.logging_utils import setup_ipython_logging, reset_logging
     
     # Import handlers terpisah yang dikonsolidasikan di sini
-    from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state, update_status_panel
-    from smartcash.ui.dataset.augmentation_config_handler import load_augmentation_config, update_ui_from_config, update_config_from_ui, save_augmentation_config
+    from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state
+    from smartcash.ui.dataset.augmentation_config_handler import load_augmentation_config, update_ui_from_config
     from smartcash.ui.dataset.augmentation_click_handler import setup_click_handlers
     from smartcash.ui.dataset.augmentation_progress_handler import setup_progress_handler
     from smartcash.ui.dataset.augmentation_visualization_handler import setup_visualization_handler
@@ -33,6 +33,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         
         # Inisialisasi AugmentationManager
         augmentation_manager = setup_augmentation_manager(ui_components, config)
+        ui_components['augmentation_manager'] = augmentation_manager
         
         # Setup handlers spesifik (dengan order yang benar untuk interdependensi)
         ui_components = setup_progress_handler(ui_components, env, config)
@@ -107,13 +108,8 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         def cleanup_resources():
             """Bersihkan resources yang digunakan oleh augmentation handler."""
             # Unregister observer group
-            try:
-                from smartcash.components.observer.manager_observer import ObserverManager
-                observer_manager = ObserverManager()
-                observer_manager.unregister_group("augmentation_observers")
-                logger.debug(f"{ICONS['cleanup']} Observer group berhasil dibersihkan")
-            except ImportError:
-                pass
+            if 'observer_manager' in ui_components:
+                ui_components['observer_manager'].cleanup()
             
             # Reset flags
             ui_components['augmentation_running'] = False

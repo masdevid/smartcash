@@ -12,27 +12,9 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Callable, Tuple
 from datetime import datetime
 
-from smartcash.ui.utils.constants import COLORS, ICONS, FILE_SIZE_UNITS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from smartcash.common.utils import format_size
+from smartcash.ui.utils.constants import COLORS, ICONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 
-def format_file_size(size_bytes: int) -> str:
-    """
-    Format ukuran file menjadi string yang mudah dibaca.
-    
-    Args:
-        size_bytes: Ukuran file dalam bytes
-        
-    Returns:
-        String berisi ukuran file dengan unit yang sesuai
-    """
-    if size_bytes == 0:
-        return "0B"
-    
-    i = 0
-    while size_bytes >= 1024 and i < len(FILE_SIZE_UNITS) - 1:
-        size_bytes /= 1024
-        i += 1
-    
-    return f"{size_bytes:.2f}{FILE_SIZE_UNITS[i]}"
 
 def display_file_info(file_path: str, description: Optional[str] = None) -> widgets.HTML:
     """
@@ -52,7 +34,7 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
         file_time = path.stat().st_mtime
         
         # Format ukuran file
-        size_str = format_file_size(file_size)
+        size_str = format_size(file_size)
         
         # Format waktu
         time_str = datetime.fromtimestamp(file_time).strftime('%Y-%m-%d %H:%M:%S')
@@ -478,7 +460,7 @@ def get_file_info(file_path: str) -> Dict[str, Any]:
             'stem': path.stem,
             'suffix': path.suffix,
             'size': file_size,
-            'size_formatted': format_file_size(file_size),
+            'size_formatted': format_size(file_size),
             'created': datetime.fromtimestamp(stat.st_ctime),
             'modified': datetime.fromtimestamp(stat.st_mtime),
             'is_file': path.is_file(),

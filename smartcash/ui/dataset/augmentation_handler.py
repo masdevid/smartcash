@@ -93,7 +93,6 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
                         <li><b>Total file:</b> {result.get('total_files', 0)}</li>
                         <li><b>Durasi:</b> {result.get('duration', 0):.2f} detik</li>
                         <li><b>Jenis augmentasi:</b> {', '.join(result.get('augmentation_types', []))}</li>
-                        <li><b>Output dir:</b> {result.get('output_dir', '')}</li>
                     </ul>
                     </div>"""
                 ))

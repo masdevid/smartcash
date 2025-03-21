@@ -28,7 +28,6 @@ from smartcash.ui.utils.visualization_utils import (
     create_model_comparison_plot
 )
 from smartcash.ui.utils.file_utils import (
-    format_file_size, 
     display_file_info, 
     directory_tree, 
     create_file_upload_widget,
@@ -105,7 +104,6 @@ __all__ = [
     'create_model_comparison_plot',
     
     # File Utils
-    'format_file_size',
     'display_file_info',
     'directory_tree',
     'create_file_upload_widget',

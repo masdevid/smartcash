@@ -135,14 +135,11 @@ def file_size(path: Union[str, Path]) -> int:
 
 def format_size(size_bytes: int) -> str:
     """Format ukuran dalam bytes ke format yang lebih mudah dibaca."""
-    if size_bytes < 1024:
-        return f"{size_bytes} B"
-    elif size_bytes < 1048576:
-        return f"{size_bytes/1024:.2f} KB"
-    elif size_bytes < 1073741824:
-        return f"{size_bytes/1048576:.2f} MB"
-    else:
-        return f"{size_bytes/1073741824:.2f} GB"
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} TB"
 
 def load_json(path: Union[str, Path]) -> Dict:
     """Load data dari file JSON."""

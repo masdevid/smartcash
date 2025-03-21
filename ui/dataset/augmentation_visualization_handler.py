@@ -5,6 +5,7 @@ Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan peningkatan
 
 from typing import Dict, Any, Optional, List, Tuple
 import os
+import time  # Tambahkan import time yang hilang
 from pathlib import Path
 import numpy as np
 import cv2
@@ -106,6 +107,7 @@ def visualize_dataset(ui_components: Dict[str, Any], mode: str = 'single', num_s
         # Show visualization container
         if 'visualization_container' in ui_components:
             ui_components['visualization_container'].layout.display = 'block'
+
 def find_label_path(img_path: Path) -> Optional[Path]:
     """
     Fungsi helper untuk mencari label path dari image path.
@@ -214,12 +216,14 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
             labels.append((img_path, label_path))
     
     if labels:
-        display_label_info(labels)
+        # Perbaiki pemanggilan display_label_info dengan labels_dir yang benar
+        display_label_info(labels, images_dir.parent.parent / 'labels')
 
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi."""
     from smartcash.ui.utils.alert_utils import create_info_alert
+    from smartcash.common.utils import format_size
     
     # Get augmentation prefix
     aug_prefix = "aug"
@@ -303,7 +307,6 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
     
     plt.tight_layout()
     plt.show()
-    
     # Tampilkan info perbandingan
     for orig_path, aug_path in matched_pairs:
         try:
@@ -330,44 +333,35 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
         except Exception:
             pass
 
-def display_label_info(image_files: List[Path], labels_dir: Path):
-    """Tampilkan informasi label untuk gambar-gambar yang dipilih."""
-    if not labels_dir.exists(): return
+def display_label_info(images_with_labels: List[Tuple[Path, Path]], labels_dir: Path):
+    """
+    Tampilkan informasi label untuk gambar-gambar yang dipilih.
     
-    matched_labels = []
-    for img_file in image_files:
-        label_file = labels_dir / f"{img_file.stem}.txt"
-        if label_file.exists():
-            matched_labels.append((img_file, label_file))
+    Args:
+        images_with_labels: List of tuples (image_path, label_path)
+        labels_dir: Path direktori label (untuk kompatibilitas)
+    """
+    if not images_with_labels: return
     
-    if matched_labels:
-        display(HTML(f"<h4 style='color:{COLORS['dark']}'>Informasi Label</h4>"))
-        for img_file, label_file in matched_labels:
-            try:
-                with open(label_file, 'r') as f:
-                    label_lines = f.read().strip().splitlines()
-                
-                num_boxes = len(label_lines)
-                classes = set()
-                for line in label_lines:
-                    parts = line.split()
-                    if parts: classes.add(parts[0])
-                
-                # Tampilkan nama file yang dipersingkat
-                shortened_name = shorten_filename(img_file.name, 20)
-                
-                display(HTML(f"""
-                <div style="margin:5px 0; padding:5px; border-left:3px solid {COLORS['primary']};">
-                    <p style="margin:0; color:{COLORS['dark']};"><strong>{shortened_name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
-                </div>
-                """))
-            except Exception:
-                pass
-
-def format_size(size_bytes: int) -> str:
-    """Format ukuran file dalam bytes ke format yang mudah dibaca."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.2f} TB"
+    display(HTML(f"<h4 style='color:{COLORS['dark']}'>Informasi Label</h4>"))
+    for img_file, label_file in images_with_labels:
+        try:
+            with open(label_file, 'r') as f:
+                label_lines = f.read().strip().splitlines()
+            
+            num_boxes = len(label_lines)
+            classes = set()
+            for line in label_lines:
+                parts = line.split()
+                if parts: classes.add(parts[0])
+            
+            # Tampilkan nama file yang dipersingkat
+            shortened_name = shorten_filename(img_file.name, 20)
+            
+            display(HTML(f"""
+            <div style="margin:5px 0; padding:5px; border-left:3px solid {COLORS['primary']};">
+                <p style="margin:0; color:{COLORS['dark']};"><strong>{shortened_name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
+            </div>
+            """))
+        except Exception:
+            pass

@@ -160,7 +160,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         description='Visualisasi Distribusi Kelas',
         button_style='info',
         icon='chart-bar',
-        layout=widgets.Layout(margin='10px 0')
+        layout=widgets.Layout(margin='0 5px 0 0')
     )
     
     # Button container
@@ -172,22 +172,30 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         save_button = widgets.Button(
             description='Simpan Konfigurasi',
             button_style='primary',
-            icon='save'
+            icon='save',
+            layout=widgets.Layout(margin='0 5px')
         )
         
         reset_button = widgets.Button(
             description='Reset ke Default',
             button_style='warning',
-            icon='refresh'
+            icon='refresh',
+            layout=widgets.Layout(margin='0 0 0 5px')
         )
         
-        buttons_container = widgets.HBox([save_button, reset_button])
+        buttons_container = widgets.HBox([save_button, reset_button], 
+            layout=widgets.Layout(display='flex', justify_content='flex-end'))
     
-    # Kombinasikan semua tombol
-    all_buttons = widgets.VBox([
+    # Kombinasikan semua tombol dalam satu baris
+    all_buttons = widgets.HBox([
         visualize_button,
         buttons_container
-    ], layout=widgets.Layout(margin='10px 0'))
+    ], layout=widgets.Layout(
+        display='flex', 
+        justify_content='space-between',
+        margin='10px 0',
+        align_items='center'
+    ))
     
     # Info box
     info_box = get_split_info()

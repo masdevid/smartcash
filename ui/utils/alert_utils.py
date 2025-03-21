@@ -54,6 +54,31 @@ def create_info_alert(message: str, alert_type: str = 'info', icon: Optional[str
     )
     return widgets.HTML(value=html_content)
 
+def create_info_log(message: str, alert_type: str = 'info', icon: Optional[str] = None) -> widgets.HTML:
+    """Create a styled plain log.
+
+    Args:
+        message: Log message
+        alert_type: Log type ('info', 'success', 'warning', 'error')
+        icon: Optional custom emoji icon (defaults to type-specific icon)
+
+    Returns:
+        HTML widget with styled log
+    """
+    style = ALERT_STYLES.get(alert_type, ALERT_STYLES['info'])
+    icon_str = icon or style['icon']
+    
+    html_content = (
+        f'<div style="padding: 5px; background-color: {style["bg_color"]}; '
+        f'color: {style["text_color"]};'
+        f'border-radius: 5px; margin: 2px 0;">'
+        f'<div style="display: flex; align-items: flex-start;">'
+        f'<div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>'
+        f'<div>{message}</div>'
+        f'</div></div>'
+    )
+    return widgets.HTML(value=html_content)
+
 def create_info_box(title: str, content: str, style: str = 'info', 
                    icon: Optional[str] = None, collapsed: bool = False) -> Union[widgets.HTML, widgets.Accordion]:
     """Create a collapsible info box.

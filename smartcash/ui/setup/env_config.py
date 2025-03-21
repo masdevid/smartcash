@@ -13,7 +13,7 @@ def setup_environment_config():
     from smartcash.ui.setup.env_config_component import create_env_config_ui
     from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
     from smartcash.ui.utils.cell_utils import setup_notebook_environment
-    from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
     
     try:
         # Setup notebook environment
@@ -135,7 +135,8 @@ def initialize_drive_sync(ui_components=None):
     
     # Fungsi log yang mengarahkan ke output widget
     def log(message, status_type="info"):
-        ui_components['logger'].log(status_type, message) if 'logger' in ui_components else print(message)
+        from smartcash.ui.utils.logging_utils import log_to_ui
+        log_to_ui(ui_components, message, status_type)
     
     # Fungsi update progress
     def update_progress(step, message, status_type="info", total_steps=4):

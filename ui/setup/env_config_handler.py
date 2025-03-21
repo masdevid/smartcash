@@ -31,25 +31,13 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     # Deteksi environment jika belum ada
     ui_components = detect_environment(ui_components, env)
     
-    # Decorator untuk try-except pada handler
-    def try_except_decorator(handler_func):
-        def wrapper(b):
-            try:
-                return handler_func(b)
-            except Exception as e:
-                from smartcash.ui.utils.alert_utils import create_status_indicator
-                with ui_components['status']:
-                    display(create_status_indicator('error', f"❌ Error: {str(e)}"))
-                if 'logger' in ui_components and ui_components['logger']:
-                    ui_components['logger'].error(f"❌ Error dalam handler: {str(e)}")
-        return wrapper
-    
-    # Handler untuk tombol Drive dengan decorator error handling
+    from smartcash.ui.utils.logging_utils import try_except_decorator
+    # Handler untuk tombol Drive
     @try_except_decorator
     def on_drive_button_clicked(b):
         handle_drive_connection(ui_components)
     
-    # Handler untuk tombol Directory dengan decorator error handling
+    # Handler untuk tombol Directory
     @try_except_decorator
     def on_directory_button_clicked(b):
         handle_directory_setup(ui_components)
@@ -57,18 +45,5 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     # Daftarkan handler ke tombol
     ui_components['drive_button'].on_click(on_drive_button_clicked)
     ui_components['directory_button'].on_click(on_directory_button_clicked)
-    
-    # Register cleanup function jika ada resources yang perlu dibersihkan
-    def cleanup_resources():
-        """Bersihkan resources saat cell di-reset atau dieksekusi ulang"""
-        if 'observer_group' in ui_components:
-            try:
-                from smartcash.components.observer.manager_observer import ObserverManager
-                observer_manager = ObserverManager()
-                observer_manager.unregister_group(ui_components['observer_group'])
-            except ImportError:
-                pass
-    
-    ui_components['cleanup'] = cleanup_resources
     
     return ui_components

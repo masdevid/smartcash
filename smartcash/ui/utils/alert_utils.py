@@ -69,9 +69,9 @@ def create_info_log(message: str, alert_type: str = 'info', icon: Optional[str] 
     icon_str = icon or style['icon']
     
     html_content = (
-        f'<div style="padding: 5px; background-color: {style["bg_color"]}; '
+        f'<div style="padding: 5px 10px; background-color: {style["bg_color"]}; '
         f'color: {style["text_color"]};'
-        f'border-radius: 5px; margin: 2px 0;">'
+        f'border-radius: 5px; margin: 1px 0;">'
         f'<div style="display: flex; align-items: flex-start;">'
         f'<div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>'
         f'<div>{message}</div>'

@@ -279,3 +279,16 @@ def alert_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'
     with output_widget:
         from smartcash.ui.utils.alert_utils import create_info_alert
         display(create_info_alert(message, level, icon))
+
+# Decorator untuk try-except pada handler
+def try_except_decorator(handler_func):
+    def wrapper(b):
+        try:
+            return handler_func(b)
+        except Exception as e:
+            from smartcash.ui.utils.alert_utils import create_status_indicator
+            with ui_components['status']:
+                display(create_status_indicator('error', f"❌ Error: {str(e)}"))
+            if 'logger' in ui_components and ui_components['logger']:
+                ui_components['logger'].error(f"❌ Error dalam handler: {str(e)}")
+    return wrapper

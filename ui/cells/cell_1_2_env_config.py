@@ -2,8 +2,8 @@
 File: smartcash/ui/cells/cell_1_2_env_config.py
 Deskripsi: Cell konfigurasi environment terintegrasi dengan sinkronisasi konfigurasi Drive
 """
-from IPython.display import display
 import sys
+from IPython.display import display
 if '.' not in sys.path: sys.path.append('.')
 
 try:

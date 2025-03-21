@@ -4,6 +4,7 @@ Deskripsi: Cell instalasi dependencies untuk SmartCash dengan pendekatan modular
 """
 
 import sys
+from IPython.display import display
 if '.' not in sys.path: sys.path.append('.')
 
 try:

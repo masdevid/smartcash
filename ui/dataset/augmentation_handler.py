@@ -33,7 +33,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         if logger: logger.debug(f"Inisialisasi augmentation handler dengan cwd: {os.getcwd()}")
         
         # Load konfigurasi terlebih dahulu, sehingga UI dibuat dengan konfigurasi yang benar
-        saved_config = load_augmentation_config()
+        saved_config = load_augmentation_config(ui_components=ui_components)
         # Store config di ui_components agar bisa diakses oleh semua handler
         ui_components['config'] = saved_config
         
@@ -160,6 +160,9 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
         # Penting: Gunakan config yang sama dengan yang digunakan untuk load
         updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
         
+        # Tambahkan logger ke config untuk digunakan oleh fungsi save
+        updated_config['logger'] = logger
+        
         # Simpan konfigurasi yang sudah diupdate
         config_path = "configs/augmentation_config.yaml"
         success = save_augmentation_config(updated_config, config_path)
@@ -214,11 +217,12 @@ def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, 
         if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 5:
             num_workers = ui_components['aug_options'].children[5].value
         
-        # PERBEDAAN UTAMA: Gunakan logger dari UI components untuk integrasi log
-        ui_logger = ui_components.get('logger')
+        # Log explisit num_workers yang akan digunakan
+        if logger:
+            logger.info(f"🔧 Menggunakan {num_workers} workers untuk augmentasi")
         
         # Buat instance AugmentationService dengan explicit parameter num_workers dan logger UI
-        augmentation_manager = AugmentationService(config, data_dir, ui_logger, num_workers)
+        augmentation_manager = AugmentationService(config, data_dir, logger, num_workers)
         
         # Simpan instance di ui_components
         ui_components['augmentation_manager'] = augmentation_manager

@@ -3,7 +3,6 @@ File: smartcash/ui/dataset/augmentation_visualization_handler.py
 Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan perbaikan algoritma pencocokan gambar
 """
 
-from typing import Dict, Any, Optional, List, Tuple
 import os
 import time
 from pathlib import Path
@@ -11,6 +10,8 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 from IPython.display import display, clear_output, HTML
+import re
+from typing import Dict, Any, Optional, List, Tuple, Set
 
 from smartcash.ui.utils.constants import COLORS, ICONS
 
@@ -220,6 +221,66 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
         display_label_info(labels, images_dir.parent.parent / 'labels')
 
 
+def get_original_from_augmented(aug_filename: str, orig_prefix: str = "rp") -> Optional[str]:
+    """
+    Ekstrak nama file original dari nama file augmentasi.
+    Format nama file augmentasi: [augmented_prefix]_[source_prefix]_[class_name]_[uuid]_var[n]
+    
+    Args:
+        aug_filename: Nama file augmentasi
+        orig_prefix: Prefix untuk file original
+        
+    Returns:
+        Nama file original yang sesuai atau None jika tidak ditemukan
+    """
+    # Pattern untuk mendeteksi bagian unik dari nama file
+    # Format: aug_rp_class_uuid_var1.jpg -> rp_class_uuid.jpg
+    pattern = r'(?:[^_]+)_(' + re.escape(orig_prefix) + r'_[^_]+_[^_]+)_var\d+'
+    match = re.search(pattern, aug_filename)
+    
+    if match:
+        # Ekstrak bagian yang cocok dengan original
+        original_part = match.group(1)
+        return f"{original_part}.jpg"
+    
+    return None
+
+
+def find_matching_pairs(
+    augmented_files: List[Path], 
+    original_files: List[Path], 
+    orig_prefix: str = "rp",
+    aug_prefix: str = "aug"
+) -> List[Tuple[Path, Path]]:
+    """
+    Temukan pasangan file augmentasi dan original berdasarkan uuid dalam nama file.
+    
+    Args:
+        augmented_files: List path file augmentasi
+        original_files: List path file original
+        orig_prefix: Prefix untuk file original
+        aug_prefix: Prefix untuk file augmentasi
+        
+    Returns:
+        List tuple (original_path, augmented_path)
+    """
+    # Siapkan mapping original filename -> path
+    original_map = {f.name: f for f in original_files}
+    
+    # Cari pasangan yang cocok
+    matched_pairs = []
+    
+    for aug_file in augmented_files:
+        # Dapatkan nama file original yang sesuai
+        orig_filename = get_original_from_augmented(aug_file.name, orig_prefix)
+        
+        if orig_filename and orig_filename in original_map:
+            orig_file = original_map[orig_filename]
+            matched_pairs.append((orig_file, aug_file))
+    
+    return matched_pairs
+
+
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan algoritma pencocokan yang lebih baik."""
     from smartcash.ui.utils.alert_utils import create_info_alert
@@ -245,85 +306,75 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
         display(create_info_alert(f"Tidak ada file gambar original ditemukan di {original_dir}", "warning"))
         return
     
-    # Metode baru: Pencocokan berdasarkan kelas dan penggunaan random aug file untuk setiap kelas
-    class_to_orig_images = {}  # Dictionary kelas -> list gambar original
-    class_to_aug_images = {}   # Dictionary kelas -> list gambar augmented
+    # Metode yang lebih baik: cari pasangan berdasarkan UUID
+    matched_pairs = find_matching_pairs(augmented_images, original_images, orig_prefix, aug_prefix)
     
-    # Identifikasi kelas dari nama file
-    def extract_class_from_filename(filename: str, prefix: str) -> Optional[str]:
-        """Ekstrak nama kelas dari nama file dengan pola prefix_class_uuid."""
-        parts = filename.split('_')
-        if len(parts) < 3 or parts[0] != prefix:
-            return None
+    # Jika tidak ada pasangan yang cocok, gunakan strategi pencocokan old style
+    if not matched_pairs:
+        display(create_info_alert("Tidak ditemukan pasangan file yang cocok, menggunakan pencocokan berdasarkan kelas...", "warning"))
         
-        # Kelas ada di tengah (prefix_class_uuid)
-        # Untuk format dengan multiple underscore di nama kelas, ambil semua kecuali prefix dan uuid terakhir
-        return '_'.join(parts[1:-1])  # Semua bagian tengah adalah nama kelas
-    
-    # Kelompokkan file original berdasarkan kelas
-    for img_path in original_images:
-        class_name = extract_class_from_filename(img_path.stem, orig_prefix)
-        if class_name:
-            if class_name not in class_to_orig_images:
-                class_to_orig_images[class_name] = []
-            class_to_orig_images[class_name].append(img_path)
-    
-    # Kelompokkan file augmented berdasarkan kelas
-    for img_path in augmented_images:
-        class_name = extract_class_from_filename(img_path.stem, aug_prefix)
-        if class_name:
-            if class_name not in class_to_aug_images:
-                class_to_aug_images[class_name] = []
-            class_to_aug_images[class_name].append(img_path)
-    
-    # Buat pasangan orig-aug dari kelas yang sama dengan memastikan aug berbeda-beda
-    matched_pairs = []
-    common_classes = set(class_to_orig_images.keys()) & set(class_to_aug_images.keys())
-    
-    # Filter hanya kelas dengan aug dan orig sama-sama tersedia
-    for cls in common_classes:
-        orig_files = class_to_orig_images[cls]
-        aug_files = class_to_aug_images[cls]
+        # Metode pencocokan berdasarkan kelas
+        class_to_orig_images = {}  # Dictionary kelas -> list gambar original
+        class_to_aug_images = {}   # Dictionary kelas -> list gambar augmented
         
-        # Hanya ambil maksimal 1 file per kelas untuk meningkatkan variasi
-        if orig_files and aug_files:
-            import random
-            orig_file = random.choice(orig_files)
-            aug_file = random.choice(aug_files)
-            matched_pairs.append((orig_file, aug_file))
+        # Identifikasi kelas dari nama file
+        def extract_class_from_filename(filename: str, prefix: str) -> Optional[str]:
+            """Ekstrak nama kelas dari nama file dengan pola prefix_class_uuid."""
+            parts = filename.split('_')
+            if len(parts) < 3 or parts[0] != prefix:
+                return None
             
-        # Batasi jumlah sampel
-        if len(matched_pairs) >= num_samples:
-            break
-    
-    # Jika masih kurang sampel, tambahkan kelas lain
-    if len(matched_pairs) < num_samples and len(common_classes) < len(class_to_aug_images):
-        remaining_classes = set(class_to_aug_images.keys()) - common_classes
-        for cls in remaining_classes:
-            if cls in class_to_orig_images and cls in class_to_aug_images:
-                orig_files = class_to_orig_images[cls]
-                aug_files = class_to_aug_images[cls]
-                
-                if orig_files and aug_files:
-                    import random
-                    orig_file = random.choice(orig_files)
-                    aug_file = random.choice(aug_files)
-                    matched_pairs.append((orig_file, aug_file))
-                
-                # Batasi jumlah sampel
-                if len(matched_pairs) >= num_samples:
-                    break
-    
-    # Fallback jika masih tidak cukup pasangan: gunakan random pairing
-    if len(matched_pairs) < min(num_samples, len(augmented_images)):
-        display(create_info_alert("Pencocokan berdasarkan kelas kurang optimal, menggunakan pencocokan random...", "warning"))
-        import random
+            # Kelas ada di tengah (prefix_class_uuid)
+            # Untuk format dengan multiple underscore di nama kelas, ambil semua kecuali prefix dan uuid terakhir
+            return '_'.join(parts[1:-1])  # Semua bagian tengah adalah nama kelas
         
-        while len(matched_pairs) < min(num_samples, len(augmented_images), len(original_images)):
-            orig_file = random.choice(original_images)
-            aug_file = random.choice([img for img in augmented_images 
-                                    if not any(img == pair[1] for pair in matched_pairs)])
-            matched_pairs.append((orig_file, aug_file))
+        # Kelompokkan file original berdasarkan kelas
+        for img_path in original_images:
+            class_name = extract_class_from_filename(img_path.stem, orig_prefix)
+            if class_name:
+                if class_name not in class_to_orig_images:
+                    class_to_orig_images[class_name] = []
+                class_to_orig_images[class_name].append(img_path)
+        
+        # Kelompokkan file augmented berdasarkan kelas
+        for img_path in augmented_images:
+            # Format baru: aug_rp_class_uuid_var1
+            # Ekstrak class name dari augmentasi (parts[2])
+            parts = img_path.stem.split('_')
+            if len(parts) >= 5 and parts[0] == aug_prefix and parts[1] == orig_prefix:
+                class_name = parts[2]
+                if class_name not in class_to_aug_images:
+                    class_to_aug_images[class_name] = []
+                class_to_aug_images[class_name].append(img_path)
+        
+        # Buat pasangan orig-aug dari kelas yang sama
+        matched_class_pairs = []
+        common_classes = set(class_to_orig_images.keys()) & set(class_to_aug_images.keys())
+        
+        # Filter hanya kelas dengan aug dan orig sama-sama tersedia
+        for cls in common_classes:
+            orig_files = class_to_orig_images[cls]
+            aug_files = class_to_aug_images[cls]
+            
+            # Hanya ambil maksimal 1 file per kelas untuk meningkatkan variasi
+            if orig_files and aug_files:
+                import random
+                orig_file = random.choice(orig_files)
+                aug_file = random.choice(aug_files)
+                matched_class_pairs.append((orig_file, aug_file))
+            
+            # Batasi jumlah sampel
+            if len(matched_class_pairs) >= num_samples:
+                break
+        
+        # Gunakan hasil dari pencocokan kelas jika ada
+        if matched_class_pairs:
+            matched_pairs = matched_class_pairs
+    
+    # Batasi jumlah sampel
+    if len(matched_pairs) > num_samples:
+        import random
+        matched_pairs = random.sample(matched_pairs, num_samples)
     
     if not matched_pairs:
         display(create_info_alert("Tidak dapat menemukan pasangan gambar untuk komparasi", "error"))
@@ -374,17 +425,21 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             aug_size = os.path.getsize(aug_path)
             
             # Ekstrak dan tampilkan class dengan jelas
-            orig_class = extract_class_from_filename(orig_path.stem, orig_prefix) or "Unknown"
-            aug_class = extract_class_from_filename(aug_path.stem, aug_prefix) or "Unknown"
+            # Format baru: aug_rp_class_uuid_var1
+            parts = aug_path.stem.split('_')
+            if len(parts) >= 5 and parts[0] == aug_prefix and parts[1] == orig_prefix:
+                class_name = parts[2]
+            else:
+                class_name = "Unknown"
             
-            # Tampilkan nama file yang dipersingkat
+            # Tampilkan nama file yang dipersingkat dan informasi detail
             orig_name = shorten_filename(orig_path.stem, 20)
             aug_name = shorten_filename(aug_path.stem, 20)
             
             display(HTML(f"""
             <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
                 <p style="color:{COLORS['dark']};"><strong>Original:</strong> {orig_name} | <strong>Augmented:</strong> {aug_name}</p>
-                <p style="color:{COLORS['dark']};"><strong>Kelas:</strong> {orig_class} → {aug_class}</p>
+                <p style="color:{COLORS['dark']};"><strong>Kelas:</strong> {class_name}</p>
                 <p style="color:{COLORS['dark']};">Dimensi: {orig_w}×{orig_h} px → {aug_w}×{aug_h} px</p>
                 <p style="color:{COLORS['dark']};">Ukuran: {format_size(orig_size)} → {format_size(aug_size)} ({aug_size/orig_size:.2f}×)</p>
             </div>

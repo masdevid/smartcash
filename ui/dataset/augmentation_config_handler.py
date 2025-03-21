@@ -10,6 +10,7 @@ from IPython.display import display
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Update konfigurasi dari UI components."""
+    logger = ui_components.get('logger')
     config = config or {}
     
     # Jika tidak ada 'augmentation' di config, buat baru
@@ -62,6 +63,10 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
 
 def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs/augmentation_config.yaml") -> bool:
     """Simpan konfigurasi augmentasi ke file."""
+    logger = None
+    if 'logger' in config and callable(getattr(config.get('logger', None), 'info', None)):
+        logger = config.get('logger')
+    
     try:
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
@@ -89,6 +94,8 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
             with open(aug_config_path, 'w') as f:
                 yaml.dump({'augmentation': config['augmentation']}, f, default_flow_style=False)
             
+            if logger:
+                logger.info(f"✅ Konfigurasi disimpan ke {config_path}")
             return True
     except ImportError:
         # Fallback: simpan hanya bagian yang relevan dengan format yang konsisten
@@ -105,14 +112,22 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
                 
             with open(path, 'w') as f:
                 yaml.dump(output_config, f, default_flow_style=False)
+            
+            if logger:
+                logger.info(f"✅ Konfigurasi disimpan ke {config_path} (fallback)")
             return True
         except Exception as e:
-            print(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+            if logger:
+                logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
             return False
     return False
 
-def load_augmentation_config(config_path: str = "configs/augmentation_config.yaml") -> Dict[str, Any]:
+def load_augmentation_config(config_path: str = "configs/augmentation_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """Load konfigurasi augmentasi dari file."""
+    logger = None
+    if ui_components and 'logger' in ui_components:
+        logger = ui_components.get('logger')
+    
     try:
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
@@ -123,13 +138,15 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
             # Log hasil untuk debugging
             has_aug = 'augmentation' in loaded_config
             has_preproc = 'preprocessing' in loaded_config
-            print(f"ℹ️ Loaded config dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
+            if logger:
+                logger.info(f"ℹ️ Loaded config dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
             
             # Jika sukses load, gunakan konfigurasi tersebut
             if loaded_config:
                 return loaded_config
     except (ImportError, FileNotFoundError) as e:
-        print(f"⚠️ Load config fallback: {str(e)}")
+        if logger:
+            logger.warning(f"⚠️ Load config fallback: {str(e)}")
         
     # Fallback: load langsung dengan yaml
     if os.path.exists(config_path):
@@ -140,13 +157,16 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
                     # Log hasil untuk debugging
                     has_aug = 'augmentation' in config
                     has_preproc = 'preprocessing' in config
-                    print(f"📄 Loaded YAML dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
+                    if logger:
+                        logger.info(f"📄 Loaded YAML dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
                     return config
         except Exception as e:
-            print(f"⚠️ Error saat load YAML: {str(e)}")
+            if logger:
+                logger.warning(f"⚠️ Error saat load YAML: {str(e)}")
     
     # Jika config tidak bisa dimuat, gunakan default config
-    print("📋 Menggunakan konfigurasi default")
+    if logger:
+        logger.info("📋 Menggunakan konfigurasi default")
     return load_default_augmentation_config()
 
 def load_default_augmentation_config() -> Dict[str, Any]:
@@ -210,7 +230,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     
     # Gunakan konfigurasi default sebagai fallback
     if not config or 'augmentation' not in config:
-        if logger: logger.info("ℹ️ Konfigurasi augmentasi tidak ditemukan, menggunakan default")
+        if logger:
+            logger.info("ℹ️ Konfigurasi augmentasi tidak ditemukan, menggunakan default")
         config = load_default_augmentation_config()
     
     aug_config = config['augmentation']
@@ -239,9 +260,11 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             if idx < len(ui_components['aug_options'].children) and field in aug_config:
                 ui_components['aug_options'].children[idx].value = aug_config[field]
                     
-        if logger: logger.info(f"✅ UI berhasil diupdate dari konfigurasi ")
+        if logger:
+            logger.info(f"✅ UI berhasil diupdate dari konfigurasi")
     except Exception as e:
         # Log error jika tersedia
-        if logger: logger.warning(f"⚠️ Error updating UI from config: {str(e)}")
+        if logger:
+            logger.warning(f"⚠️ Error updating UI from config: {str(e)}")
     
     return ui_components

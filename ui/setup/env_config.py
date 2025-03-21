@@ -45,7 +45,6 @@ def initialize_drive_sync(ui_components=None):
     
     try:
         import os, sys
-        from smartcash.ui.utils.constants import ICONS
         
         # Step 1: Deteksi environment
         update_progress(1, "Mendeteksi environment Google Drive...")
@@ -162,6 +161,7 @@ def setup_environment_config():
         
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, "env_config")
+        ui_components['logger'] = logger
         
         # Fungsi log ke output widget
         def log_to_output(message, status_type="info"):

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/split_config_handler.py
-Deskripsi: Handler utama untuk konfigurasi split dataset dengan visualisasi yang disederhanakan
+Deskripsi: Handler utama untuk konfigurasi split dataset dengan visualisasi on-demand
 """
 
 from typing import Dict, Any, Optional
@@ -45,7 +45,7 @@ def setup_split_config_handlers(ui_components: Dict[str, Any], env=None, config=
         from smartcash.ui.dataset.split_config_utils import initialize_from_config
         ui_components = initialize_from_config(ui_components, config, env, logger)
         
-        # Mendapatkan dan menampilkan statistik dataset
+        # Load statistik dasar dataset (tanpa visualisasi kelas)
         from smartcash.ui.dataset.split_config_visualization import load_and_display_dataset_stats
         load_and_display_dataset_stats(ui_components, config, env, logger)
         

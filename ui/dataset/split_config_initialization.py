@@ -102,30 +102,15 @@ def initialize_ui(ui_components: Dict[str, Any], config: Dict[str, Any], env=Non
                     </div>
                     """
         
-        # Update stats cards
-        from smartcash.ui.dataset.split_config_visualization import (
-            get_dataset_stats,
-            update_stats_cards,
-            get_class_distribution,
-            show_distribution_visualization
-        )
-        
-        # Update statistik dataset
-        stats = get_dataset_stats(config, env, logger)
+        # Update current_stats_html dengan info dasar
         if 'current_stats_html' in ui_components:
-            from smartcash.ui.utils.constants import COLORS
-            update_stats_cards(ui_components['current_stats_html'], stats, COLORS)
-        
-        # Show class distribution dalam output box
-        if 'output_box' in ui_components:
-            class_distribution = get_class_distribution(config, env, logger)
-            from smartcash.ui.utils.constants import COLORS
-            show_class_distribution_visualization(
-                ui_components['output_box'],
-                class_distribution,
-                COLORS,
-                logger
-            )
+            from smartcash.ui.utils.constants import COLORS, ICONS
+            ui_components['current_stats_html'].value = f"""
+            <div style="text-align:center; padding:15px;">
+                <h3 style="color:{COLORS['dark']}; margin-bottom:10px;">{ICONS['dataset']} Informasi Dataset</h3>
+                <p style="color:{COLORS['dark']};">Klik tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat statistik dataset lengkap.</p>
+            </div>
+            """
         
         if logger: logger.info(f"✅ UI konfigurasi split berhasil diinisialisasi")
             

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/split_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi pembagian dataset yang disederhanakan dengan dukungan visualisasi
+Deskripsi: Komponen UI untuk konfigurasi pembagian dataset dengan tombol visualisasi on-demand
 """
 
 import ipywidgets as widgets
@@ -11,7 +11,7 @@ from smartcash.common.constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PA
 
 def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi split dataset yang disederhanakan.
+    Buat komponen UI untuk konfigurasi split dataset dengan visualisasi on-demand.
     
     Args:
         env: Environment manager
@@ -24,6 +24,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.alert_utils import create_info_box, create_info_alert
     from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.info_boxes.split_info import get_split_info
     
     # Deteksi status drive
     is_colab = 'google.colab' in str(globals())
@@ -154,6 +155,14 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         "info"
     )
     
+    # Visualisasi button
+    visualize_button = widgets.Button(
+        description='Visualisasi Distribusi Kelas',
+        button_style='info',
+        icon='chart-bar',
+        layout=widgets.Layout(margin='10px 0')
+    )
+    
     # Button container
     try:
         from smartcash.ui.training_config.config_buttons import create_config_buttons
@@ -174,28 +183,14 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         
         buttons_container = widgets.HBox([save_button, reset_button])
     
+    # Kombinasikan semua tombol
+    all_buttons = widgets.VBox([
+        visualize_button,
+        buttons_container
+    ], layout=widgets.Layout(margin='10px 0'))
+    
     # Info box
-    info_box = create_info_box(
-        "Tentang Split Dataset",
-        f"""
-        <p>Pembagian dataset menjadi 3 subset:</p>
-        <ul>
-            <li><strong>Train</strong>: Dataset untuk pelatihan model (biasanya 70-80%)</li>
-            <li><strong>Validation</strong>: Dataset untuk validasi selama pelatihan (biasanya 10-15%)</li>
-            <li><strong>Test</strong>: Dataset untuk evaluasi akhir model (biasanya 10-15%)</li>
-        </ul>
-        <p>Gunakan <strong>stratified split</strong> untuk memastikan distribusi kelas tetap seimbang di semua subset.</p>
-        
-        <h4>{ICONS['folder']} Lokasi Dataset</h4>
-        <p>Data mentah dan data terpreprocessing akan diambil dari lokasi yang dikonfigurasi:</p>
-        <ul>
-            <li>Dataset mentah: <code>/content/drive/MyDrive/SmartCash/data</code></li>
-            <li>Dataset preprocessed: <code>/content/drive/MyDrive/SmartCash/data/preprocessed</code></li>
-        </ul>
-        """,
-        'info',
-        collapsed=True
-    )
+    info_box = get_split_info()
     
     # Rakit komponen UI
     ui = widgets.VBox([
@@ -206,7 +201,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         split_panel,
         advanced_accordion,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
-        buttons_container,
+        all_buttons,
         output_box,
         info_box
     ])
@@ -224,6 +219,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_options': advanced_options,
         'data_paths': data_paths,
         'buttons_container': buttons_container,
+        'visualize_button': visualize_button,
         'module_name': 'split_config'
     }
     

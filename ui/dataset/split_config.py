@@ -1,9 +1,11 @@
 """
 File: smartcash/ui/dataset/split_config.py
-Deskripsi: Koordinator utama untuk instalasi dependency SmartCash
+Deskripsi: Koordinator utama untuk konfigurasi split dataset
 """
 def setup_split_config():
     """Koordinator utama split config dengan integrasi utilities"""
+    ui_components = {}
+    
     try:
         # Import komponen dengan pendekatan konsolidasi
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
@@ -27,6 +29,7 @@ def setup_split_config():
             ui_components['logger'] = logger
             logger.info("🚀 Cell split_config diinisialisasi")
             
+        # Register cleanup handler untuk saat cell dijalankan
         from IPython import get_ipython
         if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
             cleanup = ui_components['cleanup']

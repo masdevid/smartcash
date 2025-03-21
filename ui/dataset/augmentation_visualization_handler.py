@@ -1,11 +1,11 @@
 """
 File: smartcash/ui/dataset/augmentation_visualization_handler.py
-Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan peningkatan tampilan nama file teraugmentasi
+Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan perbaikan algoritma pencocokan gambar
 """
 
 from typing import Dict, Any, Optional, List, Tuple
 import os
-import time  # Tambahkan import time yang hilang
+import time
 from pathlib import Path
 import numpy as np
 import cv2
@@ -221,7 +221,7 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
 
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
-    """Komparasi sampel dataset asli dengan yang telah diaugmentasi."""
+    """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan algoritma pencocokan yang lebih baik."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     from smartcash.common.utils import format_size
     
@@ -230,47 +230,100 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
     if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2:
         aug_prefix = ui_components['aug_options'].children[2].value
     
-    # Cari gambar augmentasi
+    # Get original prefix
+    orig_prefix = "rp"
+    
+    # Cari gambar augmentasi dan original
     augmented_images = list(augmented_dir.glob(f'{aug_prefix}_*.jpg'))
+    original_images = list(original_dir.glob(f'{orig_prefix}_*.jpg'))
     
     if not augmented_images:
         display(create_info_alert(f"Tidak ada file gambar augmentasi ditemukan di {augmented_dir}", "warning"))
         return
+        
+    if not original_images:
+        display(create_info_alert(f"Tidak ada file gambar original ditemukan di {original_dir}", "warning"))
+        return
     
-    # Ekstrak stem original dari nama file augmentasi (tanpa prefix)
-    aug_to_orig = {}
-    for aug_img in augmented_images:
-        parts = aug_img.stem.split('_')
-        if len(parts) > 2 and parts[0] == aug_prefix:
-            orig_name_parts = []
-            for i in range(1, len(parts)-1):  # Skip prefix dan random ID di akhir
-                orig_name_parts.append(parts[i])
-            orig_stem = '_'.join(orig_name_parts)
-            aug_to_orig[aug_img] = orig_stem
+    # Metode baru: Pencocokan berdasarkan kelas dan penggunaan random aug file untuk setiap kelas
+    class_to_orig_images = {}  # Dictionary kelas -> list gambar original
+    class_to_aug_images = {}   # Dictionary kelas -> list gambar augmented
     
-    # Cari file original dengan prefix rp
-    original_images = list(original_dir.glob('rp_*.jpg'))
+    # Identifikasi kelas dari nama file
+    def extract_class_from_filename(filename: str, prefix: str) -> Optional[str]:
+        """Ekstrak nama kelas dari nama file dengan pola prefix_class_uuid."""
+        parts = filename.split('_')
+        if len(parts) < 3 or parts[0] != prefix:
+            return None
+        
+        # Kelas ada di tengah (prefix_class_uuid)
+        # Untuk format dengan multiple underscore di nama kelas, ambil semua kecuali prefix dan uuid terakhir
+        return '_'.join(parts[1:-1])  # Semua bagian tengah adalah nama kelas
     
-    # Cari pasangan gambar
+    # Kelompokkan file original berdasarkan kelas
+    for img_path in original_images:
+        class_name = extract_class_from_filename(img_path.stem, orig_prefix)
+        if class_name:
+            if class_name not in class_to_orig_images:
+                class_to_orig_images[class_name] = []
+            class_to_orig_images[class_name].append(img_path)
+    
+    # Kelompokkan file augmented berdasarkan kelas
+    for img_path in augmented_images:
+        class_name = extract_class_from_filename(img_path.stem, aug_prefix)
+        if class_name:
+            if class_name not in class_to_aug_images:
+                class_to_aug_images[class_name] = []
+            class_to_aug_images[class_name].append(img_path)
+    
+    # Buat pasangan orig-aug dari kelas yang sama dengan memastikan aug berbeda-beda
     matched_pairs = []
-    for aug_img, orig_stem in aug_to_orig.items():
-        for orig_img in original_images:
-            if orig_img.stem.startswith('rp_' + orig_stem) or orig_stem in orig_img.stem:
-                matched_pairs.append((orig_img, aug_img))
-                if len(matched_pairs) >= num_samples:
-                    break
+    common_classes = set(class_to_orig_images.keys()) & set(class_to_aug_images.keys())
+    
+    # Filter hanya kelas dengan aug dan orig sama-sama tersedia
+    for cls in common_classes:
+        orig_files = class_to_orig_images[cls]
+        aug_files = class_to_aug_images[cls]
+        
+        # Hanya ambil maksimal 1 file per kelas untuk meningkatkan variasi
+        if orig_files and aug_files:
+            import random
+            orig_file = random.choice(orig_files)
+            aug_file = random.choice(aug_files)
+            matched_pairs.append((orig_file, aug_file))
+            
+        # Batasi jumlah sampel
         if len(matched_pairs) >= num_samples:
             break
     
-    # Fallback jika tidak menemukan pasangan yang cocok
-    if not matched_pairs:
-        display(create_info_alert("Tidak menemukan pasangan gambar yang cocok. Menggunakan sampel acak...", "warning"))
+    # Jika masih kurang sampel, tambahkan kelas lain
+    if len(matched_pairs) < num_samples and len(common_classes) < len(class_to_aug_images):
+        remaining_classes = set(class_to_aug_images.keys()) - common_classes
+        for cls in remaining_classes:
+            if cls in class_to_orig_images and cls in class_to_aug_images:
+                orig_files = class_to_orig_images[cls]
+                aug_files = class_to_aug_images[cls]
+                
+                if orig_files and aug_files:
+                    import random
+                    orig_file = random.choice(orig_files)
+                    aug_file = random.choice(aug_files)
+                    matched_pairs.append((orig_file, aug_file))
+                
+                # Batasi jumlah sampel
+                if len(matched_pairs) >= num_samples:
+                    break
+    
+    # Fallback jika masih tidak cukup pasangan: gunakan random pairing
+    if len(matched_pairs) < min(num_samples, len(augmented_images)):
+        display(create_info_alert("Pencocokan berdasarkan kelas kurang optimal, menggunakan pencocokan random...", "warning"))
         import random
-        for i in range(min(num_samples, len(augmented_images))):
-            if original_images and i < len(original_images):
-                matched_pairs.append((original_images[i], augmented_images[i]))
-            elif original_images:
-                matched_pairs.append((random.choice(original_images), augmented_images[i]))
+        
+        while len(matched_pairs) < min(num_samples, len(augmented_images), len(original_images)):
+            orig_file = random.choice(original_images)
+            aug_file = random.choice([img for img in augmented_images 
+                                    if not any(img == pair[1] for pair in matched_pairs)])
+            matched_pairs.append((orig_file, aug_file))
     
     if not matched_pairs:
         display(create_info_alert("Tidak dapat menemukan pasangan gambar untuk komparasi", "error"))
@@ -307,6 +360,7 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
     
     plt.tight_layout()
     plt.show()
+    
     # Tampilkan info perbandingan
     for orig_path, aug_path in matched_pairs:
         try:
@@ -319,6 +373,10 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             orig_size = os.path.getsize(orig_path)
             aug_size = os.path.getsize(aug_path)
             
+            # Ekstrak dan tampilkan class dengan jelas
+            orig_class = extract_class_from_filename(orig_path.stem, orig_prefix) or "Unknown"
+            aug_class = extract_class_from_filename(aug_path.stem, aug_prefix) or "Unknown"
+            
             # Tampilkan nama file yang dipersingkat
             orig_name = shorten_filename(orig_path.stem, 20)
             aug_name = shorten_filename(aug_path.stem, 20)
@@ -326,12 +384,19 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             display(HTML(f"""
             <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
                 <p style="color:{COLORS['dark']};"><strong>Original:</strong> {orig_name} | <strong>Augmented:</strong> {aug_name}</p>
-                <p style="color:{COLORS['dark']};">Original: {orig_w}×{orig_h} px | Augmented: {aug_w}×{aug_h} px</p>
-                <p style="color:{COLORS['dark']};">Size ratio: {aug_size/orig_size:.2f}× ({format_size(orig_size)} → {format_size(aug_size)})</p>
+                <p style="color:{COLORS['dark']};"><strong>Kelas:</strong> {orig_class} → {aug_class}</p>
+                <p style="color:{COLORS['dark']};">Dimensi: {orig_w}×{orig_h} px → {aug_w}×{aug_h} px</p>
+                <p style="color:{COLORS['dark']};">Ukuran: {format_size(orig_size)} → {format_size(aug_size)} ({aug_size/orig_size:.2f}×)</p>
             </div>
             """))
-        except Exception:
-            pass
+        except Exception as e:
+            display(HTML(f"""
+            <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['danger']}; background-color:{COLORS['light']}">
+                <p style="color:{COLORS['danger']};"><strong>Error saat memproses perbandingan:</strong> {str(e)}</p>
+                <p style="color:{COLORS['dark']};"><strong>Original:</strong> {orig_path.name}</p>
+                <p style="color:{COLORS['dark']};"><strong>Augmented:</strong> {aug_path.name}</p>
+            </div>
+            """))
 
 def display_label_info(images_with_labels: List[Tuple[Path, Path]], labels_dir: Path):
     """

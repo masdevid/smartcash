@@ -109,7 +109,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
             """Bersihkan resources yang digunakan oleh augmentation handler."""
             # Unregister observer group
             if 'observer_manager' in ui_components:
-                ui_components['observer_manager'].cleanup()
+                ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
             
             # Reset flags
             ui_components['augmentation_running'] = False

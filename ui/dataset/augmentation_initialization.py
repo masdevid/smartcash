@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_initialization.py
-Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan path handling dan tampilan lokasi dataset
+Deskripsi: Inisialisasi komponen untuk augmentasi dataset dengan deteksi otomatis data augmentasi dan tampilan tombol visualisasi
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from IPython.display import display, HTML
 import ipywidgets as widgets
 
 def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Inisialisasi komponen augmentasi dataset dengan utilitas standar."""
+    """Inisialisasi komponen augmentasi dataset dengan deteksi otomatis data augmentasi."""
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.utils.alert_utils import create_info_alert
     
@@ -56,7 +56,14 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
         
         # Cek status augmented data yang sudah ada
         augmented_path = Path(augmented_dir)
-        is_augmented = augmented_path.exists() and any((augmented_path/'images').glob('*.jpg')) if (augmented_path/'images').exists() else False
+        is_augmented = False
+        
+        # Periksa apakah ada gambar augmentasi di direktori output
+        if augmented_path.exists() and (augmented_path/'images').exists():
+            # Cari file dengan pola augmentasi berdasarkan prefix dari config atau default 'aug'
+            aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+            augmented_files = list((augmented_path/'images').glob(f"{aug_prefix}_*.*"))
+            is_augmented = len(augmented_files) > 0
         
         if is_augmented:
             # Tampilkan informasi dengan utilitas standar
@@ -78,7 +85,8 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
         # Store paths di ui_components
         ui_components.update({
             'data_dir': data_dir,
-            'augmented_dir': augmented_dir
+            'augmented_dir': augmented_dir,
+            'is_augmented': is_augmented
         })
         
     except Exception as e:

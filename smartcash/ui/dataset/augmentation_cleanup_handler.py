@@ -24,13 +24,13 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Update status dan tampilkan progress bar
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("info", f"{ICONS['trash']} Mempersiapkan pembersihan..."))
+                display(create_status_indicator("info", f"{ICONS.get('cleanup', '🧹')} Mempersiapkan pembersihan..."))
                 
             # Pastikan direktori ada
             path = Path(augmented_dir)
             if not path.exists():
                 with ui_components['status']:
-                    display(create_status_indicator("warning", f"{ICONS['warning']} Direktori tidak ditemukan: {augmented_dir}"))
+                    display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Direktori tidak ditemukan: {augmented_dir}"))
                 return
             
             # Notifikasi observer via observer system
@@ -57,7 +57,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             update_status_panel(
                 ui_components,
                 "info",
-                f"{ICONS['trash']} Membersihkan data augmentasi di {augmented_dir}"
+                f"{ICONS.get('cleanup', '🧹')} Membersihkan data augmentasi di {augmented_dir}"
             )
             
             # Hapus isi subdirektori images dan labels
@@ -100,6 +100,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     if i % 10 == 0 or i == len(files_to_delete) - 1:
                         try:
                             from smartcash.components.observer import notify
+                            from smartcash.components.observer.event_topics_observer import EventTopics
                             notify(
                                 event_type=EventTopics.AUGMENTATION_CLEANUP_PROGRESS,
                                 sender="augmentation_handler",
@@ -118,18 +119,19 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("success", 
-                    f"{ICONS['success']} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"))
+                    f"{ICONS.get('success', '✅')} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"))
             
             # Update status panel
             update_status_panel(
                 ui_components,
                 "success",
-                f"{ICONS['success']} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"
+                f"{ICONS.get('success', '✅')} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"
             )
             
             # Notifikasi observer via observer system
             try:
                 from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
                 notify(
                     event_type=EventTopics.AUGMENTATION_CLEANUP_END,
                     sender="augmentation_handler",
@@ -157,7 +159,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         except Exception as e:
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("error", f"{ICONS['error']} Gagal membersihkan: {str(e)}"))
+                display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Gagal membersihkan: {str(e)}"))
             
             # Update status panel
             try:
@@ -165,7 +167,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 update_status_panel(
                     ui_components,
                     "error",
-                    f"{ICONS['error']} Gagal membersihkan data augmentasi: {str(e)}"
+                    f"{ICONS.get('error', '❌')} Gagal membersihkan data augmentasi: {str(e)}"
                 )
             except ImportError:
                 pass

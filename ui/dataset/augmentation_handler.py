@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_handler.py
-Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan logging yang disempurnakan
+Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan perbaikan num_workers dan deteksi data augmentasi
 """
 
 from typing import Dict, Any, Optional
@@ -63,10 +63,16 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
             ui_components['progress_bar'].layout.visibility = 'hidden'
             ui_components['current_progress'].layout.visibility = 'hidden'
             
-        # Sembunyikan summary dan visualization container pada awal
-        ui_components['summary_container'].layout.display = 'none'
-        ui_components['visualization_container'].layout.display = 'none'
-        ui_components['visualization_buttons'].layout.display = 'none'
+        # Jika tidak terdeteksi data augmentasi, sembunyikan container visualisasi
+        if not ui_components.get('is_augmented', False):
+            # Sembunyikan summary dan visualization container pada awal
+            ui_components['summary_container'].layout.display = 'none'
+            ui_components['visualization_container'].layout.display = 'none'
+            ui_components['visualization_buttons'].layout.display = 'none'
+            
+            # Sembunyikan tombol cleanup
+            if 'cleanup_button' in ui_components:
+                ui_components['cleanup_button'].layout.display = 'none'
         
         # Tampilkan Log accordion terbuka secara default
         ui_components['log_accordion'].selected_index = 0
@@ -183,7 +189,7 @@ def save_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = 
         if logger: logger.error(f"{ICONS.get('error', '❌')} Error menyimpan konfigurasi: {str(e)}")
 
 def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Any:
-    """Setup dan inisialisasi AugmentationManager."""
+    """Setup dan inisialisasi AugmentationManager dengan perbaikan parameter."""
     from smartcash.ui.utils.constants import ICONS
     
     logger = ui_components.get('logger')
@@ -192,17 +198,22 @@ def setup_augmentation_manager(ui_components: Dict[str, Any], config: Dict[str, 
         # Import kelas augmentation service
         from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
         
-        # Dapatkan paths
+        # Dapatkan paths dan config yang diperlukan
         data_dir = ui_components.get('data_dir', 'data')
         
-        # Buat instance AugmentationService
-        augmentation_manager = AugmentationService(config, data_dir, logger)
+        # Ambil num_workers dari UI jika tersedia
+        num_workers = 4  # Default value
+        if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 5:
+            num_workers = ui_components['aug_options'].children[5].value
+        
+        # Buat instance AugmentationService dengan explicit parameter num_workers
+        augmentation_manager = AugmentationService(config, data_dir, logger, num_workers)
         
         # Simpan instance di ui_components
         ui_components['augmentation_manager'] = augmentation_manager
         
         # Log
-        if logger: logger.info(f"{ICONS.get('success', '✅')} AugmentationService berhasil diinisialisasi")
+        if logger: logger.info(f"{ICONS.get('success', '✅')} AugmentationService berhasil diinisialisasi dengan {num_workers} workers")
         
         # Register progress callback jika tersedia
         if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):

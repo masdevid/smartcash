@@ -1,16 +1,7 @@
 """
 File: smartcash/ui/dataset/augmentation_cleanup_handler.py
-Deskripsi: Handler untuk membersihkan data augmentasi dengan progress tracking dan tanpa backup
+Deskripsi: Perbaikan handler cleanup untuk mendukung lokasi augmentasi yang baru
 """
-
-from typing import Dict, Any
-from IPython.display import display, clear_output
-import shutil, os, glob
-from pathlib import Path
-from tqdm.auto import tqdm
-
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """Setup handler untuk tombol cleanup augmentasi data dengan progress tracking."""
@@ -18,7 +9,11 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     
     def perform_cleanup():
         """Bersihkan folder augmentasi dengan progress tracking."""
-        augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
+        # Dapatkan direktori augmentasi dari konfigurasi
+        augmented_dir = config.get('augmentation', {}).get('output_dir', 'data/augmented')
+        
+        # Dapatkan direktori preprocessed untuk membersihkan file augmentasi
+        preprocessed_dir = config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed')
         
         try:
             # Update status dan tampilkan progress bar
@@ -30,9 +25,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             path = Path(augmented_dir)
             if not path.exists():
                 with ui_components['status']:
-                    display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Direktori tidak ditemukan: {augmented_dir}"))
-                return
-            
+                    display(create_status_indicator("warning", f"{ICONS.get('warning', '⚠️')} Direktori temp tidak ditemukan: {augmented_dir}"))
+                
             # Notifikasi observer via observer system
             try:
                 from smartcash.components.observer import notify
@@ -40,7 +34,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 notify(
                     event_type=EventTopics.AUGMENTATION_CLEANUP_START,
                     sender="augmentation_handler",
-                    message=f"Mulai membersihkan data augmentasi di {augmented_dir}"
+                    message=f"Mulai membersihkan data augmentasi di {augmented_dir} dan {preprocessed_dir}"
                 )
             except (ImportError, AttributeError):
                 pass
@@ -57,33 +51,49 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             update_status_panel(
                 ui_components,
                 "info",
-                f"{ICONS.get('cleanup', '🧹')} Membersihkan data augmentasi di {augmented_dir}"
+                f"{ICONS.get('cleanup', '🧹')} Membersihkan data augmentasi di {augmented_dir} dan {preprocessed_dir}"
             )
             
-            # Hapus isi subdirektori images dan labels
+            # Hapus isi subdirektori images dan labels di folder temp
             subdirs = ['images', 'labels']
             total_files_deleted = 0
             
-            # Kumpulkan semua file yang akan dihapus terlebih dahulu
-            files_to_delete = []
+            # Ambil prefix augmentasi dari UI
+            aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+            
+            # 1. Bersihkan folder temp augmentasi
+            temp_files_to_delete = []
             for subdir in subdirs:
                 dir_path = path / subdir
                 if not dir_path.exists():
                     continue
                 
-                # Cari file dengan pola augmentasi
-                augmented_files = list(dir_path.glob(f"{ui_components['aug_options'].children[2].value}_*.*"))
-                files_to_delete.extend(augmented_files)
-                
+                # Cari file dengan pola augmentasi di folder temp
+                temp_files_to_delete.extend(list(dir_path.glob(f"{aug_prefix}_*.*")))
+            
+            # 2. Bersihkan file augmentasi di folder preprocessed (untuk setiap split)
+            preprocessed_files_to_delete = []
+            for split in ['train', 'valid', 'test']:
+                for subdir in subdirs:
+                    dir_path = Path(preprocessed_dir) / split / subdir
+                    if not dir_path.exists():
+                        continue
+                    
+                    # Cari file dengan pola augmentasi di folder preprocessed
+                    preprocessed_files_to_delete.extend(list(dir_path.glob(f"{aug_prefix}_*.*")))
+            
+            # Gabungkan semua file yang perlu dihapus
+            all_files_to_delete = temp_files_to_delete + preprocessed_files_to_delete
+            
             # Update progress bar dengan total file
-            total_files = len(files_to_delete)
+            total_files = len(all_files_to_delete)
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].max = total_files if total_files > 0 else 1
                 ui_components['progress_bar'].value = 0
                 ui_components['progress_bar'].description = f'Total: {total_files} file'
             
             # Hapus file dengan progress tracking
-            for i, file_path in enumerate(files_to_delete):
+            for i, file_path in enumerate(all_files_to_delete):
                 try:
                     # Hapus file
                     os.remove(file_path)
@@ -96,8 +106,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                         ui_components['current_progress'].value = progress_percent
                         ui_components['current_progress'].description = f'Menghapus: {file_path.name}'
                     
-                    # Report progress via observer
-                    if i % 10 == 0 or i == len(files_to_delete) - 1:
+                    # Report progress via observer (lebih jarang untuk mengurangi overhead)
+                    if i % max(10, total_files//10) == 0 or i == len(all_files_to_delete) - 1:
                         try:
                             from smartcash.components.observer import notify
                             from smartcash.components.observer.event_topics_observer import EventTopics

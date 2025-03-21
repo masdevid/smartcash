@@ -201,7 +201,7 @@ class DatasetPreprocessor:
 
     def _extract_class_from_label(self, label_path: Path) -> Optional[str]:
         """
-        Ekstrak kelas dari file label YOLO.
+        Ekstrak kelas dari file label YOLO dengan memilih class ID terkecil (prioritas banknote).
         
         Args:
             label_path: Path ke file label
@@ -213,29 +213,36 @@ class DatasetPreprocessor:
             return None
             
         try:
-            # Baca file label
+            # Baca semua baris dari file label
             with open(label_path, 'r') as f:
                 label_lines = f.readlines()
                 
             # Cek apakah ada isi label
             if not label_lines:
                 return None
-                
-            # Ambil class ID dari line pertama
-            first_line = label_lines[0].strip().split()
-            if not first_line:
+            
+            # Ekstrak semua class ID dari semua baris
+            class_ids = []
+            for line in label_lines:
+                parts = line.strip().split()
+                if parts:
+                    # Class ID ada di posisi pertama format YOLO
+                    class_ids.append(int(parts[0]))
+            
+            # Jika tidak ada class ID valid
+            if not class_ids:
                 return None
                 
-            # Class ID ada di posisi pertama format YOLO
-            class_id = first_line[0]
+            # Ambil class ID terkecil (prioritas banknote)
+            min_class_id = min(class_ids)
             
             # Map class ID ke nama kelas jika tersedia
             class_names = self.config.get('data', {}).get('class_names', {})
-            if class_names and class_id in class_names:
-                return class_names[class_id]
+            if class_names and str(min_class_id) in class_names:
+                return class_names[str(min_class_id)]
                 
             # Fallback ke class ID jika nama kelas tidak tersedia
-            return f"class{class_id}"
+            return f"class{min_class_id}"
         except Exception as e:
             self.logger.debug(f"⚠️ Gagal ekstrak kelas dari {label_path}: {str(e)}")
             return None

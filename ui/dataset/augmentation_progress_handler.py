@@ -11,11 +11,15 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
     """Setup handler progress tracking dengan integrasi observer standar."""
     logger = ui_components.get('logger')
     
+    # Filter untuk batasi jumlah update log
+    last_log_time = {'value': 0}
+    log_interval = 1.0  # Minimal interval antar log dalam detik
+    
     # Fungsi progress callback terkonsolidasi yang lebih efisien
     def progress_callback(progress=None, total=None, message=None, status='info', 
-                         current_progress=None, current_total=None, **kwargs):
+                        current_progress=None, current_total=None, **kwargs):
         """
-        Progress callback dengan utilitas UI standar.
+        Progress callback dengan pembatasan update log untuk mencegah masalah performa.
         
         Args:
             progress: Nilai progress utama
@@ -39,25 +43,44 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         # Update current progress jika tersedia dengan validasi
         if current_progress is not None and current_total is not None and current_total > 0 and 'current_progress' in ui_components:
             ui_components['current_progress'].max = current_total
-            ui_components['current_progress'].value = min(current_progress, current_total)  # Ensure progress <= total
+            ui_components['current_progress'].value = min(current_progress, current_total)
             ui_components['current_progress'].description = f"Step: {current_progress}/{current_total}"
             ui_components['current_progress'].layout.visibility = 'visible'
         
-        # Notifikasi observer dengan observer standar jika progress signifikan
-        try:
-            from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
+        # Batasi notifikasi observer untuk mencegah flooding log
+        current_time = time.time()
+        time_since_last_log = current_time - last_log_time['value']
+        
+        # Proses notifikasi hanya jika: 
+        # 1. Telah melewati interval minimum, atau
+        # 2. Perubahan status signifikan (start/complete/error), atau
+        # 3. Perubahan progress signifikan (0%, 25%, 50%, 75%, 100%)
+        is_status_event = status in ('error', 'warning') or kwargs.get('event_type', '').endswith(('_start', '_complete', '_error'))
+        is_significant_progress = progress is not None and total is not None and (
+            progress == 0 or progress == total or 
+            (total >= 4 and progress % (total // 4) == 0)  # 0%, 25%, 50%, 75%, 100%
+        )
+        
+        if is_status_event or is_significant_progress or time_since_last_log >= log_interval:
+            # Update timestamp untuk log berikutnya
+            last_log_time['value'] = current_time
             
-            if progress is not None and total is not None and (progress % max(1, total//10) == 0 or progress == total):
+            # Notifikasi observer dengan observer standar
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                
                 notify(
                     event_type=EventTopics.AUGMENTATION_PROGRESS, 
                     sender="augmentation_handler",
-                    message=message or f"Augmentasi progress: {int(progress/total*100) if total > 0 else 0}%",
+                    message=message or f"Augmentasi progress: {int(progress/total*100) if progress is not None and total is not None and total > 0 else 0}%",
                     progress=progress,
-                    total=total
+                    total=total,
+                    status=status,
+                    **kwargs
                 )
-        except ImportError:
-            pass
+            except ImportError:
+                pass
     
     # Fungsi untuk registrasi callback ke augmentation_manager dengan validasi
     def register_progress_callback(augmentation_manager):
@@ -69,7 +92,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         augmentation_manager.register_progress_callback(progress_callback)
         return True
     
-    # Setup observer integrasi full jika tersedia
+    # Setup observer integrasi full jika tersedia (dengan batasan update)
     try:
         from smartcash.components.observer.event_topics_observer import EventTopics
         from smartcash.ui.handlers.observer_handler import create_progress_observer
@@ -129,19 +152,26 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             ui_components['current_progress'].description = message
             ui_components['current_progress'].layout.visibility = 'visible'
             
-        # Notify observer
-        try:
-            from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
-            notify(
-                event_type=EventTopics.AUGMENTATION_PROGRESS, 
-                sender="augmentation_handler",
-                message=message or f"Augmentasi progress: {percentage}%",
-                progress=progress,
-                total=total
-            )
-        except ImportError:
-            pass
+        # Notify observer dengan batasan update untuk mencegah flooding log
+        current_time = time.time()
+        time_since_last_log = current_time - last_log_time['value']
+        
+        # Hanya update pada interval tertentu atau perubahan signifikan
+        if time_since_last_log >= log_interval or progress == 0 or progress == total or (total >= 4 and progress % (total // 4) == 0):
+            last_log_time['value'] = current_time
+            
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                notify(
+                    event_type=EventTopics.AUGMENTATION_PROGRESS, 
+                    sender="augmentation_handler",
+                    message=message or f"Augmentasi progress: {percentage}%",
+                    progress=progress,
+                    total=total
+                )
+            except ImportError:
+                pass
     
     # Helper untuk reset progress
     def reset_progress_bar():
@@ -155,6 +185,9 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             ui_components['current_progress'].value = 0
             ui_components['current_progress'].description = 'Current:'
             ui_components['current_progress'].layout.visibility = 'hidden'
+        
+        # Reset timestamp log
+        last_log_time['value'] = 0
     
     # Tambahkan fungsi progress dan register ke UI components
     ui_components.update({

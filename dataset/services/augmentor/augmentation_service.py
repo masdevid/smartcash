@@ -38,17 +38,39 @@ class AugmentationService:
         self._progress_callback = callback
     
     def _report_progress(self, progress: int, total: int, message: str, **kwargs) -> None:
-        """Laporkan progress ke callback dan observer."""
-        if self._progress_callback: self._progress_callback(progress=progress, total=total, message=message, **kwargs)
-        try: notify(EventTopics.AUGMENTATION_PROGRESS, sender="augmentation_service", message=message, progress=progress, total=total, **kwargs)
-        except (ImportError, AttributeError): pass
+        """
+        Laporkan progress ke callback dan observer dengan pembatasan verbositas.
+        
+        Args:
+            progress: Nilai progress saat ini
+            total: Total nilai progress
+            message: Pesan progress
+            **kwargs: Parameter tambahan
+        """
+        # Selalu panggil callback, karena ini digunakan untuk progress bar UI
+        if self._progress_callback: 
+            self._progress_callback(progress=progress, total=total, message=message, **kwargs)
+        
+        # Kurangi frekuensi notifikasi observer untuk mengurangi verbositas log
+        # Hanya report pada titik signifikan: 0%, 10%, 20%, ..., 90%, 100%
+        significant_point = (progress == 0 or progress == total or 
+                            (total > 10 and progress % (total // 10) == 0))
+        
+        if significant_point:
+            try: 
+                notify(EventTopics.AUGMENTATION_PROGRESS, sender="augmentation_service", 
+                    message=message, progress=progress, total=total, **kwargs)
+            except (ImportError, AttributeError): 
+                pass
 
+    
     def augment_dataset(self, split: str = 'train', augmentation_types: List[str] = None, 
                         target_count: int = None, target_factor: float = None, target_balance: bool = False, 
                         class_list: List[str] = None, output_dir: Optional[str] = None, source_dir: Optional[str] = None,
                         num_variations: int = None, output_prefix: str = None, process_bboxes: bool = True, 
-                        validate_results: bool = True, resume: bool = False, random_seed: int = 42, num_workers: int = 4) -> Dict[str, Any]:
-        """Augmentasi dataset dengan balancing class distribution berdasarkan data preprocessed."""
+                        validate_results: bool = True, resume: bool = False, random_seed: int = 42, 
+                        num_workers: int = 4, move_to_preprocessed: bool = True) -> Dict[str, Any]:
+        """Augmentasi dataset dengan alur baru: data sementara dan pemindahan ke preprocessed."""
         self.num_workers = num_workers
         # Inisialisasi tracking dan parameter
         start_time = time.time(); random.seed(random_seed); np.random.seed(random_seed)
@@ -69,11 +91,18 @@ class AugmentationService:
         # Dapatkan pipeline augmentasi
         pipeline = self._get_augmentation_pipeline(augmentation_types)
         
-        # Setup direktori dan validasi, jika disediakan gunakan itu, jika tidak gunakan default dari preprocessing
+        # Setup direktori dan validasi
         source_dir = source_dir or self.source_dir
-        output_path = Path(output_dir or self.output_dir)
         
-        # Split path dari source dir
+        # Untuk alur baru: Gunakan data/augmented sebagai penyimpanan sementara
+        temp_output_dir = aug_config.get('output_dir', 'data/augmented')
+        final_output_dir = output_dir or self.output_dir
+        
+        # Konversi ke path
+        temp_output_path = Path(temp_output_dir)
+        final_output_path = Path(final_output_dir)
+        
+        # Siapkan path untuk source dan temp output
         split_path = Path(source_dir) / split
         images_dir, labels_dir = split_path / 'images', split_path / 'labels'
         
@@ -82,17 +111,17 @@ class AugmentationService:
             self.logger.error(error_msg); self._report_error(error_msg)
             return {'status': 'error', 'message': error_msg}
         
-        # Setup direktori output
-        output_images_dir, output_labels_dir = output_path / split / 'images', output_path / split / 'labels'
-        output_images_dir.mkdir(parents=True, exist_ok=True); output_labels_dir.mkdir(parents=True, exist_ok=True)
+        # Setup direktori temp output (augmented)
+        temp_images_dir, temp_labels_dir = temp_output_path / 'images', temp_output_path / 'labels'
+        temp_images_dir.mkdir(parents=True, exist_ok=True); temp_labels_dir.mkdir(parents=True, exist_ok=True)
         
         # Analisis distribusi kelas untuk target balancing dengan mencari file dengan prefix
         class_to_files = self._create_class_to_files_mapping_from_preprocessed(
             images_dir, labels_dir, source_prefix=self.source_prefix
         )
         
-        # Log jumlah file per kelas yang ditemukan
-        self.logger.info(f"🔍 Ditemukan {sum(len(files) for files in class_to_files.values())} file dengan prefix {self.source_prefix} di {images_dir}")
+        # Log jumlah file per kelas (lebih ringkas)
+        self.logger.info(f"🔍 Ditemukan {sum(len(files) for files in class_to_files.values())} file dengan prefix {self.source_prefix} untuk diaugmentasi")
         for cls, files in class_to_files.items():
             self.logger.info(f"   • Kelas {cls}: {len(files)} file")
         
@@ -104,14 +133,13 @@ class AugmentationService:
             class_distribution, class_to_files, target_count, target_factor, target_balance
         )
         
-        # Log rencana augmentasi
+        # Log rencana augmentasi (lebih ringkas)
         self._log_augmentation_plan(augmentation_types, targets, class_to_files)
         
-        # Lakukan augmentasi untuk setiap kelas
+        # Initialize stats
         stats = {'original': 0, 'generated': 0, 'source_classes': len(class_to_files)}
         
-        # Copy file original ke output dir terlebih dahulu
-        self._copy_original_files(class_to_files, output_images_dir, output_labels_dir, stats)
+        # [PERUBAHAN ALUR] Tidak perlu menyalin file original ke temp folder, hanya augmentasi
         
         # Proses augmentasi per kelas
         self._total_items = sum(max(0, targets[cls] - len(class_to_files.get(cls, []))) for cls in targets)
@@ -121,30 +149,45 @@ class AugmentationService:
                 current = len(class_to_files[cls]); to_generate = max(0, target - current)
                 if to_generate <= 0: continue
                 
-                # Generate augmentasi untuk kelas ini
+                # Generate augmentasi untuk kelas ini (khusus ke temp dir)
                 generated = self._augment_class(cls, class_to_files[cls], pipeline, to_generate, 
-                                              output_images_dir, output_labels_dir, pbar, output_prefix)
+                                            temp_images_dir, temp_labels_dir, pbar, output_prefix)
                 stats['generated'] += generated
         
-        # Validasi hasil jika diminta
+        # Validasi hasil augmentasi jika diminta
         if validate_results:
-            self._validate_augmentation_results(output_images_dir, output_labels_dir)
+            self._validate_augmentation_results(temp_images_dir, temp_labels_dir)
+        
+        # [PERUBAHAN ALUR] Pindahkan hasil augmentasi ke direktori preprocessed jika diminta
+        if move_to_preprocessed:
+            self.logger.info(f"🔄 Memindahkan hasil augmentasi ke folder preprocessed: {final_output_path / split}")
+            
+            # Persiapkan direktori final di preprocessed
+            final_images_dir, final_labels_dir = final_output_path / split / 'images', final_output_path / split / 'labels'
+            final_images_dir.mkdir(parents=True, exist_ok=True); final_labels_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Pindahkan file dari temp ke final
+            moved_files = self._move_augmented_files_to_preprocessed(
+                temp_images_dir, temp_labels_dir, final_images_dir, final_labels_dir, output_prefix
+            )
+            
+            stats['moved'] = moved_files
         
         # Rekap hasil
         elapsed_time = time.time() - start_time
         stats.update({
             'status': 'success', 'augmentation_types': augmentation_types, 'split': split,
-            'output_dir': str(output_path), 'duration': elapsed_time, 'total_files': stats['original'] + stats['generated'],
+            'temp_output_dir': str(temp_output_path),
+            'final_output_dir': str(final_output_path) if move_to_preprocessed else None,
+            'duration': elapsed_time, 'total_files': stats['original'] + stats['generated'],
             'class_distribution': class_distribution, 'balanced_targets': targets
         })
         
-        # Log hasil
+        # Log hasil (lebih ringkas)
         self.logger.success(
             f"✅ Augmentasi dataset selesai ({elapsed_time:.1f}s):\n"
-            f"   • File asli: {stats['original']}\n"
             f"   • File baru: {stats['generated']}\n"
-            f"   • Total: {stats['total_files']}\n"
-            f"   • Output: {output_path}"
+            f"   • {'File dipindahkan ke preprocessed: ' + str(stats.get('moved', 0)) if move_to_preprocessed else 'Output temp: ' + str(temp_output_path)}"
         )
         
         # Notifikasi selesai
@@ -152,6 +195,57 @@ class AugmentationService:
         except (ImportError, AttributeError): pass
         
         return stats
+
+    def _move_augmented_files_to_preprocessed(self, temp_images_dir: Path, temp_labels_dir: Path, 
+                                            final_images_dir: Path, final_labels_dir: Path,
+                                            prefix: str) -> int:
+        """
+        Pindahkan hasil augmentasi dari direktori temp ke preprocessed.
+        
+        Args:
+            temp_images_dir: Direktori gambar sementara
+            temp_labels_dir: Direktori label sementara
+            final_images_dir: Direktori gambar preprocessed
+            final_labels_dir: Direktori label preprocessed
+            prefix: Prefix file augmentasi
+            
+        Returns:
+            Jumlah file yang dipindahkan
+        """
+        moved_files = 0
+        
+        # Pindahkan file gambar
+        temp_images = list(temp_images_dir.glob(f"{prefix}_*.jpg"))
+        
+        for img_path in tqdm(temp_images, desc="🔄 Memindahkan hasil augmentasi", leave=False):
+            try:
+                # Pastikan ada label
+                label_path = temp_labels_dir / f"{img_path.stem}.txt"
+                if not label_path.exists():
+                    continue
+                    
+                # Pindahkan gambar
+                shutil.copy2(img_path, final_images_dir / img_path.name)
+                
+                # Pindahkan label
+                shutil.copy2(label_path, final_labels_dir / label_path.name)
+                
+                # Hapus file di temp setelah dipindahkan (opsional)
+                # os.remove(img_path)
+                # os.remove(label_path)
+                
+                moved_files += 1
+                
+                # Report progress modulo untuk mengurangi verbositas
+                if moved_files % max(1, len(temp_images)//10) == 0:
+                    self._report_progress(moved_files, len(temp_images), 
+                                        f"Memindahkan hasil augmentasi: {moved_files}/{len(temp_images)}",
+                                        status='info')
+            except Exception as e:
+                self.logger.warning(f"⚠️ Gagal memindahkan file {img_path.name}: {str(e)}")
+        
+        return moved_files
+
     
     def _create_class_to_files_mapping_from_preprocessed(self, images_dir: Path, labels_dir: Path, source_prefix: str = 'rp') -> Dict[str, List[Tuple[Path, Path]]]:
         """Buat mapping kelas ke file gambar dari data preprocessed dengan filter prefix."""
@@ -190,27 +284,62 @@ class AugmentationService:
                 if not label_path.exists():
                     continue
                 
-                # Baca file label untuk menentukan kelas
+                # Baca file label untuk menentukan kelas (ambil class ID terkecil)
                 try:
+                    # Baca semua baris dari file label
                     with open(label_path, 'r') as f:
-                        label_content = f.readline().strip().split()
-                        if label_content:
-                            class_id = label_content[0]
-                            class_to_files[f"class{class_id}"].append((img_path, label_path))
+                        label_lines = f.readlines()
+                    
+                    # Ekstrak semua class ID
+                    class_ids = []
+                    for line in label_lines:
+                        parts = line.strip().split()
+                        if parts:
+                            class_ids.append(int(parts[0]))
+                    
+                    # Jika ada class ID valid, ambil yang terkecil
+                    if class_ids:
+                        # Ambil class ID terkecil (prioritas banknote)
+                        min_class_id = min(class_ids)
+                        class_to_files[f"class{min_class_id}"].append((img_path, label_path))
                 except Exception:
                     continue
         
         return dict(class_to_files)
     
     def _log_augmentation_plan(self, augmentation_types: List[str], targets: Dict[str, int], 
-                              class_to_files: Dict[str, List[Tuple[Path, Path]]]) -> None:
-        """Log rencana augmentasi dengan lebih terstruktur."""
-        self.logger.info(f"🔍 Augmentasi dataset dengan {len(augmentation_types)} jenis transformasi: {', '.join(augmentation_types)}")
+                            class_to_files: Dict[str, List[Tuple[Path, Path]]]) -> None:
+        """Log rencana augmentasi dengan ringkas."""
+        # Log summary types dengan satu baris
+        self.logger.info(f"🔍 Augmentasi dengan {len(augmentation_types)} jenis: {', '.join(augmentation_types)}")
+        
+        # Ringkas info target dengan mencatat hanya kelas yang perlu diaugmentasi
+        to_generate_counts = {}
+        total_to_generate = 0
+        
         for cls, target in targets.items():
             current = len(class_to_files.get(cls, []))
             to_generate = max(0, target - current)
             if to_generate > 0:
-                self.logger.info(f"   • {cls}: {current} → {target} (+{to_generate})")
+                to_generate_counts[cls] = (current, target, to_generate)
+                total_to_generate += to_generate
+        
+        # Log ringkasan
+        if total_to_generate > 0:
+            self.logger.info(f"📊 Target augmentasi: {total_to_generate} file baru dari {len(to_generate_counts)} kelas")
+            # Log detail per kelas hanya jika sedikit kelas (<= 5)
+            if len(to_generate_counts) <= 5:
+                for cls, (current, target, to_generate) in to_generate_counts.items():
+                    self.logger.info(f"   • {cls}: {current} → {target} (+{to_generate})")
+            else:
+                # Jika terlalu banyak kelas, tampilkan hanya beberapa kelas dengan augmentasi terbanyak
+                top_classes = sorted(to_generate_counts.items(), 
+                                    key=lambda x: x[1][2], reverse=True)[:3]  # Ambil 3 teratas
+                for cls, (current, target, to_generate) in top_classes:
+                    self.logger.info(f"   • {cls}: {current} → {target} (+{to_generate})")
+                self.logger.info(f"   • ... dan {len(to_generate_counts) - 3} kelas lainnya")
+        else:
+            self.logger.info(f"📊 Tidak perlu augmentasi, semua kelas sudah mencapai target")
     
     def _copy_original_files(self, class_to_files: Dict[str, List[Tuple[Path, Path]]], 
                             output_images_dir: Path, output_labels_dir: Path,

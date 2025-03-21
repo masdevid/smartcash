@@ -14,70 +14,68 @@ from smartcash.ui.utils.constants import ALERT_STYLES, ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert
 
 class UILogHandler(logging.Handler):
-    """Custom logging handler yang menampilkan log di UI output widget."""
+    """Custom logging handler for displaying logs in a UI output widget."""
     
+    # Class-level constants for better performance and maintainability
+    _LEVEL_TO_STYLE: Dict[int, str] = {
+        logging.DEBUG: 'info',
+        logging.INFO: 'info',
+        logging.WARNING: 'warning',
+        logging.ERROR: 'error',
+        logging.CRITICAL: 'error'
+    }
+    
+    _LEVEL_TO_ICON: Dict[int, str] = {
+        logging.DEBUG: ICONS.get('info', 'ℹ️'),
+        logging.INFO: ICONS.get('info', 'ℹ️'),
+        logging.WARNING: ICONS.get('warning', '⚠️'),
+        logging.ERROR: ICONS.get('error', '❌'),
+        logging.CRITICAL: ICONS.get('error', '❌')
+    }
+    
+    _IGNORED_MODULES = frozenset(['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets'])
+
     def __init__(self, output_widget: widgets.Output):
-        """
-        Initialize UILogHandler.
-        
+        """Initialize UILogHandler with an output widget.
+
         Args:
-            output_widget: Widget output untuk menampilkan log
+            output_widget: Output widget for displaying logs
         """
-        super().__init__()
+        super().__init__(level=logging.DEBUG)
         self.output_widget = output_widget
         self.setFormatter(logging.Formatter('%(message)s'))
-        # Set level paling rendah agar semua log tertangkap
-        self.setLevel(logging.DEBUG)
-    
-    def emit(self, record):
-        """Tampilkan log di widget output dengan styling alert."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        """Display log in output widget with styled alert.
+
+        Args:
+            record: Log record to process
+        """
         try:
-            # Maps logging levels to alert styles
-            level_to_style = {
-                logging.DEBUG: 'info',
-                logging.INFO: 'info',
-                logging.WARNING: 'warning', 
-                logging.ERROR: 'error',
-                logging.CRITICAL: 'error',
-            }
-            
-            # Maps logging levels to icons
-            level_to_icon = {
-                logging.DEBUG: ICONS.get('info', 'ℹ️'),
-                logging.INFO: ICONS.get('info', 'ℹ️'),
-                logging.WARNING: ICONS.get('warning', '⚠️'),
-                logging.ERROR: ICONS.get('error', '❌'),
-                logging.CRITICAL: ICONS.get('error', '❌'),
-            }
-            
-            # Ignore logs dari beberapa modul yang terlalu verbose
-            ignored_modules = ['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets']
-            if record.name and any(record.name.startswith(mod) for mod in ignored_modules):
+            # Early return for ignored modules
+            if record.name in self._IGNORED_MODULES:
                 return
-            
-            style = level_to_style.get(record.levelno, 'info')
-            alert_style = ALERT_STYLES.get(style, ALERT_STYLES['info'])
-            icon = level_to_icon.get(record.levelno, ICONS.get('info', 'ℹ️'))
-            
-            # Format log message dengan styling alert
-            message = self.format(record)
-            log_html = f"""
-            <div style="padding: 5px; margin: 2px 0; 
-                      background-color: {alert_style['bg_color']}; 
-                      color: {alert_style['text_color']}; 
-                      border-left: 4px solid {alert_style['border_color']}; 
-                      border-radius: 4px;">
-                <span style="margin-right: 8px;">{icon}</span>
-                <span>{message}</span>
-            </div>
-            """
-            
-            # Display di output widget
+
+            style_key = self._LEVEL_TO_STYLE.get(record.levelno, 'info')
+            style = ALERT_STYLES.get(style_key, ALERT_STYLES['info'])
+            icon = self._LEVEL_TO_ICON.get(record.levelno)
+
+            # Single f-string for HTML generation
+            log_html = (
+                f'<div style="padding: 5px; margin: 2px 0; '
+                f'background-color: {style["bg_color"]}; '
+                f'color: {style["text_color"]}; '
+                f'border-left: 4px solid {style["border_color"]}; '
+                f'border-radius: 4px;">'
+                f'<span style="margin-right: 8px;">{icon}</span>'
+                f'<span>{self.format(record)}</span>'
+                f'</div>'
+            )
+
             with self.output_widget:
                 display(HTML(log_html))
-                
+
         except Exception as e:
-            # Fallback ke default behavior
             print(f"Error in UILogHandler: {str(e)}")
             super().emit(record)
 
@@ -226,6 +224,7 @@ def create_dummy_logger() -> logging.Logger:
     logger.propagate = False
     
     return logger
+
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
     """
     Log messages directly to UI without a logger.

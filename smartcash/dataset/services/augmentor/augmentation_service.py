@@ -39,8 +39,9 @@ class AugmentationService:
                         target_count: int = None, target_factor: float = None, target_balance: bool = False, 
                         class_list: List[str] = None, output_dir: Optional[str] = None, 
                         num_variations: int = None, output_prefix: str = None, process_bboxes: bool = True, 
-                        validate_results: bool = True, resume: bool = False, random_seed: int = 42) -> Dict[str, Any]:
+                        validate_results: bool = True, resume: bool = False, random_seed: int = 42, num_workers: int = 4) -> Dict[str, Any]:
         """Augmentasi dataset dengan progress tracking terintegrasi dan penamaan file yang konsisten."""
+        self.num_workers = num_workers
         # Inisialisasi tracking dan parameter
         start_time = time.time(); random.seed(random_seed); np.random.seed(random_seed)
         self._current_operation = "augmentation"; self._total_items = 0

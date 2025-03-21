@@ -324,24 +324,3 @@ def create_divider() -> widgets.HTML:
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""
     return widgets.HTML(f"<div style='height: {height};'></div>")
-
-def format_file_size(size_bytes: int) -> str:
-    """
-    Format ukuran file menjadi string yang mudah dibaca.
-    
-    Args:
-        size_bytes: Ukuran file dalam bytes
-        
-    Returns:
-        String berisi ukuran file dengan unit yang sesuai
-    """
-    if size_bytes == 0:
-        return "0B"
-    
-    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-    i = 0
-    while size_bytes >= 1024 and i < len(units) - 1:
-        size_bytes /= 1024
-        i += 1
-    
-    return f"{size_bytes:.2f}{units[i]}"

@@ -322,7 +322,9 @@ def cleanup_resources(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary berisi widget UI
     """
-    logger = ui_components.get('logger')
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
+    
+    logger = setup_ipython_logging(ui_components,'cleanup_resources')
     
     # Jalankan fungsi cleanup khusus jika ada
     if 'cleanup' in ui_components and callable(ui_components['cleanup']):
@@ -348,15 +350,3 @@ def cleanup_resources(ui_components: Dict[str, Any]) -> None:
             except Exception as e:
                 if logger:
                     logger.warning(f"⚠️ Error saat membersihkan resource: {str(e)}")
-    
-    # Cleanup observer jika ada
-    try:
-        from smartcash.components.observer.manager_observer import ObserverManager
-        observer_manager = ObserverManager()
-        if observer_manager:
-            group_name = ui_components.get('observer_group', 'cell_observers')
-            observer_manager.unregister_group(group_name)
-            if logger:
-                logger.info(f"🧹 Observer group '{group_name}' berhasil dibersihkan")
-    except ImportError:
-        pass

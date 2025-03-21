@@ -7,28 +7,10 @@ import sys
 if '.' not in sys.path: sys.path.append('.')
 
 try:
-    from smartcash.ui.setup.dependency_installer_component import create_dependency_installer_ui
-    from smartcash.ui.setup.dependency_installer_handler import setup_dependency_installer_handlers
-    from smartcash.ui.utils.logging_utils import setup_ipython_logging
-
-    # Coba dapatkan environment manager dan config
-    from smartcash.common.environment import get_environment_manager
-    from smartcash.common.config import get_config_manager
-    env = get_environment_manager()
-    config_manager = get_config_manager()
-    config = config_manager.config
-
-    # Buat komponen UI
-    ui_components = create_dependency_installer_ui(env, config)
-
-    # Setup handlers
-    ui_components = setup_dependency_installer_handlers(ui_components, config)
-
-    # Setup ipython logging menggunakan utilitas yang sudah ada
-    logger = setup_ipython_logging(ui_components, "dependency_installer")
-    if logger:
-        logger.info("🚀 Cell dependency_installer diinisialisasi")
-
+    from smartcash.ui.setup.dependency_installer import setup_dependency_installer
+    # Setup dependency installer
+    ui_components = setup_dependency_installer()
+    
     # Tampilkan UI - Pastikan hanya menampilkan widget UI, bukan dictionary UI components
     display(ui_components['ui'])
 

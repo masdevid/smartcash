@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_component.py
-Deskripsi: Komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana dan fokus pada konfigurasi utama
+Deskripsi: Komponen UI untuk augmentasi dataset dengan tampilan yang lebih sederhana, slider workers dan perbaikan warna teks
 """
 
 import ipywidgets as widgets
@@ -50,7 +50,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         )
     ])
     
-    # Augmentation options dengan struktur yang lebih ringkas
+    # Augmentation options dengan struktur yang lebih ringkas dan slider workers
     aug_options = widgets.VBox([
         widgets.SelectMultiple(
             options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
@@ -82,6 +82,15 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
             value=True,
             description='Validate results',
             style={'description_width': 'initial'}
+        ),
+        widgets.IntSlider(
+            value=4,
+            min=1,
+            max=16,
+            step=1,
+            description='Workers:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='70%')
         )
     ])
     

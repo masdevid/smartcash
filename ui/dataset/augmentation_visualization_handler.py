@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_visualization_handler.py
-Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan konsolidasi fungsi
+Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan peningkatan tampilan nama file teraugmentasi
 """
 
 from typing import Dict, Any, Optional, List, Tuple
@@ -116,9 +116,34 @@ def load_image(img_path: Path) -> np.ndarray:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
+def shorten_filename(filename: str, max_length: int = 15) -> str:
+    """
+    Persingkat nama file dengan ellipsis untuk tampilan yang lebih baik.
+    
+    Args:
+        filename: Nama file yang akan dipersingkat
+        max_length: Panjang maksimum nama file
+        
+    Returns:
+        Nama file yang telah dipersingkat
+    """
+    if len(filename) <= max_length:
+        return filename
+    
+    # Potong nama file dengan format "awal...akhir"
+    prefix_len = max_length // 2 - 1
+    suffix_len = max_length - prefix_len - 3  # 3 untuk "..."
+    
+    return f"{filename[:prefix_len]}...{filename[-suffix_len:]}"
+
 def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 5):
-    """Visualisasi sampel dataset yang telah diaugmentasi."""
+    """Visualisasi sampel dataset yang telah diaugmentasi dengan peningkatan tampilan nama file."""
     from smartcash.ui.utils.alert_utils import create_info_alert
+    
+    # Get augmentation prefix
+    aug_prefix = "aug"
+    if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2:
+        aug_prefix = ui_components['aug_options'].children[2].value
     
     # Ambil semua gambar
     image_files = list(images_dir.glob('*.jpg')) + list(images_dir.glob('*.png')) + list(images_dir.glob('*.npy'))
@@ -127,7 +152,7 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
         return
     
     # Filter for only augmented images
-    aug_images = [img for img in image_files if 'aug' in img.name]
+    aug_images = [img for img in image_files if aug_prefix in img.name]
     if aug_images:
         image_files = aug_images
         
@@ -145,9 +170,9 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
         try:
             img = load_image(img_path)
             axes[i].imshow(img)
-            img_name = img_path.name
-            if len(img_name) > 10: img_name = f"...{img_name[-10:]}"
-            axes[i].set_title(f"{img_name}")
+            # Tampilkan nama file yang dipersingkat
+            shortened_name = shorten_filename(img_path.name)
+            axes[i].set_title(f"{shortened_name}")
             axes[i].axis('off')
         except Exception as e:
             axes[i].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -164,31 +189,45 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     
+    # Get augmentation prefix
+    aug_prefix = "aug"
+    if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2:
+        aug_prefix = ui_components['aug_options'].children[2].value
+    
     # Cari gambar yang memiliki pasangan augmentasi
     original_images = list(original_dir.glob('*.jpg')) + list(original_dir.glob('*.png'))
-    augmented_images = list(augmented_dir.glob('*.jpg')) + list(augmented_dir.glob('*.png')) + list(augmented_dir.glob('*.npy'))
+    augmented_images = list(augmented_dir.glob(f'{aug_prefix}_*.jpg')) + list(augmented_dir.glob(f'{aug_prefix}_*.png'))
     
-    aug_prefixes = set(img.stem.split('_aug_')[0] if '_aug_' in img.stem else '' for img in augmented_images)
+    # Ekstrak stem original dari nama file augmentasi (tanpa prefix)
+    aug_to_orig = {}
+    for aug_img in augmented_images:
+        parts = aug_img.stem.split('_')
+        if len(parts) > 2 and parts[0] == aug_prefix:
+            orig_name_parts = []
+            for i in range(1, len(parts)-1):  # Skip prefix dan random ID di akhir
+                orig_name_parts.append(parts[i])
+            orig_stem = '_'.join(orig_name_parts)
+            aug_to_orig[aug_img] = orig_stem
     
     # Cari pasangan gambar
     matched_pairs = []
-    for orig_img in original_images:
-        if orig_img.stem in aug_prefixes:
-            # Cari semua augmentasi untuk gambar ini
-            aug_matches = [img for img in augmented_images if img.stem.startswith(f"{orig_img.stem}_aug_")]
-            if aug_matches:
-                matched_pairs.append((orig_img, aug_matches[0]))  # Ambil augmentasi pertama
+    for aug_img, orig_stem in aug_to_orig.items():
+        for orig_img in original_images:
+            if orig_img.stem == orig_stem or orig_stem in orig_img.stem:
+                matched_pairs.append((orig_img, aug_img))
                 if len(matched_pairs) >= num_samples:
                     break
+        if len(matched_pairs) >= num_samples:
+            break
     
     # Fallback jika tidak menemukan pasangan yang cocok
     if not matched_pairs:
         display(create_info_alert("Tidak menemukan pasangan gambar yang cocok. Menggunakan sampel acak...", "warning"))
-        for orig_img in original_images[:num_samples]:
-            for aug_img in augmented_images:
-                if 'aug' in aug_img.name:
-                    matched_pairs.append((orig_img, aug_img))
-                    break
+        import random
+        for orig_img in random.sample(original_images, min(num_samples, len(original_images))):
+            aug_samples = [img for img in augmented_images if aug_prefix in img.name]
+            if aug_samples:
+                matched_pairs.append((orig_img, random.choice(aug_samples)))
     
     if not matched_pairs:
         display(create_info_alert("Tidak dapat menemukan pasangan gambar untuk komparasi", "error"))
@@ -207,13 +246,16 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             orig_img = load_image(orig_path)
             aug_img = load_image(aug_path)
             
-            # Tampilkan gambar
+            # Tampilkan gambar dengan nama file yang dipersingkat
+            orig_name = shorten_filename(orig_path.name)
+            aug_name = shorten_filename(aug_path.name)
+            
             axes[i, 0].imshow(orig_img)
-            axes[i, 0].set_title(f"Original: {orig_path.name}")
+            axes[i, 0].set_title(f"Original: {orig_name}")
             axes[i, 0].axis('off')
             
             axes[i, 1].imshow(aug_img)
-            axes[i, 1].set_title(f"Augmented: {aug_path.name}")
+            axes[i, 1].set_title(f"Augmented: {aug_name}")
             axes[i, 1].axis('off')
         except Exception as e:
             axes[i, 0].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -235,9 +277,13 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             orig_size = os.path.getsize(orig_path)
             aug_size = os.path.getsize(aug_path)
             
+            # Tampilkan nama file yang dipersingkat
+            orig_name = shorten_filename(orig_path.stem, 20)
+            aug_name = shorten_filename(aug_path.stem, 20)
+            
             display(HTML(f"""
             <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
-                <p style="color:{COLORS['dark']};"><strong>{orig_path.stem}</strong></p>
+                <p style="color:{COLORS['dark']};"><strong>Original:</strong> {orig_name} | <strong>Augmented:</strong> {aug_name}</p>
                 <p style="color:{COLORS['dark']};">Original: {orig_w}×{orig_h} px | Augmented: {aug_w}×{aug_h} px</p>
                 <p style="color:{COLORS['dark']};">Size ratio: {aug_size/orig_size:.2f}× ({format_size(orig_size)} → {format_size(aug_size)})</p>
             </div>
@@ -268,9 +314,12 @@ def display_label_info(image_files: List[Path], labels_dir: Path):
                     parts = line.split()
                     if parts: classes.add(parts[0])
                 
+                # Tampilkan nama file yang dipersingkat
+                shortened_name = shorten_filename(img_file.name, 20)
+                
                 display(HTML(f"""
                 <div style="margin:5px 0; padding:5px; border-left:3px solid {COLORS['primary']};">
-                    <p style="margin:0; color:{COLORS['dark']};"><strong>{img_file.name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
+                    <p style="margin:0; color:{COLORS['dark']};"><strong>{shortened_name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
                 </div>
                 """))
             except Exception:

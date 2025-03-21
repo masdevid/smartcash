@@ -1,12 +1,13 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan untuk melakukan augmentasi dataset guna memperkaya variasi data dengan progress tracking terintegrasi
+Deskripsi: Layanan untuk melakukan augmentasi dataset dengan penamaan file dan penanganan bbox yang ditingkatkan
 """
 
-import os, time, random, shutil, numpy as np
+import os, time, random, shutil, numpy as np, uuid
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any, Callable
 from tqdm.auto import tqdm
+from concurrent.futures import ThreadPoolExecutor
 from collections import defaultdict
 
 from smartcash.common.logger import get_logger
@@ -30,13 +31,8 @@ class AugmentationService:
     
     def _report_progress(self, progress: int, total: int, message: str, **kwargs) -> None:
         """Laporkan progress ke callback dan observer."""
-        # Update progress via callback jika ada
         if self._progress_callback: self._progress_callback(progress=progress, total=total, message=message, **kwargs)
-        
-        # Notifikasi via observer system
-        try:
-            notify(EventTopics.AUGMENTATION_PROGRESS, sender="augmentation_service", 
-                  message=message, progress=progress, total=total, **kwargs)
+        try: notify(EventTopics.AUGMENTATION_PROGRESS, sender="augmentation_service", message=message, progress=progress, total=total, **kwargs)
         except (ImportError, AttributeError): pass
 
     def augment_dataset(self, split: str = 'train', augmentation_types: List[str] = None, 
@@ -44,14 +40,13 @@ class AugmentationService:
                         class_list: List[str] = None, output_dir: Optional[str] = None, 
                         num_variations: int = None, output_prefix: str = None, process_bboxes: bool = True, 
                         validate_results: bool = True, resume: bool = False, random_seed: int = 42) -> Dict[str, Any]:
-        """Augmentasi dataset dengan progress tracking terintegrasi."""
+        """Augmentasi dataset dengan progress tracking terintegrasi dan penamaan file yang konsisten."""
         # Inisialisasi tracking dan parameter
         start_time = time.time(); random.seed(random_seed); np.random.seed(random_seed)
         self._current_operation = "augmentation"; self._total_items = 0
         
         # Notifikasi start augmentasi
-        try: notify(EventTopics.AUGMENTATION_START, sender="augmentation_service", 
-                   message=f"Memulai augmentasi dataset {split}")
+        try: notify(EventTopics.AUGMENTATION_START, sender="augmentation_service", message=f"Memulai augmentasi dataset {split}")
         except (ImportError, AttributeError): pass
         
         # Parameter default dan override dari config
@@ -61,7 +56,6 @@ class AugmentationService:
         output_prefix = output_prefix or aug_config.get('output_prefix', 'aug')
         process_bboxes = process_bboxes if process_bboxes is not None else aug_config.get('process_bboxes', True)
         validate_results = validate_results if validate_results is not None else aug_config.get('validate_results', True)
-        resume = resume if resume is not None else aug_config.get('resume', False)
         
         # Dapatkan pipeline augmentasi
         pipeline = self._get_augmentation_pipeline(augmentation_types)
@@ -115,7 +109,6 @@ class AugmentationService:
         
         # Proses augmentasi per kelas
         self._total_items = sum(max(0, targets[cls] - len(class_to_files.get(cls, []))) for cls in targets)
-        processed = 0
         with tqdm(total=self._total_items, desc="🔄 Augmentasi dataset") as pbar:
             for cls, target in targets.items():
                 if cls not in class_to_files or not class_to_files[cls]: continue
@@ -123,66 +116,9 @@ class AugmentationService:
                 if to_generate <= 0: continue
                 
                 # Generate augmentasi untuk kelas ini
-                for i in range(to_generate):
-                    # Cek apakah user meminta stop
-                    if not hasattr(self, '_progress_callback') or not self._progress_callback: break
-                    
-                    # Pilih file sumber secara acak
-                    img_path, label_path = random.choice(class_to_files[cls])
-                    
-                    try:
-                        # Load gambar dan label
-                        img = self._load_image(img_path)
-                        if img is None: continue
-                        
-                        # Load label
-                        bbox_data = self.utils.parse_yolo_label(label_path)
-                        if not bbox_data: continue
-                        
-                        # Ekstrak bounding box dan class untuk albumentations
-                        bboxes = [box['bbox'] for box in bbox_data]  # Format: [x_center, y_center, width, height]
-                        class_labels = [box['class_id'] for box in bbox_data]
-                        
-                        # Terapkan augmentasi
-                        try:
-                            transformed = pipeline(image=img, bboxes=bboxes, class_labels=class_labels)
-                            
-                            aug_img = transformed['image']
-                            aug_bboxes = transformed['bboxes']
-                            aug_labels = transformed['class_labels']
-                            
-                            if not aug_bboxes: continue  # Skip jika augmentasi menghilangkan semua bbox
-                                
-                            # Generate nama file baru
-                            timestamp = int(time.time() * 1000)
-                            new_stem = f"{img_path.stem}_{output_prefix}_{timestamp}_{i}"
-                            
-                            # Simpan gambar baru
-                            new_img_path = output_images_dir / f"{new_stem}.jpg"
-                            self._save_image(aug_img, new_img_path)
-                            
-                            # Simpan label baru
-                            new_label_path = output_labels_dir / f"{new_stem}.txt"
-                            with open(new_label_path, 'w') as f:
-                                f.write("\n".join(f"{cls_id} {' '.join(map(str, bbox))}" for cls_id, bbox in zip(aug_labels, aug_bboxes)))
-                            
-                            stats['generated'] += 1
-                            processed += 1
-                            
-                            # Update progress bar dan laporan progress
-                            pbar.update(1)
-                            if processed % 10 == 0 or processed == self._total_items:
-                                self._report_progress(processed, self._total_items, 
-                                                    f"Augmentasi kelas: {processed}/{self._total_items}", 
-                                                    current_progress=processed, current_total=self._total_items)
-                                
-                        except Exception as e:
-                            self.logger.debug(f"⚠️ Error saat augmentasi {img_path.name}: {str(e)}")
-                            continue
-                            
-                    except Exception as e:
-                        self.logger.debug(f"⚠️ Error saat memproses {img_path.name}: {str(e)}")
-                        continue
+                generated = self._augment_class(cls, class_to_files[cls], pipeline, to_generate, 
+                                              output_images_dir, output_labels_dir, pbar, output_prefix)
+                stats['generated'] += generated
         
         # Validasi hasil jika diminta
         if validate_results:
@@ -205,8 +141,7 @@ class AugmentationService:
         )
         
         # Notifikasi selesai
-        try: notify(EventTopics.AUGMENTATION_END, sender="augmentation_service", 
-                   message=f"Augmentasi dataset selesai: {stats['generated']} file baru", result=stats)
+        try: notify(EventTopics.AUGMENTATION_END, sender="augmentation_service", message=f"Augmentasi dataset selesai: {stats['generated']} file baru", result=stats)
         except (ImportError, AttributeError): pass
         
         return stats
@@ -249,13 +184,19 @@ class AugmentationService:
         self._report_progress(0, len(all_files), "Menyalin file original...")
         
         copied = 0
-        for files in class_to_files.values():
-            for img_path, label_path in files:
-                if self._copy_file_pair(img_path, label_path, output_images_dir, output_labels_dir):
-                    stats['original'] += 1
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = []
+            for files in class_to_files.values():
+                for img_path, label_path in files:
+                    future = executor.submit(self._copy_file_pair, img_path, label_path, 
+                                           output_images_dir, output_labels_dir)
+                    futures.append(future)
+            
+            for i, future in enumerate(futures):
+                if future.result(): stats['original'] += 1
                 copied += 1
-                if copied % max(1, len(all_files)//20) == 0:  # Report progress approximately every 5%
-                    self._report_progress(copied, len(all_files), f"Menyalin file original ({copied}/{len(all_files)})")
+                if i % max(1, len(futures)//20) == 0:  # Report progress approximately every 5%
+                    self._report_progress(copied, len(futures), f"Menyalin file original ({copied}/{len(futures)})")
     
     def _report_error(self, message: str) -> None:
         """Laporkan error ke observer system."""
@@ -374,30 +315,76 @@ class AugmentationService:
             self.logger.warning(f"⚠️ Gagal menyalin file {img_path.name}: {str(e)}")
             return False
     
-    def _load_image(self, img_path: Path) -> np.ndarray:
-        """Load gambar dengan berbagai format yang didukung."""
+    def _augment_class(self, class_name: str, source_files: List[Tuple[Path, Path]], pipeline, count: int,
+                      output_images_dir: Path, output_labels_dir: Path, 
+                      pbar: Optional[tqdm] = None, output_prefix: str = 'aug') -> int:
+        """Lakukan augmentasi untuk satu kelas dengan naming yang konsisten dan UUID."""
         import cv2
-        try:
-            img = cv2.imread(str(img_path))
-            if img is None: return None
-            return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        except Exception as e:
-            self.logger.debug(f"⚠️ Error saat load gambar {img_path}: {str(e)}")
-            return None
-    
-    def _save_image(self, img: np.ndarray, output_path: Path) -> bool:
-        """Simpan gambar ke file dengan kompresi optimal."""
-        import cv2
-        try:
-            # Konversi ke BGR untuk OpenCV
-            bgr_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            # Simpan dengan kompresi JPEG
-            cv2.imwrite(str(output_path), bgr_img, [cv2.IMWRITE_JPEG_QUALITY, 90])
-            return True
-        except Exception as e:
-            self.logger.debug(f"⚠️ Error saat menyimpan gambar {output_path}: {str(e)}")
-            return False
-    
+        
+        generated = 0; iterations = 0; max_iterations = count * 3  # Batas iterasi untuk menghindari infinite loop
+        
+        while generated < count and iterations < max_iterations:
+            iterations += 1
+            
+            # Pilih file sumber secara acak
+            img_path, label_path = random.choice(source_files)
+            
+            try:
+                # Load gambar dan label
+                img = cv2.imread(str(img_path)); 
+                if img is None: continue
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                
+                # Load label
+                bbox_data = self.utils.parse_yolo_label(label_path)
+                if not bbox_data: continue
+                
+                # Ekstrak bounding box dan class untuk albumentations
+                bboxes = [box['bbox'] for box in bbox_data]  # Format: [x_center, y_center, width, height]
+                class_labels = [box['class_id'] for box in bbox_data]
+                
+                # Terapkan augmentasi
+                try:
+                    transformed = pipeline(image=img, bboxes=bboxes, class_labels=class_labels)
+                    
+                    aug_img = transformed['image']
+                    aug_bboxes = transformed['bboxes']
+                    aug_labels = transformed['class_labels']
+                    
+                    if not aug_bboxes: continue  # Skip jika augmentasi menghilangkan semua bbox
+                        
+                    # Generate nama file baru dengan format {prefix}_{class_name}_{unique_id}
+                    unique_id = str(uuid.uuid4())[:8]  # 8 karakter pertama dari UUID
+                    new_stem = f"{output_prefix}_{class_name}_{unique_id}"
+                    
+                    # Simpan gambar baru
+                    new_img_path = output_images_dir / f"{new_stem}.jpg"
+                    cv2.imwrite(str(new_img_path), cv2.cvtColor(aug_img, cv2.COLOR_RGB2BGR))
+                    
+                    # Simpan label baru
+                    new_label_path = output_labels_dir / f"{new_stem}.txt"
+                    with open(new_label_path, 'w') as f:
+                        f.write("\n".join(f"{cls_id} {' '.join(map(str, bbox))}" for cls_id, bbox in zip(aug_labels, aug_bboxes)))
+                    
+                    generated += 1
+                    
+                    # Update progress bar dan laporan progress
+                    if pbar: pbar.update(1)
+                    if generated % 10 == 0 or generated == count:
+                        self._report_progress(generated, count, 
+                                            f"Augmentasi kelas {class_name}: {generated}/{count}", 
+                                            current_progress=generated, current_total=count)
+                        
+                except Exception as e:
+                    self.logger.debug(f"⚠️ Error saat augmentasi {img_path.name}: {str(e)}")
+                    continue
+                    
+            except Exception as e:
+                self.logger.debug(f"⚠️ Error saat memproses {img_path.name}: {str(e)}")
+                continue
+                
+        return generated
+
     def get_pipeline(self, augmentation_types: List[str]):
         """Dapatkan pipeline augmentasi untuk digunakan di luar service."""
         return self._get_augmentation_pipeline(augmentation_types)

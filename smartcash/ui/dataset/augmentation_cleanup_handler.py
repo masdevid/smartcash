@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_cleanup_handler.py
-Deskripsi: Handler untuk membersihkan data augmentasi dengan strategi kosongkan folder
+Deskripsi: Handler untuk membersihkan data augmentasi dengan progress tracking dan tanpa backup
 """
 
 from typing import Dict, Any
@@ -13,7 +13,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
 def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk tombol cleanup augmentasi data."""
+    """Setup handler untuk tombol cleanup augmentasi data dengan progress tracking."""
     logger = ui_components.get('logger')
     
     def perform_cleanup():
@@ -24,63 +24,120 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Update status dan tampilkan progress bar
             with ui_components['status']:
                 clear_output(wait=True)
-                progress_bar = tqdm(total=3, desc="🧹 Membersihkan Augmentasi", ncols=100)
                 display(create_status_indicator("info", f"{ICONS['trash']} Mempersiapkan pembersihan..."))
                 
-            # Pastikan direktori ada dan berisi subdirektori images/labels
+            # Pastikan direktori ada
             path = Path(augmented_dir)
             if not path.exists():
                 with ui_components['status']:
                     display(create_status_indicator("warning", f"{ICONS['warning']} Direktori tidak ditemukan: {augmented_dir}"))
                 return
             
-            # Update progress
-            progress_bar.update(1)
-            with ui_components['status']:
-                display(create_status_indicator("info", f"{ICONS['processing']} Menghapus gambar augmentasi..."))
+            # Notifikasi observer via observer system
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                notify(
+                    event_type=EventTopics.AUGMENTATION_CLEANUP_START,
+                    sender="augmentation_handler",
+                    message=f"Mulai membersihkan data augmentasi di {augmented_dir}"
+                )
+            except (ImportError, AttributeError):
+                pass
+            
+            # Tampilkan progress bar dan status
+            if 'progress_bar' in ui_components and 'current_progress' in ui_components:
+                ui_components['progress_bar'].layout.visibility = 'visible'
+                ui_components['current_progress'].layout.visibility = 'visible'
+                ui_components['progress_bar'].description = 'Memproses: 0%'
+                ui_components['current_progress'].description = 'Mencari file...'
+            
+            # Update status panel
+            from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+            update_status_panel(
+                ui_components,
+                "info",
+                f"{ICONS['trash']} Membersihkan data augmentasi di {augmented_dir}"
+            )
             
             # Hapus isi subdirektori images dan labels
             subdirs = ['images', 'labels']
             total_files_deleted = 0
             
+            # Kumpulkan semua file yang akan dihapus terlebih dahulu
+            files_to_delete = []
             for subdir in subdirs:
                 dir_path = path / subdir
-                if dir_path.exists():
-                    # Hapus file dengan pola augmentasi
-                    aug_files = list(glob.glob(str(dir_path / 'aug_*')) + 
-                                     glob.glob(str(dir_path / '*_augmented*')))
-                    
-                    for file_path in aug_files:
-                        try:
-                            os.remove(file_path)
-                            total_files_deleted += 1
-                        except Exception as e:
-                            logger.warning(f"⚠️ Gagal menghapus {file_path}: {e}")
+                if not dir_path.exists():
+                    continue
+                
+                # Cari file dengan pola augmentasi
+                augmented_files = list(dir_path.glob(f"{ui_components['aug_options'].children[2].value}_*.*"))
+                files_to_delete.extend(augmented_files)
+                
+            # Update progress bar dengan total file
+            total_files = len(files_to_delete)
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].max = total_files if total_files > 0 else 1
+                ui_components['progress_bar'].value = 0
+                ui_components['progress_bar'].description = f'Total: {total_files} file'
             
-            # Update progress
-            progress_bar.update(1)
-            with ui_components['status']:
-                display(create_status_indicator("info", f"{ICONS['processing']} Membersihkan metadata..."))
-            
-            # Hapus file-file metadata tambahan jika ada
-            metadata_files = list(path.glob('*.json')) + list(path.glob('*.yaml'))
-            for metadata_file in metadata_files:
+            # Hapus file dengan progress tracking
+            for i, file_path in enumerate(files_to_delete):
                 try:
-                    metadata_file.unlink()
+                    # Hapus file
+                    os.remove(file_path)
+                    total_files_deleted += 1
+                    
+                    # Update progress
+                    if 'progress_bar' in ui_components and 'current_progress' in ui_components:
+                        ui_components['progress_bar'].value = i + 1
+                        progress_percent = int((i + 1) / total_files * 100) if total_files > 0 else 100
+                        ui_components['current_progress'].value = progress_percent
+                        ui_components['current_progress'].description = f'Menghapus: {file_path.name}'
+                    
+                    # Report progress via observer
+                    if i % 10 == 0 or i == len(files_to_delete) - 1:
+                        try:
+                            from smartcash.components.observer import notify
+                            notify(
+                                event_type=EventTopics.AUGMENTATION_CLEANUP_PROGRESS,
+                                sender="augmentation_handler",
+                                message=f"Menghapus file augmentasi ({i+1}/{total_files})",
+                                progress=i+1,
+                                total=total_files
+                            )
+                        except (ImportError, AttributeError):
+                            pass
+                
                 except Exception as e:
-                    logger.warning(f"⚠️ Gagal menghapus metadata: {e}")
-            
-            # Update progress akhir
-            progress_bar.update(1)
-            
-            # Tutup progress bar
-            progress_bar.close()
+                    if logger:
+                        logger.warning(f"⚠️ Gagal menghapus {file_path}: {e}")
             
             # Tampilkan status sukses
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("success", 
-                    f"{ICONS['success']} Folder augmentasi dibersihkan. {total_files_deleted} file dihapus"))
+                    f"{ICONS['success']} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"))
+            
+            # Update status panel
+            update_status_panel(
+                ui_components,
+                "success",
+                f"{ICONS['success']} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"
+            )
+            
+            # Notifikasi observer via observer system
+            try:
+                from smartcash.components.observer import notify
+                notify(
+                    event_type=EventTopics.AUGMENTATION_CLEANUP_END,
+                    sender="augmentation_handler",
+                    message=f"Berhasil membersihkan {total_files_deleted} file augmentasi",
+                    files_deleted=total_files_deleted
+                )
+            except (ImportError, AttributeError):
+                pass
             
             # Reset UI
             if 'visualization_buttons' in ui_components:
@@ -92,13 +149,41 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
             if 'cleanup_button' in ui_components:
                 ui_components['cleanup_button'].layout.display = 'none'
             
+            # Reset progress bar
+            if 'progress_bar' in ui_components and 'current_progress' in ui_components:
+                ui_components['progress_bar'].layout.visibility = 'hidden'
+                ui_components['current_progress'].layout.visibility = 'hidden'
+            
         except Exception as e:
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("error", f"{ICONS['error']} Gagal membersihkan: {str(e)}"))
             
+            # Update status panel
+            try:
+                from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+                update_status_panel(
+                    ui_components,
+                    "error",
+                    f"{ICONS['error']} Gagal membersihkan data augmentasi: {str(e)}"
+                )
+            except ImportError:
+                pass
+            
             if logger:
                 logger.error(f"❌ Error saat membersihkan data: {str(e)}")
+            
+            # Notifikasi observer via observer system
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                notify(
+                    event_type=EventTopics.AUGMENTATION_CLEANUP_ERROR,
+                    sender="augmentation_handler",
+                    message=f"Error saat membersihkan data: {str(e)}"
+                )
+            except (ImportError, AttributeError):
+                pass
     
     # Daftarkan handler untuk tombol cleanup
     ui_components['cleanup_button'].on_click(lambda b: perform_cleanup())

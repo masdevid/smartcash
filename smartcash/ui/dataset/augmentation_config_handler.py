@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_config_handler.py
-Deskripsi: Handler konfigurasi augmentasi yang disederhanakan dengan fokus pada parameter utama
+Deskripsi: Handler konfigurasi augmentasi dengan implementasi default config untuk reset yang benar
 """
 
 from typing import Dict, Any, Optional
@@ -33,6 +33,11 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     # Use relative paths for storage
     rel_augmented_dir = os.path.relpath(augmented_dir, os.getcwd()) if os.path.isabs(augmented_dir) else augmented_dir
     
+    # Dapatkan jumlah workers dari UI jika tersedia
+    num_workers = 4  # Default value
+    if len(ui_components['aug_options'].children) > 5:
+        num_workers = ui_components['aug_options'].children[5].value
+    
     # Update config
     config['augmentation'].update({
         'enabled': True,
@@ -42,7 +47,8 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         'process_bboxes': ui_components['aug_options'].children[3].value if len(ui_components['aug_options'].children) > 3 else True,
         'validate_results': ui_components['aug_options'].children[4].value if len(ui_components['aug_options'].children) > 4 else True,
         'resume': False,
-        'output_dir': rel_augmented_dir
+        'output_dir': rel_augmented_dir,
+        'num_workers': num_workers
     })
     
     # Update data directory
@@ -94,24 +100,69 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
             except Exception:
                 pass
     
-    # Default config jika tidak ada
+    # Jika config tidak bisa dimuat, gunakan default config
+    return load_default_augmentation_config()
+
+def load_default_augmentation_config() -> Dict[str, Any]:
+    """
+    Load konfigurasi default untuk augmentasi dataset.
+    Fungsi ini menyediakan nilai default yang konsisten untuk reset ke kondisi awal.
+    
+    Returns:
+        Dictionary konfigurasi default
+    """
+    # Default config dengan nilai standar
     return {
         "augmentation": {
             "enabled": True,
+            "types": ["combined", "position", "lighting"],
             "num_variations": 2,
             "output_prefix": "aug",
             "process_bboxes": True,
-            "output_dir": "data/augmented",
             "validate_results": True,
             "resume": False,
-            "types": ["combined", "position", "lighting"]
+            "output_dir": "data/augmented",
+            "num_workers": 4,
+            "position": {
+                "fliplr": 0.5,
+                "flipud": 0.0,
+                "degrees": 15,
+                "translate": 0.1,
+                "scale": 0.1,
+                "shear": 0.0,
+                "rotation_prob": 0.5,
+                "max_angle": 15,
+                "flip_prob": 0.5,
+                "scale_ratio": 0.1
+            },
+            "lighting": {
+                "hsv_h": 0.015,
+                "hsv_s": 0.7,
+                "hsv_v": 0.4,
+                "contrast": 0.3,
+                "brightness": 0.3,
+                "compress": 0.2,
+                "brightness_prob": 0.5,
+                "brightness_limit": 0.3,
+                "contrast_prob": 0.5,
+                "contrast_limit": 0.3
+            },
+            "extreme": {
+                "rotation_min": 30,
+                "rotation_max": 90,
+                "probability": 0.3
+            }
+        },
+        "data": {
+            "dir": "data"
         }
     }
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """Update UI components dari konfigurasi."""
     if not config or 'augmentation' not in config:
-        return ui_components
+        # Jika config tidak valid, gunakan default
+        config = load_default_augmentation_config()
         
     aug_config = config['augmentation']
     
@@ -141,7 +192,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             1: 'num_variations',
             2: 'output_prefix',
             3: 'process_bboxes', 
-            4: 'validate_results'
+            4: 'validate_results',
+            5: 'num_workers'
         }
         
         # Update aug_options

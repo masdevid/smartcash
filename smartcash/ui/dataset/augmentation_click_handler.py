@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan penanganan reset dan lokasi yang diperbarui
+Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan reset yang benar ke konfigurasi default
 """
 
 from typing import Dict, Any
@@ -97,6 +97,13 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             cleanup_ui()
             return
         
+        # Ambil jumlah workers dari UI jika tersedia
+        num_workers = 4  # Default value
+        if len(ui_components['aug_options'].children) > 5:
+            num_workers = ui_components['aug_options'].children[5].value
+            # Update num_workers pada augmentation_manager
+            augmentation_manager.num_workers = num_workers
+            
         # Dapatkan opsi dari UI
         variations = ui_components['aug_options'].children[1].value
         prefix = ui_components['aug_options'].children[2].value
@@ -125,7 +132,8 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 validate_results=validate,
                 resume=False,  # Tidak menggunakan resume
                 process_bboxes=process_bboxes,
-                output_dir=output_dir
+                output_dir=output_dir,
+                num_workers=num_workers  # Gunakan jumlah workers dari UI
             )
             
             # Proses hasil sukses
@@ -275,18 +283,22 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     
     # Handler untuk tombol reset
     def on_reset_click(b):
-        """Handler untuk reset UI ke kondisi awal."""
+        """Handler untuk reset UI ke kondisi awal dengan konfigurasi default yang benar."""
         from smartcash.ui.utils.alert_utils import create_status_indicator
         from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state
 
         # Reset UI ke kondisi awal
         reset_ui()
         
-        # Reset config ke default
+        # Reset config ke default - load konfigurasi default
         try:
             # Load konfigurasi default
-            from smartcash.ui.dataset.augmentation_config_handler import load_augmentation_config, update_ui_from_config
-            default_config = load_augmentation_config()
+            from smartcash.ui.dataset.augmentation_config_handler import load_default_augmentation_config, update_ui_from_config
+            
+            # Dapatkan konfigurasi default dengan memanggil fungsi yang tepat
+            default_config = load_default_augmentation_config()
+            
+            # Update UI dari konfigurasi default
             update_ui_from_config(ui_components, default_config)
             
             # Re-detect state
@@ -295,11 +307,25 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Tampilkan pesan sukses
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset"))
+                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
+                
+            # Update status panel
+            from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+            update_status_panel(
+                ui_components, 
+                "success", 
+                f"{ICONS['success']} Konfigurasi direset ke nilai default"
+            )
+            
+            # Log success jika logger tersedia
+            if logger: logger.success(f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke nilai default")
         except Exception as e:
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
+                
+            # Log error jika logger tersedia
+            if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
     
     # Function untuk cleanup UI setelah augmentasi
     def cleanup_ui():
@@ -343,6 +369,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Sembunyikan tombol visualisasi dan cleanup
         if 'visualization_buttons' in ui_components:
             ui_components['visualization_buttons'].layout.display = 'none'
+            
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].layout.display = 'none'
         
         # Reset logs
         if 'status' in ui_components:

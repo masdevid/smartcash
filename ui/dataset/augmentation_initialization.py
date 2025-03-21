@@ -63,7 +63,7 @@ def detect_augmentation_state(ui_components: Dict[str, Any], env=None, config=No
             update_status_panel(
                 ui_components,
                 "success",
-                f"{ICONS['success']} Data teaugmentasi sudah tersedia di: {abs_augmented_dir}"
+                f"Data teraugmentasi sudah tersedia di: {abs_augmented_dir}"
             )
             
             # Tampilkan tombol cleanup dan visualisasi

@@ -25,7 +25,8 @@ def run_cell(cell_name, config_path):
         ui_components = setup_ui_component(env, config, cell_name)
         
         # Tambahkan logging yang terintegrasi
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging, alert_to_ui
+
         logger = setup_ipython_logging(ui_components, f"cell_{cell_name}")
         if logger:
             ui_components['logger'] = logger
@@ -42,24 +43,10 @@ def run_cell(cell_name, config_path):
             ui_components = handler_func(ui_components, env, config)
             
             # Cek apakah handler berhasil setup
-            if logger:
-                logger.info(f"✅ Cell {cell_name} berhasil diinisialisasi")
+            if logger: logger.info(f"✅ Cell {cell_name} berhasil diinisialisasi")
+
         except Exception as e:
-            if 'status' in ui_components:
-                with ui_components['status']:
-                    display(HTML(f"""
-                    <div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'>
-                        <h3>❌ Error Setup Handler</h3>
-                        <p>{str(e)}</p>
-                    </div>
-                    """))
-            else:
-                display(HTML(f"""
-                <div style='padding:10px; background:#f8d7da; color:#721c24; border-radius:5px'>
-                    <h3>❌ Error Setup Handler</h3>
-                    <p>{str(e)}</p>
-                </div>
-                """))
+            alert_to_ui(f"Error Setup Handler: {str(e)}", 'error', ui_components)
             
         # Tampilkan UI
         display_ui(ui_components)

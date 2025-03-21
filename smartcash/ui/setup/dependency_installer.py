@@ -21,14 +21,14 @@ def setup_dependency_installer():
         # Buat komponen UI
         ui_components = create_dependency_installer_ui(env, config)
         
+        ui_components = setup_dependency_installer_handlers(ui_components, config)
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, "dependency_installer")
         if logger:
             ui_components['logger'] = logger
             logger.info("🚀 Cell dependency_installer diinisialisasi")
 
-        ui_components = setup_dependency_installer_handlers(ui_components, env, config)
-        
+
     except ImportError as e:
         # Fallback jika modules tidak tersedia
         from smartcash.ui.utils.fallback_utils import show_status

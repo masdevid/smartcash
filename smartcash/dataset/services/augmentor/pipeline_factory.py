@@ -257,29 +257,22 @@ class AugmentationPipelineFactory:
         """
         transforms = []
         
-        # ShiftScaleRotate (kombinasi scale, rotate, translate)
-        if any(params.get(key, 0) > 0 for key in ['translate', 'scale', 'degrees']):
+        # Gunakan Affine untuk semua transformasi posisi
+        if any(params.get(key, 0) > 0 for key in ['translate', 'scale', 'degrees', 'shear']):
             transforms.append(
-                A.ShiftScaleRotate(
-                    shift_limit=params.get('translate', 0.1),
-                    scale_limit=params.get('scale', 0.1),
-                    rotate_limit=int(params.get('degrees', 15)),
+                A.Affine(
+                    scale=params.get('scale', 0.1),
+                    rotate=int(params.get('degrees', 15)),
+                    translate_percent={
+                        'x': params.get('translate', 0.1),
+                        'y': params.get('translate', 0.1)
+                    },
+                    shear=params.get('shear', 5.0),
                     p=0.7 * params.get('p_factor', 1.0),
-                    border_mode=cv2.BORDER_CONSTANT
+                    # Hapus mode dan cval yang menyebabkan warning
                 )
             )
         
-        # Affine untuk transformasi yang lebih kompleks
-        if params.get('shear', 0) > 0:
-            transforms.append(
-                A.Affine(
-                    shear=params.get('shear', 5.0),
-                    p=0.3 * params.get('p_factor', 1.0),
-                    cval=0,
-                    mode=cv2.BORDER_CONSTANT
-                )
-            )
-            
         return transforms
     
     def _get_lighting_transforms(self, params: Dict[str, Any]) -> List[A.BasicTransform]:

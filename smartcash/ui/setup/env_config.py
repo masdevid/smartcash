@@ -14,6 +14,7 @@ def initialize_drive_sync(ui_components=None):
     Args:
         ui_components: Dictionary komponen UI yang akan diupdate (opsional)
     """
+    from smartcash.ui.utils.logging_utils import log_to_ui
     # Pastikan output tersedia
     if not ui_components or 'status' not in ui_components:
         print("Error: Output widget tidak tersedia")
@@ -26,9 +27,7 @@ def initialize_drive_sync(ui_components=None):
     
     # Fungsi log yang mengarahkan ke output widget
     def log(message, status_type="info"):
-        with status_output:
-            from smartcash.ui.utils.alert_utils import create_info_alert
-            display(create_info_alert(message, status_type))
+        log_to_ui(status_output, message, status_type)
     
     # Fungsi update progress
     def update_progress(step, message, status_type="info", total_steps=4):

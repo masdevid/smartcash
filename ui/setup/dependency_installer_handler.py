@@ -254,18 +254,5 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
     ui_components['check_button'].on_click(on_check_installations)
     ui_components['check_all_button'].on_click(_on_check_all)
     ui_components['uncheck_all_button'].on_click(_on_uncheck_all)
-    
-    # Register cleanup function
-    def cleanup():
-        """Cleanup resources."""
-        if 'observer_group' in ui_components:
-            try:
-                from smartcash.components.observer.manager_observer import ObserverManager
-                observer_manager = ObserverManager()
-                observer_manager.unregister_group(ui_components['observer_group'])
-            except ImportError:
-                pass
-    
-    ui_components['cleanup'] = cleanup
 
     return ui_components

@@ -1,7 +1,17 @@
 """
 File: smartcash/ui/dataset/augmentation_visualization_handler.py
-Deskripsi: Update handler visualisasi untuk mendukung lokasi augmentasi baru
+Deskripsi: Handler untuk visualisasi dataset hasil augmentasi dengan peningkatan tampilan nama file teraugmentasi
 """
+
+from typing import Dict, Any, Optional, List, Tuple
+import os
+from pathlib import Path
+import numpy as np
+import cv2
+import matplotlib.pyplot as plt
+from IPython.display import display, clear_output, HTML
+
+from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """Setup handler untuk visualisasi dataset augmentasi dengan dukungan lokasi baru."""
@@ -96,7 +106,6 @@ def visualize_dataset(ui_components: Dict[str, Any], mode: str = 'single', num_s
         # Show visualization container
         if 'visualization_container' in ui_components:
             ui_components['visualization_container'].layout.display = 'block'
-
 def find_label_path(img_path: Path) -> Optional[Path]:
     """
     Fungsi helper untuk mencari label path dari image path.
@@ -122,6 +131,40 @@ def find_label_path(img_path: Path) -> Optional[Path]:
             return sibling_label_path
     
     return None
+
+def load_image(img_path: Path) -> np.ndarray:
+    """Fungsi helper untuk loading gambar dengan berbagai format."""
+    if str(img_path).endswith('.npy'):
+        # Handle numpy array
+        img = np.load(str(img_path))
+        # Denormalisasi jika perlu
+        if img.dtype == np.float32 and img.max() <= 1.0:
+            img = (img * 255).astype(np.uint8)
+    else:
+        # Handle gambar biasa
+        img = cv2.imread(str(img_path))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+def shorten_filename(filename: str, max_length: int = 15) -> str:
+    """
+    Persingkat nama file dengan ellipsis untuk tampilan yang lebih baik.
+    
+    Args:
+        filename: Nama file yang akan dipersingkat
+        max_length: Panjang maksimum nama file
+        
+    Returns:
+        Nama file yang telah dipersingkat
+    """
+    if len(filename) <= max_length:
+        return filename
+    
+    # Potong nama file dengan format "awal...akhir"
+    prefix_len = max_length // 2 - 1
+    suffix_len = max_length - prefix_len - 3  # 3 untuk "..."
+    
+    return f"{filename[:prefix_len]}...{filename[-suffix_len:]}"
 
 def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 5):
     """Visualisasi sampel dataset yang telah diaugmentasi dengan peningkatan tampilan nama file."""
@@ -172,6 +215,7 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
     
     if labels:
         display_label_info(labels)
+
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi."""
@@ -285,3 +329,45 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             """))
         except Exception:
             pass
+
+def display_label_info(image_files: List[Path], labels_dir: Path):
+    """Tampilkan informasi label untuk gambar-gambar yang dipilih."""
+    if not labels_dir.exists(): return
+    
+    matched_labels = []
+    for img_file in image_files:
+        label_file = labels_dir / f"{img_file.stem}.txt"
+        if label_file.exists():
+            matched_labels.append((img_file, label_file))
+    
+    if matched_labels:
+        display(HTML(f"<h4 style='color:{COLORS['dark']}'>Informasi Label</h4>"))
+        for img_file, label_file in matched_labels:
+            try:
+                with open(label_file, 'r') as f:
+                    label_lines = f.read().strip().splitlines()
+                
+                num_boxes = len(label_lines)
+                classes = set()
+                for line in label_lines:
+                    parts = line.split()
+                    if parts: classes.add(parts[0])
+                
+                # Tampilkan nama file yang dipersingkat
+                shortened_name = shorten_filename(img_file.name, 20)
+                
+                display(HTML(f"""
+                <div style="margin:5px 0; padding:5px; border-left:3px solid {COLORS['primary']};">
+                    <p style="margin:0; color:{COLORS['dark']};"><strong>{shortened_name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
+                </div>
+                """))
+            except Exception:
+                pass
+
+def format_size(size_bytes: int) -> str:
+    """Format ukuran file dalam bytes ke format yang mudah dibaca."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size_bytes < 1024.0:
+            return f"{size_bytes:.2f} {unit}"
+        size_bytes /= 1024.0
+    return f"{size_bytes:.2f} TB"

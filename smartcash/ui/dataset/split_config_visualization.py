@@ -138,7 +138,7 @@ def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, 
         f'{generate_card("Preprocessed Dataset", ICONS["processing"], colors["secondary"], preprocessed)}'
         '</div>'
     )
-
+    
 def show_distribution_visualization(output_widget, config: Dict[str, Any], env=None, logger=None) -> None:
     """Display class distribution visualization."""
     from smartcash.ui.utils.constants import COLORS, ICONS
@@ -167,50 +167,6 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'
                 f'<p>{ICONS["error"]} Visualization error: {str(e)}</p></div>'
             ))
-
-    @staticmethod
-    def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_path: str, logger=None) -> None:
-        """Plot class distribution using matplotlib."""
-        try:
-            import pandas as pd
-            import matplotlib.pyplot as plt
-            import numpy as np
-            from smartcash.ui.utils.constants import COLORS, ICONS
-
-            all_classes = sorted(set().union(*[set(d.keys()) for d in class_distribution.values()]))
-            df = pd.DataFrame([
-                {'Class': cls, 'Train': class_distribution.get('train', {}).get(cls, 0),
-                 'Valid': class_distribution.get('valid', {}).get(cls, 0),
-                 'Test': class_distribution.get('test', {}).get(cls, 0)}
-                for cls in all_classes
-            ])
-
-            plt.figure(figsize=(12, 6))
-            bar_width = 0.25
-            r1, r2, r3 = np.arange(len(df)), [x + bar_width for x in range(len(df))], [x + 2 * bar_width for x in range(len(df))]
-            plt.bar(r1, df['Train'], width=bar_width, label='Train', color=COLORS['primary'])
-            plt.bar(r2, df['Valid'], width=bar_width, label='Valid', color=COLORS['success'])
-            plt.bar(r3, df['Test'], width=bar_width, label='Test', color=COLORS['warning'])
-            plt.xlabel('Class'), plt.ylabel('Sample Count'), plt.title('Class Distribution per Dataset Split')
-            plt.xticks([r + bar_width for r in range(len(df))], df['Class'], rotation=45, ha='right')
-            plt.legend(), plt.tight_layout(), plt.show()
-
-            display(HTML(
-                f'<div style="padding:10px; background-color:{COLORS["alert_info_bg"]}; '
-                f'color:{COLORS["alert_info_text"]}; border-radius:4px; margin-top:15px;">'
-                f'<p>{ICONS["info"]} <strong>Dataset Info:</strong> Visualization shows class distribution across splits.</p>'
-                f'<p>Dataset path: <code>{dataset_path}</code></p></div>'
-                f'<h3>{ICONS["chart"]} Class Distribution Table</h3>'
-            ))
-            display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
-        except Exception as e:
-            if logger: logger.error(f"❌ Error creating visualization: {str(e)}")
-            display(HTML(
-                f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; '
-                f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'
-                f'<p>{ICONS["error"]} Visualization creation error: {str(e)}</p></div>'
-            ))
-
 def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
     """Load and display basic dataset stats."""
     try:

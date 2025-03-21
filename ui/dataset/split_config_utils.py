@@ -217,7 +217,7 @@ def handle_visualize_button(b, ui_components: Dict[str, Any], config: Dict[str, 
         except Exception as e:
             if logger: logger.error(f"❌ Error displaying visualization: {str(e)}")
             display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-
+            
 def register_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """Register all event handlers for split config UI components."""
     for slider in ui_components.get('split_sliders', []):
@@ -225,7 +225,7 @@ def register_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
             slider.observe(lambda change: handle_slider_change(change, ui_components), names='value')
 
     for button, handler in [
-        ('visualize_button', handle_visualize_button),
+        ('visualize_button', lambda b: handle_visualize_button(b, ui_components, config, env, logger)),
         ('save_button', lambda b: _handle_button_action('save', ui_components, config, env, logger)),
         ('reset_button', lambda b: _handle_button_action('reset', ui_components, config, env, logger))
     ]:
@@ -236,5 +236,3 @@ def register_event_handlers(ui_components: Dict[str, Any], config: Dict[str, Any
         [s.unobserve_all() for s in ui_components.get('split_sliders', []) if hasattr(s, 'unobserve_all')],
         logger.info("🧹 UI split config event handlers cleaned up") if logger else None
     )[-1]
-    
-    return ui_components

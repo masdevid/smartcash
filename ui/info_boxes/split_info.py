@@ -8,7 +8,7 @@ import ipywidgets as widgets
 def get_split_info(open_by_default: bool = False) -> widgets.Accordion:
     from smartcash.ui.utils.info_utils import create_info_accordion
     from smartcash.ui.utils.constants import ICONS
-    
+
     TITLE = "Tentang Konfigurasi Split Dataset"
     content = f"""
     <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
@@ -20,7 +20,7 @@ def get_split_info(open_by_default: bool = False) -> widgets.Accordion:
     </ul>
     <p>Gunakan <strong>stratified split</strong> untuk memastikan distribusi kelas tetap seimbang di semua subset.</p>
     
-    <h4>{ICONS['folder']} Lokasi Dataset</h4>
+    <h4 style="color:inherit">{ICONS['folder']} Lokasi Dataset</h4>
     <p>Data mentah dan data terpreprocessing akan diambil dari lokasi yang dikonfigurasi:</p>
     <ul>
         <li>Dataset mentah: <code>/content/drive/MyDrive/SmartCash/data</code></li>

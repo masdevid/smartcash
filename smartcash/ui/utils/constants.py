@@ -126,6 +126,7 @@ ICONS = {
     'edit': '✏️',
     'delete': '🗑️',
     'search': '🔍',
+    'refresh': '🔄',
     
     # Object icons
     'folder': '📁',

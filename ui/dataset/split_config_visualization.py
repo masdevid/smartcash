@@ -17,39 +17,80 @@ class DatasetStatsManager:
         # from smartcash.common.constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH
         drive_mounted = env and getattr(env, 'is_drive_mounted', False)
         base_path = '/content/drive/MyDrive/SmartCash/data' if drive_mounted else 'data'
-        return (
-            config.get('data', {}).get('dataset_path', base_path),
-            config.get('data', {}).get('preprocessed_path', f'{base_path}/preprocessed')
-        )
+        
+        # Default paths
+        dataset_path = base_path
+        preprocessed_path = f'{base_path}/preprocessed'
+        
+        # Get from config if available
+        if config and isinstance(config, dict) and 'data' in config and isinstance(config['data'], dict):
+            dataset_path = config['data'].get('dataset_path', base_path)
+            preprocessed_path = config['data'].get('preprocessed_path', f'{base_path}/preprocessed')
+            
+        return (dataset_path, preprocessed_path)
 
     @staticmethod
     def count_files(dataset_dir: str) -> Dict[str, Dict[str, int]]:
         """Count files in YOLO dataset structure."""
         stats = {}
+        
+        # Check if directory exists
+        if not os.path.exists(dataset_dir):
+            return stats
+            
         for split in ['train', 'valid', 'test']:
             split_dir = Path(dataset_dir) / split
+            
+            # Initialize counters
             stats[split] = {
-                'images': len(list((split_dir / 'images').glob('*.*'))) if (split_dir / 'images').exists() else 0,
-                'labels': len(list((split_dir / 'labels').glob('*.txt'))) if (split_dir / 'labels').exists() else 0
+                'images': 0,
+                'labels': 0,
+                'valid': False
             }
+            
+            # Count files if directories exist
+            images_dir = split_dir / 'images'
+            labels_dir = split_dir / 'labels'
+            
+            if images_dir.exists():
+                stats[split]['images'] = len(list(images_dir.glob('*.*')))
+            
+            if labels_dir.exists():
+                stats[split]['labels'] = len(list(labels_dir.glob('*.txt')))
+                
             stats[split]['valid'] = stats[split]['images'] > 0 and stats[split]['labels'] > 0
+            
         return stats
 
     @staticmethod
     def get_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
         """Get dataset statistics for raw and preprocessed data."""
         try:
-            raw_path, preprocessed_path = DatasetStatsManager.get_paths(config, env)
+            # Default empty stats
             stats = {
-                'raw': {'exists': os.path.exists(raw_path), 'stats': {}},
-                'preprocessed': {'exists': os.path.exists(preprocessed_path), 'stats': {}}
+                'raw': {'exists': False, 'stats': {}},
+                'preprocessed': {'exists': False, 'stats': {}}
             }
+            
+            # Get paths safely
+            if config is None:
+                config = {}
+                
+            raw_path, preprocessed_path = DatasetStatsManager.get_paths(config, env)
+            
+            # Update stats with existence info
+            stats['raw']['exists'] = os.path.exists(raw_path)
+            stats['preprocessed']['exists'] = os.path.exists(preprocessed_path)
+            
+            # Count files if directories exist
             if stats['raw']['exists']:
                 stats['raw']['stats'] = DatasetStatsManager.count_files(raw_path)
                 if logger: logger.info(f"📊 Raw dataset stats computed: {raw_path}")
+                
             if stats['preprocessed']['exists']:
                 stats['preprocessed']['stats'] = DatasetStatsManager.count_files(preprocessed_path)
                 if logger: logger.info(f"📊 Preprocessed dataset stats computed: {preprocessed_path}")
+                
             return stats
         except Exception as e:
             if logger: logger.error(f"❌ Error getting dataset stats: {str(e)}")
@@ -111,24 +152,36 @@ class DatasetStatsManager:
 def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, str]) -> None:
     """Update HTML component with dataset stats cards."""
     from smartcash.ui.utils.constants import ICONS
-    raw, preprocessed = stats.get('raw', {'stats': {}}), stats.get('preprocessed', {'stats': {}})
+    
+    # Safe access to stats
+    if not stats:
+        stats = {'raw': {'stats': {}}, 'preprocessed': {'stats': {}}}
+        
+    raw = stats.get('raw', {'stats': {}})
+    preprocessed = stats.get('preprocessed', {'stats': {}})
     
     def generate_card(title: str, icon: str, color: str, data: Dict[str, Any]) -> str:
-        images = sum(s.get('images', 0) for s in data['stats'].values())
-        labels = sum(s.get('labels', 0) for s in data['stats'].values())
+        # Safe access to stats data
+        stats_data = data.get('stats', {})
+        
+        images = sum(s.get('images', 0) for s in stats_data.values())
+        labels = sum(s.get('labels', 0) for s in stats_data.values())
+        
         card = (
             f'<div style="flex:1; min-width:220px; border:1px solid {color}; border-radius:5px; padding:10px; background-color:{colors["light"]}">'
             f'<h4 style="margin-top:0; color:{color}">{icon} {title}</h4>'
             f'<p style="margin:5px 0; font-weight:bold; font-size:1.2em; color:{colors["dark"]}">{images} images / {labels} labels</p>'
             '<div style="display:flex; flex-wrap:wrap; gap:5px;">'
         )
-        for split, sdata in data['stats'].items():
+        
+        for split, sdata in stats_data.items():
             split_color = colors['success'] if sdata.get('valid', False) else colors['danger']
             card += (
                 f'<div style="padding:5px; margin:2px; border-radius:3px; background-color:{colors["light"]}; border:1px solid {split_color}">'
                 f'<strong style="color:{split_color}">{split.capitalize()}</strong>: <span style="color:#3795BD">{sdata.get("images", 0)}</span>'
                 '</div>'
             )
+            
         return card + '</div></div>'
 
     html_component.value = (
@@ -138,7 +191,7 @@ def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, 
         f'{generate_card("Preprocessed Dataset", ICONS["processing"], colors["secondary"], preprocessed)}'
         '</div>'
     )
-    
+
 def show_distribution_visualization(output_widget, config: Dict[str, Any], env=None, logger=None) -> None:
     """Display class distribution visualization."""
     from smartcash.ui.utils.constants import COLORS, ICONS
@@ -159,7 +212,7 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 return
 
             class_distribution = DatasetStatsManager.get_class_distribution(config, env, logger)
-            DatasetStatsManager._plot_distribution(class_distribution, dataset_path, logger)
+            _plot_distribution(class_distribution, dataset_path, logger)
         except Exception as e:
             if logger: logger.error(f"❌ Error during visualization: {str(e)}")
             display(HTML(
@@ -167,17 +220,74 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'
                 f'<p>{ICONS["error"]} Visualization error: {str(e)}</p></div>'
             ))
+
+def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_path: str, logger=None) -> None:
+    """Plot class distribution using matplotlib."""
+    try:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from smartcash.ui.utils.constants import COLORS, ICONS
+
+        all_classes = sorted(set().union(*[set(d.keys()) for d in class_distribution.values()]))
+        df = pd.DataFrame([
+            {'Class': cls, 'Train': class_distribution.get('train', {}).get(cls, 0),
+             'Valid': class_distribution.get('valid', {}).get(cls, 0),
+             'Test': class_distribution.get('test', {}).get(cls, 0)}
+            for cls in all_classes
+        ])
+
+        plt.figure(figsize=(12, 6))
+        bar_width = 0.25
+        r1, r2, r3 = np.arange(len(df)), [x + bar_width for x in range(len(df))], [x + 2 * bar_width for x in range(len(df))]
+        plt.bar(r1, df['Train'], width=bar_width, label='Train', color=COLORS['primary'])
+        plt.bar(r2, df['Valid'], width=bar_width, label='Valid', color=COLORS['success'])
+        plt.bar(r3, df['Test'], width=bar_width, label='Test', color=COLORS['warning'])
+        plt.xlabel('Class'), plt.ylabel('Sample Count'), plt.title('Class Distribution per Dataset Split')
+        plt.xticks([r + bar_width for r in range(len(df))], df['Class'], rotation=45, ha='right')
+        plt.legend(), plt.tight_layout(), plt.show()
+
+        display(HTML(
+            f'<div style="padding:10px; background-color:{COLORS["alert_info_bg"]}; '
+            f'color:{COLORS["alert_info_text"]}; border-radius:4px; margin-top:15px;">'
+            f'<p>{ICONS["info"]} <strong>Dataset Info:</strong> Visualization shows class distribution across splits.</p>'
+            f'<p>Dataset path: <code>{dataset_path}</code></p></div>'
+            f'<h3>{ICONS["chart"]} Class Distribution Table</h3>'
+        ))
+        display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
+    except Exception as e:
+        if logger: logger.error(f"❌ Error creating visualization: {str(e)}")
+        display(HTML(
+            f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; '
+            f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'
+            f'<p>{ICONS["error"]} Visualization creation error: {str(e)}</p></div>'
+        ))
+
 def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
     """Load and display basic dataset stats."""
     try:
+        # Validasi input
+        if ui_components is None:
+            if logger: logger.error("❌ ui_components tidak boleh None")
+            return
+            
+        if config is None:
+            config = {}
+            
+        # Get stats
         stats = DatasetStatsManager.get_stats(config, env, logger)
+        
+        # Update UI jika ada
         if 'current_stats_html' in ui_components:
             from smartcash.ui.utils.constants import COLORS
             update_stats_cards(ui_components['current_stats_html'], stats, COLORS)
+            
         if logger: logger.info("✅ Basic dataset stats displayed successfully")
     except Exception as e:
         if logger: logger.error(f"❌ Error displaying dataset stats: {str(e)}")
-        if 'output_box' in ui_components:
+        
+        # Tampilkan error jika ada output widget
+        if ui_components is not None and 'output_box' in ui_components:
             with ui_components['output_box']:
                 from smartcash.ui.utils.constants import ICONS, COLORS
                 clear_output(wait=True)

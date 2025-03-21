@@ -19,6 +19,10 @@ def setup_split_config_handlers(ui_components: Dict[str, Any], env=None, config=
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Inisialisasi ui_components jika None
+    if ui_components is None:
+        ui_components = {}
+    
     # Setup logging terintegrasi UI
     logger = None
     try:
@@ -54,7 +58,7 @@ def setup_split_config_handlers(ui_components: Dict[str, Any], env=None, config=
         if logger:
             logger.error(f"❌ Error saat setup handler: {str(e)}")
         
-        if 'output_box' in ui_components:
+        if ui_components is not None and 'output_box' in ui_components:
             with ui_components['output_box']:
                 from smartcash.ui.utils.constants import ICONS
                 display(HTML(f"""

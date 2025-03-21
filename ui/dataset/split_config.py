@@ -4,7 +4,6 @@ Deskripsi: Koordinator utama untuk konfigurasi split dataset
 """
 def setup_split_config():
     """Koordinator utama split config dengan integrasi utilities"""
-    ui_components = {}
     
     try:
         # Import komponen dengan pendekatan konsolidasi
@@ -19,10 +18,10 @@ def setup_split_config():
 
         # Setup komponen UI dengan utils terstandarisasi
         ui_components = create_split_config_ui(env, config)
-
+        
         # Setup dataset handler dengan utils terstandarisasi
         ui_components = setup_split_config_handlers(ui_components, env, config)
-
+        
         # Setup logging untuk UI
         logger = setup_ipython_logging(ui_components, cell_name)
         if logger:
@@ -31,7 +30,7 @@ def setup_split_config():
             
         # Register cleanup handler untuk saat cell dijalankan
         from IPython import get_ipython
-        if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
+        if get_ipython() and ui_components and 'cleanup' in ui_components and callable(ui_components['cleanup']):
             cleanup = ui_components['cleanup']
             get_ipython().events.register('pre_run_cell', cleanup)
 

@@ -143,7 +143,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                     with ui_components['summary_container']:
                         clear_output(wait=True)
                         display(widgets.HTML(
-                            f"""<div style="padding:10px;">
+                            f"""<div style="padding:10px; color: black">
                             <h4>📊 Hasil Augmentasi</h4>
                             <ul>
                                 <li><b>File asli:</b> {result.get('original', 0)}</li>

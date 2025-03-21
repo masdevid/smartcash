@@ -78,7 +78,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
             with ui_components['summary_container']:
                 clear_output(wait=True)
                 display(widgets.HTML(
-                    f"""<div style="padding:10px; background-color:{COLORS['light']}; border-radius:5px; border-left:4px solid {COLORS['primary']};">
+                    f"""<div style="padding:10px; background-color:{COLORS['light']}; border-radius:5px; border-left:4px solid {COLORS['primary']}; color: black">
                     <h4 style="color:{COLORS['dark']}; margin-top:5px;">📊 Hasil Augmentasi</h4>
                     <ul>
                         <li><b>File asli:</b> {result.get('original', 0)}</li>

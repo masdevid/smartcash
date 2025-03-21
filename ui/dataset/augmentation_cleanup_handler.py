@@ -181,26 +181,23 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 # Hapus files berdasarkan pattern, bukan seluruh direktori
                 if images_dir.exists() and labels_dir.exists():
                     for pattern in augmentation_patterns:
-                        # Hapus file gambar
                         for img_file in list(images_dir.glob('*')):
-                            if re.match(pattern, img_file.name):
-                                try:
-                                    # Hapus file gambar
+                            try:
+                                # Gunakan re.match untuk pattern dari awal
+                                if re.match(pattern, img_file.name):
+                                    # Hapus gambar
                                     img_file.unlink()
                                     deleted_count += 1
                                     
-                                    # Hapus label yang bersesuaian jika ada
+                                    # Hapus label yang sesuai
                                     label_file = labels_dir / f"{img_file.stem}.txt"
                                     if label_file.exists():
                                         label_file.unlink()
                                         deleted_count += 1
-                                except Exception as e:
-                                    if logger: logger.warning(f"⚠️ Gagal menghapus {img_file}: {e}")
-                    
-                    # Cek jika folder kosong dan hapus jika perlu
-                    if not any(images_dir.iterdir()) and not any(labels_dir.iterdir()):
-                        shutil.rmtree(path, ignore_errors=True)
-                        deleted_count += 2  # Directories
+                            except Exception as e:
+                                if logger:
+                                    logger.warning(f"⚠️ Error saat proses file {img_file}: {e}")
+                
                     
                     # Log hasil penghapusan
                     with ui_components['status']:

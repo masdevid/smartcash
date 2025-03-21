@@ -117,30 +117,48 @@ class DatasetStatsManager:
 
     @staticmethod
     def _map_class_names(split_classes: Dict[int, int], logger=None) -> Dict[str, int]:
-        """Map class IDs to names with formatted ID notation."""
-        try:
-            from smartcash.common.layer_config import get_layer_config_manager
-            class_map = get_layer_config_manager().get_class_map() if get_layer_config_manager() else {}
-            # Format: '{id}:Class_name (id_name)'
-            return {f"{cid}:{class_map.get(cid, f'Class {cid}')} (l2_{str(cid).zfill(3)})": count 
-                   for cid, count in split_classes.items()}
-        except ImportError:
-            return {f"{cid}:Class {cid} (l2_{str(cid).zfill(3)})": count 
-                   for cid, count in split_classes.items()}
+        """Map class IDs to properly formatted code notation."""
+        formatted_classes = {}
+        
+        for cid, count in split_classes.items():
+            # Regular classes start from 0
+            if cid < 7:
+                formatted_name = f"{str(cid+1).zfill(3)}:{cid}"
+            # l2 classes start from 7
+            elif 7 <= cid < 16:
+                l2_idx = cid - 7
+                formatted_name = f"l2_{str(l2_idx+1).zfill(3)}:{cid}"
+            # l3 classes start from 16
+            else:
+                l3_idx = cid - 16
+                formatted_name = f"l3_{str(l3_idx+1).zfill(3)}:{cid}"
+                
+            formatted_classes[formatted_name] = count
+                
+        return formatted_classes
 
     @staticmethod
     def _dummy_distribution() -> Dict[str, Dict[str, int]]:
-        """Return dummy class distribution with ID-prefixed class names."""
+        """Return dummy class distribution with correctly formatted class names."""
         return {
-            'train': {'0:Rp1000 (l2_000)': 120, '1:Rp2000 (l2_001)': 110, '2:Rp5000 (l2_002)': 130, 
-                     '3:Rp10000 (l2_003)': 140, '4:Rp20000 (l2_004)': 125, '5:Rp50000 (l2_005)': 115, 
-                     '6:Rp100000 (l2_006)': 135},
-            'valid': {'0:Rp1000 (l2_000)': 30, '1:Rp2000 (l2_001)': 25, '2:Rp5000 (l2_002)': 35, 
-                     '3:Rp10000 (l2_003)': 40, '4:Rp20000 (l2_004)': 35, '5:Rp50000 (l2_005)': 28, 
-                     '6:Rp100000 (l2_006)': 32},
-            'test': {'0:Rp1000 (l2_000)': 30, '1:Rp2000 (l2_001)': 25, '2:Rp5000 (l2_002)': 35, 
-                    '3:Rp10000 (l2_003)': 35, '4:Rp20000 (l2_004)': 30, '5:Rp50000 (l2_005)': 27, 
-                    '6:Rp100000 (l2_006)': 33}
+            'train': {
+                '001:0': 120, '002:1': 110, '003:2': 130, '004:3': 140, 
+                '005:4': 125, '006:5': 115, '007:6': 135,
+                'l2_001:7': 80, 'l2_002:8': 85, 'l2_003:9': 75,
+                'l3_001:16': 60, 'l3_002:17': 55
+            },
+            'valid': {
+                '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 40, 
+                '005:4': 35, '006:5': 28, '007:6': 32,
+                'l2_001:7': 20, 'l2_002:8': 22, 'l2_003:9': 18,
+                'l3_001:16': 15, 'l3_002:17': 12
+            },
+            'test': {
+                '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 35, 
+                '005:4': 30, '006:5': 27, '007:6': 33,
+                'l2_001:7': 18, 'l2_002:8': 20, 'l2_003:9': 19,
+                'l3_001:16': 14, 'l3_002:17': 13
+            }
         }
 
 def update_stats_cards(html_component, stats: Dict[str, Any], colors: Dict[str, str]) -> None:
@@ -219,44 +237,65 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
             ))
 
 def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_path: str, logger=None) -> None:
-    """Plot class distribution using matplotlib."""
+    """Plot class distribution using matplotlib with improved formatting."""
     try:
         import pandas as pd
         import matplotlib.pyplot as plt
-        import numpy as np
+        import seaborn as sns
         from smartcash.ui.utils.constants import COLORS, ICONS
-
-        # Extract and prepare data from distribution
+        
+        # Mengubah struktur tabel - kelas sebagai kolom, split sebagai baris
         all_classes = sorted(set().union(*[set(d.keys()) for d in class_distribution.values()]))
         
-        # Create DataFrame with class as index
-        df = pd.DataFrame([
-            {'Class': cls, 'Train': class_distribution.get('train', {}).get(cls, 0),
-             'Valid': class_distribution.get('valid', {}).get(cls, 0),
-             'Test': class_distribution.get('test', {}).get(cls, 0)}
-            for cls in all_classes
-        ])
-
-        # Plot the distribution
-        plt.figure(figsize=(12, 6))
-        bar_width = 0.25
-        r1, r2, r3 = np.arange(len(df)), [x + bar_width for x in range(len(df))], [x + 2 * bar_width for x in range(len(df))]
-        plt.bar(r1, df['Train'], width=bar_width, label='Train', color=COLORS['primary'])
-        plt.bar(r2, df['Valid'], width=bar_width, label='Valid', color=COLORS['success'])
-        plt.bar(r3, df['Test'], width=bar_width, label='Test', color=COLORS['warning'])
-        plt.xlabel('Class'), plt.ylabel('Sample Count'), plt.title('Class Distribution per Dataset Split')
-        plt.xticks([r + bar_width for r in range(len(df))], df['Class'], rotation=45, ha='right')
-        plt.legend(), plt.tight_layout(), plt.show()
-
-        # Show additional info after plot
+        # Membuat dictionary yang akan dikonversi ke DataFrame
+        data = {
+            'Split': ['Train', 'Valid', 'Test'],
+        }
+        
+        # Tambahkan data untuk setiap kelas
+        for cls in all_classes:
+            data[cls] = [
+                class_distribution.get('train', {}).get(cls, 0),
+                class_distribution.get('valid', {}).get(cls, 0),
+                class_distribution.get('test', {}).get(cls, 0)
+            ]
+        
+        # Buat DataFrame dengan Split sebagai index
+        df = pd.DataFrame(data).set_index('Split')
+        
+        # Visualisasi heatmap untuk memudahkan melihat distribusi kelas per split
+        plt.figure(figsize=(14, 6))
+        sns.heatmap(df, annot=True, fmt='d', cmap='Blues', linewidths=.5, cbar_kws={'label': 'Samples'})
+        plt.title('Class Distribution per Dataset Split')
+        plt.ylabel('Split')
+        plt.xlabel('Class')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        plt.show()
+        
+        # Tampilkan barchart untuk melihat jumlah sample per kelas
+        plt.figure(figsize=(14, 6))
+        df_melted = df.reset_index().melt(id_vars=['Split'], var_name='Class', value_name='Samples')
+        sns.barplot(x='Class', y='Samples', hue='Split', data=df_melted)
+        plt.title('Class Distribution Comparison')
+        plt.xticks(rotation=45, ha='right')
+        plt.legend(title='Split')
+        plt.tight_layout()
+        plt.show()
+        
+        # Tampilkan informasi dan tabel
         display(HTML(
             f'<div style="padding:10px; background-color:{COLORS["alert_info_bg"]}; '
             f'color:{COLORS["alert_info_text"]}; border-radius:4px; margin-top:15px;">'
-            f'<p>{ICONS["info"]} <strong>Dataset Info:</strong> Visualization shows class distribution across splits.</p>'
+            f'<p>{ICONS["info"]} <strong>Dataset Info:</strong> Visualisasi menunjukkan distribusi kelas pada setiap split.</p>'
             f'<p>Dataset path: <code>{dataset_path}</code></p></div>'
-            f'<h3>{ICONS["chart"]} Class Distribution Table</h3>'
+            f'<h3>{ICONS["chart"]} Tabel Distribusi Kelas</h3>'
         ))
-        display(df.style.background_gradient(cmap='Blues', subset=['Train', 'Valid', 'Test']))
+        
+        # Tampilkan tabel dengan highlight heatmap
+        cm = sns.light_palette("blue", as_cmap=True)
+        display(df.style.background_gradient(cmap=cm))
+        
     except Exception as e:
         if logger: logger.error(f"❌ Error creating visualization: {str(e)}")
         display(HTML(

@@ -1,8 +1,20 @@
 """
 File: smartcash/ui/dataset/augmentation_click_handler.py
-Deskripsi: Update handler click augmentasi untuk mendukung alur baru
+Deskripsi: Handler tombol dan interaksi UI untuk augmentasi dataset dengan pengurangan verbositas logging
 """
 
+from typing import Dict, Any
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+
+def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """Setup handler untuk tombol UI augmentasi dengan pengelompokan yang lebih baik."""
+    
+    logger = ui_components.get('logger')
+    from smartcash.ui.utils.constants import ICONS
+    
+    # Penanganan error dengan decorator
+    from smartcash.ui.handlers.error_handler import try_except_decorator
 @try_except_decorator(ui_components.get('status'))
 def on_augment_click(b):
     """Handler tombol augmentasi dengan alur augmentasi yang diperbarui."""
@@ -209,3 +221,161 @@ def on_augment_click(b):
         
         # Restore UI
         cleanup_ui()
+    
+    # Handler untuk tombol stop
+    def on_stop_click(b):
+        """Handler untuk menghentikan augmentasi."""
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+        
+        ui_components['augmentation_running'] = False
+        
+        # Tampilkan pesan di status
+        with ui_components['status']:
+            clear_output(wait=True)
+            display(create_status_indicator("warning", f"{ICONS['warning']} Menghentikan augmentasi..."))
+        
+        # Update status panel
+        update_status_panel(
+            ui_components, 
+            "warning", 
+            f"{ICONS['warning']} Augmentasi dihentikan oleh pengguna"
+        )
+        
+        # Notifikasi observer
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            notify(
+                event_type=EventTopics.AUGMENTATION_END,
+                sender="augmentation_handler",
+                message=f"Augmentasi dihentikan oleh pengguna"
+            )
+        except ImportError:
+            pass
+        
+        # Reset UI
+        cleanup_ui()
+    
+    # Handler untuk tombol reset
+    def on_reset_click(b):
+        """Handler untuk reset UI ke kondisi awal."""
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.dataset.augmentation_initialization import detect_augmentation_state
+
+        # Reset UI ke kondisi awal
+        reset_ui()
+        
+        # Reset config ke default - load konfigurasi default
+        try:
+            # Load konfigurasi default
+            from smartcash.ui.dataset.augmentation_config_handler import load_default_augmentation_config, update_ui_from_config
+            
+            # Dapatkan konfigurasi default
+            default_config = load_default_augmentation_config()
+            
+            # Update UI dari konfigurasi default
+            update_ui_from_config(ui_components, default_config)
+            
+            # Re-detect state
+            detect_augmentation_state(ui_components, env, config)
+            
+            # Tampilkan pesan sukses
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
+                
+            # Update status panel
+            from smartcash.ui.dataset.augmentation_initialization import update_status_panel
+            update_status_panel(
+                ui_components, 
+                "success", 
+                f"{ICONS['success']} Konfigurasi direset ke nilai default"
+            )
+            
+            # Log success jika logger tersedia
+            if logger: logger.success(f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke nilai default")
+        except Exception as e:
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
+                
+            # Log error jika logger tersedia
+            if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
+    
+    # Function untuk cleanup UI setelah augmentasi
+    def cleanup_ui():
+        """Kembalikan UI ke kondisi operasional setelah augmentasi."""
+        ui_components['augment_button'].layout.display = 'block'
+        ui_components['stop_button'].layout.display = 'none'
+        
+        # Re-aktifkan tombol yang dinonaktifkan
+        ui_components['reset_button'].disabled = False
+        ui_components['save_button'].disabled = False
+        ui_components['cleanup_button'].disabled = False
+        
+        # Reset progress bar
+        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+            ui_components['reset_progress_bar']()
+        else:
+            # Fallback jika fungsi reset tidak tersedia
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].layout.visibility = 'hidden'
+            ui_components['current_progress'].value = 0
+            ui_components['current_progress'].layout.visibility = 'hidden'
+    
+    # Function untuk reset komplet UI
+    def reset_ui():
+        """Reset UI ke kondisi default total, termasuk semua panel."""
+        # Reset tombol dan progress
+        cleanup_ui()
+        
+        # Reset summary
+        if 'summary_container' in ui_components:
+            ui_components['summary_container'].layout.display = 'none'
+            with ui_components['summary_container']:
+                clear_output()
+        
+        # Reset visualisasi
+        if 'visualization_container' in ui_components:
+            ui_components['visualization_container'].layout.display = 'none'
+            with ui_components['visualization_container']:
+                clear_output()
+                
+        # Sembunyikan tombol visualisasi dan cleanup
+        if 'visualization_buttons' in ui_components:
+            ui_components['visualization_buttons'].layout.display = 'none'
+            
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].layout.display = 'none'
+        
+        # Reset logs
+        if 'status' in ui_components:
+            with ui_components['status']:
+                clear_output()
+            
+        # Reset accordion
+        if 'log_accordion' in ui_components:
+            ui_components['log_accordion'].selected_index = None
+    
+    # Register handlers untuk tombol-tombol
+    if 'augment_button' in ui_components:
+        ui_components['augment_button'].on_click(on_augment_click)
+    
+    if 'stop_button' in ui_components:
+        ui_components['stop_button'].on_click(on_stop_click)
+        
+    if 'reset_button' in ui_components:
+        ui_components['reset_button'].on_click(on_reset_click)
+    
+    # Tambahkan referensi ke handlers di ui_components
+    ui_components.update({
+        'on_augment_click': on_augment_click,
+        'on_stop_click': on_stop_click,
+        'on_reset_click': on_reset_click,
+        'cleanup_ui': cleanup_ui,
+        'reset_ui': reset_ui,
+        'augmentation_running': False
+    })
+    
+    return ui_components

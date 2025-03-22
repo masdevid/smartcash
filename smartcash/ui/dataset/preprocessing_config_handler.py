@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan penanganan path relatif
+Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan integrasi config_manager dan config_sync
 """
 
 from typing import Dict, Any, Optional
@@ -11,7 +11,7 @@ from IPython.display import display
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Update konfigurasi preprocessing dari nilai UI dengan validasi path relatif.
+    Update konfigurasi preprocessing dari nilai UI dengan pendekatan DRY.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -20,101 +20,79 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     Returns:
         Dictionary konfigurasi yang telah diupdate
     """
-    if config is None:
-        config = {}
+    # Inisialisasi config jika None
+    config = config or {}
     
     # Pastikan section preprocessing ada
-    if 'preprocessing' not in config:
-        config['preprocessing'] = {}
+    if 'preprocessing' not in config: config['preprocessing'] = {}
     
-    # Update paths dengan path relatif
-    data_dir = ui_components.get('data_dir', 'data')
-    preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
+    # Konsolidasi path handling dengan satu fungsi untuk konversi path
+    def get_relative_path(path: str) -> str:
+        """Convert path ke relative jika absolut"""
+        return os.path.relpath(path, os.getcwd()) if os.path.isabs(path) else path
     
-    # Convert to relative if absolute
-    if os.path.isabs(data_dir):
-        rel_data_dir = os.path.relpath(data_dir, os.getcwd())
-    else:
-        rel_data_dir = data_dir
-        
-    if os.path.isabs(preprocessed_dir):
-        rel_preprocessed_dir = os.path.relpath(preprocessed_dir, os.getcwd())
-    else:
-        rel_preprocessed_dir = preprocessed_dir
+    # Ekstrak dan update paths dengan single-line assignment
+    data_dir = get_relative_path(ui_components.get('data_dir', 'data'))
+    preprocessed_dir = get_relative_path(ui_components.get('preprocessed_dir', 'data/preprocessed'))
     
-    # Update paths dalam config
-    if 'data' not in config:
-        config['data'] = {}
-    config['data']['dir'] = rel_data_dir
-    config['preprocessing']['output_dir'] = rel_preprocessed_dir
+    # Update paths dalam config dengan destructuring
+    if 'data' not in config: config['data'] = {}
+    config['data']['dir'] = data_dir
+    config['preprocessing']['output_dir'] = preprocessed_dir
     
-    preproc_config = config['preprocessing']
+    # Konsolidasi ekstraksi nilai komponen UI dengan error checking
+    preproc_options = ui_components.get('preprocess_options', {})
+    if not hasattr(preproc_options, 'children') or len(preproc_options.children) < 5: return config
     
-    # Dapatkan nilai dari komponen UI dengan pendekatan konsolidasi
-    preproc_options = ui_components.get('preprocess_options')
-    if preproc_options and hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
-        # Extract nilai opsi dengan validasi
-        img_size = preproc_options.children[0].value
-        normalize = preproc_options.children[1].value
-        preserve_ratio = preproc_options.children[2].value
-        enable_cache = preproc_options.children[3].value
-        num_workers = preproc_options.children[4].value
-        
-        # Update konfigurasi dengan nilai yang diekstrak
-        preproc_config['img_size'] = [img_size, img_size]
-        preproc_config['enabled'] = enable_cache
-        preproc_config['num_workers'] = num_workers
-        
-        # Pastikan section normalization ada
-        if 'normalization' not in preproc_config:
-            preproc_config['normalization'] = {}
-            
-        preproc_config['normalization']['enabled'] = normalize
-        preproc_config['normalization']['preserve_aspect_ratio'] = preserve_ratio
+    # Extract semua nilai dengan one-liner per value
+    img_size, normalize, preserve_ratio, enable_cache, num_workers = [
+        preproc_options.children[i].value for i in range(5)
+    ]
     
-    # Dapatkan pengaturan validasi
+    # Update konfigurasi dengan nilai tersebut
+    config['preprocessing'].update({
+        'img_size': [img_size, img_size],
+        'enabled': enable_cache,
+        'num_workers': num_workers,
+        'normalization': {
+            'enabled': normalize,
+            'preserve_aspect_ratio': preserve_ratio,
+            'target_size': [img_size, img_size]
+        }
+    })
+    
+    # Ekstrak dan set validasi dengan destructuring
     validation_options = ui_components.get('validation_options')
-    if validation_options and hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
-        # Extract nilai validasi dengan inline extraction
-        validate_enabled = validation_options.children[0].value
-        fix_issues = validation_options.children[1].value
-        move_invalid = validation_options.children[2].value
-        invalid_dir = validation_options.children[3].value
+    if hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
+        validate_enabled, fix_issues, move_invalid, invalid_dir = [
+            validation_options.children[i].value for i in range(4)
+        ]
         
-        # Convert invalid_dir to relative path
-        if os.path.isabs(invalid_dir):
-            rel_invalid_dir = os.path.relpath(invalid_dir, os.getcwd())
-        else:
-            rel_invalid_dir = invalid_dir
-        
-        # Pastikan section validate ada
-        if 'validate' not in preproc_config:
-            preproc_config['validate'] = {}
-            
-        preproc_config['validate']['enabled'] = validate_enabled
-        preproc_config['validate']['fix_issues'] = fix_issues
-        preproc_config['validate']['move_invalid'] = move_invalid
-        preproc_config['validate']['invalid_dir'] = rel_invalid_dir
+        # Update validate config dengan inline dictionary
+        config['preprocessing']['validate'] = {
+            'enabled': validate_enabled,
+            'fix_issues': fix_issues,
+            'move_invalid': move_invalid,
+            'invalid_dir': get_relative_path(invalid_dir)
+        }
     
-    # Ekstrak split selector jika tersedia
+    # Ekstrak split selector dengan map nilai
     split_selector = ui_components.get('split_selector')
     if split_selector and hasattr(split_selector, 'value'):
-        split_value = split_selector.value
-        # Translate nilai UI ke konfigurasi
-        if split_value == 'All Splits':
-            preproc_config['splits'] = ['train', 'valid', 'test']
-        elif split_value == 'Train Only':
-            preproc_config['splits'] = ['train']
-        elif split_value == 'Validation Only':
-            preproc_config['splits'] = ['valid']
-        elif split_value == 'Test Only':
-            preproc_config['splits'] = ['test']
+        # Map nilai UI ke konfigurasi dengan dictionary
+        split_map = {
+            'All Splits': ['train', 'valid', 'test'],
+            'Train Only': ['train'],
+            'Validation Only': ['valid'],
+            'Test Only': ['test']
+        }
+        config['preprocessing']['splits'] = split_map.get(split_selector.value, ['train', 'valid', 'test'])
     
     return config
 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
     """
-    Simpan konfigurasi preprocessing ke file dengan integrasi utilitas standar.
+    Simpan konfigurasi preprocessing ke file dengan integrasi config_manager dan config_sync.
     
     Args:
         config: Konfigurasi yang akan disimpan
@@ -123,34 +101,41 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
     Returns:
         Boolean menunjukkan keberhasilan
     """
-    # Coba gunakan utilitas standar config_manager
+    # Gunakan config_manager dan config_sync jika tersedia
     try:
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
-        if config_manager:
-            # Simpan config
-            config_manager.config.update(config)
-            config_manager.save_config(config_path, create_dirs=True)
-            return True
-    except ImportError:
-        pass
-    
-    # Fallback: simpan langsung ke file
-    try:
-        path = Path(config_path)
         
-        # Pastikan direktori ada
-        path.parent.mkdir(parents=True, exist_ok=True)
+        # Simpan config ke config_manager dan ke file
+        config_manager.config.update(config)
+        config_manager.save_config(config_path, create_dirs=True)
         
-        with open(path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+        # Sinkronisasi ke drive jika di Colab
+        try:
+            from smartcash.common.config_sync import sync_config_with_drive
+            from smartcash.common.environment import get_environment_manager
+            
+            env_manager = get_environment_manager()
+            if env_manager.is_drive_mounted:
+                # Sinkronisasi konfigurasi ke drive dengan lebih sedikit parameter
+                sync_config_with_drive(config_path, sync_strategy='local_priority')
+        except (ImportError, AttributeError):
+            pass
+            
         return True
-    except Exception:
-        return False
+    except ImportError:
+        # Fallback: simpan langsung ke file
+        try:
+            Path(config_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False)
+            return True
+        except Exception:
+            return False
 
 def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml") -> Dict[str, Any]:
     """
-    Load konfigurasi preprocessing dari file dengan integrasi standar.
+    Load konfigurasi preprocessing dari file dengan integrasi config_manager dan config_sync.
     
     Args:
         config_path: Path file konfigurasi
@@ -158,20 +143,32 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     Returns:
         Dictionary konfigurasi
     """
-    # Coba gunakan utilitas standar config_manager
+    # Coba gunakan config_manager dengan integasi config_sync
     try:
         from smartcash.common.config import get_config_manager
+        from smartcash.common.environment import get_environment_manager
+        
+        # Dapatkan config_manager dan environment manager
         config_manager = get_config_manager()
-        if config_manager:
-            # Periksa apakah config sudah dimuat di config_manager
-            if config_manager.config:
-                return config_manager.config
+        env_manager = get_environment_manager()
+        
+        # Coba sinkronisasi dari drive terlebih dahulu jika di Colab
+        try:
+            if env_manager.is_drive_mounted:
+                from smartcash.common.config_sync import sync_config_with_drive
+                # Sinkronisasi config dari drive dengan prioritas drive
+                sync_config_with_drive(config_path, sync_strategy='drive_priority')
+        except (ImportError, AttributeError):
+            pass
             
-            # Load config
-            try:
-                return config_manager.load_config(config_path)
-            except FileNotFoundError:
-                pass
+        # Periksa apakah config sudah dimuat di config_manager
+        if config_manager.config: return config_manager.config
+        
+        # Load config dari file
+        try:
+            return config_manager.load_config(config_path)
+        except FileNotFoundError:
+            pass
     except ImportError:
         pass
     
@@ -183,7 +180,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     except Exception:
         pass
         
-    # Default config
+    # Default config jika semua cara gagal
     return {
         "preprocessing": {
             "output_dir": "data/preprocessed",
@@ -192,20 +189,22 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             "num_workers": 4,
             "normalization": {
                 "enabled": True,
-                "preserve_aspect_ratio": True
+                "preserve_aspect_ratio": True,
+                "target_size": [640, 640]
             },
             "validate": {
                 "enabled": True,
                 "fix_issues": True,
                 "move_invalid": True,
                 "invalid_dir": "data/invalid"
-            }
+            },
+            "splits": ["train", "valid", "test"]
         }
     }
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update komponen UI dari konfigurasi dengan validasi.
+    Update komponen UI dari konfigurasi dengan pendekatan DRY.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -214,21 +213,17 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Dictionary UI yang telah diupdate
     """
-    # Ambil path dan update UI
+    # Ekstrak path dengan default
     data_dir = config.get('data', {}).get('dir', 'data')
     preprocessed_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
     
-    # Update path inputs
-    if 'path_input' in ui_components:
-        ui_components['path_input'].value = data_dir
+    # Update path input dengan single-line assignments
+    if 'path_input' in ui_components: ui_components['path_input'].value = data_dir
+    if 'preprocessed_input' in ui_components: ui_components['preprocessed_input'].value = preprocessed_dir
     
-    if 'preprocessed_input' in ui_components:
-        ui_components['preprocessed_input'].value = preprocessed_dir
-    
-    # Update path info dengan absolute path
+    # Update path info dengan path absolute menggunakan f-string DRY
     from smartcash.ui.utils.constants import COLORS
-    abs_data_dir = os.path.abspath(data_dir)
-    abs_preprocessed_dir = os.path.abspath(preprocessed_dir)
+    abs_data_dir, abs_preprocessed_dir = map(os.path.abspath, [data_dir, preprocessed_dir])
     
     if 'path_info' in ui_components:
         ui_components['path_info'].value = f"""
@@ -241,67 +236,54 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         """
     
     # Simpan path di ui_components
-    ui_components['data_dir'] = data_dir
-    ui_components['preprocessed_dir'] = preprocessed_dir
+    ui_components.update({'data_dir': data_dir, 'preprocessed_dir': preprocessed_dir})
     
-    # Ekstrak konfigurasi preprocessing
+    # Konsolidasi update UI options dengan satu loop
     preproc_config = config.get('preprocessing', {})
-    
-    # Update opsi preprocessing dengan validasi dan inline extraction
     preproc_options = ui_components.get('preprocess_options')
-    if preproc_options and hasattr(preproc_options, 'children'):
-        # Update image size dari config
-        if 'img_size' in preproc_config and len(preproc_options.children) > 0:
-            img_size = preproc_config['img_size']
-            if isinstance(img_size, list) and len(img_size) > 0:
-                preproc_options.children[0].value = img_size[0]
-        
-        # Update opsi normalisasi
-        if 'normalization' in preproc_config and len(preproc_options.children) > 1:
-            norm_config = preproc_config['normalization']
-            # Update normalization enabled dan preserve aspect ratio dengan one-liner
-            if len(preproc_options.children) > 1: preproc_options.children[1].value = norm_config.get('enabled', True)
-            if len(preproc_options.children) > 2: preproc_options.children[2].value = norm_config.get('preserve_aspect_ratio', True)
-        
-        # Update cache enabled
-        if 'enabled' in preproc_config and len(preproc_options.children) > 3:
-            preproc_options.children[3].value = preproc_config['enabled']
-        
-        # Update workers
-        if 'num_workers' in preproc_config and len(preproc_options.children) > 4:
-            preproc_options.children[4].value = preproc_config['num_workers']
     
-    # Update validation options
+    if preproc_options and hasattr(preproc_options, 'children'):
+        # Daftar pasangan (indeks, nilai, fungsi_konversi)
+        option_updates = [
+            (0, preproc_config.get('img_size', [640, 640])[0], None),  # Image size
+            (1, preproc_config.get('normalization', {}).get('enabled', True), None),  # Normalize
+            (2, preproc_config.get('normalization', {}).get('preserve_aspect_ratio', True), None),  # Aspect ratio
+            (3, preproc_config.get('enabled', True), None),  # Cache enabled
+            (4, preproc_config.get('num_workers', 4), None)  # Workers
+        ]
+        
+        # Update setiap opsi dengan batasan ukuran children
+        for i, value, converter in option_updates:
+            if i < len(preproc_options.children):
+                preproc_options.children[i].value = converter(value) if converter else value
+    
+    # Update validation options dengan konsolidasi
     validation_options = ui_components.get('validation_options')
     if validation_options and hasattr(validation_options, 'children') and 'validate' in preproc_config:
         val_config = preproc_config['validate']
-        
-        # Update validation options dengan validasi
-        if len(validation_options.children) > 0: validation_options.children[0].value = val_config.get('enabled', True)
-        if len(validation_options.children) > 1: validation_options.children[1].value = val_config.get('fix_issues', True)
-        if len(validation_options.children) > 2: validation_options.children[2].value = val_config.get('move_invalid', True)
-        if len(validation_options.children) > 3: validation_options.children[3].value = val_config.get('invalid_dir', 'data/invalid')
+        # List update untuk validasi dengan index < len() check dalam single line
+        [(validation_options.children[i].value if i < len(validation_options.children) else None) for i, v in 
+         enumerate([val_config.get('enabled', True), val_config.get('fix_issues', True), 
+                   val_config.get('move_invalid', True), val_config.get('invalid_dir', 'data/invalid')])]
     
-    # Update split selector jika ada
+    # Update split selector dengan pendekatan map/filter/reduce
     split_selector = ui_components.get('split_selector')
     if split_selector and hasattr(split_selector, 'value') and 'splits' in preproc_config:
-        splits = preproc_config['splits']
-        # Translate konfigurasi ke nilai UI
-        if isinstance(splits, list):
-            if sorted(splits) == sorted(['train', 'valid', 'test']):
-                split_selector.value = 'All Splits'
-            elif splits == ['train']:
-                split_selector.value = 'Train Only'
-            elif splits == ['valid']:
-                split_selector.value = 'Validation Only'
-            elif splits == ['test']:
-                split_selector.value = 'Test Only'
+        # Konversi list split ke nilai UI dengan dictionary
+        split_value_map = {
+            str(sorted(['train', 'valid', 'test'])): 'All Splits',
+            str(['train']): 'Train Only',
+            str(['valid']): 'Validation Only',
+            str(['test']): 'Test Only'
+        }
+        # Dapatkan nilai UI berdasarkan split atau default ke 'All Splits'
+        split_selector.value = split_value_map.get(str(sorted(preproc_config['splits'])), 'All Splits')
     
     return ui_components
 
 def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
-    Setup handler konfigurasi preprocessing.
+    Setup handler konfigurasi preprocessing dengan pendekatan DRY.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -314,49 +296,43 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
     logger = ui_components.get('logger')
     
     # Load config jika belum tersedia
-    if not config:
-        config = load_preprocessing_config()
+    config = config or load_preprocessing_config()
     
     # Update UI dari config
     ui_components = update_ui_from_config(ui_components, config)
     
-    # Tambahkan handler untuk tombol save
-    if 'save_button' in ui_components:
-        def on_save_config(b):
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            from smartcash.ui.utils.constants import ICONS
-            
-            # Update config dari UI
-            updated_config = update_config_from_ui(ui_components, config)
-            
-            # Simpan config
+    # Handler untuk tombol save dengan closure
+    def on_save_config(b):
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.utils.constants import ICONS
+        from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
+        
+        # Update config dari UI dan simpan dalam satu operasi
+        updated_config, success = update_config_from_ui(ui_components, config), False
+        try:
             success = save_preprocessing_config(updated_config)
+            status, icon = ('success', ICONS['success']) if success else ('error', ICONS['error'])
+            message = f"{icon} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
             
-            # Tampilkan status dengan utility standar
-            with ui_components.get('status'):
-                display(create_status_indicator(
-                    'success' if success else 'error',
-                    f"{ICONS['success'] if success else ICONS['error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
-                ))
-            
-            # Update status panel
-            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
-            update_status_panel(
-                ui_components,
-                'success' if success else 'error',
-                f"{ICONS['success'] if success else ICONS['error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
-            )
-            
-            if logger: logger.info(f"{ICONS['success'] if success else ICONS['error']} Konfigurasi preprocessing {'berhasil' if success else 'gagal'} disimpan")
-            
-        ui_components['save_button'].on_click(on_save_config)
+            # Update status panel dan log dalam satu template message
+            with ui_components.get('status'): display(create_status_indicator(status, message))
+            update_status_panel(ui_components, status, message)
+            if logger: logger.info(message)
+        except Exception as e:
+            error_msg = f"{ICONS['error']} Error menyimpan konfigurasi: {str(e)}"
+            with ui_components.get('status'): display(create_status_indicator('error', error_msg))
+            if logger: logger.error(error_msg)
     
-    # Tambahkan fungsi ke ui_components
+    # Tambahkan handler ke tombol jika tersedia
+    if 'save_button' in ui_components: ui_components['save_button'].on_click(on_save_config)
+    
+    # Tambahkan semua fungsi ke ui_components dalam satu assignment
     ui_components.update({
         'update_config_from_ui': update_config_from_ui,
         'save_preprocessing_config': save_preprocessing_config,
         'load_preprocessing_config': load_preprocessing_config,
-        'update_ui_from_config': update_ui_from_config
+        'update_ui_from_config': update_ui_from_config,
+        'on_save_config': on_save_config
     })
     
     return ui_components

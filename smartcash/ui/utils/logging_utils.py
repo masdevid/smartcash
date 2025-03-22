@@ -32,7 +32,7 @@ class UILogHandler(logging.Handler):
         logging.CRITICAL: ICONS.get('error', '❌')
     }
     
-    _IGNORED_MODULES = frozenset(['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets'])
+    _IGNORED_MODULES = frozenset(['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets', 'ColabKernelApp'])
 
     def __init__(self, output_widget: widgets.Output):
         """Initialize UILogHandler with an output widget.
@@ -40,7 +40,7 @@ class UILogHandler(logging.Handler):
         Args:
             output_widget: Output widget for displaying logs
         """
-        super().__init__(level=logging.DEBUG)
+        super().__init__(level=logging.INFO)  # Changed from DEBUG to INFO
         self.output_widget = output_widget
         self.setFormatter(logging.Formatter('%(message)s'))
 
@@ -53,6 +53,10 @@ class UILogHandler(logging.Handler):
         try:
             # Early return for ignored modules
             if record.name in self._IGNORED_MODULES:
+                return
+                
+            # Ignore DEBUG messages completely
+            if record.levelno < logging.INFO:
                 return
 
             style_key = self._LEVEL_TO_STYLE.get(record.levelno, 'info')
@@ -118,8 +122,12 @@ def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]
     root_logger.addHandler(ui_handler)
     added_handlers.append(ui_handler)
     
-    # Set level root logger ke debug agar semua log tertangkap
-    root_logger.setLevel(logging.DEBUG)
+    # Set level root logger ke INFO, bukan DEBUG
+    root_logger.setLevel(logging.INFO)
+    
+    # Mute logging dari beberapa modul tertentu
+    for name in ['ColabKernelApp', 'ipykernel', 'matplotlib']:
+        logging.getLogger(name).setLevel(logging.WARNING)
     
     # Hentikan propagasi untuk semua logger yang sudah ada
     for name in logging.root.manager.loggerDict:
@@ -131,7 +139,7 @@ def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]
 def setup_ipython_logging(
     ui_components: Dict[str, Any],
     logger_name: str = 'ui_logger',
-    log_level: int = logging.INFO,
+    log_level: int = logging.INFO,  # Changed from logging.DEBUG to logging.INFO
     clear_existing_handlers: bool = True,
     redirect_root: bool = True
 ) -> Optional[logging.Logger]:
@@ -141,7 +149,7 @@ def setup_ipython_logging(
     Args:
         ui_components: Dictionary berisi widget UI
         logger_name: Nama logger
-        log_level: Level logging
+        log_level: Level logging (default INFO, bukan DEBUG)
         clear_existing_handlers: Hapus handler yang sudah ada
         redirect_root: Redirect juga root logger ke widget output
         
@@ -163,6 +171,9 @@ def setup_ipython_logging(
     
     # Setup logger module-level
     logger = logging.getLogger(logger_name)
+    
+    # Pastikan level minimal INFO, bukan DEBUG
+    log_level = max(log_level, logging.INFO)
     logger.setLevel(log_level)
     
     # Hapus handler existing jika perlu
@@ -185,7 +196,7 @@ def setup_ipython_logging(
             if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
                 root_logger.removeHandler(handler)
         
-        # Redirect root logger ke UI widget
+        # Redirect root logger ke UI widget dengan level INFO
         root_handlers = redirect_all_logging(output_widget)
         ui_components['root_log_handlers'] = root_handlers
     
@@ -203,12 +214,18 @@ def reset_logging():
     # Tambahkan kembali handler ke console
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
+    console_handler.setLevel(logging.INFO)  # Gunakan level INFO, bukan WARNING
     root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.WARNING)  # Default level
+    root_logger.setLevel(logging.INFO)  # Default level INFO
     
     # Reset propagation untuk semua logger
     for name in logging.root.manager.loggerDict:
-        logging.getLogger(name).propagate = True
+        # Untuk logger yang tidak perlu debug, set ke level WARNING
+        if name in ['ColabKernelApp', 'ipykernel', 'matplotlib']:
+            logging.getLogger(name).setLevel(logging.WARNING)
+        else:
+            logging.getLogger(name).setLevel(logging.INFO)
+            logging.getLogger(name).propagate = True
 
 def create_dummy_logger() -> logging.Logger:
     """
@@ -221,6 +238,7 @@ def create_dummy_logger() -> logging.Logger:
     logger.handlers = []
     logger.addHandler(logging.NullHandler())
     logger.propagate = False
+    logger.setLevel(logging.INFO)  # Changed from default to INFO
     
     return logger
 
@@ -233,6 +251,10 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info') 
         message: Message to display
         level: Log level ('info', 'success', 'warning', 'error')
     """
+    # Ignore if level is DEBUG
+    if level == 'debug':
+        return
+        
     # Find output widget efficiently
     output_widget = next(
         (ui_components[key] for key in ('status', 'log_output', 'output')
@@ -261,6 +283,10 @@ def alert_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info'
         message: Message to display
         level: Log level ('info', 'success', 'warning', 'error')
     """
+    # Ignore if level is DEBUG
+    if level == 'debug':
+        return
+        
     # Find output widget efficiently
     output_widget = next(
         (ui_components[key] for key in ('status', 'log_output', 'output')

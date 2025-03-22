@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_detection.py
-Deskripsi: Modul untuk deteksi environment SmartCash dengan integrasi UI utils
+Deskripsi: Modul untuk deteksi environment SmartCash dengan integrasi UI utils dan perbaikan progress tracking
 """
 
 import os
@@ -22,6 +22,13 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
     Returns:
         Dictionary UI components yang telah diperbarui
     """
+    # Update progress bar jika tersedia
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 0
+        ui_components['progress_message'].value = "Mendeteksi environment..."
+        ui_components['progress_bar'].layout.visibility = 'visible'
+        ui_components['progress_message'].layout.visibility = 'visible'
+    
     # Coba gunakan environment manager atau gunakan fallback detection
     is_colab = False
     is_drive_mounted = False
@@ -45,6 +52,11 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             # Fallback: Deteksi manual
             is_colab = 'google.colab' in sys.modules
             is_drive_mounted = os.path.exists('/content/drive/MyDrive')
+    
+    # Update progress
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 1
+        ui_components['progress_message'].value = f"Environment: {'Google Colab' if is_colab else 'Local'}"
     
     # Update colab panel dengan menggunakan komponen create_info_alert
     if 'colab_panel' in ui_components:
@@ -74,5 +86,10 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
             
             # Sembunyikan tombol drive
             ui_components['drive_button'].layout.display = 'none'
+    
+    # Update progress lagi
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 2
+        ui_components['progress_message'].value = f"Drive: {'terhubung' if is_drive_mounted else 'tidak terhubung'}"
     
     return ui_components

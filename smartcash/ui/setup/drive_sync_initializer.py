@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/drive_sync_initializer.py
-Deskripsi: Modul untuk inisialisasi sinkronisasi Drive dengan output logging yang ditingkatkan
+Deskripsi: Modul untuk inisialisasi sinkronisasi Drive dengan output logging yang ditingkatkan dan perbaikan progress tracking
 """
 
 from typing import Dict, Any, Optional
@@ -15,13 +15,25 @@ def initialize_drive_sync(ui_components: Dict[str, Any]):
     """
     logger = ui_components.get('logger')
     
+    # Update progress bar dan pesan jika tersedia
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 0
+        ui_components['progress_message'].value = "Memeriksa Google Drive..."
+        ui_components['progress_bar'].layout.visibility = 'visible'
+        ui_components['progress_message'].layout.visibility = 'visible'
+    
     # Cek apakah environment sudah terdeteksi
     try:
         from smartcash.ui.utils.drive_utils import detect_drive_mount
         is_mounted, drive_path = detect_drive_mount()
         
         if logger:
-            logger.debug(f"🔍 Status Google Drive: {'terhubung' if is_mounted else 'tidak terhubung'}")
+            logger.info(f"🔍 Status Google Drive: {'terhubung' if is_mounted else 'tidak terhubung'}")
+        
+        # Update progress components
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].value = 1
+            ui_components['progress_message'].value = "Status Drive: " + ('terhubung' if is_mounted else 'tidak terhubung')
         
         # Jika Drive terhubung, coba sinkronisasi konfigurasi
         if is_mounted and drive_path:
@@ -48,9 +60,18 @@ def initialize_drive_sync(ui_components: Dict[str, Any]):
                             logger.info(f"✅ Sinkronisasi konfigurasi berhasil: {message}")
                         else:
                             logger.warning(f"⚠️ Sinkronisasi konfigurasi: {message}")
+                            
+                    # Update progress
+                    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                        ui_components['progress_bar'].value = 2
+                        ui_components['progress_message'].value = f"Sinkronisasi base_config: {'berhasil' if success else 'sebagian'}"
                 except Exception as e:
                     if logger:
                         logger.warning(f"⚠️ Error saat sync_with_drive_enhanced: {str(e)}")
+                    # Update progress
+                    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                        ui_components['progress_bar'].value = 2
+                        ui_components['progress_message'].value = "Sinkronisasi dasar: gagal"
                     
                 # Langkah 2: Coba use_drive_as_source_of_truth
                 try:
@@ -62,19 +83,37 @@ def initialize_drive_sync(ui_components: Dict[str, Any]):
                             logger.info("✅ Sinkronisasi semua konfigurasi berhasil")
                         else:
                             logger.warning("⚠️ Sinkronisasi semua konfigurasi berhasil sebagian")
-                            
+                    
+                    # Update progress
+                    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                        ui_components['progress_bar'].value = 3
+                        ui_components['progress_message'].value = f"Sinkronisasi semua konfigurasi: {'berhasil' if success else 'sebagian'}"
                 except Exception as e:
                     if logger:
                         logger.warning(f"⚠️ Error saat use_drive_as_source_of_truth: {str(e)}")
+                    # Update progress
+                    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                        ui_components['progress_bar'].value = 3
+                        ui_components['progress_message'].value = "Sinkronisasi semua: gagal"
             
             except ImportError as e:
                 if logger:
                     logger.warning(f"⚠️ ConfigManager tidak tersedia: {str(e)}")
+                
+                # Update progress
+                if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                    ui_components['progress_bar'].value = 3
+                    ui_components['progress_message'].value = "Sinkronisasi tidak tersedia"
             
-            # Update progress
+            # Kembalikan UI ke status normal
             if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-                ui_components['progress_bar'].value = 2
+                ui_components['progress_bar'].value = 3
                 ui_components['progress_message'].value = "Sinkronisasi selesai"
+        else:
+            # Drive tidak terhubung, perbarui UI
+            if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                ui_components['progress_bar'].value = 3
+                ui_components['progress_message'].value = "Google Drive tidak terhubung"
         
         # Notifikasi observer jika ada
         notify_drive_sync_status(ui_components, is_mounted, drive_path)
@@ -82,6 +121,11 @@ def initialize_drive_sync(ui_components: Dict[str, Any]):
     except ImportError as e:
         if logger:
             logger.warning(f"⚠️ Error saat initialize_drive_sync: {str(e)}")
+        
+        # Update progress jika terjadi error
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].value = 3
+            ui_components['progress_message'].value = "Error: Drive utils tidak tersedia"
         
         # Notifikasi observer jika ada
         notify_drive_sync_status(ui_components, False, None, str(e))

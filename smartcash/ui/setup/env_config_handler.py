@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_handler.py
-Deskripsi: Handler untuk komponen UI konfigurasi environment dengan integrasi ui_handlers
+Deskripsi: Handler untuk komponen UI konfigurasi environment dengan integrasi ui_handlers dan perbaikan handlers tombol
 """
 
 import os
@@ -19,6 +19,8 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    logger = ui_components.get('logger')
+    
     # Import komponen dari handlers untuk mengurangi duplikasi
     from smartcash.ui.handlers.observer_handler import setup_observer_handlers
     from smartcash.ui.setup.env_detection import detect_environment
@@ -31,19 +33,114 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     # Deteksi environment jika belum ada
     ui_components = detect_environment(ui_components, env)
     
-    from smartcash.ui.handlers.error_handler import try_except_decorator
-    # Handler untuk tombol Drive
-    @try_except_decorator
+    # Handler untuk tombol Drive dengan error handling yang lebih baik
     def on_drive_button_clicked(b):
-        handle_drive_connection(ui_components)
+        """Handler untuk tombol hubungkan Google Drive."""
+        try:
+            # Nonaktifkan tombol selama proses berjalan
+            ui_components['drive_button'].disabled = True
+            ui_components['directory_button'].disabled = True
+            
+            # Jalankan fungsi handle_drive_connection
+            handle_drive_connection(ui_components)
+            
+            # Re-aktifkan tombol setelah selesai
+            ui_components['drive_button'].disabled = False
+            ui_components['directory_button'].disabled = False
+        except Exception as e:
+            # Tangani error dan tampilkan di log
+            from smartcash.ui.utils.alert_utils import create_status_indicator
+            
+            if logger:
+                logger.error(f"❌ Error saat menghubungkan Drive: {str(e)}")
+                
+            with ui_components['status']:
+                display(create_status_indicator("error", f"❌ Error saat menghubungkan Drive: {str(e)}"))
+                
+            # Re-aktifkan tombol setelah error
+            ui_components['drive_button'].disabled = False
+            ui_components['directory_button'].disabled = False
+            
+            # Jalankan cleanup jika ada
+            if callable(getattr(ui_components.get('cleanup'), None)):
+                ui_components['cleanup']()
     
-    # Handler untuk tombol Directory
-    @try_except_decorator
+    # Handler untuk tombol Directory dengan error handling yang lebih baik
     def on_directory_button_clicked(b):
-        handle_directory_setup(ui_components)
+        """Handler untuk tombol setup direktori lokal."""
+        try:
+            # Nonaktifkan tombol selama proses berjalan
+            ui_components['drive_button'].disabled = True
+            ui_components['directory_button'].disabled = True
+            
+            # Jalankan fungsi handle_directory_setup
+            handle_directory_setup(ui_components)
+            
+            # Re-aktifkan tombol setelah selesai
+            ui_components['drive_button'].disabled = False
+            ui_components['directory_button'].disabled = False
+        except Exception as e:
+            # Tangani error dan tampilkan di log
+            from smartcash.ui.utils.alert_utils import create_status_indicator
+            
+            if logger:
+                logger.error(f"❌ Error saat setup direktori: {str(e)}")
+                
+            with ui_components['status']:
+                display(create_status_indicator("error", f"❌ Error saat setup direktori: {str(e)}"))
+                
+            # Re-aktifkan tombol setelah error
+            ui_components['drive_button'].disabled = False
+            ui_components['directory_button'].disabled = False
+            
+            # Jalankan cleanup jika ada
+            if callable(getattr(ui_components.get('cleanup'), None)):
+                ui_components['cleanup']()
     
-    # Daftarkan handler ke tombol
-    ui_components['drive_button'].on_click(on_drive_button_clicked)
-    ui_components['directory_button'].on_click(on_directory_button_clicked)
+    # Pastikan tombol tersedia sebelum mendaftarkan handler
+    if 'drive_button' in ui_components and ui_components['drive_button'] is not None:
+        # Daftarkan handler ke tombol Google Drive
+        ui_components['drive_button'].on_click(on_drive_button_clicked)
+    
+    if 'directory_button' in ui_components and ui_components['directory_button'] is not None:
+        # Daftarkan handler ke tombol Directory
+        ui_components['directory_button'].on_click(on_directory_button_clicked)
+    
+    # Definisi cleanup function
+    def cleanup_resources():
+        """Fungsi untuk membersihkan resources."""
+        try:
+            # Unregister observer group jika ada
+            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
+                ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
+            
+            # Reset logging
+            try:
+                from smartcash.ui.utils.logging_utils import reset_logging
+                reset_logging()
+            except ImportError:
+                pass
+            
+            if logger:
+                logger.debug("🧹 Cleanup env_config_handlers berhasil")
+        except Exception as e:
+            if logger:
+                logger.warning(f"⚠️ Error saat cleanup: {str(e)}")
+    
+    # Tetapkan fungsi cleanup ke ui_components
+    ui_components['cleanup'] = cleanup_resources
+    
+    # Register cleanup dengan IPython event
+    try:
+        from IPython import get_ipython
+        ipython = get_ipython()
+        if ipython:
+            ipython.events.register('pre_run_cell', cleanup_resources)
+    except (ImportError, AttributeError):
+        pass
+    
+    # Log inisialisasi selesai
+    if logger:
+        logger.info("✅ Environment config handlers berhasil diinisialisasi")
     
     return ui_components

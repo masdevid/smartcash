@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/directory_handler.py
-Deskripsi: Handler untuk setup struktur direktori proyek dengan integrasi UI utils
+Deskripsi: Handler untuk setup struktur direktori proyek dengan integrasi UI utils dan progress tracking
 """
 
 import os
@@ -10,6 +10,7 @@ from IPython.display import display, HTML, clear_output
 
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+from smartcash.ui.utils.file_utils import directory_tree, format_file_size
 
 def handle_directory_setup(ui_components: Dict[str, Any]):
     """
@@ -18,20 +19,44 @@ def handle_directory_setup(ui_components: Dict[str, Any]):
     Args:
         ui_components: Dictionary komponen UI
     """
+    logger = ui_components.get('logger')
+    
+    # Update progress tracking
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 0
+        ui_components['progress_message'].value = "Mempersiapkan setup direktori..."
+        ui_components['progress_bar'].layout.visibility = 'visible'
+        ui_components['progress_message'].layout.visibility = 'visible'
+    
     with ui_components['status']:
         clear_output()
         display(create_info_alert(f"Membuat struktur direktori...", "info", ICONS['processing']))
     
     try:
+        # Update progress
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].value = 1
+            ui_components['progress_message'].value = "Mendeteksi direktori yang ada..."
+        
         setup_directory_structure(ui_components)
+        
+        # Update progress
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].value = 3
+            ui_components['progress_message'].value = "Setup direktori selesai"
     except Exception as e:
+        # Update progress pada error
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].value = 3
+            ui_components['progress_message'].value = f"Error: {str(e)[:30]}..."
+            
         with ui_components['status']:
-            clear_output()
+            clear_output(wait=True)
             display(create_status_indicator('error', f"Error saat membuat struktur direktori: {str(e)}"))
         
         # Log error jika logger tersedia
-        if 'logger' in ui_components and ui_components['logger']:
-            ui_components['logger'].error(f"❌ Error setup direktori: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error setup direktori: {str(e)}")
 
 def setup_directory_structure(ui_components: Dict[str, Any]):
     """
@@ -40,6 +65,8 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
     Args:
         ui_components: Dictionary komponen UI
     """
+    logger = ui_components.get('logger')
+    
     # Struktur direktori standar
     directories = [
         "data/train/images", "data/train/labels",
@@ -52,14 +79,27 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
     ]
     
     stats = {'created': 0, 'existing': 0}
+    created_dirs = []
     
     with ui_components['status']:
         clear_output()
-        for dir_path in directories:
+        total_dirs = len(directories)
+        
+        # Update progress
+        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+            ui_components['progress_bar'].max = total_dirs
+        
+        for i, dir_path in enumerate(directories):
+            # Update progress
+            if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                ui_components['progress_bar'].value = i
+                ui_components['progress_message'].value = f"Membuat: {dir_path}"
+            
             path = Path(dir_path)
             if not path.exists():
                 path.mkdir(parents=True, exist_ok=True)
                 stats['created'] += 1
+                created_dirs.append(dir_path)
                 display(create_status_indicator('success', f"Direktori dibuat: {dir_path}"))
             else:
                 stats['existing'] += 1
@@ -72,6 +112,13 @@ def setup_directory_structure(ui_components: Dict[str, Any]):
         
         # Tampilkan struktur direktori
         display_directory_tree(ui_components)
+        
+    # Log hasil
+    if logger:
+        logger.success(f"✅ Setup direktori selesai: {stats['created']} direktori baru, {stats['existing']} sudah ada")
+        if created_dirs:
+            logger.info(f"📁 Direktori yang dibuat: {', '.join(created_dirs[:5])}" + 
+                      (f" dan {len(created_dirs)-5} lainnya" if len(created_dirs) > 5 else ""))
 
 def display_directory_tree(ui_components: Dict[str, Any]):
     """
@@ -138,9 +185,10 @@ def create_project_tree(project_path: Path) -> str:
     other_dirs = [d for d in project_path.iterdir() 
                   if d.is_dir() and not d.name.startswith('.') and d.name not in important_dirs]
     
-    for dir_path in sorted(other_dirs):
+    for i, dir_path in enumerate(sorted(other_dirs)):
         symbol, color = get_dir_symbol(dir_path.name)
-        tree += f"├─ <span style='color:{color};'>{symbol} {dir_path.name}/</span>\n"
+        connector = "└─" if i == len(other_dirs) - 1 else "├─"
+        tree += f"{connector} <span style='color:{color};'>{symbol} {dir_path.name}/</span>\n"
     
     tree += "</pre>"
     return tree

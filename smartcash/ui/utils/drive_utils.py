@@ -8,7 +8,6 @@ import shutil
 import time
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional, Callable, List
-from concurrent.futures import ThreadPoolExecutor
 
 def detect_drive_mount() -> Tuple[bool, Optional[str]]:
     """
@@ -317,9 +316,9 @@ def async_sync_drive(
     logger=None, 
     callback: Optional[Callable[[str, str], None]] = None,
     bidirectional: bool = True
-):
+) -> Dict[str, Any]:
     """
-    Jalankan sinkronisasi drive secara asynchronous dengan ThreadPoolExecutor.
+    Jalankan sinkronisasi drive secara "asinkron" (tanpa thread pool, langsung sync).
     
     Args:
         config: Konfigurasi aplikasi
@@ -329,12 +328,13 @@ def async_sync_drive(
         bidirectional: Apakah melakukan sinkronisasi dua arah
         
     Returns:
-        Future yang dapat digunakan untuk memeriksa status
+        Hasil sinkronisasi (sama seperti sync_drive_to_local)
     """
-    executor = ThreadPoolExecutor(max_workers=1)
-    future = executor.submit(
-        sync_drive_to_local,
-        config, env, logger, callback, bidirectional
+    # Dalam versi ini, kita langsung jalankan sinkronisasi (tanpa threading)
+    return sync_drive_to_local(
+        config=config, 
+        env=env, 
+        logger=logger, 
+        callback=callback, 
+        bidirectional=bidirectional
     )
-    executor.shutdown(wait=False)
-    return future

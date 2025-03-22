@@ -8,7 +8,6 @@ import json
 import yaml
 from typing import Dict, List, Any, Optional, Union
 from pathlib import Path
-import threading
 
 from smartcash.common.interfaces.layer_config_interface import ILayerConfigManager
 
@@ -25,7 +24,6 @@ class LayerConfigManager(ILayerConfigManager):
     
     # Singleton instance
     _instance = None
-    _lock = threading.Lock()
     
     # Default layer configuration
     DEFAULT_CONFIG = {
@@ -57,11 +55,10 @@ class LayerConfigManager(ILayerConfigManager):
     
     def __new__(cls, *args, **kwargs):
         """Implementasi singleton untuk memastikan hanya ada satu instance."""
-        with cls._lock:
-            if cls._instance is None:
-                cls._instance = super(LayerConfigManager, cls).__new__(cls)
-                # Inisialisasi atribut instance di __init__
-            return cls._instance
+        if cls._instance is None:
+            cls._instance = super(LayerConfigManager, cls).__new__(cls)
+            # Inisialisasi atribut instance di __init__
+        return cls._instance
     
     def __init__(
         self,

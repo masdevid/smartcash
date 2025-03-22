@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Dict
 
 from smartcash.ui.utils.constants import COLORS
-from smartcash.ui.dataset.visualization_helpers.plot_base import create_figure, add_styling
+from smartcash.ui.helpers.plot_base import create_figure, add_styling
 
 def plot_class_distribution_stacked(
     original_distribution: Dict[str, int],

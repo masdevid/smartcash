@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from typing import Dict
 
 from smartcash.ui.utils.constants import COLORS
-from smartcash.ui.dataset.visualization_helpers.plot_base import (
+from smartcash.ui.helpers.plot_base import (
     prepare_class_dataframe, create_figure, add_styling
 )
 

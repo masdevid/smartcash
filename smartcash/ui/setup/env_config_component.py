@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan optimasi visibilitas logging
+Deskripsi: Komponen UI untuk konfigurasi environment SmartCash dengan perbaikan layout progress
 """
 
 import ipywidgets as widgets
@@ -28,17 +28,18 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         "Setup environment untuk project SmartCash"
     )
     
-    # Progress tracker components
-    progress_bar = widgets.IntProgress(
-        value=0,
-        min=0,
-        max=3,
-        description='Progress:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='50%', margin='10px 0')
-    )
-    
-    progress_message = widgets.HTML("Mempersiapkan environment...")
+    # Progress tracker dengan layout inline
+    progress_container = widgets.HBox([
+        widgets.IntProgress(
+            value=0,
+            min=0,
+            max=3,
+            description='Progress:',
+            style={'description_width': 'initial'},
+            layout=widgets.Layout(width='50%')
+        ),
+        widgets.HTML("Mempersiapkan environment...", layout=widgets.Layout(margin='0 0 0 10px', padding='5px'))
+    ], layout=widgets.Layout(margin='10px 0', align_items='center'))
     
     # Panel status Colab/Drive
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
@@ -90,7 +91,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     ui = widgets.VBox([
         header,
         colab_panel,
-        widgets.VBox([progress_bar, progress_message], layout=widgets.Layout(margin='10px 0')),
+        progress_container,
         divider, 
         button_group,
         log_box,              # Taruh log box sebelum help_box
@@ -104,8 +105,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'colab_panel': colab_panel,
         'drive_button': button_group.children[0],
         'directory_button': button_group.children[1],
-        'progress_bar': progress_bar,
-        'progress_message': progress_message,
+        'progress_bar': progress_container.children[0],
+        'progress_message': progress_container.children[1],
         'status': status,
         'log_header': log_header,
         'log_box': log_box,

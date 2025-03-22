@@ -129,19 +129,24 @@ class UILogger(logging.Logger):
     def get_ui_components(self) -> Dict[str, Any]:
         """Dapatkan UI components untuk logger ini."""
         return self._ui_components
-
 def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO) -> Optional[UILogger]:
-    """Setup logging IPython dengan integrasi UI dan error handling."""
+    """Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe."""
     global _logger_cache, _handler_cache
     
     try:
-        # Pastikan module_name dan logger_name
+        # Pastikan ui_components valid
+        if not ui_components:
+            print(f"Warning: ui_components tidak valid untuk setup logging")
+            return create_dummy_logger()
+            
+        # Pastikan module_name dan logger_name valid
         module_name = module_name or ui_components.get('module_name', 'smartcash')
         logger_name = f"smartcash.{module_name}"
         
-        # Cache check dan return untuk efisiensi
+        # Cache check untuk efisiensi
         if logger_name in _logger_cache:
             logger = _logger_cache[logger_name]
+            # Update UI components jika logger mendukungnya
             if isinstance(logger, UILogger):
                 logger.set_ui_components(ui_components)
             return logger
@@ -153,6 +158,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None
         
         # Pastikan output widget tersedia dengan fallback creation
         if 'status' not in ui_components or not ui_components['status']:
+            import ipywidgets as widgets
             ui_components['status'] = widgets.Output(
                 layout=widgets.Layout(
                     width='100%',
@@ -164,6 +170,10 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None
                     overflow='auto'
                 )
             )
+            # Tampilkan pesan untuk memastikan output widget terlihat
+            from IPython.display import display, HTML
+            with ui_components['status']:
+                display(HTML(f"<div style='color: blue;'><strong>🚀 Widget output untuk logging dibuat</strong></div>"))
         
         # Handler creation and setup with caching
         output_widget = ui_components['status']
@@ -175,19 +185,23 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None
             _handler_cache[handler_key] = handler
         else:
             handler = _handler_cache[handler_key]
+            # Update UI components reference untuk memastikan handler terupdate
             handler.ui_components = ui_components
         
-        # Remove any existing UI handlers to avoid duplication
+        # Remove any existing handlers dengan tipe yang sama untuk mencegah duplikasi
         for h in logger.handlers[:]:
             if isinstance(h, UILogHandler):
                 logger.removeHandler(h)
         
-        # Add the handler
+        # Add the handler dan kirim pesan test untuk memastikan visibilitas
         logger.addHandler(handler)
+        logger.info(f"🔄 Logger {logger_name} siap digunakan")
         
-        # Set UI components and cache
+        # Set UI components reference untuk UILogger
         if isinstance(logger, UILogger):
             logger.set_ui_components(ui_components)
+            
+        # Cache logger untuk penggunaan berikutnya
         _logger_cache[logger_name] = logger
         
         return logger
@@ -215,18 +229,23 @@ def create_dummy_logger():
         setattr(logger, 'success', lambda msg, *args, **kwargs: logger.info(f"✅ {msg}", *args, **kwargs))
     
     return logger
-
 def log_to_ui(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
-    """Log message ke UI components dengan style yang sesuai."""
+    """Log message ke UI components dengan style yang sesuai dan penanganan error yang lebih baik."""
     global _in_output_context
     
-    # Exit early if no output widget
+    # Exit early if no ui_components
+    if not ui_components:
+        print(message)
+        return
+    
+    # Get output widget with safe fallback
     output_widget = ui_components.get('status')
     if not output_widget:
         print(message)
         return
     
     # Thread-safe styling dan icon mapping
+    from smartcash.ui.utils.constants import COLORS, ICONS
     style = f"color: {COLORS.get('danger' if status_type == 'error' else 'warning' if status_type == 'warning' else 'success' if status_type == 'success' else 'info' if status_type == 'info' else 'muted', 'gray')};"
     icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
     
@@ -239,12 +258,21 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, status_type: str = "i
     with _output_lock:
         _in_output_context = True
         try:
-            # Pastikan Output widget sudah diinisialisasi sebelum menggunakan with
+            # Gunakan display(HTML()) untuk memastikan rendering yang konsisten
+            from IPython.display import display, HTML, clear_output
+            
+            # Pastikan Output widget valid dan memiliki metode yang diperlukan
             if hasattr(output_widget, 'clear_output'):
                 with output_widget:
+                    # Gunakan HTML untuk memastikan formatting konsisten
                     display(HTML(f"<span style='color: gray;'>[{datetime.now().strftime('%H:%M:%S')}]</span> <span style='{style}'>{message}</span>"))
             else:
+                # Fallback dengan print
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
+        except Exception as e:
+            # Fallback ke print jika terjadi error
+            print(f"Error logging to UI: {str(e)}")
+            print(f"Original message: {message}")
         finally:
             _in_output_context = False
     
@@ -253,7 +281,7 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, status_type: str = "i
         try:
             from smartcash.ui.utils.alert_utils import create_info_alert
             ui_components['status_panel'].value = create_info_alert(message, status_type).value
-        except (ImportError, Exception):
+        except Exception:
             pass
 
 def alert_to_ui(ui_components: Dict[str, Any], title: str, message: str, status_type: str = "info") -> None:

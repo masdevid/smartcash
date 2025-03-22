@@ -221,7 +221,7 @@ def reset_logging():
     # Reset propagation untuk semua logger
     for name in logging.root.manager.loggerDict:
         # Untuk logger yang tidak perlu debug, set ke level WARNING
-        if name in ['ColabKernelApp', 'ipykernel', 'matplotlib']:
+        if name in ['ColabKernelApp', 'ipykernel', 'matplotlib', 'torch']:
             logging.getLogger(name).setLevel(logging.WARNING)
         else:
             logging.getLogger(name).setLevel(logging.INFO)

@@ -1,7 +1,16 @@
 """
 File: smartcash/ui/utils/cell_utils.py
-Deskripsi: Optimasi setup notebook environment dengan pemisahan logger dari UI components
+Deskripsi: Utilitas untuk cell notebook dengan integrasi logging dan komponen alert yang konsisten
 """
+
+import importlib
+import sys
+import os
+from pathlib import Path
+from typing import Dict, Any, Tuple, Optional, Callable
+import yaml
+import ipywidgets as widgets
+from IPython.display import display, HTML
 
 def setup_notebook_environment(
     cell_name: str, 

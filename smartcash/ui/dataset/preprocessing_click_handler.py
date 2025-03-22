@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan fokus pada visualisasi
+Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan perbaikan visualisasi
 """
 
 from typing import Dict, Any
@@ -127,9 +127,21 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Update status panel
             update_status_panel(ui_components, "success", f"Preprocessing dataset berhasil")
             
-            # Tampilkan tombol visualisasi
+            # PERBAIKAN: Tampilkan tombol visualisasi dan cleanup
             ui_components['visualization_buttons'].layout.display = 'flex'
             ui_components['cleanup_button'].layout.display = 'block'
+            
+            # PERBAIKAN: Tampilkan container visualisasi
+            if 'visualization_container' in ui_components:
+                ui_components['visualization_container'].layout.display = 'block'
+            
+            # PERBAIKAN: Tampilkan tiap tombol visualisasi secara individual
+            if 'visualize_button' in ui_components:
+                ui_components['visualize_button'].layout.display = 'inline-flex'
+            if 'compare_button' in ui_components:
+                ui_components['compare_button'].layout.display = 'inline-flex'
+            if 'distribution_button' in ui_components:
+                ui_components['distribution_button'].layout.display = 'inline-flex'
             
             # Notifikasi observer tentang selesai preprocessing
             try:

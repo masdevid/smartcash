@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_cleanup_handler.py
-Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan EventTopics yang diperbarui
+Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan menonaktifkan tombol selama proses
 """
 
 from typing import Dict, Any
@@ -24,9 +24,24 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     """
     logger = ui_components.get('logger')
     
+    # Fungsi untuk menonaktifkan semua tombol saat proses cleanup
+    def disable_buttons(disable=True):
+        """Nonaktifkan semua tombol saat sedang proses."""
+        buttons = [
+            'preprocess_button', 'cleanup_button', 'save_button', 
+            'visualize_button', 'compare_button', 'distribution_button'
+        ]
+        
+        for btn_name in buttons:
+            if btn_name in ui_components:
+                ui_components[btn_name].disabled = disable
+    
     # Handler untuk tombol cleanup
     def on_cleanup_click(b):
         try:
+            # Nonaktifkan semua tombol saat proses dimulai
+            disable_buttons(True)
+            
             # Buat dialog konfirmasi jika tersedia
             try:
                 from smartcash.ui.helpers.ui_helpers import create_confirmation_dialog
@@ -38,6 +53,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 def on_cancel_cleanup():
                     with ui_components['status']: 
                         display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+                    # Aktifkan kembali tombol setelah batal
+                    disable_buttons(False)
                 
                 dialog = create_confirmation_dialog(
                     "Konfirmasi Pembersihan Data",
@@ -71,12 +88,16 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         except Exception as e:
             with ui_components['status']: 
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
+            # Aktifkan kembali tombol jika terjadi error
+            disable_buttons(False)
     
     # Fungsi untuk membatalkan cleanup
     def cancel_cleanup():
         with ui_components['status']: 
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+        # Aktifkan kembali tombol setelah batal
+        disable_buttons(False)
     
     # Fungsi untuk melakukan cleanup sebenarnya
     def perform_cleanup():
@@ -84,7 +105,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
         
         try:
-            # Tampilkan status
+            # Tampilkan status proses dimulai
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing..."))
@@ -158,6 +179,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     ui_components['visualize_button'].layout.display = 'none'
                 if 'compare_button' in ui_components:
                     ui_components['compare_button'].layout.display = 'none'
+                if 'distribution_button' in ui_components:
+                    ui_components['distribution_button'].layout.display = 'none'
                 
                 # Notifikasi observer
                 try:
@@ -170,6 +193,9 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     )
                 except ImportError:
                     pass
+                
+            # Aktifkan kembali tombol preprocess setelah cleanup selesai
+            ui_components['preprocess_button'].disabled = False
                 
         except Exception as e:
             with ui_components['status']:
@@ -191,6 +217,10 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 )
             except ImportError:
                 pass
+        
+        finally:
+            # Aktifkan kembali tombol setelah proses selesai
+            disable_buttons(False)
     
     # Register handler
     ui_components['cleanup_button'].on_click(on_cleanup_click)
@@ -199,7 +229,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     ui_components.update({
         'on_cleanup_click': on_cleanup_click,
         'perform_cleanup': perform_cleanup,
-        'cancel_cleanup': cancel_cleanup
+        'cancel_cleanup': cancel_cleanup,
+        'disable_buttons': disable_buttons
     })
     
     return ui_components

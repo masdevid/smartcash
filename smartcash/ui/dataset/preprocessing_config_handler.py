@@ -1,19 +1,20 @@
 """
 File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan persistensi yang ditingkatkan
+Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan perbaikan persistensi
 """
 
 from typing import Dict, Any, Optional
 import os
 import yaml
+import json
 from pathlib import Path
 from IPython.display import display
-import json
+import copy
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY."""
     # Inisialisasi config jika None
-    config = config or {}
+    config = config.copy() if config else {}
     
     # Pastikan section preprocessing ada
     if 'preprocessing' not in config: config['preprocessing'] = {}
@@ -95,8 +96,7 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
                 existing_config = yaml.safe_load(f) or {}
                 
             # Merge existing config dengan config baru, prioritaskan config baru
-            from copy import deepcopy
-            merged_config = deepcopy(existing_config)
+            merged_config = copy.deepcopy(existing_config)
             
             # Update preprocessing section dengan deep merge
             if 'preprocessing' in config:

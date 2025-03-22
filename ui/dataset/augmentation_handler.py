@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_handler.py
-Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan perbaikan num_workers dan integrasi logging
+Deskripsi: Handler terintegrasi untuk augmentasi dataset dengan perbaikan num_workers, integrasi logging dan visualisasi kelas
 """
 
 from typing import Dict, Any, Optional
@@ -23,6 +23,9 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     from smartcash.ui.dataset.augmentation_progress_handler import setup_progress_handler
     from smartcash.ui.dataset.augmentation_visualization_handler import setup_visualization_handler
     from smartcash.ui.dataset.augmentation_cleanup_handler import setup_cleanup_handler
+    
+    # Import modul baru untuk visualisasi distribusi kelas
+    from smartcash.ui.dataset.visualization_integrator import setup_visualization_handlers
     
     try:
         # Setup logging dengan integrasi UI
@@ -49,6 +52,9 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
         ui_components = setup_click_handlers(ui_components, env, saved_config)
         ui_components = setup_visualization_handler(ui_components, env, saved_config)
         ui_components = setup_cleanup_handler(ui_components, env, saved_config)
+        
+        # Setup visualisasi distribusi kelas (fitur baru)
+        ui_components = setup_visualization_handlers(ui_components, env, saved_config)
         
         # Setup event handler untuk save button
         ui_components['save_button'].on_click(lambda b: save_config_handler(ui_components, saved_config))

@@ -86,7 +86,8 @@ class AugmentationService:
         process_bboxes: bool = True,
         target_balance: bool = False,
         num_workers: int = None,
-        move_to_preprocessed: bool = True
+        move_to_preprocessed: bool = True,
+        target_count: int = 1000
     ) -> Dict[str, Any]:
         """
         Augmentasi dataset dengan penggunaan multiprocessing dan balancing class.
@@ -102,6 +103,7 @@ class AugmentationService:
             target_balance: Coba balancing jumlah sampel per kelas
             num_workers: Override num_workers untuk proses ini
             move_to_preprocessed: Pindahkan hasil ke direktori preprocessed
+            target_count: Jumlah target sampel per kelas (default: 1000)
             
         Returns:
             Dictionary berisi hasil augmentasi
@@ -147,7 +149,7 @@ class AugmentationService:
         if target_balance:
             try:
                 # Persiapkan balancing untuk class target
-                message = f"🎯 Mempersiapkan balancing class dengan target 1000 sampel per kelas"
+                message = f"🎯 Mempersiapkan balancing class dengan target {target_count} sampel per kelas"
                 self.report_progress(message=message)
                 self.logger.info(message)
                 
@@ -155,22 +157,27 @@ class AugmentationService:
                 result = self.class_balancer.prepare_balanced_dataset(
                     image_files=image_files,
                     labels_dir=labels_input_dir,
-                    target_count=1000,
+                    target_count=target_count,
                     filter_single_class=True  # Filter untuk file yang hanya memiliki 1 class
                 )
                 
                 # Gunakan file yang direkomendasikan untuk balancing
                 balanced_files = result.get('selected_files', [])
                 class_stats = result.get('class_counts', {})
+                augmentation_needs = result.get('augmentation_needs', {})
+                
+                # Log kebutuhan augmentasi per kelas dengan lebih detail
+                for class_id, needed in augmentation_needs.items():
+                    current_count = class_stats.get(class_id, 0)
+                    if needed > 0:
+                        self.logger.info(f"🏷️ Kelas {class_id}: perlu tambahan {needed} sampel (dari {current_count} → {target_count})")
+                    else:
+                        self.logger.info(f"✅ Kelas {class_id}: sudah cukup ({current_count} ≥ {target_count})")
                 
                 # Update file yang akan diproses
                 if balanced_files:
                     self.logger.info(f"📊 Menggunakan {len(balanced_files)} dari {len(image_files)} untuk balancing class")
                     image_files = balanced_files
-                    
-                    # Log statistik kelas
-                    for class_id, count in class_stats.items():
-                        self.logger.info(f"🏷️ Kelas {class_id}: {count} sampel asli, target: 1000")
                 else:
                     self.logger.warning("⚠️ Tidak ada file yang cocok untuk balancing, menggunakan semua file")
             
@@ -333,7 +340,8 @@ class AugmentationService:
             "augmentation_types": augmentation_types,
             "duration": duration,
             "output_dir": output_dir,
-            "final_output_dir": final_output_dir
+            "final_output_dir": final_output_dir,
+            "target_count": target_count
         }
     
     def _move_files_to_preprocessed(

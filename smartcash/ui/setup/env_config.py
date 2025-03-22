@@ -90,10 +90,12 @@ def verify_default_configs(ui_components: Dict[str, Any]) -> None:
         required_configs = [
             "base_config.yaml",
             "colab_config.yaml",
-            "model_config.yaml",
+            "dataset_config.yaml",
             "preprocessing_config.yaml",
             "training_config.yaml",
-            "augmentation_config.yaml"
+            "augmentation_config.yaml",
+            "evaluation_config.yaml",
+            "model_config.yaml"
         ]
         
         # Cek dan buat template konfigurasi jika diperlukan

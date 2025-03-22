@@ -31,7 +31,7 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     # Deteksi environment jika belum ada
     ui_components = detect_environment(ui_components, env)
     
-    from smartcash.ui.utils.logging_utils import try_except_decorator
+    from smartcash.ui.handlers.error_handler import try_except_decorator
     # Handler untuk tombol Drive
     @try_except_decorator
     def on_drive_button_clicked(b):

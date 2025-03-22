@@ -126,7 +126,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import helper untuk distribusi kelas
-            from smartcash.ui.visualization_integrator import create_distribution_visualizations
+            from smartcash.ui.dataset.visualization_integrator import create_distribution_visualizations
             
             # Gunakan function distribusi kelas standard dari visualization_integrator dengan wrapper yang terkonsolidasi
             create_distribution_visualizations(

@@ -1,6 +1,6 @@
 """
 File: smartcash/common/config_sync.py
-Deskripsi: Utilitas ringkas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan perbaikan error boolean
+Deskripsi: Utilitas ringkas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan perbaikan error path sama
 """
 
 import os, shutil, yaml, json, copy
@@ -100,12 +100,18 @@ def sync_config_with_drive(
         local_config_path = Path("configs") / config_file
         drive_config_path = env_manager.drive_path / "configs" / config_file
         
+        # PERBAIKAN: Hentikan proses jika path identik (cek realpath untuk symlink)
+        if os.path.realpath(local_config_path) == os.path.realpath(drive_config_path):
+            msg = f"⚠️ Path lokal sama dengan drive: {local_config_path}, gunakan path lain"
+            if logger: logger.warning(msg)
+            return True, msg, load_config_file(local_config_path)  # Return sukses dengan config yang ada
+        
         # Validasi file ada
         if not local_config_path.exists() and not drive_config_path.exists():
             if logger: logger.warning(f"⚠️ File konfigurasi tidak ditemukan: {config_file}")
             return False, f"File konfigurasi tidak ditemukan: {config_file}", {}
         
-        # Backup jika diminta - PERBAIKAN: create_backup adalah boolean, bukan callable
+        # Backup jika diminta
         if create_backup and local_config_path.exists():
             try:
                 backup_dir = Path("configs/backup")
@@ -202,11 +208,18 @@ def sync_all_configs(
             if logger: logger.info(f"🔄 Sinkronisasi {file_name}...")
             
             try:
-                # PERBAIKAN: Langsung panggil sync_config_with_drive dengan parameter yang benar
+                # PERBAIKAN: Jika realpath sama, lewati file
+                if os.path.realpath(local_config_dir / file_name) == os.path.realpath(drive_config_dir / file_name):
+                    msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
+                    if logger: logger.info(f"ℹ️ {msg}")
+                    results["skipped"].append({"file": file_name, "message": msg})
+                    continue
+                
+                # Panggil sync_config_with_drive dengan parameter yang benar
                 success, message, config = sync_config_with_drive(
                     config_file=file_name, 
                     sync_strategy=sync_strategy,
-                    create_backup=create_backup,  # create_backup adalah boolean, bukan callable
+                    create_backup=create_backup,
                     logger=logger
                 )
                 

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan perbaikan persistensi
+Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan perbaikan pengecekan path identik
 """
 
 from typing import Dict, Any, Optional
@@ -119,19 +119,21 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
         
-        # Gunakan Google Drive jika tersedia
+        # PERBAIKAN: Hindari menyalin ke drive jika path identik
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             
             if env_manager.is_drive_mounted:
                 drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
-                os.makedirs(Path(drive_config_path).parent, exist_ok=True)
                 
-                # Cek apakah path sama untuk mencegah error
-                if os.path.abspath(config_path) == os.path.abspath(drive_config_path):
+                # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
+                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
                     if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
                 else:
+                    # Buat direktori jika belum ada
+                    os.makedirs(Path(drive_config_path).parent, exist_ok=True)
+                    
                     # Salin file ke Google Drive
                     import shutil
                     shutil.copy2(config_path, drive_config_path)
@@ -168,8 +170,8 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                 drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
                 
                 if os.path.exists(drive_config_path):
-                    # Cek apakah path sama untuk mencegah error
-                    if os.path.abspath(config_path) == os.path.abspath(drive_config_path):
+                    # PERBAIKAN: Cek realpath untuk menghandle symlink
+                    if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
                         if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
                     else:
                         # Salin dari Drive ke lokal untuk memastikan sinkronisasi

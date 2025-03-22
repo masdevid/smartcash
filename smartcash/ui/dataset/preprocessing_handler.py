@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_handler.py
-Deskripsi: Handler untuk preprocessing dataset dengan integrasi visualisasi yang ditingkatkan
+Deskripsi: Handler untuk preprocessing dataset dengan perbaikan deteksi dan visualisasi dataset yang sudah ada
 """
 
 from typing import Dict, Any
@@ -63,8 +63,19 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
         
         # Cek status data preprocessed yang sudah ada
         preprocessed_path = Path(preprocessed_dir)
-        images_path = preprocessed_path / 'train' / 'images'
-        is_preprocessed = preprocessed_path.exists() and images_path.exists() and any(images_path.glob('*.jpg'))
+        # PERBAIKAN: Cek lebih lengkap untuk berbagai split dan format file
+        is_preprocessed = False
+        for split in ['train', 'valid', 'test']:
+            images_path = preprocessed_path / split / 'images'
+            if images_path.exists():
+                # Cek format file .jpg, .png, dan .npy
+                jpg_files = list(images_path.glob('*.jpg'))
+                png_files = list(images_path.glob('*.png'))
+                npy_files = list(images_path.glob('*.npy'))
+                
+                if jpg_files or png_files or npy_files:
+                    is_preprocessed = True
+                    break
         
         if is_preprocessed:
             from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
@@ -76,9 +87,21 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
                 f"{ICONS['success']} Dataset preprocessed sudah tersedia di: {preprocessed_dir}"
             )
             
-            # Tampilkan tombol cleanup dan visualisasi
+            # PERBAIKAN: Tampilkan tombol yang relevan ketika data terdeteksi
             ui_components['cleanup_button'].layout.display = 'block'
             ui_components['visualization_buttons'].layout.display = 'flex'
+            
+            # PERBAIKAN: Tampilkan tombol visualisasi secara individual
+            if 'visualize_button' in ui_components:
+                ui_components['visualize_button'].layout.display = 'inline-flex'
+            if 'compare_button' in ui_components:
+                ui_components['compare_button'].layout.display = 'inline-flex'
+            if 'distribution_button' in ui_components:
+                ui_components['distribution_button'].layout.display = 'inline-flex'
+            
+            # PERBAIKAN: Tampilkan container visualisasi
+            if 'visualization_container' in ui_components:
+                ui_components['visualization_container'].layout.display = 'block'
             
             if logger: logger.info(f"{ICONS['folder']} Dataset preprocessed terdeteksi di: {os.path.abspath(preprocessed_dir)}")
             
@@ -89,6 +112,9 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
                 
                 if 'update_summary' in ui_components and callable(ui_components['update_summary']):
                     ui_components['update_summary'](summary)
+                    # PERBAIKAN: Tampilkan summary container
+                    if 'summary_container' in ui_components:
+                        ui_components['summary_container'].layout.display = 'block'
             except Exception as e:
                 if logger: logger.debug(f"{ICONS['info']} {str(e)}")
         
@@ -188,7 +214,12 @@ def get_preprocessing_stats(preprocessed_dir: str) -> Dict[str, Any]:
             
         # Hitung gambar dan label
         images_dir, labels_dir = split_dir / 'images', split_dir / 'labels'
-        num_images = len(list(images_dir.glob('*.jpg'))) + len(list(images_dir.glob('*.npy'))) if images_dir.exists() else 0
+        
+        # PERBAIKAN: Cek semua format file yang didukung
+        num_images = 0
+        if images_dir.exists():
+            num_images = len(list(images_dir.glob('*.jpg'))) + len(list(images_dir.glob('*.png'))) + len(list(images_dir.glob('*.npy')))
+            
         num_labels = len(list(labels_dir.glob('*.txt'))) if labels_dir.exists() else 0
         
         # Update statistik

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_cleanup_handler.py
-Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan menonaktifkan tombol selama proses
+Deskripsi: Handler yang disederhanakan untuk membersihkan data hasil preprocessing dengan perbaikan dialog konfirmasi
 """
 
 from typing import Dict, Any
@@ -52,10 +52,12 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 
                 def on_cancel_cleanup():
                     with ui_components['status']: 
+                        clear_output(wait=True)  # PERBAIKAN: Clear output sebelum menampilkan pesan batal
                         display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
                     # Aktifkan kembali tombol setelah batal
                     disable_buttons(False)
                 
+                # Buat dialog konfirmasi
                 dialog = create_confirmation_dialog(
                     "Konfirmasi Pembersihan Data",
                     "Apakah Anda yakin ingin menghapus semua data hasil preprocessing? Tindakan ini tidak dapat dibatalkan.",
@@ -79,6 +81,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                     confirm_btn = widgets.Button(description="Ya, Hapus Data", button_style="danger", icon="trash")
                     cancel_btn = widgets.Button(description="Batal", button_style="info", icon="times")
                     
+                    # PERBAIKAN: Gunakan lambda dengan parameter untuk menghindari closure yang salah
                     confirm_btn.on_click(lambda b: perform_cleanup())
                     cancel_btn.on_click(lambda b: cancel_cleanup())
                     
@@ -94,7 +97,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     # Fungsi untuk membatalkan cleanup
     def cancel_cleanup():
         with ui_components['status']: 
-            clear_output(wait=True)
+            clear_output(wait=True)  # PERBAIKAN: Clear output untuk menghilangkan dialog
             display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
         # Aktifkan kembali tombol setelah batal
         disable_buttons(False)
@@ -107,7 +110,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
         try:
             # Tampilkan status proses dimulai
             with ui_components['status']:
-                clear_output(wait=True)
+                clear_output(wait=True)  # PERBAIKAN: Clear output untuk menghilangkan dialog
                 display(create_status_indicator("info", f"{ICONS.get('trash', '🗑️')} Membersihkan data preprocessing..."))
             
             # Update status panel

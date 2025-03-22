@@ -23,18 +23,20 @@ _output_lock = threading.RLock()
 class UILogHandler(logging.Handler):
     """Handler logging yang terintegrasi dengan UI components."""
     
-    def __init__(self, ui_components: Dict[str, Any], level=logging.NOTSET):
+    def __init__(self, ui_components: Dict[str, Any], level=logging.NOTSET, handler_name: str = None):
         """
         Inisialisasi UILogHandler.
         
         Args:
             ui_components: Dictionary berisi komponen UI
             level: Level minimum logging yang akan ditampilkan
+            handler_name: Nama unik handler, berguna untuk membedakan handler observer
         """
         super().__init__(level)
         self.ui_components = ui_components
         self.output_widget = ui_components.get('status')
         self._emit_depth = 0  # Untuk mencegah rekursi
+        self.name = handler_name or "ui_handler"
     
     def emit(self, record):
         """Tampilkan log di widget output dengan styling alert."""
@@ -151,7 +153,8 @@ def setup_ipython_logging(
     ui_components: Dict[str, Any],
     module_name: str = 'ui_logger',
     log_level: int = logging.INFO,
-    redirect_root: bool = True
+    redirect_root: bool = True,
+    keep_observers: bool = True
 ) -> Optional[logging.Logger]:
     """
     Setup logging untuk notebook dengan integrasi UI.
@@ -208,13 +211,13 @@ def setup_ipython_logging(
         # Simpan di registered loggers
         _registered_loggers.add(logger_name)
         
-        # Hapus UI handlers yang mungkin sudah ada
+        # Hapus UI handlers yang mungkin sudah ada kecuali observer handlers
         for handler in logger.handlers[:]:
-            if isinstance(handler, UILogHandler):
+            if isinstance(handler, UILogHandler) and (not keep_observers or 'observer' not in str(handler)):
                 logger.removeHandler(handler)
         
         # Buat dan tambahkan UI handler
-        ui_handler = UILogHandler(ui_components, level=log_level)
+        ui_handler = UILogHandler(ui_components, level=log_level, handler_name=f"{module_name}_handler")
         ui_handler.setFormatter(logging.Formatter('%(message)s'))
         logger.addHandler(ui_handler)
         
@@ -231,7 +234,7 @@ def setup_ipython_logging(
                     root_logger.removeHandler(handler)
             
             # Tambahkan UI handler ke root logger
-            root_handler = UILogHandler(ui_components, level=log_level)
+            root_handler = UILogHandler(ui_components, level=log_level, handler_name="root_logger_handler")
             root_handler.setFormatter(logging.Formatter('%(message)s'))
             root_logger.addHandler(root_handler)
             
@@ -356,43 +359,47 @@ def alert_to_ui(ui_components: Dict[str, Any], message: str, status: str = 'info
 
 def reset_logging():
     """Reset semua konfigurasi logging ke default."""
-    global _registered_loggers, _root_handlers
+    global _registered_loggers, _root_handlers, _handler_cache
     
     try:
         # Reset root logger
         root_logger = logging.getLogger()
         
-        # Hapus UI handlers dari root logger
+        # Hapus UI handlers dari root logger tapi simpan referensinya
+        removed_handlers = []
         for handler in list(_root_handlers):
             if handler in root_logger.handlers:
                 root_logger.removeHandler(handler)
+                removed_handlers.append(handler)
         
-        # Reset registered loggers
+        # Reset registered loggers tapi jangan hapus observer handlers
         for logger_name in _registered_loggers:
             logger = logging.getLogger(logger_name)
-            # Hapus semua UILogHandlers
+            # Hapus semua UILogHandlers kecuali observer handler
             for handler in logger.handlers[:]:
-                if isinstance(handler, UILogHandler):
+                if isinstance(handler, UILogHandler) and 'observer' not in str(handler):
                     logger.removeHandler(handler)
-            # Aktifkan propagasi kembali
-            logger.propagate = True
+            # Biarkan propagasi non-aktif untuk mencegah duplikasi log
+            # logger.propagate = False
         
-        # Reset tracking variables
-        _root_handlers = []
-        _registered_loggers = set()
+        # Reset tracking variables secara parsial
+        _root_handlers = [h for h in _root_handlers if h not in removed_handlers]
+        # Jangan reset _registered_loggers agar observer tetap terdaftar
         
         # Kembalikan root logger ke konfigurasi standar
         for handler in root_logger.handlers[:]:
-            if isinstance(handler, UILogHandler):
+            if isinstance(handler, UILogHandler) and 'observer' not in str(handler):
                 root_logger.removeHandler(handler)
                 
         # Tambahkan StreamHandler standar jika tidak ada
-        if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+        has_stream_handler = any(isinstance(h, logging.StreamHandler) and not isinstance(h, UILogHandler) 
+                               for h in root_logger.handlers)
+        if not has_stream_handler:
             handler = logging.StreamHandler(sys.stdout)
             handler.setFormatter(logging.Formatter('%(name)s - %(levelname)s - %(message)s'))
             root_logger.addHandler(handler)
             
-        # Reset level ke INFO
+        # Reset level ke INFO tapi jangan terlalu rendah
         root_logger.setLevel(logging.INFO)
             
     except Exception as e:

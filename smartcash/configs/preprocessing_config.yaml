@@ -26,10 +26,10 @@ preprocessing:
   normalization:
     enabled: true
     method: 'minmax'  # minmax, zscore, atau whitening
-    target_size: [640, 640]
+    target_size: [640, 640]  # Menggunakan list bukan tuple
     preserve_aspect_ratio: true
     normalize_pixel_values: true
-    pixel_range: [0, 1]  # Range normalisasi pixel
+    pixel_range: [0, 1]  # Menggunakan list bukan tuple
 
   # Opsi analisis dataset
   analysis:
@@ -72,8 +72,8 @@ augmentation:
     hsv_h: 0.025
     hsv_s: 0.7
     hsv_v: 0.4
-    contrast: [0.7, 1.3]
-    brightness: [0.7, 1.3]
+    contrast: [0.7, 1.3]  # Menggunakan list bukan tuple
+    brightness: [0.7, 1.3]  # Menggunakan list bukan tuple
     blur: 0.2
     noise: 0.1
     compress: 0.2

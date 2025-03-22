@@ -150,6 +150,8 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 ui_components['cleanup_button'].layout.display = 'none'
                 if 'summary_container' in ui_components:
                     ui_components['summary_container'].layout.display = 'none'
+                if 'visualization_container' in ui_components:
+                    ui_components['visualization_container'].layout.display = 'none'
                 if 'visualization_buttons' in ui_components:
                     ui_components['visualization_buttons'].layout.display = 'none'
                 if 'visualize_button' in ui_components:

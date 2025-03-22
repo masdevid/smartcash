@@ -197,17 +197,23 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     if preproc_options and hasattr(preproc_options, 'children'):
         # Update opsi dengan list comprehension
         if len(preproc_options.children) >= 5:
+            # Perbaikan: Ambil komponen pertama dari array img_size jika tuple/list
+            img_size = preproc_config.get('img_size', [640, 640])
+            img_size_value = img_size[0] if isinstance(img_size, (list, tuple)) else img_size
+            
             # Definisi pasangan field dan nilai dari config
-            option_pairs = [
-                (0, preproc_config.get('img_size', [640, 640])[0]),  # Image size
-                (1, preproc_config.get('normalization', {}).get('enabled', True)),  # Normalize
-                (2, preproc_config.get('normalization', {}).get('preserve_aspect_ratio', True)),  # Aspect ratio
-                (3, preproc_config.get('enabled', True)),  # Cache enabled
-                (4, preproc_config.get('num_workers', 4))  # Workers
+            option_values = [
+                img_size_value,  # Image size (integer)
+                preproc_config.get('normalization', {}).get('enabled', True),  # Normalize
+                preproc_config.get('normalization', {}).get('preserve_aspect_ratio', True),  # Aspect ratio
+                preproc_config.get('enabled', True),  # Cache enabled
+                preproc_config.get('num_workers', 4)  # Workers
             ]
             
-            # Update semua nilai dengan list comprehension
-            [setattr(child, 'value', val) for child, val in zip(preproc_options.children, option_pairs)]
+            # Update nilai options satu per satu untuk menghindari error
+            for i, value in enumerate(option_values):
+                if i < len(preproc_options.children):
+                    preproc_options.children[i].value = value
     
     # Update validation options dengan data dari config
     validation_options = ui_components.get('validation_options')
@@ -216,15 +222,17 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     if validation_options and hasattr(validation_options, 'children'):
         if len(validation_options.children) >= 4:
             # Definisi pasangan field dan nilai dari config
-            validation_pairs = [
-                (0, validation_config.get('enabled', True)),  # Enable validation
-                (1, validation_config.get('fix_issues', True)),  # Fix issues
-                (2, validation_config.get('move_invalid', True)),  # Move invalid
-                (3, validation_config.get('invalid_dir', 'data/invalid'))  # Invalid dir
+            validation_values = [
+                validation_config.get('enabled', True),  # Enable validation
+                validation_config.get('fix_issues', True),  # Fix issues
+                validation_config.get('move_invalid', True),  # Move invalid
+                validation_config.get('invalid_dir', 'data/invalid')  # Invalid dir
             ]
             
-            # Update semua nilai dengan list comprehension
-            [setattr(child, 'value', val) for child, val in zip(validation_options.children, validation_pairs)]
+            # Update nilai options satu per satu
+            for i, value in enumerate(validation_values):
+                if i < len(validation_options.children):
+                    validation_options.children[i].value = value
     
     # Update split selector
     split_selector = ui_components.get('split_selector')

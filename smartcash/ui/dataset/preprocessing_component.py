@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_component.py
-Deskripsi: Komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan
+Deskripsi: Komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan dan fitur cleanup
 """
 
 import ipywidgets as widgets
@@ -13,7 +13,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON, HORIZONTAL_GROUP
 
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
@@ -60,39 +60,96 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Tombol-tombol preprocessing dengan styling standar
-    preprocess_button = widgets.Button(description='Run Preprocessing', button_style='primary', icon='cog')
-    stop_button = widgets.Button(description='Stop', button_style='danger', icon='stop', 
-                               layout=widgets.Layout(display='none'))
-    cleanup_button = widgets.Button(description='Clean Preprocessed Data', button_style='danger', 
-                                  icon='trash', layout=widgets.Layout(display='none'))
-    save_button = widgets.Button(description='Simpan Konfigurasi', button_style='success', icon='save')
+    preprocess_button = widgets.Button(
+        description='Run Preprocessing', 
+        button_style='primary', 
+        icon='cog',
+        tooltip="Mulai proses preprocessing dataset",
+        layout=widgets.Layout(margin='5px')
+    )
     
-    # Tombol-tombol visualisasi
-    visualize_button = widgets.Button(description='Visualisasi Sampel', button_style='info',
-                                    icon='image', layout=widgets.Layout(display='none'))
-    compare_button = widgets.Button(description='Bandingkan Dataset', button_style='info',
-                                  icon='columns', layout=widgets.Layout(display='none'))
-    distribution_button = widgets.Button(description='Distribusi Kelas', button_style='info',
-                                       icon='bar-chart', layout=widgets.Layout(display='none'))
+    stop_button = widgets.Button(
+        description='Stop', 
+        button_style='danger', 
+        icon='stop', 
+        tooltip="Hentikan proses yang sedang berjalan",
+        layout=widgets.Layout(display='none', margin='5px')
+    )
     
-    # Container tombol utama
-    button_container = widgets.HBox([
-        preprocess_button, stop_button, save_button, cleanup_button
-    ], layout=widgets.Layout(margin='10px 0'))
+    cleanup_button = widgets.Button(
+        description='Clean Preprocessed Data', 
+        button_style='danger', 
+        icon='trash', 
+        tooltip="Hapus data preprocessing",
+        layout=widgets.Layout(display='none', margin='5px')
+    )
     
-    # Container tombol visualisasi
-    visualization_buttons = widgets.HBox([
-        visualize_button, compare_button, distribution_button
-    ], layout=widgets.Layout(margin='10px 0', display='none'))
+    save_button = widgets.Button(
+        description='Simpan Konfigurasi', 
+        button_style='success', 
+        icon='save',
+        tooltip="Simpan konfigurasi preprocessing",
+        layout=widgets.Layout(margin='5px')
+    )
+    
+    # Tombol-tombol visualisasi dengan layout yang lebih konsisten
+    visualize_button = widgets.Button(
+        description='Visualisasi Sampel', 
+        button_style='info',
+        icon='image', 
+        tooltip="Tampilkan sampel hasil preprocessing",
+        layout=widgets.Layout(display='none', margin='5px')
+    )
+    
+    compare_button = widgets.Button(
+        description='Bandingkan Dataset', 
+        button_style='info',
+        icon='columns', 
+        tooltip="Bandingkan dataset asli dan hasil preprocessing",
+        layout=widgets.Layout(display='none', margin='5px')
+    )
+    
+    distribution_button = widgets.Button(
+        description='Distribusi Kelas', 
+        button_style='info',
+        icon='bar-chart', 
+        tooltip="Tampilkan distribusi kelas dataset",
+        layout=widgets.Layout(display='none', margin='5px')
+    )
+    
+    # Container tombol utama dengan HORIZONTAL_GROUP standar
+    button_container = widgets.HBox(
+        [preprocess_button, stop_button, save_button, cleanup_button],
+        layout=HORIZONTAL_GROUP
+    )
+    
+    # Container tombol visualisasi dengan HORIZONTAL_GROUP standar
+    visualization_buttons = widgets.HBox(
+        [visualize_button, compare_button, distribution_button],
+        layout=widgets.Layout(
+            display='none',
+            **{k:v for k,v in HORIZONTAL_GROUP.items() if k != 'display'}
+        )
+    )
     
     # Progress tracking dengan styling standar
-    progress_bar = widgets.IntProgress(value=0, min=0, max=100, description='Overall:',
-                                    bar_style='info', orientation='horizontal',
-                                    layout=widgets.Layout(visibility='hidden', width='100%'))
-    current_progress = widgets.IntProgress(value=0, min=0, max=100, description='Current:',
-                                        bar_style='info', orientation='horizontal',
-                                        layout=widgets.Layout(visibility='hidden', width='100%'))
+    progress_bar = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Overall:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
     
+    current_progress = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Current:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    # Container progress dengan styling yang lebih konsisten
     progress_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
         progress_bar, 
@@ -106,10 +163,24 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     log_accordion = widgets.Accordion(children=[status], selected_index=0)
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")
     
-    # Summary stats container
+    # Summary stats container dengan styling yang konsisten
     summary_container = widgets.Output(
-        layout=widgets.Layout(border='1px solid #ddd', padding='10px', 
-                             margin='10px 0', display='none')
+        layout=widgets.Layout(
+            border='1px solid #ddd', 
+            padding='10px', 
+            margin='10px 0', 
+            display='none'
+        )
+    )
+    
+    # Container visualisasi
+    visualization_container = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd', 
+            padding='10px', 
+            margin='10px 0', 
+            display='none'
+        )
     )
     
     # Help panel dengan komponen info_box standar
@@ -132,6 +203,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         log_accordion,
         summary_container,
         visualization_buttons,
+        visualization_container,
         help_panel
     ])
     
@@ -156,6 +228,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'visualize_button': visualize_button,
         'compare_button': compare_button,
         'distribution_button': distribution_button,
+        'visualization_container': visualization_container,
         'module_name': 'preprocessing',
         # Default dataset paths
         'data_dir': 'data',

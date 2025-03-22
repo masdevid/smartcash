@@ -20,7 +20,9 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
         """Visualisasikan sampel dataset yang telah dipreprocessing."""
         from smartcash.ui.utils.alert_utils import create_status_indicator
         
-        with ui_components['status']:
+        output_widget = ui_components.get('visualization_container', ui_components.get('status'))
+        
+        with output_widget:
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS['processing']} Mempersiapkan visualisasi sampel..."))
         
@@ -30,24 +32,27 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             
             # Cek apakah direktori tersedia
             if not Path(preprocessed_dir).exists():
-                with ui_components['status']:
+                with output_widget:
                     display(create_status_indicator("warning", 
                         f"{ICONS['warning']} Direktori preprocessed tidak ditemukan: {preprocessed_dir}"))
                 return
+            
+            # Tampilkan container visualisasi
+            ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi visualisasi
             from smartcash.ui.dataset.preprocessing_visualization_handler import visualize_preprocessed_samples
             
             # Visualisasikan sampel
             visualize_preprocessed_samples(
-                ui_components=ui_components,
+                ui_components={"status": output_widget, "logger": logger},
                 preprocessed_dir=preprocessed_dir,
                 original_dir=ui_components.get('data_dir', 'data'),
                 num_samples=5
             )
             
         except Exception as e:
-            with ui_components['status']:
+            with output_widget:
                 display(create_status_indicator("error", f"{ICONS['error']} Error saat visualisasi: {str(e)}"))
             
             if logger: logger.error(f"{ICONS['error']} Error visualisasi sampel: {str(e)}")
@@ -57,7 +62,9 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
         """Bandingkan sampel dataset mentah dengan yang telah dipreprocessing."""
         from smartcash.ui.utils.alert_utils import create_status_indicator
         
-        with ui_components['status']:
+        output_widget = ui_components.get('visualization_container', ui_components.get('status'))
+        
+        with output_widget:
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS['processing']} Mempersiapkan perbandingan dataset..."))
         
@@ -68,24 +75,27 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             
             # Cek ketersediaan direktori
             if not Path(data_dir).exists() or not Path(preprocessed_dir).exists():
-                with ui_components['status']:
+                with output_widget:
                     display(create_status_indicator("warning", 
                         f"{ICONS['warning']} Direktori dataset tidak lengkap untuk perbandingan"))
                 return
+            
+            # Tampilkan container visualisasi
+            ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi perbandingan
             from smartcash.ui.dataset.preprocessing_visualization_handler import compare_raw_vs_preprocessed
             
             # Visualisasikan perbandingan
             compare_raw_vs_preprocessed(
-                ui_components=ui_components,
+                ui_components={"status": output_widget, "logger": logger},
                 raw_dir=data_dir,
                 preprocessed_dir=preprocessed_dir,
                 num_samples=3
             )
             
         except Exception as e:
-            with ui_components['status']:
+            with output_widget:
                 display(create_status_indicator("error", f"{ICONS['error']} Error saat perbandingan: {str(e)}"))
             
             if logger: logger.error(f"{ICONS['error']} Error perbandingan dataset: {str(e)}")
@@ -95,7 +105,9 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
         """Visualisasikan distribusi kelas dataset."""
         from smartcash.ui.utils.alert_utils import create_status_indicator
         
-        with ui_components['status']:
+        output_widget = ui_components.get('visualization_container', ui_components.get('status'))
+        
+        with output_widget:
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS['processing']} Mempersiapkan visualisasi distribusi kelas..."))
         
@@ -105,74 +117,30 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             
             # Cek apakah direktori tersedia
             if not Path(preprocessed_dir).exists():
-                with ui_components['status']:
+                with output_widget:
                     display(create_status_indicator("warning", 
                         f"{ICONS['warning']} Direktori preprocessed tidak ditemukan: {preprocessed_dir}"))
                 return
-                
+            
+            # Tampilkan container visualisasi
+            ui_components['visualization_container'].layout.display = 'block'
+            
             # Import helper untuk distribusi kelas
-            from smartcash.ui.helpers.class_distribution_analyzer import analyze_class_distribution_by_prefix, count_files_by_prefix
-            from smartcash.ui.helpers.distribution_summary_display import display_distribution_summary, display_file_summary
-            from smartcash.ui.helpers.plot_single import plot_class_distribution
-            from smartcash.ui.helpers.plot_comparison import plot_class_distribution_comparison
-            from smartcash.ui.helpers.plot_stacked import plot_class_distribution_stacked
+            from smartcash.ui.visualization_integrator import create_distribution_visualizations
             
-            # Dapatkan distribusi kelas
-            all_counts, orig_counts, aug_counts = analyze_class_distribution_by_prefix(
-                preprocessed_dir, 'train', 'aug', 'rp')
-            prefix_counts = count_files_by_prefix(preprocessed_dir, 'train')
+            # Gunakan function distribusi kelas standard dari visualization_integrator dengan wrapper yang terkonsolidasi
+            create_distribution_visualizations(
+                ui_components={"visualization_container": output_widget, "logger": logger, 
+                               "status": output_widget, "data_dir": ui_components.get('data_dir')},
+                dataset_dir=preprocessed_dir,
+                split_name='train',
+                aug_prefix='aug',
+                orig_prefix='rp',
+                target_count=1000
+            )
             
-            # Tampilkan visualisasi di output
-            with ui_components['status']:
-                clear_output(wait=True)
-                
-                # Tampilkan header visualisasi
-                display(HTML(f"""
-                <h3 style="color: {COLORS['dark']};">{ICONS['chart']} Visualisasi Distribusi Kelas</h3>
-                <p>Analisis distribusi kelas pada dataset yang telah dipreprocessing.</p>
-                """))
-                
-                # Tampilkan ringkasan file
-                if prefix_counts:
-                    display_file_summary(prefix_counts)
-                
-                # Tampilkan ringkasan kelas
-                if all_counts:
-                    display_distribution_summary(all_counts, orig_counts, aug_counts, 1000)
-                    
-                    # Tampilkan visualisasi
-                    if orig_counts:
-                        plt.figure(figsize=(10, 6))
-                        fig = plot_class_distribution(
-                            orig_counts, 
-                            title="Distribusi Kelas pada Data Asli",
-                            color=COLORS['primary']
-                        )
-                        plt.show()
-                    
-                    if aug_counts:
-                        plt.figure(figsize=(10, 6))
-                        fig = plot_class_distribution(
-                            aug_counts, 
-                            title="Distribusi Kelas pada Data Augmentasi",
-                            color=COLORS['warning']
-                        )
-                        plt.show()
-                    
-                    if orig_counts and aug_counts:
-                        plt.figure(figsize=(12, 6))
-                        fig = plot_class_distribution_comparison(orig_counts, aug_counts)
-                        plt.show()
-                        
-                        plt.figure(figsize=(12, 6))
-                        fig = plot_class_distribution_stacked(orig_counts, aug_counts)
-                        plt.show()
-                else:
-                    display(create_status_indicator("warning", 
-                        f"{ICONS['warning']} Tidak ditemukan data distribusi kelas"))
-                
         except Exception as e:
-            with ui_components['status']:
+            with output_widget:
                 display(create_status_indicator("error", f"{ICONS['error']} Error saat visualisasi distribusi: {str(e)}"))
             
             if logger: logger.error(f"{ICONS['error']} Error visualisasi distribusi kelas: {str(e)}")

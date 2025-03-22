@@ -1,6 +1,6 @@
 """
 File: smartcash/common/config_sync.py
-Deskripsi: Utilitas ringkas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan fallback terpusat
+Deskripsi: Utilitas ringkas untuk sinkronisasi konfigurasi antara lokal dan Google Drive dengan perbaikan error boolean
 """
 
 import os, shutil, yaml, json, copy
@@ -58,31 +58,6 @@ def merge_configs_smart(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dic
     # Nilai skalar: prioritaskan nilai yang tidak kosong
     return copy.deepcopy(config2) if config1 == "" or config1 is None or config1 == 0 else copy.deepcopy(config1)
 
-def create_backup(local_path: Path, logger=None) -> bool:
-    """Buat backup file konfigurasi"""
-    try:
-        # Gunakan fungsi fallback dari fallback_utils jika tersedia
-        try:
-            from smartcash.ui.utils.fallback_utils import backup_file
-            success, backup_path = backup_file(local_path, backup_dir="configs/backup", timestamp=True)
-            if logger and success: logger.info(f"✅ Backup berhasil dibuat: {backup_path}")
-            return success
-        except ImportError:
-            # Fallback internal jika fungsi tidak tersedia
-            backup_dir = Path("configs/backup")
-            backup_dir.mkdir(parents=True, exist_ok=True)
-            
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_path = backup_dir / f"{local_path.stem}_{timestamp}{local_path.suffix}"
-            
-            shutil.copy2(local_path, backup_path)
-            if logger: logger.info(f"✅ Backup berhasil dibuat: {backup_path}")
-            return True
-    except Exception as e:
-        if logger: logger.warning(f"⚠️ Error saat membuat backup: {str(e)}")
-        return False
-
 def get_environment(logger=None):
     """Dapatkan environment manager dengan fallback"""
     try:
@@ -122,8 +97,20 @@ def sync_config_with_drive(
             if logger: logger.warning(f"⚠️ File konfigurasi tidak ditemukan: {config_file}")
             return False, f"File konfigurasi tidak ditemukan: {config_file}", {}
         
-        # Backup jika diminta
-        if create_backup and local_config_path.exists(): create_backup(local_config_path, logger)
+        # Backup jika diminta - PERBAIKAN: create_backup adalah boolean, bukan callable
+        if create_backup and local_config_path.exists():
+            try:
+                backup_dir = Path("configs/backup")
+                backup_dir.mkdir(parents=True, exist_ok=True)
+                
+                from datetime import datetime
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                backup_path = backup_dir / f"{local_config_path.stem}_{timestamp}{local_config_path.suffix}"
+                
+                shutil.copy2(local_config_path, backup_path)
+                if logger: logger.info(f"✅ Backup berhasil dibuat: {backup_path}")
+            except Exception as e:
+                if logger: logger.warning(f"⚠️ Error saat membuat backup: {str(e)}")
         
         # Load konfigurasi
         local_config = load_config_file(local_config_path) if local_config_path.exists() else {}
@@ -206,24 +193,22 @@ def sync_all_configs(
         for file_name in all_config_files:
             if logger: logger.info(f"🔄 Sinkronisasi {file_name}...")
             
-            # Gunakan try_operation dari fallback_utils jika tersedia
             try:
-                from smartcash.ui.utils.fallback_utils import try_operation
-                success, message, config = try_operation(
-                    lambda: sync_config_with_drive(file_name, sync_strategy, create_backup, logger),
-                    logger, f"sinkronisasi file {file_name}"
-                ) or (False, f"Gagal sinkronisasi {file_name}", {})
-            except ImportError:
-                # Fallback langsung jika fungsi tidak tersedia
-                try:
-                    success, message, config = sync_config_with_drive(file_name, sync_strategy, create_backup, logger)
-                except Exception as e:
-                    success, message, config = False, f"Error: {str(e)}", {}
-            
-            if success:
-                results["skipped" if "identik" in message else "success"].append({"file": file_name, "message": message})
-            else:
-                results["failure"].append({"file": file_name, "message": message})
+                # PERBAIKAN: Langsung panggil sync_config_with_drive dengan parameter yang benar
+                success, message, config = sync_config_with_drive(
+                    config_file=file_name, 
+                    sync_strategy=sync_strategy,
+                    create_backup=create_backup,  # create_backup adalah boolean, bukan callable
+                    logger=logger
+                )
+                
+                if success:
+                    results["skipped" if "identik" in message else "success"].append({"file": file_name, "message": message})
+                else:
+                    results["failure"].append({"file": file_name, "message": message})
+                    
+            except Exception as e:
+                results["failure"].append({"file": file_name, "message": str(e)})
         
         # Log hasil
         if logger:

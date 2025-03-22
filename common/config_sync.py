@@ -39,7 +39,7 @@ def are_configs_identical(config1: Dict[str, Any], config2: Dict[str, Any]) -> b
     """Periksa apakah dua konfigurasi identik"""
     return json.dumps(config1, sort_keys=True) == json.dumps(config2, sort_keys=True)
 
-def merge_configs_smart(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dict[str, Any]:
+def merge_configs_smart(config1: Any, config2: Any) -> Any:
     """Gabungkan dua konfigurasi dengan strategi smart"""
     if config1 is None: return copy.deepcopy(config2)
     if config2 is None: return copy.deepcopy(config1)
@@ -48,12 +48,20 @@ def merge_configs_smart(config1: Dict[str, Any], config2: Dict[str, Any]) -> Dic
     if isinstance(config1, dict) and isinstance(config2, dict):
         result = copy.deepcopy(config1)
         for key, value in config2.items():
-            result[key] = merge_configs_smart(result[key], value) if key in result else copy.deepcopy(value)
+            result[key] = merge_configs_smart(result.get(key), value) if key in result else copy.deepcopy(value)
         return result
     
     # List: gabungkan dengan filter duplikat jika perlu
     if isinstance(config1, list) and isinstance(config2, list):
-        return list(set(config1 + config2)) if all(not isinstance(x, (dict, list)) for x in config1 + config2) else copy.deepcopy(config1) + copy.deepcopy(config2)
+        # Untuk list sederhana, gabungkan dengan unik
+        if all(not isinstance(x, (dict, list)) for x in config1 + config2):
+            # Hanya gunakan set untuk elemen yang hashable
+            try:
+                return list(set(config1 + config2))
+            except TypeError:
+                pass
+        # Untuk list kompleks atau unhashable, gabungkan saja
+        return copy.deepcopy(config1) + copy.deepcopy(config2)
     
     # Nilai skalar: prioritaskan nilai yang tidak kosong
     return copy.deepcopy(config2) if config1 == "" or config1 is None or config1 == 0 else copy.deepcopy(config1)

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_progress_handler.py
-Deskripsi: Handler progress tracking untuk preprocessing dataset dengan integrasi observer standard
+Deskripsi: Handler progress tracking untuk preprocessing dataset dengan peningkatan log output
 """
 
 from typing import Dict, Any
@@ -48,6 +48,26 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             ui_components['current_progress'].description = f"Step: {current_progress}/{current_total}"
             ui_components['current_progress'].layout.visibility = 'visible'
         
+        # Tampilkan pesan di status area jika ada pesan untuk visibilitas lebih baik
+        if message and 'status' in ui_components:
+            from smartcash.ui.utils.alert_utils import create_status_indicator
+            with ui_components['status']:
+                current_time = time.time()
+                if current_time - last_log_time['value'] >= log_interval:
+                    last_log_time['value'] = current_time
+                    display(create_status_indicator(status, message))
+                    
+                    # Log juga ke logger formal
+                    if logger:
+                        log_methods = {
+                            'info': logger.info,
+                            'success': logger.success if hasattr(logger, 'success') else logger.info,
+                            'warning': logger.warning,
+                            'error': logger.error
+                        }
+                        log_method = log_methods.get(status, logger.info)
+                        log_method(f"{message} [{progress}/{total}]" if progress is not None and total is not None else message)
+        
         # Batasi notifikasi observer untuk mencegah flooding log
         current_time = time.time()
         time_since_last_log = current_time - last_log_time['value']
@@ -87,10 +107,12 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
     def register_progress_callback(preprocessing_manager):
         """Register callback progress ke preprocessing_manager."""
         if not preprocessing_manager or not hasattr(preprocessing_manager, 'register_progress_callback'): 
+            if logger: logger.warning(f"{ICONS['warning']} Preprocessing manager tidak mendukung progress callback")
             return False
         
         # Register callback ke preprocessing_manager
         preprocessing_manager.register_progress_callback(progress_callback)
+        if logger: logger.info(f"{ICONS['success']} Progress callback berhasil didaftarkan")
         return True
     
     # Setup observer integrasi full jika tersedia (dengan batasan update)
@@ -119,7 +141,8 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             event_type=EventTopics.PREPROCESSING_CURRENT_PROGRESS,
             total=100,
             progress_widget_key='current_progress',
-            update_output=False,
+            update_output=True,  # Update output juga untuk current progress yang lebih visible
+            output_widget_key='status',
             observer_group='preprocessing_observers'
         )
         
@@ -130,7 +153,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
     # Helper utility untuk memudahkan update progress
     def update_progress_bar(progress, total, message=None):
         """
-        Update progress bar dengan satu fungsi.
+        Update progress bar dengan satu fungsi dan tampilkan di log.
         
         Args:
             progress: Nilai progress saat ini
@@ -148,10 +171,29 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
             ui_components['progress_bar'].description = f"Progress: {percentage}%"
             ui_components['progress_bar'].layout.visibility = 'visible'
         
-        # Update message jika ada
-        if message and 'current_progress' in ui_components:
-            ui_components['current_progress'].description = message
+        # Update message jika ada dan tampilkan di log
+        progress_message = message or f"Preprocessing progress: {int(progress/total*100) if total > 0 else 0}%"
+        if 'current_progress' in ui_components:
+            ui_components['current_progress'].description = message or "Processing..."
             ui_components['current_progress'].layout.visibility = 'visible'
+            
+        # Log to UI output untuk visibilitas yang lebih baik
+        if 'status' in ui_components:
+            from smartcash.ui.utils.alert_utils import create_status_indicator
+            
+            # Batasi log rate untuk mencegah flooding
+            current_time = time.time()
+            time_since_last_log = current_time - last_log_time['value']
+            is_significant_progress = progress == 0 or progress == total or (total >= 4 and progress % (total // 4) == 0)
+            
+            if time_since_last_log >= log_interval or is_significant_progress:
+                last_log_time['value'] = current_time
+                
+                with ui_components['status']:
+                    display(create_status_indicator("info", progress_message))
+                    
+                # Log juga ke logger formal
+                if logger: logger.info(f"{progress_message}")
             
         # Notify observer dengan batasan update untuk mencegah flooding log
         current_time = time.time()
@@ -167,7 +209,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
                 notify(
                     event_type=EventTopics.PREPROCESSING_PROGRESS, 
                     sender="preprocessing_handler",
-                    message=message or f"Preprocessing progress: {percentage}%",
+                    message=progress_message,
                     progress=progress,
                     total=total
                 )
@@ -189,6 +231,9 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         
         # Reset timestamp log
         last_log_time['value'] = 0
+        
+        # Log reset
+        if logger: logger.debug(f"{ICONS['refresh']} Progress bar direset")
     
     # Tambahkan fungsi progress dan register ke UI components
     ui_components.update({

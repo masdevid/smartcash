@@ -77,7 +77,15 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
     """Simpan konfigurasi preprocessing dengan penanganan persistensi yang lebih baik."""
+    logger = None
     try:
+        # Ambil logger dari lingkungan jika tersedia
+        try:
+            from smartcash.common.logger import get_logger
+            logger = get_logger("preprocessing_config")
+        except ImportError:
+            pass
+        
         # Pastikan direktori config ada
         Path(config_path).parent.mkdir(parents=True, exist_ok=True)
         
@@ -120,45 +128,69 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
                 drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
                 os.makedirs(Path(drive_config_path).parent, exist_ok=True)
                 
-                # Salin file ke Google Drive
-                import shutil
-                shutil.copy2(config_path, drive_config_path)
-        except (ImportError, AttributeError):
-            pass
+                # Cek apakah path sama untuk mencegah error
+                if os.path.abspath(config_path) == os.path.abspath(drive_config_path):
+                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
+                else:
+                    # Salin file ke Google Drive
+                    import shutil
+                    shutil.copy2(config_path, drive_config_path)
+                    if logger: logger.info(f"📤 Konfigurasi disalin ke drive: {drive_config_path}")
+        except (ImportError, AttributeError) as e:
+            if logger: logger.debug(f"ℹ️ Tidak dapat menyalin ke drive: {str(e)}")
             
         return True
     except Exception as e:
-        print(f"Error menyimpan konfigurasi: {str(e)}")
+        error_msg = f"Error menyimpan konfigurasi: {str(e)}"
+        if logger: 
+            logger.error(f"❌ {error_msg}")
+        else:
+            print(f"❌ {error_msg}")
         return False
 
 def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml") -> Dict[str, Any]:
-    """Load konfigurasi preprocessing dengan prioritas Google Drive."""    
-    # Coba load dari Google Drive terlebih dahulu
+    """Load konfigurasi preprocessing dengan prioritas Google Drive."""
+    logger = None
     try:
-        from smartcash.common.environment import get_environment_manager
-        env_manager = get_environment_manager()
-        
-        if env_manager.is_drive_mounted:
-            drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+        # Ambil logger dari lingkungan jika tersedia
+        try:
+            from smartcash.common.logger import get_logger
+            logger = get_logger("preprocessing_config")
+        except ImportError:
+            pass
             
-            if os.path.exists(drive_config_path):
-                # Salin dari Drive ke lokal untuk memastikan sinkronisasi
-                import shutil
-                os.makedirs(Path(config_path).parent, exist_ok=True)
-                shutil.copy2(drive_config_path, config_path)
-    except (ImportError, AttributeError):
-        pass
-    
-    # Load dari local file
-    try:
+        # Coba load dari Google Drive terlebih dahulu
+        try:
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager()
+            
+            if env_manager.is_drive_mounted:
+                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+                
+                if os.path.exists(drive_config_path):
+                    # Cek apakah path sama untuk mencegah error
+                    if os.path.abspath(config_path) == os.path.abspath(drive_config_path):
+                        if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
+                    else:
+                        # Salin dari Drive ke lokal untuk memastikan sinkronisasi
+                        import shutil
+                        os.makedirs(Path(config_path).parent, exist_ok=True)
+                        shutil.copy2(drive_config_path, config_path)
+                        if logger: logger.info(f"📥 Konfigurasi disalin dari drive: {drive_config_path}")
+        except (ImportError, AttributeError) as e:
+            if logger: logger.debug(f"ℹ️ Tidak dapat menyalin dari drive: {str(e)}")
+        
+        # Load dari local file
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f) or {}
+                if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path}")
                 return config
-    except Exception:
-        pass
+    except Exception as e:
+        if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
     
     # Default config jika tidak ada file
+    if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
     return {
         "preprocessing": {
             "output_dir": "data/preprocessed",

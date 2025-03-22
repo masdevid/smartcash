@@ -1,13 +1,13 @@
 """
 File: smartcash/common/environment.py
-Manajer lingkungan terpusat untuk deteksi dan konfigurasi environment aplikasi SmartCash
+Deskripsi: Manajer lingkungan terpusat untuk deteksi dan konfigurasi environment aplikasi SmartCash dengan perhitungan progres yang dioptimalkan
 """
 
 import os
 import sys
 import shutil
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple, List, Union
+from typing import Dict, Any, Optional, Tuple, List, Union, Callable
 
 class EnvironmentManager:
     """
@@ -176,12 +176,13 @@ class EnvironmentManager:
         # Fallback ke base_dir jika tidak ditemukan
         return self._base_dir
     
-    def setup_project_structure(self, use_drive: bool = False) -> Dict[str, int]:
+    def setup_project_structure(self, use_drive: bool = False, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
         Buat struktur direktori proyek SmartCash.
         
         Args:
             use_drive: Gunakan Google Drive untuk penyimpanan jika tersedia
+            progress_callback: Callback untuk menampilkan progres (current, total, message)
             
         Returns:
             Statistik pembuatan direktori
@@ -208,7 +209,13 @@ class EnvironmentManager:
             'error': 0
         }
         
-        for dir_path in directories:
+        total_dirs = len(directories)
+        
+        for idx, dir_path in enumerate(directories):
+            if progress_callback:
+                # Perhitungan progress yang benar: idx dimulai dari 0, jadi tambahkan 1 untuk menghindari progress 0%
+                progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
+                
             full_path = base / dir_path
             try:
                 if not full_path.exists():
@@ -226,10 +233,13 @@ class EnvironmentManager:
         
         return stats
     
-    def create_symlinks(self) -> Dict[str, int]:
+    def create_symlinks(self, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
         Buat symlink dari direktori lokal ke direktori Google Drive.
         
+        Args:
+            progress_callback: Callback untuk menampilkan progres (current, total, message)
+            
         Returns:
             Statistik pembuatan symlink
         """
@@ -254,7 +264,13 @@ class EnvironmentManager:
             'error': 0
         }
         
-        for local_name, target_path in symlinks.items():
+        total_symlinks = len(symlinks)
+        
+        for idx, (local_name, target_path) in enumerate(symlinks.items()):
+            if progress_callback:
+                # Perhitungan progress yang benar: idx dimulai dari 0, jadi tambahkan 1
+                progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
+                
             try:
                 local_path = self._base_dir / local_name
                 
@@ -435,13 +451,15 @@ class EnvironmentManager:
         return info
     
     def install_requirements(self, requirements_file: Optional[Union[str, Path]] = None,
-                           additional_packages: Optional[List[str]] = None) -> bool:
+                           additional_packages: Optional[List[str]] = None,
+                           progress_callback: Optional[Callable[[int, int, str], None]] = None) -> bool:
         """
         Install requirement packages menggunakan pip.
         
         Args:
             requirements_file: Path ke file requirements.txt
             additional_packages: List package tambahan untuk diinstall
+            progress_callback: Callback untuk menampilkan progres (current, total, message)
             
         Returns:
             Status keberhasilan instalasi
@@ -449,6 +467,8 @@ class EnvironmentManager:
         import subprocess
         
         success = True
+        steps_completed = 0
+        total_steps = (1 if requirements_file else 0) + (1 if additional_packages else 0)
         
         # Install dari file requirements
         if requirements_file:
@@ -456,6 +476,9 @@ class EnvironmentManager:
             if req_path.exists():
                 if self._logger:
                     self._logger.info(f"📦 Menginstall packages dari {req_path}...")
+                
+                if progress_callback:
+                    progress_callback(1, total_steps, f"Menginstall packages dari {req_path}")
                 
                 cmd = [sys.executable, "-m", "pip", "install", "-r", str(req_path)]
                 process = subprocess.run(cmd, capture_output=True, text=True)
@@ -467,6 +490,7 @@ class EnvironmentManager:
                 else:
                     if self._logger:
                         self._logger.info(f"✅ Requirements berhasil diinstall")
+                    steps_completed += 1
             else:
                 if self._logger:
                     self._logger.warning(f"⚠️ File requirements tidak ditemukan: {req_path}")
@@ -476,6 +500,9 @@ class EnvironmentManager:
         if additional_packages:
             if self._logger:
                 self._logger.info(f"📦 Menginstall package tambahan: {', '.join(additional_packages)}")
+            
+            if progress_callback:
+                progress_callback(steps_completed + 1, total_steps, f"Menginstall package tambahan")
                 
             cmd = [sys.executable, "-m", "pip", "install"] + additional_packages
             process = subprocess.run(cmd, capture_output=True, text=True)

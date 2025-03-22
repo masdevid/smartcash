@@ -113,10 +113,5 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'help_panel': help_box,
         'module_name': 'env_config'  # Tambahkan module_name untuk memudahkan setup logger
     }
-    
-    # Test log langsung ke widget untuk memastikan fungsi
-    from IPython.display import display, HTML
-    with status:
-        display(HTML("<div style='color: blue;'><strong>🚀 UI komponen environment config berhasil dibuat</strong></div>"))
-    
+
     return ui_components

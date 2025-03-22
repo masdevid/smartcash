@@ -1,320 +1,196 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Utilitas untuk logging di notebook dengan tampilan berbasis UI alerts dan penangkapan semua output logging
+Deskripsi: Utilitas logging dengan integrasi UI yang dioptimalkan dan dikompres dengan one-liner style
 """
 
 import logging
-import sys
-import io
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from IPython.display import display, HTML
+from datetime import datetime
+import sys
 
-from smartcash.ui.utils.constants import ALERT_STYLES, ICONS
+from smartcash.ui.utils.constants import COLORS, ICONS
+
+# Cache untuk handler dan logger
+_logger_cache, _handler_cache, _in_output_context = {}, {}, False
 
 class UILogHandler(logging.Handler):
-    """Custom logging handler for displaying logs in a UI output widget."""
+    """Handler logging yang terintegrasi dengan UI components."""
     
-    # Class-level constants for better performance and maintainability
-    _LEVEL_TO_STYLE: Dict[int, str] = {
-        logging.DEBUG: 'info',
-        logging.INFO: 'info',
-        logging.WARNING: 'warning',
-        logging.ERROR: 'error',
-        logging.CRITICAL: 'error'
-    }
+    def __init__(self, ui_components: Dict[str, Any], level=logging.NOTSET):
+        super().__init__(level); self.ui_components = ui_components; self.output_widget = ui_components.get('status')
     
-    _LEVEL_TO_ICON: Dict[int, str] = {
-        logging.DEBUG: ICONS.get('info', 'ℹ️'),
-        logging.INFO: ICONS.get('info', 'ℹ️'),
-        logging.WARNING: ICONS.get('warning', '⚠️'),
-        logging.ERROR: ICONS.get('error', '❌'),
-        logging.CRITICAL: ICONS.get('error', '❌')
-    }
-    
-    _IGNORED_MODULES = frozenset(['matplotlib', 'PIL', 'IPython', 'ipykernel', 'traitlets', 'ColabKernelApp'])
-
-    def __init__(self, output_widget: widgets.Output):
-        """Initialize UILogHandler with an output widget.
-
-        Args:
-            output_widget: Output widget for displaying logs
-        """
-        super().__init__(level=logging.INFO)  # Changed from DEBUG to INFO
-        self.output_widget = output_widget
-        self.setFormatter(logging.Formatter('%(message)s'))
-
-    def emit(self, record: logging.LogRecord) -> None:
-        """Display log in output widget with styled alert.
-
-        Args:
-            record: Log record to process
-        """
+    def emit(self, record):
+        global _in_output_context
+        if not self.output_widget: print(self.format(record)); return
+        if _in_output_context: return
+            
         try:
-            # Early return for ignored modules
-            if record.name in self._IGNORED_MODULES:
-                return
-                
-            # Ignore DEBUG messages completely
-            if record.levelno < logging.INFO:
-                return
-
-            style_key = self._LEVEL_TO_STYLE.get(record.levelno, 'info')
-            style = ALERT_STYLES.get(style_key, ALERT_STYLES['info'])
-            icon = self._LEVEL_TO_ICON.get(record.levelno)
-
-            # Single f-string for HTML generation
-            log_html = (
-                f'<div style="padding: 5px; margin: 2px 0; '
-                f'background-color: {style["bg_color"]}; '
-                f'color: {style["text_color"]}; '
-                f'border-left: 4px solid {style["border_color"]}; '
-                f'border-radius: 4px;">'
-                f'<span style="margin-right: 8px;">{icon}</span>'
-                f'<span>{self.format(record)}</span>'
-                f'</div>'
-            )
-
-            with self.output_widget:
-                display(HTML(log_html))
-
+            # Format log message with one-liner style
+            msg = self.format(record)
+            status_type, icon, style = ("error", ICONS.get("error", "❌"), f"color: {COLORS.get('danger', 'red')};") if record.levelno >= logging.ERROR else \
+                                       ("warning", ICONS.get("warning", "⚠️"), f"color: {COLORS.get('warning', 'orange')};") if record.levelno >= logging.WARNING else \
+                                       ("success", ICONS.get("success", "✅"), f"color: {COLORS.get('success', 'green')};") if record.levelno >= logging.INFO and "success" in record.msg.lower() else \
+                                       ("info", ICONS.get("info", "ℹ️"), f"color: {COLORS.get('info', 'blue')};") if record.levelno >= logging.INFO else \
+                                       ("debug", ICONS.get("debug", "🔍"), f"color: {COLORS.get('muted', 'gray')};")
+            
+            # Format and display with one-liner approach
+            _in_output_context = True
+            try:
+                with self.output_widget: display(HTML(f"<span style='color: gray;'>[{datetime.now().strftime('%H:%M:%S')}]</span> <span style='{style}'>{msg}</span>"))
+            finally: _in_output_context = False
+            
+            # Update status panel for important levels
+            if status_type in ['error', 'warning', 'success']: self._update_status_panel(msg, status_type)
+            self._notify_observer(msg, status_type, record)
         except Exception as e:
-            print(f"Error in UILogHandler: {str(e)}")
-            super().emit(record)
+            print(f"Error dalam UILogHandler: {str(e)}"); print(f"Original message: {record.msg}")
+    
+    def _update_status_panel(self, message: str, status_type: str):
+        """Update status panel jika tersedia."""
+        if 'status_panel' in self.ui_components:
+            try: 
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                self.ui_components['status_panel'].value = create_info_alert(message, status_type).value
+            except ImportError: pass
+    
+    def _notify_observer(self, message: str, status_type: str, record: logging.LogRecord):
+        """Notify observer jika tersedia."""
+        try:
+            if 'observer_manager' in self.ui_components:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                
+                # One-liner event type mapping
+                event_type = getattr(EventTopics, f"LOG_{status_type.upper()}", EventTopics.LOG_INFO)
+                
+                notify(event_type=event_type, sender=record.name, message=message, 
+                       status=status_type, level=record.levelname, logger=record.name)
+        except (ImportError, AttributeError): pass
 
 class UILogger(logging.Logger):
-    """Logger khusus dengan metode yang disesuaikan untuk alerts styling."""
+    """Logger dengan metode tambahan untuk keperluan UI."""
+    
+    def __init__(self, name, level=logging.NOTSET):
+        super().__init__(name, level); self._ui_components = None
+    
+    def set_ui_components(self, ui_components: Dict[str, Any]):
+        """Set UI components untuk logger."""
+        self._ui_components = ui_components
     
     def success(self, msg, *args, **kwargs):
-        """
-        Log dengan level INFO tapi dengan style success.
-        
-        Args:
-            msg: Pesan log
-            *args, **kwargs: Argumen tambahan
-        """
-        if self.isEnabledFor(logging.INFO):
-            # Tambahkan emoji success jika belum ada
-            if not any(emoji in msg for emoji in ['✅', '✓', '🎉']):
-                msg = f"✅ {msg}"
-            self._log(logging.INFO, msg, args, **kwargs)
+        """Log message dengan level SUCCESS."""
+        self.info(f"✅ {msg}" if not any(icon in str(msg) for icon in ["✅", "👍", "🎉"]) else msg, *args, **kwargs)
 
-def redirect_all_logging(output_widget: widgets.Output) -> List[logging.Handler]:
-    """
-    Redirect semua output logging Python ke widget output.
-    
-    Args:
-        output_widget: Widget output untuk menampilkan log
-        
-    Returns:
-        List handler yang telah ditambahkan
-    """
-    # Simpan referensi ke root logger dan handler yang telah ditambahkan
-    root_logger = logging.getLogger()
-    added_handlers = []
-    
-    # Hapus semua handler yang sudah ada
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
-    
-    # Buat dan tambahkan UI handler ke root logger
-    ui_handler = UILogHandler(output_widget)
-    root_logger.addHandler(ui_handler)
-    added_handlers.append(ui_handler)
-    
-    # Set level root logger ke INFO, bukan DEBUG
-    root_logger.setLevel(logging.INFO)
-    
-    # Mute logging dari beberapa modul tertentu
-    for name in ['ColabKernelApp', 'ipykernel', 'matplotlib']:
-        logging.getLogger(name).setLevel(logging.WARNING)
-    
-    # Hentikan propagasi untuk semua logger yang sudah ada
-    for name in logging.root.manager.loggerDict:
-        logger = logging.getLogger(name)
-        logger.propagate = False
-    
-    return added_handlers
+    def get_ui_components(self) -> Dict[str, Any]:
+        """Dapatkan UI components untuk logger ini."""
+        return self._ui_components
 
-def setup_ipython_logging(
-    ui_components: Dict[str, Any],
-    logger_name: str = 'ui_logger',
-    log_level: int = logging.INFO,  # Changed from logging.DEBUG to logging.INFO
-    clear_existing_handlers: bool = True,
-    redirect_root: bool = True
-) -> Optional[logging.Logger]:
-    """
-    Setup logger untuk notebook dengan output ke widget.
+def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO) -> Optional[UILogger]:
+    """Setup logging IPython dengan integrasi UI."""
+    global _logger_cache, _handler_cache
     
-    Args:
-        ui_components: Dictionary berisi widget UI
-        logger_name: Nama logger
-        log_level: Level logging (default INFO, bukan DEBUG)
-        clear_existing_handlers: Hapus handler yang sudah ada
-        redirect_root: Redirect juga root logger ke widget output
-        
-    Returns:
-        Logger instance atau None jika gagal
-    """
-    # Register custom logger class
+    # Pastikan module_name dan logger_name
+    module_name = module_name or ui_components.get('module_name', 'smartcash')
+    logger_name = f"smartcash.{module_name}"
+    
+    # One-liner cache check and return
+    if logger_name in _logger_cache: 
+        logger = _logger_cache[logger_name]
+        if isinstance(logger, UILogger): logger.set_ui_components(ui_components)
+        return logger
+    
+    # Setup logger dengan one-liner
     logging.setLoggerClass(UILogger)
+    logger = logging.getLogger(logger_name); logger.setLevel(log_level)
     
-    # Dapatkan output widget
-    output_widget = None
-    for key in ['status', 'log_output', 'output']:
-        if key in ui_components and isinstance(ui_components[key], widgets.Output):
-            output_widget = ui_components[key]
-            break
+    # Pastikan output widget tersedia dengan one-liner
+    if 'status' not in ui_components or not ui_components['status']:
+        ui_components['status'] = widgets.Output(layout=widgets.Layout(width='100%', border='1px solid #ddd', 
+                                                                       min_height='100px', max_height='300px', 
+                                                                       margin='10px 0', padding='10px', overflow='auto'))
     
-    if not output_widget:
-        return None
+    # Handler creation and setup with one-liner
+    output_widget = ui_components['status']
+    handler_key = id(output_widget)
     
-    # Setup logger module-level
-    logger = logging.getLogger(logger_name)
+    if handler_key not in _handler_cache:
+        handler = UILogHandler(ui_components, level=log_level)
+        handler.setFormatter(logging.Formatter('%(message)s'))
+        _handler_cache[handler_key] = handler
+    else:
+        handler = _handler_cache[handler_key]; handler.ui_components = ui_components
     
-    # Pastikan level minimal INFO, bukan DEBUG
-    log_level = max(log_level, logging.INFO)
-    logger.setLevel(log_level)
+    # Handler management with one-liner
+    [logger.removeHandler(h) for h in logger.handlers[:] if isinstance(h, UILogHandler)]
+    logger.addHandler(handler)
     
-    # Hapus handler existing jika perlu
-    if clear_existing_handlers:
-        logger.handlers = []
-    
-    # Tambahkan UI handler
-    ui_handler = UILogHandler(output_widget)
-    ui_handler.setLevel(log_level)
-    logger.addHandler(ui_handler)
-    
-    # Nonaktifkan propagasi ke root logger agar tidak muncul di console
-    logger.propagate = False
-    
-    # Hapus semua handler console dari logging module untuk memastikan tidak ada log yang muncul di console
-    if redirect_root:
-        # Hapus handler lama dari root logger
-        root_logger = logging.getLogger()
-        for handler in root_logger.handlers[:]:
-            if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
-                root_logger.removeHandler(handler)
-        
-        # Redirect root logger ke UI widget dengan level INFO
-        root_handlers = redirect_all_logging(output_widget)
-        ui_components['root_log_handlers'] = root_handlers
+    # Set UI components and cache
+    if isinstance(logger, UILogger): logger.set_ui_components(ui_components)
+    _logger_cache[logger_name] = logger
     
     return logger
+
+def create_dummy_logger():
+    """Buat logger dummy untuk fallback."""
+    logger = logging.getLogger('dummy_logger'); logger.setLevel(logging.INFO)
+    [logger.removeHandler(h) for h in logger.handlers[:]]; handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s')); logger.addHandler(handler)
+    if not hasattr(logger, 'success'): logger.success = lambda msg, *args, **kwargs: logger.info(f"✅ {msg}", *args, **kwargs)
+    return logger
+
+def log_to_ui(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
+    """Log message ke UI components dengan style yang sesuai."""
+    global _in_output_context
+    
+    # Exit early if no output widget
+    output_widget = ui_components.get('status')
+    if not output_widget: print(message); return
+    
+    # One-liner style and icon
+    style = f"color: {COLORS.get('danger' if status_type == 'error' else 'warning' if status_type == 'warning' else 'success' if status_type == 'success' else 'info' if status_type == 'info' else 'muted', 'gray')};"
+    icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
+    
+    # One-liner icon check and add
+    icon_values = [ICONS.get(t, "") for t in ["error", "warning", "success", "info", "debug"]]
+    message = f"{icon} {message}" if not any(i in message for i in icon_values if i) else message
+    
+    # Display with one-liner context management
+    _in_output_context = True
+    try: 
+        with output_widget: display(HTML(f"<span style='color: gray;'>[{datetime.now().strftime('%H:%M:%S')}]</span> <span style='{style}'>{message}</span>"))
+    finally: _in_output_context = False
+    
+    # One-liner status panel update
+    if status_type in ['error', 'warning', 'success'] and 'status_panel' in ui_components:
+        try: 
+            from smartcash.ui.utils.alert_utils import create_info_alert
+            ui_components['status_panel'].value = create_info_alert(message, status_type).value
+        except ImportError: pass
+
+def alert_to_ui(ui_components: Dict[str, Any], title: str, message: str, status_type: str = "info") -> None:
+    """Tampilkan alert ke UI components dengan style yang sesuai."""
+    try:
+        from smartcash.ui.utils.alert_utils import create_info_alert
+        output_widget = ui_components.get('status')
+        content = f"<strong>{title}</strong><br>{message}"
+        
+        # One-liner display and update
+        if output_widget:
+            with output_widget: display(create_info_alert(content, status_type))
+            if 'status_panel' in ui_components: ui_components['status_panel'].value = create_info_alert(content, status_type).value
+        else: print(f"{title}: {message}")
+    except ImportError: print(f"{title}: {message}")
 
 def reset_logging():
-    """
-    Reset konfigurasi logging ke default (untuk testing atau reset).
-    """
-    # Reset root logger
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers[:]:
-        root_logger.removeHandler(handler)
+    """Reset semua konfigurasi logging ke default."""
+    global _logger_cache, _handler_cache, _in_output_context
     
-    # Tambahkan kembali handler ke console
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(logging.Formatter('%(levelname)s:%(name)s:%(message)s'))
-    console_handler.setLevel(logging.INFO)  # Gunakan level INFO, bukan WARNING
-    root_logger.addHandler(console_handler)
-    root_logger.setLevel(logging.INFO)  # Default level INFO
+    # Reset with one-liner
+    [logger.removeHandler(h) for logger_name in _logger_cache for h in logging.getLogger(logger_name).handlers[:] if isinstance(h, UILogHandler)]
+    _logger_cache, _handler_cache, _in_output_context = {}, {}, False
     
-    # Reset propagation untuk semua logger
-    for name in logging.root.manager.loggerDict:
-        # Untuk logger yang tidak perlu debug, set ke level WARNING
-        if name in ['ColabKernelApp', 'ipykernel', 'matplotlib', 'torch']:
-            logging.getLogger(name).setLevel(logging.WARNING)
-        else:
-            logging.getLogger(name).setLevel(logging.INFO)
-            logging.getLogger(name).propagate = True
-
-def create_dummy_logger() -> logging.Logger:
-    """
-    Buat dummy logger yang tidak melakukan output.
-    
-    Returns:
-        Logger instance
-    """
-    logger = logging.getLogger('dummy_logger')
-    logger.handlers = []
-    logger.addHandler(logging.NullHandler())
-    logger.propagate = False
-    logger.setLevel(logging.INFO)  # Changed from default to INFO
-    
-    return logger
-
-def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
-    """
-    Log messages directly to UI without a logger.
-
-    Args:
-        ui_components: Dictionary containing UI widgets
-        message: Message to display
-        level: Log level ('info', 'success', 'warning', 'error')
-    """
-    # Ignore if level is DEBUG
-    if level == 'debug':
-        return
-        
-    # Find output widget efficiently
-    output_widget = next(
-        (ui_components[key] for key in ('status', 'log_output', 'output')
-         if key in ui_components and isinstance(ui_components[key], widgets.Output)),
-        None
-    )
-    
-    if not output_widget:
-        return
-
-    # Get style and icon with fallback to 'info'
-    style = ALERT_STYLES.get(level, ALERT_STYLES['info'])
-    icon = style.get('icon', ICONS.get(level, ICONS['info']))
-
-    # Display using context manager
-    with output_widget:
-        from smartcash.ui.utils.alert_utils import create_info_log
-        display(create_info_log(message, level, icon))
-
-def alert_to_ui(ui_components: Dict[str, Any], message: str, level: str = 'info') -> None:
-    """
-    Alert messages directly to UI without a logger.
-
-    Args:
-        ui_components: Dictionary containing UI widgets
-        message: Message to display
-        level: Log level ('info', 'success', 'warning', 'error')
-    """
-    # Ignore if level is DEBUG
-    if level == 'debug':
-        return
-        
-    # Find output widget efficiently
-    output_widget = next(
-        (ui_components[key] for key in ('status', 'log_output', 'output')
-         if key in ui_components and isinstance(ui_components[key], widgets.Output)),
-        None
-    )
-    
-    if not output_widget:
-        return
-
-    # Get style and icon with fallback to 'info'
-    style = ALERT_STYLES.get(level, ALERT_STYLES['info'])
-    icon = style.get('icon', ICONS.get(level, ICONS['info']))
-
-    # Display using context manager
-    with output_widget:
-        from smartcash.ui.utils.alert_utils import create_info_alert
-        display(create_info_alert(message, level, icon))
-
-# Decorator untuk try-except pada handler
-def try_except_decorator(handler_func):
-    def wrapper(b):
-        try:
-            return handler_func(b)
-        except Exception as e:
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            with ui_components['status']:
-                display(create_status_indicator('error', f"❌ Error: {str(e)}"))
-            if 'logger' in ui_components and ui_components['logger']:
-                ui_components['logger'].error(f"❌ Error dalam handler: {str(e)}")
-    return wrapper
+    # Reset default config
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                       handlers=[logging.StreamHandler(sys.stdout)])

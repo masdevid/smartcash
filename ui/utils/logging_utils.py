@@ -1,12 +1,11 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Utilitas logging dengan integrasi UI yang dioptimalkan dan thread-safe untuk menghindari masalah konkurensi
+Deskripsi: Utilitas logging dengan integrasi UI yang dioptimalkan untuk menampilkan logs dalam widget output
 """
 
 import logging
 import sys
 import io
-import threading
 from typing import Dict, Any, Optional, List, Set
 from datetime import datetime
 import ipywidgets as widgets
@@ -18,7 +17,6 @@ from smartcash.ui.utils.constants import COLORS, ICONS, ALERT_STYLES
 _root_handlers = []
 _registered_loggers = set()
 _handler_cache = {}
-_output_lock = threading.RLock()
 
 class UILogHandler(logging.Handler):
     """Handler logging yang terintegrasi dengan UI components."""
@@ -91,10 +89,9 @@ class UILogHandler(logging.Handler):
             </div>
             """
             
-            # Gunakan with-lock untuk memastikan thread-safety
-            with _output_lock:
-                with self.output_widget:
-                    display(HTML(log_html))
+            # Display di output widget
+            with self.output_widget:
+                display(HTML(log_html))
             
             # Update status panel untuk level penting
             if record.levelno >= logging.WARNING or ('success' in msg.lower() and record.levelno == logging.INFO):

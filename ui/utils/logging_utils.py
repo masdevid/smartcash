@@ -4,18 +4,18 @@ Deskripsi: Utilitas logging dengan integrasi UI yang dioptimalkan dan mekanisme 
 """
 
 import logging
-from typing import Dict, Any, Optional
-import ipywidgets as widgets
-from IPython.display import display, HTML
-from datetime import datetime
 import sys
 import threading
+from typing import Dict, Any, Optional
+from datetime import datetime
+from IPython.display import display, HTML
 
 from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
+from smartcash.ui.handlers.error_handler import handle_ui_error, show_ui_message
 
-# Cache untuk handler dan logger
-_logger_cache = {}
-_handler_cache = {}
+# Cache untuk handler dan logger dengan thread-safety
+_logger_cache, _handler_cache = {}, {}
 _output_lock = threading.RLock()
 _in_output_context = False
 
@@ -36,37 +36,33 @@ class UILogHandler(logging.Handler):
             return
             
         # Hindari rekursi infinite jika pemanggilan dalam konteks output
-        if _in_output_context:
-            return
+        if _in_output_context: return
             
         try:
             # Format log message dengan styling yang konsisten
             msg = self.format(record)
             
             # One-liner style mapping untuk status dan icon
-            status_type = "error" if record.levelno >= logging.ERROR else \
-                         "warning" if record.levelno >= logging.WARNING else \
-                         "success" if record.levelno >= logging.INFO and "success" in record.msg.lower() else \
-                         "info" if record.levelno >= logging.INFO else "debug"
-            
-            icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
-            style = f"color: {COLORS.get('danger' if status_type == 'error' else 'warning' if status_type == 'warning' else 'success' if status_type == 'success' else 'info' if status_type == 'info' else 'muted', 'gray')};"
+            status_type = "error" if record.levelno >= logging.ERROR else "warning" if record.levelno >= logging.WARNING else "success" if record.levelno >= logging.INFO and "success" in record.msg.lower() else "info" if record.levelno >= logging.INFO else "debug"
             
             # Format dan display dengan thread-safe approach
             with _output_lock:
                 _in_output_context = True
                 try:
-                    # Pastikan Output widget sudah diinisialisasi sebelum menggunakan with
                     if hasattr(self.output_widget, 'clear_output'):
                         with self.output_widget:
-                            display(HTML(f"<span style='color: gray;'>[{datetime.now().strftime('%H:%M:%S')}]</span> <span style='{style}'>{msg}</span>"))
+                            # Gunakan komponen dari handlers yang sudah ada
+                            display(create_status_indicator(status_type, msg))
                     else:
+                        # Fallback dengan print jika widget tidak ada
+                        icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
                         print(f"[{datetime.now().strftime('%H:%M:%S')}] {icon} {msg}")
                 finally:
                     _in_output_context = False
             
-            # Update status panel untuk level penting
+            # Update status panel untuk level penting menggunakan komponen dari handlers
             if status_type in ['error', 'warning', 'success']:
+                show_ui_message(msg, status_type, None)
                 self._update_status_panel(msg, status_type)
                 
             # Notify observer jika event penting
@@ -77,36 +73,25 @@ class UILogHandler(logging.Handler):
             print(f"Original message: {record.msg}")
     
     def _update_status_panel(self, message: str, status_type: str):
-        """Update status panel jika tersedia dengan error handling."""
+        """Update status panel jika tersedia dengan komponen UI utils."""
         if 'status_panel' in self.ui_components:
             try:
-                from smartcash.ui.utils.alert_utils import create_info_alert
-                # Gunakan status panel dari ui_components, bukan fungsi
+                # Gunakan komponen dari ui_utils yang sudah ada
                 self.ui_components['status_panel'].value = create_info_alert(message, status_type).value
-            except (ImportError, Exception) as e:
-                print(f"Error updating status panel: {str(e)}")
+            except Exception:
+                pass
     
     def _notify_observer(self, message: str, status_type: str, record: logging.LogRecord):
-        """Notify observer jika tersedia dengan error handling."""
+        """Notify observer jika tersedia dengan integrasi observer_handler."""
         try:
             if 'observer_manager' in self.ui_components:
                 from smartcash.components.observer import notify
                 from smartcash.components.observer.event_topics_observer import EventTopics
                 
-                # Event type mapping
-                event_type_name = f"LOG_{status_type.upper()}"
-                event_type = getattr(EventTopics, event_type_name, EventTopics.LOG_INFO)
-                
-                notify(
-                    event_type=event_type,
-                    sender=record.name,
-                    message=message,
-                    status=status_type,
-                    level=record.levelname,
-                    logger=record.name
-                )
+                # Event type mapping one-liner
+                event_type = getattr(EventTopics, f"LOG_{status_type.upper()}", EventTopics.LOG_INFO)
+                notify(event_type=event_type, sender=record.name, message=message, status=status_type, level=record.levelname, logger=record.name)
         except (ImportError, AttributeError, Exception):
-            # Diam-diam gagal, jangan crash aplikasi
             pass
 
 class UILogger(logging.Logger):
@@ -122,33 +107,29 @@ class UILogger(logging.Logger):
     
     def success(self, msg, *args, **kwargs):
         """Log message dengan level SUCCESS."""
-        if not any(icon in str(msg) for icon in ["✅", "👍", "🎉"]):
-            msg = f"✅ {msg}"
+        if not any(icon in str(msg) for icon in ["✅", "👍", "🎉"]): msg = f"✅ {msg}"
         self.info(msg, *args, **kwargs)
 
     def get_ui_components(self) -> Dict[str, Any]:
         """Dapatkan UI components untuk logger ini."""
         return self._ui_components
+
 def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO) -> Optional[UILogger]:
     """Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe."""
     global _logger_cache, _handler_cache
     
     try:
-        # Pastikan ui_components valid
-        if not ui_components:
-            print(f"Warning: ui_components tidak valid untuk setup logging")
-            return create_dummy_logger()
+        # Validasi input dan return dummy logger jika tidak valid
+        if not ui_components: return create_dummy_logger()
             
-        # Pastikan module_name dan logger_name valid
+        # Normalkan nama module dan logger
         module_name = module_name or ui_components.get('module_name', 'smartcash')
         logger_name = f"smartcash.{module_name}"
         
-        # Cache check untuk efisiensi
+        # Cache lookup untuk efisiensi
         if logger_name in _logger_cache:
             logger = _logger_cache[logger_name]
-            # Update UI components jika logger mendukungnya
-            if isinstance(logger, UILogger):
-                logger.set_ui_components(ui_components)
+            if isinstance(logger, UILogger): logger.set_ui_components(ui_components)
             return logger
         
         # Setup logger dengan UILogger class
@@ -156,58 +137,50 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None
         logger = logging.getLogger(logger_name)
         logger.setLevel(log_level)
         
-        # Pastikan output widget tersedia dengan fallback creation
+        # Pastikan output widget tersedia dengan menggunakan handler_utils
         if 'status' not in ui_components or not ui_components['status']:
+            from smartcash.ui.handlers.error_handler import get_ui_component
+            from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
+            
+            # Create output widget dengan layout standar
             import ipywidgets as widgets
-            ui_components['status'] = widgets.Output(
-                layout=widgets.Layout(
-                    width='100%',
-                    border='1px solid #ddd',
-                    min_height='100px',
-                    max_height='300px',
-                    margin='10px 0',
-                    padding='10px',
-                    overflow='auto'
-                )
-            )
+            ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
+            
             # Tampilkan pesan untuk memastikan output widget terlihat
-            from IPython.display import display, HTML
             with ui_components['status']:
-                display(HTML(f"<div style='color: blue;'><strong>🚀 Widget output untuk logging dibuat</strong></div>"))
+                display(create_status_indicator('info', "🚀 Widget output untuk logging dibuat"))
         
-        # Handler creation and setup with caching
+        # Handler creation and setup with thread-safe caching
         output_widget = ui_components['status']
         handler_key = id(output_widget)
         
-        if handler_key not in _handler_cache:
-            handler = UILogHandler(ui_components, level=log_level)
-            handler.setFormatter(logging.Formatter('%(message)s'))
-            _handler_cache[handler_key] = handler
-        else:
-            handler = _handler_cache[handler_key]
-            # Update UI components reference untuk memastikan handler terupdate
-            handler.ui_components = ui_components
+        with _output_lock:
+            if handler_key not in _handler_cache:
+                handler = UILogHandler(ui_components, level=log_level)
+                handler.setFormatter(logging.Formatter('%(message)s'))
+                _handler_cache[handler_key] = handler
+            else:
+                handler = _handler_cache[handler_key]
+                handler.ui_components = ui_components
+            
+            # Remove handler lama dengan tipe yang sama untuk mencegah duplikasi
+            for h in logger.handlers[:]:
+                if isinstance(h, UILogHandler): logger.removeHandler(h)
+            
+            # Add handler dan kirim pesan test
+            logger.addHandler(handler)
         
-        # Remove any existing handlers dengan tipe yang sama untuk mencegah duplikasi
-        for h in logger.handlers[:]:
-            if isinstance(h, UILogHandler):
-                logger.removeHandler(h)
-        
-        # Add the handler dan kirim pesan test untuk memastikan visibilitas
-        logger.addHandler(handler)
+        # Set UI components reference dan kirim test log
+        if isinstance(logger, UILogger): logger.set_ui_components(ui_components)
         logger.info(f"🔄 Logger {logger_name} siap digunakan")
-        
-        # Set UI components reference untuk UILogger
-        if isinstance(logger, UILogger):
-            logger.set_ui_components(ui_components)
             
         # Cache logger untuk penggunaan berikutnya
         _logger_cache[logger_name] = logger
         
         return logger
     except Exception as e:
+        # Fallback ke dummy logger dengan error handling
         print(f"Error during setup_ipython_logging: {str(e)}")
-        # Return a fallback logger to prevent crashes
         return create_dummy_logger()
 
 def create_dummy_logger():
@@ -216,80 +189,45 @@ def create_dummy_logger():
     logger.setLevel(logging.INFO)
     
     # Reset handlers untuk menghindari duplikasi
-    for h in logger.handlers[:]:
-        logger.removeHandler(h)
+    for h in logger.handlers[:]: logger.removeHandler(h)
         
-    # Tambahkan handler baru
+    # Tambahkan handler baru dan success method
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(logging.Formatter('%(levelname)s - %(message)s'))
     logger.addHandler(handler)
     
-    # Tambah metode success jika belum ada
-    if not hasattr(logger, 'success'):
-        setattr(logger, 'success', lambda msg, *args, **kwargs: logger.info(f"✅ {msg}", *args, **kwargs))
+    # Add success method dalam satu line
+    if not hasattr(logger, 'success'): setattr(logger, 'success', lambda msg, *args, **kwargs: logger.info(f"✅ {msg}", *args, **kwargs))
     
     return logger
+
 def log_to_ui(ui_components: Dict[str, Any], message: str, status_type: str = "info") -> None:
-    """Log message ke UI components dengan style yang sesuai dan penanganan error yang lebih baik."""
-    global _in_output_context
+    """Log message ke UI components dengan komponen handlers/utils terintegrasi."""
+    # Early exit untuk invalid input
+    if not ui_components: return print(message)
     
-    # Exit early if no ui_components
-    if not ui_components:
-        print(message)
-        return
-    
-    # Get output widget with safe fallback
+    # Gunakan show_ui_message dari handler terintegrasi jika ada
     output_widget = ui_components.get('status')
-    if not output_widget:
-        print(message)
-        return
+    if output_widget:
+        show_ui_message(message, status_type, output_widget)
+    else:
+        # Fallback ke print
+        icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] {icon} {message}")
     
-    # Thread-safe styling dan icon mapping
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    style = f"color: {COLORS.get('danger' if status_type == 'error' else 'warning' if status_type == 'warning' else 'success' if status_type == 'success' else 'info' if status_type == 'info' else 'muted', 'gray')};"
-    icon = ICONS.get(status_type, ICONS.get("info", "ℹ️"))
-    
-    # Cek dan tambahkan icon jika belum ada
-    icon_values = [ICONS.get(t, "") for t in ["error", "warning", "success", "info", "debug"]]
-    if not any(i in message for i in icon_values if i):
-        message = f"{icon} {message}"
-    
-    # Display dengan thread-safe context management
-    with _output_lock:
-        _in_output_context = True
+    # Update status panel jika ada
+    if 'status_panel' in ui_components:
         try:
-            # Gunakan display(HTML()) untuk memastikan rendering yang konsisten
-            from IPython.display import display, HTML, clear_output
-            
-            # Pastikan Output widget valid dan memiliki metode yang diperlukan
-            if hasattr(output_widget, 'clear_output'):
-                with output_widget:
-                    # Gunakan HTML untuk memastikan formatting konsisten
-                    display(HTML(f"<span style='color: gray;'>[{datetime.now().strftime('%H:%M:%S')}]</span> <span style='{style}'>{message}</span>"))
-            else:
-                # Fallback dengan print
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
-        except Exception as e:
-            # Fallback ke print jika terjadi error
-            print(f"Error logging to UI: {str(e)}")
-            print(f"Original message: {message}")
-        finally:
-            _in_output_context = False
-    
-    # Update status panel jika diperlukan
-    if status_type in ['error', 'warning', 'success'] and 'status_panel' in ui_components:
-        try:
-            from smartcash.ui.utils.alert_utils import create_info_alert
             ui_components['status_panel'].value = create_info_alert(message, status_type).value
         except Exception:
             pass
 
 def alert_to_ui(ui_components: Dict[str, Any], title: str, message: str, status_type: str = "info") -> None:
-    """Tampilkan alert ke UI components dengan style yang sesuai."""
+    """Tampilkan alert ke UI components dengan komponen handlers/utils terintegrasi."""
     try:
-        from smartcash.ui.utils.alert_utils import create_info_alert
-        output_widget = ui_components.get('status')
+        # Gunakan komponen dari utils yang sudah ada
         content = f"<strong>{title}</strong><br>{message}"
+        output_widget = ui_components.get('status')
         
         # Display dan update dengan error handling
         if output_widget and hasattr(output_widget, 'clear_output'):
@@ -301,30 +239,23 @@ def alert_to_ui(ui_components: Dict[str, Any], title: str, message: str, status_
                 ui_components['status_panel'].value = create_info_alert(content, status_type).value
         else:
             print(f"{title}: {message}")
-    except (ImportError, Exception) as e:
+    except Exception:
         print(f"{title}: {message}")
-        print(f"Error displaying alert: {str(e)}")
 
 def reset_logging():
     """Reset semua konfigurasi logging ke default dengan thread safety."""
     global _logger_cache, _handler_cache, _in_output_context
     
     with _output_lock:
-        # Hapus semua UILogHandler
+        # Hapus semua UILogHandler dan reset caches dalam satu loop
         for logger_name in _logger_cache:
             logger = logging.getLogger(logger_name)
             for h in logger.handlers[:]:
-                if isinstance(h, UILogHandler):
-                    logger.removeHandler(h)
+                if isinstance(h, UILogHandler): logger.removeHandler(h)
         
-        # Reset caches
-        _logger_cache = {}
-        _handler_cache = {}
-        _in_output_context = False
+        # Reset caches dan status
+        _logger_cache, _handler_cache, _in_output_context = {}, {}, False
     
     # Reset default config
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
-    )
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', 
+                      handlers=[logging.StreamHandler(sys.stdout)])

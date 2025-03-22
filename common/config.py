@@ -145,26 +145,49 @@ class ConfigManager:
         raise KeyError(f"Tidak ada implementasi terdaftar untuk {interface_type.__name__}")
 
     def sync_with_drive_enhanced(self, config_file: str, sync_strategy: str = 'drive_priority', backup: bool = True) -> Tuple[bool, str, Dict[str, Any]]:
-        """Sinkronisasi file konfigurasi dengan Google Drive menggunakan strategi yang ditingkatkan."""
-        try:
-            from smartcash.common.config_sync import sync_config_with_drive
-            logger = None; 
-            try: 
-                from smartcash.common.logger import get_logger; logger = get_logger("config_manager")
-            except ImportError: pass
+        """
+        Sinkronisasi file konfigurasi dengan Google Drive menggunakan strategi yang ditingkatkan.
+        
+        Args:
+            config_file: Path ke file konfigurasi
+            sync_strategy: Strategi sinkronisasi ('merge', 'drive_priority', 'local_priority')
+            backup: Buat backup sebelum mengganti file (Boolean value, bukan callable)
             
-            # Panggil fungsi sinkronisasi yang ditingkatkan
+        Returns:
+            Tuple (success, message, merged_config)
+        """
+        try:
+            # Import modul config_sync dengan penanganan yang lebih baik
+            try:
+                from smartcash.common.config_sync import sync_config_with_drive
+            except ImportError:
+                # Fallback jika modul belum tersedia
+                return False, "❌ Module config_sync tidak tersedia", {}
+                
+            logger = None
+            try: 
+                from smartcash.common.logger import get_logger
+                logger = get_logger("config_manager")
+            except ImportError:
+                pass
+            
+            # Panggil fungsi sinkronisasi dengan backup sebagai parameter boolean, bukan callable
             success, message, merged_config = sync_config_with_drive(
-                config_file=config_file, sync_strategy=sync_strategy, create_backup=backup, logger=logger
+                config_file=config_file, 
+                sync_strategy=sync_strategy, 
+                create_backup=backup, 
+                logger=logger
             )
             
             # Update config saat ini jika sukses
-            if success and merged_config: self.config = merged_config
+            if success and merged_config:
+                self.config = merged_config
             return success, message, merged_config
             
         except Exception as e:
             error_msg = f"❌ Error saat sinkronisasi konfigurasi: {str(e)}"
-            if hasattr(self, '_logger') and self._logger: self._logger.error(error_msg)
+            if hasattr(self, '_logger') and self._logger:
+                self._logger.error(error_msg)
             return False, error_msg, {}
 
     def use_drive_as_source_of_truth(self) -> bool:

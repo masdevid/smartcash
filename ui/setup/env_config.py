@@ -1,104 +1,96 @@
 """
 File: smartcash/ui/setup/env_config.py
-Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan perbaikan integrasi logging
+Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan fallback terpusat
 """
 
 from typing import Dict, Any
-from IPython.display import display, HTML
+from IPython.display import display
 
 def setup_environment_config():
-    """Koordinator utama setup dan konfigurasi environment dengan integrasi logging yang ditingkatkan"""
+    """Koordinator utama setup dan konfigurasi environment dengan integrasi fallback_utils"""
+    # Inisialisasi ui_components dengan nilai default
+    ui_components = {'status': None, 'module_name': 'env_config'}
+    
     try:
-        # Import komponen dengan pendekatan konsolidasi
+        # Import modul dengan pendekatan konsolidasi
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
         from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
+        from smartcash.ui.utils.fallback_utils import try_operation, create_fallback_ui
 
-        # Setup environment dan load config
-        cell_name = "env_config"
-        env, config = setup_notebook_environment(cell_name)
-        
-        # Buat komponen UI dengan utils terstandarisasi
+        # Setup environment dan komponen UI
+        env, config = setup_notebook_environment("env_config")
         ui_components = create_env_config_ui(env, config)
         
-        # Kirim pesan log awal untuk konfirmasi visibilitas
-        if 'status' in ui_components:
-            log_to_ui(ui_components, "🚀 Inisialisasi environment config dimulai", "info")
+        # Buat fallback UI jika diperlukan
+        if 'ui' not in ui_components: ui_components = create_fallback_ui(ui_components, "Membuat fallback UI", "info")
         
-        # Setup logging dengan integrasi UI
-        logger = setup_ipython_logging(ui_components, cell_name)
-        if logger:
-            ui_components['logger'] = logger
-            logger.info("✅ Logger environment config berhasil diinisialisasi")
+        # Setup logging dan log inisialisasi
+        if 'status' in ui_components: log_to_ui(ui_components, "🚀 Inisialisasi environment config dimulai", "info")
+        logger = setup_ipython_logging(ui_components, "env_config")
+        if logger: ui_components['logger'] = logger; logger.info("✅ Logger environment config berhasil diinisialisasi")
         
-        # Pastikan konfigurasi default tersedia
-        try:
-            from smartcash.common.default_config import ensure_all_configs_exist
-            success = ensure_all_configs_exist()
-            if logger:
-                if success: logger.info("✅ Konfigurasi default berhasil diverifikasi")
-                else: logger.info("ℹ️ Konfigurasi default sudah ada")
-        except ImportError as e:
-            if logger: logger.warning(f"⚠️ Module default_config tidak tersedia: {str(e)}")
+        # Jalankan operasi konfigurasi dengan error handling yang ditingkatkan
+        try_operation(lambda: ensure_default_configs(logger), logger, "verifikasi konfigurasi default", ui_components)
+        try_operation(lambda: sync_configs_with_drive(logger), logger, "sinkronisasi Drive", ui_components)
         
-        # Inisialisasi Drive sync menggunakan modul terpisah
-        try:
-            from smartcash.ui.setup.drive_sync_initializer import initialize_drive_sync
-            initialize_drive_sync(ui_components)
-            if logger: logger.info("🔄 Drive sync berhasil diinisialisasi")
-        except ImportError as e:
-            if logger: logger.warning(f"⚠️ Module drive_sync_initializer tidak tersedia: {str(e)}")
-
-        # Setup handlers untuk UI
+        # Setup handlers dan cleanup
         ui_components = setup_env_config_handlers(ui_components, env, config)
-        if logger: logger.info("🚀 Handlers environment config berhasil disetup")
+        register_cleanup(ui_components, logger)
         
-        # Cleanup function untuk dijalankan saat cell di-reset
-        def cleanup_resources():
-            """Clean up resources properly."""
-            # Unregister observer group jika ada
-            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
-                try:
-                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
-                except Exception as e:
-                    if logger: logger.debug(f"⚠️ Error saat unregister observer: {str(e)}")
-            
-            # Kembalikan logging ke default
-            from smartcash.ui.utils.logging_utils import reset_logging
-            reset_logging()
-            
-            if logger: logger.debug("🧹 Environment config resources cleaned up")
-            
-        # Register cleanup function
-        ui_components['cleanup'] = cleanup_resources
-        
-        # Register cleanup untuk event IPython jika di notebook
-        try:
-            from IPython import get_ipython
-            if get_ipython() and 'cleanup' in ui_components and callable(ui_components['cleanup']):
-                cleanup = ui_components['cleanup']
-                get_ipython().events.register('pre_run_cell', cleanup)
-                if logger: logger.debug("✅ Cleanup event berhasil diregistrasi")
-        except Exception as e:
-            if logger: logger.debug(f"⚠️ Error saat register cleanup event: {str(e)}")
-
-    except ImportError as e:
-        # Fallback jika modules tidak tersedia
-        from smartcash.ui.utils.fallback_utils import show_status
-        ui_components = {'status': None, 'module_name': 'env_config'}
-        show_status(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}", "warning", ui_components)
     except Exception as e:
-        # Generic exception handling
-        from smartcash.ui.utils.fallback_utils import show_status
-        ui_components = {'status': None, 'module_name': 'env_config'}
-        show_status(f"❌ Error saat inisialisasi environment config: {str(e)}", "error", ui_components)
-        
-        # Pastikan logging dikembalikan ke default
-        try:
-            from smartcash.ui.utils.logging_utils import reset_logging
-            reset_logging()
-        except:
-            pass
+        # Gunakan create_fallback_ui dari fallback_utils
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui
+        ui_components = create_fallback_ui(ui_components, f"❌ Error saat inisialisasi environment config: {str(e)}", "error")
     
     return ui_components
+
+def ensure_default_configs(logger):
+    """Pastikan konfigurasi default tersedia"""
+    try:
+        from smartcash.common.default_config import ensure_all_configs_exist
+        return ensure_all_configs_exist()
+    except ImportError:
+        if logger: logger.warning("⚠️ Module default_config tidak tersedia")
+        return None
+
+def sync_configs_with_drive(logger):
+    """Sinkronisasi konfigurasi dengan Google Drive"""
+    try:
+        from smartcash.common.config_sync import sync_all_configs
+        results = sync_all_configs(sync_strategy='drive_priority', create_backup=True)
+        
+        if logger:
+            success_count = len(results.get('success', []))
+            skipped_count = len(results.get('skipped', []))
+            failure_count = len(results.get('failure', []))
+            logger.info(f"🔄 Sinkronisasi selesai: {success_count} sukses, {skipped_count} dilewati, {failure_count} gagal")
+        
+        return results
+    except (ImportError, TypeError):
+        if logger: logger.warning("⚠️ Module config_sync tidak tersedia atau error")
+        return None
+
+def register_cleanup(ui_components, logger):
+    """Daftarkan fungsi cleanup untuk resources"""
+    # Definisikan fungsi cleanup
+    def cleanup_resources():
+        if 'observer_manager' in ui_components and 'observer_group' in ui_components:
+            try: ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
+            except Exception as e: 
+                if logger: logger.debug(f"⚠️ Error saat unregister observer: {str(e)}")
+        
+        try:
+            from smartcash.ui.utils.logging_utils import reset_logging
+            reset_logging()
+        except: pass
+        
+        if logger: logger.debug("🧹 Resources dibersihkan")
+    
+    # Daftarkan ke ui_components dan IPython
+    ui_components['cleanup'] = cleanup_resources
+    try:
+        from IPython import get_ipython
+        if get_ipython(): get_ipython().events.register('pre_run_cell', cleanup_resources)
+    except Exception: pass

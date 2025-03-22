@@ -217,3 +217,90 @@ def handle_download_status(
         status_widget = ui_components['status']
         with status_widget:
             display(create_status_message(message, status_type))
+
+def import_with_fallback(module_path: str, fallback_value: Any = None) -> Any:
+    """
+    Import modul atau atribut dengan fallback jika gagal.
+    
+    Args:
+        module_path: Path ke modul atau fungsi/kelas yang akan diimport
+        fallback_value: Nilai yang akan dikembalikan jika import gagal
+        
+    Returns:
+        Modul/fungsi/kelas yang diimport atau fallback_value
+    """
+    try:
+        if '.' in module_path:
+            parts = module_path.split('.')
+            module_name = '.'.join(parts[:-1])
+            attr_name = parts[-1]
+            
+            module = importlib.import_module(module_name)
+            return getattr(module, attr_name)
+        else:
+            return importlib.import_module(module_path)
+    except (ImportError, AttributeError):
+        return fallback_value
+
+def create_fallback_ui(ui_components: Dict[str, Any], message: str, status_type: str = "warning") -> Dict[str, Any]:
+    """
+    Buat UI fallback saat terjadi error.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan error/warning
+        status_type: Tipe status pesan
+        
+    Returns:
+        Dictionary ui_components yang diperbarui
+    """
+    import ipywidgets as widgets
+    from smartcash.ui.utils.constants import COLORS
+    
+    # Pastikan ui_components valid
+    if ui_components is None: ui_components = {'module_name': 'fallback'}
+    
+    # Buat status output jika belum ada
+    if 'status' not in ui_components or ui_components['status'] is None:
+        ui_components['status'] = widgets.Output(layout=widgets.Layout(
+            width='100%', border='1px solid #ddd', min_height='100px', padding='10px'))
+    
+    # Buat UI container jika belum ada
+    if 'ui' not in ui_components:
+        header = widgets.HTML("<h2>SmartCash UI (Fallback Mode)</h2>")
+        ui_components['ui'] = widgets.VBox([header, ui_components['status']], 
+                                          layout=widgets.Layout(width='100%', padding='10px'))
+    
+    # Tampilkan pesan status
+    show_status(message, status_type, ui_components)
+    
+    # Reset logging jika mungkin
+    try:
+        from smartcash.ui.utils.logging_utils import reset_logging
+        reset_logging()
+    except: pass
+    
+    return ui_components
+
+def try_operation(operation: Callable, logger=None, operation_name: str = "operasi", 
+                 ui_components: Optional[Dict[str, Any]] = None) -> Any:
+    """
+    Jalankan operasi dengan error handling terpadu.
+    
+    Args:
+        operation: Fungsi operasi yang akan dijalankan
+        logger: Logger untuk logging
+        operation_name: Nama operasi untuk pesan log
+        ui_components: UI components untuk menampilkan status
+        
+    Returns:
+        Hasil operasi atau None jika gagal
+    """
+    try:
+        result = operation()
+        if logger and result: logger.info(f"✅ {operation_name.capitalize()} berhasil")
+        return result
+    except Exception as e:
+        if logger: logger.warning(f"⚠️ Error saat {operation_name}: {str(e)}")
+        if ui_components: show_status(f"⚠️ Error saat {operation_name}: {str(e)}", "warning", ui_components)
+        return None

@@ -55,9 +55,7 @@ class LayerConfigManager(ILayerConfigManager):
     
     def __new__(cls, *args, **kwargs):
         """Implementasi singleton untuk memastikan hanya ada satu instance."""
-        if cls._instance is None:
-            cls._instance = super(LayerConfigManager, cls).__new__(cls)
-            # Inisialisasi atribut instance di __init__
+        if cls._instance is None: cls._instance = super(LayerConfigManager, cls).__new__(cls)
         return cls._instance
     
     def __init__(
@@ -74,21 +72,9 @@ class LayerConfigManager(ILayerConfigManager):
             config_path: Optional path ke file konfigurasi
             logger: Optional logger untuk mencatat aktivitas
         """
-        # Check if already initialized (singleton pattern)
-        if hasattr(self, '_initialized') and self._initialized:
-            return
-            
+        if hasattr(self, '_initialized') and self._initialized: return
         self.logger = logger
-        self.config = {}
-        
-        # Set initial configuration
-        if config:
-            self.config = config
-        elif config_path and os.path.exists(config_path):
-            self.load_config(config_path)
-        else:
-            self.config = self.DEFAULT_CONFIG
-            
+        self.config = config or (self.load_config(config_path) and self.config if config_path and os.path.exists(config_path) else self.DEFAULT_CONFIG)
         self._initialized = True
         
         if self.logger:
@@ -116,12 +102,7 @@ class LayerConfigManager(ILayerConfigManager):
         return list(self.config.keys())
     
     def get_enabled_layers(self) -> List[str]:
-        """
-        Dapatkan daftar nama layer yang diaktifkan.
-        
-        Returns:
-            List nama layer yang enabled=True
-        """
+        """Dapatkan daftar nama layer yang diaktifkan."""
         return [name for name, conf in self.config.items() if conf.get('enabled', True)]
     
     def get_class_map(self) -> Dict[int, str]:

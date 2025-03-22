@@ -78,22 +78,9 @@ def resolve_drive_path(path: str, config: Dict[str, Any] = None, env = None) -> 
     return os.path.abspath(path)
 
 def is_newer(src_path: str, dst_path: str) -> bool:
-    """
-    Cek apakah file source lebih baru dari file destination.
-    
-    Args:
-        src_path: Path file source
-        dst_path: Path file destination
-        
-    Returns:
-        Boolean menunjukkan apakah source lebih baru
-    """
-    if not os.path.exists(dst_path):
-        return True
-        
-    if not os.path.exists(src_path):
-        return False
-        
+    """Cek apakah file source lebih baru dari file destination."""
+    if not os.path.exists(dst_path): return True
+    if not os.path.exists(src_path): return False
     return os.path.getmtime(src_path) > os.path.getmtime(dst_path)
 
 def sync_drive_to_local(
@@ -249,11 +236,7 @@ def sync_directory(
     import fnmatch
     import re
     
-    # Jika exclude_patterns None, gunakan default
-    if exclude_patterns is None:
-        exclude_patterns = ['*.pyc', '__pycache__', '.git', '.ipynb_checkpoints', '*.swp', '*.swo']
-    
-    # Pastikan direktori tujuan ada
+    exclude_patterns = exclude_patterns or ['*.pyc', '__pycache__', '.git', '.ipynb_checkpoints', '*.swp', '*.swo']
     os.makedirs(dst_dir, exist_ok=True)
     
     result = {
@@ -262,10 +245,7 @@ def sync_directory(
         "errors": 0
     }
     
-    def is_excluded(path: str) -> bool:
-        """Cek apakah path sesuai exclude pattern."""
-        filename = os.path.basename(path)
-        return any(fnmatch.fnmatch(filename, pattern) for pattern in exclude_patterns)
+    def is_excluded(path: str) -> bool: return any(fnmatch.fnmatch(os.path.basename(path), pattern) for pattern in exclude_patterns)
     
     # Sync file dari src_dir ke dst_dir
     for root, dirs, files in os.walk(src_dir):
@@ -310,31 +290,6 @@ def sync_directory(
     
     return result
 
-def async_sync_drive(
-    config: Dict[str, Any], 
-    env=None, 
-    logger=None, 
-    callback: Optional[Callable[[str, str], None]] = None,
-    bidirectional: bool = True
-) -> Dict[str, Any]:
-    """
-    Jalankan sinkronisasi drive secara "asinkron" (tanpa thread pool, langsung sync).
-    
-    Args:
-        config: Konfigurasi aplikasi
-        env: Environment manager
-        logger: Logger untuk logging
-        callback: Callback function untuk update status
-        bidirectional: Apakah melakukan sinkronisasi dua arah
-        
-    Returns:
-        Hasil sinkronisasi (sama seperti sync_drive_to_local)
-    """
-    # Dalam versi ini, kita langsung jalankan sinkronisasi (tanpa threading)
-    return sync_drive_to_local(
-        config=config, 
-        env=env, 
-        logger=logger, 
-        callback=callback, 
-        bidirectional=bidirectional
-    )
+def async_sync_drive(config: Dict[str, Any], env=None, logger=None, callback: Optional[Callable[[str, str], None]]=None, bidirectional: bool=True) -> Dict[str, Any]:
+    """Jalankan sinkronisasi drive secara langsung (tanpa thread pool)."""
+    return sync_drive_to_local(config=config, env=env, logger=logger, callback=callback, bidirectional=bidirectional)

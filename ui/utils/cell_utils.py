@@ -1,38 +1,32 @@
 """
 File: smartcash/ui/utils/cell_utils.py
-Deskripsi: Utilitas untuk cell notebook dengan integrasi logging dan komponen alert yang konsisten
+Deskripsi: Optimasi setup notebook environment dengan pemisahan logger dari UI components
 """
 
-import importlib
-import sys
-import os
-from pathlib import Path
-from typing import Dict, Any, Tuple, Optional, Callable
-import yaml
-import ipywidgets as widgets
-from IPython.display import display, HTML
-
-from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.ui.utils.logging_utils import setup_ipython_logging, UILogger, create_dummy_logger
-
 def setup_notebook_environment(
-    cell_name: str,
-    config_path: str = "configs/colab_config.yaml"
-) -> Tuple[Any, Dict[str, Any]]:
+    cell_name: str, 
+    config_path: str = "configs/colab_config.yaml",
+    setup_logger: bool = False  # Parameter baru untuk opsional setup logger
+) -> tuple:
     """
-    Setup environment notebook dengan konfigurasi cell.
+    Setup environment notebook dengan konfigurasi cell dan opsional setup logger.
     
     Args:
         cell_name: Nama cell untuk identifikasi dan logging
         config_path: Path relatif ke file konfigurasi
+        setup_logger: Apakah setup logger di fungsi ini
         
     Returns:
         Tuple berisi (environment_manager, config_dict)
     """
+    # Import logger terkait
+    from smartcash.ui.utils.logging_utils import create_dummy_logger
+    
     # Buat logger dummy sementara untuk log awal
     logger = create_dummy_logger()
     
     # Pastikan smartcash dalam path
+    import sys
     if '.' not in sys.path:
         sys.path.append('.')
         logger.info(f"🛠️ Menambahkan direktori saat ini ke sys.path")
@@ -43,49 +37,70 @@ def setup_notebook_environment(
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
         
-        # Setup komponen
-        logger = get_logger(f"cell_{cell_name}")
-        
+        # Setup komponen env dan config tanpa logger
         env_manager = get_environment_manager()
         config_manager = get_config_manager()
         
+        # Setup logger jika diminta
+        if setup_logger:
+            logger = get_logger(f"cell_{cell_name}")
+        
         # Load konfigurasi
         try:
+            from pathlib import Path
             config_path = Path(config_path)
             if config_path.exists():
                 config = config_manager.load_config(str(config_path))
+                if setup_logger:
+                    logger.debug(f"📄 Konfigurasi dimuat dari {config_path}")
             else:
                 config = config_manager.config
-                logger.warning(f"⚠️ File konfigurasi {config_path} tidak ditemukan, menggunakan konfigurasi default")
+                if setup_logger:
+                    logger.warning(f"⚠️ File konfigurasi {config_path} tidak ditemukan, menggunakan konfigurasi default")
         except Exception as e:
-            logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
+            if setup_logger:
+                logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
             config = {}
             
+        # Berhasil, kembalikan env_manager dan config
         return env_manager, config
         
     except ImportError as e:
         print(f"⚠️ Mode fungsionalitas terbatas - {str(e)}")
         
-        # Fallback implementation
-        env = type('DummyEnv', (), {
-            'is_colab': 'google.colab' in sys.modules,
-            'base_dir': os.getcwd(),
-            'get_path': lambda p: os.path.join(os.getcwd(), p),
-            'is_drive_mounted': False,
-            'drive_path': None
-        })
+        # Fallback implementation sederhana
+        class DummyEnv:
+            def __init__(self):
+                self.is_colab = 'google.colab' in sys.modules
+                self.base_dir = self._get_cwd()
+                self.is_drive_mounted = self._check_drive_mounted()
+                self.drive_path = '/content/drive/MyDrive' if self.is_drive_mounted else None
+            
+            def _get_cwd(self):
+                import os
+                return os.getcwd()
+                
+            def _check_drive_mounted(self):
+                import os
+                return os.path.exists('/content/drive/MyDrive')
+                
+            def get_path(self, p):
+                import os
+                return os.path.join(self.base_dir, p)
         
         # Fallback config loading
         config = {}
         try:
+            import yaml
+            from pathlib import Path
             if Path(config_path).exists():
                 with open(config_path, 'r') as f:
-                    config = yaml.safe_load(f)
+                    config = yaml.safe_load(f) or {}
                 print(f"🔄 Berhasil memuat konfigurasi dari {config_path}")
         except Exception as e:
             print(f"❌ Error saat memuat konfigurasi: {str(e)}")
             
-        return env, config
+        return DummyEnv(), config
 
 def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
     """
@@ -97,6 +112,10 @@ def create_default_ui_components(cell_name: str) -> Dict[str, Any]:
     Returns:
         Dictionary berisi widget UI default
     """
+    # Import komponen UI dan konstanta
+    import ipywidgets as widgets
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    
     # Format judul cell dari nama
     title = " ".join(word.capitalize() for word in cell_name.split("_"))
     
@@ -148,10 +167,15 @@ def setup_ui_component(
     Returns:
         Dictionary berisi widget UI
     """
+    # Import komponen terkait
+    from IPython.display import display, HTML
+    
     # Buat default UI components
     ui_components = create_default_ui_components(component_name)
     
     # Setup logger yang terintegrasi dengan UI dan redirect semua output logging
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
+    
     logger = setup_ipython_logging(ui_components, f"cell_{component_name}")
     if logger:
         ui_components['logger'] = logger
@@ -168,6 +192,7 @@ def setup_ui_component(
             pass
 
         # Coba import dari lokasi baru (setelah refactor)
+        import importlib
         import_locations = [
             f"smartcash.ui.setup.{component_name}_component",
             f"smartcash.ui.dataset.{component_name}_component",
@@ -202,6 +227,7 @@ def setup_ui_component(
                     if 'create_status_indicator' in ui_components:
                         display(ui_components['create_status_indicator']("warning", error_msg))
                     else:
+                        from smartcash.ui.utils.constants import COLORS, ICONS
                         display(HTML(f"""
                         <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
                                   color:{COLORS['alert_warning_text']}; 
@@ -222,6 +248,7 @@ def setup_ui_component(
                 if 'create_status_indicator' in ui_components:
                     display(ui_components['create_status_indicator']("error", error_msg))
                 else:
+                    from smartcash.ui.utils.constants import COLORS, ICONS
                     display(HTML(f"""
                     <div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
                               color:{COLORS['alert_danger_text']}; 
@@ -233,6 +260,7 @@ def setup_ui_component(
     
     # Setup handler jika tersedia
     try:
+        import importlib
         handler_locations = [
             f"smartcash.ui.{component_name.split('_')[0]}.{component_name}_handler",
             f"smartcash.ui.setup.{component_name.split('_')[0]}.{component_name}_handler",
@@ -270,6 +298,9 @@ def display_ui(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary berisi widget UI
     """
+    # Import komponen terkait
+    from IPython.display import display, HTML
+    
     logger = ui_components.get('logger')
     
     if 'ui' in ui_components:
@@ -278,6 +309,7 @@ def display_ui(ui_components: Dict[str, Any]) -> None:
         display(ui_components['ui'])
     else:
         # Fallback jika 'ui' tidak ada
+        import ipywidgets as widgets
         for key, component in ui_components.items():
             if isinstance(component, (widgets.Widget, widgets.widgets.Widget)):
                 if logger:
@@ -293,6 +325,7 @@ def display_ui(ui_components: Dict[str, Any]) -> None:
             if 'create_status_indicator' in ui_components:
                 display(ui_components['create_status_indicator']("warning", message))
             else:
+                from smartcash.ui.utils.constants import COLORS, ICONS
                 display(HTML(f"""
                 <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
                           color:{COLORS['alert_warning_text']}; 

@@ -81,9 +81,7 @@ def register_cleanup(ui_components, logger):
             except Exception as e: 
                 if logger: logger.debug(f"⚠️ Error saat unregister observer: {str(e)}")
         
-        try:
-            from smartcash.ui.utils.logging_utils import reset_logging
-            reset_logging()
+        try: from smartcash.ui.utils.logging_utils import reset_logging; reset_logging()
         except: pass
         
         if logger: logger.debug("🧹 Resources dibersihkan")

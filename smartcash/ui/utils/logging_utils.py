@@ -101,32 +101,17 @@ class UILogger(logging.Logger):
         super().__init__(name, level)
         self._ui_components = None
     
-    def set_ui_components(self, ui_components: Dict[str, Any]):
-        """Set UI components untuk logger."""
-        self._ui_components = ui_components
+    def set_ui_components(self, ui_components: Dict[str, Any]): self._ui_components = ui_components
     
     def success(self, msg, *args, **kwargs):
         """Log message dengan level SUCCESS."""
         if not any(icon in str(msg) for icon in ["✅", "👍", "🎉"]): msg = f"✅ {msg}"
         self.info(msg, *args, **kwargs)
 
-    def get_ui_components(self) -> Dict[str, Any]:
-        """Dapatkan UI components untuk logger ini."""
-        return self._ui_components
+    def get_ui_components(self) -> Dict[str, Any]: return self._ui_components
 
 def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO, redirect_root: bool = False) -> Optional[UILogger]:
-    """
-    Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        module_name: Nama modul untuk logger
-        log_level: Level logging
-        redirect_root: Redirect logger root ke UI juga
-        
-    Returns:
-        UILogger instance atau dummy logger
-    """
+    """Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe."""
     global _logger_cache, _handler_cache
     
     try:

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan perbaikan visualisasi
+Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan logika progress yang ditingkatkan
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 import ipywidgets as widgets
 
 def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
-    """Setup handler untuk tombol UI preprocessing dengan fokus pada visualisasi."""
+    """Setup handler untuk tombol UI preprocessing dengan sistem progress yang ditingkatkan."""
     
     logger = ui_components.get('logger')
     from smartcash.ui.utils.constants import ICONS
@@ -18,7 +18,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     
     @try_except_decorator(ui_components.get('status'))
     def on_preprocess_click(b):
-        """Handler tombol preprocessing dengan dukungan visualisasi yang ditingkatkan."""
+        """Handler tombol preprocessing dengan dukungan progress tracking yang dioptimalkan."""
         # Dapatkan split dari UI
         split_option = ui_components['split_selector'].value
         split_map = {'All Splits': None, 'Train Only': 'train', 'Validation Only': 'valid', 'Test Only': 'test'}
@@ -54,8 +54,12 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
         
-        # Update status panel
-        update_status_panel(ui_components, "info", f"{ICONS['processing']} Preprocessing dataset {split or 'All Splits'}...")
+        # Tandai preprocessing sedang berjalan
+        ui_components['preprocessing_running'] = True
+        
+        # Update status panel dengan informasi awal
+        split_info = f"Split {split}" if split else "Semua split"
+        update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai preprocessing {split_info}...")
         
         # Notifikasi observer tentang mulai preprocessing
         try:
@@ -64,13 +68,10 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             notify(
                 event_type=EventTopics.PREPROCESSING_START,
                 sender="preprocessing_handler",
-                message=f"Memulai preprocessing dataset {split or 'All Splits'}"
+                message=f"Memulai preprocessing dataset {split_info}"
             )
         except ImportError:
             pass
-        
-        # Tandai preprocessing sedang berjalan
-        ui_components['preprocessing_running'] = True
         
         # Dapatkan dataset manager
         dataset_manager = ui_components.get('dataset_manager')
@@ -107,6 +108,9 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 dataset_manager.preprocess_config['preprocessed_dir'] = preprocessed_dir
                 dataset_manager.preprocess_config['raw_dataset_dir'] = data_dir
             
+            # Log awal preprocessing dengan pesan ringkas
+            if logger: logger.info(f"{ICONS['start']} Memulai preprocessing {split_info}")
+            
             # Jalankan preprocessing
             preprocess_result = dataset_manager.preprocess_dataset(
                 split=split, 
@@ -118,30 +122,34 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Setelah selesai, update UI dengan status sukses
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"Preprocessing dataset {split or 'all splits'} selesai"))
+                display(create_status_indicator("success", f"{ICONS['success']} Preprocessing {split_info} selesai"))
             
             # Update summary jika function tersedia
             if 'update_summary' in ui_components and callable(ui_components['update_summary']):
                 ui_components['update_summary'](preprocess_result)
             
             # Update status panel
-            update_status_panel(ui_components, "success", f"Preprocessing dataset berhasil")
+            update_status_panel(ui_components, "success", f"{ICONS['success']} Preprocessing dataset berhasil diselesaikan")
             
-            # PERBAIKAN: Tampilkan tombol visualisasi dan cleanup
+            # Tampilkan tombol visualisasi dan cleanup
             ui_components['visualization_buttons'].layout.display = 'flex'
             ui_components['cleanup_button'].layout.display = 'block'
             
-            # PERBAIKAN: Tampilkan container visualisasi
+            # Tampilkan container visualisasi
             if 'visualization_container' in ui_components:
                 ui_components['visualization_container'].layout.display = 'block'
             
-            # PERBAIKAN: Tampilkan tiap tombol visualisasi secara individual
+            # Tampilkan tiap tombol visualisasi secara individual
             if 'visualize_button' in ui_components:
                 ui_components['visualize_button'].layout.display = 'inline-flex'
             if 'compare_button' in ui_components:
                 ui_components['compare_button'].layout.display = 'inline-flex'
             if 'distribution_button' in ui_components:
                 ui_components['distribution_button'].layout.display = 'inline-flex'
+            
+            # Tampilkan summary container jika ada
+            if 'summary_container' in ui_components:
+                ui_components['summary_container'].layout.display = 'block'
             
             # Notifikasi observer tentang selesai preprocessing
             try:
@@ -150,7 +158,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
                 notify(
                     event_type=EventTopics.PREPROCESSING_END,
                     sender="preprocessing_handler",
-                    message=f"Preprocessing dataset {split or 'All Splits'} selesai"
+                    message=f"Preprocessing dataset {split_info} selesai"
                 )
             except ImportError:
                 pass
@@ -191,6 +199,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         from smartcash.ui.utils.alert_utils import create_status_indicator
         from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
         
+        # Set flag untuk menghentikan preprocessing
         ui_components['preprocessing_running'] = False
         
         # Tampilkan pesan di status

@@ -13,7 +13,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON, HORIZONTAL_GROUP
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
 
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
@@ -117,18 +117,27 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(display='none', margin='5px')
     )
     
-    # Container tombol utama dengan HORIZONTAL_GROUP standar
+    # Container tombol utama dengan styling standar
     button_container = widgets.HBox(
         [preprocess_button, stop_button, save_button, cleanup_button],
-        layout=HORIZONTAL_GROUP
+        layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            align_items='center',
+            width='100%',
+            margin='10px 0'
+        )
     )
     
-    # Container tombol visualisasi dengan HORIZONTAL_GROUP standar
+    # Container tombol visualisasi dengan styling standar
     visualization_buttons = widgets.HBox(
         [visualize_button, compare_button, distribution_button],
         layout=widgets.Layout(
             display='none',
-            **{k:v for k,v in HORIZONTAL_GROUP.items() if k != 'display'}
+            flex_flow='row wrap',
+            align_items='center',
+            width='100%',
+            margin='10px 0'
         )
     )
     

@@ -5,12 +5,6 @@ Deskripsi: Koordinator utama preprocessing dataset dengan antarmuka visual yang 
 
 def setup_preprocessing():
     """Koordinator utama data preprocessing dengan integrasi utilities yang disederhanakan."""
-    # Cek jika instance sudah dibuat sebelumnya (mencegah duplikasi)
-    # import builtins
-    # if hasattr(builtins, '_preprocessing_ui_instance'):
-    #     # Hanya kembalikan instance yang telah ada
-    #     return builtins._preprocessing_ui_instance
-        
     try:
         # Import komponen dengan pendekatan konsolidasi
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
@@ -45,15 +39,7 @@ def setup_preprocessing():
                     setattr(get_ipython().events, '_preprocessing_cleanup_registered', True)
             except:
                 pass
-            
-        # Display UI - hanya tampilkan 1 kali
-        # from smartcash.ui.utils.cell_utils import display_ui
-        # display_ui(ui_components)
-
-        # Simpan instance sebagai global untuk mencegah duplikasi
-        # builtins._preprocessing_ui_instance = ui_components
-        
-        # Kembalikan ui_components untuk digunakan sebagai state global
+          
         return ui_components
 
     except ImportError as e:

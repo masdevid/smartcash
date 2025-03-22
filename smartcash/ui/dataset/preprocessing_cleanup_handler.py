@@ -6,9 +6,9 @@ Deskripsi: Handler untuk membersihkan data hasil preprocessing dengan progress t
 from typing import Dict, Any
 from IPython.display import display, clear_output
 import shutil
-from pathlib import Path
-import time
+import time  # Pastikan import time tersedia
 import os
+from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
@@ -171,7 +171,6 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 # ===== FALLBACK: PEMBERSIHAN MANUAL =====
                 path = Path(preprocessed_dir)
                 if path.exists():
-                    import time
                     start_time = time.time()
                     
                     # Step 1: Scan direktori (25%)

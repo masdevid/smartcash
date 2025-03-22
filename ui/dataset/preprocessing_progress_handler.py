@@ -4,7 +4,7 @@ Deskripsi: Handler progress tracking untuk preprocessing dataset dengan throttli
 """
 
 from typing import Dict, Any
-import time
+import time  # Pastikan import time ada di sini
 from IPython.display import display
 from smartcash.ui.utils.constants import ICONS
 
@@ -13,7 +13,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
     logger = ui_components.get('logger')
     
     # Simpan state tracking untuk batasi frekuensi update
-    last_update = {'overall': 0, 'current': 0, 'message': None}
+    last_update = {'overall': 0, 'current': 0, 'message': None, 'message_time': 0, 'notify_time': 0}
     update_interval = 0.5  # Hanya update UI setiap 0.5 detik
     message_throttle_interval = 2.0  # Hanya log pesan setiap 2 detik
     key_progress_points = {0, 25, 50, 75, 100}  # Titik progress penting untuk selalu dilog
@@ -212,6 +212,7 @@ def setup_progress_handler(ui_components: Dict[str, Any], env=None, config=None)
         
         # Reset timestamp-timestamp throttling
         last_update.clear()
+        last_update.update({'overall': 0, 'current': 0, 'message': None, 'message_time': 0, 'notify_time': 0})
         
         # Log reset
         if logger: logger.debug(f"{ICONS['refresh']} Progress bar direset")

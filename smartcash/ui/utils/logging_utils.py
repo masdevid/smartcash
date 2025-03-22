@@ -114,8 +114,19 @@ class UILogger(logging.Logger):
         """Dapatkan UI components untuk logger ini."""
         return self._ui_components
 
-def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO) -> Optional[UILogger]:
-    """Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe."""
+def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None, log_level=logging.INFO, redirect_root: bool = False) -> Optional[UILogger]:
+    """
+    Setup logging IPython dengan integrasi UI yang lebih robust dan thread-safe.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        module_name: Nama modul untuk logger
+        log_level: Level logging
+        redirect_root: Redirect logger root ke UI juga
+        
+    Returns:
+        UILogger instance atau dummy logger
+    """
     global _logger_cache, _handler_cache
     
     try:
@@ -169,10 +180,22 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: str = None
             
             # Add handler dan kirim pesan test
             logger.addHandler(handler)
+            
+            # Redirect root logger jika diminta
+            if redirect_root:
+                root_logger = logging.getLogger()
+                # Hapus semua UILogHandler untuk mencegah duplikasi
+                for h in root_logger.handlers[:]:
+                    if isinstance(h, UILogHandler) or isinstance(h, logging.StreamHandler):
+                        root_logger.removeHandler(h)
+                # Tambahkan handler UI ke root logger
+                root_logger.addHandler(handler)
+                # Set level root logger
+                root_logger.setLevel(log_level)
         
         # Set UI components reference dan kirim test log
         if isinstance(logger, UILogger): logger.set_ui_components(ui_components)
-        logger.info(f"🔄 Logger {logger_name} siap digunakan")
+        logger.info(f"🔄 Logger {logger_name} siap digunakan{' dengan redirect root' if redirect_root else ''}")
             
         # Cache logger untuk penggunaan berikutnya
         _logger_cache[logger_name] = logger
@@ -252,6 +275,11 @@ def reset_logging():
             logger = logging.getLogger(logger_name)
             for h in logger.handlers[:]:
                 if isinstance(h, UILogHandler): logger.removeHandler(h)
+        
+        # Juga hapus dari root logger
+        root_logger = logging.getLogger()
+        for h in root_logger.handlers[:]:
+            if isinstance(h, UILogHandler): root_logger.removeHandler(h)
         
         # Reset caches dan status
         _logger_cache, _handler_cache, _in_output_context = {}, {}, False

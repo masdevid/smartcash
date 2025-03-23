@@ -11,7 +11,8 @@ from IPython.display import display
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Update konfigurasi dari UI components."""
     logger = ui_components.get('logger')
-    config = config or {}
+    # PERBAIKAN: Deep copy untuk mencegah modifikasi tidak sengaja
+    config = copy.deepcopy(config) if config else {}
     
     # Jika tidak ada 'augmentation' di config, buat baru
     if 'augmentation' not in config:
@@ -59,6 +60,9 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     if 'file_prefix' not in config['preprocessing']:
         config['preprocessing']['file_prefix'] = 'rp'
     
+    # PERBAIKAN: Simpan ke ui_components untuk memastikan persistensi
+    ui_components['config'] = config
+    
     return config
 
 def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs/augmentation_config.yaml") -> bool:
@@ -66,119 +70,97 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
     logger = None
     if 'logger' in config and callable(getattr(config.get('logger', None), 'info', None)):
         logger = config.get('logger')
-     # PERBAIKAN: Buat salinan config tanpa logger untuk disimpan
-    config_to_save = config.copy()
-    if 'logger' in config_to_save:
-        config_to_save.pop('logger')
+    
     try:
+        # PERBAIKAN: Deep copy untuk mencegah modifikasi tidak sengaja
+        save_config = copy.deepcopy(config)
+        
         # Pastikan direktori config ada
         Path(config_path).parent.mkdir(parents=True, exist_ok=True)
         
-        from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager()
-        if config_manager:
-            # Ambil konfigurasi lengkap
-            full_config = config_manager.config.copy() if config_manager.config else {}
+        # PERBAIKAN: Cek jika file sudah ada, merge dengan config yang ada
+        if os.path.exists(config_path):
+            with open(config_path, 'r') as f:
+                existing_config = yaml.safe_load(f) or {}
+                
+            # Merge existing config dengan config baru
+            merged_config = copy.deepcopy(existing_config)
             
             # Update config dengan augmentation settings baru
-            if 'augmentation' in config:
-                if 'augmentation' not in full_config:
-                    full_config['augmentation'] = {}
-                full_config['augmentation'].update(config['augmentation'])
+            if 'augmentation' in save_config:
+                if 'augmentation' not in merged_config:
+                    merged_config['augmentation'] = {}
+                merged_config['augmentation'].update(save_config['augmentation'])
             
             # Update preprocessing jika ada
-            if 'preprocessing' in config:
-                if 'preprocessing' not in full_config:
-                    full_config['preprocessing'] = {}
-                full_config['preprocessing'].update(config['preprocessing'])
-            
-            # Simpan konfigurasi lengkap
-            config_manager.save_config(config_path, create_dirs=True)
-            
-            # PERBAIKAN: Cegah duplikasi ke Google Drive jika path sama
-            try:
-                from smartcash.common.environment import get_environment_manager
-                env_manager = get_environment_manager()
+            if 'preprocessing' in save_config:
+                if 'preprocessing' not in merged_config:
+                    merged_config['preprocessing'] = {}
+                merged_config['preprocessing'].update(save_config['preprocessing'])
                 
-                if env_manager.is_drive_mounted:
-                    drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
-                    
-                    # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
-                    if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                        if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
-                    else:
-                        # Buat direktori drive jika belum ada
-                        os.makedirs(Path(drive_config_path).parent, exist_ok=True)
-                        
-                        # Simpan juga ke drive untuk backup
-                        with open(drive_config_path, 'w') as f:
-                            yaml.dump(full_config, f, default_flow_style=False)
-                        
-                        if logger: logger.info(f"📤 Konfigurasi disimpan ke drive: {drive_config_path}")
-            except Exception as e:
-                if logger: logger.debug(f"ℹ️ Tidak dapat menyimpan ke drive: {str(e)}")
-            
-            # Untuk debugging - simpan juga salinan konfigurasi augmentasi saja
-            aug_config_path = config_path.replace('.yaml', '_aug_only.yaml')
-            with open(aug_config_path, 'w') as f:
-                yaml.dump({'augmentation': config['augmentation']}, f, default_flow_style=False)
-            
-            if logger:
-                logger.info(f"✅ Konfigurasi disimpan ke {config_path}")
-            return True
-    except ImportError:
-        # Fallback: simpan hanya bagian yang relevan dengan format yang konsisten
+            # Gunakan config yang sudah dimerge
+            save_config = merged_config
+        
+        # Coba gunakan ConfigManager untuk konsistensi
         try:
-            path = Path(config_path)
-            path.parent.mkdir(parents=True, exist_ok=True)
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager()
             
-            # Hanya simpan bagian yang relevan dengan format yang konsisten
-            output_config = {}
-            if 'augmentation' in config:
-                output_config['augmentation'] = config['augmentation']
-            if 'preprocessing' in config:
-                output_config['preprocessing'] = config['preprocessing']
-                
-            with open(path, 'w') as f:
-                yaml.dump(output_config, f, default_flow_style=False)
+            # Update config di manager
+            for section in ['augmentation', 'preprocessing']:
+                if section in save_config:
+                    for key, value in save_config[section].items():
+                        config_manager.set(f"{section}.{key}", value)
             
-            # PERBAIKAN: Cegah duplikasi ke Google Drive jika path sama
-            try:
-                from smartcash.common.environment import get_environment_manager
-                env_manager = get_environment_manager()
+            # Simpan ke file
+            config_manager.save_config(config_path)
+            
+            if logger: logger.info(f"✅ Konfigurasi disimpan ke {config_path} via ConfigManager")
+        except (ImportError, AttributeError):
+            # Fallback: simpan langsung ke file
+            with open(config_path, 'w') as f:
+                yaml.dump(save_config, f, default_flow_style=False)
+            
+            if logger: logger.info(f"✅ Konfigurasi disimpan ke {config_path} (fallback)")
+        
+        # PERBAIKAN: Cegah duplikasi ke Google Drive jika path sama
+        try:
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager()
+            
+            if env_manager.is_drive_mounted:
+                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
                 
-                if env_manager.is_drive_mounted:
-                    drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+                # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
+                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
+                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
+                else:
+                    # Buat direktori drive jika belum ada
+                    os.makedirs(Path(drive_config_path).parent, exist_ok=True)
                     
-                    # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
-                    if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                        if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
-                    else:
-                        # Buat direktori drive jika belum ada
-                        os.makedirs(Path(drive_config_path).parent, exist_ok=True)
-                        
-                        # Salin file ke Google Drive
-                        import shutil
-                        shutil.copy2(config_path, drive_config_path)
-                        
-                        if logger: logger.info(f"📤 Konfigurasi disalin ke drive: {drive_config_path}")
-            except (ImportError, AttributeError) as e:
-                if logger: logger.debug(f"ℹ️ Tidak dapat menyalin ke drive: {str(e)}")
-            
-            if logger:
-                logger.info(f"✅ Konfigurasi disimpan ke {config_path} (fallback)")
-            return True
+                    # Simpan juga ke drive untuk backup
+                    with open(drive_config_path, 'w') as f:
+                        yaml.dump(save_config, f, default_flow_style=False)
+                    
+                    if logger: logger.info(f"📤 Konfigurasi disimpan ke drive: {drive_config_path}")
         except Exception as e:
-            if logger:
-                logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
-            return False
-    return False
+            if logger: logger.debug(f"ℹ️ Tidak dapat menyimpan ke drive: {str(e)}")
+        
+        return True
+    except Exception as e:
+        if logger: logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+        return False
 
 def load_augmentation_config(config_path: str = "configs/augmentation_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """Load konfigurasi augmentasi dari file."""
     logger = None
     if ui_components and 'logger' in ui_components:
         logger = ui_components.get('logger')
+    
+    # PERBAIKAN: Cek apakah ada config tersimpan di ui_components
+    if ui_components and 'config' in ui_components and ui_components['config']:
+        if logger: logger.info("ℹ️ Menggunakan konfigurasi dari UI components")
+        return ui_components['config']
     
     try:
         # PERBAIKAN: Cek konfigurasi dari Google Drive terlebih dahulu 
@@ -193,53 +175,80 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
                 if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
                     if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
                 elif os.path.exists(drive_config_path):
-                    # Salin dari Drive ke lokal untuk memastikan sinkronisasi
-                    import shutil
-                    os.makedirs(Path(config_path).parent, exist_ok=True)
-                    shutil.copy2(drive_config_path, config_path)
-                    if logger: logger.info(f"📥 Konfigurasi disalin dari drive: {drive_config_path}")
+                    # Baca langsung dari file drive untuk mendapatkan versi terbaru
+                    with open(drive_config_path, 'r') as f:
+                        drive_config = yaml.safe_load(f)
+                        
+                    if drive_config:
+                        # Salin juga ke lokal untuk digunakan sebagai cache
+                        os.makedirs(Path(config_path).parent, exist_ok=True)
+                        with open(config_path, 'w') as f:
+                            yaml.dump(drive_config, f, default_flow_style=False)
+                            
+                        if logger: logger.info(f"📥 Konfigurasi dimuat dari drive: {drive_config_path}")
+                        
+                        # PERBAIKAN: Simpan ke ui_components jika tersedia
+                        if ui_components: ui_components['config'] = drive_config
+                        return drive_config
         except (ImportError, AttributeError) as e:
             if logger: logger.debug(f"ℹ️ Tidak dapat menyalin dari drive: {str(e)}")
+                
+        # PERBAIKAN: Coba load dari ConfigManager untuk konsistensi
+        try:
+            from smartcash.common.config import get_config_manager
+            config_manager = get_config_manager()
             
-        from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager()
-        if config_manager:
-            # Coba load dari config manager
+            # Paksa reload config untuk mendapatkan data terbaru
             loaded_config = config_manager.load_config(config_path)
             
             # Log hasil untuk debugging
             has_aug = 'augmentation' in loaded_config
             has_preproc = 'preprocessing' in loaded_config
-            if logger:
-                logger.info(f"ℹ️ Loaded config dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
             
-            # Jika sukses load, gunakan konfigurasi tersebut
-            if loaded_config:
+            if loaded_config and (has_aug or has_preproc):
+                if logger: logger.info(f"ℹ️ Loaded config dari {config_path} via ConfigManager")
+                
+                # PERBAIKAN: Simpan ke ui_components jika tersedia
+                if ui_components: ui_components['config'] = loaded_config
                 return loaded_config
-    except (ImportError, FileNotFoundError) as e:
-        if logger:
-            logger.warning(f"⚠️ Load config fallback: {str(e)}")
+        except (ImportError, FileNotFoundError, AttributeError) as e:
+            if logger: logger.warning(f"⚠️ Load config fallback: {str(e)}")
         
-    # Fallback: load langsung dengan yaml
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                if config:
-                    # Log hasil untuk debugging
-                    has_aug = 'augmentation' in config
-                    has_preproc = 'preprocessing' in config
-                    if logger:
-                        logger.info(f"📄 Loaded YAML dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
-                    return config
-        except Exception as e:
-            if logger:
-                logger.warning(f"⚠️ Error saat load YAML: {str(e)}")
+        # Fallback: load langsung dengan yaml
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    if config:
+                        # Log hasil untuk debugging
+                        has_aug = 'augmentation' in config
+                        has_preproc = 'preprocessing' in config
+                        if logger:
+                            logger.info(f"📄 Loaded YAML dari {config_path}: augmentation={has_aug}, preprocessing={has_preproc}")
+                        
+                        # PERBAIKAN: Verifikasi struktur dasar config ada
+                        if 'augmentation' not in config: config['augmentation'] = {}
+                        if 'preprocessing' not in config: config['preprocessing'] = {}
+                        
+                        # PERBAIKAN: Simpan ke ui_components jika tersedia
+                        if ui_components: ui_components['config'] = config
+                        return config
+            except Exception as e:
+                if logger:
+                    logger.warning(f"⚠️ Error saat load YAML: {str(e)}")
+    except Exception as e:
+        if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
     
     # Jika config tidak bisa dimuat, gunakan default config
     if logger:
         logger.info("📋 Menggunakan konfigurasi default")
-    return load_default_augmentation_config()
+    
+    default_config = load_default_augmentation_config()
+    
+    # PERBAIKAN: Simpan default config ke ui_components jika tersedia
+    if ui_components: ui_components['config'] = default_config
+    
+    return default_config
 
 def load_default_augmentation_config() -> Dict[str, Any]:
     """
@@ -338,5 +347,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Log error jika tersedia
         if logger:
             logger.warning(f"⚠️ Error updating UI from config: {str(e)}")
+    
+    # PERBAIKAN: Simpan referensi config di ui_components untuk persistensi
+    ui_components['config'] = config
     
     return ui_components

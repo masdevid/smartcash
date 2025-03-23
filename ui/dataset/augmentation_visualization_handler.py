@@ -110,48 +110,6 @@ def visualize_dataset(ui_components: Dict[str, Any], mode: str = 'single', num_s
         if 'visualization_container' in ui_components:
             ui_components['visualization_container'].layout.display = 'block'
 
-def find_label_path(img_path: Path) -> Optional[Path]:
-    """
-    Fungsi helper untuk mencari label path dari image path.
-    
-    Args:
-        img_path: Path gambar
-        
-    Returns:
-        Path file label atau None jika tidak ditemukan
-    """
-    # Cek apakah ada file label di folder paralel
-    parent_dir = img_path.parent.parent
-    label_path = parent_dir / 'labels' / f"{img_path.stem}.txt"
-    
-    if label_path.exists():
-        return label_path
-    
-    # Cek apakah ada file label di folder sibling
-    sibling_label_dir = img_path.parent.parent / 'labels'
-    if sibling_label_dir.exists():
-        sibling_label_path = sibling_label_dir / f"{img_path.stem}.txt"
-        if sibling_label_path.exists():
-            return sibling_label_path
-    
-    return None
-
-def load_image(img_path: Path) -> np.ndarray:
-    """Fungsi helper untuk loading gambar dengan berbagai format."""
-    if str(img_path).endswith('.npy'):
-        # Handle numpy array
-        img = np.load(str(img_path))
-        # Denormalisasi jika perlu
-        if img.dtype == np.float32 and img.max() <= 1.0:
-            img = (img * 255).astype(np.uint8)
-    else:
-        # Handle gambar biasa
-        img = cv2.imread(str(img_path))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    return img
-
-
-
 
 def get_original_from_augmented(aug_filename: str, orig_prefix: str = "rp") -> Optional[str]:
     """

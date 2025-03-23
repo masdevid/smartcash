@@ -10,7 +10,7 @@ def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: 
     """Visualisasi sampel dataset yang telah diaugmentasi dengan peningkatan tampilan nama file."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     import matplotlib.pyplot as plt
-    from smartcash.ui.utils.file_utils import shorten_filename
+    from smartcash.ui.utils.file_utils import shorten_filename, load_image, find_label_path
     from smartcash.ui.helpers.ui_helpers import display_label_info
     
     # Get augmentation prefix

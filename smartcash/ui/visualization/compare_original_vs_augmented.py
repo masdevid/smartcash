@@ -6,12 +6,13 @@ Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar au
 from pathlib import Path
 from typing import Dict, Any
 from IPython.display import display, HTML
+import matplotlib.pyplot as plt
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan algoritma pencocokan yang lebih baik."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     from smartcash.common.utils import format_size
-    from smartcash.ui.utils.file_utils import shorten_filename
+    from smartcash.ui.utils.file_utils import shorten_filename, find_matching_pairs, load_image
     from smartcash.ui.utils.constants import COLORS, ICONS 
     
     # Get augmentation prefix

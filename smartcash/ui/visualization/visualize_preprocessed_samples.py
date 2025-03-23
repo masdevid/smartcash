@@ -7,6 +7,8 @@ from IPython.display import display, clear_output, HTML
 from pathlib import Path
 from typing import Dict, Any
 import matplotlib.pyplot as plt
+import numpy as np
+import cv2
 
 def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
     """

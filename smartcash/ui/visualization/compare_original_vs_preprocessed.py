@@ -7,14 +7,17 @@ from typing import Dict, Any
 from IPython.display import display, clear_output
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 
-def compare_original_vs_preprocessed(ui_components: Dict[str, Any], original_dir: str, preprocessed_dir: str, num_samples: int = 3):
+def compare_original_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, preprocessed_dir: str, num_samples: int = 3):
     """
     Komparasi sampel dataset original dengan yang telah dipreprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
-        original_dir: Direktori dataset original
+        raw_dir: Direktori dataset original
         preprocessed_dir: Direktori dataset preprocessed
         num_samples: Jumlah sampel yang akan divisualisasikan
     """

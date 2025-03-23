@@ -540,3 +540,79 @@ def create_file_download_link(file_path: str, link_text: Optional[str] = None) -
         return widgets.HTML(link)
     except Exception as e:
         return widgets.HTML(f"<p style='color:{COLORS['danger']}'>❌ Error membuat link download: {str(e)}</p>")
+
+
+def find_label_path(img_path: Path) -> Optional[Path]:
+    """
+    Fungsi helper untuk mencari label path dari image path.
+    
+    Args:
+        img_path: Path gambar
+        
+    Returns:
+        Path file label atau None jika tidak ditemukan
+    """
+    # Cek apakah ada file label di folder paralel
+    parent_dir = img_path.parent.parent
+    label_path = parent_dir / 'labels' / f"{img_path.stem}.txt"
+    
+    if label_path.exists():
+        return label_path
+    
+    # Cek apakah ada file label di folder sibling
+    sibling_label_dir = img_path.parent.parent / 'labels'
+    if sibling_label_dir.exists():
+        sibling_label_path = sibling_label_dir / f"{img_path.stem}.txt"
+        if sibling_label_path.exists():
+            return sibling_label_path
+    
+    return None
+
+def load_image(img_path: Path) -> np.ndarray:
+    """Fungsi helper untuk loading gambar dengan berbagai format."""
+    if str(img_path).endswith('.npy'):
+        # Handle numpy array
+        img = np.load(str(img_path))
+        # Denormalisasi jika perlu
+        if img.dtype == np.float32 and img.max() <= 1.0:
+            img = (img * 255).astype(np.uint8)
+    else:
+        # Handle gambar biasa
+        img = cv2.imread(str(img_path))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    return img
+
+
+def find_matching_pairs(
+    augmented_files: List[Path], 
+    original_files: List[Path], 
+    orig_prefix: str = "rp",
+    aug_prefix: str = "aug"
+) -> List[Tuple[Path, Path]]:
+    """
+    Temukan pasangan file augmentasi dan original berdasarkan uuid dalam nama file.
+    
+    Args:
+        augmented_files: List path file augmentasi
+        original_files: List path file original
+        orig_prefix: Prefix untuk file original
+        aug_prefix: Prefix untuk file augmentasi
+        
+    Returns:
+        List tuple (original_path, augmented_path)
+    """
+    # Siapkan mapping original filename -> path
+    original_map = {f.name: f for f in original_files}
+    
+    # Cari pasangan yang cocok
+    matched_pairs = []
+    
+    for aug_file in augmented_files:
+        # Dapatkan nama file original yang sesuai
+        orig_filename = get_original_from_augmented(aug_file.name, orig_prefix)
+        
+        if orig_filename and orig_filename in original_map:
+            orig_file = original_map[orig_filename]
+            matched_pairs.append((orig_file, aug_file))
+    
+    return matched_pairs

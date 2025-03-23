@@ -90,11 +90,11 @@ def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=
     if 'compare_button' in ui_components:
         ui_components['compare_button'].on_click(on_compare_click)
     
-    from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_sample
+    from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
     from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
     # Tambahkan fungsi ke ui_components
     ui_components.update({
-        'visualize_dataset': visualize_preprocessed_sample,
+        'visualize_dataset': visualize_preprocessed_samples,
         'compare_datasets': compare_original_vs_preprocessed,
         'on_visualize_click': on_visualize_click,
         'on_compare_click': on_compare_click

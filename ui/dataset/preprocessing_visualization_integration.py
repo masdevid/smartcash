@@ -41,10 +41,10 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi visualisasi
-            from smartcash.ui.visualization.visualize_preprocessed_sample import visualize_preprocessed_sample
+            from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
             
             # Visualisasikan sampel
-            visualize_preprocessed_sample(
+            visualize_preprocessed_samples(
                 ui_components={"status": output_widget, "logger": logger},
                 preprocessed_dir=preprocessed_dir,
                 original_dir=ui_components.get('data_dir', 'data'),

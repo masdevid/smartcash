@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/preprocessor/dataset_preprocessor.py
-Deskripsi: Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan
+Deskripsi: Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan dan refactor untuk DRY
 """
 
 import os
@@ -11,13 +11,20 @@ from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 import cv2
 import numpy as np
 from tqdm.auto import tqdm
-import uuid
-import re
 
 from smartcash.common.exceptions import DatasetProcessingError
 from smartcash.dataset.services.preprocessor.pipeline import PreprocessingPipeline
 from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
 from smartcash.components.observer import notify, EventTopics
+
+# Import utils yang telah dipindahkan
+from smartcash.dataset.utils.preprocessor_utils import (
+    extract_class_from_label,
+    get_source_dir,
+    update_progress,
+    resolve_splits,
+    preprocess_single_image
+)
 
 class DatasetPreprocessor:
     """Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan."""
@@ -59,7 +66,7 @@ class DatasetPreprocessor:
             try: notify(event_type=EventTopics.PREPROCESSING_START, sender="dataset_preprocessor", message=f"Memulai preprocessing dataset {split or 'semua split'}") 
             except Exception: pass
             
-            if not (splits_to_process := self._resolve_splits(split)): return {"error": "Tidak ada split valid"}
+            if not (splits_to_process := resolve_splits(split)): return {"error": "Tidak ada split valid"}
             start_time, results = time.time(), {}
             
             # Definisi langkah-langkah utama preprocessing dengan step metadata
@@ -83,19 +90,23 @@ class DatasetPreprocessor:
             total_progress = total_images_all + 2  # +1 persiapan, +1 finalisasi
             
             # Step 1: Persiapan dataset - 10% dari total progress
-            self._update_progress(1, total_progress, f"Persiapan preprocessing dataset ({total_images_all} gambar di {len(splits_to_process)} split)...", 
-                                status="info", step=0, current_step=1, current_total=3, total_files_all=total_progress)
+            update_progress(
+                self._progress_callback, 1, total_progress, 
+                f"Persiapan preprocessing dataset ({total_images_all} gambar di {len(splits_to_process)} split)...", 
+                status="info", step=0, split_step="0/1", 
+                total_files_all=total_progress
+            )
             
             # Step 2: Proses setiap split - 80% dari total progress
             progress_so_far = 1  # Mulai dari 1 (setelah persiapan)
             
             for i, current_split in enumerate(splits_to_process):
                 # PERBAIKAN: Update progress untuk mulai memproses split ini dengan metadata lebih lengkap
-                self._update_progress(
-                    progress_so_far, total_progress, 
+                update_progress(
+                    self._progress_callback, progress_so_far, total_progress, 
                     f"Memulai preprocessing split {current_split} ({total_images_by_split.get(current_split, 0)} gambar)...", 
-                    status="info", step=1, current_step=i+1, current_total=len(splits_to_process), 
-                    split=current_split, split_step=f"{i+1}/{len(splits_to_process)}",
+                    status="info", step=1, split=current_split, 
+                    split_step=f"{i+1}/{len(splits_to_process)}",
                     total_files_all=total_progress
                 )
                 
@@ -117,18 +128,18 @@ class DatasetPreprocessor:
                 
                 # PERBAIKAN: Memberikan pesan ringkas tentang hasil split dengan informasi lebih lengkap
                 split_msg = f"Preprocessing Split {current_split} ({i+1}/{len(splits_to_process)}) selesai: {split_result.get('processed', 0)} diproses, {split_result.get('skipped', 0)} dilewati"
-                self._update_progress(
-                    progress_so_far, total_progress, split_msg, status="info", 
-                    step=1, current_step=i+1, current_total=len(splits_to_process),
-                    split=current_split, split_step=f"{i+1}/{len(splits_to_process)}",
+                update_progress(
+                    self._progress_callback, progress_so_far, total_progress, split_msg, 
+                    status="info", step=1, split=current_split, 
+                    split_step=f"{i+1}/{len(splits_to_process)}",
                     total_files_all=total_progress
                 )
             
             # Step 3: Finalisasi - 10% dari total progress
-            self._update_progress(
-                total_progress - 1, total_progress, 
+            update_progress(
+                self._progress_callback, total_progress - 1, total_progress, 
                 f"Finalisasi hasil preprocessing...", status="info",
-                step=2, current_step=1, current_total=1,
+                step=2, split_step="1/1",
                 total_files_all=total_progress
             )
             
@@ -146,10 +157,10 @@ class DatasetPreprocessor:
             }
             
             # Update progress final (100%)
-            self._update_progress(
-                total_progress, total_progress, 
+            update_progress(
+                self._progress_callback, total_progress, total_progress, 
                 f"Preprocessing selesai: {total_images} gambar berhasil diproses dalam {total_result['processing_time']:.1f} detik", 
-                status="success", step=2, current_step=1, current_total=1,
+                status="success", step=2, split_step="1/1",
                 total_files_all=total_progress
             )
             
@@ -166,25 +177,9 @@ class DatasetPreprocessor:
             except Exception: pass
             raise DatasetProcessingError(f"Gagal melakukan preprocessing: {str(e)}")
     
-    def _resolve_splits(self, split: Optional[str]) -> List[str]:
-        """
-        Resolve split parameter menjadi list split yang akan diproses.
-        
-        Args:
-            split: Split yang akan diproses ('train', 'valid', 'test', None untuk semua)
-            
-        Returns:
-            List split yang akan diproses
-        """
-        # Jika split None atau 'all', proses semua split
-        if not split or split.lower() == 'all':
-            return ['train', 'valid', 'test']
-        # Untuk split 'val', gunakan 'valid'
-        elif split.lower() == 'val':
-            return ['valid']
-        # Untuk nilai split lainnya
-        else:
-            return [split]
+    def _get_source_dir(self, split: str) -> str:
+        """Proxy method ke utils function untuk backward compatibility."""
+        return get_source_dir(split, self.config)
     
     def _preprocess_split(self, split: str, force_reprocess: bool, show_progress: bool, 
                          progress_start: int = 0, total_progress: int = 100, 
@@ -197,10 +192,10 @@ class DatasetPreprocessor:
                 processed = len(list((images_path := self.storage.get_split_path(split) / 'images').glob('*.*'))) if images_path.exists() else 0
                 
                 # Update progress untuk menandai split sudah selesai diproses
-                self._update_progress(
-                    progress_start + processed, total_progress,
+                update_progress(
+                    self._progress_callback, progress_start + processed, total_progress,
                     f"Split {split} sudah dipreprocess sebelumnya ({processed} gambar)", status="info",
-                    step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                    step=1, split=split, split_step=split_step,
                     total_files_all=total_files_all
                 )
                                     
@@ -212,9 +207,9 @@ class DatasetPreprocessor:
             if not images_dir.exists() or not labels_dir.exists():
                 error_message = f"❌ Direktori gambar atau label tidak ditemukan: {images_dir} atau {labels_dir}"
                 self.logger.error(error_message)
-                self._update_progress(
-                    progress_start, total_progress, error_message, status="error", 
-                    step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                update_progress(
+                    self._progress_callback, progress_start, total_progress, error_message, 
+                    status="error", step=1, split=split, split_step=split_step,
                     total_files_all=total_files_all
                 )
                 return {'processed': 0, 'skipped': 0, 'failed': 1, 'success': False, 'error': error_message}
@@ -231,9 +226,10 @@ class DatasetPreprocessor:
             
             if num_files == 0:
                 self.logger.warning(f"⚠️ Tidak ada file gambar yang ditemukan di {images_dir}")
-                self._update_progress(
-                    progress_start, total_progress, f"Tidak ada file gambar ditemukan di {images_dir}", 
-                    status="warning", step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                update_progress(
+                    self._progress_callback, progress_start, total_progress, 
+                    f"Tidak ada file gambar ditemukan di {images_dir}", 
+                    status="warning", step=1, split=split, split_step=split_step,
                     total_files_all=total_files_all
                 )
                 return {'processed': 0, 'skipped': 0, 'failed': 0, 'success': True}
@@ -250,11 +246,11 @@ class DatasetPreprocessor:
             }
             
             # PERBAIKAN: Tambahkan notifikasi awal saat mulai preprocessing split
-            self._update_progress(
-                progress_start, total_progress,
+            update_progress(
+                self._progress_callback, progress_start, total_progress,
                 f"Memulai preprocessing split {split} ({num_files} gambar)...",
-                status="info", step=1, current_step=1, current_total=3,
-                split=split, split_step=split_step, total_files_all=total_files_all,
+                status="info", step=1, split=split, split_step=split_step, 
+                total_files_all=total_files_all,
                 current_progress=0, current_total=num_files
             )
             
@@ -269,21 +265,21 @@ class DatasetPreprocessor:
                     if current_processed == 1 or current_processed == num_files or current_processed % max(1, num_files // 10) == 0:
                         progress_msg = f"Preprocessing split {split}: {current_processed}/{num_files} gambar"
                         
-                        self._update_progress(
-                            overall_processed, 
-                            total_progress,
-                            progress_msg, 
-                            status='info', 
-                            current_progress=current_processed,
-                            current_total=num_files,
-                            split=split,
-                            split_step=split_step,
-                            step=1,
-                            total_files_all=total_files_all
+                        update_progress(
+                            self._progress_callback, overall_processed, total_progress, progress_msg, 
+                            status='info', current_progress=current_processed,
+                            current_total=num_files, split=split, split_step=split_step,
+                            step=1, total_files_all=total_files_all
                         )
                     
-                    # Proses gambar dan update statistic
-                    stats['processed' if self._preprocess_single_image(img_path, labels_dir, target_images_dir, target_labels_dir, preprocessing_options) else 'skipped'] += 1
+                    # Proses gambar dan update statistic menggunakan fungsi dari utils
+                    result = preprocess_single_image(
+                        img_path, labels_dir, target_images_dir, target_labels_dir,
+                        self.pipeline, self.storage, self.file_prefix,
+                        preprocessing_options, self.logger
+                    )
+                    stats['processed' if result else 'skipped'] += 1
+                    
                 except Exception as e:
                     self.logger.error(f"❌ Gagal memproses {img_path.name}: {str(e)}"); stats['failed'] += 1
                 
@@ -292,10 +288,10 @@ class DatasetPreprocessor:
             progress.close()
             
             # Notifikasi finalisasi dan penyimpanan
-            self._update_progress(
-                progress_start + num_files, total_progress, 
+            update_progress(
+                self._progress_callback, progress_start + num_files, total_progress, 
                 f"Menyimpan metadata dan finalisasi split {split}", status="info", 
-                step=1, current_step=2, current_total=3, split=split, split_step=split_step,
+                step=1, split=split, split_step=split_step,
                 total_files_all=total_files_all
             )
             
@@ -308,10 +304,10 @@ class DatasetPreprocessor:
             self.logger.info(summary_message)
             
             # Final update untuk split
-            self._update_progress(
-                progress_start + num_files, total_progress, 
+            update_progress(
+                self._progress_callback, progress_start + num_files, total_progress, 
                 f"Preprocessing split {split} selesai", status="success", 
-                step=1, current_step=3, current_total=3, split=split, split_step=split_step,
+                step=1, split=split, split_step=split_step,
                 total_files_all=total_files_all
             )
             
@@ -320,174 +316,6 @@ class DatasetPreprocessor:
         except Exception as e:
             self.logger.error(f"❌ Gagal preprocessing split {split}: {str(e)}")
             return {'processed': 0, 'skipped': 0, 'failed': 1, 'success': False, 'error': str(e)}
-    
-    def _extract_class_from_label(self, label_path: Path) -> Optional[str]:
-        """
-        Ekstrak kelas dari file label YOLO dengan memilih class ID terkecil (prioritas banknote).
-        
-        Args:
-            label_path: Path ke file label
-            
-        Returns:
-            Nama kelas atau None jika tidak ditemukan
-        """
-        if not label_path.exists():
-            return None
-            
-        try:
-            # Baca semua baris dari file label
-            with open(label_path, 'r') as f:
-                label_lines = f.readlines()
-                
-            # Cek apakah ada isi label
-            if not label_lines:
-                return None
-            
-            # Ekstrak semua class ID dari semua baris
-            class_ids = []
-            for line in label_lines:
-                parts = line.strip().split()
-                if parts:
-                    # Class ID ada di posisi pertama format YOLO
-                    class_ids.append(int(parts[0]))
-            
-            # Jika tidak ada class ID valid
-            if not class_ids:
-                return None
-                
-            # Ambil class ID terkecil (prioritas banknote)
-            min_class_id = min(class_ids)
-            
-            # Map class ID ke nama kelas jika tersedia
-            class_names = self.config.get('data', {}).get('class_names', {})
-            if class_names and str(min_class_id) in class_names:
-                return class_names[str(min_class_id)]
-                
-            # Fallback ke class ID jika nama kelas tidak tersedia
-            return f"class{min_class_id}"
-        except Exception as e:
-            self.logger.debug(f"⚠️ Gagal ekstrak kelas dari {label_path}: {str(e)}")
-            return None
-    
-    def _get_source_dir(self, split: str) -> str:
-        """
-        Dapatkan direktori sumber data split.
-        
-        Args:
-            split: Split dataset ('train', 'valid', 'test')
-            
-        Returns:
-            Path direktori sumber data
-        """
-        # Cek apakah ada path spesifik untuk split
-        data_dir = self.config.get('data', {}).get('dir', 'data')
-        
-        # Jika punya local.split, gunakan itu
-        if 'local' in self.config.get('data', {}) and split in self.config.get('data', {}).get('local', {}):
-            return self.config['data']['local'][split]
-        
-        # Fallback ke direktori default
-        return os.path.join(data_dir, split)
-        
-    def _preprocess_single_image(self, img_path: Path, labels_dir: Path, 
-                               target_images_dir: Path, target_labels_dir: Path,
-                               preprocessing_options: Dict[str, Any] = None) -> bool:
-        """
-        Preprocess satu gambar dan label terkait, dan simpan hasilnya dengan penamaan yang ditingkatkan.
-        
-        Args:
-            img_path: Path ke file gambar
-            labels_dir: Direktori berisi file label
-            target_images_dir: Direktori output untuk gambar
-            target_labels_dir: Direktori output untuk label
-            preprocessing_options: Opsi preprocessing tambahan
-            
-        Returns:
-            Boolean menunjukkan keberhasilan preprocessing
-        """
-        # Generate nama file output berdasarkan nama file input
-        img_id = img_path.stem
-        label_path = labels_dir / f"{img_id}.txt"
-        
-        # Lewati jika tidak ada file label yang sesuai
-        if not label_path.exists():
-            self.logger.debug(f"⚠️ File label tidak ditemukan untuk {img_id}, dilewati")
-            return False
-            
-        # Proses gambar
-        try:
-            # Baca gambar
-            image = cv2.imread(str(img_path))
-            if image is None:
-                self.logger.warning(f"⚠️ Tidak dapat membaca gambar: {img_path}")
-                return False
-                
-            # Ambil opsi preprocessing dari options
-            options = preprocessing_options or {}
-            img_size = options.get('img_size', [640, 640])
-            normalize = options.get('normalize', True)
-            preserve_aspect_ratio = options.get('preserve_aspect_ratio', True)
-            
-            # Setup preprocessing options
-            self.pipeline.set_options(img_size=img_size, normalize=normalize, 
-                                     preserve_aspect_ratio=preserve_aspect_ratio)
-            
-            # Preprocess gambar
-            processed_image = self.pipeline.process(image)
-            
-            # Ekstrak kelas dari file label untuk penamaan file
-            banknote_class = self._extract_class_from_label(label_path)
-            
-            # Generate ID unik untuk file
-            unique_id = str(uuid.uuid4())[:8]  # 8 karakter pertama dari UUID
-            
-            # Generate nama file baru dengan format {prefix}_{class}_{unique_id}
-            new_filename = f"{self.file_prefix}_{banknote_class or 'unknown'}_{unique_id}"
-            
-            # Simpan hasil gambar
-            output_path = target_images_dir / f"{new_filename}.jpg"
-            
-            # Normalisasi jika perlu sebelum menyimpan
-            if normalize and processed_image.dtype == np.float32:
-                save_image = (processed_image * 255).astype(np.uint8)
-            else:
-                save_image = processed_image
-                
-            cv2.imwrite(str(output_path), save_image)
-            
-            # Salin file label dengan nama baru
-            with open(label_path, 'r') as src_file:
-                with open(target_labels_dir / f"{new_filename}.txt", 'w') as dst_file:
-                    dst_file.write(src_file.read())
-            
-            # Simpan metadata
-            metadata = {
-                'original_path': str(img_path),
-                'original_id': img_id,
-                'original_size': (image.shape[1], image.shape[0]),  # width, height
-                'processed_size': (processed_image.shape[1], processed_image.shape[0]),
-                'preprocessing_timestamp': time.time(),
-                'banknote_class': banknote_class,
-                'new_filename': new_filename
-            }
-            
-            # Simpan ke storage - dengan penanganan error untuk backward compatibility
-            try:
-                self.storage.save_metadata(split=Path(target_images_dir).parent.name, image_id=new_filename, metadata=metadata)
-            except (AttributeError, Exception) as e:
-                # Jika metode save_metadata tidak ada (backward compatibility)
-                self.logger.debug(f"⚠️ Storage tidak mendukung save_metadata: {str(e)}")
-            
-            return True
-            
-        except Exception as e:
-            # Tampilkan pesan error dengan nama file yang terpotong
-            short_id = img_id
-            if len(short_id) > 15:
-                short_id = f"...{short_id[-10:]}"
-            
-            self.logger.error(f"❌ Error saat preprocessing {short_id}: {str(e)}")
-            return False
     
     def clean_preprocessed(self, split: Optional[str] = None) -> None:
         """
@@ -531,42 +359,6 @@ class DatasetPreprocessor:
         """
         split_path = self.storage.get_split_path(split)
         return split_path.exists() and len(list(split_path.glob('**/*.jpg'))) > 0
-        
-    def _update_progress(self, current: int, total: int, message: str = None, status: str = 'info', **kwargs) -> None:
-        """
-        Update progress dengan callback dan notifikasi observer.
-        Throttling dilakukan di level UI, bukan di level service
-        
-        Args:
-            current: Progress saat ini
-            total: Total progress
-            message: Pesan progress
-            status: Status progress ('info', 'success', 'warning', 'error')
-            **kwargs: Parameter tambahan untuk callback
-        """
-        # Call progress callback jika ada
-        if self._progress_callback:
-            self._progress_callback(
-                progress=current, 
-                total=total, 
-                message=message or f"Preprocessing progress: {int(current/total*100) if total > 0 else 0}%", 
-                status=status, 
-                **kwargs
-            )
-        
-        # Notifikasi observer jika tidak disertakan flag suppress_notify
-        if not kwargs.get('suppress_notify', False):
-            try: 
-                notify(
-                    event_type=EventTopics.PREPROCESSING_PROGRESS, 
-                    sender="dataset_preprocessor", 
-                    message=message or f"Preprocessing progress: {int(current/total*100) if total > 0 else 0}%", 
-                    progress=current, 
-                    total=total, 
-                    **kwargs
-                )
-            except Exception: 
-                pass
 
 # Class alias untuk backward compatibility
 DatasetPreprocessorService = DatasetPreprocessor

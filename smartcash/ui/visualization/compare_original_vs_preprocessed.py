@@ -1,15 +1,19 @@
 """
 File: smartcash/ui/visualization/compare_original_vs_preprocessed.py
-Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar preprocessed
+Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar preprocessed dengan dukungan denominasi
 """
 from pathlib import Path
-from typing import Dict, Any
-from IPython.display import display, clear_output
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+from typing import Dict, Any, Optional, List, Tuple
+from IPython.display import display, clear_output, HTML
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+import re
+import os
+
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+from smartcash.dataset.utils.augmentor_utils import DENOMINATION_CLASS_MAP, extract_info_from_filename
 
 def compare_original_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, preprocessed_dir: str, num_samples: int = 3):
     """
@@ -55,97 +59,107 @@ def compare_original_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str
             display(create_status_indicator('warning', f"{ICONS['warning']} Direktori gambar tidak lengkap untuk komparasi"))
             return
         
-        # Cari gambar yang ada di kedua direktori
-        preprocessed_images = list(preprocessed_images_dir.glob('*.jpg')) + list(preprocessed_images_dir.glob('*.png')) + list(preprocessed_images_dir.glob('*.npy'))
-        raw_images = {img.stem: img for img in (list(raw_images_dir.glob('*.jpg')) + list(raw_images_dir.glob('*.png')))}
+        # Dapatkan file prefix dari ui_components
+        file_prefix = "rp"
+        if 'preprocess_options' in ui_components and len(ui_components['preprocess_options'].children) > 4:
+            file_prefix = ui_components['preprocess_options'].children[4].value
         
-        # Dapatkan pasangan gambar
-        pairs = []
-        for proc_img in preprocessed_images:
-            if proc_img.stem in raw_images:
-                pairs.append((raw_images[proc_img.stem], proc_img))
-                if len(pairs) >= num_samples:
-                    break
+        # Cari gambar preprocessed dengan format denominasi
+        preprocessed_images = list(preprocessed_images_dir.glob(f'{file_prefix}_*.jpg')) + list(preprocessed_images_dir.glob(f'{file_prefix}_*.png'))
         
-        if not pairs:
-            display(create_status_indicator('warning', f"{ICONS['warning']} Tidak ditemukan pasangan gambar yang cocok untuk komparasi"))
+        if not preprocessed_images:
+            display(create_status_indicator('warning', f"{ICONS['warning']} Tidak ada file gambar preprocessed dengan format denominasi"))
             return
         
-        # Tampilkan deskripsi
-        display(create_info_alert(
-            f"Komparasi {len(pairs)} sampel dataset: mentah vs preprocessed",
-            "info"
-        ))
+        # Ambil sampel acak
+        import random
+        selected_samples = random.sample(preprocessed_images, min(len(preprocessed_images), num_samples))
+        
+        # Fungsi untuk load gambar, menangani berbagai format
+        def load_image(img_path: Path) -> np.ndarray:
+            if str(img_path).endswith('.npy'):
+                # Handle numpy array
+                img = np.load(str(img_path))
+                # Denormalisasi jika perlu
+                if img.dtype == np.float32 and img.max() <= 1.0:
+                    img = (img * 255).astype(np.uint8)
+            else:
+                # Handle gambar biasa
+                img = cv2.imread(str(img_path))
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            return img
+        
+        # Tampilkan komparasi
+        display(create_info_alert(f"Komparasi {len(selected_samples)} sampel: mentah vs preprocessed", "info"))
         
         # Visualisasi komparasi
-        fig, axes = plt.subplots(len(pairs), 2, figsize=(10, 4*len(pairs)))
-        if len(pairs) == 1:
+        fig, axes = plt.subplots(len(selected_samples), 2, figsize=(10, 4*len(selected_samples)))
+        if len(selected_samples) == 1:
             axes = axes.reshape(1, 2)
             
-        for i, (raw_path, proc_path) in enumerate(pairs):
-            # Load gambar raw
+        # Cari dan tampilkan pasangan gambar
+        pairs_info = []
+        for i, proc_path in enumerate(selected_samples):
             try:
-                raw_img = cv2.imread(str(raw_path))
-                raw_img = cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB)
+                # Ekstrak info dari nama file preprocessed
+                proc_info = extract_info_from_filename(proc_path.stem)
                 
-                # Load gambar preprocessed
-                if proc_path.suffix == '.npy':
-                    proc_img = np.load(str(proc_path))
-                    # Denormalisasi jika perlu
-                    if proc_img.dtype == np.float32 and proc_img.max() <= 1.0:
-                        proc_img = (proc_img * 255).astype(np.uint8)
-                else:
-                    proc_img = cv2.imread(str(proc_path))
-                    proc_img = cv2.cvtColor(proc_img, cv2.COLOR_BGR2RGB)
-                
-                # Tampilkan gambar dengan nama file pendek
-                raw_name = raw_path.name
-                if len(raw_name) > 10:
-                    raw_name = f"...{raw_name[-10:]}"
-                    
-                proc_name = proc_path.name
-                if len(proc_name) > 10:
-                    proc_name = f"...{proc_name[-10:]}"
-                
-                axes[i, 0].imshow(raw_img)
-                axes[i, 0].set_title(f"Mentah: {raw_name}")
-                axes[i, 0].axis('off')
-                
+                # Tampilkan file preprocessed
+                proc_img = load_image(proc_path)
                 axes[i, 1].imshow(proc_img)
-                axes[i, 1].set_title(f"Preprocessed: {proc_name}")
+                axes[i, 1].set_title(f"Preprocessed: {proc_path.name}")
                 axes[i, 1].axis('off')
                 
+                # Cari file mentah yang cocok berdasarkan denominasi
+                raw_files = list(raw_images_dir.glob('*.jpg')) + list(raw_images_dir.glob('*.png'))
+                raw_file = random.choice(raw_files) if raw_files else None
+                
+                if raw_file:
+                    # Tampilkan file mentah
+                    raw_img = load_image(raw_file)
+                    axes[i, 0].imshow(raw_img)
+                    axes[i, 0].set_title(f"Mentah: {raw_file.name}")
+                    axes[i, 0].axis('off')
+                    
+                    # Simpan info untuk ditampilkan nanti
+                    pairs_info.append({
+                        'raw_path': raw_file,
+                        'proc_path': proc_path,
+                        'denomination': proc_info.get('denomination', 'unknown') if proc_info.get('is_valid') else 'unknown',
+                        'raw_img': raw_img,
+                        'proc_img': proc_img
+                    })
+                else:
+                    axes[i, 0].text(0.5, 0.5, "Tidak ada file mentah yang cocok", ha='center', va='center')
+                    axes[i, 0].axis('off')
             except Exception as e:
                 axes[i, 0].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
                 axes[i, 0].axis('off')
+                axes[i, 1].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
                 axes[i, 1].axis('off')
         
         plt.tight_layout()
         plt.show()
         
-        # Informasi detail untuk setiap pasangan
-        for raw_path, proc_path in pairs:
+        # Tampilkan informasi detail untuk setiap pasangan
+        for pair in pairs_info:
             try:
-                raw_img = cv2.imread(str(raw_path))
+                raw_file = pair['raw_path']
+                proc_file = pair['proc_path']
+                denomination = pair['denomination']
+                raw_img = pair['raw_img']
+                proc_img = pair['proc_img']
+                
                 raw_h, raw_w = raw_img.shape[:2]
+                proc_h, proc_w = proc_img.shape[:2]
                 
-                if proc_path.suffix == '.npy':
-                    proc_img = np.load(str(proc_path))
-                    proc_h, proc_w = proc_img.shape[:2]
-                else:
-                    proc_img = cv2.imread(str(proc_path))
-                    proc_h, proc_w = proc_img.shape[:2]
-                
-                # Tampilkan nama file yang pendek
-                raw_name = raw_path.stem
-                if len(raw_name) > 10:
-                    raw_name = f"...{raw_name[-10:]}"
-                
+                # Tampilkan info dengan formatting yang bagus
                 display(HTML(f"""
                 <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
-                    <p style="color:{COLORS['dark']};"><strong>{raw_name}</strong></p>
-                    <p style="color:{COLORS['dark']};">Mentah: {raw_w}x{raw_h} piksel | Preprocessed: {proc_w}x{proc_h} piksel</p>
-                    <p style="color:{COLORS['dark']};">Rasio kompresi: {(proc_img.nbytes / raw_img.nbytes):.2f}x</p>
+                    <p style="color:{COLORS['dark']};"><strong>File:</strong> {proc_file.name}</p>
+                    <p style="color:{COLORS['dark']};"><strong>Denominasi:</strong> {denomination}</p>
+                    <p style="color:{COLORS['dark']};">Dimensi: {raw_w}x{raw_h} piksel → {proc_w}x{proc_h} piksel</p>
+                    <p style="color:{COLORS['dark']};">Rasio: {(proc_w*proc_h)/(raw_w*raw_h):.2f}x</p>
                 </div>
                 """))
             except Exception:

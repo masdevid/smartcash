@@ -1,47 +1,66 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_worker.py
-Deskripsi: Worker untuk augmentasi file individu dengan tracking multi-class dan optimasi one-liner
+Deskripsi: Worker untuk augmentasi file individu dengan dukungan denominasi mata uang Rupiah
 """
 
 import os
 import cv2
+import uuid
 import numpy as np
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set, Tuple, Union
-from collections import defaultdict
+from typing import Dict, Any, List, Optional, Set, Tuple
 
-def get_classes_from_label(label_path: str) -> Tuple[Optional[str], Set[str], Dict[str, int]]:
+# Import utils untuk denominasi
+from smartcash.dataset.utils.augmentor_utils import (
+    DENOMINATION_CLASS_MAP, get_denomination_label, 
+    generate_denomination_filename, extract_info_from_filename
+)
+
+def get_classes_from_label(label_path: str) -> Tuple[Optional[str], Set[str]]:
     """
-    Ekstrak ID kelas utama, semua kelas, dan distribusi kelas dari file label YOLOv5.
+    Ekstrak ID kelas utama dan semua kelas dari file label YOLOv5 dengan prioritas denominasi.
     
     Args:
         label_path: Path file label
         
     Returns:
-        Tuple (ID kelas utama, set semua kelas, distribusi kelas)
+        Tuple (ID kelas utama, set semua kelas)
     """
     try:
-        if not os.path.exists(label_path): return None, set(), {}
-        
-        # Baca file dan ekstrak semua class_ids dengan one-liner
+        if not os.path.exists(label_path):
+            return None, set()
+            
+        # Baca file label
         with open(label_path, 'r') as f:
             lines = f.readlines()
             
-        # Initialize dengan one-liner
-        classes_counter = defaultdict(int)
+        # Ekstrak semua class ID
+        class_ids = []
+        all_classes = set()
         
-        # Parse dengan one-liner where possible
-        [classes_counter.update({parts[0]: classes_counter[parts[0]] + 1}) 
-         for line in lines if len(parts := line.strip().split()) >= 5 
-         and parts[0] != "-1" and parts[0].lower() != "unknown"]
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) >= 5:  # Format YOLOv5: class_id x y width height
+                class_id = parts[0]
+                class_ids.append(class_id)
+                all_classes.add(class_id)
         
-        # Dapatkan main class dan semua kelas dengan one-liner
-        main_class = min(classes_counter.keys()) if classes_counter else None
-        all_classes = set(classes_counter.keys())
+        if not class_ids:
+            return None, set()
+            
+        # Prioritaskan denominasi (kelas yang ada di mapping)
+        valid_denomination_ids = [cls for cls in class_ids if cls in DENOMINATION_CLASS_MAP]
         
-        return main_class, all_classes, dict(classes_counter)
+        # Jika ada valid denomination, ambil yang terkecil (untuk konsistensi)
+        if valid_denomination_ids:
+            main_class = min(valid_denomination_ids)
+        else:
+            # Jika tidak ada valid denomination, ambil yang terkecil dari semua kelas
+            main_class = min(class_ids)
+        
+        return main_class, all_classes
     except Exception:
-        return None, set(), {}
+        return None, set()
 
 def process_single_file(
     image_path: str,
@@ -54,11 +73,11 @@ def process_single_file(
     labels_input_dir: str = None,
     images_output_dir: str = None,
     labels_output_dir: str = None,
-    class_id: Optional[str] = None,
-    track_multi_class: bool = False
+    class_id: Optional[str] = None,  # Parameter opsional untuk metadata kelas
+    track_multi_class: bool = False  # Tracking untuk multi-class
 ) -> Dict[str, Any]:
     """
-    Proses augmentasi untuk satu file gambar dengan tracking multi-class.
+    Proses augmentasi untuk satu file gambar dengan format penamaan denominasi.
     
     Args:
         image_path: Path file gambar
@@ -72,126 +91,165 @@ def process_single_file(
         images_output_dir: Direktori output gambar
         labels_output_dir: Direktori output label
         class_id: ID kelas untuk metadata (opsional)
-        track_multi_class: Aktifkan tracking multi-class distributions
+        track_multi_class: Aktifkan tracking untuk multi-class
         
     Returns:
         Dictionary hasil augmentasi dengan metadata
     """
     try:
-        # Validasi input dengan one-liner
-        if not os.path.exists(image_path): 
-            return {"status": "error", "message": f"File tidak ditemukan: {image_path}", "generated": 0}
+        # Konversi path ke Path object
+        img_path = Path(image_path)
         
-        # Baca gambar dengan one-liner
-        image = cv2.imread(str(image_path))
-        if image is None: 
-            return {"status": "error", "message": f"Tidak dapat membaca gambar: {image_path}", "generated": 0}
+        # Jika path tidak valid, return status error
+        if not img_path.exists():
+            return {
+                "status": "error",
+                "message": f"File tidak ditemukan: {img_path}",
+                "generated": 0
+            }
         
-        # Dapatkan path label dengan one-liner
-        img_name = Path(image_path).stem
-        label_path = os.path.join(labels_input_dir, f"{img_name}.txt") if labels_input_dir else None
+        # Baca gambar
+        image = cv2.imread(str(img_path))
+        if image is None:
+            return {
+                "status": "error",
+                "message": f"Tidak dapat membaca gambar: {img_path}",
+                "generated": 0
+            }
         
-        # Dapatkan class ID, semua kelas, dan distribusi kelas
-        main_class_id, all_classes, class_distribution = (None, set(), {})
-        if label_path and os.path.exists(label_path):
-            main_class_id, all_classes, class_distribution = get_classes_from_label(label_path)
-            
-        # Gunakan class_id dari parameter atau dari label
-        class_id = class_id or main_class_id
+        # Dapatkan path label jika perlu memproses bbox
+        label_path = None
+        if labels_input_dir:
+            label_name = f"{img_path.stem}.txt"
+            label_path = os.path.join(labels_input_dir, label_name)
         
-        # Baca data bbox dengan one-liner
+        # Dapatkan class ID dan semua kelas jika belum ditentukan
+        main_class_id, all_classes = None, set()
+        if class_id is None and label_path and os.path.exists(label_path):
+            main_class_id, all_classes = get_classes_from_label(label_path)
+            class_id = main_class_id
+        
+        # Baca data bbox jika perlu dan label ada
         bboxes = []
         if process_bboxes and label_path and os.path.exists(label_path):
             try:
                 with open(label_path, 'r') as f:
                     bboxes = [line.strip() for line in f.readlines()]
             except Exception:
+                # Jika gagal membaca bbox, nonaktifkan processing
                 process_bboxes = False
         
         # Siapkan metadata
-        img_id = Path(image_path).stem
+        img_id = img_path.stem
         original_h, original_w = image.shape[:2]
         
+        # Extract info dari nama file original untuk uuid dll
+        original_filename_info = extract_info_from_filename(img_path.stem)
+        
+        # Tentukan format penamaan file berdasarkan hasil ekstraksi
+        if original_filename_info['is_valid']:
+            # Gunakan format yang sama dengan file asli
+            file_uuid = original_filename_info['uuid']
+            augmentation_prefix = original_filename_info.get('prefix', 'rp')
+        else:
+            # Fallback ke format default
+            file_uuid = img_path.stem  # Gunakan stem sebagai uuid jika format tak dikenali
+            augmentation_prefix = 'rp'
+        
+        # Tracking untuk multi-class jika diaktifkan
+        multi_class_update = {}
+        
         # Proses augmentasi untuk setiap variasi
-        results, class_updates = [], defaultdict(int)
+        results = []
         for var_idx in range(num_variations):
             try:
-                # Augmentasi gambar dengan pipeline
+                # Augmentasi gambar
                 augmented = pipeline(image=image)
                 augmented_image = augmented['image']
                 
-                # Proses bounding box dengan conditional one-liner
-                augmented_bboxes = (
-                    bbox_augmentor.transform_bboxes(image, augmented_image, bboxes, augmented.get('transforms', []))
-                    if process_bboxes and bbox_augmentor and bboxes else bboxes
-                )
+                # Dapatkan bounding box baru jika perlu
+                augmented_bboxes = []
+                if process_bboxes and bbox_augmentor and bboxes:
+                    # Gunakan bbox augmentor jika tersedia
+                    augmented_bboxes = bbox_augmentor.transform_bboxes(
+                        image, augmented_image, bboxes, augmented.get('transforms', [])
+                    )
+                elif bboxes:
+                    # Gunakan bbox original jika tidak perlu transform
+                    augmented_bboxes = bboxes
                 
                 # Validasi hasil jika diminta
                 if validate_results:
-                    # Skip jika dimensi tidak valid atau bbox gagal diproses
-                    if augmented_image.shape[0] <= 0 or augmented_image.shape[1] <= 0 or (process_bboxes and not augmented_bboxes):
+                    # Cek dimensi gambar
+                    if augmented_image.shape[0] <= 0 or augmented_image.shape[1] <= 0:
+                        continue
+                    
+                    # Cek integritas bbox jika ada
+                    if process_bboxes and not augmented_bboxes:
                         continue
                 
-                # Generate nama file dengan one-liner
-                output_basename = f"{output_prefix}_{img_id}_var{var_idx+1}"
-                output_paths = {
-                    'image': os.path.join(images_output_dir, f"{output_basename}.jpg"),
-                    'label': os.path.join(labels_output_dir, f"{output_basename}.txt") if process_bboxes and labels_output_dir else None
-                }
+                # Generate nama file output dengan format denominasi
+                if class_id in DENOMINATION_CLASS_MAP:
+                    # Format: aug_rp_100k_uuid_var_1.jpg
+                    output_basename = f"aug_{augmentation_prefix}_{get_denomination_label(class_id)}_{file_uuid}_var_{var_idx+1}"
+                else:
+                    # Format fallback: aug_rp_unknown_uuid_var_1.jpg
+                    output_basename = f"aug_{augmentation_prefix}_unknown_{file_uuid}_var_{var_idx+1}"
+                
+                output_image_path = os.path.join(images_output_dir, f"{output_basename}.jpg")
                 
                 # Simpan hasil augmentasi gambar
-                cv2.imwrite(output_paths['image'], augmented_image)
+                cv2.imwrite(output_image_path, augmented_image)
                 
-                # Simpan hasil augmentasi bbox dan track class update
-                if process_bboxes and output_paths['label'] and augmented_bboxes:
-                    with open(output_paths['label'], 'w') as f:
+                # Simpan hasil augmentasi bbox jika perlu
+                if process_bboxes and labels_output_dir and augmented_bboxes:
+                    output_label_path = os.path.join(labels_output_dir, f"{output_basename}.txt")
+                    with open(output_label_path, 'w') as f:
                         for bbox in augmented_bboxes:
                             f.write(f"{bbox}\n")
-                            
-                            # Track perubahan distribusi kelas jika diaktifkan
-                            if track_multi_class:
-                                try:
-                                    # Extract class ID dari bbox dengan one-liner
-                                    bbox_class = bbox.strip().split()[0]
-                                    if bbox_class != "-1" and bbox_class.lower() != "unknown":
-                                        class_updates[bbox_class] += 1
-                                except IndexError:
-                                    pass
                 
-                # Catat hasil untuk variasi ini dengan one-liner
+                # Catat hasil untuk variasi ini
                 results.append({
                     "variant": var_idx + 1,
-                    "image_path": output_paths['image'],
-                    "label_path": output_paths['label'],
+                    "image_path": output_image_path,
                     "original_size": (original_w, original_h),
                     "augmented_size": (augmented_image.shape[1], augmented_image.shape[0]),
                     "has_bboxes": len(augmented_bboxes) > 0 if process_bboxes else False
                 })
                 
+                # Update tracking multi-class jika diaktifkan
+                if track_multi_class:
+                    for cls in all_classes:
+                        if cls not in multi_class_update:
+                            multi_class_update[cls] = 0
+                        multi_class_update[cls] += 1
+                
             except Exception as e:
                 # Skip variasi yang error
                 continue
         
-        # Buat output dengan one-liner update
-        output = {
+        # Return hasil proses
+        result = {
             "status": "success",
             "image_id": img_id,
-            "class_id": class_id,
-            "all_classes": list(all_classes) if all_classes else [class_id] if class_id else [],
-            "original_path": str(image_path),
+            "class_id": class_id,  # Kelas utama
+            "denomination": get_denomination_label(class_id) if class_id else "unknown",
+            "all_classes": list(all_classes) if all_classes else [class_id] if class_id else [],  # Semua kelas
+            "original_path": str(img_path),
             "generated": len(results),
             "variations": results
         }
         
-        # Tambahkan informasi multi-class jika tracking diaktifkan
-        if track_multi_class:
-            output.update({
-                "class_distribution": class_distribution,
-                "multi_class_update": dict(class_updates)
-            })
+        # Tambahkan tracking multi-class jika diaktifkan
+        if track_multi_class and multi_class_update:
+            result["multi_class_update"] = multi_class_update
         
-        return output
+        return result
     
     except Exception as e:
-        # Handle error dengan one-liner
-        return {"status": "error", "message": f"Error saat augmentasi {image_path}: {str(e)}", "generated": 0}
+        # Handle error
+        return {
+            "status": "error",
+            "message": f"Error saat augmentasi {str(image_path)}: {str(e)}",
+            "generated": 0
+        }

@@ -413,7 +413,7 @@ class ClassBalancer:
                     fulfilled_classes[cls] = self.current_class_counts[cls]
         
         # Log kelas yang sudah terpenuhi
-        if fulfilled_classes:
-            self.logger.info(f"✅ Kelas yang mencapai target setelah augmentasi: {', '.join(fulfilled_classes.keys())}")
+        # if fulfilled_classes:
+        #     self.logger.info(f"✅ Kelas yang mencapai target setelah augmentasi: {', '.join(fulfilled_classes.keys())}")
         
         return fulfilled_classes

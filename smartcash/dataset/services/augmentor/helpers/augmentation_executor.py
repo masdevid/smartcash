@@ -171,7 +171,7 @@ def execute_prioritized_class_augmentation(
         )
         
         if not files_for_class:
-            service.logger.warning(f"⚠️ Tidak ada file tersedia untuk kelas {class_id}, dilewati")
+            # service.logger.warning(f"⚠️ Tidak ada file tersedia untuk kelas {class_id}, dilewati")
             continue
             
         service.logger.info(f"📑 Menggunakan {len(files_for_class)} file untuk augmentasi kelas {class_id}")

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/visualization/visualize_preprocessed_samples.py
-Deskripsi: Utilitas untuk menampilkan sampel dataset yang telah dipreprocessing
+Deskripsi: Utilitas untuk menampilkan sampel dataset yang telah dipreprocessing dengan dukungan format denominasi
 """
 from smartcash.ui.utils.constants import COLORS, ICONS 
 from IPython.display import display, clear_output, HTML
@@ -9,10 +9,13 @@ from typing import Dict, Any
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+import re
+
+from smartcash.dataset.utils.augmentor_utils import extract_info_from_filename
 
 def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
     """
-    Visualisasi sampel dataset yang telah dipreprocessing.
+    Visualisasi sampel dataset yang telah dipreprocessing dengan dukungan format denominasi.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -49,14 +52,20 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
             display(create_status_indicator('warning', f"{ICONS['warning']} Direktori gambar tidak ditemukan di {train_dir}"))
             return
             
-        # Ambil semua gambar
-        image_files = list(images_dir.glob('*.jpg')) + list(images_dir.glob('*.png')) + list(images_dir.glob('*.npy'))
+        # Dapatkan file prefix dari ui_components
+        file_prefix = "rp"
+        if 'preprocess_options' in ui_components and len(ui_components['preprocess_options'].children) > 4:
+            file_prefix = ui_components['preprocess_options'].children[4].value
+            
+        # Ambil semua gambar dengan format denominasi
+        image_files = list(images_dir.glob(f'{file_prefix}_*.jpg')) + list(images_dir.glob(f'{file_prefix}_*.png')) + list(images_dir.glob(f'{file_prefix}_*.npy'))
         if not image_files:
             display(create_status_indicator('warning', f"{ICONS['warning']} Tidak ada file gambar ditemukan di {images_dir}"))
             return
             
         # Batasi jumlah sampel
-        image_files = image_files[:min(num_samples, len(image_files))]
+        import random
+        image_files = random.sample(image_files, min(num_samples, len(image_files)))
         
         # Tampilkan deskripsi dengan create_info_alert standar
         display(create_info_alert(
@@ -83,13 +92,21 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
                     img = cv2.imread(str(img_path))
                     img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                 
+                # Ekstrak info dari nama file
+                file_info = extract_info_from_filename(img_path.stem)
+                
                 # Tampilkan gambar
                 axes[i].imshow(img)
+                
                 # Tampilkan nama file yang pendek
                 img_name = img_path.name
-                if len(img_name) > 10:
-                    img_name = f"...{img_name[-10:]}"
-                axes[i].set_title(f"{img_name}")
+                
+                # Tambahkan informasi denominasi jika tersedia
+                title = f"{img_name[:10]}...{img_name[-7:]}"
+                if file_info.get('is_valid') and 'denomination' in file_info:
+                    title += f"\n({file_info['denomination']})"
+                
+                axes[i].set_title(title)
                 axes[i].axis('off')
             except Exception as e:
                 axes[i].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -108,11 +125,12 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
                     img = cv2.imread(str(img_path))
                     h, w = img.shape[:2]
                 
-                # Tampilkan nama file yang pendek
-                img_name = img_path.name
-                if len(img_name) > 15:
-                    img_name = f"...{img_name[-10:]}"
+                # Ekstrak info dari nama file
+                file_info = extract_info_from_filename(img_path.stem)
                 
-                display(HTML(f"<p style='color:{COLORS['dark']}'><strong>{img_name}</strong>: {w}x{h} piksel</p>"))
+                # Tampilkan info dengan denominasi
+                denomination = file_info.get('denomination', 'unknown') if file_info.get('is_valid') else 'unknown'
+                
+                display(HTML(f"<p style='color:{COLORS['dark']}'><strong>{img_path.name}</strong>: {w}x{h} piksel | Denominasi: {denomination}</p>"))
             except Exception:
                 pass

@@ -1,19 +1,64 @@
 """
 File: smartcash/ui/visualization/compare_original_vs_augmented.py
-Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar augmentasi
+Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar augmentasi dengan dukungan format denominasi
 """
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional, Tuple
 from IPython.display import display, HTML
 import matplotlib.pyplot as plt
+import re
+import os
+import cv2
+import numpy as np
+
+def match_original_with_augmented(aug_filename: str, original_files: List[Path]) -> Optional[Path]:
+    """
+    Mencari file original yang cocok dengan file augmentasi berdasarkan format denominasi.
+    
+    Format file augmentasi: aug_rp_100k_uuid_var_1.jpg
+    Format file original: rp_100k_uuid.jpg
+    
+    Args:
+        aug_filename: Nama file augmentasi
+        original_files: List file original
+        
+    Returns:
+        Path file original yang cocok atau None jika tidak ditemukan
+    """
+    # Pattern untuk file augmentasi
+    pattern = r'aug_(?P<prefix>\w+)_(?P<denomination>\w+)_(?P<uuid>[^_]+)_var_(?P<variation>\d+)'
+    match = re.match(pattern, Path(aug_filename).stem)
+    
+    if not match:
+        return None
+    
+    # Ekstrak informasi dari augmented file
+    orig_prefix = match.group('prefix')
+    denomination = match.group('denomination')
+    uuid = match.group('uuid')
+    
+    # Cari file original yang cocok
+    original_pattern = f"{orig_prefix}_{denomination}_{uuid}"
+    
+    for orig_file in original_files:
+        if orig_file.stem.startswith(original_pattern):
+            return orig_file
+    
+    return None
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
-    """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan algoritma pencocokan yang lebih baik."""
+    """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan dukungan format denominasi."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     from smartcash.common.utils import format_size
-    from smartcash.ui.utils.file_utils import shorten_filename, find_matching_pairs, load_image
-    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.utils.file_utils import shorten_filename, load_image, find_label_path
+from smartcash.ui.utils.constants import COLORS, ICONS 
+from smartcash.dataset.utils.augmentor_utils import DENOMINATION_CLASS_MAP, extract_info_from_filename
+
+def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
+    """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan dukungan format denominasi."""
+    from smartcash.ui.utils.alert_utils import create_info_alert
+    from smartcash.common.utils import format_size
     
     # Get augmentation prefix
     aug_prefix = "aug"
@@ -35,79 +80,24 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
         display(create_info_alert(f"Tidak ada file gambar original ditemukan di {original_dir}", "warning"))
         return
     
-    # Metode yang lebih baik: cari pasangan berdasarkan UUID
-    matched_pairs = find_matching_pairs(augmented_images, original_images, orig_prefix, aug_prefix)
+    # Cari pasangan yang cocok berdasarkan format denominasi
+    matched_pairs = []
     
-    # Jika tidak ada pasangan yang cocok, gunakan strategi pencocokan old style
+    for aug_file in augmented_images:
+        # Cari file original yang cocok dengan format denominasi
+        orig_file = match_original_with_augmented(aug_file.name, original_images)
+        if orig_file:
+            matched_pairs.append((orig_file, aug_file))
+    
+    # Jika tidak ada pasangan yang cocok, tampilkan pesan error
     if not matched_pairs:
-        display(create_info_alert("Tidak ditemukan pasangan file yang cocok, menggunakan pencocokan berdasarkan kelas...", "warning"))
-        
-        # Metode pencocokan berdasarkan kelas
-        class_to_orig_images = {}  # Dictionary kelas -> list gambar original
-        class_to_aug_images = {}   # Dictionary kelas -> list gambar augmented
-        
-        # Identifikasi kelas dari nama file
-        def extract_class_from_filename(filename: str, prefix: str) -> Optional[str]:
-            """Ekstrak nama kelas dari nama file dengan pola prefix_class_uuid."""
-            parts = filename.split('_')
-            if len(parts) < 3 or parts[0] != prefix:
-                return None
-            
-            # Kelas ada di tengah (prefix_class_uuid)
-            # Untuk format dengan multiple underscore di nama kelas, ambil semua kecuali prefix dan uuid terakhir
-            return '_'.join(parts[1:-1])  # Semua bagian tengah adalah nama kelas
-        
-        # Kelompokkan file original berdasarkan kelas
-        for img_path in original_images:
-            class_name = extract_class_from_filename(img_path.stem, orig_prefix)
-            if class_name:
-                if class_name not in class_to_orig_images:
-                    class_to_orig_images[class_name] = []
-                class_to_orig_images[class_name].append(img_path)
-        
-        # Kelompokkan file augmented berdasarkan kelas
-        for img_path in augmented_images:
-            # Format baru: aug_rp_class_uuid_var1
-            # Ekstrak class name dari augmentasi (parts[2])
-            parts = img_path.stem.split('_')
-            if len(parts) >= 5 and parts[0] == aug_prefix and parts[1] == orig_prefix:
-                class_name = parts[2]
-                if class_name not in class_to_aug_images:
-                    class_to_aug_images[class_name] = []
-                class_to_aug_images[class_name].append(img_path)
-        
-        # Buat pasangan orig-aug dari kelas yang sama
-        matched_class_pairs = []
-        common_classes = set(class_to_orig_images.keys()) & set(class_to_aug_images.keys())
-        
-        # Filter hanya kelas dengan aug dan orig sama-sama tersedia
-        for cls in common_classes:
-            orig_files = class_to_orig_images[cls]
-            aug_files = class_to_aug_images[cls]
-            
-            # Hanya ambil maksimal 1 file per kelas untuk meningkatkan variasi
-            if orig_files and aug_files:
-                import random
-                orig_file = random.choice(orig_files)
-                aug_file = random.choice(aug_files)
-                matched_class_pairs.append((orig_file, aug_file))
-            
-            # Batasi jumlah sampel
-            if len(matched_class_pairs) >= num_samples:
-                break
-        
-        # Gunakan hasil dari pencocokan kelas jika ada
-        if matched_class_pairs:
-            matched_pairs = matched_class_pairs
+        display(create_info_alert("Tidak ditemukan pasangan file yang cocok dengan format denominasi", "warning"))
+        return
     
     # Batasi jumlah sampel
     if len(matched_pairs) > num_samples:
         import random
         matched_pairs = random.sample(matched_pairs, num_samples)
-    
-    if not matched_pairs:
-        display(create_info_alert("Tidak dapat menemukan pasangan gambar untuk komparasi", "error"))
-        return
     
     # Tampilkan deskripsi
     display(create_info_alert(f"Komparasi {len(matched_pairs)} sampel: asli vs augmentasi", "info"))
@@ -141,7 +131,7 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
     plt.tight_layout()
     plt.show()
     
-    # Tampilkan info perbandingan
+    # Tampilkan info perbandingan dan ekstrak denominasi
     for orig_path, aug_path in matched_pairs:
         try:
             orig_img = load_image(orig_path)
@@ -153,13 +143,16 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             orig_size = os.path.getsize(orig_path)
             aug_size = os.path.getsize(aug_path)
             
-            # Ekstrak dan tampilkan class dengan jelas
-            # Format baru: aug_rp_class_uuid_var1
-            parts = aug_path.stem.split('_')
-            if len(parts) >= 5 and parts[0] == aug_prefix and parts[1] == orig_prefix:
-                class_name = parts[2]
-            else:
-                class_name = "Unknown"
+            # Ekstrak denominasi dari nama file
+            orig_info = extract_info_from_filename(orig_path.stem)
+            aug_info = extract_info_from_filename(aug_path.stem)
+            
+            # Tentukan denominasi untuk ditampilkan
+            denomination = "Unknown"
+            if aug_info['is_valid'] and 'denomination' in aug_info:
+                denomination = aug_info['denomination']
+            elif orig_info['is_valid'] and 'denomination' in orig_info:
+                denomination = orig_info['denomination']
             
             # Tampilkan nama file yang dipersingkat dan informasi detail
             orig_name = shorten_filename(orig_path.stem, 20)
@@ -168,7 +161,7 @@ def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, outpu
             display(HTML(f"""
             <div style="margin:10px 0; padding:5px; border-left:3px solid {COLORS['primary']}; background-color:{COLORS['light']}">
                 <p style="color:{COLORS['dark']};"><strong>Original:</strong> {orig_name} | <strong>Augmented:</strong> {aug_name}</p>
-                <p style="color:{COLORS['dark']};"><strong>Kelas:</strong> {class_name}</p>
+                <p style="color:{COLORS['dark']};"><strong>Denominasi:</strong> {denomination}</p>
                 <p style="color:{COLORS['dark']};">Dimensi: {orig_w}×{orig_h} px → {aug_w}×{aug_h} px</p>
                 <p style="color:{COLORS['dark']};">Ukuran: {format_size(orig_size)} → {format_size(aug_size)} ({aug_size/orig_size:.2f}×)</p>
             </div>

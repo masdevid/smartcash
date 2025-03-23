@@ -1,61 +1,137 @@
 """
 File: smartcash/dataset/utils/augmentor_utils.py
-Deskripsi: Fungsi helper untuk augmentasi dataset dengan tracking multi-class dan optimasi one-liner
+Deskripsi: Fungsi helper untuk augmentasi dataset dengan pendekatan DRY, one-liner, dan mapping denominasi
 """
 
-import os, glob, shutil, random, re
+import os
+import glob
+import shutil
+import random
+import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Tuple, Callable, Set, Union
 from collections import defaultdict
 
+# Mapping denominasi mata uang Rupiah berdasarkan class id
+DENOMINATION_CLASS_MAP = {
+    '0': '1k',    # 1.000 Rupiah
+    '1': '2k',    # 2.000 Rupiah
+    '2': '5k',    # 5.000 Rupiah
+    '3': '10k',   # 10.000 Rupiah
+    '4': '20k',   # 20.000 Rupiah
+    '5': '50k',   # 50.000 Rupiah
+    '6': '100k',  # 100.000 Rupiah
+    '7': '1k',    # 1.000 Rupiah (variant)
+    '8': '2k',    # 2.000 Rupiah (variant)
+    '9': '5k',    # 5.000 Rupiah (variant)
+    '10': '10k',  # 10.000 Rupiah (variant)
+    '11': '20k',  # 20.000 Rupiah (variant)
+    '12': '50k',  # 50.000 Rupiah (variant)
+    '13': '100k', # 100.000 Rupiah (variant)
+}
+
+def get_denomination_label(class_id: str) -> str:
+    """Dapatkan label denominasi dari class ID."""
+    return DENOMINATION_CLASS_MAP.get(class_id, 'unknown')
+
 def get_class_from_label(label_path: str) -> Optional[str]:
-    """Ekstrak ID kelas utama dari file label YOLOv5."""
+    """Ekstrak ID kelas utama dari file label YOLOv5 dengan prioritas denominasi."""
     try:
         if not os.path.exists(label_path): return None
         # Baca file dan ekstrak class_ids dengan one-liner
         with open(label_path, 'r') as f:
             class_ids = [parts[0] for line in f.readlines() 
-                      if len(parts := line.strip().split()) >= 5 
-                      and parts[0] != "-1" and parts[0].lower() != "unknown"]
-        return min(class_ids) if class_ids else None
+                      if len(parts := line.strip().split()) >= 5]
+                      
+        # Jika tidak ada kelas yang valid, return None
+        if not class_ids: return None
+        
+        # Prioritaskan denominasi (kelas yang ada di mapping)
+        valid_denomination_ids = [cls for cls in class_ids if cls in DENOMINATION_CLASS_MAP]
+        
+        # Jika ada valid denomination, ambil yang terkecil (untuk konsistensi)
+        if valid_denomination_ids:
+            return min(valid_denomination_ids)
+            
+        # Jika tidak ada valid denomination, ambil yang terkecil dari semua kelas
+        return min(class_ids)
     except Exception:
         return None
 
-def process_label_file(label_path: str, collect_all_classes: bool = False) -> Tuple[Optional[str], Set[str], Dict[str, int]]:
-    """
-    Proses file label untuk mendapatkan kelas utama, semua kelas, dan distribusi kelas.
-    
-    Args:
-        label_path: Path ke file label
-        collect_all_classes: Kumpulkan semua kelas dalam file
-        
-    Returns:
-        Tuple (kelas utama, set semua kelas, distribusi kelas)
-    """
+def process_label_file(label_path: str, collect_all_classes: bool = False) -> Tuple[Optional[str], Set[str]]:
+    """Proses file label untuk mendapatkan kelas utama dan semua kelas dengan prioritas denominasi."""
     try:
-        if not os.path.exists(label_path): return None, set(), {}
-        
-        # Parse file dengan one-liner
-        class_distribution = defaultdict(int)
-        
-        # Baca file label dan hitung kelas dengan one-liner
+        if not os.path.exists(label_path): return None, set()
+        # Baca file dan ekstrak class_ids dengan one-liner
         with open(label_path, 'r') as f:
-            [class_distribution.update({parts[0]: class_distribution[parts[0]] + 1})
-             for line in f.readlines() 
-             if len(parts := line.strip().split()) >= 5 
-             and parts[0] != "-1" and parts[0].lower() != "unknown"]
+            class_ids = [parts[0] for line in f.readlines() 
+                      if len(parts := line.strip().split()) >= 5]
         
-        # Ekstrak informasi dengan one-liner
-        main_class = min(class_distribution.keys()) if class_distribution else None
-        all_classes = set(class_distribution.keys()) if collect_all_classes else set()
+        if not class_ids: return None, set()
         
-        return main_class, all_classes, dict(class_distribution)
+        # Prioritaskan denominasi (kelas yang ada di mapping)
+        valid_denomination_ids = [cls for cls in class_ids if cls in DENOMINATION_CLASS_MAP]
+        
+        # Tentukan kelas utama
+        main_class = min(valid_denomination_ids) if valid_denomination_ids else min(class_ids)
+        
+        return (main_class, set(class_ids) if collect_all_classes and class_ids else set())
     except Exception:
-        return None, set(), {}
+        return None, set()
+
+def generate_denomination_filename(class_id: str, uuid: str, prefix: str = 'rp', variation: Optional[int] = None) -> str:
+    """Generate nama file dengan format denominasi."""
+    denomination = get_denomination_label(class_id)
+    
+    # Format: rp_100k_uuid.jpg or aug_rp_100k_uuid_var_1.jpg
+    if variation is not None:
+        return f"aug_{prefix}_{denomination}_{uuid}_var_{variation}.jpg"
+    else:
+        return f"{prefix}_{denomination}_{uuid}.jpg"
+
+def extract_info_from_filename(filename: str) -> Dict[str, Any]:
+    """Ekstrak informasi dari nama file dengan format denominasi."""
+    # Format ekspektasi:
+    # - Original: rp_100k_uuid.jpg
+    # - Augmented: aug_rp_100k_uuid_var_1.jpg
+    
+    info = {'is_valid': False}
+    
+    # Pattern untuk augmented
+    aug_pattern = r'aug_(?P<prefix>\w+)_(?P<denomination>\w+)_(?P<uuid>[^_]+)_var_(?P<variation>\d+)'
+    # Pattern untuk original
+    orig_pattern = r'(?P<prefix>\w+)_(?P<denomination>\w+)_(?P<uuid>[^_\.]+)'
+    
+    # Coba match dengan pattern augmented
+    aug_match = re.match(aug_pattern, filename)
+    if aug_match:
+        info.update({
+            'is_valid': True,
+            'is_augmented': True,
+            'prefix': aug_match.group('prefix'),
+            'denomination': aug_match.group('denomination'),
+            'uuid': aug_match.group('uuid'),
+            'variation': int(aug_match.group('variation'))
+        })
+        return info
+    
+    # Coba match dengan pattern original
+    orig_match = re.match(orig_pattern, filename)
+    if orig_match:
+        info.update({
+            'is_valid': True,
+            'is_augmented': False,
+            'prefix': orig_match.group('prefix'),
+            'denomination': orig_match.group('denomination'),
+            'uuid': orig_match.group('uuid')
+        })
+        return info
+    
+    return info
 
 def move_files_to_preprocessed(images_output_dir: str, labels_output_dir: str, 
-                            output_prefix: str, final_output_dir: str,
-                            split: str, logger=None) -> bool:
+                             output_prefix: str, final_output_dir: str,
+                             split: str, logger=None) -> bool:
     """Pindahkan file augmentasi ke direktori preprocessed."""
     try:
         # Buat direktori target dan dapatkan file dengan one-liner
@@ -85,7 +161,7 @@ def move_files_to_preprocessed(images_output_dir: str, labels_output_dir: str,
         return False
 
 def process_augmentation_results(results: List[Dict], logger=None) -> Dict[str, Any]:
-    """Proses hasil augmentasi untuk statistik konsolidasian dengan tracking multi-class."""
+    """Proses hasil augmentasi untuk statistik konsolidasian."""
     try:
         # Statistik dasar dengan one-liner
         stats = {
@@ -98,15 +174,9 @@ def process_augmentation_results(results: List[Dict], logger=None) -> Dict[str, 
         # Populate class stats dengan one-liner
         [stats['class_stats'][result.get('class_id', 'unknown')].update({
             'files': stats['class_stats'][result.get('class_id', 'unknown')]['files'] + 1,
-            'generated': stats['class_stats'][result.get('class_id', 'unknown')]['generated'] + result.get('generated', 0)
+            'generated': stats['class_stats'][result.get('class_id', 'unknown')]['generated'] + result.get('generated', 0),
+            'denomination': get_denomination_label(result.get('class_id', 'unknown'))
         }) for result in stats['successful']]
-        
-        # Multi-class updates dengan tracking yang lebih akurat
-        stats['multi_class_updates'] = defaultdict(int)
-        for result in stats['successful']:
-            if 'multi_class_update' in result:
-                for cls, count in result['multi_class_update'].items():
-                    stats['multi_class_updates'][cls] += count
         
         # Tambahan statistik dengan one-liner
         stats.update({
@@ -130,42 +200,35 @@ def map_and_analyze_files(
     labels_dir: str,
     target_count: int = 1000,
     progress_callback: Optional[Callable] = None
-) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int], List[str], Dict[str, Dict[str, int]]]:
+) -> Tuple[Dict[str, List[str]], Dict[str, int], Dict[str, int], List[str]]:
     """
-    Konsolidasi fungsi mapping, needs calculation, dan selection dengan tracking multi-class.
+    Konsolidasi fungsi mapping, needs calculation, dan selection dengan pendekatan DRY.
     
-    Args:
-        image_files: List path file image
-        labels_dir: Path direktori label
-        target_count: Target jumlah instance per kelas
-        progress_callback: Callback untuk progress reporting
-        
     Returns:
-        Tuple (files_by_class, class_counts, augmentation_needs, selected_files, class_distributions)
+        Tuple (files_by_class, class_counts, augmentation_needs, selected_files)
     """
-    # Initialize semua containers dengan one-liner
-    files_by_class, class_counts, files_metadata = defaultdict(list), defaultdict(int), {}
+    files_by_class, class_counts = defaultdict(list), defaultdict(int)
     
-    # Notifikasi mulai
-    if progress_callback: progress_callback(
-        progress=0, total=len(image_files),
-        message=f"Menganalisis {len(image_files)} file dataset untuk balancing",
-        status="info", step=0
-    )
+    # Notifikasi mulai pemrosesan
+    if progress_callback:
+        progress_callback(
+            progress=0, total=len(image_files),
+            message=f"Menganalisis {len(image_files)} file dataset untuk balancing",
+            status="info", step=0
+        )
     
     # Proses semua file sekaligus dengan progress reporting
     for i, img_path in enumerate(image_files):
         img_name = Path(img_path).stem
         label_path = str(Path(labels_dir) / f"{img_name}.txt")
         
-        # Proses label file untuk mendapatkan kelas dan distribusi
-        main_class, all_classes, class_distribution = process_label_file(label_path, True)
+        # Proses label file untuk mendapatkan kelas
+        main_class, all_classes = process_label_file(label_path, True)
         if not main_class: continue
         
-        # Update tracking dan metadata dengan one-liner
+        # Update tracking kelas dengan one-liner
         files_by_class[main_class].append(img_path)
-        files_metadata[img_path] = {'classes': all_classes, 'distribution': class_distribution, 'main_class': main_class}
-        [class_counts.update({cls: class_counts[cls] + count}) for cls, count in class_distribution.items()]
+        [class_counts.update({cls: class_counts[cls] + 1}) for cls in all_classes]
         
         # Report progres dengan throttling
         if progress_callback and (i % max(1, len(image_files) // 10) == 0 or i == len(image_files) - 1):
@@ -179,11 +242,11 @@ def map_and_analyze_files(
     augmentation_needs = {cls_id: max(0, target_count - count) 
                        for cls_id, count in class_counts.items()}
     
-    # Pilih file untuk augmentasi dengan prioritas
+    # Pilih file untuk augmentasi
     classes_to_augment = [cls_id for cls_id, needed in augmentation_needs.items() if needed > 0]
     selected_files = []
     
-    # Proses file selection untuk setiap kelas dengan prioritisasi
+    # Proses file selection untuk setiap kelas dengan one-liner where possible
     for i, class_id in enumerate(classes_to_augment):
         needed = augmentation_needs.get(class_id, 0)
         available_files = files_by_class.get(class_id, [])
@@ -209,19 +272,19 @@ def map_and_analyze_files(
             status="info", step=0
         )
     
-    return files_by_class, class_counts, augmentation_needs, selected_files, files_metadata
+    return files_by_class, class_counts, augmentation_needs, selected_files
 
 # Backward compatibility untuk API lama
 def map_files_to_classes(image_files: List[str], labels_dir: str, progress_callback: Optional[Callable] = None) -> Tuple[Dict[str, List[str]], Dict[str, int]]:
     """Backward compatibility untuk map_files_to_classes."""
-    files_by_class, class_counts, _, _, _ = map_and_analyze_files(image_files, labels_dir, progress_callback=progress_callback)
+    files_by_class, class_counts, _, _ = map_and_analyze_files(image_files, labels_dir, progress_callback=progress_callback)
     return files_by_class, class_counts
 
 def calculate_augmentation_needs(class_counts: Dict[str, int], target_count: int, progress_callback: Optional[Callable] = None) -> Dict[str, int]:
     """Backward compatibility untuk calculate_augmentation_needs."""
     augmentation_needs = {cls_id: max(0, target_count - count) for cls_id, count in class_counts.items()}
     
-    # Log ringkasan hasil kebutuhan augmentasi
+    # Log ringkasan hasil kebutuhan augmentasi untuk backward compatibility
     if progress_callback:
         classes_needing = sum(1 for needed in augmentation_needs.values() if needed > 0)
         total_needed = sum(augmentation_needs.values())

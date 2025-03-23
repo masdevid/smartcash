@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/helpers/distribution_summary_display.py
+File: smartcash/ui/visualization/distribution_summary_display.py
 Deskripsi: Utilitas untuk menampilkan ringkasan distribusi kelas dalam format tabel
 """
 

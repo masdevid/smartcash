@@ -1,10 +1,11 @@
 """
 File: smartcash/ui/dataset/visualization_integrator.py
-Deskripsi: Modul integrasi visualisasi distribusi kelas yang lebih DRY dan optimal
+Deskripsi: Modul integrasi visualisasi distribusi kelas
 """
 
 from typing import Dict, Any, Optional, List, Tuple
 from IPython.display import display, clear_output, HTML
+from smartcash.ui.visualization.get_preprocessing_stats import get_preprocessing_stats
 import matplotlib.pyplot as plt
 import time
 from pathlib import Path
@@ -50,7 +51,7 @@ def create_distribution_visualizations(
     target_count: int = 1000
 ):
     """
-    Buat dan tampilkan visualisasi distribusi kelas dengan pendekatan DRY.
+    Buat dan tampilkan visualisasi distribusi kelas
     
     Args:
         ui_components: Dictionary berisi komponen UI

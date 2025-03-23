@@ -48,6 +48,7 @@ def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=
             
         # Coba tampilkan visualisasi dengan error handling
         try:
+            from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
             visualize_preprocessed_samples(ui_components, preprocessed_dir, data_dir)
         except Exception as e:
             with ui_components['status']:
@@ -75,8 +76,8 @@ def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=
             
         # Coba tampilkan visualisasi komparasi dengan error handling
         try:
-            from smartcash.ui.visualization.compare_raw_vs_preprocessed import compare_raw_vs_preprocessed
-            compare_raw_vs_preprocessed(ui_components, data_dir, preprocessed_dir)
+            from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
+            compare_original_vs_preprocessed(ui_components, data_dir, preprocessed_dir)
         except Exception as e:
             with ui_components['status']:
                 display(create_status_indicator('error', f"{ICONS['error']} Error saat komparasi: {str(e)}"))
@@ -90,11 +91,11 @@ def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=
         ui_components['compare_button'].on_click(on_compare_click)
     
     from smartcash.ui.visualization.visualize_preprocessed_sample import visualize_preprocessed_sample
-    from smartcash.ui.visualization.compare_raw_vs_preprocessed import compare_raw_vs_preprocessed
+    from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
     # Tambahkan fungsi ke ui_components
     ui_components.update({
         'visualize_dataset': visualize_preprocessed_sample,
-        'compare_datasets': compare_raw_vs_preprocessed,
+        'compare_datasets': compare_original_vs_preprocessed,
         'on_visualize_click': on_visualize_click,
         'on_compare_click': on_compare_click
     })

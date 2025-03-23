@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/helpers/class_distribution_analyzer.py
+File: smartcash/ui/visualization/class_distribution_analyzer.py
 Deskripsi: Utilitas untuk analisis distribusi kelas dalam dataset
 """
 

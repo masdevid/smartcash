@@ -1,3 +1,7 @@
+"""
+File: smartcash/ui/visualization/get_preprocessing_stats.py
+Deskripsi: Utilitas untuk mendapatkan statistik dataset preprocessing
+"""
 
 def get_preprocessing_stats(ui_components: Dict[str, Any], preprocessed_dir: str) -> Dict[str, Any]:
     """

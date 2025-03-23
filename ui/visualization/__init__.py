@@ -22,7 +22,7 @@ from smartcash.ui.visualization.visualization_integrator import create_distribut
 from smartcash.ui.visualization.visualize_preprocessed_sample import visualize_preprocessed_sample
 from smartcash.ui.visualization.distribution_summary_display import display_distribution_summary
 from smartcash.ui.visualization.get_preprocessing_stats import get_preprocessing_stats
-from smartcash.ui.visualization.compare_raw_vs_preprocessed import compare_raw_vs_preprocessed
+from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
 
 __all__ = [
      # Analyzer
@@ -44,7 +44,7 @@ __all__ = [
     'visualize_preprocessed_sample',
     'display_distribution_summary',
     'get_preprocessing_stats',
-    'compare_raw_vs_preprocessed',
+    'compare_original_vs_preprocessed',
 ]
 
 

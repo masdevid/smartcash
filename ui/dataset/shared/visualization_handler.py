@@ -45,12 +45,12 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             # Import dan panggil handler visualisasi yang sesuai (diprioritaskan)
             try:
                 # Opsi 1: Coba gunakan fungsi dari preprocessing_visualization_handler
-                from smartcash.ui.dataset.preprocessing_visualization_handler import visualize_preprocessed_samples
+                from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
                 visualize_preprocessed_samples(ui_components, dataset_dir, ui_components.get('data_dir', 'data'))
             except ImportError:
                 try:
                     # Opsi 2: Coba gunakan fungsi dari augmentation_visualization_handler
-                    from smartcash.ui.dataset.augmentation_visualization_handler import visualize_augmented_samples
+                    from smartcash.ui.visualization.visualize_augmented_samples import visualize_augmented_samples
                     visualize_augmented_samples(Path(dataset_dir) / 'train' / 'images', output_widget, ui_components)
                 except ImportError:
                     # Opsi 3: Coba gunakan helper visualisasi dataset yang sudah ada
@@ -140,8 +140,8 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             # Import dan panggil handler komparasi yang sesuai (diprioritaskan)
             try:
                 # Opsi 1: Coba gunakan fungsi dari preprocessing_visualization_handler
-                from smartcash.ui.dataset.preprocessing_visualization_handler import compare_raw_vs_preprocessed
-                compare_raw_vs_preprocessed(ui_components, original_dir, processed_dir)
+                from smartcash.ui.dataset.preprocessing_visualization_handler import compare_original_vs_preprocessed
+                compare_original_vs_preprocessed(ui_components, original_dir, processed_dir)
             except ImportError:
                 try:
                     # Opsi 2: Coba gunakan fungsi dari augmentation_visualization_handler

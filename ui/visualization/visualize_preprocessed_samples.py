@@ -1,5 +1,9 @@
+"""
+File: smartcash/ui/visualization/visualize_preprocessed_samples.py
+Deskripsi: Utilitas untuk menampilkan sampel dataset yang telah dipreprocessing
+"""
 
-def visualize_preprocessed_sample(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
+def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
     """
     Visualisasi sampel dataset yang telah dipreprocessing.
     

@@ -1,12 +1,16 @@
+"""
+File: smartcash/ui/visualization/compare_original_vs_preprocessed.py
+Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar preprocessed
+"""
 
 
-def compare_raw_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, preprocessed_dir: str, num_samples: int = 3):
+def compare_original_vs_preprocessed(ui_components: Dict[str, Any], original_dir: str, preprocessed_dir: str, num_samples: int = 3):
     """
-    Komparasi sampel dataset mentah dengan yang telah dipreprocessing.
+    Komparasi sampel dataset original dengan yang telah dipreprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
-        raw_dir: Direktori dataset mentah
+        original_dir: Direktori dataset original
         preprocessed_dir: Direktori dataset preprocessed
         num_samples: Jumlah sampel yang akan divisualisasikan
     """

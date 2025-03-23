@@ -84,10 +84,10 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi perbandingan
-            from smartcash.ui.visualization.compare_raw_vs_preprocessed import compare_raw_vs_preprocessed
+            from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
             
             # Visualisasikan perbandingan
-            compare_raw_vs_preprocessed(
+            compare_original_vs_preprocessed(
                 ui_components={"status": output_widget, "logger": logger},
                 raw_dir=data_dir,
                 preprocessed_dir=preprocessed_dir,

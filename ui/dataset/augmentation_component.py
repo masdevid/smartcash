@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation_component.py
-Deskripsi: Komponen UI untuk augmentasi dataset dengan fokus pada augmentasi dari data preprocessed
+Deskripsi: Komponen UI untuk augmentasi dataset dengan tombol yang diseragamkan dan fokus pada data preprocessed
 """
 
 import ipywidgets as widgets
@@ -23,6 +23,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
     from smartcash.ui.utils.alert_utils import create_info_alert
+    from smartcash.ui.helpers.action_buttons import create_action_buttons, create_visualization_buttons
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
@@ -83,26 +84,32 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         )
     ])
     
-    # Tombol-tombol dengan styling standar
-    augment_button = widgets.Button(description='Run Augmentation', button_style='primary', icon='random')
-    stop_button = widgets.Button(description='Stop', button_style='danger', icon='stop', 
-                               layout=widgets.Layout(display='none'))
-    reset_button = widgets.Button(description='Reset', button_style='warning', icon='refresh')
-    cleanup_button = widgets.Button(description='Clean Augmented Data', button_style='danger', icon='trash')
-    save_button = widgets.Button(description='Simpan Konfigurasi', button_style='success', icon='save')
+    # Buat tombol aksi dengan komponen standar
+    action_buttons = create_action_buttons(
+        primary_label="Run Augmentation",
+        primary_icon="random",
+        cleanup_enabled=True
+    )
     
-    # Container tombol utama
-    button_container = widgets.HBox([
-        augment_button, stop_button, reset_button, save_button, cleanup_button
-    ], layout=widgets.Layout(margin='10px 0', gap='10px'))
+    # Tombol visualisasi dengan komponen standar
+    visualization_buttons = create_visualization_buttons()
     
     # Progress tracking dengan styling standar
-    progress_bar = widgets.IntProgress(value=0, min=0, max=100, description='Overall:',
-                                    bar_style='info', orientation='horizontal',
-                                    layout=widgets.Layout(visibility='hidden', width='100%'))
-    current_progress = widgets.IntProgress(value=0, min=0, max=100, description='Current:',
-                                         bar_style='info', orientation='horizontal',
-                                         layout=widgets.Layout(visibility='hidden', width='100%'))
+    progress_bar = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Overall:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    current_progress = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Current:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
     
     # Progress container dengan warna header yang terlihat
     progress_container = widgets.VBox([
@@ -129,12 +136,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Visualization buttons
-    visualization_buttons = widgets.HBox([
-        widgets.Button(description='Tampilkan Sampel', button_style='info', icon='image'),
-        widgets.Button(description='Bandingkan Hasil', button_style='info', icon='columns')
-    ], layout=widgets.Layout(margin='10px 0', display='none', gap='10px'))
-    
     # Summary container
     summary_container = widgets.Output(
         layout=widgets.Layout(
@@ -158,11 +159,11 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
         aug_options,
         create_divider(),
-        button_container,
+        action_buttons['container'],
         progress_container,
         log_accordion,
         summary_container,
-        visualization_buttons,
+        visualization_buttons['container'],
         visualization_container,
         help_panel
     ], layout=widgets.Layout(width='100%', padding='10px'))
@@ -173,17 +174,21 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'header': header,
         'status_panel': status_panel,
         'aug_options': aug_options,
-        'augment_button': augment_button,
-        'stop_button': stop_button,
-        'reset_button': reset_button,
-        'cleanup_button': cleanup_button,
-        'save_button': save_button,
+        'augment_button': action_buttons['primary_button'],
+        'stop_button': action_buttons['stop_button'],
+        'reset_button': action_buttons['reset_button'],
+        'cleanup_button': action_buttons['cleanup_button'],
+        'save_button': action_buttons['save_button'],
+        'button_container': action_buttons['container'],
         'progress_bar': progress_bar,
         'current_progress': current_progress,
         'status': status,
         'log_accordion': log_accordion,
         'summary_container': summary_container,
-        'visualization_buttons': visualization_buttons,
+        'visualization_buttons': visualization_buttons['container'],
+        'visualize_button': visualization_buttons['visualize_button'],
+        'compare_button': visualization_buttons['compare_button'],
+        'distribution_button': visualization_buttons['distribution_button'],
         'visualization_container': visualization_container,
         'module_name': 'augmentation'
     }

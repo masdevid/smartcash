@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_click_handler.py
-Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan logika progress yang ditingkatkan
+Deskripsi: Handler tombol dan interaksi UI untuk preprocessing dataset dengan button standar dan pendekatan DRY
 """
 
 from typing import Dict, Any
@@ -41,7 +41,7 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         # Disable semua komponen UI yang tidak diperlukan selama preprocessing
         disable_ui_during_processing(ui_components, True)
         
-        # Update UI: sembunyikan tombol preprocess, tampilkan tombol stop
+        # Update UI tombol dengan komponen standar
         ui_components['preprocess_button'].layout.display = 'none'
         ui_components['stop_button'].layout.display = 'block'
         
@@ -131,25 +131,13 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
             # Update status panel
             update_status_panel(ui_components, "success", f"{ICONS['success']} Preprocessing dataset berhasil diselesaikan")
             
-            # Tampilkan tombol visualisasi dan cleanup
+            # Tampilkan tombol visualisasi dan cleanup sekaligus
             ui_components['visualization_buttons'].layout.display = 'flex'
             ui_components['cleanup_button'].layout.display = 'block'
             
-            # Tampilkan container visualisasi
-            if 'visualization_container' in ui_components:
-                ui_components['visualization_container'].layout.display = 'block'
-            
-            # Tampilkan tiap tombol visualisasi secara individual
-            if 'visualize_button' in ui_components:
-                ui_components['visualize_button'].layout.display = 'inline-flex'
-            if 'compare_button' in ui_components:
-                ui_components['compare_button'].layout.display = 'inline-flex'
-            if 'distribution_button' in ui_components:
-                ui_components['distribution_button'].layout.display = 'inline-flex'
-            
-            # Tampilkan summary container jika ada
-            if 'summary_container' in ui_components:
-                ui_components['summary_container'].layout.display = 'block'
+            # Tampilkan container visualisasi dan summary
+            ui_components['visualization_container'].layout.display = 'block'
+            ui_components['summary_container'].layout.display = 'block'
             
             # Notifikasi observer tentang selesai preprocessing
             try:
@@ -237,8 +225,10 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         if 'advanced_accordion' in ui_components:
             ui_components['advanced_accordion'].disabled = disable
         
-        if 'save_button' in ui_components:
-            ui_components['save_button'].disabled = disable
+        # Disable tombol-tombol yang ada di container
+        ui_components['save_button'].disabled = disable
+        ui_components['reset_button'].disabled = disable if 'reset_button' in ui_components else False
+        ui_components['cleanup_button'].disabled = disable
             
         # Disable semua input komponen dalam list
         for comp_name in components_to_disable:
@@ -281,13 +271,41 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
     if 'stop_button' in ui_components:
         ui_components['stop_button'].on_click(on_stop_click)
     
+    # Reset handler untuk reset button jika ada
+    if 'reset_button' in ui_components:
+        def on_reset_click(b):
+            """Reset UI dan konfigurasi ke default."""
+            # Reset UI
+            cleanup_ui()
+            
+            # Hide visualization dan summary
+            ui_components['visualization_container'].layout.display = 'none'
+            ui_components['summary_container'].layout.display = 'none'
+            ui_components['visualization_buttons'].layout.display = 'none'
+            ui_components['cleanup_button'].layout.display = 'none'
+            
+            # Reset logs
+            with ui_components['status']:
+                clear_output()
+            
+            # Reset status
+            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
+            update_status_panel(ui_components, "info", f"{ICONS['info']} UI direset ke kondisi awal")
+            
+            # Reset progress
+            if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+                ui_components['reset_progress_bar']()
+        
+        ui_components['reset_button'].on_click(on_reset_click)
+    
     # Tambahkan referensi ke handlers di ui_components
     ui_components.update({
         'on_preprocess_click': on_preprocess_click,
         'on_stop_click': on_stop_click,
         'cleanup_ui': cleanup_ui,
         'disable_ui_during_processing': disable_ui_during_processing,
-        'preprocessing_running': False
+        'preprocessing_running': False,
+        'on_reset_click': on_reset_click if 'reset_button' in ui_components else None
     })
     
     return ui_components

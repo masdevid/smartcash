@@ -11,7 +11,7 @@ from smartcash.dataset.services.augmentor.helpers.validation_helper import (
     check_output_file_exists, validate_class_metadata
 )
 from smartcash.dataset.services.augmentor.helpers.parallel_helper import (
-    process_files_with_executor, process_single_file_with_progress, execute_batch_files
+    process_files_with_executor,    
 )
 from smartcash.dataset.services.augmentor.helpers.tracking_helper import (
     track_class_progress, prioritize_classes_by_need, track_multi_class_distribution
@@ -35,8 +35,6 @@ __all__ = [
     
     # Parallel Helper
     'process_files_with_executor',
-    'process_single_file_with_progress',
-    'execute_batch_files',
     
     # Tracking Helper
     'track_class_progress',

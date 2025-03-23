@@ -11,15 +11,15 @@ import cv2
 import re
 import os
 
-from smartcash.dataset.utils.augmentor_utils import extract_info_from_filename
+from smartcash.dataset.utils.denomination_utils import extract_info_from_filename
+from smartcash.dataset.utils.data_utils import load_image
+from smartcash.ui.utils.file_utils import shorten_filename, find_label_path
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.helpers.ui_helpers import display_label_info
 
 def visualize_augmented_samples(images_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 5):
     """Visualisasi sampel dataset yang telah diaugmentasi dengan dukungan format denominasi."""
     from smartcash.ui.utils.alert_utils import create_info_alert
-    import matplotlib.pyplot as plt
-    from smartcash.ui.utils.file_utils import shorten_filename, load_image, find_label_path
-    from smartcash.ui.helpers.ui_helpers import display_label_info
-    from smartcash.ui.utils.constants import COLORS, ICONS 
     
     # Get augmentation prefix
     aug_prefix = "aug"

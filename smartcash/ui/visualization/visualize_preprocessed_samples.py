@@ -11,7 +11,8 @@ import numpy as np
 import cv2
 import re
 
-from smartcash.dataset.utils.augmentor_utils import extract_info_from_filename
+from smartcash.dataset.utils.denomination_utils import extract_info_from_filename, get_denomination_label
+from smartcash.dataset.utils.data_utils import load_image
 
 def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
     """
@@ -81,16 +82,7 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
         for i, img_path in enumerate(image_files):
             # Load gambar
             try:
-                if img_path.suffix == '.npy':
-                    # Handle numpy array preprocessed
-                    img = np.load(str(img_path))
-                    # Denormalisasi jika perlu
-                    if img.dtype == np.float32 and img.max() <= 1.0:
-                        img = (img * 255).astype(np.uint8)
-                else:
-                    # Handle gambar biasa
-                    img = cv2.imread(str(img_path))
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = load_image(img_path)
                 
                 # Ekstrak info dari nama file
                 file_info = extract_info_from_filename(img_path.stem)
@@ -118,12 +110,8 @@ def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_d
         # Tampilkan informasi ukuran gambar
         for img_path in image_files:
             try:
-                if img_path.suffix == '.npy':
-                    img = np.load(str(img_path))
-                    h, w = img.shape[:2]
-                else:
-                    img = cv2.imread(str(img_path))
-                    h, w = img.shape[:2]
+                img = load_image(img_path)
+                h, w = img.shape[:2]
                 
                 # Ekstrak info dari nama file
                 file_info = extract_info_from_filename(img_path.stem)

@@ -3,11 +3,16 @@ File: smartcash/ui/visualization/compare_original_vs_augmented.py
 Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar augmentasi
 """
 
+from pathlib import Path
+from typing import Dict, Any
+from IPython.display import display, HTML
 
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan algoritma pencocokan yang lebih baik."""
     from smartcash.ui.utils.alert_utils import create_info_alert
     from smartcash.common.utils import format_size
+    from smartcash.ui.utils.file_utils import shorten_filename
+    from smartcash.ui.utils.constants import COLORS, ICONS 
     
     # Get augmentation prefix
     aug_prefix = "aug"

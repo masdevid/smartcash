@@ -57,6 +57,28 @@ def display_file_info(file_path: str, description: Optional[str] = None) -> widg
     else:
         return widgets.HTML(value=f"<p>{ICONS['warning']} File tidak ditemukan: {file_path}</p>")
 
+
+def shorten_filename(filename: str, max_length: int = 15) -> str:
+    """
+    Persingkat nama file dengan ellipsis untuk tampilan yang lebih baik.
+    
+    Args:
+        filename: Nama file yang akan dipersingkat
+        max_length: Panjang maksimum nama file
+        
+    Returns:
+        Nama file yang telah dipersingkat
+    """
+    if len(filename) <= max_length:
+        return filename
+    
+    # Potong nama file dengan format "awal...akhir"
+    prefix_len = max_length // 2 - 1
+    suffix_len = max_length - prefix_len - 3  # 3 untuk "..."
+    
+    return f"{filename[:prefix_len]}...{filename[-suffix_len:]}"
+
+
 def directory_tree(
     root_dir: Union[str, Path], 
     max_depth: int = 2, 

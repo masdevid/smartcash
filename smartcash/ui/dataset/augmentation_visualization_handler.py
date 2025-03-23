@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from IPython.display import display, clear_output, HTML
 import re
 from typing import Dict, Any, Optional, List, Tuple, Set
-
+from smartcash.ui.utils.file_utils import shorten_filename
 from smartcash.ui.utils.constants import COLORS, ICONS
 
 def setup_visualization_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -150,25 +150,6 @@ def load_image(img_path: Path) -> np.ndarray:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     return img
 
-def shorten_filename(filename: str, max_length: int = 15) -> str:
-    """
-    Persingkat nama file dengan ellipsis untuk tampilan yang lebih baik.
-    
-    Args:
-        filename: Nama file yang akan dipersingkat
-        max_length: Panjang maksimum nama file
-        
-    Returns:
-        Nama file yang telah dipersingkat
-    """
-    if len(filename) <= max_length:
-        return filename
-    
-    # Potong nama file dengan format "awal...akhir"
-    prefix_len = max_length // 2 - 1
-    suffix_len = max_length - prefix_len - 3  # 3 untuk "..."
-    
-    return f"{filename[:prefix_len]}...{filename[-suffix_len:]}"
 
 
 

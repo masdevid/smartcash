@@ -2,7 +2,11 @@
 File: smartcash/ui/visualization/compare_original_vs_preprocessed.py
 Deskripsi: Utilitas untuk menampilkan komparasi gambar original dengan gambar preprocessed
 """
-
+from pathlib import Path
+from typing import Dict, Any
+from IPython.display import display, clear_output
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 
 def compare_original_vs_preprocessed(ui_components: Dict[str, Any], original_dir: str, preprocessed_dir: str, num_samples: int = 3):
     """
@@ -14,8 +18,6 @@ def compare_original_vs_preprocessed(ui_components: Dict[str, Any], original_dir
         preprocessed_dir: Direktori dataset preprocessed
         num_samples: Jumlah sampel yang akan divisualisasikan
     """
-    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-    
     output_widget = ui_components.get('status')
     if not output_widget:
         return

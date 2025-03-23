@@ -324,3 +324,38 @@ def create_divider() -> widgets.HTML:
 def create_spacing(height: str = '10px') -> widgets.HTML:
     """Buat elemen spacing untuk mengatur jarak antar komponen."""
     return widgets.HTML(f"<div style='height: {height};'></div>")
+
+
+
+def display_label_info(images_with_labels: List[Tuple[Path, Path]], labels_dir: Path):
+    """
+    Tampilkan informasi label untuk gambar-gambar yang dipilih.
+    
+    Args:
+        images_with_labels: List of tuples (image_path, label_path)
+        labels_dir: Path direktori label (untuk kompatibilitas)
+    """
+    if not images_with_labels: return
+    from smartcash.ui.utils.file_utils import shorten_filename
+    display(HTML(f"<h4 style='color:{COLORS['dark']}'>Informasi Label</h4>"))
+    for img_file, label_file in images_with_labels:
+        try:
+            with open(label_file, 'r') as f:
+                label_lines = f.read().strip().splitlines()
+            
+            num_boxes = len(label_lines)
+            classes = set()
+            for line in label_lines:
+                parts = line.split()
+                if parts: classes.add(parts[0])
+            
+            # Tampilkan nama file yang dipersingkat
+            shortened_name = shorten_filename(img_file.name, 20)
+            
+            display(HTML(f"""
+            <div style="margin:5px 0; padding:5px; border-left:3px solid {COLORS['primary']};">
+                <p style="margin:0; color:{COLORS['dark']};"><strong>{shortened_name}</strong>: {num_boxes} objek terdeteksi, {len(classes)} kelas</p>
+            </div>
+            """))
+        except Exception:
+            pass

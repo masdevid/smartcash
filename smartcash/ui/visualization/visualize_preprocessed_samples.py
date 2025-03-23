@@ -2,6 +2,11 @@
 File: smartcash/ui/visualization/visualize_preprocessed_samples.py
 Deskripsi: Utilitas untuk menampilkan sampel dataset yang telah dipreprocessing
 """
+from smartcash.ui.utils.constants import COLORS, ICONS 
+from IPython.display import display, clear_output, HTML
+from pathlib import Path
+from typing import Dict, Any
+import matplotlib.pyplot as plt
 
 def visualize_preprocessed_samples(ui_components: Dict[str, Any], preprocessed_dir: str, original_dir: str, num_samples: int = 5):
     """

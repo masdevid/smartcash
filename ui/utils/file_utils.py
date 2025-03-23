@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Union, Callable, Tuple
 from datetime import datetime
+import numpy as np
 
 from smartcash.common.utils import format_size
 from smartcash.ui.utils.constants import COLORS, ICONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
@@ -569,7 +570,6 @@ def find_label_path(img_path: Path) -> Optional[Path]:
     return None
 
 def load_image(img_path: Path) -> np.ndarray:
-    import numpy as np
     import cv2
 
     """Fungsi helper untuk loading gambar dengan berbagai format."""

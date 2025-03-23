@@ -19,7 +19,7 @@ from smartcash.ui.visualization.plot_comparison import plot_class_distribution_c
 from smartcash.ui.visualization.plot_stacked import plot_class_distribution_stacked
 from smartcash.ui.visualization.visualization_integrator import create_distribution_visualizations
 
-from smartcash.ui.visualization.visualize_preprocessed_sample import visualize_preprocessed_sample
+from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
 from smartcash.ui.visualization.distribution_summary_display import display_distribution_summary
 from smartcash.ui.visualization.get_preprocessing_stats import get_preprocessing_stats
 from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
@@ -41,7 +41,7 @@ __all__ = [
 
     # Visualization
     'create_distribution_visualizations',
-    'visualize_preprocessed_sample',
+    'visualize_preprocessed_samples',
     'display_distribution_summary',
     'get_preprocessing_stats',
     'compare_original_vs_preprocessed',

@@ -19,10 +19,6 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], config: D
     from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
     from smartcash.ui.utils.metric_utils import create_metric_display
     from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-    from smartcash.ui.utils.metric_utils import create_metric_display
-    from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-    from smartcash.ui.utils.fallback_utils import update_status_panel
     from smartcash.ui.utils.fallback_utils import update_status_panel
     
     # Setup observer handlers

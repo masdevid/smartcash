@@ -23,7 +23,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
     from smartcash.ui.utils.alert_utils import create_info_alert
-    from smartcash.ui.helpers.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 

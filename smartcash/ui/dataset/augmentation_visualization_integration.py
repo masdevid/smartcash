@@ -18,7 +18,7 @@ def integrate_visualization_to_augmentation(ui_components: Dict[str, Any], env=N
         Dictionary UI components yang telah diupdate
     """
     # Import handler visualisasi
-    from smartcash.ui.dataset.visualization_integrator import setup_visualization_handlers
+    from smartcash.ui.visualization.visualization_integrator import setup_visualization_handlers
     
     # Setup handlers visualisasi
     ui_components = setup_visualization_handlers(ui_components, env, config)

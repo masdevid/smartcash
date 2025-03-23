@@ -136,7 +136,7 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
         Returns:
             Dictionary ringkasan hasil preprocessing
         """
-        from smartcash.ui.dataset.preprocessing_visualization_handler import get_preprocessing_stats
+        from smartcash.ui.dataset.shared.get_preprocessing_stats import get_preprocessing_stats
         
         # Gunakan default jika tidak disediakan
         preprocessed_dir = preprocessed_dir or ui_components.get('preprocessed_dir', 'data/preprocessed')

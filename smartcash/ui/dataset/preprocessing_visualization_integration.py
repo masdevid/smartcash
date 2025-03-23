@@ -41,10 +41,10 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi visualisasi
-            from smartcash.ui.dataset.preprocessing_visualization_handler import visualize_preprocessed_samples
+            from smartcash.ui.visualization.visualize_preprocessed_sample import visualize_preprocessed_sample
             
             # Visualisasikan sampel
-            visualize_preprocessed_samples(
+            visualize_preprocessed_sample(
                 ui_components={"status": output_widget, "logger": logger},
                 preprocessed_dir=preprocessed_dir,
                 original_dir=ui_components.get('data_dir', 'data'),
@@ -84,7 +84,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import fungsi perbandingan
-            from smartcash.ui.dataset.preprocessing_visualization_handler import compare_raw_vs_preprocessed
+            from smartcash.ui.visualization.compare_raw_vs_preprocessed import compare_raw_vs_preprocessed
             
             # Visualisasikan perbandingan
             compare_raw_vs_preprocessed(
@@ -126,7 +126,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             ui_components['visualization_container'].layout.display = 'block'
             
             # Import helper untuk distribusi kelas
-            from smartcash.ui.dataset.visualization_integrator import create_distribution_visualizations
+            from smartcash.ui.visualization.visualization_integrator import create_distribution_visualizations
             
             # Gunakan function distribusi kelas standard dari visualization_integrator dengan wrapper yang terkonsolidasi
             create_distribution_visualizations(

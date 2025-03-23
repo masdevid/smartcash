@@ -14,7 +14,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
-    from smartcash.ui.helpers.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
 
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 

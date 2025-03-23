@@ -3,7 +3,7 @@ File: smartcash/dataset/utils/progress_utils.py
 Deskripsi: Utilitas untuk pelaporan progress dan notifikasi observer
 """
 
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List
 
 def update_progress(
     callback: Callable, 

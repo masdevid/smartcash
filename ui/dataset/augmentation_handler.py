@@ -25,7 +25,7 @@ def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=
     from smartcash.ui.dataset.augmentation_cleanup_handler import setup_cleanup_handler
     
     # Import modul baru untuk visualisasi distribusi kelas
-    from smartcash.ui.dataset.visualization_integrator import setup_visualization_handlers
+    from smartcash.ui.visualization.visualization_integrator import setup_visualization_handlers
     
     try:
         # Setup logging dengan integrasi UI

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/preprocessor/dataset_preprocessor.py
-Deskripsi: Layanan preprocessing dataset dengan fitur penamaan file berdasarkan kelas dan ID unik dan progress reporting yang dioptimalkan
+Deskripsi: Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan
 """
 
 import os
@@ -20,7 +20,7 @@ from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
 from smartcash.components.observer import notify, EventTopics
 
 class DatasetPreprocessor:
-    """Layanan preprocessing dataset dengan penamaan file berdasarkan kelas dan ID unik."""
+    """Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan."""
     
     def __init__(self, config, logger=None):
         """
@@ -52,7 +52,6 @@ class DatasetPreprocessor:
             callback: Progress callback function
         """
         self._progress_callback = callback
-        
     
     def preprocess_dataset(self, split: str = None, force_reprocess: bool = False, show_progress: bool = True, **kwargs) -> Dict[str, Any]:
         """Preprocess dataset dan simpan hasil untuk penggunaan berikutnya."""
@@ -70,47 +69,68 @@ class DatasetPreprocessor:
                 {"name": "Finalisasi hasil", "weight": 0.1}          # 10% dari total progress
             ]
             
-            # Hitung total untuk progress bar utama (total semua gambar di semua split)
-            total_images = 0
+            # PERBAIKAN: Hitung total gambar di semua split terlebih dahulu
+            total_images_by_split = {}
+            total_images_all = 0
             for current_split in splits_to_process:
                 images_dir = Path(self._get_source_dir(current_split)) / 'images'
                 if images_dir.exists():
-                    total_images += len(list(images_dir.glob('*.*')))
+                    split_images = len(list(images_dir.glob('*.*')))
+                    total_images_by_split[current_split] = split_images
+                    total_images_all += split_images
             
             # Tambahkan buffer untuk langkah persiapan dan finalisasi
-            total_progress = total_images + 2  # +1 persiapan, +1 finalisasi
+            total_progress = total_images_all + 2  # +1 persiapan, +1 finalisasi
             
             # Step 1: Persiapan dataset - 10% dari total progress
-            self._update_progress(1, total_progress, f"Persiapan preprocessing dataset...", status="info", 
-                               step=0, current_step=1, current_total=3)
+            self._update_progress(1, total_progress, f"Persiapan preprocessing dataset ({total_images_all} gambar di {len(splits_to_process)} split)...", 
+                                status="info", step=0, current_step=1, current_total=3, total_files_all=total_progress)
             
             # Step 2: Proses setiap split - 80% dari total progress
             progress_so_far = 1  # Mulai dari 1 (setelah persiapan)
             
             for i, current_split in enumerate(splits_to_process):
-                # Update progress untuk mulai memproses split ini
-                self._update_progress(progress_so_far, total_progress, 
-                                   f"Memulai preprocessing split {current_split}...", status="info",
-                                   step=1, current_step=1, current_total=len(splits_to_process))
+                # PERBAIKAN: Update progress untuk mulai memproses split ini dengan metadata lebih lengkap
+                self._update_progress(
+                    progress_so_far, total_progress, 
+                    f"Memulai preprocessing split {current_split} ({total_images_by_split.get(current_split, 0)} gambar)...", 
+                    status="info", step=1, current_step=i+1, current_total=len(splits_to_process), 
+                    split=current_split, split_step=f"{i+1}/{len(splits_to_process)}",
+                    total_files_all=total_progress
+                )
                 
-                # Proses split dan dapatkan hasil
-                split_result = self._preprocess_split(current_split, force_reprocess, show_progress, 
-                                                    progress_start=progress_so_far, total_progress=total_progress, **kwargs)
+                # Proses split dan dapatkan hasil dengan parameter yang ditingkatkan
+                split_result = self._preprocess_split(
+                    current_split, force_reprocess, show_progress, 
+                    progress_start=progress_so_far, 
+                    total_progress=total_progress, 
+                    total_files_all=total_progress,
+                    split_step=f"{i+1}/{len(splits_to_process)}",
+                    **kwargs
+                )
+                
                 results[current_split] = split_result
                 
                 # Update progress setelah split selesai
                 images_processed = split_result.get('processed', 0) + split_result.get('skipped', 0)
                 progress_so_far += images_processed
                 
-                # Memberikan pesan ringkas tentang hasil split
-                split_msg = f"Split {current_split}: {split_result.get('processed', 0)} diproses, {split_result.get('skipped', 0)} dilewati"
-                self._update_progress(progress_so_far, total_progress, split_msg, status="info", 
-                                    step=1, current_step=i+1, current_total=len(splits_to_process))
+                # PERBAIKAN: Memberikan pesan ringkas tentang hasil split dengan informasi lebih lengkap
+                split_msg = f"Preprocessing Split {current_split} ({i+1}/{len(splits_to_process)}) selesai: {split_result.get('processed', 0)} diproses, {split_result.get('skipped', 0)} dilewati"
+                self._update_progress(
+                    progress_so_far, total_progress, split_msg, status="info", 
+                    step=1, current_step=i+1, current_total=len(splits_to_process),
+                    split=current_split, split_step=f"{i+1}/{len(splits_to_process)}",
+                    total_files_all=total_progress
+                )
             
             # Step 3: Finalisasi - 10% dari total progress
-            self._update_progress(total_progress - 1, total_progress, 
-                                f"Finalisasi hasil preprocessing...", status="info",
-                                step=2, current_step=1, current_total=1)
+            self._update_progress(
+                total_progress - 1, total_progress, 
+                f"Finalisasi hasil preprocessing...", status="info",
+                step=2, current_step=1, current_total=1,
+                total_files_all=total_progress
+            )
             
             # Hitung total statistik
             total_images, total_skipped, total_failed = [sum(r.get(k, 0) for r in results.values()) for k in ('processed', 'skipped', 'failed')]
@@ -126,12 +146,16 @@ class DatasetPreprocessor:
             }
             
             # Update progress final (100%)
-            self._update_progress(total_progress, total_progress, 
-                               f"Preprocessing selesai: {total_images} gambar berhasil diproses", status="success",
-                                step=2, current_step=1, current_total=1)
+            self._update_progress(
+                total_progress, total_progress, 
+                f"Preprocessing selesai: {total_images} gambar berhasil diproses dalam {total_result['processing_time']:.1f} detik", 
+                status="success", step=2, current_step=1, current_total=1,
+                total_files_all=total_progress
+            )
             
             try: notify(event_type=EventTopics.PREPROCESSING_END, sender="dataset_preprocessor", 
-                    message=f"Preprocessing selesai: {total_images} gambar berhasil diproses", duration=total_result['processing_time'])
+                       message=f"Preprocessing selesai: {total_images} gambar berhasil diproses", 
+                       duration=total_result['processing_time'])
             except Exception: pass
                 
             return total_result
@@ -163,7 +187,8 @@ class DatasetPreprocessor:
             return [split]
     
     def _preprocess_split(self, split: str, force_reprocess: bool, show_progress: bool, 
-                        progress_start: int = 0, total_progress: int = 100, **kwargs) -> Dict[str, Any]:
+                         progress_start: int = 0, total_progress: int = 100, 
+                         split_step: str = "", total_files_all: int = 0, **kwargs) -> Dict[str, Any]:
         """Preprocess satu split dataset dengan tracking progress yang lebih detail."""
         try:
             # Cek apakah sudah dipreprocess dan tidak perlu diproses ulang
@@ -172,9 +197,12 @@ class DatasetPreprocessor:
                 processed = len(list((images_path := self.storage.get_split_path(split) / 'images').glob('*.*'))) if images_path.exists() else 0
                 
                 # Update progress untuk menandai split sudah selesai diproses
-                self._update_progress(progress_start + processed, total_progress,
-                                   f"Split {split} sudah dipreprocess sebelumnya ({processed} gambar)", status="info",
-                                    step=1, current_step=1, current_total=1)
+                self._update_progress(
+                    progress_start + processed, total_progress,
+                    f"Split {split} sudah dipreprocess sebelumnya ({processed} gambar)", status="info",
+                    step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                    total_files_all=total_files_all
+                )
                                     
                 return {'processed': processed, 'skipped': 0, 'failed': 0, 'success': True}
                 
@@ -184,8 +212,11 @@ class DatasetPreprocessor:
             if not images_dir.exists() or not labels_dir.exists():
                 error_message = f"❌ Direktori gambar atau label tidak ditemukan: {images_dir} atau {labels_dir}"
                 self.logger.error(error_message)
-                self._update_progress(progress_start, total_progress, error_message, status="error", 
-                                    step=1, current_step=1, current_total=1)
+                self._update_progress(
+                    progress_start, total_progress, error_message, status="error", 
+                    step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                    total_files_all=total_files_all
+                )
                 return {'processed': 0, 'skipped': 0, 'failed': 1, 'success': False, 'error': error_message}
                 
             # Setup direktori target
@@ -200,8 +231,11 @@ class DatasetPreprocessor:
             
             if num_files == 0:
                 self.logger.warning(f"⚠️ Tidak ada file gambar yang ditemukan di {images_dir}")
-                self._update_progress(progress_start, total_progress, f"Tidak ada file gambar ditemukan di {images_dir}", 
-                                    status="warning", step=1, current_step=1, current_total=1)
+                self._update_progress(
+                    progress_start, total_progress, f"Tidak ada file gambar ditemukan di {images_dir}", 
+                    status="warning", step=1, current_step=1, current_total=1, split=split, split_step=split_step,
+                    total_files_all=total_files_all
+                )
                 return {'processed': 0, 'skipped': 0, 'failed': 0, 'success': True}
                 
             # Setup progress tracking dan statistik
@@ -215,23 +249,40 @@ class DatasetPreprocessor:
                 'preserve_aspect_ratio': kwargs.get('preserve_aspect_ratio', self.config.get('preprocessing', {}).get('normalization', {}).get('preserve_aspect_ratio', True))
             }
             
+            # PERBAIKAN: Tambahkan notifikasi awal saat mulai preprocessing split
+            self._update_progress(
+                progress_start, total_progress,
+                f"Memulai preprocessing split {split} ({num_files} gambar)...",
+                status="info", step=1, current_step=1, current_total=3,
+                split=split, split_step=split_step, total_files_all=total_files_all,
+                current_progress=0, current_total=num_files
+            )
+            
             # Proses setiap gambar
             for i, img_path in enumerate(image_files):
                 try:
-                    # Hanya update progress pada interval atau titik penting (0%, 25%, 50%, 75%, 100%)
-                    percent_complete = int((i / num_files) * 100)
-                    if i == 0 or i == num_files - 1 or percent_complete % 25 == 0 or (i % max(1, num_files // 10) == 0):
-                        progress_msg = f"Memproses split {split}: {i+1}/{num_files} gambar"
+                    # PERBAIKAN: Update progress bar dengan informasi lebih lengkap dan konsisten
+                    current_processed = i + 1
+                    overall_processed = progress_start + current_processed
+                    
+                    # Update progress setiap 10% atau pada file terakhir
+                    if current_processed == 1 or current_processed == num_files or current_processed % max(1, num_files // 10) == 0:
+                        progress_msg = f"Preprocessing split {split}: {current_processed}/{num_files} gambar"
+                        
                         self._update_progress(
-                            progress_start + i, 
+                            overall_processed, 
                             total_progress,
                             progress_msg, 
                             status='info', 
-                            current_progress=i+1, 
+                            current_progress=current_processed,
                             current_total=num_files,
-                            step=1
+                            split=split,
+                            split_step=split_step,
+                            step=1,
+                            total_files_all=total_files_all
                         )
                     
+                    # Proses gambar dan update statistic
                     stats['processed' if self._preprocess_single_image(img_path, labels_dir, target_images_dir, target_labels_dir, preprocessing_options) else 'skipped'] += 1
                 except Exception as e:
                     self.logger.error(f"❌ Gagal memproses {img_path.name}: {str(e)}"); stats['failed'] += 1
@@ -241,28 +292,35 @@ class DatasetPreprocessor:
             progress.close()
             
             # Notifikasi finalisasi dan penyimpanan
-            self._update_progress(progress_start + num_files, total_progress, 
-                                f"Menyimpan metadata dan finalisasi split {split}", status="info", 
-                                step=1, current_step=2, current_total=3)
+            self._update_progress(
+                progress_start + num_files, total_progress, 
+                f"Menyimpan metadata dan finalisasi split {split}", status="info", 
+                step=1, current_step=2, current_total=3, split=split, split_step=split_step,
+                total_files_all=total_files_all
+            )
             
             # Update statistik dan simpan metadata
             stats.update({'end_time': time.time(), 'duration': time.time() - stats['start_time'], 'total': num_files, 'success': stats['failed'] == 0})
             self.storage.update_stats(split, stats)
             
-            # Log ringkasan hasil
-            summary_message = f"✅ Preprocessing '{split}' selesai: {stats['processed']} berhasil, {stats['skipped']} dilewati, {stats['failed']} gagal, durasi: {stats['duration']:.2f} detik"
+            # PERBAIKAN: Tampilkan pesan selesai preprocessing split
+            summary_message = f"✅ Preprocessing split {split} selesai: {stats['processed']} berhasil, {stats['skipped']} dilewati, {stats['failed']} gagal, dalam {stats['duration']:.2f} detik"
             self.logger.info(summary_message)
             
             # Final update untuk split
-            self._update_progress(progress_start + num_files, total_progress, 
-                                f"Preprocessing split {split} selesai", status="success", 
-                                step=1, current_step=3, current_total=3)
+            self._update_progress(
+                progress_start + num_files, total_progress, 
+                f"Preprocessing split {split} selesai", status="success", 
+                step=1, current_step=3, current_total=3, split=split, split_step=split_step,
+                total_files_all=total_files_all
+            )
+            
             return stats
                 
         except Exception as e:
             self.logger.error(f"❌ Gagal preprocessing split {split}: {str(e)}")
             return {'processed': 0, 'skipped': 0, 'failed': 1, 'success': False, 'error': str(e)}
-
+    
     def _extract_class_from_label(self, label_path: Path) -> Optional[str]:
         """
         Ekstrak kelas dari file label YOLO dengan memilih class ID terkecil (prioritas banknote).
@@ -332,8 +390,8 @@ class DatasetPreprocessor:
         return os.path.join(data_dir, split)
         
     def _preprocess_single_image(self, img_path: Path, labels_dir: Path, 
-                              target_images_dir: Path, target_labels_dir: Path,
-                              preprocessing_options: Dict[str, Any] = None) -> bool:
+                               target_images_dir: Path, target_labels_dir: Path,
+                               preprocessing_options: Dict[str, Any] = None) -> bool:
         """
         Preprocess satu gambar dan label terkait, dan simpan hasilnya dengan penamaan yang ditingkatkan.
         

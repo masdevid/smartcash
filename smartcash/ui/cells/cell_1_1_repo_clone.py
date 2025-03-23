@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/cells/cell_1_1_repo_clone.py
+File: smartcash/ui/cells/setup/cell_1_1_repository_clone.py
 Deskripsi: Clone/update repository YOLOv5 dan SmartCash dengan pilihan branch
 """
 
@@ -29,7 +29,7 @@ def clone_or_update_repos(b):
         for repo in [("https://github.com/ultralytics/yolov5.git", "yolov5"), (url_input.value.strip(), url_input.value.split("/")[-1].replace(".git", ""), branch_dropdown.value, True)]:
             ok, msg = repo_action(*repo); display(create_alert(msg, "success" if ok else "error"))
             if not ok: return
-        display(HTML("""<div style="padding:15px;margin:10px;background-color:#2c3e50;border-left:5px solid #2ecc71;color:white"><h3>🔄 Langkah Selanjutnya</h3><ol><li>Klik <b>Runtime</b> di menu atas</li><li>Pilih <b>Restart runtime</b></li><li>Klik <b>Yes</b> pada konfirmasi</li></ol></div>"""))
+        display(HTML("""<div style="padding:15px;margin:10px;background-color:#white;border-left:5px solid #2ecc71;color:black"><h3 style="color: inherit;">🔄 Langkah Selanjutnya</h3><ol><li>Klik <b>Runtime</b> di menu atas</li><li>Pilih <b>Restart runtime</b></li><li>Klik <b>Yes</b> pada konfirmasi</li></ol></div>"""))
 
 # UI setup with one-liner definitions
 title = widgets.HTML("""<div style="background:#f8f9fa;padding:15px;border-radius:5px;border-left:5px solid #3498db;margin-bottom:15px"><h1 style="margin:0;color:#2F58CD">🚀 Setup Proyek SmartCash</h1><p style="margin:5px 0;color: black">Clone atau update repository project</p></div>""")

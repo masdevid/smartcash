@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/shared/progress_handler.py
-Deskripsi: Utilitas bersama untuk progress tracking dengan throttling yang digunakan oleh preprocessing dan augmentasi
+Deskripsi: Utilitas bersama untuk progress tracking dengan throttling yang ditingkatkan
 """
 
 from typing import Dict, Any, Tuple, Callable
@@ -11,7 +11,7 @@ from smartcash.ui.utils.alert_utils import create_status_indicator
 
 def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None):
     """
-    Setup callback progress dengan batasan frekuensi update dan throttling.
+    Setup callback progress dengan batasan frekuensi update dan throttling yang ditingkatkan.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -26,9 +26,15 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
     message_throttle_interval = 2.0  # Hanya log pesan setiap 2 detik
     
     # Informasi jumlah file untuk penghitungan progress
-    total_info = {'total_files': 0, 'processed_files': 0, 'current_split': '', 'splits': {}}
+    total_info = {
+        'total_files': 0, 
+        'processed_files': 0, 
+        'current_split': '', 
+        'splits': {},
+        'important_messages': set()  # Untuk menyimpan pesan penting
+    }
     
-    # Fungsi progress callback dengan throttling log
+    # Fungsi progress callback dengan throttling log yang ditingkatkan
     def progress_callback(progress=None, total=None, message=None, status='info', 
                          current_progress=None, current_total=None, **kwargs):
         """
@@ -50,25 +56,29 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
             
         current_time = time.time()
         
-        # Ekstrak metadata untuk perhitungan progress
-        step = kwargs.get('step', 0)  # 0=persiapan, 1=proses split, 2=finalisasi
+        # Ekstrak metadata untuk perhitungan progress yang lebih akurat
+        step = kwargs.get('step', 0)      # 0=persiapan, 1=proses split, 2=finalisasi
         split = kwargs.get('split', '')
+        split_step = kwargs.get('split_step', '')
+        
+        # PERBAIKAN: Tambahkan informasi total file di semua split
+        total_files_all = kwargs.get('total_files_all', 0)
         
         # Update informasi split saat ini jika berbeda
         if split and split != total_info['current_split']:
             total_info['current_split'] = split
-            # Log pergantian split secara eksplisit
+            # Log pergantian split secara eksplisit sebagai pesan penting
             if logger:
                 logger.info(f"{ICONS['processing']} Memulai proses split {split}")
             
             with ui_components['status']:
                 display(create_status_indicator('info', f"{ICONS['processing']} Memulai proses split {split}"))
         
-        # ===== PERHITUNGAN PROGRESS KESELURUHAN =====
+        # ===== PERHITUNGAN PROGRESS KESELURUHAN DENGAN PERBAIKAN =====
         # Jika ini pertama kali melihat split ini, tambahkan ke statistik
         if split and total is not None and split not in total_info['splits']:
             total_info['splits'][split] = {'total': total, 'progress': 0}
-            total_info['total_files'] += total
+            total_info['total_files'] = total_files_all or total_info['total_files'] + total
             
         # Update progress untuk split ini
         if split and progress is not None and total is not None:
@@ -81,12 +91,15 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                     # Update progress untuk split ini
                     total_info['splits'][split]['progress'] = progress
         
+        # PERBAIKAN: Gunakan total_files_all jika tersedia
+        total_files_all = total_files_all or total_info['total_files']
+        
         # Hitung total progress berdasarkan total file di semua split
         overall_progress = total_info['processed_files']
-        overall_total = max(total_info['total_files'], 1)  # Hindari division by zero
+        overall_total = max(total_files_all, 1)  # Hindari division by zero
         
         # ===== UPDATE PROGRESS BAR TOTAL =====
-        if time.time() - last_update.get('time', 0) >= update_interval:
+        if current_time - last_update.get('time', 0) >= update_interval:
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].max = overall_total
                 ui_components['progress_bar'].value = min(overall_progress, overall_total)
@@ -96,35 +109,51 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                 ui_components['progress_bar'].description = f"Total: {overall_percentage}%"
                 ui_components['progress_bar'].layout.visibility = 'visible'
                 
-                last_update['time'] = time.time()
+                last_update['time'] = current_time
                 
         # ===== UPDATE CURRENT PROGRESS BAR (UNTUK SPLIT SAAT INI) =====
         if progress is not None and total is not None and total > 0 and 'current_progress' in ui_components:
-            if time.time() - last_update.get('time', 0) >= update_interval:
+            if current_time - last_update.get('time', 0) >= update_interval:
                 ui_components['current_progress'].max = total
                 ui_components['current_progress'].value = min(progress, total)
                 
-                # Format deskripsi split
+                # Format deskripsi split dengan lebih informatif
                 split_percentage = int(progress / total * 100) if total > 0 else 0
                 
-                if split:
+                # PERBAIKAN: Tampilkan informasi split step jika tersedia
+                if split_step:
+                    ui_components['current_progress'].description = f"Split {split_step}: {split_percentage}%"
+                elif split:
                     ui_components['current_progress'].description = f"Split {split}: {split_percentage}%"
                 else:
                     ui_components['current_progress'].description = f"Progress: {split_percentage}%"
                     
                 ui_components['current_progress'].layout.visibility = 'visible'
                 
-                last_update['time'] = time.time()
+                last_update['time'] = current_time
         
-        # ===== UPDATE LOG UI (DENGAN THROTTLING) =====
+        # ===== UPDATE LOG UI (DENGAN THROTTLING YANG DITINGKATKAN) =====
         if message:
+            # PERBAIKAN: Menentukan apakah pesan saat ini adalah pesan penting
+            is_important = (
+                status != 'info' or                # Bukan info biasa
+                step == 0 or step == 2 or          # Tahap persiapan atau finalisasi
+                "selesai" in message.lower() or    # Pesan selesai
+                "memulai" in message.lower() or    # Pesan mulai
+                "analyzing" in message.lower() or  # Pesan analisis
+                "balancing" in message.lower() or  # Pesan balancing
+                "memindahkan" in message.lower() or # Pesan memindahkan
+                message not in total_info['important_messages'] # Pesan belum pernah ditampilkan
+            )
+            
+            # Simpan pesan penting untuk menghindari duplikasi
+            if is_important:
+                total_info['important_messages'].add(message)
+            
             time_to_log = current_time - last_update.get('message_time', 0) >= message_throttle_interval
             
-            # Log selesainya split secara eksplisit
-            split_completion = "selesai" in message.lower() and split in message.lower()
-            
-            # Log hanya pesan penting atau dengan interval waktu yang cukup
-            if time_to_log or step == 0 or step == 2 or split_completion or status != 'info':
+            # PERBAIKAN: Log hanya untuk pesan penting atau sesuai interval
+            if (is_important and time_to_log) or status != 'info':
                 # Log dengan logger jika tersedia
                 if logger:
                     log_method = getattr(logger, status) if hasattr(logger, status) else logger.info
@@ -134,12 +163,12 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                 last_update['message_time'] = current_time
                 
                 # Display di output widget jika status penting atau pergantian step
-                if status != 'info' or step == 0 or step == 2 or split_completion:
+                if status != 'info' or step == 0 or step == 2 or is_important:
                     with ui_components['status']:
                         display(create_status_indicator(status, message))
                         
         # ===== NOTIFY OBSERVER UNTUK INTEGRASI DENGAN SISTEM LAIN =====
-        if time.time() - last_update.get('notify_time', 0) >= message_throttle_interval:
+        if current_time - last_update.get('notify_time', 0) >= message_throttle_interval:
             try:
                 from smartcash.components.observer import notify
                 from smartcash.components.observer.event_topics_observer import EventTopics
@@ -150,29 +179,26 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                     else 'AUGMENTATION'
                 )
                 
+                # PERBAIKAN: Sertakan informasi split dan persentase yang lebih akurat
+                notify_message = message or f"Progress {int(overall_progress/overall_total*100)}%"
+                if split and current_progress is not None and current_total is not None:
+                    notify_message = f"Split {split}: {int(current_progress/current_total*100)}% - {notify_message}"
+                
                 # Update overall progress untuk observer
                 notify(
                     event_type=getattr(EventTopics, f"{event_type_prefix}_PROGRESS"),
                     sender=f"{'preprocessing' if 'preprocessing_running' in ui_components else 'augmentation'}_handler",
-                    message=message or f"Progress total: {int(overall_progress/overall_total*100)}%",
+                    message=notify_message,
                     progress=overall_progress,
                     total=overall_total,
                     current_split=split,
+                    current_progress=progress,
+                    current_total=total,
+                    total_files_all=total_files_all,
                     **kwargs
                 )
                 
-                # Update progress untuk split saat ini jika ada
-                if split and progress is not None and total is not None:
-                    notify(
-                        event_type=getattr(EventTopics, f"{event_type_prefix}_CURRENT_PROGRESS"),
-                        sender=f"{'preprocessing' if 'preprocessing_running' in ui_components else 'augmentation'}_handler",
-                        message=f"Progress split {split}: {int(progress/total*100)}%",
-                        progress=progress,
-                        total=total,
-                        **kwargs
-                    )
-                
-                last_update['notify_time'] = time.time()
+                last_update['notify_time'] = current_time
             except ImportError:
                 pass
     
@@ -217,8 +243,15 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
         process_running_key = 'preprocessing_running' if 'preprocessing_running' in ui_components else 'augmentation_running'
         ui_components[process_running_key] = False
         
+        # Reset informasi progress tracking
         total_info.clear()
-        total_info.update({'total_files': 0, 'processed_files': 0, 'current_split': '', 'splits': {}})
+        total_info.update({
+            'total_files': 0, 
+            'processed_files': 0, 
+            'current_split': '', 
+            'splits': {},
+            'important_messages': set()
+        })
         
         # Reset timestamp throttling
         last_update.clear()

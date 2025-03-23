@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan perbaikan pengecekan path identik dan persistensi nilai
+Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan persistensi yang ditingkatkan
 """
 
 from typing import Dict, Any, Optional
@@ -9,9 +9,10 @@ from pathlib import Path
 from IPython.display import display
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY."""
-    # Inisialisasi config jika None
-    config = copy.deepcopy(config) if config else {}
+    """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY dan persistensi yang ditingkatkan."""
+    # Inisialisasi config dengan deep copy untuk mencegah modifikasi tidak sengaja
+    config = copy.deepcopy(config or {})
+    logger = ui_components.get('logger')
     
     # Pastikan section preprocessing ada
     if 'preprocessing' not in config: config['preprocessing'] = {}
@@ -74,6 +75,8 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     # PERBAIKAN: Simpan referensi config di ui_components untuk memastikan persistensi
     ui_components['config'] = config
     
+    if logger: logger.debug(f"🔄 Konfigurasi preprocessing berhasil diupdate dari UI")
+    
     return config
 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
@@ -87,7 +90,7 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         except ImportError:
             pass
         
-        # PERBAIKAN: Buat deep copy untuk mencegah modifikasi tidak sengaja
+        # Buat deep copy untuk mencegah modifikasi tidak sengaja
         save_config = copy.deepcopy(config)
         
         # Pastikan direktori config ada
@@ -120,7 +123,7 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         with open(config_path, 'w') as f:
             yaml.dump(save_config, f, default_flow_style=False)
         
-        # PERBAIKAN: Hindari menyalin ke drive jika path identik
+        # Coba sync dengan drive jika tersedia
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
@@ -151,18 +154,26 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
             print(f"❌ {error_msg}")
         return False
 
-def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml") -> Dict[str, Any]:
-    """Load konfigurasi preprocessing dengan prioritas Google Drive dan mendukung persistensi."""
+def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """Load konfigurasi preprocessing dengan persistensi yang disempurnakan."""
     logger = None
     try:
-        # Ambil logger dari lingkungan jika tersedia
-        try:
-            from smartcash.common.logger import get_logger
-            logger = get_logger("preprocessing_config")
-        except ImportError:
-            pass
+        # Ambil logger dari lingkungan atau ui_components
+        if ui_components and 'logger' in ui_components:
+            logger = ui_components['logger']
+        else:
+            try:
+                from smartcash.common.logger import get_logger
+                logger = get_logger("preprocessing_config")
+            except ImportError:
+                pass
             
-        # PERBAIKAN: Coba load dari Google Drive terlebih dahulu
+        # PERBAIKAN: Cek apakah ada config tersimpan di ui_components
+        if ui_components and 'config' in ui_components and ui_components['config']:
+            if logger: logger.info("ℹ️ Menggunakan konfigurasi dari UI components")
+            return ui_components['config']
+            
+        # Coba load dari Google Drive terlebih dahulu
         try:
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
@@ -170,7 +181,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             if env_manager.is_drive_mounted:
                 drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
                 
-                # PERBAIKAN: Cek apakah path sama dengan realpath untuk mencegah error symlink
+                # Cek apakah path sama dengan realpath untuk mencegah error symlink
                 if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
                     if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
                 elif os.path.exists(drive_config_path):
@@ -185,11 +196,14 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                             yaml.dump(drive_config, f, default_flow_style=False)
                             
                         if logger: logger.info(f"📥 Konfigurasi dimuat dari drive: {drive_config_path}")
+                        
+                        # PERBAIKAN: Simpan ke ui_components jika tersedia
+                        if ui_components: ui_components['config'] = drive_config
                         return drive_config
         except (ImportError, AttributeError) as e:
             if logger: logger.debug(f"ℹ️ Tidak dapat memuat dari drive: {str(e)}")
         
-        # PERBAIKAN: Load dari ConfigManager jika tersedia untuk konsistensi
+        # Load dari ConfigManager jika tersedia untuk konsistensi
         try:
             from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
@@ -199,6 +213,9 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             
             if full_config and ('preprocessing' in full_config or 'data' in full_config):
                 if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path} via ConfigManager")
+                
+                # PERBAIKAN: Simpan ke ui_components jika tersedia
+                if ui_components: ui_components['config'] = full_config
                 return full_config
         except (ImportError, AttributeError):
             pass
@@ -209,17 +226,18 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                 config = yaml.safe_load(f) or {}
                 if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path}")
                 
-                # PERBAIKAN: Verifikasi struktur dasar config ada
+                # Verifikasi struktur dasar config ada
                 if 'preprocessing' not in config: config['preprocessing'] = {}
                 if 'data' not in config: config['data'] = {}
                 
+                # PERBAIKAN: Simpan ke ui_components jika tersedia
+                if ui_components: ui_components['config'] = config
                 return config
     except Exception as e:
         if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
     
     # Default config jika tidak ada file
-    if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
-    return {
+    default_config = {
         "preprocessing": {
             "output_dir": "data/preprocessed",
             "img_size": [640, 640],
@@ -242,9 +260,18 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             "dir": "data"
         }
     }
+    
+    if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
+    
+    # PERBAIKAN: Simpan default config ke ui_components jika tersedia
+    if ui_components: ui_components['config'] = default_config
+    
+    return default_config
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Update komponen UI dari konfigurasi dengan pendekatan DRY."""
+    """Update komponen UI dari konfigurasi dengan pendekatan DRY dan persistensi yang ditingkatkan."""
+    logger = ui_components.get('logger')
+    
     # Update data paths dan simpan di UI components
     data_dir = config.get('data', {}).get('dir', 'data')
     preprocessed_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
@@ -257,7 +284,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     if preproc_options and hasattr(preproc_options, 'children'):
         # Update opsi dengan list comprehension
         if len(preproc_options.children) >= 5:
-            # Perbaikan: Ambil komponen pertama dari array img_size jika tuple/list
+            # Ambil komponen pertama dari array img_size jika tuple/list
             img_size = preproc_config.get('img_size', [640, 640])
             img_size_value = img_size[0] if isinstance(img_size, (list, tuple)) else img_size
             
@@ -313,6 +340,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     # PERBAIKAN: Simpan referensi config di ui_components untuk persistensi
     ui_components['config'] = config
     
+    if logger: logger.debug(f"🔄 UI berhasil diupdate dari konfigurasi")
+    
     return ui_components
 
 def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
@@ -325,7 +354,7 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
         config = ui_components['config']
     else:
         # Load config jika belum tersedia
-        config = config or load_preprocessing_config()
+        config = config or load_preprocessing_config(ui_components=ui_components)
     
     # Update UI dari config
     ui_components = update_ui_from_config(ui_components, config)

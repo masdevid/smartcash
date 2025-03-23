@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/preprocessing_manager.py
-Deskripsi: Manager khusus untuk fungsionalitas preprocessing dataset
+Deskripsi: Manager khusus untuk fungsionalitas preprocessing dataset dengan integrasi logger yang lebih baik
 """
 
 import torch
@@ -37,6 +37,8 @@ class PreprocessingManager:
         self._progress_callback = callback
         if self._preprocessor:
             self._preprocessor.register_progress_callback(callback)
+            if self.logger:
+                self.logger.debug("🔄 Progress callback telah diregister ke preprocessor")
     
     def _get_preprocessor(self):
         """
@@ -49,16 +51,22 @@ class PreprocessingManager:
             try:
                 from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
                 
+                # Integrasikan konfigurasi untuk preprocessor
                 integrated_config = {
                     'preprocessing': {
                         'img_size': self.preprocess_config.get('img_size', [640, 640]),
                         'output_dir': self.preprocess_config.get('preprocessed_dir', 'data/preprocessed'),
+                        'normalization': {
+                            'enabled': self.preprocess_config.get('normalize', True),
+                            'preserve_aspect_ratio': self.preprocess_config.get('preserve_aspect_ratio', True)
+                        }
                     },
                     'data': {
                         'dir': self.preprocess_config.get('raw_dataset_dir', 'data')
                     }
                 }
                 
+                # Inisialisasi preprocessor dengan logger yang sama untuk konsistensi logging
                 self._preprocessor = DatasetPreprocessor(
                     config=integrated_config,
                     logger=self.logger
@@ -67,9 +75,15 @@ class PreprocessingManager:
                 # Register callback jika ada
                 if self._progress_callback:
                     self._preprocessor.register_progress_callback(self._progress_callback)
+                    if self.logger:
+                        self.logger.debug("🔄 Progress callback diregister ke preprocessor saat inisialisasi")
             except ImportError as e:
+                if self.logger:
+                    self.logger.error(f"🚨 Error saat memuat DatasetPreprocessor: {str(e)}")
                 raise DatasetError(f"🚨 Error saat memuat DatasetPreprocessor: {str(e)}")
             except Exception as e:
+                if self.logger:
+                    self.logger.error(f"🚨 Error saat menginisialisasi preprocessor: {str(e)}")
                 raise DatasetError(f"🚨 Error saat menginisialisasi preprocessor: {str(e)}")
                 
         return self._preprocessor
@@ -95,11 +109,15 @@ class PreprocessingManager:
                         'batch_size': self.config.get('batch_size', 16),
                         'num_workers': self.config.get('num_workers', 4)
                     },
-                    logger=self.logger
+                    logger=self.logger  # Teruskan logger yang sama
                 )
             except ImportError as e:
+                if self.logger:
+                    self.logger.error(f"🚨 Error saat memuat PreprocessedDatasetLoader: {str(e)}")
                 raise DatasetError(f"🚨 Error saat memuat PreprocessedDatasetLoader: {str(e)}")
             except Exception as e:
+                if self.logger:
+                    self.logger.error(f"🚨 Error saat menginisialisasi preprocessed loader: {str(e)}")
                 raise DatasetError(f"🚨 Error saat menginisialisasi preprocessed loader: {str(e)}")
                 
         return self._preprocessed_loader
@@ -117,6 +135,10 @@ class PreprocessingManager:
             Dict: Statistik hasil preprocessing
         """
         try:
+            if self.logger:
+                split_info = split if split != 'all' else 'semua split'
+                self.logger.info(f"🚀 Memulai preprocessing dataset ({split_info})")
+                
             preprocessor = self._get_preprocessor()
             
             # Extract parameter yang diperlukan untuk preprocessing
@@ -126,13 +148,26 @@ class PreprocessingManager:
                 'preserve_aspect_ratio': kwargs.get('preserve_aspect_ratio', True),
             }
             
-            return preprocessor.preprocess_dataset(
+            # Jalankan preprocessing
+            result = preprocessor.preprocess_dataset(
                 split=split, 
                 force_reprocess=force_reprocess,
                 **valid_preprocessor_params
             )
+            
+            # Log hasil preprocessing
+            if self.logger and result:
+                total_images = result.get('total_images', 0)
+                processing_time = result.get('processing_time', 0)
+                self.logger.info(f"✅ Preprocessing selesai: {total_images} gambar, waktu: {processing_time:.2f} detik")
+                
+            return result
+            
         except Exception as e:
-            raise DatasetProcessingError(f"🔄 Error saat preprocessing dataset: {str(e)}")
+            error_msg = f"🔄 Error saat preprocessing dataset: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetProcessingError(error_msg)
     
     def clean_preprocessed(self, split='all') -> bool:
         """
@@ -145,11 +180,22 @@ class PreprocessingManager:
             Boolean menunjukkan keberhasilan
         """
         try:
+            if self.logger:
+                split_info = split if split != 'all' else 'semua split'
+                self.logger.info(f"🧹 Membersihkan data preprocessed ({split_info})")
+                
             preprocessor = self._get_preprocessor()
             preprocessor.clean_preprocessed(split=None if split == 'all' else split)
+            
+            if self.logger:
+                self.logger.success(f"✅ Pembersihan data preprocessing selesai")
+                
             return True
         except Exception as e:
-            raise DatasetProcessingError(f"🧹 Error saat membersihkan data preprocessed: {str(e)}")
+            error_msg = f"🧹 Error saat membersihkan data preprocessed: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetProcessingError(error_msg)
     
     def get_preprocessed_stats(self) -> Dict[str, Any]:
         """
@@ -160,9 +206,22 @@ class PreprocessingManager:
         """
         try:
             preprocessor = self._get_preprocessor()
-            return preprocessor.get_preprocessed_stats()
+            stats = preprocessor.get_preprocessed_stats()
+            
+            if self.logger:
+                total_stats = sum(
+                    stats.get(split, {}).get('processed', 0) 
+                    for split in ['train', 'valid', 'test'] 
+                    if split in stats
+                )
+                self.logger.info(f"📊 Statistik dataset preprocessed: {total_stats} total gambar")
+                
+            return stats
         except Exception as e:
-            raise DatasetError(f"📊 Error saat mengambil statistik preprocessed: {str(e)}")
+            error_msg = f"📊 Error saat mengambil statistik preprocessed: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetError(error_msg)
     
     def get_dataset(self, split: str, **kwargs) -> torch.utils.data.Dataset:
         """
@@ -176,11 +235,25 @@ class PreprocessingManager:
             Dataset
         """
         try:
-            return self._get_preprocessed_loader().get_dataset(split, **kwargs)
+            if self.logger:
+                self.logger.debug(f"📂 Memuat dataset {split}...")
+                
+            dataset = self._get_preprocessed_loader().get_dataset(split, **kwargs)
+            
+            if self.logger:
+                self.logger.debug(f"✅ Dataset {split} berhasil dimuat ({len(dataset)} sampel)")
+                
+            return dataset
         except FileNotFoundError as e:
-            raise DatasetFileError(f"📁 File dataset tidak ditemukan: {str(e)}")
+            error_msg = f"📁 File dataset tidak ditemukan: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetFileError(error_msg)
         except Exception as e:
-            raise DatasetError(f"📊 Error saat memuat dataset: {str(e)}")
+            error_msg = f"📊 Error saat memuat dataset: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetError(error_msg)
     
     def get_dataloader(self, split: str, **kwargs) -> torch.utils.data.DataLoader:
         """
@@ -194,11 +267,25 @@ class PreprocessingManager:
             DataLoader
         """
         try:
-            return self._get_preprocessed_loader().get_dataloader(split, **kwargs)
+            if self.logger:
+                self.logger.debug(f"📂 Memuat dataloader {split}...")
+                
+            dataloader = self._get_preprocessed_loader().get_dataloader(split, **kwargs)
+            
+            if self.logger:
+                self.logger.debug(f"✅ Dataloader {split} berhasil dibuat ({len(dataloader.dataset)} sampel)")
+                
+            return dataloader
         except FileNotFoundError as e:
-            raise DatasetFileError(f"📁 File dataset tidak ditemukan: {str(e)}")
+            error_msg = f"📁 File dataset tidak ditemukan: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetFileError(error_msg)
         except Exception as e:
-            raise DatasetError(f"📊 Error saat membuat dataloader: {str(e)}")
+            error_msg = f"📊 Error saat membuat dataloader: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetError(error_msg)
     
     def get_all_dataloaders(self, **kwargs) -> Dict[str, torch.utils.data.DataLoader]:
         """
@@ -211,6 +298,18 @@ class PreprocessingManager:
             Dictionary dengan dataloader per split
         """
         try:
-            return self._get_preprocessed_loader().get_all_dataloaders(**kwargs)
+            if self.logger:
+                self.logger.info(f"📂 Memuat semua dataloader...")
+                
+            dataloaders = self._get_preprocessed_loader().get_all_dataloaders(**kwargs)
+            
+            if self.logger and dataloaders:
+                split_info = ", ".join([f"{k}: {len(v.dataset)}" for k, v in dataloaders.items()])
+                self.logger.info(f"✅ Semua dataloader berhasil dibuat ({split_info} sampel)")
+                
+            return dataloaders
         except Exception as e:
-            raise DatasetError(f"📊 Error saat membuat semua dataloader: {str(e)}")
+            error_msg = f"📊 Error saat membuat semua dataloader: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            raise DatasetError(error_msg)

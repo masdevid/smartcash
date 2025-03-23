@@ -270,10 +270,407 @@ class AugmentationService:
                 augmentation_types, start_time
             )
 
-        def _move_files_to_preprocessed(self, images_output_dir, labels_output_dir, 
-                                output_prefix, final_output_dir, split):
-            """Pindahkan file hasil augmentasi ke direktori preprocessed."""
-            return move_files_to_preprocessed(
-                images_output_dir, labels_output_dir, output_prefix,
-                final_output_dir, split, self.logger
+    def _move_files_to_preprocessed(self, images_output_dir, labels_output_dir, 
+                            output_prefix, final_output_dir, split):
+        """Pindahkan file hasil augmentasi ke direktori preprocessed."""
+        return move_files_to_preprocessed(
+            images_output_dir, labels_output_dir, output_prefix,
+            final_output_dir, split, self.logger
+        )
+    def _augment_with_class_tracking(
+        self,
+        class_files,
+        class_counts,
+        class_augmentation_needs,
+        augmentation_params,
+        target_count,
+        num_workers,
+        move_to_preprocessed,
+        final_output_dir,
+        preprocessed_dir,
+        output_dir,
+        images_output_dir,
+        labels_output_dir,
+        split,
+        augmentation_types,
+        start_time
+    ) -> Dict[str, Any]:
+        """
+        Augmentasi dataset dengan tracking progress per kelas untuk balancing.
+        
+        Args:
+            class_files: Dictionary mapping kelas ke file
+            class_counts: Dictionary jumlah file per kelas
+            class_augmentation_needs: Dictionary kebutuhan augmentasi per kelas
+            augmentation_params: Parameter untuk worker augmentasi
+            target_count: Target jumlah sampel per kelas
+            num_workers: Jumlah worker untuk multiprocessing
+            move_to_preprocessed: Pindahkan hasil ke preprocessed
+            final_output_dir: Direktori target akhir
+            preprocessed_dir: Direktori preprocessed
+            output_dir: Direktori output sementara
+            images_output_dir: Direktori output gambar
+            labels_output_dir: Direktori output label
+            split: Split dataset
+            augmentation_types: Jenis augmentasi
+            start_time: Waktu mulai augmentasi
+            
+        Returns:
+            Dictionary hasil augmentasi dengan statistik per kelas
+        """
+        # Override num_workers jika diberikan
+        n_workers = num_workers if num_workers is not None else self.num_workers
+        
+        # Jumlah kelas yang perlu diaugmentasi
+        classes_to_augment = [cls for cls, need in class_augmentation_needs.items() if need > 0]
+        total_classes = len(classes_to_augment)
+        
+        # Statisik hasil augmentasi
+        result_stats = {
+            'total_augmented': 0,
+            'total_generated': 0,
+            'failed': 0,
+            'class_stats': {},
+            'success': True
+        }
+        
+        # Report start of processing
+        self.report_progress(
+            message=f"🚀 Memulai augmentasi untuk {total_classes} kelas dengan tracking per kelas",
+            status="info",
+            step=1  # Tahap processing
+        )
+        
+        # Proses satu kelas pada satu waktu
+        for i, class_id in enumerate(classes_to_augment):
+            needed = class_augmentation_needs[class_id]
+            files = class_files[class_id]
+            
+            if not files or needed <= 0:
+                continue
+                
+            # Report class processing start
+            class_message = f"Memproses kelas {class_id} ({i+1}/{total_classes}): perlu {needed} instances"
+            self.logger.info(f"🔄 {class_message}")
+            self.report_progress(
+                message=class_message,
+                status="info",
+                step=1,  # Tahap processing
+                current_progress=i,
+                current_total=total_classes,
+                class_id=class_id
             )
+            
+            # Pilih file yang akan diaugmentasi untuk kelas ini
+            files_to_augment = files
+            if len(files) > needed:
+                files_to_augment = random.sample(files, min(len(files), needed))
+            
+            # Augmentasi file untuk kelas ini dengan multiprocessing
+            class_results = []
+            
+            # Jika hanya 1 file atau worker, gunakan processing sederhana
+            if len(files_to_augment) == 1 or n_workers <= 1:
+                for file_path in tqdm(files_to_augment, desc=f"Augmentasi kelas {class_id}"):
+                    # Tambahkan class_id ke parameter augmentasi
+                    params = augmentation_params.copy()
+                    params['class_id'] = class_id
+                    
+                    # Proses file
+                    result = process_single_file(file_path, **params)
+                    class_results.append(result)
+                    
+                    # Update progress
+                    self.report_progress(
+                        message=f"Memproses file {file_path.split('/')[-1]} untuk kelas {class_id}",
+                        status="info",
+                        step=1,  # Tahap processing
+                        current_progress=i,
+                        current_total=total_classes,
+                        class_id=class_id
+                    )
+            else:
+                # Gunakan multiprocessing untuk augmentasi
+                with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                    # Submit all tasks
+                    futures = {}
+                    for file_path in files_to_augment:
+                        # Tambahkan class_id ke parameter augmentasi
+                        params = augmentation_params.copy()
+                        params['class_id'] = class_id
+                        
+                        # Submit task
+                        future = executor.submit(process_single_file, file_path, **params)
+                        futures[future] = file_path
+                    
+                    # Process results as they complete
+                    for i, future in enumerate(tqdm(as_completed(futures), total=len(futures), desc=f"Augmentasi kelas {class_id}")):
+                        file_path = futures[future]
+                        try:
+                            result = future.result()
+                            class_results.append(result)
+                        except Exception as e:
+                            self.logger.error(f"❌ Error saat memproses {file_path}: {str(e)}")
+                            result_stats['failed'] += 1
+                        
+                        # Update progress per file with throttling (only every 10%)
+                        if i % max(1, len(futures) // 10) == 0 or i == len(futures) - 1:
+                            self.report_progress(
+                                progress=i+1,
+                                total=len(futures),
+                                message=f"Augmentasi kelas {class_id}: {i+1}/{len(futures)} file",
+                                status="info",
+                                step=1,  # Tahap processing
+                                current_progress=i+1,
+                                current_total=len(futures),
+                                class_id=class_id
+                            )
+            
+            # Process class results
+            generated_for_class = sum(result.get('generated', 0) for result in class_results)
+            success_for_class = sum(1 for result in class_results if result.get('status') == 'success')
+            
+            # Update class statistics
+            result_stats['class_stats'][class_id] = {
+                'original': len(files),
+                'files_augmented': len(files_to_augment),
+                'target': target_count,
+                'generated': generated_for_class,
+                'variations_per_file': generated_for_class / max(1, len(files_to_augment)),
+                'success_rate': success_for_class / max(1, len(files_to_augment))
+            }
+            
+            # Update total statistics
+            result_stats['total_augmented'] += len(files_to_augment)
+            result_stats['total_generated'] += generated_for_class
+            
+            # Report class completion
+            class_complete_message = f"✅ Kelas {class_id} selesai: {generated_for_class} variasi dibuat dari {len(files_to_augment)} file"
+            self.logger.info(class_complete_message)
+            self.report_progress(
+                message=class_complete_message,
+                status="success",
+                step=1,  # Tahap processing
+                current_progress=i+1,
+                current_total=total_classes,
+                class_id=class_id
+            )
+        
+        # Semua kelas selesai, finalisasi hasil
+        duration = time.time() - start_time
+        result_stats['duration'] = duration
+        
+        # Pindahkan file ke preprocessed jika diminta
+        if move_to_preprocessed:
+            self.report_progress(
+                message=f"🔄 Memindahkan {result_stats['total_generated']} file ke direktori preprocessed",
+                status="info",
+                step=2  # Tahap finalisasi
+            )
+            
+            # Pindahkan file dengan menggunakan fungsi bantuan
+            move_success = move_files_to_preprocessed(
+                images_output_dir, labels_output_dir,
+                augmentation_params['output_prefix'], final_output_dir,
+                split, self.logger
+            )
+            
+            # Report status pemindahan
+            if move_success:
+                self.logger.info(f"✅ File augmentasi berhasil dipindahkan ke {final_output_dir}/{split}")
+                result_stats['final_output_dir'] = final_output_dir
+            else:
+                self.logger.warning(f"⚠️ Gagal memindahkan file augmentasi ke {final_output_dir}/{split}")
+                result_stats['final_output_dir'] = output_dir
+        
+        # Log final statistics
+        summary_message = (
+            f"✅ Augmentasi selesai dalam {duration:.2f} detik:\n"
+            f"- {result_stats['total_augmented']} file diaugmentasi dari {total_classes} kelas\n"
+            f"- {result_stats['total_generated']} variasi dihasilkan"
+        )
+        self.logger.info(summary_message)
+        self.report_progress(
+            message=f"✅ Augmentasi selesai dalam {duration:.2f} detik: {result_stats['total_generated']} variasi dihasilkan",
+            status="success",
+            step=2  # Tahap finalisasi
+        )
+        
+        # Add additional info to result
+        result_stats.update({
+            'original': sum(class_counts.values()),
+            'augmentation_types': augmentation_types,
+            'status': 'success',
+            'split': split,
+            'output_dir': output_dir,
+            'preprocessed_dir': preprocessed_dir
+        })
+        
+        return result_stats
+
+    def _augment_without_class_tracking(
+        self,
+        image_files,
+        augmentation_params,
+        num_workers,
+        move_to_preprocessed,
+        final_output_dir,
+        preprocessed_dir,
+        output_dir,
+        images_output_dir,
+        labels_output_dir,
+        split,
+        augmentation_types,
+        start_time
+    ) -> Dict[str, Any]:
+        """
+        Augmentasi dataset tanpa tracking progress per kelas.
+        
+        Args:
+            image_files: List file gambar yang akan diaugmentasi
+            augmentation_params: Parameter untuk worker augmentasi
+            num_workers: Jumlah worker untuk multiprocessing
+            move_to_preprocessed: Pindahkan hasil ke preprocessed
+            final_output_dir: Direktori target akhir
+            preprocessed_dir: Direktori preprocessed
+            output_dir: Direktori output sementara
+            images_output_dir: Direktori output gambar
+            labels_output_dir: Direktori output label
+            split: Split dataset
+            augmentation_types: Jenis augmentasi
+            start_time: Waktu mulai augmentasi
+            
+        Returns:
+            Dictionary hasil augmentasi dengan statistik
+        """
+        # Override num_workers jika diberikan
+        n_workers = num_workers if num_workers is not None else self.num_workers
+        total_files = len(image_files)
+        
+        # Statistik hasil augmentasi
+        result_stats = {
+            'total_augmented': 0,
+            'total_generated': 0,
+            'failed': 0,
+            'success': True
+        }
+        
+        # Report start of processing
+        self.report_progress(
+            message=f"🚀 Memulai augmentasi {total_files} file",
+            status="info",
+            step=1  # Tahap processing
+        )
+        
+        # Proses semua file, dengan atau tanpa multiprocessing
+        all_results = []
+        
+        # Jika hanya 1 file atau worker, gunakan processing sederhana
+        if total_files == 1 or n_workers <= 1:
+            for i, file_path in enumerate(tqdm(image_files, desc="Augmentasi")):
+                # Proses file
+                result = process_single_file(file_path, **augmentation_params)
+                all_results.append(result)
+                
+                # Update progress dengan throttling (hanya setiap 10%)
+                if i % max(1, total_files // 10) == 0 or i == total_files - 1:
+                    percentage = int((i+1) / total_files * 100)
+                    self.report_progress(
+                        progress=i+1,
+                        total=total_files,
+                        message=f"Augmentasi ({percentage}%): {i+1}/{total_files} file",
+                        status="info",
+                        step=1,  # Tahap processing
+                        current_progress=i+1,
+                        current_total=total_files
+                    )
+        else:
+            # Gunakan multiprocessing untuk augmentasi
+            with ProcessPoolExecutor(max_workers=n_workers) as executor:
+                # Submit all tasks
+                futures = {}
+                for file_path in image_files:
+                    future = executor.submit(process_single_file, file_path, **augmentation_params)
+                    futures[future] = file_path
+                
+                # Process results as they complete
+                for i, future in enumerate(tqdm(as_completed(futures), total=len(futures), desc="Augmentasi")):
+                    file_path = futures[future]
+                    try:
+                        result = future.result()
+                        all_results.append(result)
+                    except Exception as e:
+                        self.logger.error(f"❌ Error saat memproses {file_path}: {str(e)}")
+                        result_stats['failed'] += 1
+                    
+                    # Update progress per file dengan throttling (hanya setiap 10%)
+                    if i % max(1, total_files // 10) == 0 or i == total_files - 1:
+                        percentage = int((i+1) / total_files * 100)
+                        self.report_progress(
+                            progress=i+1,
+                            total=total_files,
+                            message=f"Augmentasi ({percentage}%): {i+1}/{total_files} file",
+                            status="info",
+                            step=1,  # Tahap processing
+                            current_progress=i+1,
+                            current_total=total_files
+                        )
+        
+        # Process all results
+        successful_results = [result for result in all_results if result.get('status') == 'success']
+        result_stats['total_augmented'] = len(successful_results)
+        result_stats['total_generated'] = sum(result.get('generated', 0) for result in all_results)
+        
+        # Finalisasi hasil
+        duration = time.time() - start_time
+        result_stats['duration'] = duration
+        
+        # Pindahkan file ke preprocessed jika diminta
+        if move_to_preprocessed:
+            self.report_progress(
+                message=f"🔄 Memindahkan {result_stats['total_generated']} file ke direktori preprocessed",
+                status="info",
+                step=2  # Tahap finalisasi
+            )
+            
+            # Pindahkan file dengan menggunakan fungsi bantuan
+            move_success = move_files_to_preprocessed(
+                images_output_dir, labels_output_dir,
+                augmentation_params['output_prefix'], final_output_dir,
+                split, self.logger
+            )
+            
+            # Report status pemindahan
+            if move_success:
+                self.logger.info(f"✅ File augmentasi berhasil dipindahkan ke {final_output_dir}/{split}")
+                result_stats['final_output_dir'] = final_output_dir
+            else:
+                self.logger.warning(f"⚠️ Gagal memindahkan file augmentasi ke {final_output_dir}/{split}")
+                result_stats['final_output_dir'] = output_dir
+        
+        # Log final statistics
+        summary_message = (
+            f"✅ Augmentasi selesai dalam {duration:.2f} detik:\n"
+            f"- {result_stats['total_augmented']} file diaugmentasi\n"
+            f"- {result_stats['total_generated']} variasi dihasilkan"
+        )
+        self.logger.info(summary_message)
+        self.report_progress(
+            message=f"✅ Augmentasi selesai dalam {duration:.2f} detik: {result_stats['total_generated']} variasi dihasilkan",
+            status="success",
+            step=2  # Tahap finalisasi
+        )
+        
+        # Add additional info to result
+        result_stats.update({
+            'original': total_files,
+            'generated': result_stats['total_generated'],
+            'augmentation_types': augmentation_types,
+            'status': 'success',
+            'split': split,
+            'output_dir': output_dir,
+            'preprocessed_dir': preprocessed_dir
+        })
+        
+        return result_stats
+    

@@ -66,7 +66,10 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
     logger = None
     if 'logger' in config and callable(getattr(config.get('logger', None), 'info', None)):
         logger = config.get('logger')
-    
+     # PERBAIKAN: Buat salinan config tanpa logger untuk disimpan
+    config_to_save = config.copy()
+    if 'logger' in config_to_save:
+        config_to_save.pop('logger')
     try:
         # Pastikan direktori config ada
         Path(config_path).parent.mkdir(parents=True, exist_ok=True)

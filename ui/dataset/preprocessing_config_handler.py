@@ -79,6 +79,12 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
     """Simpan konfigurasi preprocessing dengan penanganan persistensi yang lebih baik."""
     logger = None
+    # if 'logger' in config and callable(getattr(config.get('logger', None), 'info', None)):
+    #     logger = config.get('logger')
+    # # Buat salinan config tanpa logger untuk disimpan
+    # config_to_save = config.copy()
+    # if 'logger' in config_to_save:
+    #     config_to_save.pop('logger')
     try:
         # Ambil logger dari lingkungan jika tersedia
         try:

@@ -1,38 +1,36 @@
 """
-File: smartcash/ui/dataset/preprocessing_summary_handler.py
-Deskripsi: Handler untuk menampilkan ringkasan dan statistik hasil preprocessing dengan komponen UI standar dan perbaikan warna header
+File: smartcash/ui/dataset/shared/summary_handler.py
+Deskripsi: Handler bersama untuk tampilan ringkasan hasil preprocessing/augmentasi
 """
 
 from typing import Dict, Any, Optional
 from IPython.display import display, clear_output, HTML
-import time
-from pathlib import Path
 import ipywidgets as widgets
-
 from smartcash.ui.utils.constants import COLORS, ICONS
 
-
-def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+def setup_shared_summary_handler(ui_components: Dict[str, Any], env=None, config=None, 
+                               module_type: str = 'preprocessing') -> Dict[str, Any]:
     """
-    Setup handler untuk ringkasan preprocessing.
+    Setup handler untuk ringkasan hasil processing.
     
     Args:
         ui_components: Dictionary komponen UI
         env: Environment manager
         config: Konfigurasi aplikasi
+        module_type: Tipe modul ('preprocessing' atau 'augmentation')
         
     Returns:
         Dictionary UI components yang telah diupdate
     """
     logger = ui_components.get('logger')
     
-    # Fungsi utama update summary dengan berbagai visualisasi dan styling konsisten
+    # Fungsi utama update summary dengan visualisasi yang konsisten
     def update_summary(result):
         """
-        Update komponen summary dengan hasil preprocessing.
+        Update komponen summary dengan hasil preprocessing/augmentasi.
         
         Args:
-            result: Hasil preprocessing
+            result: Hasil processing
         """
         if not result or 'summary_container' not in ui_components:
             return
@@ -48,8 +46,9 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             from smartcash.ui.utils.constants import COLORS, ICONS
             
             # Header dengan warna yang terlihat
+            title = "Hasil Preprocessing" if module_type == 'preprocessing' else "Hasil Augmentasi"
             display(styled_html(
-                f"<h3 style='margin-top:0; color:{COLORS['dark']}'>{ICONS.get('stats', '📊')} Hasil Preprocessing</h3>", 
+                f"<h3 style='margin-top:0; color:{COLORS['dark']}'>{ICONS.get('stats', '📊')} {title}</h3>", 
                 bg_color=COLORS['light'], text_color=COLORS['dark'], 
                 border_color=COLORS['primary']
             ))
@@ -60,16 +59,25 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 justify_content='space-around', width='100%', margin='10px 0'
             ))
             
-            # Jumlah gambar
-            metrics_container.children = [
-                create_metric_display("Jumlah Gambar", result.get('total_images', 0)),
-                create_metric_display("Resolusi", f"{result.get('image_size', [0, 0])[0]}x{result.get('image_size', [0, 0])[1]}"),
-                create_metric_display("Waktu Proses", f"{result.get('processing_time', 0):.2f}s")
-            ]
+            # Metrik khusus berdasarkan jenis modul
+            if module_type == 'preprocessing':
+                metrics_container.children = [
+                    create_metric_display("Jumlah Gambar", result.get('total_images', 0)),
+                    create_metric_display("Resolusi", f"{result.get('image_size', [0, 0])[0]}x{result.get('image_size', [0, 0])[1]}"),
+                    create_metric_display("Waktu Proses", f"{result.get('processing_time', 0):.2f}s")
+                ]
+            else:
+                metrics_container.children = [
+                    create_metric_display("File Original", result.get('original', 0)),
+                    create_metric_display("File Augmentasi", result.get('generated', 0)),
+                    create_metric_display("Total File", result.get('total_files', 0)),
+                    create_metric_display("Waktu Proses", f"{result.get('duration', 0):.2f}s")
+                ]
             
             display(metrics_container)
-            # Split stats jika tersedia
-            if 'split_stats' in result:
+            
+            # Split stats jika tersedia (hanya di preprocessing)
+            if 'split_stats' in result and module_type == 'preprocessing':
                 # Buat tabel untuk split stats
                 th_style = f"padding:8px; text-align:center; border:1px solid #ddd; color:#343a40;";
                 split_stats_html = f"""
@@ -110,6 +118,13 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 
                 display(HTML(split_stats_html))
             
+            # Jenis augmentasi (hanya di augmentation)
+            if 'augmentation_types' in result and module_type == 'augmentation':
+                display(styled_html(
+                    f"<p style='color:{COLORS['dark']};'><strong>Jenis augmentasi:</strong> {', '.join(result.get('augmentation_types', []))}</p>", 
+                    bg_color=COLORS['light'], text_color=COLORS['dark']
+                ))
+            
             # Info tambahan
             if 'output_dir' in result:
                 display(styled_html(
@@ -120,18 +135,18 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
             # Tombol visualisasi jika tersedia
             if 'visualize_button' in ui_components:
                 ui_components['visualize_button'].layout.display = 'inline-flex'
-                
             if 'compare_button' in ui_components:
                 ui_components['compare_button'].layout.display = 'inline-flex'
+            if 'distribution_button' in ui_components:
+                ui_components['distribution_button'].layout.display = 'inline-flex'
     
-    # Fungsi untuk generate ringkasan
-    def generate_preprocessing_summary(preprocessed_dir: Optional[str] = None, data_dir: Optional[str] = None) -> Dict[str, Any]:
+    # Fungsi untuk generate ringkasan preprocessing
+    def generate_preprocessing_summary(preprocessed_dir: Optional[str] = None) -> Dict[str, Any]:
         """
         Generate ringkasan hasil preprocessing dari direktori.
         
         Args:
             preprocessed_dir: Direktori hasil preprocessing
-            data_dir: Direktori dataset mentah
             
         Returns:
             Dictionary ringkasan hasil preprocessing
@@ -140,12 +155,11 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
         
         # Gunakan default jika tidak disediakan
         preprocessed_dir = preprocessed_dir or ui_components.get('preprocessed_dir', 'data/preprocessed')
-        data_dir = data_dir or ui_components.get('data_dir', 'data')
         
         # Dapatkan konfigurasi
         img_size = [640, 640]  # Default
         try:
-            # Ambil dari ui_components
+            # Ambil dari ui_components khusus preprocessing
             if 'preprocess_options' in ui_components and hasattr(ui_components['preprocess_options'], 'children'):
                 img_size_value = ui_components['preprocess_options'].children[0].value
                 img_size = [img_size_value, img_size_value]
@@ -171,6 +185,70 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
         
         return summary
     
+    # Fungsi untuk generate ringkasan augmentasi
+    def generate_augmentation_summary(augmented_dir: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Generate ringkasan hasil augmentasi dari direktori.
+        
+        Args:
+            augmented_dir: Direktori hasil augmentasi
+            
+        Returns:
+            Dictionary ringkasan hasil augmentasi
+        """
+        from smartcash.ui.visualization.class_distribution_analyzer import count_files_by_prefix
+        
+        # Gunakan default jika tidak disediakan
+        augmented_dir = augmented_dir or ui_components.get('augmented_dir', 'data/augmented')
+        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
+        
+        # Cari semua file di kedua lokasi
+        aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+        
+        # Hitung file di folder augmentasi
+        aug_files = 0
+        aug_path = Path(augmented_dir)
+        if aug_path.exists():
+            aug_images_dir = aug_path / 'images'
+            if aug_images_dir.exists():
+                aug_files = len(list(aug_images_dir.glob(f"{aug_prefix}_*.*")))
+        
+        # Hitung file di folder preprocessed
+        orig_files = 0
+        preproc_files = 0
+        preproc_path = Path(preprocessed_dir)
+        if preproc_path.exists():
+            for split in ['train', 'valid', 'test']:
+                images_dir = preproc_path / split / 'images'
+                if not images_dir.exists():
+                    continue
+                
+                orig_prefix = 'rp'  # Default prefix untuk file original
+                orig_files += len(list(images_dir.glob(f"{orig_prefix}_*.*")))
+                preproc_files += len(list(images_dir.glob(f"{aug_prefix}_*.*")))
+        
+        # Dapatkan nilai dari aug_options jika tersedia
+        aug_types = []
+        if 'aug_options' in ui_components and hasattr(ui_components['aug_options'], 'children') and len(ui_components['aug_options'].children) > 0:
+            # Map UI types to config types
+            type_map = {'Combined (Recommended)': 'combined', 'Position Variations': 'position', 
+                      'Lighting Variations': 'lighting', 'Extreme Rotation': 'extreme_rotation'}
+            
+            selected_types = ui_components['aug_options'].children[0].value
+            aug_types = [type_map.get(t, 'combined') for t in selected_types]
+        
+        # Buat ringkasan
+        summary = {
+            'original': orig_files,
+            'generated': aug_files + preproc_files,
+            'total_files': orig_files + aug_files + preproc_files,
+            'duration': 0,  # Tidak diketahui karena loading dari disk
+            'augmentation_types': aug_types,
+            'output_dir': preprocessed_dir
+        }
+        
+        return summary
+    
     # Handler untuk tombol summary
     def on_summary_click(b):
         """Handler untuk tombol summary."""
@@ -178,23 +256,23 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
         
         with ui_components['status']:
             clear_output(wait=True)
-            display(create_status_indicator('info', f"{ICONS['processing']} Mempersiapkan ringkasan preprocessing..."))
+            display(create_status_indicator('info', f"{ICONS['processing']} Mempersiapkan ringkasan..."))
         
         try:
-            # Generate ringkasan
-            summary = generate_preprocessing_summary()
+            # Generate ringkasan berdasarkan module_type
+            summary = generate_preprocessing_summary() if module_type == 'preprocessing' else generate_augmentation_summary()
             
             # Update UI dengan ringkasan
             update_summary(summary)
             
             # Tampilkan status sukses
             with ui_components['status']:
-                display(create_status_indicator('success', f"{ICONS['success']} Ringkasan preprocessing berhasil ditampilkan"))
+                display(create_status_indicator('success', f"{ICONS['success']} Ringkasan berhasil ditampilkan"))
                 
         except Exception as e:
             with ui_components['status']:
                 display(create_status_indicator('error', f"{ICONS['error']} Error saat membuat ringkasan: {str(e)}"))
-            if logger: logger.error(f"{ICONS['error']} Error saat membuat ringkasan preprocessing: {str(e)}")
+            if logger: logger.error(f"{ICONS['error']} Error saat membuat ringkasan: {str(e)}")
     
     # Tambahkan handler ke tombol jika tersedia
     if 'summary_button' in ui_components:
@@ -203,43 +281,8 @@ def setup_summary_handler(ui_components: Dict[str, Any], env=None, config=None) 
     # Tambahkan fungsi ke ui_components
     ui_components.update({
         'update_summary': update_summary,
-        'generate_preprocessing_summary': generate_preprocessing_summary,
+        'generate_summary': generate_preprocessing_summary if module_type == 'preprocessing' else generate_augmentation_summary,
         'on_summary_click': on_summary_click
     })
     
     return ui_components
-
-def create_preprocessing_metrics(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
-    """
-    Buat dan tampilkan metrik preprocessing dalam format card.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        result: Hasil preprocessing
-    """
-    import ipywidgets as widgets
-    from smartcash.ui.utils.metric_utils import create_metric_display
-    
-    # Container untuk metrik
-    metrics_container = widgets.HBox(
-        layout=widgets.Layout(
-            display='flex',
-            flex_flow='row wrap',
-            align_items='stretch',
-            width='100%'
-        )
-    )
-    
-    # Buat metric cards
-    metrics_container.children = [
-        create_metric_display("Jumlah Gambar", result.get('total_images', 0)),
-        create_metric_display("Resolusi", f"{result.get('image_size', [0, 0])[0]}x{result.get('image_size', [0, 0])[1]}"),
-        create_metric_display("Waktu Proses", f"{result.get('processing_time', 0):.2f}s", "detik"),
-        create_metric_display("Status", "Lengkap" if result.get('valid', False) else "Tidak Lengkap", 
-                             is_good=result.get('valid', False))
-    ]
-    
-    # Tampilkan dalam container
-    if 'summary_container' in ui_components:
-        with ui_components['summary_container']:
-            display(metrics_container)

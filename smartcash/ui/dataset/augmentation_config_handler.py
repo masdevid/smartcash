@@ -4,7 +4,7 @@ Deskripsi: Handler konfigurasi augmentasi dengan dukungan balancing kelas dan su
 """
 
 from typing import Dict, Any, Optional
-import os, yaml
+import os, yaml, copy
 from pathlib import Path
 from IPython.display import display
 
@@ -68,6 +68,9 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
         logger = config.get('logger')
     
     try:
+        # Pastikan direktori config ada
+        Path(config_path).parent.mkdir(parents=True, exist_ok=True)
+        
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
         if config_manager:
@@ -88,6 +91,29 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
             
             # Simpan konfigurasi lengkap
             config_manager.save_config(config_path, create_dirs=True)
+            
+            # PERBAIKAN: Cegah duplikasi ke Google Drive jika path sama
+            try:
+                from smartcash.common.environment import get_environment_manager
+                env_manager = get_environment_manager()
+                
+                if env_manager.is_drive_mounted:
+                    drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+                    
+                    # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
+                    if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
+                        if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
+                    else:
+                        # Buat direktori drive jika belum ada
+                        os.makedirs(Path(drive_config_path).parent, exist_ok=True)
+                        
+                        # Simpan juga ke drive untuk backup
+                        with open(drive_config_path, 'w') as f:
+                            yaml.dump(full_config, f, default_flow_style=False)
+                        
+                        if logger: logger.info(f"📤 Konfigurasi disimpan ke drive: {drive_config_path}")
+            except Exception as e:
+                if logger: logger.debug(f"ℹ️ Tidak dapat menyimpan ke drive: {str(e)}")
             
             # Untuk debugging - simpan juga salinan konfigurasi augmentasi saja
             aug_config_path = config_path.replace('.yaml', '_aug_only.yaml')
@@ -113,6 +139,29 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
             with open(path, 'w') as f:
                 yaml.dump(output_config, f, default_flow_style=False)
             
+            # PERBAIKAN: Cegah duplikasi ke Google Drive jika path sama
+            try:
+                from smartcash.common.environment import get_environment_manager
+                env_manager = get_environment_manager()
+                
+                if env_manager.is_drive_mounted:
+                    drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+                    
+                    # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
+                    if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
+                        if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
+                    else:
+                        # Buat direktori drive jika belum ada
+                        os.makedirs(Path(drive_config_path).parent, exist_ok=True)
+                        
+                        # Salin file ke Google Drive
+                        import shutil
+                        shutil.copy2(config_path, drive_config_path)
+                        
+                        if logger: logger.info(f"📤 Konfigurasi disalin ke drive: {drive_config_path}")
+            except (ImportError, AttributeError) as e:
+                if logger: logger.debug(f"ℹ️ Tidak dapat menyalin ke drive: {str(e)}")
+            
             if logger:
                 logger.info(f"✅ Konfigurasi disimpan ke {config_path} (fallback)")
             return True
@@ -129,6 +178,26 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
         logger = ui_components.get('logger')
     
     try:
+        # PERBAIKAN: Cek konfigurasi dari Google Drive terlebih dahulu 
+        try:
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager()
+            
+            if env_manager.is_drive_mounted:
+                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
+                
+                # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
+                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
+                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
+                elif os.path.exists(drive_config_path):
+                    # Salin dari Drive ke lokal untuk memastikan sinkronisasi
+                    import shutil
+                    os.makedirs(Path(config_path).parent, exist_ok=True)
+                    shutil.copy2(drive_config_path, config_path)
+                    if logger: logger.info(f"📥 Konfigurasi disalin dari drive: {drive_config_path}")
+        except (ImportError, AttributeError) as e:
+            if logger: logger.debug(f"ℹ️ Tidak dapat menyalin dari drive: {str(e)}")
+            
         from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
         if config_manager:

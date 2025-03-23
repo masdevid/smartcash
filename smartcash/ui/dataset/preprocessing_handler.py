@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing_handler.py
-Deskripsi: Handler untuk preprocessing dataset dengan perbaikan deteksi dan visualisasi dataset yang sudah ada
+Deskripsi: Handler terpadu untuk preprocessing dataset menggunakan shared modules
 """
 
 from typing import Dict, Any
@@ -10,7 +10,7 @@ from IPython.display import display, clear_output
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup semua handler untuk komponen UI preprocessing dataset.
+    Setup semua handler untuk komponen UI preprocessing dataset dengan pendekatan DRY.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -37,122 +37,27 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
             'preprocessed_dir': preprocessed_dir,
         })
         
-        # Setup config handler
+        # Setup config handler (tetap spesifik untuk preprocessing)
         from smartcash.ui.dataset.preprocessing_config_handler import setup_preprocessing_config_handler
         ui_components = setup_preprocessing_config_handler(ui_components, config, env)
         
-        # Setup tombol handler
+        # Setup tombol handler (tetap spesifik untuk preprocessing)
         from smartcash.ui.dataset.preprocessing_click_handler import setup_click_handlers
         ui_components = setup_click_handlers(ui_components, env, config)
         
-        # Setup progress handler
-        from smartcash.ui.dataset.preprocessing_progress_handler import setup_progress_handler
-        ui_components = setup_progress_handler(ui_components, env, config)
+        # Setup dataset manager
+        from smartcash.ui.dataset.shared.setup_utils import setup_manager
+        dataset_manager = setup_manager(ui_components, config, 'preprocessing')
+        ui_components['dataset_manager'] = dataset_manager
         
-        # Setup visualisasi handler
-        from smartcash.ui.dataset.preprocessing_visualization_integration import setup_visualization_handlers
-        ui_components = setup_visualization_handlers(ui_components, env, config)
-        
-        # Setup cleanup handler
-        from smartcash.ui.dataset.preprocessing_cleanup_handler import setup_cleanup_handler
-        ui_components = setup_cleanup_handler(ui_components, env, config)
-        
-        # Setup summary handler
-        from smartcash.ui.dataset.preprocessing_summary_handler import setup_summary_handler
-        ui_components = setup_summary_handler(ui_components, env, config)
+        # Gunakan shared handlers untuk progress, visualization, cleanup dan summary
+        from smartcash.ui.dataset.shared.integration import apply_shared_handlers, create_cleanup_function
+        ui_components = apply_shared_handlers(ui_components, env, config, 'preprocessing')
+        create_cleanup_function(ui_components, 'preprocessing')
         
         # Cek status data preprocessed yang sudah ada
-        preprocessed_path = Path(preprocessed_dir)
-        # PERBAIKAN: Cek lebih lengkap untuk berbagai split dan format file
-        is_preprocessed = False
-        for split in ['train', 'valid', 'test']:
-            images_path = preprocessed_path / split / 'images'
-            if images_path.exists():
-                # Cek format file .jpg, .png, dan .npy
-                jpg_files = list(images_path.glob('*.jpg'))
-                png_files = list(images_path.glob('*.png'))
-                npy_files = list(images_path.glob('*.npy'))
-                
-                if jpg_files or png_files or npy_files:
-                    is_preprocessed = True
-                    break
-        
-        if is_preprocessed:
-            from smartcash.ui.dataset.preprocessing_initialization import update_status_panel
-            
-            # Update status panel
-            update_status_panel(
-                ui_components,
-                "success",
-                f"{ICONS['success']} Dataset preprocessed sudah tersedia di: {preprocessed_dir}"
-            )
-            
-            # PERBAIKAN: Tampilkan tombol yang relevan ketika data terdeteksi
-            ui_components['cleanup_button'].layout.display = 'block'
-            ui_components['visualization_buttons'].layout.display = 'flex'
-            
-            # PERBAIKAN: Tampilkan tombol visualisasi secara individual
-            if 'visualize_button' in ui_components:
-                ui_components['visualize_button'].layout.display = 'inline-flex'
-            if 'compare_button' in ui_components:
-                ui_components['compare_button'].layout.display = 'inline-flex'
-            if 'distribution_button' in ui_components:
-                ui_components['distribution_button'].layout.display = 'inline-flex'
-            
-            # PERBAIKAN: Tampilkan container visualisasi
-            if 'visualization_container' in ui_components:
-                ui_components['visualization_container'].layout.display = 'block'
-            
-            if logger: logger.info(f"{ICONS['folder']} Dataset preprocessed terdeteksi di: {os.path.abspath(preprocessed_dir)}")
-            
-            # Update summary jika tersedia
-            try:
-                from smartcash.ui.dataset.preprocessing_summary_handler import generate_preprocessing_summary
-                summary = generate_preprocessing_summary(preprocessed_dir)
-                
-                if 'update_summary' in ui_components and callable(ui_components['update_summary']):
-                    ui_components['update_summary'](summary)
-                    # PERBAIKAN: Tampilkan summary container
-                    if 'summary_container' in ui_components:
-                        ui_components['summary_container'].layout.display = 'block'
-            except Exception as e:
-                if logger: logger.debug(f"{ICONS['info']} {str(e)}")
-        
-        # Setup dataset manager jika belum ada
-        if 'dataset_manager' not in ui_components:
-            try:
-                from smartcash.ui.utils.fallback_utils import get_dataset_manager
-                dataset_manager = get_dataset_manager(config, logger)
-                if dataset_manager:
-                    ui_components['dataset_manager'] = dataset_manager
-                    
-                    # Register callback progress jika ada
-                    if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
-                        ui_components['register_progress_callback'](dataset_manager)
-            except ImportError:
-                if logger: logger.debug(f"{ICONS['info']} Dataset manager tidak tersedia")
-        
-        # Setup observer
-        try:
-            from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-            ui_components = setup_observer_handlers(ui_components, "preprocessing_observers")
-        except ImportError:
-            pass
-        
-        # Setup cleanup function
-        def cleanup_resources():
-            """Bersihkan resources yang digunakan."""
-            if logger: logger.info(f"{ICONS['cleanup']} Membersihkan resources preprocessing")
-            
-            # Unregister observer
-            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
-                try:
-                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
-                except Exception as e:
-                    if logger: logger.debug(f"{ICONS['warning']} Error unregister observer: {str(e)}")
-        
-        # Tambahkan cleanup function ke UI components
-        ui_components['cleanup'] = cleanup_resources
+        from smartcash.ui.dataset.shared.setup_utils import detect_module_state
+        ui_components = detect_module_state(ui_components, 'preprocessing')
         
         # Log success
         if logger: logger.info(f"{ICONS['success']} Handler preprocessing berhasil diinisialisasi")

@@ -1,42 +1,38 @@
 """
 File: smartcash/ui/dataset/shared/progress_handler.py
-Deskripsi: Utilitas shared untuk mengelola progress tracking pada modul dataset
+Deskripsi: Utilitas bersama untuk progress tracking dengan throttling yang digunakan oleh preprocessing dan augmentasi
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Tuple, Callable
 import time
 from IPython.display import display
-
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 
-def setup_progress_handler(ui_components: Dict[str, Any], module_name: str = "process") -> Dict[str, Any]:
+def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None):
     """
-    Setup handler progress tracking yang dapat digunakan bersama.
+    Setup callback progress dengan batasan frekuensi update dan throttling.
     
     Args:
         ui_components: Dictionary komponen UI
-        module_name: Nama modul ('preprocessing' atau 'augmentation')
+        logger: Logger instance
         
     Returns:
-        Dictionary UI components yang telah diupdate
+        Tuple (progress_callback, register_progress_callback, reset_progress_bar)
     """
-    logger = ui_components.get('logger')
+    # Simpan state tracking untuk batasi frekuensi update
+    last_update = {'time': 0, 'message_time': 0, 'notify_time': 0}
+    update_interval = 0.5  # Hanya update UI setiap 0.5 detik
+    message_throttle_interval = 2.0  # Hanya log pesan setiap 2 detik
     
-    # Untuk batasi jumlah update log
-    last_update_time = {'value': 0}
-    log_interval = 1.0  # Interval minimum antar update log (detik)
+    # Informasi jumlah file untuk penghitungan progress
+    total_info = {'total_files': 0, 'processed_files': 0, 'current_split': '', 'splits': {}}
     
-    # State untuk tracking progress
-    total_info = {'total_files': 0, 'processed_files': 0, 'current_item': '', 'items': {}}
-    
-    # Reset flag status
-    ui_components[f'{module_name}_running'] = False
-    
+    # Fungsi progress callback dengan throttling log
     def progress_callback(progress=None, total=None, message=None, status='info', 
                          current_progress=None, current_total=None, **kwargs):
         """
-        Progress callback dengan throttling untuk mencegah flooding log dan UI.
+        Progress callback dengan throttling log untuk mencegah flooding UI.
         
         Args:
             progress: Nilai progress utama
@@ -48,187 +44,163 @@ def setup_progress_handler(ui_components: Dict[str, Any], module_name: str = "pr
             **kwargs: Parameter lain yang diteruskan dari caller
         """
         # Skip jika proses sudah dihentikan
-        if not ui_components.get(f'{module_name}_running', True): return
-        
-        # Ekstrak metadata untuk progress tracking
-        step = kwargs.get('step', 0)
-        current_item = kwargs.get('current_item', kwargs.get('split', ''))
-        
-        # Update informasi untuk current_item jika berbeda
-        if current_item and current_item != total_info['current_item']:
-            total_info['current_item'] = current_item
+        process_running_key = 'preprocessing_running' if 'preprocessing_running' in ui_components else 'augmentation_running'
+        if not ui_components.get(process_running_key, True): 
+            return
             
-            # Log pergantian item secara eksplisit
+        current_time = time.time()
+        
+        # Ekstrak metadata untuk perhitungan progress
+        step = kwargs.get('step', 0)  # 0=persiapan, 1=proses split, 2=finalisasi
+        split = kwargs.get('split', '')
+        
+        # Update informasi split saat ini jika berbeda
+        if split and split != total_info['current_split']:
+            total_info['current_split'] = split
+            # Log pergantian split secara eksplisit
             if logger:
-                logger.info(f"{ICONS['processing']} Memulai {module_name} item {current_item}")
+                logger.info(f"{ICONS['processing']} Memulai proses split {split}")
             
             with ui_components['status']:
-                display(create_status_indicator('info', f"{ICONS['processing']} Memulai {module_name} item {current_item}"))
+                display(create_status_indicator('info', f"{ICONS['processing']} Memulai proses split {split}"))
         
-        # ===== UPDATE PROGRESS STATISTICS =====
-        if current_item and total is not None and current_item not in total_info['items']:
-            total_info['items'][current_item] = {'total': total, 'progress': 0}
+        # ===== PERHITUNGAN PROGRESS KESELURUHAN =====
+        # Jika ini pertama kali melihat split ini, tambahkan ke statistik
+        if split and total is not None and split not in total_info['splits']:
+            total_info['splits'][split] = {'total': total, 'progress': 0}
             total_info['total_files'] += total
             
-        # Update progress untuk item ini
-        if current_item and progress is not None and total is not None:
-            if current_item in total_info['items']:
-                old_progress = total_info['items'][current_item].get('progress', 0)
+        # Update progress untuk split ini
+        if split and progress is not None and total is not None:
+            if split in total_info['splits']:
+                # Hitung delta dari progress sebelumnya
+                old_progress = total_info['splits'][split].get('progress', 0)
                 if progress > old_progress:
+                    # Tambahkan delta ke total progress
                     total_info['processed_files'] += (progress - old_progress)
-                    total_info['items'][current_item]['progress'] = progress
+                    # Update progress untuk split ini
+                    total_info['splits'][split]['progress'] = progress
         
-        # Hitung total progress
+        # Hitung total progress berdasarkan total file di semua split
         overall_progress = total_info['processed_files']
         overall_total = max(total_info['total_files'], 1)  # Hindari division by zero
         
-        # Batasi frekuensi update UI
-        current_time = time.time()
-        time_since_last_update = current_time - last_update_time['value']
-        
-        # Hanya update UI jika:
-        # 1. Interval minimum terpenuhi, atau
-        # 2. Status penting (error/warning), atau
-        # 3. Perubahan signifikan (0%, 25%, 50%, 75%, 100%)
-        is_status_event = status in ('error', 'warning') or kwargs.get('event_type', '').endswith(('_start', '_complete', '_error'))
-        is_significant_progress = progress is not None and total is not None and (
-            progress == 0 or progress == total or 
-            (total >= 4 and progress % (total // 4) == 0)  # 0%, 25%, 50%, 75%, 100%
-        )
-        
-        if is_status_event or is_significant_progress or time_since_last_update >= log_interval:
-            # Update timestamp untuk log berikutnya
-            last_update_time['value'] = current_time
-            
-            # ===== UPDATE PROGRESS BAR TOTAL =====
+        # ===== UPDATE PROGRESS BAR TOTAL =====
+        if time.time() - last_update.get('time', 0) >= update_interval:
             if 'progress_bar' in ui_components:
                 ui_components['progress_bar'].max = overall_total
                 ui_components['progress_bar'].value = min(overall_progress, overall_total)
                 
-                # Hitung persentase
-                overall_percentage = int(overall_progress / overall_total * 100) if overall_total > 0 else 0
+                # Hitung persentase untuk overall progress bar
+                overall_percentage = int(overall_progress / overall_total * 100)
                 ui_components['progress_bar'].description = f"Total: {overall_percentage}%"
                 ui_components['progress_bar'].layout.visibility = 'visible'
-            
-            # ===== UPDATE CURRENT PROGRESS BAR =====
-            if progress is not None and total is not None and 'current_progress' in ui_components:
+                
+                last_update['time'] = time.time()
+                
+        # ===== UPDATE CURRENT PROGRESS BAR (UNTUK SPLIT SAAT INI) =====
+        if progress is not None and total is not None and total > 0 and 'current_progress' in ui_components:
+            if time.time() - last_update.get('time', 0) >= update_interval:
                 ui_components['current_progress'].max = total
                 ui_components['current_progress'].value = min(progress, total)
                 
-                # Format deskripsi
-                current_percentage = int(progress / total * 100) if total > 0 else 0
+                # Format deskripsi split
+                split_percentage = int(progress / total * 100) if total > 0 else 0
                 
-                if current_item:
-                    ui_components['current_progress'].description = f"Item {current_item}: {current_percentage}%"
+                if split:
+                    ui_components['current_progress'].description = f"Split {split}: {split_percentage}%"
                 else:
-                    ui_components['current_progress'].description = f"Progress: {current_percentage}%"
+                    ui_components['current_progress'].description = f"Progress: {split_percentage}%"
                     
                 ui_components['current_progress'].layout.visibility = 'visible'
-            
-            # Log jika ada message
-            if message and logger:
-                log_method = getattr(logger, status) if hasattr(logger, status) else logger.info
-                log_method(message)
                 
-                # Display message di status jika status penting atau pergantian step
-                if status != 'info' or step in (0, 2) or 'selesai' in message.lower():
+                last_update['time'] = time.time()
+        
+        # ===== UPDATE LOG UI (DENGAN THROTTLING) =====
+        if message:
+            time_to_log = current_time - last_update.get('message_time', 0) >= message_throttle_interval
+            
+            # Log selesainya split secara eksplisit
+            split_completion = "selesai" in message.lower() and split in message.lower()
+            
+            # Log hanya pesan penting atau dengan interval waktu yang cukup
+            if time_to_log or step == 0 or step == 2 or split_completion or status != 'info':
+                # Log dengan logger jika tersedia
+                if logger:
+                    log_method = getattr(logger, status) if hasattr(logger, status) else logger.info
+                    log_method(message)
+                
+                # Update timestamp terakhir untuk message
+                last_update['message_time'] = current_time
+                
+                # Display di output widget jika status penting atau pergantian step
+                if status != 'info' or step == 0 or step == 2 or split_completion:
                     with ui_components['status']:
                         display(create_status_indicator(status, message))
-            
-            # Notifikasi observer
-            from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
-            
-            # Map modul ke event type
-            event_map = {
-                'preprocessing': 'PREPROCESSING',
-                'augmentation': 'AUGMENTATION'
-            }
-            event_base = event_map.get(module_name, 'PROCESS').upper()
-            
-            # Notify overall progress
-            progress_event = getattr(EventTopics, f"{event_base}_PROGRESS")
-            notify(
-                event_type=progress_event,
-                sender=f"{module_name}_handler",
-                message=message or f"{module_name} progress: {int(overall_progress/overall_total*100) if overall_total > 0 else 0}%",
-                progress=overall_progress,
-                total=overall_total,
-                **kwargs
-            )
-            
-            # Notify current progress jika ada
-            if current_item and progress is not None and total is not None:
-                current_event = getattr(EventTopics, f"{event_base}_CURRENT_PROGRESS")
+                        
+        # ===== NOTIFY OBSERVER UNTUK INTEGRASI DENGAN SISTEM LAIN =====
+        if time.time() - last_update.get('notify_time', 0) >= message_throttle_interval:
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                
+                # Tentukan event type berdasarkan context (preprocessing atau augmentation)
+                event_type_prefix = (
+                    'PREPROCESSING' if 'preprocessing_running' in ui_components 
+                    else 'AUGMENTATION'
+                )
+                
+                # Update overall progress untuk observer
                 notify(
-                    event_type=current_event,
-                    sender=f"{module_name}_handler",
-                    message=f"{module_name} item {current_item}: {int(progress/total*100) if total > 0 else 0}%",
-                    progress=progress,
-                    total=total,
+                    event_type=getattr(EventTopics, f"{event_type_prefix}_PROGRESS"),
+                    sender=f"{'preprocessing' if 'preprocessing_running' in ui_components else 'augmentation'}_handler",
+                    message=message or f"Progress total: {int(overall_progress/overall_total*100)}%",
+                    progress=overall_progress,
+                    total=overall_total,
+                    current_split=split,
                     **kwargs
                 )
+                
+                # Update progress untuk split saat ini jika ada
+                if split and progress is not None and total is not None:
+                    notify(
+                        event_type=getattr(EventTopics, f"{event_type_prefix}_CURRENT_PROGRESS"),
+                        sender=f"{'preprocessing' if 'preprocessing_running' in ui_components else 'augmentation'}_handler",
+                        message=f"Progress split {split}: {int(progress/total*100)}%",
+                        progress=progress,
+                        total=total,
+                        **kwargs
+                    )
+                
+                last_update['notify_time'] = time.time()
+            except ImportError:
+                pass
     
     # Fungsi untuk registrasi callback ke manager
     def register_progress_callback(manager):
-        """Register progress callback ke manager dengan deteksi method yang tersedia."""
-        if not manager: return False
+        """Register callback progress ke manager."""
+        if not manager: 
+            return False
             
-        # Pendekatan 1: register_progress_callback 
-        if hasattr(manager, 'register_progress_callback'):
-            manager.register_progress_callback(progress_callback)
-            if logger: logger.info(f"{ICONS['success']} Progress callback berhasil didaftarkan ke manager")
-            return True
-            
-        # Pendekatan 2: _progress_callback
-        elif hasattr(manager, '_progress_callback'):
-            manager._progress_callback = progress_callback
-            if logger: logger.info(f"{ICONS['success']} Progress callback berhasil didaftarkan via atribut langsung")
-            return True
+        # Mencoba register dengan berbagai metode yang mungkin tersedia
+        try:
+            # Pendekatan 1: register_progress_callback 
+            if hasattr(manager, 'register_progress_callback'):
+                manager.register_progress_callback(progress_callback)
+                if logger: logger.info(f"{ICONS['success']} Progress callback berhasil didaftarkan ke manager")
+                return True
+                
+            # Pendekatan 2: _progress_callback
+            elif hasattr(manager, '_progress_callback'):
+                manager._progress_callback = progress_callback
+                if logger: logger.info(f"{ICONS['success']} Progress callback berhasil didaftarkan via atribut langsung")
+                return True
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Gagal mendaftarkan callback: {str(e)}")
             
         return False
     
-    # Setup observer
-    from smartcash.components.observer.event_topics_observer import EventTopics
-    from smartcash.ui.handlers.observer_handler import create_progress_observer
-    
-    # Map modul ke event type
-    event_map = {
-        'preprocessing': 'PREPROCESSING',
-        'augmentation': 'AUGMENTATION'
-    }
-    event_base = event_map.get(module_name, 'PROCESS').upper()
-    
-    # Setup observer untuk overall progress
-    progress_events = [
-        getattr(EventTopics, f"{event_base}_PROGRESS"),
-        getattr(EventTopics, f"{event_base}_START"),
-        getattr(EventTopics, f"{event_base}_END"),
-        getattr(EventTopics, f"{event_base}_ERROR")
-    ]
-    
-    create_progress_observer(
-        ui_components=ui_components,
-        event_type=progress_events,
-        total=100,
-        progress_widget_key='progress_bar',
-        output_widget_key='status',
-        observer_group=f'{module_name}_observers'
-    )
-    
-    # Setup observer untuk current progress
-    create_progress_observer(
-        ui_components=ui_components,
-        event_type=getattr(EventTopics, f"{event_base}_CURRENT_PROGRESS"),
-        total=100,
-        progress_widget_key='current_progress',
-        update_output=False,
-        observer_group=f'{module_name}_observers'
-    )
-    
-    if logger: logger.info(f"{ICONS['success']} Progress observer berhasil diinisialisasi")
-    
-    # Helper untuk reset progress
+    # Helper untuk reset progress bar
     def reset_progress_bar():
         """Reset semua komponen progress ke nilai awal."""
         if 'progress_bar' in ui_components:
@@ -238,28 +210,21 @@ def setup_progress_handler(ui_components: Dict[str, Any], module_name: str = "pr
             
         if 'current_progress' in ui_components:
             ui_components['current_progress'].value = 0
-            ui_components['current_progress'].description = 'Current:'
+            ui_components['current_progress'].description = 'Split:'
             ui_components['current_progress'].layout.visibility = 'hidden'
         
-        # Reset internal state
-        ui_components[f'{module_name}_running'] = False
+        # Reset status flags dan informasi progress
+        process_running_key = 'preprocessing_running' if 'preprocessing_running' in ui_components else 'augmentation_running'
+        ui_components[process_running_key] = False
+        
         total_info.clear()
-        total_info.update({'total_files': 0, 'processed_files': 0, 'current_item': '', 'items': {}})
-        last_update_time['value'] = 0
+        total_info.update({'total_files': 0, 'processed_files': 0, 'current_split': '', 'splits': {}})
+        
+        # Reset timestamp throttling
+        last_update.clear()
+        last_update.update({'time': 0, 'message_time': 0, 'notify_time': 0})
+        
+        # Log reset
+        if logger: logger.debug(f"{ICONS['refresh']} Progress bar direset")
     
-    # Tambahkan semua fungsi dan state ke UI components
-    ui_components.update({
-        'progress_callback': progress_callback,
-        'register_progress_callback': register_progress_callback,
-        'reset_progress_bar': reset_progress_bar,
-        f'{module_name}_running': False
-    })
-    
-    # Coba register callback jika manager sudah ada
-    manager_keys = [f'{module_name}_manager', 'dataset_manager', 'augmentation_manager']
-    for key in manager_keys:
-        if key in ui_components:
-            register_progress_callback(ui_components[key])
-            break
-    
-    return ui_components
+    return progress_callback, register_progress_callback, reset_progress_bar

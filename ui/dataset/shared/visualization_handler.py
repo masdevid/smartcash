@@ -83,7 +83,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             
             # Coba gunakan helper distribusi kelas yang sudah ada
             try:
-                from smartcash.ui.dataset.visualization_integrator import create_distribution_visualizations
+                from smartcash.ui.visualization.visualization_integrator import create_distribution_visualizations
                 create_distribution_visualizations(
                     ui_components={"visualization_container": output_widget, "logger": logger, 
                                   "status": output_widget, "data_dir": ui_components.get('data_dir')},
@@ -96,8 +96,8 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             except ImportError:
                 try:
                     # Fallback ke visualisasi plot_class_distribution
-                    from smartcash.ui.helpers.plot_single import plot_class_distribution
-                    from smartcash.ui.helpers.class_distribution_analyzer import analyze_class_distribution
+                    from smartcash.ui.visualization.plot_single import plot_class_distribution
+                    from smartcash.ui.visualization.class_distribution_analyzer import analyze_class_distribution
                     
                     # Analisis distribusi kelas
                     class_counts = analyze_class_distribution(dataset_dir, split='train')
@@ -140,20 +140,20 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], env=None, config
             # Import dan panggil handler komparasi yang sesuai (diprioritaskan)
             try:
                 # Opsi 1: Coba gunakan fungsi dari preprocessing_visualization_handler
-                from smartcash.ui.dataset.preprocessing_visualization_handler import compare_original_vs_preprocessed
+                from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
                 compare_original_vs_preprocessed(ui_components, original_dir, processed_dir)
             except ImportError:
                 try:
                     # Opsi 2: Coba gunakan fungsi dari augmentation_visualization_handler
-                    from smartcash.ui.dataset.augmentation_visualization_handler import compare_original_vs_augmented
+                    from smartcash.ui.visualization.compare_original_vs_augmented import compare_original_vs_augmented
                     compare_original_vs_augmented(Path(original_dir) / 'train' / 'images', 
                                                 Path(processed_dir) / 'train' / 'images', 
                                                 output_widget, ui_components)
                 except ImportError:
                     try:
                         # Opsi 3: Coba gunakan helper komparasi dataset yang sudah ada
-                        from smartcash.ui.helpers.plot_comparison import plot_class_distribution_comparison
-                        from smartcash.ui.helpers.class_distribution_analyzer import analyze_class_distribution
+                        from smartcash.ui.visualization.plot_comparison import plot_class_distribution_comparison
+                        from smartcash.ui.visualization.class_distribution_analyzer import analyze_class_distribution
                         
                         # Analisis distribusi kelas untuk kedua dataset
                         original_counts = analyze_class_distribution(original_dir, split='train')

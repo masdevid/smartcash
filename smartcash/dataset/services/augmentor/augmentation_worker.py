@@ -1,187 +1,200 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_worker.py
-Deskripsi: Worker untuk augmentasi gambar dan label dataset dengan teknik SRP
+Deskripsi: Worker untuk augmentasi file individu dengan dukungan metadata kelas
 """
 
 import os
 import cv2
-import uuid
+import shutil
+import time
 import numpy as np
-from typing import Dict, List, Any, Optional, Tuple
-import albumentations as A
 from pathlib import Path
+from typing import Dict, Any, List, Optional
+
+def get_class_from_label(label_path: str) -> Optional[str]:
+    """
+    Ekstrak ID kelas utama dari file label YOLOv5.
+    
+    Args:
+        label_path: Path file label
+        
+    Returns:
+        ID kelas utama atau None jika tidak ada
+    """
+    try:
+        if not os.path.exists(label_path):
+            return None
+            
+        # Baca file label
+        with open(label_path, 'r') as f:
+            lines = f.readlines()
+            
+        # Cari class ID
+        class_ids = []
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) >= 5:  # Format YOLOv5: class_id x y width height
+                class_ids.append(parts[0])
+                
+        # Jika ada class ID, ambil yang terkecil (prioritas banknote)
+        if class_ids:
+            return min(class_ids)
+        
+        return None
+    except Exception:
+        return None
 
 def process_single_file(
     image_path: str,
-    pipeline: A.Compose,
+    pipeline,
     num_variations: int = 2,
     output_prefix: str = 'aug',
     process_bboxes: bool = True,
     validate_results: bool = True,
     bbox_augmentor = None,
-    labels_input_dir: str = '',
-    images_output_dir: str = '',
-    labels_output_dir: str = ''
+    labels_input_dir: str = None,
+    images_output_dir: str = None,
+    labels_output_dir: str = None,
+    class_id: Optional[str] = None  # Parameter opsional untuk metadata kelas
 ) -> Dict[str, Any]:
     """
-    Proses augmentasi satu file dengan multiple variasi.
+    Proses augmentasi untuk satu file gambar dengan metadata kelas.
     
     Args:
-        image_path: Path file gambar input
-        pipeline: Pipeline augmentasi Albumentations
-        num_variations: Jumlah variasi augmentasi
-        output_prefix: Prefix nama file output
-        process_bboxes: Apakah label bbox juga diproses
+        image_path: Path file gambar
+        pipeline: Pipeline augmentasi
+        num_variations: Jumlah variasi yang akan dibuat
+        output_prefix: Prefix untuk file output
+        process_bboxes: Proses bounding box juga
         validate_results: Validasi hasil augmentasi
-        bbox_augmentor: Instance dari BBoxAugmentor
-        labels_input_dir: Path direktori label input
-        images_output_dir: Path direktori output gambar
-        labels_output_dir: Path direktori output label
+        bbox_augmentor: Augmentor untuk bounding box
+        labels_input_dir: Direktori input label
+        images_output_dir: Direktori output gambar
+        labels_output_dir: Direktori output label
+        class_id: ID kelas untuk metadata (opsional)
         
     Returns:
-        Dictionary berisi hasil augmentasi file
+        Dictionary hasil augmentasi dengan metadata
     """
     try:
-        # Extract filename
-        filename = os.path.basename(image_path)
-        filename_stem = os.path.splitext(filename)[0]
+        # Konversi path ke Path object
+        img_path = Path(image_path)
         
-        # Cek apakah ada file label
-        label_path = os.path.join(labels_input_dir, f"{filename_stem}.txt")
-        has_label = os.path.exists(label_path)
-        
-        # Jika proses bbox tapi tidak ada label, skip
-        if process_bboxes and not has_label:
+        # Jika path tidak valid, return status error
+        if not img_path.exists():
             return {
-                "status": "skipped", 
-                "message": f"File label tidak ditemukan: {label_path}", 
+                "status": "error",
+                "message": f"File tidak ditemukan: {img_path}",
                 "generated": 0
             }
         
-        # Load gambar
-        image = cv2.imread(image_path)
+        # Baca gambar
+        image = cv2.imread(str(img_path))
         if image is None:
             return {
-                "status": "error", 
-                "message": f"Gagal membaca gambar: {image_path}", 
+                "status": "error",
+                "message": f"Tidak dapat membaca gambar: {img_path}",
                 "generated": 0
             }
         
-        # Konversi ke RGB
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # Dapatkan path label jika perlu memproses bbox
+        label_path = None
+        if process_bboxes and labels_input_dir:
+            label_name = f"{img_path.stem}.txt"
+            label_path = os.path.join(labels_input_dir, label_name)
+            
+            # Jika file label tidak ada, skip processing bbox
+            if not os.path.exists(label_path):
+                process_bboxes = False
         
-        # Dapatkan bboxes dari file label jika ada
+        # Dapatkan class ID jika belum ditentukan
+        if class_id is None and label_path:
+            class_id = get_class_from_label(label_path)
+        
+        # Baca data bbox jika perlu
         bboxes = []
-        class_ids = []
-        
-        if has_label and process_bboxes:
-            with open(label_path, 'r') as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        class_id = int(parts[0])
-                        # YOLO format: class_id, x_center, y_center, width, height
-                        bbox = [float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])]
-                        bboxes.append(bbox)
-                        class_ids.append(class_id)
-        
-        # Lakukan augmentasi untuk setiap variasi
-        augmented_count = 0
-        
-        for i in range(num_variations):
-            # Ekstrak komponen nama file untuk penggunaan dalam augmented file
-            original_parts = filename_stem.split('_', 1)
-            # Format: [prefix]_[class+uuid]
-            if len(original_parts) > 1:
-                file_class_section = original_parts[1]  # Bagian kelas dan uuid
-            else:
-                # Fallback jika format tidak sesuai
-                file_class_section = f"unknown_{uuid.uuid4().hex[:8]}"
-                
-            # Simpan original filename di augmented filename untuk memudahkan matching
-            # Format: [augmented_prefix]_[source_prefix]_[class+uuid]_var[n]
-            source_prefix = original_parts[0] if len(original_parts) > 0 else "unknown"
-            
-            # Generate nama file yang baru dengan menyimpan informasi sumber
-            # Ini memudahkan untuk visualisasi perbandingan karena menyimpan uuid yang sama
-            augmented_filename = f"{output_prefix}_{source_prefix}_{file_class_section}_var{i+1}"
-            augmented_image_path = os.path.join(images_output_dir, f"{augmented_filename}.jpg")
-            augmented_label_path = os.path.join(labels_output_dir, f"{augmented_filename}.txt")
-            
-            # Proses augmentasi
+        if process_bboxes and label_path and os.path.exists(label_path):
             try:
-                # Transformasi dengan pipeline albumentations
-                if process_bboxes and bboxes:
-                    # Dengan bboxes
-                    transformed = pipeline(
-                        image=image,
-                        bboxes=bboxes,
-                        class_labels=class_ids
+                with open(label_path, 'r') as f:
+                    bboxes = [line.strip() for line in f.readlines()]
+            except Exception:
+                # Jika gagal membaca bbox, nonaktifkan processing
+                process_bboxes = False
+        
+        # Siapkan metadata
+        img_id = img_path.stem
+        original_h, original_w = image.shape[:2]
+        
+        # Proses augmentasi untuk setiap variasi
+        results = []
+        for var_idx in range(num_variations):
+            try:
+                # Augmentasi gambar
+                augmented = pipeline(image=image)
+                augmented_image = augmented['image']
+                
+                # Dapatkan bounding box baru jika perlu
+                augmented_bboxes = []
+                if process_bboxes and bbox_augmentor and bboxes:
+                    # Gunakan bbox augmentor jika tersedia
+                    augmented_bboxes = bbox_augmentor.transform_bboxes(
+                        image, augmented_image, bboxes, augmented.get('transforms', [])
                     )
-                    
-                    transformed_image = transformed['image']
-                    transformed_bboxes = transformed['bboxes']
-                    transformed_labels = transformed['class_labels']
-                else:
-                    # Tanpa bboxes
-                    transformed = pipeline(image=image)
-                    transformed_image = transformed['image']
-                    transformed_bboxes = []
-                    transformed_labels = []
+                elif bboxes:
+                    # Gunakan bbox original jika tidak perlu transform
+                    augmented_bboxes = bboxes
                 
                 # Validasi hasil jika diminta
                 if validate_results:
-                    # Cek apakah gambar valid
-                    if transformed_image is None or transformed_image.size == 0:
+                    # Cek dimensi gambar
+                    if augmented_image.shape[0] <= 0 or augmented_image.shape[1] <= 0:
                         continue
                     
-                    # Validasi bboxes
-                    if process_bboxes and transformed_bboxes:
-                        valid_bboxes = []
-                        valid_labels = []
-                        
-                        for j, (bbox, class_id) in enumerate(zip(transformed_bboxes, transformed_labels)):
-                            # Validasi: bbox valid jika ukuran > 0 dan koordinat dalam range [0,1]
-                            x, y, w, h = bbox
-                            if (0 <= x <= 1 and 0 <= y <= 1 and 
-                                0 < w <= 1 and 0 < h <= 1 and
-                                x - w/2 >= 0 and x + w/2 <= 1 and
-                                y - h/2 >= 0 and y + h/2 <= 1):
-                                valid_bboxes.append(bbox)
-                                valid_labels.append(class_id)
-                        
-                        # Update bboxes dan labels dengan yang valid
-                        transformed_bboxes = valid_bboxes
-                        transformed_labels = valid_labels
+                    # Cek integritas bbox jika ada
+                    if process_bboxes and not augmented_bboxes:
+                        continue
                 
-                # Simpan gambar
-                # Konversi kembali ke BGR untuk OpenCV
-                output_image = cv2.cvtColor(transformed_image, cv2.COLOR_RGB2BGR)
-                cv2.imwrite(augmented_image_path, output_image)
+                # Generate nama file output
+                output_basename = f"{output_prefix}_{img_id}_var{var_idx+1}"
+                output_image_path = os.path.join(images_output_dir, f"{output_basename}.jpg")
                 
-                # Simpan label jika ada
-                if process_bboxes and transformed_bboxes:
-                    with open(augmented_label_path, 'w') as f:
-                        for j, (bbox, class_id) in enumerate(zip(transformed_bboxes, transformed_labels)):
-                            # YOLO format: class_id, x_center, y_center, width, height
-                            f.write(f"{class_id} {bbox[0]} {bbox[1]} {bbox[2]} {bbox[3]}\n")
+                # Simpan hasil augmentasi gambar
+                cv2.imwrite(output_image_path, augmented_image)
                 
-                augmented_count += 1
+                # Simpan hasil augmentasi bbox jika perlu
+                if process_bboxes and labels_output_dir and augmented_bboxes:
+                    output_label_path = os.path.join(labels_output_dir, f"{output_basename}.txt")
+                    with open(output_label_path, 'w') as f:
+                        for bbox in augmented_bboxes:
+                            f.write(f"{bbox}\n")
+                
+                # Catat hasil untuk variasi ini
+                results.append({
+                    "variant": var_idx + 1,
+                    "image_path": output_image_path,
+                    "original_size": (original_w, original_h),
+                    "augmented_size": (augmented_image.shape[1], augmented_image.shape[0]),
+                    "has_bboxes": len(augmented_bboxes) > 0 if process_bboxes else False
+                })
                 
             except Exception as e:
+                # Skip variasi yang error
                 continue
         
-        # Return results
+        # Return hasil proses
         return {
             "status": "success",
-            "generated": augmented_count,
-            "original_file": filename,
-            "message": f"Berhasil augmentasi {filename}"
+            "image_id": img_id,
+            "class_id": class_id,  # Tambahkan informasi kelas
+            "original_path": str(img_path),
+            "generated": len(results),
+            "variations": results
         }
-        
+    
     except Exception as e:
+        # Handle error
         return {
             "status": "error",
-            "message": f"Error saat proses file {os.path.basename(image_path)}: {str(e)}",
+            "message": f"Error saat augmentasi {str(image_path)}: {str(e)}",
             "generated": 0
         }

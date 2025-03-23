@@ -1,160 +1,215 @@
 """
-File: smartcash/dataset/services/augmentor/class_balancer.py
-Deskripsi: Komponen untuk melakukan balancing kelas pada dataset deteksi objek dengan perhitungan ulang target sebaran
+File: smartcash/dataset/services/augmentor/class_balancer_helper.py
+Deskripsi: Fungsi utility untuk membantu class balancer dengan progres tracking yang lebih baik
 """
 
+from typing import Dict, List, Tuple, Any, Optional, Callable
+from collections import defaultdict
 import os
-import glob
-from collections import defaultdict, Counter
-from typing import Dict, List, Any, Tuple, Set, Optional
+import random
 from pathlib import Path
 
-from smartcash.common.logger import get_logger
+def map_files_to_classes(
+    image_files: List[str], 
+    labels_dir: str,
+    progress_callback: Optional[Callable] = None
+) -> Tuple[Dict[str, List[str]], Dict[str, int]]:
+    """
+    Memetakan file gambar ke kelas mereka berdasarkan label YOLOv5.
+    
+    Args:
+        image_files: List path file gambar
+        labels_dir: Path direktori label
+        progress_callback: Callback untuk melaporkan progres
+        
+    Returns:
+        Tuple (files_by_class, class_counts)
+    """
+    files_by_class = defaultdict(list)
+    class_counts = defaultdict(int)
+    
+    # Notifikasi mulai pemrosesan
+    if progress_callback:
+        progress_callback(
+            progress=0, 
+            total=len(image_files),
+            message=f"Memetakan {len(image_files)} file ke kelas masing-masing",
+            status="info",
+            step=0  # Tahap analisis
+        )
+    
+    # Proses setiap file gambar dengan progres tracking
+    for i, img_path in enumerate(image_files):
+        # Dapatkan file label yang sesuai
+        img_name = Path(img_path).stem
+        label_path = Path(labels_dir) / f"{img_name}.txt"
+        
+        if not label_path.exists():
+            continue
+            
+        # Baca file label untuk mendapatkan kelas
+        try:
+            with open(label_path, 'r') as f:
+                label_content = f.readlines()
+                
+            # Ekstrak class ID dari setiap baris
+            for line in label_content:
+                parts = line.strip().split()
+                if len(parts) >= 5:  # Format YOLO: class_id x y width height
+                    class_id = parts[0]
+                    files_by_class[class_id].append(img_path)
+                    class_counts[class_id] += 1
+        except Exception:
+            # Skip file yang bermasalah
+            continue
+        
+        # Report progres dengan throttling
+        if progress_callback and (i % max(1, len(image_files) // 10) == 0 or i == len(image_files) - 1):
+            progress_callback(
+                progress=i+1, 
+                total=len(image_files),
+                message=f"Analisis file ({int((i+1)/len(image_files)*100)}%): {i+1}/{len(image_files)}",
+                status="info",
+                step=0  # Tahap analisis
+            )
+    
+    # Log ringkasan hasil pemetaan
+    if progress_callback:
+        progress_callback(
+            progress=len(image_files), 
+            total=len(image_files),
+            message=f"✅ Analisis selesai: {len(files_by_class)} kelas ditemukan dalam {len(image_files)} file",
+            status="info",
+            step=0  # Tahap analisis
+        )
+    
+    return files_by_class, class_counts
 
-class ClassBalancer:
+def calculate_augmentation_needs(
+    class_counts: Dict[str, int], 
+    target_count: int,
+    progress_callback: Optional[Callable] = None
+) -> Dict[str, int]:
     """
-    Komponen untuk balancing kelas dataset dengan fokus pada file yang berisi single class 
-    untuk meningkatkan kualitas augmentasi.
+    Menghitung kebutuhan augmentasi per kelas untuk mencapai target balancing.
+    
+    Args:
+        class_counts: Dictionary jumlah instance per kelas
+        target_count: Target jumlah instance per kelas
+        progress_callback: Callback untuk melaporkan progres
+        
+    Returns:
+        Dictionary kebutuhan augmentasi per kelas
     """
+    augmentation_needs = {}
     
-    def __init__(self, config: Dict = None, logger=None):
-        """
-        Inisialisasi ClassBalancer.
-        
-        Args:
-            config: Konfigurasi aplikasi
-            logger: Logger kustom
-        """
-        self.config = config or {}
-        self.logger = logger or get_logger("class_balancer")
+    # Notifikasi mulai perhitungan
+    if progress_callback:
+        progress_callback(
+            message=f"Menghitung kebutuhan augmentasi untuk {len(class_counts)} kelas (target: {target_count}/kelas)",
+            status="info",
+            step=0  # Tahap analisis
+        )
     
-    def prepare_balanced_dataset(
-        self,
-        image_files: List[str],
-        labels_dir: str,
-        target_count: int = 1000,
-        filter_single_class: bool = True
-    ) -> Dict[str, Any]:
-        """
-        Persiapkan dataset dengan jumlah sampel yang seimbang antar kelas.
-        Target = 1000 - jumlah label class X di split train.
-        
-        Args:
-            image_files: List path file gambar yang tersedia
-            labels_dir: Direktori file label
-            target_count: Jumlah target sampel per kelas (asli + augmentasi)
-            filter_single_class: Filter hanya file dengan 1 kelas
+    # Hitung kebutuhan augmentasi per kelas
+    for i, (class_id, count) in enumerate(class_counts.items()):
+        # Jika jumlah instance lebih kecil dari target, perlu augmentasi
+        if count < target_count:
+            augmentation_needs[class_id] = target_count - count
+        else:
+            augmentation_needs[class_id] = 0
             
-        Returns:
-            Dictionary informasi balancing dan files yang terpilih
-        """
-        # Kelompokkan file berdasarkan kelas
-        self.logger.info(f"📊 Memulai proses balancing dataset dengan target {target_count} sampel per kelas")
+        # Report progress dengan throttling
+        if progress_callback and (i % max(1, len(class_counts) // 5) == 0 or i == len(class_counts) - 1):
+            progress_callback(
+                progress=i+1, 
+                total=len(class_counts),
+                message=f"Analisis kebutuhan augmentasi: {i+1}/{len(class_counts)} kelas",
+                status="info",
+                step=0  # Tahap analisis
+            )
+    
+    # Statistik hasil
+    classes_needing_augmentation = sum(1 for needed in augmentation_needs.values() if needed > 0)
+    total_needed = sum(augmentation_needs.values())
+    
+    # Log ringkasan hasil kebutuhan augmentasi
+    if progress_callback:
+        progress_callback(
+            message=f"📊 Hasil analisis: {classes_needing_augmentation}/{len(class_counts)} kelas perlu ditambah {total_needed} sampel",
+            status="info",
+            step=0  # Tahap analisis
+        )
+    
+    return augmentation_needs
+
+def select_files_for_augmentation(
+    files_by_class: Dict[str, List[str]],
+    augmentation_needs: Dict[str, int],
+    progress_callback: Optional[Callable] = None
+) -> List[str]:
+    """
+    Pilih file untuk augmentasi berdasarkan kebutuhan balancing.
+    
+    Args:
+        files_by_class: Dictionary file per kelas
+        augmentation_needs: Dictionary kebutuhan augmentasi per kelas
+        progress_callback: Callback untuk melaporkan progres
         
-        class_to_files = defaultdict(list)  # class_id -> list of files
-        file_to_classes = {}  # file_path -> list of classes
-        file_class_count = {}  # file_path -> jumlah kelas
-        class_instance_counts = defaultdict(int)  # class_id -> total instance count
+    Returns:
+        List file yang dipilih untuk augmentasi
+    """
+    selected_files = []
+    
+    # Notifikasi mulai pemilihan file
+    if progress_callback:
+        progress_callback(
+            message=f"Memilih file untuk augmentasi berdasarkan kebutuhan balancing",
+            status="info",
+            step=0  # Tahap analisis
+        )
+    
+    # Hitung jumlah total kelas yang membutuhkan augmentasi
+    classes_to_augment = [cls_id for cls_id, needed in augmentation_needs.items() if needed > 0]
+    
+    # Proses setiap kelas dengan progres tracking
+    for i, class_id in enumerate(classes_to_augment):
+        needed = augmentation_needs[class_id]
+        available_files = files_by_class.get(class_id, [])
         
-        # Analisis semua file untuk mendapatkan distribusi kelas
-        for img_path in image_files:
-            # Dapatkan file label
-            filename = os.path.basename(img_path)
-            filename_stem = os.path.splitext(filename)[0]
-            label_path = os.path.join(labels_dir, f"{filename_stem}.txt")
+        if not available_files or needed <= 0:
+            continue
             
-            if not os.path.exists(label_path):
-                continue
-                
-            # Parse label untuk mendapatkan kelas
-            try:
-                classes_in_file = []
-                class_counts = defaultdict(int)
-                
-                with open(label_path, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) >= 5:
-                            class_id = int(parts[0])
-                            classes_in_file.append(class_id)
-                            class_counts[class_id] += 1
-                            class_instance_counts[class_id] += 1
-                
-                unique_classes = set(classes_in_file)
-                
-                # Jika filter single class dan file memiliki lebih dari 1 kelas, skip
-                if filter_single_class and len(unique_classes) > 1:
-                    continue
-                
-                # Simpan informasi
-                file_to_classes[img_path] = list(unique_classes)
-                file_class_count[img_path] = len(unique_classes)
-                
-                # Tambahkan file ke setiap kelas yang ada di dalamnya
-                for class_id in unique_classes:
-                    class_to_files[class_id].append((img_path, class_counts[class_id]))
-            except Exception as e:
-                self.logger.debug(f"⚠️ Error saat membaca label {label_path}: {str(e)}")
+        # Jika jumlah file lebih sedikit dari kebutuhan augmentasi
+        # kita perlu menggunakan beberapa file lebih dari sekali
+        num_files_to_select = min(len(available_files), needed)
         
-        # Hitung jumlah file dan instance per kelas
-        class_counts = {class_id: len(files) for class_id, files in class_to_files.items()}
-        
-        # Log distribusi kelas asli
-        self.logger.info(f"🔍 Ditemukan {len(class_counts)} kelas berbeda")
-        for class_id, count in sorted(class_instance_counts.items()):
-            self.logger.info(f"🏷️ Kelas {class_id}: {count} objek dalam {class_counts.get(class_id, 0)} file")
-        
-        # Pilih file yang perlu diaugmentasi berdasarkan jumlah instance per kelas
-        selected_files = set()
-        augmentation_needs = {}  # class_id -> jumlah yang perlu diaugmentasi
-        
-        for class_id, instance_count in class_instance_counts.items():
-            # Hitung kebutuhan augmentasi (jumlah instance tambahan yang diperlukan)
-            if instance_count < target_count:
-                # Jika jumlah objek kurang dari target, kita perlu augmentasi
-                needed = target_count - instance_count
-                augmentation_needs[class_id] = needed
-                self.logger.info(f"🎯 Kelas {class_id}: memiliki {instance_count} objek, perlu {needed} tambahan (target {target_count})")
-                
-                # Pilih file yang mengandung kelas ini untuk diaugmentasi
-                # Urutkan berdasarkan jumlah instance kelas ini dalam file (prioritaskan yang lebih banyak)
-                files_with_counts = class_to_files.get(class_id, [])
-                # Sort descending berdasarkan jumlah instance
-                files_with_counts.sort(key=lambda x: x[1], reverse=True)
-                
-                # Tambahkan file ke daftar yang akan diaugmentasi
-                for file_path, _ in files_with_counts:
-                    selected_files.add(file_path)
-            else:
-                # Jika sudah mencukupi, tidak perlu augmentasi
-                augmentation_needs[class_id] = 0
-                self.logger.info(f"✅ Kelas {class_id}: memiliki {instance_count} objek, sudah mencukupi (target {target_count})")
-        
-        # Jika tidak ada file terpilih, gunakan strategi alternatif
-        if not selected_files and image_files:
-            self.logger.warning("⚠️ Tidak ada file terpilih untuk balancing, menggunakan strategi alternatif")
+        # Pilih file secara acak jika ada banyak file
+        if len(available_files) > num_files_to_select:
+            files_to_augment = random.sample(available_files, num_files_to_select)
+        else:
+            files_to_augment = available_files
             
-            # Strategi alternatif: ambil beberapa file dari kelas yang paling sedikit instancenya
-            min_class_id = min(class_instance_counts, key=class_instance_counts.get) if class_instance_counts else None
-            if min_class_id is not None:
-                files_with_counts = class_to_files[min_class_id]
-                for file_path, _ in files_with_counts:
-                    selected_files.add(file_path)
-                self.logger.info(f"🔄 Strategi alternatif: menggunakan {len(selected_files)} file dari kelas {min_class_id}")
+        # Tambahkan ke daftar file terpilih
+        selected_files.extend(files_to_augment)
         
-        # Konversi hasil menjadi list
-        selected_files_list = list(selected_files)
-        
-        # Log hasil
-        self.logger.info(f"✅ Terpilih {len(selected_files_list)} file untuk diaugmentasi dari {len(image_files)} total")
-        
-        return {
-            "status": "success",
-            "selected_files": selected_files_list,
-            "class_counts": class_counts,
-            "class_instance_counts": dict(class_instance_counts),
-            "augmentation_needs": augmentation_needs,
-            "total_classes": len(class_counts),
-            "total_files": len(image_files),
-            "selected_files_count": len(selected_files_list)
-        }
+        # Report progress dengan throttling
+        if progress_callback and (i % max(1, len(classes_to_augment) // 5) == 0 or i == len(classes_to_augment) - 1):
+            percentage = int((i+1) / len(classes_to_augment) * 100)
+            progress_callback(
+                progress=i+1, 
+                total=len(classes_to_augment),
+                message=f"Pemilihan file ({percentage}%): kelas {i+1}/{len(classes_to_augment)}",
+                status="info",
+                step=0  # Tahap analisis
+            )
+    
+    # Log ringkasan hasil pemilihan file
+    if progress_callback:
+        progress_callback(
+            message=f"✅ Pemilihan selesai: {len(selected_files)} file dipilih untuk augmentasi",
+            status="info",
+            step=0  # Tahap analisis
+        )
+    
+    return selected_files

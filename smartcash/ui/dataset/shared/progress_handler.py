@@ -31,6 +31,8 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
         'processed_files': 0, 
         'current_split': '', 
         'splits': {},
+        # PERBAIKAN: Tambah tracking per kelas
+        'classes': {},
         'important_messages': set()  # Untuk menyimpan pesan penting
     }
     
@@ -61,6 +63,13 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
         split = kwargs.get('split', '')
         split_step = kwargs.get('split_step', '')
         
+        # PERBAIKAN: Ekstrak informasi kelas untuk augmentasi
+        class_id = kwargs.get('class_id', None)
+        class_progress = kwargs.get('class_progress', None)
+        class_total = kwargs.get('class_total', None)
+        total_classes = kwargs.get('total_classes', None)
+        current_class_index = kwargs.get('current_class_index', None)
+        
         # PERBAIKAN: Tambahkan informasi total file di semua split
         total_files_all = kwargs.get('total_files_all', 0)
         
@@ -73,6 +82,18 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
             
             with ui_components['status']:
                 display(create_status_indicator('info', f"{ICONS['processing']} Memulai proses split {split}"))
+        
+        # PERBAIKAN: Update informasi progress per kelas untuk augmentasi
+        if class_id is not None and class_total is not None:
+            if class_id not in total_info['classes']:
+                total_info['classes'][class_id] = {'progress': 0, 'total': class_total}
+            
+            # Update progress untuk kelas ini
+            if class_progress is not None:
+                old_progress = total_info['classes'][class_id].get('progress', 0)
+                if class_progress > old_progress:
+                    # Update progress untuk kelas ini
+                    total_info['classes'][class_id]['progress'] = class_progress
         
         # ===== PERHITUNGAN PROGRESS KESELURUHAN DENGAN PERBAIKAN =====
         # Jika ini pertama kali melihat split ini, tambahkan ke statistik
@@ -106,27 +127,43 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                 
                 # Hitung persentase untuk overall progress bar
                 overall_percentage = int(overall_progress / overall_total * 100)
-                ui_components['progress_bar'].description = f"Total: {overall_percentage}%"
+                
+                # PERBAIKAN: Tampilkan informasi kelas saat augmentasi
+                if total_classes and current_class_index is not None:
+                    ui_components['progress_bar'].description = f"Kelas {current_class_index+1}/{total_classes}: {overall_percentage}%"
+                else:
+                    ui_components['progress_bar'].description = f"Total: {overall_percentage}%"
+                    
                 ui_components['progress_bar'].layout.visibility = 'visible'
                 
                 last_update['time'] = current_time
                 
-        # ===== UPDATE CURRENT PROGRESS BAR (UNTUK SPLIT SAAT INI) =====
-        if progress is not None and total is not None and total > 0 and 'current_progress' in ui_components:
+        # ===== UPDATE CURRENT PROGRESS BAR (UNTUK KELAS ATAU SPLIT SAAT INI) =====
+        if 'current_progress' in ui_components:
             if current_time - last_update.get('time', 0) >= update_interval:
-                ui_components['current_progress'].max = total
-                ui_components['current_progress'].value = min(progress, total)
+                # PERBAIKAN: Prioritaskan informasi kelas untuk augmentasi
+                if class_progress is not None and class_total is not None and class_total > 0:
+                    ui_components['current_progress'].max = class_total
+                    ui_components['current_progress'].value = min(class_progress, class_total)
+                    
+                    class_percentage = int(class_progress / class_total * 100) if class_total > 0 else 0
+                    ui_components['current_progress'].description = f"Kelas {class_id}: {class_percentage}%"
                 
-                # Format deskripsi split dengan lebih informatif
-                split_percentage = int(progress / total * 100) if total > 0 else 0
-                
-                # PERBAIKAN: Tampilkan informasi split step jika tersedia
-                if split_step:
-                    ui_components['current_progress'].description = f"Split {split_step}: {split_percentage}%"
-                elif split:
-                    ui_components['current_progress'].description = f"Split {split}: {split_percentage}%"
-                else:
-                    ui_components['current_progress'].description = f"Progress: {split_percentage}%"
+                # Fallback ke informasi split jika tidak ada informasi kelas
+                elif progress is not None and total is not None and total > 0:
+                    ui_components['current_progress'].max = total
+                    ui_components['current_progress'].value = min(progress, total)
+                    
+                    # Format deskripsi split dengan lebih informatif
+                    split_percentage = int(progress / total * 100) if total > 0 else 0
+                    
+                    # PERBAIKAN: Tampilkan informasi split step jika tersedia
+                    if split_step:
+                        ui_components['current_progress'].description = f"Split {split_step}: {split_percentage}%"
+                    elif split:
+                        ui_components['current_progress'].description = f"Split {split}: {split_percentage}%"
+                    else:
+                        ui_components['current_progress'].description = f"Progress: {split_percentage}%"
                     
                 ui_components['current_progress'].layout.visibility = 'visible'
                 
@@ -134,15 +171,20 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
         
         # ===== UPDATE LOG UI (DENGAN THROTTLING YANG DITINGKATKAN) =====
         if message:
-            # PERBAIKAN: Menentukan apakah pesan saat ini adalah pesan penting
+            # PERBAIKAN: Menentukan apakah pesan saat ini adalah pesan penting untuk konsolidasi log
             is_important = (
-                status != 'info' or                # Bukan info biasa
-                step == 0 or step == 2 or          # Tahap persiapan atau finalisasi
-                "selesai" in message.lower() or    # Pesan selesai
-                "memulai" in message.lower() or    # Pesan mulai
-                "analyzing" in message.lower() or  # Pesan analisis
-                "balancing" in message.lower() or  # Pesan balancing
-                "memindahkan" in message.lower() or # Pesan memindahkan
+                status != 'info' or                      # Bukan info biasa
+                step == 0 or step == 2 or                # Tahap persiapan atau finalisasi
+                "selesai" in message.lower() or          # Pesan selesai
+                "memulai" in message.lower() or          # Pesan mulai
+                "menganalisis" in message.lower() or     # Pesan analisis
+                "analisis" in message.lower() or         # Pesan analisis
+                "statistik" in message.lower() or        # Pesan statistik
+                "balancing" in message.lower() or        # Pesan balancing
+                "memindahkan" in message.lower() or      # Pesan memindahkan
+                "menyimpan" in message.lower() or        # Pesan penyimpanan
+                "peta distribusi" in message.lower() or  # Pesan peta distribusi kelas
+                ("kelas" in message.lower() and ("mulai" in message.lower() or "selesai" in message.lower())) or  # Pesan kelas
                 message not in total_info['important_messages'] # Pesan belum pernah ditampilkan
             )
             
@@ -152,7 +194,7 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
             
             time_to_log = current_time - last_update.get('message_time', 0) >= message_throttle_interval
             
-            # PERBAIKAN: Log hanya untuk pesan penting atau sesuai interval
+            # PERBAIKAN: Log hanya untuk pesan penting atau sesuai interval, konsolidasikan log
             if (is_important and time_to_log) or status != 'info':
                 # Log dengan logger jika tersedia
                 if logger:
@@ -179,10 +221,27 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                     else 'AUGMENTATION'
                 )
                 
-                # PERBAIKAN: Sertakan informasi split dan persentase yang lebih akurat
+                # PERBAIKAN: Sertakan informasi kelas untuk augmentasi
                 notify_message = message or f"Progress {int(overall_progress/overall_total*100)}%"
-                if split and current_progress is not None and current_total is not None:
+                
+                # Prioritaskan informasi kelas untuk augmentasi
+                if class_id is not None and class_progress is not None and class_total is not None:
+                    class_percentage = int(class_progress / class_total * 100) if class_total > 0 else 0
+                    notify_message = f"Kelas {class_id}: {class_percentage}% - {notify_message}"
+                # Fallback ke informasi split
+                elif split and current_progress is not None and current_total is not None:
                     notify_message = f"Split {split}: {int(current_progress/current_total*100)}% - {notify_message}"
+                
+                # Tambahkan parameter terkait kelas untuk augmentasi
+                extra_params = {}
+                if class_id is not None:
+                    extra_params.update({
+                        'class_id': class_id,
+                        'class_progress': class_progress,
+                        'class_total': class_total,
+                        'total_classes': total_classes,
+                        'current_class_index': current_class_index
+                    })
                 
                 # Update overall progress untuk observer
                 notify(
@@ -195,7 +254,8 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
                     current_progress=progress,
                     current_total=total,
                     total_files_all=total_files_all,
-                    **kwargs
+                    **kwargs,
+                    **extra_params
                 )
                 
                 last_update['notify_time'] = current_time
@@ -243,13 +303,14 @@ def setup_throttled_progress_callback(ui_components: Dict[str, Any], logger=None
         process_running_key = 'preprocessing_running' if 'preprocessing_running' in ui_components else 'augmentation_running'
         ui_components[process_running_key] = False
         
-        # Reset informasi progress tracking
+        # Reset informasi progress tracking dengan reset state yang lengkap
         total_info.clear()
         total_info.update({
             'total_files': 0, 
             'processed_files': 0, 
             'current_split': '', 
             'splits': {},
+            'classes': {},  # Reset informasi kelas
             'important_messages': set()
         })
         

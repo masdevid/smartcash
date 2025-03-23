@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan utama untuk augmentasi dataset dengan dukungan multi-processing dan balancing class
+Deskripsi: Layanan utama untuk augmentasi dataset dengan dukungan multi-processing, balancing class dan tracking progres per kelas
 """
 
 import os
@@ -16,6 +16,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 import albumentations as A
 from tqdm.auto import tqdm
 import multiprocessing
+from collections import defaultdict
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.services.augmentor.pipeline_factory import AugmentationPipelineFactory
@@ -25,7 +26,7 @@ from smartcash.dataset.services.augmentor.augmentation_worker import process_sin
 
 class AugmentationService:
     """
-    Layanan augmentasi dataset dengan dukungan multiprocessing dan balancing class.
+    Layanan augmentasi dataset dengan dukungan multiprocessing, balancing class dan tracking progres per kelas.
     Implementasi sesuai SRP dengan delegasi tugas ke worker dan balancer.
     """
     
@@ -90,7 +91,7 @@ class AugmentationService:
         target_count: int = 1000
     ) -> Dict[str, Any]:
         """
-        Augmentasi dataset dengan penggunaan multiprocessing dan balancing class.
+        Augmentasi dataset dengan penggunaan multiprocessing, balancing class dan tracking progres per kelas.
         
         Args:
             split: Split dataset ('train', 'valid', 'test')
@@ -145,15 +146,22 @@ class AugmentationService:
             self.logger.warning(f"⚠️ {message}")
             return {"status": "error", "message": message}
         
-        # Filter file berdasarkan kebutuhan balancing jika diminta
+        # Dictionary untuk menyimpan data per kelas untuk balancing dan progres tracking
+        class_files = defaultdict(list)
+        class_counts = defaultdict(int)
+        class_augmentation_needs = {}
+        
+        # PERBAIKAN: Memindahkan persiapan balancing ke blok terpisah untuk konsolidasi log
         if target_balance:
+            # Report progress untuk tahap analisis
+            self.report_progress(
+                message=f"🔍 Menganalisis peta distribusi kelas untuk balancing",
+                status="info",
+                step=0  # Tahap persiapan
+            )
+            
+            # Gunakan class balancer untuk mendapatkan file yang perlu diaugmentasi
             try:
-                # Persiapkan balancing untuk class target
-                message = f"🎯 Mempersiapkan balancing class dengan target {target_count} sampel per kelas"
-                self.report_progress(message=message)
-                self.logger.info(message)
-                
-                # Gunakan class balancer untuk mendapatkan file yang perlu diaugmentasi
                 result = self.class_balancer.prepare_balanced_dataset(
                     image_files=image_files,
                     labels_dir=labels_input_dir,
@@ -164,23 +172,28 @@ class AugmentationService:
                 # Gunakan file yang direkomendasikan untuk balancing
                 balanced_files = result.get('selected_files', [])
                 class_stats = result.get('class_counts', {})
-                augmentation_needs = result.get('augmentation_needs', {})
+                class_augmentation_needs = result.get('augmentation_needs', {})
                 
-                # Log kebutuhan augmentasi per kelas dengan lebih detail
-                for class_id, needed in augmentation_needs.items():
-                    current_count = class_stats.get(class_id, 0)
-                    if needed > 0:
-                        self.logger.info(f"🏷️ Kelas {class_id}: perlu tambahan {needed} sampel (dari {current_count} → {target_count})")
-                    else:
-                        self.logger.info(f"✅ Kelas {class_id}: sudah cukup ({current_count} ≥ {target_count})")
+                # PERBAIKAN: Struktur ulang data per kelas untuk progres tracking
+                for class_id, files in result.get('class_files', {}).items():
+                    class_files[class_id] = files
+                    class_counts[class_id] = len(files)
+                
+                # PERBAIKAN: Konsolidasi log kebutuhan augmentasi per kelas
+                classes_needing_augmentation = [class_id for class_id, needed in class_augmentation_needs.items() if needed > 0]
+                total_needed = sum(class_augmentation_needs.values())
+                
+                # Log rangkuman statistik balancing dengan konsolidasi
+                summary_message = f"📊 Statistik Balancing Kelas (target: {target_count}/kelas): {len(classes_needing_augmentation)} kelas perlu ditambah {total_needed} sampel"
+                self.logger.info(summary_message)
+                self.report_progress(message=summary_message, status="info", step=0)
                 
                 # Update file yang akan diproses
                 if balanced_files:
-                    self.logger.info(f"📊 Menggunakan {len(balanced_files)} dari {len(image_files)} untuk balancing class")
+                    self.logger.info(f"🔄 Menggunakan {len(balanced_files)} dari {len(image_files)} file untuk balancing class")
                     image_files = balanced_files
                 else:
                     self.logger.warning("⚠️ Tidak ada file yang cocok untuk balancing, menggunakan semua file")
-            
             except Exception as e:
                 self.logger.warning(f"⚠️ Error saat balancing class: {str(e)}. Menggunakan semua file.")
         
@@ -195,7 +208,6 @@ class AugmentationService:
         
         # Cek resume jika diminta
         if resume:
-            # TODO: Implementasi resume dengan tracking file yang sudah diproses
             self.logger.info(f"⏩ Resume augmentation belum diimplementasikan, melanjutkan dengan semua file")
         
         # Setup augmentation pipeline berdasarkan jenis yang diminta
@@ -230,8 +242,333 @@ class AugmentationService:
             'labels_output_dir': labels_output_dir,
         }
         
-        # Proses dengan multiprocessing
-        self.logger.info(f"🚀 Memulai augmentasi dengan {self.num_workers if num_workers is None else num_workers} workers")
+        # PERBAIKAN: Proses augmentasi per kelas jika target_balance aktif
+        if target_balance and class_files:
+            return self._augment_with_class_tracking(
+                class_files, class_counts, class_augmentation_needs, 
+                augmentation_params, target_count, num_workers, 
+                move_to_preprocessed, final_output_dir, preprocessed_dir,
+                output_dir, images_output_dir, labels_output_dir, split,
+                augmentation_types, start_time
+            )
+        else:
+            # Lanjutkan dengan augmentasi standar jika tidak ada target balancing
+            return self._augment_without_class_tracking(
+                image_files, augmentation_params, num_workers,
+                move_to_preprocessed, final_output_dir, preprocessed_dir,
+                output_dir, images_output_dir, labels_output_dir, split,
+                augmentation_types, start_time
+            )
+    
+    def _augment_with_class_tracking(
+        self, 
+        class_files: Dict[str, List[str]], 
+        class_counts: Dict[str, int],
+        class_augmentation_needs: Dict[str, int],
+        augmentation_params: Dict[str, Any],
+        target_count: int,
+        num_workers: Optional[int],
+        move_to_preprocessed: bool,
+        final_output_dir: str,
+        preprocessed_dir: str,
+        output_dir: str,
+        images_output_dir: str,
+        labels_output_dir: str,
+        split: str,
+        augmentation_types: List[str],
+        start_time: float
+    ) -> Dict[str, Any]:
+        """
+        Proses augmentasi dengan tracking progress per kelas untuk balancing.
+        
+        Args:
+            class_files: Dictionary file per kelas
+            class_counts: Jumlah file asli per kelas
+            class_augmentation_needs: Jumlah file yang perlu ditambahkan per kelas
+            augmentation_params: Parameter augmentasi
+            target_count: Target jumlah instance per kelas
+            num_workers: Jumlah worker
+            move_to_preprocessed: Apakah hasil dipindahkan ke direktori preprocessed
+            final_output_dir: Direktori akhir hasil
+            preprocessed_dir: Direktori preprocessed
+            output_dir: Direktori output sementara
+            images_output_dir: Direktori output gambar
+            labels_output_dir: Direktori output label
+            split: Split dataset
+            augmentation_types: Jenis augmentasi
+            start_time: Waktu mulai proses
+            
+        Returns:
+            Dictionary hasil augmentasi
+        """
+        # Persiapkan tracking progres
+        self.logger.info(f"🚀 Memulai augmentasi dengan tracking per kelas ({len(class_files)} kelas)")
+        
+        # Filter hanya kelas yang membutuhkan augmentasi
+        classes_to_augment = [cls_id for cls_id, needed in class_augmentation_needs.items() if needed > 0]
+        
+        # Tampilkan progress awal
+        self.report_progress(
+            0, len(classes_to_augment),  # Overall progress: jumlah kelas yang diproses
+            f"Memulai augmentasi {len(classes_to_augment)} kelas dengan {len(augmentation_types)} jenis augmentasi",
+            status="info",
+            step=1,  # Tahap proses utama
+            total_classes=len(classes_to_augment)
+        )
+        
+        # Simpan statistik dan hasil
+        total_augmented_count = 0
+        total_generated = 0
+        total_errors = 0
+        result_by_class = {}
+        
+        # Batasi worker sesuai kebutuhan
+        use_workers = num_workers if num_workers is not None else self.num_workers
+        max_workers = min(use_workers, multiprocessing.cpu_count(), 16)
+        
+        # Proses setiap kelas yang membutuhkan augmentasi
+        for class_idx, class_id in enumerate(classes_to_augment):
+            # Jika signal stop, hentikan proses
+            if self._stop_signal:
+                self.logger.warning("⚠️ Augmentasi dihentikan oleh pengguna")
+                return {"status": "cancelled", "message": "Augmentasi dihentikan oleh pengguna"}
+                
+            # Ambil file untuk kelas ini dan kebutuhan augmentasi
+            files_for_class = class_files.get(class_id, [])
+            needed_augmentations = class_augmentation_needs.get(class_id, 0)
+            current_count = class_counts.get(class_id, 0)
+            
+            # Log mulai augmentasi kelas
+            class_start_message = f"🔄 Memulai augmentasi kelas {class_id} ({class_idx+1}/{len(classes_to_augment)}): {current_count}/{target_count} instance"
+            self.logger.info(class_start_message)
+            self.report_progress(
+                class_idx, len(classes_to_augment),  # Overall progress
+                class_start_message,
+                status="info",
+                step=1,  # Tahap proses utama
+                class_id=class_id,
+                class_progress=0,
+                class_total=needed_augmentations,
+                total_classes=len(classes_to_augment),
+                current_class_index=class_idx
+            )
+            
+            # Periksa jika ada file untuk kelas ini
+            if not files_for_class:
+                self.logger.warning(f"⚠️ Tidak ada file untuk kelas {class_id}, melewati")
+                continue
+                
+            # Tracking progress untuk kelas ini
+            class_augmented = 0
+            class_generated = 0
+            class_errors = 0
+            
+            try:
+                # Proses dengan executor untuk paralelisme
+                with ProcessPoolExecutor(max_workers=max_workers) as executor:
+                    # Hitung berapa file yang perlu diproses dan berapa variasi per file
+                    # Jika needed_augmentations > jumlah file, maka kita perlu augmentasi lebih dari 1 variasi per file
+                    base_variations = augmentation_params['num_variations']
+                    
+                    # Hitung jumlah total variasi yang dibutuhkan
+                    total_variations_needed = needed_augmentations
+                    
+                    # Pilih file secara random jika ada banyak file
+                    if len(files_for_class) > 0:
+                        selected_files = files_for_class
+                        # Jika jumlah file lebih banyak dari yang dibutuhkan, pilih secara random
+                        if len(selected_files) > needed_augmentations and needed_augmentations > 0:
+                            selected_files = random.sample(files_for_class, min(needed_augmentations, len(files_for_class)))
+                    else:
+                        selected_files = []
+                    
+                    # Log jumlah file terpilih
+                    self.logger.info(f"📄 Kelas {class_id}: terpilih {len(selected_files)} file untuk menghasilkan {total_variations_needed} variasi")
+                    
+                    # Submit semua task
+                    futures = {}
+                    for img_path in selected_files:
+                        # Copy parameter augmentasi dan tambahkan parameter spesifik kelas
+                        params_for_class = augmentation_params.copy()
+                        
+                        # Konfigurasi task
+                        future = executor.submit(
+                            process_single_file, 
+                            image_path=img_path, 
+                            **params_for_class
+                        )
+                        futures[future] = img_path
+                    
+                    # Progress tracking
+                    processed_files = 0
+                    class_progress_report_interval = max(1, len(selected_files) // 10)  # Report setiap 10% progress
+                    
+                    # Proses hasil
+                    for future in as_completed(futures):
+                        if self._stop_signal:
+                            self.logger.warning("⚠️ Augmentasi dihentikan oleh pengguna")
+                            executor.shutdown(wait=False)
+                            return {"status": "cancelled", "message": "Augmentasi dihentikan oleh pengguna"}
+                        
+                        # Get result
+                        img_path = futures[future]
+                        try:
+                            result = future.result()
+                            if result['status'] == 'success':
+                                class_augmented += 1
+                                class_generated += result.get('generated', 0)
+                            else:
+                                class_errors += 1
+                                self.logger.debug(f"⚠️ Error augmentasi {img_path}: {result.get('message')}")
+                        except Exception as e:
+                            class_errors += 1
+                            self.logger.debug(f"⚠️ Error task augmentasi {img_path}: {str(e)}")
+                        
+                        # Update progress
+                        processed_files += 1
+                        
+                        # Report progress per kelas dengan throttling
+                        if processed_files % class_progress_report_interval == 0 or processed_files == len(selected_files):
+                            progress_percentage = int(processed_files / len(selected_files) * 100)
+                            self.report_progress(
+                                class_idx, len(classes_to_augment),  # Overall progress
+                                f"Augmentasi kelas {class_id}: {processed_files}/{len(selected_files)} file ({progress_percentage}%)",
+                                status="info",
+                                step=1,  # Tahap proses utama
+                                class_id=class_id,
+                                class_progress=processed_files,
+                                class_total=len(selected_files),
+                                total_classes=len(classes_to_augment),
+                                current_class_index=class_idx
+                            )
+                
+                # Update statistik total
+                total_augmented_count += class_augmented
+                total_generated += class_generated
+                total_errors += class_errors
+                
+                # Simpan hasil per kelas
+                result_by_class[class_id] = {
+                    'processed': class_augmented,
+                    'generated': class_generated,
+                    'errors': class_errors,
+                    'original': len(files_for_class)
+                }
+                
+                # Log selesai augmentasi kelas
+                class_end_message = f"✅ Selesai augmentasi kelas {class_id}: {class_generated} gambar baru dari {class_augmented} file"
+                self.logger.info(class_end_message)
+                self.report_progress(
+                    class_idx + 1, len(classes_to_augment),  # Overall progress
+                    class_end_message,
+                    status="success",
+                    step=1,  # Tahap proses utama
+                    class_id=class_id,
+                    class_progress=len(selected_files),
+                    class_total=len(selected_files),
+                    total_classes=len(classes_to_augment),
+                    current_class_index=class_idx
+                )
+                
+            except Exception as e:
+                self.logger.error(f"❌ Error saat augmentasi kelas {class_id}: {str(e)}")
+                total_errors += 1
+        
+        # Pindahkan hasil ke direktori preprocessed jika diminta
+        if move_to_preprocessed and total_generated > 0:
+            move_message = f"📦 Memindahkan {total_generated} file hasil augmentasi ke {final_output_dir}"
+            self.logger.info(move_message)
+            self.report_progress(
+                len(classes_to_augment), len(classes_to_augment),
+                move_message,
+                status="info",
+                step=2  # Tahap finalisasi
+            )
+            
+            try:
+                self._move_files_to_preprocessed(
+                    images_output_dir, 
+                    labels_output_dir, 
+                    augmentation_params['output_prefix'], 
+                    final_output_dir,
+                    split
+                )
+                self.logger.info(f"✅ Hasil augmentasi berhasil dipindahkan ke {final_output_dir}")
+            except Exception as e:
+                message = f"Error saat memindahkan file: {str(e)}"
+                self.logger.error(f"❌ {message}")
+                return {
+                    "status": "partial_error", 
+                    "message": message,
+                    "original": sum(class_counts.values()),
+                    "generated": total_generated,
+                    "augmentation_types": augmentation_types,
+                    "duration": time.time() - start_time,
+                    "results_by_class": result_by_class
+                }
+        
+        # Rangkuman hasil
+        duration = time.time() - start_time
+        summary_message = f"🎉 Augmentasi dataset dengan balancing kelas selesai: {total_generated} file dari {total_augmented_count} gambar dalam {duration:.1f} detik"
+        self.logger.success(summary_message)
+        self.report_progress(
+            len(classes_to_augment), len(classes_to_augment),
+            summary_message,
+            status="success",
+            step=2  # Tahap finalisasi
+        )
+        
+        return {
+            "status": "success",
+            "original": sum(class_counts.values()),
+            "generated": total_generated,
+            "errors": total_errors,
+            "total_files": sum(class_counts.values()) + total_generated,
+            "augmentation_types": augmentation_types,
+            "duration": duration,
+            "output_dir": output_dir,
+            "final_output_dir": final_output_dir,
+            "target_count": target_count,
+            "results_by_class": result_by_class
+        }
+    
+    def _augment_without_class_tracking(
+        self,
+        image_files: List[str],
+        augmentation_params: Dict[str, Any],
+        num_workers: Optional[int],
+        move_to_preprocessed: bool,
+        final_output_dir: str,
+        preprocessed_dir: str,
+        output_dir: str,
+        images_output_dir: str,
+        labels_output_dir: str,
+        split: str,
+        augmentation_types: List[str],
+        start_time: float
+    ) -> Dict[str, Any]:
+        """
+        Proses augmentasi tanpa tracking per kelas (metode standar).
+        
+        Args:
+            image_files: List path file gambar
+            augmentation_params: Parameter augmentasi
+            num_workers: Jumlah worker
+            move_to_preprocessed: Apakah hasil dipindahkan ke direktori preprocessed
+            final_output_dir: Direktori akhir hasil
+            preprocessed_dir: Direktori preprocessed
+            output_dir: Direktori output sementara
+            images_output_dir: Direktori output gambar
+            labels_output_dir: Direktori output label
+            split: Split dataset
+            augmentation_types: Jenis augmentasi
+            start_time: Waktu mulai proses
+            
+        Returns:
+            Dictionary hasil augmentasi
+        """
+        total_files = len(image_files)
+        self.logger.info(f"🚀 Memulai augmentasi {total_files} file dengan {len(augmentation_types)} jenis augmentasi")
         self.report_progress(0, total_files, f"Memulai augmentasi {total_files} file", "info")
         
         # Simpan statistik jumlah file yang berhasil diaugmentasi
@@ -282,11 +619,15 @@ class AugmentationService:
                     
                     # Update progress
                     processed += 1
-                    self.report_progress(
-                        processed, total_files, 
-                        f"Augmentasi {processed}/{total_files} file", 
-                        "info" if total_errors == 0 else "warning"
-                    )
+                    
+                    # Throttled progress updates (setiap 5% atau 10 file)
+                    report_interval = max(1, min(total_files // 20, 10))
+                    if processed % report_interval == 0 or processed == total_files:
+                        self.report_progress(
+                            processed, total_files, 
+                            f"Augmentasi {processed}/{total_files} file ({int(processed/total_files*100)}%)", 
+                            "info" if total_errors == 0 else "warning"
+                        )
         except Exception as e:
             message = f"Error saat proses multiprocessing: {str(e)}"
             self.logger.error(f"❌ {message}")
@@ -303,7 +644,7 @@ class AugmentationService:
                 self._move_files_to_preprocessed(
                     images_output_dir, 
                     labels_output_dir, 
-                    output_prefix, 
+                    augmentation_params['output_prefix'], 
                     final_output_dir,
                     split
                 )
@@ -322,14 +663,15 @@ class AugmentationService:
         
         # Final progress update
         duration = time.time() - start_time
+        summary_message = f"🎉 Augmentasi selesai: {total_generated} file dihasilkan dari {total_files} gambar dalam {duration:.1f} detik"
         self.report_progress(
             total_files, total_files, 
-            f"Augmentasi selesai: {total_generated} file dihasilkan dalam {duration:.1f} detik", 
+            summary_message,
             "success"
         )
         
         # Berhasil
-        self.logger.success(f"✅ Augmentasi dataset selesai: {total_generated} file dari {total_files} gambar dalam {duration:.1f} detik")
+        self.logger.success(summary_message)
         
         return {
             "status": "success",
@@ -340,65 +682,5 @@ class AugmentationService:
             "augmentation_types": augmentation_types,
             "duration": duration,
             "output_dir": output_dir,
-            "final_output_dir": final_output_dir,
-            "target_count": target_count
+            "final_output_dir": final_output_dir
         }
-    
-    def _move_files_to_preprocessed(
-        self, 
-        images_source_dir: str, 
-        labels_source_dir: str,
-        file_prefix: str,
-        preprocessed_dir: str,
-        split: str = 'train'
-    ) -> None:
-        """
-        Pindahkan file hasil augmentasi ke direktori preprocessed.
-        
-        Args:
-            images_source_dir: Direktori sumber gambar
-            labels_source_dir: Direktori sumber label
-            file_prefix: Prefix file yang akan dipindahkan
-            preprocessed_dir: Path direktori preprocessed
-            split: Split dataset ('train', 'valid', 'test')
-        """
-        # Siapkan path tujuan
-        images_target_dir = os.path.join(preprocessed_dir, split, 'images')
-        labels_target_dir = os.path.join(preprocessed_dir, split, 'labels')
-        
-        # Pastikan direktori ada
-        os.makedirs(images_target_dir, exist_ok=True)
-        os.makedirs(labels_target_dir, exist_ok=True)
-        
-        # Temukan semua file gambar augmentasi
-        image_pattern = os.path.join(images_source_dir, f"{file_prefix}_*.jpg")
-        image_files = glob.glob(image_pattern)
-        
-        # Jika tidak ada file, kembalikan
-        if not image_files:
-            self.logger.warning(f"⚠️ Tidak ada file dengan pola {image_pattern} untuk dipindahkan")
-            return
-        
-        # Log jumlah file
-        self.logger.info(f"🔄 Memindahkan {len(image_files)} file gambar ke {images_target_dir}")
-        
-        # Pindahkan gambar
-        for img_path in tqdm(image_files, desc="Memindahkan gambar", unit="file"):
-            filename = os.path.basename(img_path)
-            target_path = os.path.join(images_target_dir, filename)
-            
-            # Copy file (tidak gunakan move untuk menghindari kehilangan file jika error)
-            shutil.copy2(img_path, target_path)
-            
-            # Jika label ada, pindahkan juga
-            label_filename = os.path.splitext(filename)[0] + '.txt'
-            label_source = os.path.join(labels_source_dir, label_filename)
-            
-            if os.path.exists(label_source):
-                label_target = os.path.join(labels_target_dir, label_filename)
-                shutil.copy2(label_source, label_target)
-    
-    def stop(self) -> None:
-        """Berhenti augmentasi yang sedang berjalan."""
-        self._stop_signal = True
-        self.logger.warning("⚠️ Mengirim sinyal berhenti ke augmentation service")

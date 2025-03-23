@@ -15,13 +15,9 @@ from datetime import datetime
 from smartcash.common.logger import get_logger
 from smartcash.common.interfaces.layer_config_interface import ILayerConfigManager
 from smartcash.common.layer_config import get_layer_config
-
-# Konstanta
-IMG_EXTENSIONS = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
-DEFAULT_SPLITS = ['train', 'valid', 'test']
-DEFAULT_SPLIT_RATIOS = {'train': 0.7, 'valid': 0.15, 'test': 0.15}
-DEFAULT_RANDOM_SEED = 42
-
+from smartcash.dataset.utils.dataset_constants import (
+    IMG_EXTENSIONS, DEFAULT_SPLITS, DEFAULT_SPLIT_RATIOS, DEFAULT_RANDOM_SEED
+)
 
 class DatasetUtils:
     """Utilitas umum untuk operasi dataset."""

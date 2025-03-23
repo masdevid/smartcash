@@ -12,6 +12,12 @@ import os
 import cv2
 import numpy as np
 
+from smartcash.dataset.utils.denomination_utils import extract_info_from_filename
+from smartcash.dataset.utils.data_utils import load_image
+from smartcash.ui.utils.file_utils import shorten_filename
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.common.utils import format_size
+
 def match_original_with_augmented(aug_filename: str, original_files: List[Path]) -> Optional[Path]:
     """
     Mencari file original yang cocok dengan file augmentasi berdasarkan format denominasi.
@@ -50,15 +56,6 @@ def match_original_with_augmented(aug_filename: str, original_files: List[Path])
 def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
     """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan dukungan format denominasi."""
     from smartcash.ui.utils.alert_utils import create_info_alert
-    from smartcash.common.utils import format_size
-    from smartcash.ui.utils.file_utils import shorten_filename, load_image, find_label_path
-from smartcash.ui.utils.constants import COLORS, ICONS 
-from smartcash.dataset.utils.augmentor_utils import DENOMINATION_CLASS_MAP, extract_info_from_filename
-
-def compare_original_vs_augmented(original_dir: Path, augmented_dir: Path, output_widget, ui_components: Dict[str, Any], num_samples: int = 3):
-    """Komparasi sampel dataset asli dengan yang telah diaugmentasi dengan dukungan format denominasi."""
-    from smartcash.ui.utils.alert_utils import create_info_alert
-    from smartcash.common.utils import format_size
     
     # Get augmentation prefix
     aug_prefix = "aug"

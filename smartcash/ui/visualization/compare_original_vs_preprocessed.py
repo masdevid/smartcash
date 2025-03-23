@@ -13,7 +13,8 @@ import os
 
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-from smartcash.dataset.utils.augmentor_utils import DENOMINATION_CLASS_MAP, extract_info_from_filename
+from smartcash.dataset.utils.denomination_utils import extract_info_from_filename
+from smartcash.dataset.utils.data_utils import load_image
 
 def compare_original_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str, preprocessed_dir: str, num_samples: int = 3):
     """
@@ -74,20 +75,6 @@ def compare_original_vs_preprocessed(ui_components: Dict[str, Any], raw_dir: str
         # Ambil sampel acak
         import random
         selected_samples = random.sample(preprocessed_images, min(len(preprocessed_images), num_samples))
-        
-        # Fungsi untuk load gambar, menangani berbagai format
-        def load_image(img_path: Path) -> np.ndarray:
-            if str(img_path).endswith('.npy'):
-                # Handle numpy array
-                img = np.load(str(img_path))
-                # Denormalisasi jika perlu
-                if img.dtype == np.float32 and img.max() <= 1.0:
-                    img = (img * 255).astype(np.uint8)
-            else:
-                # Handle gambar biasa
-                img = cv2.imread(str(img_path))
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-            return img
         
         # Tampilkan komparasi
         display(create_info_alert(f"Komparasi {len(selected_samples)} sampel: mentah vs preprocessed", "info"))

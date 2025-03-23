@@ -10,57 +10,9 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
 
-# Import utils untuk denominasi
-from smartcash.dataset.utils.augmentor_utils import (
-    DENOMINATION_CLASS_MAP, get_denomination_label, 
-    generate_denomination_filename, extract_info_from_filename
-)
-
-def get_classes_from_label(label_path: str) -> Tuple[Optional[str], Set[str]]:
-    """
-    Ekstrak ID kelas utama dan semua kelas dari file label YOLOv5 dengan prioritas denominasi.
-    
-    Args:
-        label_path: Path file label
-        
-    Returns:
-        Tuple (ID kelas utama, set semua kelas)
-    """
-    try:
-        if not os.path.exists(label_path):
-            return None, set()
-            
-        # Baca file label
-        with open(label_path, 'r') as f:
-            lines = f.readlines()
-            
-        # Ekstrak semua class ID
-        class_ids = []
-        all_classes = set()
-        
-        for line in lines:
-            parts = line.strip().split()
-            if len(parts) >= 5:  # Format YOLOv5: class_id x y width height
-                class_id = parts[0]
-                class_ids.append(class_id)
-                all_classes.add(class_id)
-        
-        if not class_ids:
-            return None, set()
-            
-        # Prioritaskan denominasi (kelas yang ada di mapping)
-        valid_denomination_ids = [cls for cls in class_ids if cls in DENOMINATION_CLASS_MAP]
-        
-        # Jika ada valid denomination, ambil yang terkecil (untuk konsistensi)
-        if valid_denomination_ids:
-            main_class = min(valid_denomination_ids)
-        else:
-            # Jika tidak ada valid denomination, ambil yang terkecil dari semua kelas
-            main_class = min(class_ids)
-        
-        return main_class, all_classes
-    except Exception:
-        return None, set()
+# Import utils untuk denominasi dan label dari modul terkonsolidasi
+from smartcash.dataset.utils.denomination_utils import DENOMINATION_CLASS_MAP, get_denomination_label, extract_info_from_filename
+from smartcash.dataset.utils.label_utils import get_classes_from_label
 
 def process_single_file(
     image_path: str,

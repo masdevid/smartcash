@@ -7,6 +7,9 @@ import os
 from typing import Dict, Tuple
 from pathlib import Path
 
+# Import fungsi dari utils terkonsolidasi
+from smartcash.dataset.utils.image_analysis_utils import analyze_class_distribution, analyze_class_distribution_by_prefix, count_files_by_prefix
+
 def analyze_class_distribution(dataset_dir: str, split_name: str = 'train') -> Dict[str, int]:
     """
     Analisis distribusi kelas dalam dataset.
@@ -18,26 +21,8 @@ def analyze_class_distribution(dataset_dir: str, split_name: str = 'train') -> D
     Returns:
         Dictionary berisi {class_id: jumlah_instance}
     """
-    class_counts = {}
-    labels_dir = os.path.join(dataset_dir, split_name, 'labels')
-    
-    if not os.path.exists(labels_dir):
-        return class_counts
-    
-    # Loop melalui semua file label
-    for label_file in Path(labels_dir).glob('*.txt'):
-        try:
-            with open(label_file, 'r') as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        class_id = int(parts[0])
-                        class_counts[class_id] = class_counts.get(class_id, 0) + 1
-        except Exception:
-            # Skip file yang bermasalah
-            continue
-    
-    return class_counts
+    # Delegasi ke fungsi di modul terkonsolidasi
+    return analyze_class_distribution(dataset_dir, split_name)
 
 def analyze_class_distribution_by_prefix(
     dataset_dir: str, 
@@ -57,46 +42,8 @@ def analyze_class_distribution_by_prefix(
     Returns:
         Tuple berisi (class_counts_all, class_counts_orig, class_counts_aug)
     """
-    class_counts_all = {}
-    class_counts_orig = {}
-    class_counts_aug = {}
-    
-    labels_dir = os.path.join(dataset_dir, split_name, 'labels')
-    images_dir = os.path.join(dataset_dir, split_name, 'images')
-    
-    if not os.path.exists(labels_dir) or not os.path.exists(images_dir):
-        return class_counts_all, class_counts_orig, class_counts_aug
-    
-    # Loop melalui semua file label
-    for label_file in Path(labels_dir).glob('*.txt'):
-        try:
-            # Dapatkan nama file gambar yang bersesuaian
-            img_name = label_file.stem + '.jpg'
-            img_path = os.path.join(images_dir, img_name)
-            
-            # Tentukan apakah ini file original atau augmentasi
-            is_augmented = label_file.stem.startswith(aug_prefix)
-            is_original = label_file.stem.startswith(orig_prefix)
-            
-            # Baca file label
-            with open(label_file, 'r') as f:
-                for line in f:
-                    parts = line.strip().split()
-                    if len(parts) >= 5:
-                        class_id = int(parts[0])
-                        
-                        # Update semua counter
-                        class_counts_all[class_id] = class_counts_all.get(class_id, 0) + 1
-                        
-                        if is_augmented:
-                            class_counts_aug[class_id] = class_counts_aug.get(class_id, 0) + 1
-                        elif is_original:
-                            class_counts_orig[class_id] = class_counts_orig.get(class_id, 0) + 1
-        except Exception:
-            # Skip file yang bermasalah
-            continue
-    
-    return class_counts_all, class_counts_orig, class_counts_aug
+    # Delegasi ke fungsi di modul terkonsolidasi
+    return analyze_class_distribution_by_prefix(dataset_dir, split_name, aug_prefix, orig_prefix)
 
 def count_files_by_prefix(dataset_dir: str, split_name: str = 'train', file_extension: str = '.jpg'):
     """
@@ -110,19 +57,5 @@ def count_files_by_prefix(dataset_dir: str, split_name: str = 'train', file_exte
     Returns:
         Dictionary berisi {prefix: jumlah_file}
     """
-    images_dir = os.path.join(dataset_dir, split_name, 'images')
-    
-    if not os.path.exists(images_dir):
-        return {}
-        
-    # Hitung file berdasarkan prefix
-    prefix_counts = {}
-    
-    for image_file in Path(images_dir).glob(f'*{file_extension}'):
-        # Ambil prefix (karakter sebelum underscore pertama)
-        parts = image_file.stem.split('_', 1)
-        if parts:
-            prefix = parts[0]
-            prefix_counts[prefix] = prefix_counts.get(prefix, 0) + 1
-    
-    return prefix_counts
+    # Delegasi ke fungsi di modul terkonsolidasi
+    return count_files_by_prefix(dataset_dir, split_name, file_extension)

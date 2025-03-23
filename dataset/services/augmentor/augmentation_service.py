@@ -19,7 +19,9 @@ from smartcash.dataset.services.augmentor.augmentation_worker import process_sin
 from smartcash.dataset.services.augmentor.helpers.path_helper import setup_paths
 from smartcash.dataset.services.augmentor.helpers.parallel_helper import process_files_with_executor
 from smartcash.dataset.services.augmentor.helpers.tracking_helper import track_class_progress
-from smartcash.dataset.utils.augmentor_utils import move_files_to_preprocessed
+from smartcash.dataset.services.augmentor.helpers.augmentation_executor import execute_augmentation_with_tracking
+from smartcash.dataset.services.augmentor.helpers.validation_helper import validate_input_files
+from smartcash.dataset.utils.move_utils import move_files_to_preprocessed
 
 class AugmentationService:
     """Layanan augmentasi dataset dengan prioritisasi kelas dan pelacakan dinamis"""
@@ -91,7 +93,6 @@ class AugmentationService:
         paths = setup_paths(self.config, split)
         
         # Validasi input files dengan helper
-        from smartcash.dataset.services.augmentor.helpers.validation_helper import validate_input_files
         image_files, validation_result = validate_input_files(
             paths['images_input_dir'], 
             self.config.get('preprocessing', {}).get('file_prefix', 'rp'),
@@ -109,7 +110,6 @@ class AugmentationService:
             return {"status": "info", "message": "Tidak ada kelas yang memerlukan augmentasi", "generated": 0}
         
         # Gunakan helper untuk augmentasi dengan pelacakan dinamis
-        from smartcash.dataset.services.augmentor.helpers.augmentation_executor import execute_augmentation_with_tracking
         augmentation_result = execute_augmentation_with_tracking(
             self, class_data, augmentation_types, num_variations, output_prefix,
             validate_results, process_bboxes, num_workers or self.num_workers, 

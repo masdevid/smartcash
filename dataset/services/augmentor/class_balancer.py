@@ -10,6 +10,9 @@ import logging
 import random
 from pathlib import Path
 
+# Import utils dari modul terkonsolidasi
+from smartcash.dataset.utils.file_mapping_utils import map_and_analyze_files, select_prioritized_files_for_class
+
 class ClassBalancer:
     """Kelas untuk balancing class dengan prioritas pengambilan sampel optimal"""
     
@@ -286,73 +289,44 @@ class ClassBalancer:
                     status="info"
                 )
             
-            # 1. Cari file yang memiliki kelas ini dan tidak memiliki kelas yang sudah terpenuhi target
-            high_priority_files = []
-            medium_priority_files = []
-            low_priority_files = []
+            # Menggunakan fungsi helper dari file_mapping_utils untuk selection dengan prioritas
+            processed_files = set([f for f in selected_files])
+            files_for_class = select_prioritized_files_for_class(
+                cls_id, 
+                {cls: [f[0] for f in files] for cls, files in files_by_class.items()},
+                self.current_class_counts, 
+                target_count,
+                processed_files, 
+                {"files_metadata": files_metadata}
+            )
             
-            # Kategorikan file berdasarkan prioritas
-            for file_path, metadata in files_metadata.items():
-                if cls_id not in metadata['classes']:
-                    continue
-                    
-                # Cek apakah file ini memiliki kelas yang sudah terpenuhi target
-                has_fulfilled = any(cls in fulfilled_classes for cls in metadata['classes'])
+            if not files_for_class:
+                self.logger.warning(f"⚠️ Tidak ada file tersedia untuk kelas {cls_id}, dilewati")
+                continue
                 
-                # Prioritas Atas: Tidak memiliki kelas terpenuhi dan jumlah kelas terkecil
-                if not has_fulfilled:
-                    high_priority_files.append((file_path, metadata))
-                
-                # Prioritas Menengah: Jumlah kelas terkecil
-                elif metadata['num_classes'] <= 2:  # Asumsi 2 atau kurang kelas masih prioritas menengah
-                    medium_priority_files.append((file_path, metadata))
-                    
-                # Prioritas Bawah: Sisanya
-                else:
-                    low_priority_files.append((file_path, metadata))
+            # Tambahkan file ke daftar terpilih
+            selected_files.extend(files_for_class)
             
-            # Sortir file berdasarkan jumlah kelas (terkecil dulu)
-            high_priority_files.sort(key=lambda x: x[1]['num_classes'])
-            medium_priority_files.sort(key=lambda x: x[1]['num_classes'])
-            
-            # Gabungkan semua file berdasarkan prioritas
-            prioritized_files = high_priority_files + medium_priority_files + low_priority_files
-            
-            # Pilih file berdasarkan prioritas dan kebutuhan
-            files_for_class = []
-            remaining_need = needed
-            
-            for file_path, metadata in prioritized_files:
-                if remaining_need <= 0:
-                    break
-                    
-                # Tambahkan file ke daftar terpilih
-                files_for_class.append(file_path)
-                
-                # Kurangi kebutuhan berdasarkan kontribusi file ini untuk kelas saat ini
-                contribution = metadata['class_counts'].get(cls_id, 0)
-                remaining_need -= contribution
-                
-                # Update kebutuhan untuk semua kelas dalam file ini
-                for file_cls, count in metadata['class_counts'].items():
-                    if file_cls in current_needs:
-                        current_needs[file_cls] = max(0, current_needs[file_cls] - count)
-                        
+            # Gabungkan metadata untuk file-file yang dipilih
+            for file_path in files_for_class:
+                # Kurangi kebutuhan untuk semua kelas dalam file ini
+                if file_path in files_metadata:
+                    for file_cls, count in files_metadata[file_path]['class_counts'].items():
+                        if file_cls in current_needs:
+                            current_needs[file_cls] = max(0, current_needs[file_cls] - count)
+                            
                         # Cek apakah kelas ini sudah terpenuhi target
                         self.current_class_counts[file_cls] += count
                         if self.current_class_counts[file_cls] >= target_count:
                             fulfilled_classes.add(file_cls)
                             self.logger.info(f"✅ Kelas {file_cls} telah mencapai target {target_count}")
             
-            # Tambahkan semua file untuk kelas ini ke daftar terpilih
-            selected_files.extend(files_for_class)
-            
             # Cek apakah kelas saat ini sudah terpenuhi
-            if remaining_need <= 0 or self.current_class_counts[cls_id] >= target_count:
+            if current_needs.get(cls_id, 0) <= 0 or self.current_class_counts[cls_id] >= target_count:
                 fulfilled_classes.add(cls_id)
                 self.logger.info(f"✅ Kelas {cls_id} telah mencapai target {target_count}")
             else:
-                self.logger.info(f"⚠️ Kelas {cls_id} masih membutuhkan {remaining_need} instances")
+                self.logger.info(f"⚠️ Kelas {cls_id} masih membutuhkan {current_needs.get(cls_id, 0)} instances")
                 
             # Report progress
             if progress_callback:
@@ -412,8 +386,19 @@ class ClassBalancer:
                 if self.current_class_counts[cls] >= target_count:
                     fulfilled_classes[cls] = self.current_class_counts[cls]
         
-        # Log kelas yang sudah terpenuhi
-        # if fulfilled_classes:
-        #     self.logger.info(f"✅ Kelas yang mencapai target setelah augmentasi: {', '.join(fulfilled_classes.keys())}")
+        # Cek multi_class_update jika tersedia untuk tracking lebih akurat
+        for result in augmentation_results:
+            if result.get('status') == 'success' and 'multi_class_update' in result:
+                for cls, count in result['multi_class_update'].items():
+                    # Skip jika kelas tidak valid atau sudah terpenuhi
+                    if not cls or cls in fulfilled_classes:
+                        continue
+                        
+                    # Update tracking
+                    self.current_class_counts[cls] += count
+                    
+                    # Cek jika sudah mencapai target
+                    if self.current_class_counts[cls] >= target_count:
+                        fulfilled_classes[cls] = self.current_class_counts[cls]
         
         return fulfilled_classes

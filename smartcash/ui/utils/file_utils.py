@@ -569,6 +569,9 @@ def find_label_path(img_path: Path) -> Optional[Path]:
     return None
 
 def load_image(img_path: Path) -> np.ndarray:
+    import numpy as np
+    import cv2
+
     """Fungsi helper untuk loading gambar dengan berbagai format."""
     if str(img_path).endswith('.npy'):
         # Handle numpy array
@@ -616,3 +619,28 @@ def find_matching_pairs(
             matched_pairs.append((orig_file, aug_file))
     
     return matched_pairs
+
+
+def get_original_from_augmented(aug_filename: str, orig_prefix: str = "rp") -> Optional[str]:
+    """
+    Ekstrak nama file original dari nama file augmentasi.
+    Format nama file augmentasi: [augmented_prefix]_[source_prefix]_[class_name]_[uuid]_var[n]
+    
+    Args:
+        aug_filename: Nama file augmentasi
+        orig_prefix: Prefix untuk file original
+        
+    Returns:
+        Nama file original yang sesuai atau None jika tidak ditemukan
+    """
+    # Pattern untuk mendeteksi bagian unik dari nama file
+    # Format: aug_rp_class_uuid_var1.jpg -> rp_class_uuid.jpg
+    pattern = r'(?:[^_]+)_(' + re.escape(orig_prefix) + r'_[^_]+_[^_]+)_var\d+'
+    match = re.search(pattern, aug_filename)
+    
+    if match:
+        # Ekstrak bagian yang cocok dengan original
+        original_part = match.group(1)
+        return f"{original_part}.jpg"
+    
+    return None

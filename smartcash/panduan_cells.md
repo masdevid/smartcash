@@ -2,7 +2,7 @@
 
 ## Prinsip Utama
 - **Hindari Duplikasi** - Gunakan komponen dan services yang sudah ada
-- **Granular File Structure** - Pecah setiap fitur ke file independen
+- **Granular File Structure** - Pecah setiap fitur ke file independen (terutama masing-masing ui handler)
 - **Selektif Singleton** - Gunakan singleton untuk core services, non-singleton untuk UI handlers
 - **Shared Components** - Komponen bersama di `ui/components`,`ui/handlers`,`ui/charts`,`ui/info_boxes`, dan , `ui/reports`
 - **Consistent Component Naming** - Penggunaan name komponent yang konsisten seperti log output yang sebelumnya punya banyak variasi name
@@ -30,6 +30,7 @@ ui/
 ├── module/                        # Modul specific implementasi
 │   ├── name_initializer.py        # Main initializer
 │   ├── name_component.py          # Definisi UI components
+│   ├── name_handlers.py           # Definisi UI handlers awal dengan logic handler yang terpisah
 │   ├── handlers/                  # Handler implementations
 │   │   ├── button_handlers.py     # Handler untuk tombol UI
 │   │   ├── form_handlers.py       # Handler untuk form UI

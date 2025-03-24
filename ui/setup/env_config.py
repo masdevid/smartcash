@@ -66,26 +66,14 @@ def setup_environment_config():
     
     except Exception as e:
         # Fallback sederhana jika terjadi error
-        try:
-            from smartcash.ui.utils.fallback_utils import create_fallback_ui, show_status
-            ui_components = create_fallback_ui(ui_components, f"❌ Error saat inisialisasi environment config: {str(e)}", "error")
-            show_status(f"Error: {str(e)}", "error", ui_components)
-            
-            # Log error jika logger tersedia
-            if 'logger' in ui_components:
-                ui_components['logger'].error(f"❌ Error setup environment config: {str(e)}")
-        except ImportError:
-            # Jika fallback_utils tidak tersedia, gunakan widgets standar
-            import ipywidgets as widgets
-            from IPython.display import display, HTML
-            
-            # Buat fallback UI sangat sederhana
-            header = widgets.HTML("<h3>⚙️ Environment Config</h3>")
-            error_msg = widgets.HTML(f"<div style='color:red;padding:10px;border:1px solid red;'>❌ Error: {str(e)}</div>")
-            ui_components['ui'] = widgets.VBox([header, error_msg])
-            
-            # Display error
-            print(f"Error initializing environment config: {str(e)}")
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui, show_status
+        ui_components = create_fallback_ui(ui_components, f"❌ Error saat inisialisasi environment config: {str(e)}", "error")
+        show_status(f"Error: {str(e)}", "error", ui_components)
+        
+        # Log error jika logger tersedia
+        if 'logger' in ui_components:
+            ui_components['logger'].error(f"❌ Error setup environment config: {str(e)}")
+       
     
     # Return ui_components
     return ui_components

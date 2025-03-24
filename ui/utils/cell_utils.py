@@ -29,7 +29,6 @@ def setup_notebook_environment(
         Tuple berisi (environment_manager, config_dict)
     """
     # Import logger terkait
-    from smartcash.common.logger import get_logger
     
     # Buat logger dummy sementara untuk log awal
     
@@ -43,6 +42,7 @@ def setup_notebook_environment(
     try:
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
+        from smartcash.common.logger import get_logger
         
         # Setup komponen env dan config tanpa logger
         env_manager = get_environment_manager()

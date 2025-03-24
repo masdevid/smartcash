@@ -6,7 +6,7 @@ Deskripsi: Utilitas untuk membuat konfigurasi default jika belum ada file konfig
 import yaml
 from pathlib import Path
 from typing import Dict, Any
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_PREPROCESSED_DIR, DEFAULT_AUGMENTED_DIR, DEFAULT_VISUALIZATION_DIR
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_PREPROCESSED_DIR, DEFAULT_AUGMENTED_DIR, DEFAULT_VISUALIZATION_DIR
 
 def generate_default_config() -> Dict[str, Any]:
     """

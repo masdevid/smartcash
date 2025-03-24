@@ -37,7 +37,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Simpan referensi ke checkbox dan status widgets
     checkboxes = {}
-    group_boxes = []
+    category_boxes = []
     
     # Buat UI untuk setiap kategori package
     for category in package_categories:
@@ -69,7 +69,8 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
                 [checkbox, status_widget],
                 layout=widgets.Layout(
                     width='100%',
-                    align_items='center'
+                    align_items='center',
+                    justify_content='space-between'
                 )
             )
             
@@ -96,18 +97,23 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
                 padding='10px',
                 border=f'1px solid {COLORS["border"]}',
                 border_radius='5px',
-                width='100%'  # Gunakan lebar penuh untuk layout kolom
+                width='31%',  # Atur lebar untuk 3 kolom
+                min_width='250px'  # Min width untuk responsive
             )
         )
         
-        group_boxes.append(group_box)
+        category_boxes.append(group_box)
     
-    # Container untuk groups dengan VBox (column layout)
-    packages_container = widgets.VBox(
-        group_boxes,
+    # Container untuk groups dengan HBox dan flex layout untuk kolom
+    packages_container = widgets.HBox(
+        category_boxes,
         layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            justify_content='space-between',
             width='100%',
-            margin='10px 0'
+            margin='10px 0',
+            gap='10px'  # Spacing antar kolom
         )
     )
     

@@ -22,13 +22,6 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.info_boxes.environment_info import get_environment_info
     
-    # Reuse button components dari ui_helpers jika tersedia
-    try:
-        from smartcash.ui.components.action_buttons import create_action_buttons
-        has_action_buttons = True
-    except ImportError:
-        has_action_buttons = False
-    
     # Header
     header = create_header(
         "⚙️ Konfigurasi Environment", 
@@ -44,46 +37,33 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Panel status Colab/Drive
     colab_panel = widgets.HTML(value="Mendeteksi environment...")
     
-    # Button components (reuse atau create)
-    if has_action_buttons:
-        # Reuse dari komponen action_buttons
-        buttons = create_action_buttons(
-            primary_label="Hubungkan Google Drive",
-            primary_icon="link",
-            secondary_buttons=[("Setup Direktori Lokal", "folder-plus", "info")],
-            cleanup_enabled=False
-        )
-        drive_button = buttons['primary_button']
-        directory_button = buttons['secondary_buttons'][0]
-        button_container = buttons['container']
-    else:
-        # Create manual jika komponen tidak tersedia
-        drive_button = widgets.Button(
-            description="Hubungkan Google Drive",
-            button_style="primary",
-            icon="link",
-            layout=widgets.Layout(margin='5px')
-        )
-        
-        directory_button = widgets.Button(
-            description="Setup Direktori Lokal",
-            button_style="info",
-            icon="folder-plus",
-            layout=widgets.Layout(margin='5px')
-        )
-        
-        button_container = widgets.HBox(
-            [drive_button, directory_button],
-            layout=widgets.Layout(
-                display='flex',
-                flex_flow='row wrap',
-                justify_content='flex-start',
-                gap='10px',
-                margin='10px 0'
-            )
-        )
+    # Tombol-tombol aksi yang diperlukan saja
+    drive_button = widgets.Button(
+        description="Hubungkan Google Drive",
+        button_style="primary",
+        icon="link",
+        layout=widgets.Layout(margin='5px')
+    )
     
-    # Panel log messages - PERBAIKAN: Gunakan widgets langsung, bukan dictionary
+    directory_button = widgets.Button(
+        description="Setup Direktori Lokal",
+        button_style="info",
+        icon="folder-plus",
+        layout=widgets.Layout(margin='5px')
+    )
+    
+    button_container = widgets.HBox(
+        [drive_button, directory_button],
+        layout=widgets.Layout(
+            display='flex',
+            flex_flow='row wrap',
+            justify_content='flex-start',
+            gap='10px',
+            margin='10px 0'
+        )
+    )
+    
+    # Panel log messages - gunakan widgets langsung
     log_header = widgets.HTML(f"<h3 style='margin: 10px 0 5px 0; color: {COLORS['dark']};'>{ICONS['info']} Log Messages</h3>")
     
     log_output = widgets.Output(

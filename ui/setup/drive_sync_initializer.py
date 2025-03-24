@@ -1,6 +1,6 @@
 """
-File: smartcash/common/drive_sync_initializer.py
-Deskripsi: Fungsi inisialisasi dan sinkronisasi konfigurasi antara local dan Google Drive, dengan alur baru yang lebih konsisten
+File: smartcash/ui/setup/drive_sync_initializer.py
+Deskripsi: Fungsi inisialisasi dan sinkronisasi konfigurasi antara local dan Google Drive yang lebih robust
 """
 
 import os
@@ -37,6 +37,11 @@ def copy_configs_to_drive(logger=None):
         if not module_config_path.exists():
             if logger: logger.warning(f"⚠️ Folder konfigurasi tidak ditemukan di modul: {module_config_path}")
             return False, f"Folder konfigurasi tidak ditemukan di modul: {module_config_path}"
+            
+        # Pastikan drive_path ada
+        if env_manager.drive_path is None:
+            if logger: logger.warning("⚠️ Drive path tidak valid (None)")
+            return False, "Drive path tidak valid (None)"
             
         # Siapkan direktori di Drive
         drive_config_path = env_manager.drive_path / "configs"
@@ -78,7 +83,7 @@ def is_config_file_valid(file_path):
 
 def initialize_configs(logger=None):
     """
-    Inisialisasi konfigurasi dengan alur baru.
+    Inisialisasi konfigurasi dengan alur baru dan penanganan None value.
     
     Args:
         logger: Logger opsional untuk logging
@@ -100,6 +105,11 @@ def initialize_configs(logger=None):
         
         # Cek apakah Drive terpasang
         if env_manager.is_drive_mounted:
+            # Verifikasi drive_path valid
+            if env_manager.drive_path is None:
+                if logger: logger.warning("⚠️ Drive terpasang tapi path tidak valid (None)")
+                return False, "Drive terpasang tapi path tidak valid (None)"
+                
             drive_config_dir = env_manager.drive_path / "configs"
             drive_config_dir.mkdir(parents=True, exist_ok=True)
             
@@ -146,11 +156,20 @@ def initialize_configs(logger=None):
             else:
                 if logger: logger.info("ℹ️ Konfigurasi ditemukan di Drive dan lokal. Menggunakan Drive sebagai sumber kebenaran...")
                 # Gunakan Drive sebagai sumber kebenaran
-                from smartcash.common.config import get_config_manager
-                config_manager = get_config_manager()
-                if hasattr(config_manager, 'use_drive_as_source_of_truth'):
-                    success = config_manager.use_drive_as_source_of_truth()
-                    return success, "Sinkronisasi konfigurasi selesai"
+                try:
+                    from smartcash.common.config import get_config_manager
+                    config_manager = get_config_manager()
+                    if hasattr(config_manager, 'use_drive_as_source_of_truth'):
+                        success = config_manager.use_drive_as_source_of_truth()
+                        return success, "Sinkronisasi konfigurasi selesai"
+                except Exception as e:
+                    if logger: logger.warning(f"⚠️ Error saat sinkronisasi otomatis: {str(e)}")
+                    # Fallback: salin manual dari Drive ke lokal
+                    for config_file in drive_config_dir.glob("*.yaml"):
+                        target_path = local_config_dir / config_file.name
+                        shutil.copy2(config_file, target_path)
+                    return True, "Konfigurasi disalin manual dari Drive ke lokal"
+                
                 return True, "Konfigurasi sudah ada di kedua tempat"
                 
         # Scenario 5: Drive tidak terpasang, cek lokal
@@ -158,21 +177,29 @@ def initialize_configs(logger=None):
             if not local_configs_exist:
                 if logger: logger.warning("⚠️ Drive tidak terpasang dan konfigurasi lokal kosong")
                 # Cari path konfigurasi standar dalam modul
-                import smartcash
-                module_path = Path(smartcash.__file__).parent
-                module_config_path = module_path / "configs"
-                
-                if module_config_path.exists():
-                    if logger: logger.info("ℹ️ Menyalin konfigurasi dari modul ke lokal...")
-                    # Salin konfigurasi dari modul
-                    for config_file in module_config_path.glob("*.yaml"):
-                        target_path = local_config_dir / config_file.name
-                        shutil.copy2(config_file, target_path)
-                    if logger: logger.success("✅ Konfigurasi berhasil disalin dari modul")
-                    return True, "Konfigurasi berhasil disalin dari modul"
-                else:
-                    if logger: logger.error("❌ Tidak dapat menemukan konfigurasi")
-                    return False, "Tidak dapat menemukan konfigurasi"
+                try:
+                    import smartcash
+                    module_path = Path(smartcash.__file__).parent
+                    module_config_path = module_path / "configs"
+                    
+                    if module_config_path.exists():
+                        if logger: logger.info("ℹ️ Menyalin konfigurasi dari modul ke lokal...")
+                        # Salin konfigurasi dari modul
+                        for config_file in module_config_path.glob("*.yaml"):
+                            target_path = local_config_dir / config_file.name
+                            shutil.copy2(config_file, target_path)
+                        if logger: logger.success("✅ Konfigurasi berhasil disalin dari modul")
+                        return True, "Konfigurasi berhasil disalin dari modul"
+                    else:
+                        if logger: logger.error("❌ Tidak dapat menemukan konfigurasi")
+                        # Fallback: Buat konfigurasi default
+                        from smartcash.common.default_config import ensure_base_config_exists
+                        if ensure_base_config_exists():
+                            return True, "Konfigurasi default berhasil dibuat"
+                        return False, "Tidak dapat menemukan konfigurasi"
+                except Exception as e:
+                    if logger: logger.error(f"❌ Error saat mencari konfigurasi modul: {str(e)}")
+                    return False, f"Error saat mencari konfigurasi modul: {str(e)}"
             else:
                 if logger: logger.info("ℹ️ Menggunakan konfigurasi lokal yang ada")
                 return True, "Menggunakan konfigurasi lokal yang ada"

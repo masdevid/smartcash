@@ -137,6 +137,7 @@ ICONS = {
     'metric': '📈',
     'stats': '📊',
     'chart': '📊',
+    'link': '🔗',
     
     # Domain-specific icons
     'settings': '🔧',

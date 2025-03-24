@@ -29,10 +29,7 @@ def setup_notebook_environment(
         Tuple berisi (environment_manager, config_dict)
     """
     # Import logger terkait
-    from smartcash.ui.utils.logging_utils import create_dummy_logger
-    
-    # Buat logger dummy sementara untuk log awal
-    logger = create_dummy_logger()
+    from smartcash.ui.utils.logging_utils import setup_ipython_logging
     
     # Pastikan smartcash dalam path
     import sys
@@ -52,7 +49,7 @@ def setup_notebook_environment(
         
         # Setup logger jika diminta
         if setup_logger:
-            logger = get_logger(f"cell_{cell_name}")
+            logger = setup_ipython_logging(ui_components, f"cell_{cell_name}")
         
         # Load konfigurasi
         try:

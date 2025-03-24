@@ -85,7 +85,6 @@ __all__ = [
     
     # Logging Utils
     'setup_ipython_logging',
-    'create_dummy_logger',
     'log_to_ui',
     'alert_to_ui'
     

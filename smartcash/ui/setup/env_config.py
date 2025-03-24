@@ -46,7 +46,7 @@ def setup_environment_config():
                 
                 # Setup Drive sync initializer
                 try:
-                    from smartcash.common.drive_sync_initializer import initialize_configs
+                    from smartcash.ui.setup.drive_sync_initializer import initialize_configs
                     success, message = initialize_configs(logger)
                     if logger: logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
                 except ImportError as e:

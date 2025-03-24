@@ -107,7 +107,7 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
             
         # Jalankan inisialisasi sinkronisasi Drive jika tersedia
         try:
-            from smartcash.common.drive_sync_initializer import initialize_configs
+            from smartcash.ui.setup.drive_sync_initializer import initialize_configs
             success, message = initialize_configs(logger)
             log_to_ui(ui_components, f"🔄 Sinkronisasi konfigurasi: {message}", "info")
         except ImportError:

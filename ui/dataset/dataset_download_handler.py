@@ -12,7 +12,7 @@ def setup_dataset_download_handlers(ui_components: Dict[str, Any], env=None, con
     logger = None
     try:
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging(ui_components, "dataset_download", redirect_root=True)
+        logger = setup_ipython_logging(ui_components, "dataset_download")
         if logger: 
             ui_components['logger'] = logger
             logger.info(f"{ICONS['info']} Download dataset handler diinisialisasi")

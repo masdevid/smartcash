@@ -29,10 +29,10 @@ def setup_notebook_environment(
         Tuple berisi (environment_manager, config_dict)
     """
     # Import logger terkait
-    from smartcash.ui.utils.logging_utils import create_dummy_logger
+    from smartcash.common.logger import SmartCashLogger, get_logger
     
     # Buat logger dummy sementara untuk log awal
-    logger = create_dummy_logger()
+    logger = SmartCashLogger()
     
     # Pastikan smartcash dalam path
     import sys
@@ -42,7 +42,6 @@ def setup_notebook_environment(
         
     # Import dependencies dengan fallback
     try:
-        from smartcash.common.logger import get_logger
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config import get_config_manager
         

@@ -7,7 +7,7 @@ import logging
 import sys
 from typing import Dict, Any, Optional, Union
 from IPython.display import display, HTML
-
+from smartcash.ui.utils.constants import ALERT_STYLES, ICONS
 def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger"):
     """
     Buat logger yang langsung menampilkan output ke UI tanpa addHandler.

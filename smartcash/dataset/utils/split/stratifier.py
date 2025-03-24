@@ -11,7 +11,7 @@ from typing import Dict, List, Tuple, Union, Any, Optional
 
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
-from smartcash.dataset.utils.dataset_utils import DEFAULT_RANDOM_SEED, DEFAULT_SPLIT_RATIOS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_RANDOM_SEED, DEFAULT_SPLIT_RATIOS
 
 
 class DatasetStratifier:

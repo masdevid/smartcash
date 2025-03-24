@@ -10,7 +10,7 @@ from typing import Dict, List, Union, Optional
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 
 class DatasetMerger:

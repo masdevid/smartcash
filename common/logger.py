@@ -236,7 +236,7 @@ def get_logger(name: str,
     Args:
         name: Nama logger
         level: Level minimum log
-        log_file: Path file log (auto-generated jika None)
+        log_file: Path file log (auto-generated jika None)f
         use_colors: Flag untuk menggunakan warna
         use_emojis: Flag untuk menggunakan emoji
         log_dir: Direktori untuk file log

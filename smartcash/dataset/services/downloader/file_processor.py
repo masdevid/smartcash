@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 from smartcash.components.observer.manager_observer import ObserverManager
 from smartcash.components.observer import notify, EventTopics
 

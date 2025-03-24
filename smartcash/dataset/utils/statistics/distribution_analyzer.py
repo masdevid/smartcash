@@ -11,9 +11,11 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.utils.dataset_utils import DatasetUtils, DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_utils import DatasetUtils
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 from smartcash.dataset.utils.statistics.class_stats import ClassStatistics
 from smartcash.dataset.utils.statistics.image_stats import ImageStatistics
+
 
 
 class DistributionAnalyzer:

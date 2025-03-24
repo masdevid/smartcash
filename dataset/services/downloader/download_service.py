@@ -10,7 +10,8 @@ from datetime import datetime
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
-from smartcash.dataset.utils.dataset_utils import DatasetUtils, DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_utils import DatasetUtils
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 # Import layanan-layanan khusus
 from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader

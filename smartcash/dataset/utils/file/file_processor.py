@@ -13,7 +13,7 @@ from smartcash.dataset.utils.file_wrapper import (
     find_image_files, find_corrupted_images, copy_files, 
     move_files, extract_zip, ensure_dir
 )
-from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 
 class FileProcessor:

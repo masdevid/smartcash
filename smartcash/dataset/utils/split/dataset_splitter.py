@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS, DEFAULT_SPLIT_RATIOS, DEFAULT_RANDOM_SEED
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_SPLIT_RATIOS, DEFAULT_RANDOM_SEED
 
 
 class DatasetSplitter:

@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Optional, Union, Callable, Tuple
 from datetime import datetime
 import numpy as np
 
-from smartcash.common.utils import format_size
+from smartcash.dataset.utils import format_size
 from smartcash.ui.utils.constants import COLORS, ICONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
 
 

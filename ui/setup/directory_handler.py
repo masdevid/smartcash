@@ -10,8 +10,6 @@ from IPython.display import display, HTML, clear_output
 
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-from smartcash.ui.utils.file_utils import directory_tree
-from smartcash.common.utils import format_size
 
 def handle_directory_setup(ui_components: Dict[str, Any]):
     """

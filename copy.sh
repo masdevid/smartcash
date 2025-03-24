@@ -16,3 +16,9 @@ git add .
 git commit -am "update"
 git push origin migration
 rm -rf ui
+rm -rf model
+rm -rf configs
+rm -rf components
+rm -rf dataset
+rm -rf detection
+rm -rf common

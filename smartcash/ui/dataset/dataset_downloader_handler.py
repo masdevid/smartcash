@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/dataset_downloader_handler.py
-Deskripsi: Setup handler untuk UI dataset downloader dengan integrasi ke berbagai endpoint
+Deskripsi: Setup handler untuk UI dataset downloader dengan integrasi ke berbagai endpoint dan API key management
 """
 
 from typing import Dict, Any, Optional
@@ -23,6 +23,9 @@ def setup_dataset_downloader_handlers(ui_components: Dict[str, Any], env=None, c
     
     # Setup observer untuk menerima event notifikasi
     _setup_observers(ui_components)
+    
+    # Setup API key handler dan verifikasi
+    _setup_api_key_handler(ui_components)
     
     # Setup handlers untuk UI events
     _setup_endpoint_handlers(ui_components)
@@ -63,12 +66,25 @@ def _setup_observers(ui_components: Dict[str, Any]) -> None:
         from smartcash.ui.dataset.handlers.download_progress_observer import setup_download_progress_observer
         
         # Setup basic observers
-        setup_observer_handlers(ui_components, "dataset_downloader_observers")
+        ui_components = setup_observer_handlers(ui_components, "dataset_downloader_observers")
         
         # Setup download progress observer
         setup_download_progress_observer(ui_components)
     except ImportError:
         pass
+
+def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup API key handler untuk Roboflow."""
+    try:
+        from smartcash.ui.dataset.handlers.api_key_handler import setup_api_key_input
+        
+        # Setup API key input dan validasi
+        setup_api_key_input(ui_components)
+    except ImportError:
+        # Log gagal import jika logger tersedia
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug("ℹ️ API key handler tidak tersedia")
 
 def _setup_endpoint_handlers(ui_components: Dict[str, Any]) -> None:
     """Setup handlers untuk endpoint dropdown."""
@@ -126,6 +142,10 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
                 except Exception:
                     pass
             
+            # Reset API key highlight jika ada
+            if 'rf_apikey' in ui_components:
+                ui_components['rf_apikey'].layout.border = ""
+            
             # Reset logging
             try:
                 from smartcash.ui.utils.logging_utils import reset_logging
@@ -138,6 +158,7 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
             if logger:
                 logger.debug("🧹 Cleanup dataset_downloader berhasil")
         except Exception as e:
+            # Ignore exceptions during cleanup
             pass
     
     # Tetapkan fungsi cleanup ke ui_components

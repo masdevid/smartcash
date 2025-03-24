@@ -13,11 +13,7 @@ from smartcash.ui.utils.cell_utils import (
 )
 from smartcash.ui.utils.logging_utils import (
     setup_ipython_logging, 
-    UILogger, 
-    UILogHandler, 
-    create_dummy_logger, 
-    log_to_ui,
-    alert_to_ui
+    log_to_ui
 )
 from smartcash.ui.utils.visualization_utils import (
     create_metric_display, 
@@ -89,8 +85,6 @@ __all__ = [
     
     # Logging Utils
     'setup_ipython_logging',
-    'UILogger',
-    'UILogHandler',
     'create_dummy_logger',
     'log_to_ui',
     'alert_to_ui'

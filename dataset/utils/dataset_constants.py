@@ -2,7 +2,7 @@
 File: smartcash/dataset/utils/dataset_constants.py
 Deskripsi: Konstanta yang digunakan dalam operasi dataset
 """
-from common.constants import APP_NAME
+from smartcash.common.constants import APP_NAME
 # Konstanta untuk format file gambar
 IMG_EXTENSIONS = ['*.jpg', '*.jpeg', '*.png', '*.JPG', '*.JPEG', '*.PNG']
 

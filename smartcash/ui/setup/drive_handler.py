@@ -237,7 +237,7 @@ def setup_drive_directories(drive_path: Path, ui_components: Dict[str, Any], sil
     logger = ui_components.get('logger')
     
     # Direktori utama yang diperlukan - konsolisasi one-liner dengan list comprehension
-    [os.makedirs(drive_path / dir_name, parents=True, exist_ok=True) for dir_name in [
+    [(drive_path / dir_name).mkdir(parents=True, exist_ok=True) for dir_name in [
         'configs',
         'data', 'data/train', 'data/train/images', 'data/train/labels',
         'data/valid', 'data/valid/images', 'data/valid/labels',

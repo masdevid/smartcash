@@ -10,7 +10,7 @@ from IPython.display import display, HTML
 
 # Import komponen dari ui_logger
 try:
-    from smartcash.ui.utils.ui_logger import create_direct_ui_logger, intercept_cell_utils_logs
+    from smartcash.ui.utils.ui_logger import create_direct_ui_logger, log_to_ui, intercept_cell_utils_logs
 except ImportError:
     # Definisikan fungsi placeholder jika import gagal
     def log_to_ui(ui_components, message, level="info", emoji=""):

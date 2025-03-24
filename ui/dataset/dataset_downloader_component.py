@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/dataset_downloader_component.py
-Deskripsi: Komponen UI untuk download dataset dengan komponen terpadu dan dukungan API key dari secrets
+Deskripsi: Komponen UI untuk download dataset dengan area konfirmasi dan panel status yang lebih terlihat
 """
 
 import ipywidgets as widgets
@@ -184,6 +184,30 @@ def create_dataset_downloader_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     
+    # PERBAIKAN: Status panel yang terlihat jelas di bawah tombol
+    from smartcash.ui.utils.constants import ALERT_STYLES
+    status_panel = widgets.HTML(
+        value=f"""
+        <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
+                   color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
+                   border-left:4px solid {ALERT_STYLES['info']['text_color']};">
+           <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Siap untuk memulai download dataset</p>
+        </div>
+        """,
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0'
+        )
+    )
+    
+    # PERBAIKAN: Area untuk konfirmasi dialog
+    confirmation_area = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0'
+        )
+    )
+    
     # Progress tracking
     progress_bar = widgets.IntProgress(
         value=0,
@@ -237,6 +261,8 @@ def create_dataset_downloader_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             url_accordion,
             output_container,
             button_container,
+            status_panel,              # PERBAIKAN: Status panel di bawah button
+            confirmation_area,         # PERBAIKAN: Area konfirmasi sebelum log output
             progress_container,
             status,
             info_box
@@ -267,6 +293,8 @@ def create_dataset_downloader_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'rf_accordion': rf_accordion,
         'drive_accordion': drive_accordion,
         'url_accordion': url_accordion,
+        'status_panel': status_panel,       # PERBAIKAN: Tambahkan panel status ke UI components
+        'confirmation_area': confirmation_area,  # PERBAIKAN: Tambahkan area konfirmasi ke UI components
         'module_name': 'dataset_downloader'
     }
     

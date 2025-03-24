@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/handlers/download_handler.py
-Deskripsi: Handler untuk proses download dataset dari berbagai sumber dengan integrasi service downloader
+Deskripsi: Perbaikan penempatan dialog konfirmasi dan status panel pada UI dataset download
 """
 
 import time
@@ -43,6 +43,11 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     # Validasi konfigurasi
     is_valid, error_msg = validate_download_config(endpoint_config)
     if not is_valid:
+        # Update status panel utama selain log output
+        from smartcash.ui.utils.fallback_utils import update_status_panel
+        update_status_panel(ui_components, error_msg, "error")
+        
+        # Log ke UI output dan logger
         from smartcash.ui.utils.ui_logger import log_to_ui
         log_to_ui(ui_components, error_msg, "error", "❌")
         if logger: logger.error(f"❌ {error_msg}")
@@ -52,10 +57,32 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         # Nonaktifkan tombol selama proses
         _disable_ui_buttons(ui_components, True)
         
+        # Reset status panel ke mode info untuk memulai proses
+        from smartcash.ui.utils.fallback_utils import update_status_panel
+        update_status_panel(ui_components, "Memulai proses download dataset...", "info")
+        
         # Buat fungsi untuk download dengan ThreadPoolExecutor
         def execute_download(config):
             # Tampilkan progress bar
             _show_progress(ui_components, "Memulai download dataset...")
+            
+            # Cek apakah dataset sudah ada dan skip download jika sudah lengkap
+            from smartcash.dataset.services.downloader.download_validator import DownloadValidator
+            validator = DownloadValidator(logger=logger)
+            output_dir = config.get('output_dir', 'data')
+            
+            # PERBAIKAN: Cek apakah dataset sudah lengkap dan skip jika ya
+            if validator.is_dataset_available(output_dir, verify_content=True) and not config.get('force_download', False):
+                # Update status panel dengan info bahwa dataset sudah ada
+                _update_progress(ui_components, 100, "Dataset sudah tersedia di lokasi output")
+                from smartcash.ui.utils.fallback_utils import update_status_panel
+                update_status_panel(ui_components, "✅ Dataset sudah tersedia di lokasi output, proses download dilewati", "success")
+                
+                if logger: logger.success("✅ Dataset sudah tersedia, proses download dilewati")
+                
+                # Aktifkan kembali tombol
+                _disable_ui_buttons(ui_components, False)
+                return
             
             # Download dataset dengan service atau handler yang sesuai
             with ThreadPoolExecutor(max_workers=1) as executor:
@@ -66,6 +93,11 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
                 status_type = "success" if success else "error"
                 icon = "✅" if success else "❌"
                 
+                # Update status panel utama
+                from smartcash.ui.utils.fallback_utils import update_status_panel
+                update_status_panel(ui_components, f"{icon} {message}", status_type)
+                
+                # Log ke UI output
                 from smartcash.ui.utils.ui_logger import log_to_ui
                 log_to_ui(ui_components, message, status_type, icon)
                 
@@ -82,18 +114,55 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         from smartcash.ui.dataset.handlers.confirmation_handler import create_dataset_confirmation, prepare_dataset_confirmation
         proceed_callback, cancel_callback = prepare_dataset_confirmation(ui_components, endpoint_config, execute_download)
         
-        # Periksa apakah perlu konfirmasi berdasarkan dataset yang ada
-        create_dataset_confirmation(ui_components, proceed_callback, cancel_callback)
+        # Cek apakah dataset sudah ada dan perlu konfirmasi
+        output_dir = endpoint_config.get('output_dir', 'data')
+        from smartcash.ui.dataset.handlers.confirmation_handler import check_existing_dataset
+        if check_existing_dataset(output_dir):
+            # PERBAIKAN: Tampilkan dialog konfirmasi di atas output log
+            from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
+            
+            # Pesan konfirmasi
+            message = (f"Dataset sudah ada di {output_dir}. "
+                      f"Melanjutkan operasi akan menimpa data yang ada. "
+                      f"Apakah Anda yakin ingin melanjutkan?")
+            
+            # Buat dialog konfirmasi
+            dialog = create_confirmation_dialog(
+                message=message,
+                on_confirm=proceed_callback,
+                on_cancel=cancel_callback,
+                title="Dataset Sudah Ada",
+                confirm_label="Ya, Lanjutkan",
+                cancel_label="Batal"
+            )
+            
+            # Tampilkan dialog di atas status output dengan container terpisah
+            if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+                with ui_components['confirmation_area']:
+                    display(dialog)
+            else:
+                # Fallback ke area di atas status jika confirmation_area tidak tersedia
+                display(dialog)
+        else:
+            # Jika dataset belum ada, langsung jalankan callback
+            proceed_callback()
     
     except Exception as e:
-        # Tampilkan error dan aktifkan kembali tombol
+        # Tampilkan error, update status panel dan aktifkan kembali tombol
         from smartcash.ui.utils.ui_logger import log_to_ui
         error_msg = f"Error saat download dataset: {str(e)}"
+        
+        # Update status panel utama
+        from smartcash.ui.utils.fallback_utils import update_status_panel
+        update_status_panel(ui_components, f"❌ {error_msg}", "error")
+        
+        # Log ke UI output
         log_to_ui(ui_components, error_msg, "error", "❌")
         if logger: logger.error(f"❌ {error_msg}")
         
         _disable_ui_buttons(ui_components, False)
 
+# Fungsi lainnya tetap sama
 def _download_dataset(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Proses download dataset berdasarkan konfigurasi dengan dukungan services.
@@ -154,6 +223,10 @@ def _download_dataset(ui_components: Dict[str, Any], config: Dict[str, Any]) -> 
                 
                 # Update progress sebelum download
                 _update_progress(ui_components, 30, f"Mendownload dataset dari Roboflow: {workspace}/{project}:{version}")
+                
+                # Update status panel dengan progress
+                from smartcash.ui.utils.fallback_utils import update_status_panel
+                update_status_panel(ui_components, f"🔄 Mendownload dataset: {workspace}/{project}:{version}", "info")
                 
                 # Lakukan download
                 result = download_service.download_from_roboflow(

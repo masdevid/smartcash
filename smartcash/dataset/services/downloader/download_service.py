@@ -63,6 +63,32 @@ class DownloadService:
     def _notify(self, event_type, **kwargs):
         """Helper untuk mengirimkan notifikasi observer dengan one-liner."""
         if self.observer_manager: notify(event_type, self, **kwargs)
+    
+    def _cleanup_old_backups(self, max_backups: int = 3):
+        """Hapus backup lama untuk menghemat ruang penyimpanan."""
+        try:
+            # Dapatkan daftar semua backup
+            backups = self.backup_service.list_backups()
+            if len(backups) <= max_backups:
+                return
+                
+            # Urutkan berdasarkan waktu pembuatan (terlama di awal)
+            sorted_backups = sorted(
+                backups.items(), 
+                key=lambda x: datetime.strptime(x[1]['created_at'], "%Y-%m-%d %H:%M:%S") if 'created_at' in x[1] else datetime.now()
+            )
+            
+            # Hapus backup lama yang melebihi jumlah maksimum
+            for name, info in sorted_backups[:-max_backups]:
+                try:
+                    backup_path = Path(info['path'])
+                    if backup_path.exists():
+                        backup_path.unlink()
+                        self.logger.info(f"🗑️ Menghapus backup lama: {name}")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Gagal menghapus backup lama {name}: {str(e)}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error saat pembersihan backup lama: {str(e)}")
             
     def download_from_roboflow(self, api_key: Optional[str] = None, workspace: Optional[str] = None,
                               project: Optional[str] = None, version: Optional[str] = None,
@@ -87,13 +113,20 @@ class DownloadService:
         output_path, temp_download_path = Path(output_dir), Path(output_dir).with_name(f"{Path(output_dir).name}_temp")
         
         try:
-            # Backup existing dataset if needed
+            # Backup existing dataset if needed (hanya jika folder output ada dan tidak kosong)
             backup_path = None
             if backup_existing and output_path.exists() and any(output_path.iterdir()):
                 self._notify(EventTopics.DOWNLOAD_PROGRESS, step="backup", message="Backup dataset yang ada",
                          progress=1, total_steps=5, current_step=1, status="info")
                 backup_result = self.backup_service.backup_dataset(output_path, show_progress=show_progress)
                 backup_path = backup_result.get('backup_path')
+                
+                # Setelah backup berhasil, kita dapat membersihkan backup lama
+                self._cleanup_old_backups()
+            else:
+                # Jika tidak ada perlu backup, langsung update progress
+                self._notify(EventTopics.DOWNLOAD_PROGRESS, step="prep", message="Persiapan download",
+                         progress=1, total_steps=5, current_step=1, status="info")
             
             # Prepare temporary directory
             if temp_download_path.exists(): shutil.rmtree(temp_download_path)
@@ -180,13 +213,20 @@ class DownloadService:
         if not src_path.exists(): raise DatasetError(f"❌ Direktori sumber tidak ditemukan: {src_path}")
         dst_path = Path(output_dir) if output_dir else self.data_dir
         
-        # Backup existing data if needed
+        # Backup existing data if needed (hanya jika folder tidak kosong)
         backup_path = None
         if backup_existing and dst_path.exists() and any(dst_path.iterdir()):
             self._notify(EventTopics.EXPORT_PROGRESS, step="backup", message="Backup data sebelumnya",
                      progress=1, total_steps=3, current_step=1, status="info")
             backup_result = self.backup_service.backup_dataset(dst_path, show_progress=show_progress)
             backup_path = backup_result.get('backup_path')
+            
+            # Bersihkan backup lama setelah berhasil backup
+            self._cleanup_old_backups()
+        else:
+            # Jika tidak perlu backup, langsung update progress
+            self._notify(EventTopics.EXPORT_PROGRESS, step="prep", message="Persiapan ekspor dataset",
+                     progress=1, total_steps=3, current_step=1, status="info")
         
         # Export the dataset
         self._notify(EventTopics.EXPORT_PROGRESS, step="export", message=f"Mengekspor dataset ke {dst_path}",
@@ -320,11 +360,14 @@ class DownloadService:
         self.logger.info(f"📦 Mengimport dataset dari {zip_path} ke {target_path}")
         
         try:
-            # Backup existing data if needed
+            # Backup existing data if needed (hanya jika direktori tidak kosong)
             backup_path = None
             if backup_existing and target_path.exists() and any(target_path.iterdir()):
                 backup_result = self.backup_service.backup_dataset(target_path, show_progress=show_progress)
                 backup_path = backup_result.get('backup_path')
+                
+                # Bersihkan backup lama setelah berhasil backup
+                self._cleanup_old_backups()
             
             # Process the ZIP file
             result = self.processor.process_zip_file(

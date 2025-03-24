@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config.py
-Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan perbaikan inisialisasi dan error handling
+Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan integrasi UI logger
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from IPython.display import display
 from concurrent.futures import ThreadPoolExecutor
 
 def setup_environment_config():
-    """Koordinator utama setup dan konfigurasi environment dengan integrasi drive_sync_initializer."""
+    """Koordinator utama setup dan konfigurasi environment dengan integrasi UI logger."""
     # Inisialisasi ui_components dengan nilai default
     ui_components = {'status': None, 'module_name': 'env_config'}
     
@@ -17,20 +17,24 @@ def setup_environment_config():
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        from smartcash.ui.utils.ui_logger import log_to_ui, setup_root_logger_ui_redirect
         from smartcash.ui.utils.fallback_utils import show_status
         
         # Setup environment dan komponen UI
         env, config = setup_notebook_environment("env_config")
         ui_components = create_env_config_ui(env, config)
         
-        # Setup logging dan log inisialisasi
+        # Setup logging dan direct ke UI
         if 'status' in ui_components: 
             log_to_ui(ui_components, "🚀 Inisialisasi environment config dimulai", "info")
         
+        # Setup logger dan arahkan ke UI
         logger = setup_ipython_logging(ui_components, "env_config")
-        if logger: 
+        if logger:
             ui_components['logger'] = logger
+            # Arahkan semua log ke UI
+            setup_root_logger_ui_redirect(ui_components)
             logger.info("✅ Logger environment config berhasil diinisialisasi")
         
         # Inisialisasi default konfigurasi menggunakan ThreadPoolExecutor

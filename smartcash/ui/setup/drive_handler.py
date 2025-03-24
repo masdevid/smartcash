@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/drive_handler.py
-Deskripsi: Handler untuk koneksi Google Drive dan pembuatan symlinks dengan sinkronisasi dua arah yang ditingkatkan
+Deskripsi: Handler untuk koneksi Google Drive dan pembuatan symlinks dengan UI logger terintegrasi
 """
 
 import os, shutil, time
@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
+from smartcash.ui.utils.ui_logger import log_to_ui
 
 def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False):
     """
@@ -29,10 +30,8 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
         ui_components['progress_bar'].layout.visibility = 'visible'
         ui_components['progress_message'].layout.visibility = 'visible'
     
-    if not silent and 'status' in ui_components:
-        with ui_components['status']:
-            clear_output()
-            display(create_info_alert("Menghubungkan ke Google Drive...", "info", ICONS['processing']))
+    # Log ke UI langsung 
+    log_to_ui(ui_components, "Menghubungkan ke Google Drive...", "info", ICONS['processing'])
     
     try:
         # Mount drive dan dapatkan path - jalankan dalam thread terpisah
@@ -51,16 +50,15 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
                 ui_components['progress_bar'].value = 3
                 ui_components['progress_message'].value = "Google Drive gagal terhubung"
             
+            log_to_ui(ui_components, "Google Drive gagal terhubung", "error", "❌")
+                
             # Reset progress
             if hasattr(ui_components, 'reset_progress') and callable(ui_components['reset_progress']):
                 ui_components['reset_progress']()
             return
         
-        # Update status panel dengan create_info_alert
-        if not silent and 'status' in ui_components:
-            with ui_components['status']:
-                clear_output()
-                display(create_info_alert("Google Drive berhasil terhubung!", "success", ICONS['success']))
+        # Update ke UI dengan log_to_ui
+        log_to_ui(ui_components, "Google Drive berhasil terhubung!", "success", ICONS['success'])
                 
         # Update progress
         if 'progress_bar' in ui_components and 'progress_message' in ui_components:
@@ -69,13 +67,8 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
                 
         # Pastikan struktur direktori ada di Drive dengan ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=2) as executor:
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    setup_future = executor.submit(setup_drive_directories, drive_path, ui_components, silent)
-                    setup_future.result()
-            else:
-                setup_future = executor.submit(setup_drive_directories, drive_path, ui_components, silent)
-                setup_future.result()
+            setup_future = executor.submit(setup_drive_directories, drive_path, ui_components, silent)
+            setup_future.result()
                 
         # Update progress
         if 'progress_bar' in ui_components and 'progress_message' in ui_components:
@@ -85,17 +78,10 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
         # Buat symlinks dengan ThreadPoolExecutor
         try:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                if not silent and 'status' in ui_components:
-                    with ui_components['status']:
-                        symlink_future = executor.submit(create_symlinks, drive_path, ui_components, silent)
-                        symlink_future.result()
-                else:
-                    symlink_future = executor.submit(create_symlinks, drive_path, ui_components, silent)
-                    symlink_future.result()
+                symlink_future = executor.submit(create_symlinks, drive_path, ui_components, silent)
+                symlink_future.result()
         except Exception as e:
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_info_alert(f"Error saat membuat symlinks: {str(e)}", "warning", ICONS['warning']))
+            log_to_ui(ui_components, f"Error saat membuat symlinks: {str(e)}", "warning", ICONS['warning'])
             if logger:
                 logger.warning(f"⚠️ Error saat membuat symlinks: {str(e)}")
                 
@@ -107,17 +93,10 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
         # Sinkronisasi konfigurasi dua arah dengan ThreadPoolExecutor
         try:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                if not silent and 'status' in ui_components:
-                    with ui_components['status']:
-                        sync_future = executor.submit(sync_configs_bidirectional, drive_path, ui_components, silent)
-                        sync_future.result()
-                else:
-                    sync_future = executor.submit(sync_configs_bidirectional, drive_path, ui_components, silent)
-                    sync_future.result()
+                sync_future = executor.submit(sync_configs_bidirectional, drive_path, ui_components, silent)
+                sync_future.result()
         except Exception as e:
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_info_alert(f"Error saat sinkronisasi konfigurasi: {str(e)}", "warning", ICONS['warning']))
+            log_to_ui(ui_components, f"Error saat sinkronisasi konfigurasi: {str(e)}", "warning", ICONS['warning'])
             if logger:
                 logger.warning(f"⚠️ Error saat sinkronisasi konfigurasi: {str(e)}")
         
@@ -130,7 +109,7 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
         try:
             from smartcash.common.drive_sync_initializer import initialize_configs
             success, message = initialize_configs(logger)
-            if logger: logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
+            log_to_ui(ui_components, f"🔄 Sinkronisasi konfigurasi: {message}", "info")
         except ImportError:
             pass
         
@@ -146,9 +125,8 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
             # Sembunyikan tombol drive karena sudah terhubung
             ui_components['drive_button'].layout.display = 'none'
         
-        # Log success jika logger tersedia
-        if logger:
-            logger.success(f"✅ Google Drive berhasil terhubung di {drive_path}")
+        # Log success dengan UI logger
+        log_to_ui(ui_components, f"Google Drive berhasil terhubung di {drive_path}", "success", "✅")
             
         # Reset progress setelah selesai
         if hasattr(ui_components, 'reset_progress') and callable(ui_components['reset_progress']):
@@ -159,16 +137,10 @@ def handle_drive_connection(ui_components: Dict[str, Any], silent: bool = False)
         if 'progress_bar' in ui_components and 'progress_message' in ui_components:
             ui_components['progress_bar'].value = 5
             ui_components['progress_message'].value = f"Error: {str(e)[:30]}..."
-            
-        if not silent and 'status' in ui_components:
-            with ui_components['status']:
-                clear_output()
-                display(create_info_alert(f"Error saat menghubungkan ke Google Drive: {str(e)}", "error", ICONS['error']))
         
-        # Log error jika logger tersedia
-        if logger:
-            logger.error(f"❌ Error koneksi Google Drive: {str(e)}")
-            
+        # Log error ke UI logger
+        log_to_ui(ui_components, f"Error saat menghubungkan ke Google Drive: {str(e)}", "error", ICONS['error'])
+        
         # Reset progress setelah error
         if hasattr(ui_components, 'reset_progress') and callable(ui_components['reset_progress']):
             ui_components['reset_progress']()
@@ -192,10 +164,8 @@ def mount_google_drive(ui_components: Dict[str, Any], silent: bool = False) -> O
         is_mounted, drive_path = detect_drive_mount()
         
         if not is_mounted:
-            # Update status jika tidak silent
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_status_indicator("info", f"{ICONS['processing']} Mounting Google Drive..."))
+            # Update status dengan log_to_ui
+            log_to_ui(ui_components, f"Mounting Google Drive...", "info", ICONS['processing'])
             
             # Mount Drive dengan Google Colab
             from google.colab import drive
@@ -206,9 +176,7 @@ def mount_google_drive(ui_components: Dict[str, Any], silent: bool = False) -> O
             is_mounted, drive_path = detect_drive_mount()
             
             if not is_mounted:
-                if not silent and 'status' in ui_components:
-                    with ui_components['status']:
-                        display(create_info_alert("Gagal mount Google Drive", "error", ICONS['error']))
+                log_to_ui(ui_components, "Gagal mount Google Drive", "error", ICONS['error'])
                 return None
         
         # Path dasar Google Drive
@@ -220,9 +188,7 @@ def mount_google_drive(ui_components: Dict[str, Any], silent: bool = False) -> O
         
         return smartcash_dir
     except Exception as e:
-        if not silent and 'status' in ui_components:
-            with ui_components['status']:
-                display(create_info_alert(f"Error saat mounting Google Drive: {str(e)}", "error", ICONS['error']))
+        log_to_ui(ui_components, f"Error saat mounting Google Drive: {str(e)}", "error", ICONS['error'])
         return None
 
 def setup_drive_directories(drive_path: Path, ui_components: Dict[str, Any], silent: bool = False):
@@ -246,9 +212,8 @@ def setup_drive_directories(drive_path: Path, ui_components: Dict[str, Any], sil
         'logs', 'checkpoints'
     ]]
     
-    if not silent and 'status' in ui_components:
-        with ui_components['status']:
-            display(create_status_indicator("success", f"{ICONS.get('success', '✅')} Struktur direktori berhasil dibuat di {drive_path}"))
+    # Log ke UI
+    log_to_ui(ui_components, f"Struktur direktori berhasil dibuat di {drive_path}", "success", ICONS.get('success', '✅'))
                 
     if logger:
         logger.info(f"✅ Struktur direktori berhasil dibuat di {drive_path}")
@@ -273,9 +238,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any], silent: boo
         'checkpoints': drive_path / 'checkpoints'
     }
     
-    if not silent and 'status' in ui_components:
-        with ui_components['status']:
-            display(create_status_indicator("info", f"🔗 Membuat symlinks..."))
+    log_to_ui(ui_components, "🔗 Membuat symlinks...", "info")
     
     # Buat symlinks dengan one-liner
     for local_name, target_path in symlinks.items():
@@ -286,9 +249,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any], silent: boo
         # Handle existing directory
         if local_path.exists() and not local_path.is_symlink():
             backup_path = local_path.with_name(f"{local_name}_backup")
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_status_indicator("info", f"Memindahkan direktori lokal ke backup: {local_name} → {local_name}_backup"))
+            log_to_ui(ui_components, f"Memindahkan direktori lokal ke backup: {local_name} → {local_name}_backup", "info")
             
             # Hapus backup lama jika ada dan pindahkan folder saat ini ke backup
             if backup_path.exists(): shutil.rmtree(backup_path)
@@ -297,9 +258,7 @@ def create_symlinks(drive_path: Path, ui_components: Dict[str, Any], silent: boo
         # Buat symlink jika belum ada
         if not local_path.exists():
             local_path.symlink_to(target_path)
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_status_indicator("success", f"Symlink dibuat: {local_name} → {target_path}"))
+            log_to_ui(ui_components, f"Symlink dibuat: {local_name} → {target_path}", "success")
                     
     if logger:
         logger.info(f"✅ Symlinks berhasil dibuat ke Google Drive")
@@ -315,9 +274,7 @@ def sync_configs_bidirectional(drive_path: Path, ui_components: Dict[str, Any], 
     """
     logger = ui_components.get('logger')
     
-    if not silent and 'status' in ui_components:
-        with ui_components['status']:
-            display(create_status_indicator("info", f'{ICONS["processing"]} Sinkronisasi Konfigurasi Dua Arah'))
+    log_to_ui(ui_components, f'Sinkronisasi Konfigurasi Dua Arah', "info", ICONS["processing"])
     
     try:
         # Coba gunakan modul terpadu config_sync dengan error handling
@@ -331,30 +288,24 @@ def sync_configs_bidirectional(drive_path: Path, ui_components: Dict[str, Any], 
                 logger=logger
             )
             
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    success_count = len(results.get("success", []))
-                    failure_count = len(results.get("failure", []))
-                    skipped_count = len(results.get("skipped", []))
-                    
-                    display(create_status_indicator(
-                        "success" if failure_count == 0 else "warning", 
-                        f"Sinkronisasi selesai: {success_count} disinkronisasi, {skipped_count} dilewati, {failure_count} gagal"
-                    ))
+            success_count = len(results.get("success", []))
+            failure_count = len(results.get("failure", []))
+            skipped_count = len(results.get("skipped", []))
+            
+            log_to_ui(ui_components, 
+                f"Sinkronisasi selesai: {success_count} disinkronisasi, {skipped_count} dilewati, {failure_count} gagal",
+                "success" if failure_count == 0 else "warning"
+            )
             
             if logger:
-                logger.info(f"✅ Sinkronisasi konfigurasi selesai: {len(results.get('success', []))} berhasil, {len(results.get('failure', []))} gagal")
+                logger.info(f"✅ Sinkronisasi konfigurasi selesai: {success_count} berhasil, {failure_count} gagal")
                 
         except ImportError:
             # Jika modul tidak tersedia, gunakan implementasi minimal
-            if not silent and 'status' in ui_components:
-                with ui_components['status']:
-                    display(create_status_indicator("info", f"Menggunakan metode sinkronisasi file sederhana"))
+            log_to_ui(ui_components, "Menggunakan metode sinkronisasi file sederhana", "info")
             copy_configs_between_locations(drive_path, ui_components, silent)
     except Exception as e:
-        if not silent and 'status' in ui_components:
-            with ui_components['status']:
-                display(create_status_indicator("error", f"Error saat sinkronisasi: {str(e)}"))
+        log_to_ui(ui_components, f"Error saat sinkronisasi: {str(e)}", "error")
         
 def copy_configs_between_locations(drive_path: Path, ui_components: Dict[str, Any], silent: bool = False):
     """
@@ -403,14 +354,12 @@ def copy_configs_between_locations(drive_path: Path, ui_components: Dict[str, An
     copied_from_drive = sum(1 for r in drive_to_local_results if r['success'])
     
     # Tampilkan hasil
-    if not silent and 'status' in ui_components:
-        with ui_components['status']:
-            if copied_to_drive > 0:
-                display(create_status_indicator("success", f"{copied_to_drive} file disalin ke Drive"))
-            if copied_from_drive > 0:
-                display(create_status_indicator("success", f"{copied_from_drive} file disalin dari Drive"))
-            if copied_to_drive == 0 and copied_from_drive == 0:
-                display(create_status_indicator("info", "Tidak ada file yang perlu disinkronisasi"))
+    if copied_to_drive > 0:
+        log_to_ui(ui_components, f"{copied_to_drive} file disalin ke Drive", "success")
+    if copied_from_drive > 0:
+        log_to_ui(ui_components, f"{copied_from_drive} file disalin dari Drive", "success")
+    if copied_to_drive == 0 and copied_from_drive == 0:
+        log_to_ui(ui_components, "Tidak ada file yang perlu disinkronisasi", "info")
     
     if logger:
         logger.info(f"✅ Sinkronisasi konfigurasi manual: {copied_to_drive} ke Drive, {copied_from_drive} dari Drive")

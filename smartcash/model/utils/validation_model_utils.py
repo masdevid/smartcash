@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 
 from smartcash.model.config.model_config import ModelConfig
 from smartcash.model.config.backbone_config import BackboneConfig
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 class ModelValidator:
     """

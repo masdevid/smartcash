@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_TRAIN_DIR, DEFAULT_VALID_DIR, DEFAULT_TEST_DIR, DEFAULT_CHECKPOINT_DIR
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_TRAIN_DIR, DEFAULT_VALID_DIR, DEFAULT_TEST_DIR, DEFAULT_CHECKPOINT_DIR
 
 class ModelConfig:
     """

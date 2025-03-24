@@ -7,7 +7,7 @@ from typing import Dict, Any, Tuple, Optional
 import os
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
-from dataset.utils.dataset_constants import DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class DatasetStatsManager:
     """Manages dataset statistics and visualization operations."""

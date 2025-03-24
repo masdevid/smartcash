@@ -7,7 +7,7 @@ import cv2
 import numpy as np
 from typing import Tuple, Dict, Any, List, Optional, Union, Callable
 import logging
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 class PreprocessingPipeline:
     """Pipeline yang dapat dikonfigurasi untuk preprocessing gambar dengan berbagai transformasi."""

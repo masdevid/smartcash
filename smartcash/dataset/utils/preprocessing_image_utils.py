@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 
 from smartcash.dataset.utils.label_utils import extract_class_from_label
 from smartcash.dataset.utils.denomination_utils import get_denomination_label
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DENOMINATION_CLASS_MAP
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DENOMINATION_CLASS_MAP
 
 def preprocess_single_image(
     img_path: Path, 

@@ -5,7 +5,7 @@ Deskripsi: Utilitas untuk penanganan dan mapping denominasi mata uang Rupiah
 
 from typing import Dict, Any, Optional
 import re
-from dataset.utils.dataset_constants import DENOMINATION_CLASS_MAP
+from smartcash.dataset.utils.dataset_constants import DENOMINATION_CLASS_MAP
 
 def get_denomination_label(class_id: str) -> str:
     """

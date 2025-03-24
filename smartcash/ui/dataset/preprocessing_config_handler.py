@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 import os, yaml, json, copy
 from pathlib import Path
 from IPython.display import display
-from dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR, DEFAULT_IMG_SIZE
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR, DEFAULT_IMG_SIZE
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY dan persistensi yang ditingkatkan."""

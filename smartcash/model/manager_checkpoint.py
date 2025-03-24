@@ -12,7 +12,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.common.exceptions import ModelCheckpointError
 from smartcash.model.services.checkpoint.checkpoint_service import CheckpointService
-from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
+from smartcash.dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 class ModelCheckpointManager(ICheckpointService):
     """

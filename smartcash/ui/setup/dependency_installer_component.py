@@ -1,66 +1,59 @@
 """
 File: smartcash/ui/setup/dependency_installer_component.py
-Deskripsi: Komponen UI untuk instalasi dependencies dengan alur 3 tahap otomatis
+Deskripsi: Komponen UI untuk instalasi dependencies dengan memanfaatkan ui_helpers untuk konsistensi tampilan
 """
 
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 
 def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
-    """
-    Buat komponen UI untuk instalasi dependencies.
+    """Buat komponen UI untuk instalasi dependencies dengan ui_helpers."""
     
-    Args:
-        env: Environment manager (opsional)
-        config: Konfigurasi aplikasi (opsional)
-        
-    Returns:
-        Dictionary UI components
-    """
-    # Import komponen UI standar
+    # Import komponen dari ui_helpers untuk konsistensi
     from smartcash.ui.utils.alert_utils import create_info_box
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.helpers.ui_helpers import create_spacing
     from smartcash.ui.info_boxes.dependencies_info import get_dependencies_info
     from smartcash.ui.setup.package_requirements import get_package_categories
     
-    # Header dengan styling konsisten
+    # Header dengan komponen standar
     header = create_header(
         "📦 Instalasi Dependencies", 
-        "Setup package otomatis untuk SmartCash"
+        "Setup package yang diperlukan untuk SmartCash"
     )
     
     # Status panel menggunakan komponen alert standar
     status_panel = widgets.HTML(
         create_info_box(
-            "Auto-Deteksi Dependencies", 
-            "Sistem akan mendeteksi dependencies yang dibutuhkan dan menginstalnya secara otomatis",
+            "Pilih Packages", 
+            "Pilih packages yang akan diinstall dan klik \"Install Packages\"",
             style="info"
         ).value
     )
     
-    # Kategori package dengan metadata
+    # Menggunakan get_package_categories yang sudah ada
     package_categories = get_package_categories()
     
-    # Tempat untuk menyimpan checkbox widgets
+    # Simpan referensi ke checkbox dan status widgets
     checkboxes = {}
-    category_widgets = []
+    group_boxes = []
     
-    # Buat widget untuk setiap kategori package
+    # Buat UI untuk setiap kategori package
     for category in package_categories:
-        # Header kategori
-        category_header = widgets.HTML(f"""
+        # Header untuk grup
+        group_header = widgets.HTML(f"""
         <div style="padding:5px 0">
-            <h3 style="margin:5px 0;color:{COLORS['dark']}">{category['icon']} {category['name']}</h3>
+            <h3 style="margin:5px 0;color:inherit">{category['icon']} {category['name']}</h3>
             <p style="margin:2px 0;color:{COLORS['muted']}">{category['description']}</p>
         </div>
         """)
         
-        # Buat checkbox untuk setiap package dalam kategori
-        package_widgets = []
+        # Buat checkboxes dengan layout untuk tampilan vertikal
+        package_rows = []
         for package in category['packages']:
             # Widget status di samping checkbox
-            pkg_status = widgets.HTML(f"<div style='width:100px;color:{COLORS['muted']}'>Memeriksa...</div>")
+            status_widget = widgets.HTML(f"<div style='width:100px;color:{COLORS['muted']}'>Memeriksa...</div>")
             
             # Checkbox untuk package
             checkbox = widgets.Checkbox(
@@ -71,45 +64,52 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
                 tooltip=package['description']
             )
             
-            # Simpan referensi ke checkbox
-            checkboxes[package['key']] = checkbox
-            
-            # Package row dengan status
-            package_row = widgets.HBox(
-                [checkbox, pkg_status],
+            # Row untuk checkbox dan status
+            row = widgets.HBox(
+                [checkbox, status_widget],
                 layout=widgets.Layout(
                     width='100%',
                     align_items='center'
                 )
             )
             
-            # Simpan referensi status
-            checkboxes[f"{package['key']}_status"] = pkg_status
+            package_rows.append(row)
             
-            package_widgets.append(package_row)
+            # Simpan referensi ke checkbox dan status
+            checkboxes[package['key']] = checkbox
+            checkboxes[f"{package['key']}_status"] = status_widget
         
-        # Buat VBox untuk package dalam kategori
-        packages_box = widgets.VBox(
-            package_widgets,
+        # VBox untuk group checkboxes
+        group_checkboxes = widgets.VBox(
+            package_rows,
             layout=widgets.Layout(
-                margin='0 0 0 15px',  # Berikan indentasi
+                margin='5px 0 10px 15px',  # Memberikan indentasi
                 width='100%'
             )
         )
         
-        # Container untuk kategori
-        category_box = widgets.VBox(
-            [category_header, packages_box],
+        # Box untuk grup dengan border
+        group_box = widgets.VBox(
+            [group_header, group_checkboxes],
             layout=widgets.Layout(
                 margin='10px 0',
                 padding='10px',
                 border=f'1px solid {COLORS["border"]}',
                 border_radius='5px',
-                width='100%'
+                width='100%'  # Gunakan lebar penuh untuk layout kolom
             )
         )
         
-        category_widgets.append(category_box)
+        group_boxes.append(group_box)
+    
+    # Container untuk groups dengan VBox (column layout)
+    packages_container = widgets.VBox(
+        group_boxes,
+        layout=widgets.Layout(
+            width='100%',
+            margin='10px 0'
+        )
+    )
     
     # Custom package input
     custom_header = widgets.HTML(f"""
@@ -203,7 +203,7 @@ def create_dependency_installer_ui(env=None, config=None) -> Dict[str, Any]:
         [
             header,
             status_panel,
-            *category_widgets,
+            packages_container,
             custom_section,
             button_container,
             progress,

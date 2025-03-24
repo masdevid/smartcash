@@ -83,8 +83,26 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             )
         )
     
-    # Panel log messages
-    log_output = _create_log_output()
+    # Panel log messages - PERBAIKAN: Gunakan widgets langsung, bukan dictionary
+    log_header = widgets.HTML(f"<h3 style='margin: 10px 0 5px 0; color: {COLORS['dark']};'>{ICONS['info']} Log Messages</h3>")
+    
+    log_output = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            border=f'1px solid {COLORS["primary"]}',
+            min_height='150px',
+            max_height='300px',
+            margin='0 0 10px 0',
+            padding='10px',
+            overflow='auto',
+            background_color=f'{COLORS["light"]}'
+        )
+    )
+    
+    log_container = widgets.VBox(
+        [log_header, log_output],
+        layout=widgets.Layout(margin='15px 0')
+    )
     
     # Panel info bantuan
     help_box = get_environment_info()
@@ -99,7 +117,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         progress_container,
         divider, 
         button_container,
-        log_output,
+        log_container,
         help_box
     ], layout=widgets.Layout(width='100%', padding='10px'))
     
@@ -113,8 +131,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'progress_bar': progress_bar,
         'progress_message': progress_message,
         'progress_container': progress_container,
-        'status': log_output['output'],
-        'log_box': log_output['container'],
+        'status': log_output,
+        'log_box': log_container,
         'help_panel': help_box,
         'module_name': 'env_config'
     }
@@ -154,42 +172,4 @@ def _create_progress_components() -> Dict[str, widgets.Widget]:
         'progress_bar': progress_bar,
         'progress_message': progress_message,
         'container': progress_container
-    }
-
-def _create_log_output() -> Dict[str, widgets.Widget]:
-    """
-    Buat komponen output untuk log.
-    
-    Returns:
-        Dictionary berisi komponen log output
-    """
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Header untuk log
-    log_header = widgets.HTML(f"<h3 style='margin: 10px 0 5px 0; color: {COLORS['dark']};'>{COLORS['info']} Log Messages</h3>")
-    
-    # Output widget
-    output = widgets.Output(
-        layout=widgets.Layout(
-            width='100%',
-            border=f'1px solid {COLORS["primary"]}',
-            min_height='150px',
-            max_height='300px',
-            margin='0 0 10px 0',
-            padding='10px',
-            overflow='auto',
-            background_color=f'{COLORS["light"]}'
-        )
-    )
-    
-    # Container untuk log components
-    container = widgets.VBox([
-        log_header,
-        output
-    ], layout=widgets.Layout(margin='15px 0'))
-    
-    return {
-        'header': log_header,
-        'output': output,
-        'container': container
     }

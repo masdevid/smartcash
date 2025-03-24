@@ -30,7 +30,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: Optional[s
         # Import komponen UI logger
         from smartcash.ui.utils.ui_logger import create_direct_ui_logger, intercept_stdout_to_ui
         
-        # Intercept stdout untuk arahkan output console ke UI
+        # Pastikan intercept stdout dilakukan terlebih dahulu, sebelum membuat logger
         intercept_stdout_to_ui(ui_components)
         
         # Buat logger yang langsung ke UI

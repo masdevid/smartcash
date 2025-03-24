@@ -5,6 +5,7 @@ Deskripsi: Utility untuk mengarahkan output logger ke UI widget dengan integrasi
 
 import logging
 import sys
+import threading
 from typing import Dict, Any, Optional, Union
 from IPython.display import display, HTML
 
@@ -148,7 +149,7 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     """
     Intercept stdout dan arahkan ke UI widget.
-    Metode yang lebih clean dengan satu implementasi.
+    Metode yang lebih clean dengan satu implementasi dan thread lock.
     
     Args:
         ui_components: Dictionary berisi komponen UI dengan kunci 'status'
@@ -161,44 +162,67 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
         return
     
-    # Buat stdout interceptor
+    # Buat stdout interceptor dengan thread-safety
     class UIStdoutInterceptor:
         def __init__(self, ui_components):
             self.ui_components = ui_components
             self.terminal = sys.stdout
             self.buffer = ""
+            self.lock = threading.RLock()
+            self.buffer_limit = 1000  # Batasi buffer untuk mencegah memory leak
             
         def write(self, message):
             # Write ke terminal asli
             self.terminal.write(message)
             
-            # Buffer output sampai ada newline
-            self.buffer += message
-            if '\n' in self.buffer:
-                lines = self.buffer.split('\n')
-                self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
+            # Buffer output sampai ada newline, dengan thread-safety
+            with self.lock:
+                # Batasi ukuran buffer
+                if len(self.buffer) > self.buffer_limit:
+                    self.buffer = self.buffer[-self.buffer_limit:]
                 
-                # Tampilkan setiap baris lengkap
-                for line in lines[:-1]:
-                    if line.strip():  # Cek jika bukan baris kosong
-                        with self.ui_components['status']:
+                self.buffer += message
+                if '\n' in self.buffer:
+                    lines = self.buffer.split('\n')
+                    self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
+                    
+                    # Tampilkan setiap baris lengkap
+                    for line in lines[:-1]:
+                        if line.strip():  # Cek jika bukan baris kosong
                             try:
-                                from smartcash.ui.utils.alert_utils import create_status_indicator
-                                display(create_status_indicator("info", line))
-                            except ImportError:
-                                display(HTML(f"<div>{line}</div>"))
+                                with self.ui_components['status']:
+                                    try:
+                                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                                        display(create_status_indicator("info", line))
+                                    except ImportError:
+                                        display(HTML(f"<div>{line}</div>"))
+                            except Exception:
+                                # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
+                                self.terminal.write(f"[UI STDOUT ERROR] {line}\n")
         
         def flush(self):
             self.terminal.flush()
-            # Flush buffer jika perlu
-            if self.buffer:
-                with self.ui_components['status']:
+            # Flush buffer jika perlu, dengan thread-safety
+            with self.lock:
+                if self.buffer:
                     try:
-                        from smartcash.ui.utils.alert_utils import create_status_indicator
-                        display(create_status_indicator("info", self.buffer))
-                    except ImportError:
-                        display(HTML(f"<div>{self.buffer}</div>"))
-                self.buffer = ""
+                        with self.ui_components['status']:
+                            try:
+                                from smartcash.ui.utils.alert_utils import create_status_indicator
+                                display(create_status_indicator("info", self.buffer))
+                            except ImportError:
+                                display(HTML(f"<div>{self.buffer}</div>"))
+                    except Exception:
+                        # Fallback ke stdout asli
+                        self.terminal.write(f"[UI STDOUT ERROR] {self.buffer}\n")
+                    self.buffer = ""
+        
+        # Kebutuhan IOBase lainnya
+        def isatty(self):
+            return False
+            
+        def fileno(self):
+            return self.terminal.fileno()
     
     # Simpan stdout original dan replace dengan interceptor
     original_stdout = sys.stdout

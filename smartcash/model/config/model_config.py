@@ -8,6 +8,8 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Union
 
+from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_TRAIN_DIR, DEFAULT_VALID_DIR, DEFAULT_TEST_DIR, DEFAULT_CHECKPOINT_DIR
+
 class ModelConfig:
     """
     Konfigurasi dasar model SmartCash dengan dukungan load/save YAML
@@ -18,7 +20,7 @@ class ModelConfig:
     DEFAULT_CONFIG = {
         'model': {
             'name': 'smartcash_model',
-            'img_size': [640, 640],
+            'img_size': DEFAULT_IMG_SIZE,
             'batch_size': 16,
             'workers': 4,
             'backbone': 'efficientnet_b4'
@@ -42,9 +44,9 @@ class ModelConfig:
         },
         'layers': ['banknote'],
         'data': {
-            'train': 'data/train',
-            'val': 'data/valid',
-            'test': 'data/test',
+            'train': DEFAULT_TRAIN_DIR,
+            'val': DEFAULT_VALID_DIR,
+            'test': DEFAULT_TEST_DIR,
             'preprocessing': {
                 'cache_dir': '.cache/smartcash'
             }
@@ -58,7 +60,7 @@ class ModelConfig:
             'params': {}
         },
         'checkpoint': {
-            'save_dir': 'runs/train/weights',
+            'save_dir': DEFAULT_CHECKPOINT_DIR,
             'save_interval': 10,
             'save_last': True,
             'save_best': True

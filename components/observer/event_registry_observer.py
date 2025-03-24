@@ -1,12 +1,13 @@
 """
 File: smartcash/components/observer/event_registry_observer.py
-Deskripsi: Registry untuk event dan observer di SmartCash
+Deskripsi: Registry untuk event dan observer di SmartCash dengan optimasi concurrent.futures
 """
 
-import threading
+import concurrent.futures
 import weakref
-from typing import Dict, List, Set, Any, Optional
 import time
+from threading import RLock
+from typing import Dict, List, Set, Any, Optional
 
 from smartcash.components.observer.base_observer import BaseObserver
 
@@ -24,7 +25,7 @@ class EventRegistry:
     _instance = None
     
     # Lock untuk thread-safety
-    _lock = threading.RLock()
+    _lock = RLock()
     
     # Dictionary untuk menyimpan observer berdasarkan event_type
     # Format: {event_type: {observer_id: (observer_weakref, priority)}}
@@ -41,21 +42,44 @@ class EventRegistry:
         'last_notify_time': 0,
     }
     
+    # ThreadPoolExecutor untuk operasi non-critical
+    _executor = None
+    
     def __new__(cls):
         """
-        Implementasi singleton pattern.
+        Implementasi singleton pattern dengan lazy initialization.
         
         Returns:
             Instance EventRegistry singleton
         """
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super(EventRegistry, cls).__new__(cls)
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = super(EventRegistry, cls).__new__(cls)
+                cls._instance._initialize()
         return cls._instance
     
-    @classmethod
-    def register(cls, event_type: str, observer: BaseObserver, priority: Optional[int] = None) -> None:
+    def _initialize(self):
+        """Inisialisasi registry dengan lazy initialization."""
+        # Inisialisasi executor hanya jika diperlukan
+        self._executor = None
+    
+    def _get_executor(self):
+        """
+        Lazy initialization untuk thread pool executor.
+        
+        Returns:
+            ThreadPoolExecutor instance
+        """
+        if self._executor is None:
+            with self._lock:
+                if self._executor is None:
+                    self._executor = concurrent.futures.ThreadPoolExecutor(
+                        max_workers=4,
+                        thread_name_prefix="EventRegistry"
+                    )
+        return self._executor
+    
+    def register(self, event_type: str, observer: BaseObserver, priority: Optional[int] = None) -> None:
         """
         Mendaftarkan observer untuk event tertentu.
         
@@ -73,26 +97,25 @@ class EventRegistry:
             priority = observer.priority
             
         # Daftarkan event_type
-        with cls._lock:
+        with self._lock:
             # Tambahkan event_type ke set jika belum ada
-            cls._event_types.add(event_type)
+            self._event_types.add(event_type)
             
             # Inisialisasi dictionary untuk event_type jika belum ada
-            if event_type not in cls._observers:
-                cls._observers[event_type] = {}
+            if event_type not in self._observers:
+                self._observers[event_type] = {}
             
             # Simpan observer dalam weak reference untuk mencegah memory leak
             observer_ref = weakref.ref(observer)
             
             # Simpan observer dan prioritasnya
             observer_id = id(observer)
-            cls._observers[event_type][observer_id] = (observer_ref, priority)
+            self._observers[event_type][observer_id] = (observer_ref, priority)
             
             # Update statistik
-            cls._stats['register_count'] += 1
+            self._stats['register_count'] += 1
     
-    @classmethod
-    def unregister(cls, event_type: str, observer: BaseObserver) -> None:
+    def unregister(self, event_type: str, observer: BaseObserver) -> None:
         """
         Membatalkan registrasi observer untuk event tertentu.
         
@@ -100,19 +123,18 @@ class EventRegistry:
             event_type: Tipe event
             observer: Observer yang akan dibatalkan registrasinya
         """
-        with cls._lock:
-            if event_type in cls._observers:
+        with self._lock:
+            if event_type in self._observers:
                 observer_id = id(observer)
-                if observer_id in cls._observers[event_type]:
-                    del cls._observers[event_type][observer_id]
-                    cls._stats['unregister_count'] += 1
+                if observer_id in self._observers[event_type]:
+                    del self._observers[event_type][observer_id]
+                    self._stats['unregister_count'] += 1
                     
                     # Hapus dictionary event_type jika tidak ada observer lagi
-                    if not cls._observers[event_type]:
-                        del cls._observers[event_type]
+                    if not self._observers[event_type]:
+                        del self._observers[event_type]
     
-    @classmethod
-    def unregister_from_all(cls, observer: BaseObserver) -> None:
+    def unregister_from_all(self, observer: BaseObserver) -> None:
         """
         Membatalkan registrasi observer dari semua event.
         
@@ -120,34 +142,32 @@ class EventRegistry:
             observer: Observer yang akan dibatalkan registrasinya
         """
         observer_id = id(observer)
-        with cls._lock:
-            for event_type in list(cls._observers.keys()):
-                if observer_id in cls._observers[event_type]:
-                    del cls._observers[event_type][observer_id]
-                    cls._stats['unregister_count'] += 1
+        with self._lock:
+            for event_type in list(self._observers.keys()):
+                if observer_id in self._observers[event_type]:
+                    del self._observers[event_type][observer_id]
+                    self._stats['unregister_count'] += 1
                     
                     # Hapus dictionary event_type jika tidak ada observer lagi
-                    if not cls._observers[event_type]:
-                        del cls._observers[event_type]
+                    if not self._observers[event_type]:
+                        del self._observers[event_type]
     
-    @classmethod
-    def unregister_all(cls, event_type: Optional[str] = None) -> None:
+    def unregister_all(self, event_type: Optional[str] = None) -> None:
         """
         Membatalkan registrasi semua observer untuk event tertentu atau semua event.
         
         Args:
-            event_type: Tipe event yang akan dibersihkan (None untuk semua event)
+            event_type: Tipe event yang akan dibersihkan (None untuk semua)
         """
-        with cls._lock:
+        with self._lock:
             if event_type is None:
                 # Hapus semua observer untuk semua event
-                cls._observers.clear()
-            elif event_type in cls._observers:
+                self._observers.clear()
+            elif event_type in self._observers:
                 # Hapus semua observer untuk event tertentu
-                del cls._observers[event_type]
+                del self._observers[event_type]
     
-    @classmethod
-    def get_observers(cls, event_type: str) -> List[BaseObserver]:
+    def get_observers(self, event_type: str) -> List[BaseObserver]:
         """
         Mendapatkan semua observer yang valid untuk event tertentu,
         diurutkan berdasarkan prioritas.
@@ -163,69 +183,60 @@ class EventRegistry:
         # Track observer IDs yang sudah diperiksa untuk mencegah duplikasi
         processed_ids = set()
         
-        with cls._lock:
-            # Periksa event_type yang cocok secara persis
-            if event_type in cls._observers:
-                for observer_id, (observer_ref, priority) in cls._observers[event_type].items():
-                    observer = observer_ref()
-                    if observer is not None and observer.is_enabled and observer.should_process_event(event_type):
-                        result.append((observer, priority))
-                        processed_ids.add(observer_id)
+        with self._lock:
+            # One-liner untuk mendapatkan observers dari event_type yang cocok persis
+            if event_type in self._observers:
+                result.extend([(observer_ref(), priority) for observer_id, (observer_ref, priority) in self._observers[event_type].items()
+                             if (observer := observer_ref()) is not None 
+                             and observer.is_enabled 
+                             and observer.should_process_event(event_type)
+                             and not processed_ids.add(id(observer))])
             
-            # Periksa event_type parent untuk hierarki event
-            # Misalnya, untuk 'training.epoch.end', periksa juga 'training.epoch' dan 'training'
+            # Menangani hierarki event dengan one-liner untuk setiap level
             parts = event_type.split('.')
             for i in range(len(parts) - 1, 0, -1):
                 parent_event = '.'.join(parts[:i])
-                if parent_event in cls._observers:
-                    for observer_id, (observer_ref, priority) in cls._observers[parent_event].items():
-                        # Skip jika observer sudah diproses
-                        if observer_id in processed_ids:
-                            continue
-                            
-                        observer = observer_ref()
-                        if observer is not None and observer.is_enabled and observer.should_process_event(event_type):
-                            result.append((observer, priority))
-                            processed_ids.add(observer_id)
+                if parent_event in self._observers:
+                    result.extend([(observer_ref(), priority) for observer_id, (observer_ref, priority) in self._observers[parent_event].items()
+                                 if observer_id not in processed_ids
+                                 and (observer := observer_ref()) is not None 
+                                 and observer.is_enabled 
+                                 and observer.should_process_event(event_type)
+                                 and not processed_ids.add(observer_id)])
         
-        # Urutkan berdasarkan prioritas dan kembalikan hanya observer
-        result.sort(key=lambda x: x[1], reverse=True)
-        return [obs for obs, _ in result]
+        # Urutkan berdasarkan prioritas dan kembalikan hanya observer dengan one-liner
+        return [obs for obs, _ in sorted(result, key=lambda x: x[1], reverse=True)]
     
-    @classmethod
-    def get_all_event_types(cls) -> List[str]:
+    def get_all_event_types(self) -> List[str]:
         """
         Mendapatkan semua tipe event yang telah didaftarkan.
         
         Returns:
             List tipe event
         """
-        with cls._lock:
-            return list(cls._event_types)
+        with self._lock:
+            return list(self._event_types)
     
-    @classmethod
-    def get_stats(cls) -> Dict[str, Any]:
+    def get_stats(self) -> Dict[str, Any]:
         """
-        Mendapatkan statistik registry.
+        Mendapatkan statistik registry dengan one-liner.
         
         Returns:
             Dictionary statistik
         """
-        with cls._lock:
-            stats = cls._stats.copy()
-            stats['observer_count'] = sum(len(observers) for observers in cls._observers.values())
-            stats['event_type_count'] = len(cls._event_types)
+        with self._lock:
+            stats = dict(self._stats)
+            stats['observer_count'] = sum(len(observers) for observers in self._observers.values())
+            stats['event_type_count'] = len(self._event_types)
             return stats
     
-    @classmethod
-    def update_notify_stats(cls) -> None:
+    def update_notify_stats(self) -> None:
         """Update statistik notifikasi."""
-        with cls._lock:
-            cls._stats['notify_count'] += 1
-            cls._stats['last_notify_time'] = time.time()
+        with self._lock:
+            self._stats['notify_count'] += 1
+            self._stats['last_notify_time'] = time.time()
     
-    @classmethod
-    def clean_references(cls) -> int:
+    def clean_references(self) -> int:
         """
         Membersihkan weak references yang tidak valid lagi.
         
@@ -233,16 +244,33 @@ class EventRegistry:
             Jumlah referensi yang dibersihkan
         """
         cleaned_count = 0
-        with cls._lock:
-            for event_type in list(cls._observers.keys()):
-                for observer_id in list(cls._observers[event_type].keys()):
-                    observer_ref, _ = cls._observers[event_type][observer_id]
-                    if observer_ref() is None:
-                        del cls._observers[event_type][observer_id]
-                        cleaned_count += 1
+        with self._lock:
+            for event_type in list(self._observers.keys()):
+                invalid_refs = [observer_id for observer_id, (observer_ref, _) in self._observers[event_type].items() if observer_ref() is None]
+                for observer_id in invalid_refs:
+                    del self._observers[event_type][observer_id]
+                    cleaned_count += 1
                 
                 # Hapus dictionary event_type jika tidak ada observer lagi
-                if not cls._observers[event_type]:
-                    del cls._observers[event_type]
+                if not self._observers[event_type]:
+                    del self._observers[event_type]
         
         return cleaned_count
+    
+    def clean_references_async(self) -> concurrent.futures.Future:
+        """
+        Membersihkan weak references secara asinkron.
+        
+        Returns:
+            Future yang mewakili hasil pembersihan
+        """
+        executor = self._get_executor()
+        return executor.submit(self.clean_references)
+    
+    def shutdown(self) -> None:
+        """Shutdown executor dan bersihkan resources."""
+        if self._executor is not None:
+            with self._lock:
+                if self._executor is not None:
+                    self._executor.shutdown(wait=True)
+                    self._executor = None

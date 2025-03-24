@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 
 from smartcash.model.config.model_config import ModelConfig
 from smartcash.model.config.backbone_config import BackboneConfig
-
+from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 class ModelValidator:
     """
@@ -239,7 +239,7 @@ def check_img_size(img_size: Union[int, List[int]], stride: int = 32) -> Tuple[i
     return tuple(new_size)
 
 
-def check_anchors(dataset, model, thr: float = 4.0, imgsz: List[int] = [640, 640]) -> None:
+def check_anchors(dataset, model, thr: float = 4.0, imgsz: List[int] = DEFAULT_IMG_SIZE) -> None:
     """
     Periksa apakah anchors perlu diperbarui berdasarkan dataset.
     
@@ -288,7 +288,7 @@ def check_anchors(dataset, model, thr: float = 4.0, imgsz: List[int] = [640, 640
         print(f'❌ Pemeriksaan anchors gagal: {e}')
 
 
-def kmeans_anchors(dataset, n: int = 9, img_size: List[int] = [640, 640], thr: float = 4.0) -> np.ndarray:
+def kmeans_anchors(dataset, n: int = 9, img_size: List[int] = DEFAULT_IMG_SIZE, thr: float = 4.0) -> np.ndarray:
     """
     Hitung anchors menggunakan K-means clustering.
     

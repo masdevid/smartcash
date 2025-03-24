@@ -18,10 +18,6 @@ DEFAULT_OUTPUT_DIR = "output"
 DEFAULT_MODEL_DIR = "models"
 DEFAULT_LOGS_DIR = "logs"
 
-# Google Drive paths (for Colab)
-DRIVE_BASE_PATH = "/content/drive/MyDrive/SmartCash"
-DRIVE_DATASET_PATH = f"{DRIVE_BASE_PATH}/data"
-DRIVE_PREPROCESSED_PATH = f"{DRIVE_BASE_PATH}/data/preprocessed"
 
 # Layer detection
 class DetectionLayer(Enum):
@@ -56,9 +52,8 @@ ENV_MODEL_PATH = os.environ.get("SMARTCASH_MODEL_PATH", "")
 ENV_DATA_PATH = os.environ.get("SMARTCASH_DATA_PATH", "")
 
 # Default values
-DEFAULT_CONFIDENCE_THRESHOLD = 0.25
+DEFAULT_CONF_THRESHOLD = 0.25
 DEFAULT_IOU_THRESHOLD = 0.45
-DEFAULT_IMG_SIZE = (640, 640)
 
 # Limits
 MAX_BATCH_SIZE = 64

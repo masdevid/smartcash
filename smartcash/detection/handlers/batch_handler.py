@@ -10,10 +10,13 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 
-from smartcash.common.utils import ensure_dir, generate_unique_id
+from smartcash.common.utils import generate_unique_id
 from smartcash.common.logger import SmartCashLogger, get_logger
-from smartcash.common.constants import IMAGE_EXTENSIONS, MAX_BATCH_SIZE
+from smartcash.common.constants import (IMAGE_EXTENSIONS, MAX_BATCH_SIZE)
 from smartcash.common.types import Detection
+from smartcash.dataset.utils import (
+    ensure_dir
+)
 
 
 class BatchHandler:

@@ -86,61 +86,6 @@ def get_timestamp() -> str:
     """Dapatkan timestamp string format untuk nama file."""
     return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-def ensure_dir(path: Union[str, Path]) -> Path:
-    """Pastikan direktori ada, jika tidak buat."""
-    path = Path(path)
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-def copy_file(src: Union[str, Path], dst: Union[str, Path], overwrite: bool = False) -> bool:
-    """
-    Copy file dari src ke dst.
-    
-    Args:
-        src: Path sumber
-        dst: Path tujuan
-        overwrite: Flag untuk overwrite jika file tujuan sudah ada
-        
-    Returns:
-        True jika berhasil, False jika gagal
-    """
-    src, dst = Path(src), Path(dst)
-    
-    # Cek jika file sumber ada
-    if not src.exists():
-        return False
-        
-    # Cek jika file tujuan sudah ada dan overwrite = False
-    if dst.exists() and not overwrite:
-        return False
-        
-    # Buat direktori tujuan jika belum ada
-    if not dst.parent.exists():
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        
-    # Copy file
-    try:
-        shutil.copy2(src, dst)
-        return True
-    except Exception:
-        return False
-
-def file_exists(path: Union[str, Path]) -> bool:
-    """Cek apakah file ada."""
-    return Path(path).exists()
-
-def file_size(path: Union[str, Path]) -> int:
-    """Dapatkan ukuran file dalam bytes."""
-    return Path(path).stat().st_size
-
-def format_size(size_bytes: int) -> str:
-    """Format ukuran dalam bytes ke format yang lebih mudah dibaca."""
-    for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024.0:
-            return f"{size_bytes:.2f} {unit}"
-        size_bytes /= 1024.0
-    return f"{size_bytes:.2f} TB"
-
 def load_json(path: Union[str, Path]) -> Dict:
     """Load data dari file JSON."""
     with open(path, 'r', encoding='utf-8') as f:

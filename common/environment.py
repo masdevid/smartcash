@@ -5,7 +5,6 @@ Deskripsi: Manajer lingkungan terpusat untuk deteksi dan konfigurasi environment
 
 import os
 import sys
-import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List, Union, Callable
 
@@ -24,9 +23,7 @@ class EnvironmentManager:
     
     def __new__(cls, *args, **kwargs):
         """Implementasi pola singleton."""
-        if cls._instance is None:
-            cls._instance = super(EnvironmentManager, cls).__new__(cls)
-            cls._instance._initialized = False
+        if cls._instance is None: cls._instance = super(EnvironmentManager, cls).__new__(cls)
         return cls._instance
     
     def __init__(self, base_dir: Optional[str] = None, logger = None):
@@ -38,12 +35,24 @@ class EnvironmentManager:
             logger: Instance logger
         """
         # Mencegah re-inisialisasi
-        if getattr(self, '_initialized', False):
-            return
+        if getattr(self, '_initialized', False): return
             
-        self._logger = logger
-        self._in_colab = self._detect_colab()
-        self._in_notebook = self._detect_notebook()
+        # Import komponen yang sudah ada
+        try:
+            from smartcash.common.utils import is_colab, is_notebook
+            from smartcash.common.file_utils import get_file_utils
+            from smartcash.common.logger import get_logger
+            
+            self._in_colab = is_colab()
+            self._in_notebook = is_notebook()
+            self._file_utils = get_file_utils(logger=logger)
+            self.logger = logger or get_logger("environment_manager")
+        except ImportError:
+            self._in_colab = self._detect_colab()
+            self._in_notebook = self._detect_notebook()
+            self._file_utils = None
+            self.logger = logger
+        
         self._drive_mounted = False
         self._drive_path = None
         
@@ -54,51 +63,42 @@ class EnvironmentManager:
             else Path(os.getcwd())
         )
         
-        # Auto-mount drive jika di Colab
-        if self._in_colab:
-            self._check_drive_mounted()
+        # Auto-detect drive jika di Colab
+        if self._in_colab: self.detect_drive()
             
         self._initialized = True
         
-        if self._logger:
+        if self.logger:
             env_type = "Google Colab" if self._in_colab else "Notebook" if self._in_notebook else "Lokal"
-            self._logger.info(f"🔍 Environment terdeteksi: {env_type}")
-            self._logger.info(f"📂 Direktori dasar: {self._base_dir}")
+            self.logger.info(f"🔍 Environment terdeteksi: {env_type}")
+            self.logger.info(f"📂 Direktori dasar: {self._base_dir}")
     
     @property
-    def is_colab(self) -> bool:
-        """Cek apakah berjalan di Google Colab."""
-        return self._in_colab
+    def is_colab(self) -> bool: return self._in_colab
     
     @property
-    def is_notebook(self) -> bool:
-        """Cek apakah berjalan di notebook (Jupyter, IPython)."""
-        return self._in_notebook
+    def is_notebook(self) -> bool: return self._in_notebook
     
     @property
-    def base_dir(self) -> Path:
-        """Dapatkan direktori dasar."""
-        return self._base_dir
+    def base_dir(self) -> Path: return self._base_dir
     
     @property
-    def drive_path(self) -> Optional[Path]:
-        """Dapatkan path Google Drive jika ter-mount."""
-        return self._drive_path
+    def drive_path(self) -> Optional[Path]: return self._drive_path
     
     @property
-    def is_drive_mounted(self) -> bool:
-        """Cek apakah Google Drive ter-mount."""
-        return self._drive_mounted
+    def is_drive_mounted(self) -> bool: return self._drive_mounted
     
-    def _check_drive_mounted(self) -> bool:
-        """Cek dan mount Google Drive jika memungkinkan."""
+    def detect_drive(self) -> bool:
+        """Deteksi dan set status Google Drive."""
         drive_path = Path('/content/drive/MyDrive/SmartCash')
-        if os.path.exists('/content/drive/MyDrive'):
+        drive_mount_point = Path('/content/drive/MyDrive')
+        
+        if drive_mount_point.exists():
+            # Pastikan directory SmartCash ada di Drive
             os.makedirs(drive_path, exist_ok=True)
             self._drive_mounted = True
             self._drive_path = drive_path
-            if self._logger:
-                self._logger.info(f"✅ Google Drive terdeteksi pada: {drive_path}")
+            if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {drive_path}")
             return True
         return False
     
@@ -114,14 +114,12 @@ class EnvironmentManager:
         """
         if not self._in_colab:
             msg = "⚠️ Google Drive hanya dapat di-mount di Google Colab"
-            if self._logger:
-                self._logger.warning(msg)
+            if self.logger: self.logger.warning(msg)
             return False, msg
         
         try:
             # Sudah ter-mount
-            if self._drive_mounted:
-                return True, "✅ Google Drive sudah ter-mount"
+            if self._drive_mounted: return True, "✅ Google Drive sudah ter-mount"
             
             # Import dan mount
             from google.colab import drive
@@ -135,46 +133,24 @@ class EnvironmentManager:
             self._drive_mounted = True
             
             msg = f"✅ Google Drive berhasil di-mount pada {self._drive_path}"
-            if self._logger:
-                self._logger.info(msg)
+            if self.logger: self.logger.info(msg)
             
             return True, msg
         
         except Exception as e:
             msg = f"❌ Error mounting Google Drive: {str(e)}"
-            if self._logger:
-                self._logger.error(msg)
+            if self.logger: self.logger.error(msg)
             return False, msg
     
     def get_path(self, relative_path: str) -> Path:
-        """
-        Dapatkan path absolut berdasarkan environment.
-        
-        Args:
-            relative_path: Path relatif dari direktori dasar
-            
-        Returns:
-            Path absolut
-        """
+        """Dapatkan path absolut berdasarkan environment."""
         return self._base_dir / relative_path
     
     def get_project_root(self) -> Path:
-        """
-        Dapatkan direktori root proyek SmartCash.
-        
-        Returns:
-            Path direktori root proyek
-        """
-        # Cek beberapa kemungkinan lokasi root project
-        current = Path.cwd()
-        
-        # Cek jika direktori saat ini atau parentnya mengandung file setup.py atau struktur proyek smartcash
-        for path in [current] + list(current.parents):
-            if (path / "setup.py").exists() and (path / "smartcash").exists():
-                return path
-                
-        # Fallback ke base_dir jika tidak ditemukan
-        return self._base_dir
+        """Dapatkan direktori root proyek SmartCash."""
+        from smartcash.common.utils import get_project_root
+        try: return get_project_root()
+        except: return self._base_dir  # Fallback
     
     def setup_project_structure(self, use_drive: bool = False, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
@@ -199,37 +175,41 @@ class EnvironmentManager:
         ]
         
         # Tentukan direktori dasar
-        base = (self._drive_path if use_drive and self._drive_mounted 
-                else self._base_dir)
+        base = (self._drive_path if use_drive and self._drive_mounted else self._base_dir)
         
-        # Buat direktori
-        stats = {
-            'created': 0,
-            'existing': 0,
-            'error': 0
-        }
-        
+        # Buat direktori menggunakan file_utils jika tersedia
+        stats = {'created': 0, 'existing': 0, 'error': 0}
         total_dirs = len(directories)
         
-        for idx, dir_path in enumerate(directories):
-            if progress_callback:
-                # Perhitungan progress yang benar: idx dimulai dari 0, jadi tambahkan 1 untuk menghindari progress 0%
-                progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
+        if self._file_utils:
+            for idx, dir_path in enumerate(directories):
+                if progress_callback: progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
                 
-            full_path = base / dir_path
-            try:
-                if not full_path.exists():
-                    full_path.mkdir(parents=True, exist_ok=True)
-                    stats['created'] += 1
-                else:
-                    stats['existing'] += 1
-            except Exception as e:
-                stats['error'] += 1
-                if self._logger:
-                    self._logger.warning(f"⚠️ Error pembuatan direktori: {dir_path} - {str(e)}")
+                full_path = base / dir_path
+                try:
+                    path = self._file_utils.ensure_dir(full_path)
+                    stats['created' if not path.exists() else 'existing'] += 1
+                except Exception as e:
+                    stats['error'] += 1
+                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan direktori: {dir_path} - {str(e)}")
+        else:
+            # Fallback jika file_utils tidak tersedia
+            for idx, dir_path in enumerate(directories):
+                if progress_callback: progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
+                
+                full_path = base / dir_path
+                try:
+                    if not full_path.exists():
+                        full_path.mkdir(parents=True, exist_ok=True)
+                        stats['created'] += 1
+                    else:
+                        stats['existing'] += 1
+                except Exception as e:
+                    stats['error'] += 1
+                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan direktori: {dir_path} - {str(e)}")
         
-        if self._logger:
-            self._logger.info(f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada")
+        if self.logger:
+            self.logger.info(f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada")
         
         return stats
     
@@ -245,8 +225,7 @@ class EnvironmentManager:
         """
         if not self._drive_mounted:
             msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
-            if self._logger:
-                self._logger.warning(msg)
+            if self.logger: self.logger.warning(msg)
             return {'created': 0, 'existing': 0, 'error': 0}
         
         # Mapping symlink
@@ -258,64 +237,47 @@ class EnvironmentManager:
             'checkpoints': self._drive_path / 'checkpoints'
         }
         
-        stats = {
-            'created': 0,
-            'existing': 0,
-            'error': 0
-        }
-        
+        stats = {'created': 0, 'existing': 0, 'error': 0}
         total_symlinks = len(symlinks)
         
+        # Gunakan file_utils jika tersedia
+        import shutil
+        
         for idx, (local_name, target_path) in enumerate(symlinks.items()):
-            if progress_callback:
-                # Perhitungan progress yang benar: idx dimulai dari 0, jadi tambahkan 1
-                progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
+            if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
                 
             try:
-                local_path = self._base_dir / local_name
-                
                 # Pastikan direktori target ada
-                target_path.mkdir(parents=True, exist_ok=True)
+                os.makedirs(target_path, exist_ok=True)
+                local_path = self._base_dir / local_name
                 
                 # Cek jika path lokal ada dan bukan symlink
                 if local_path.exists() and not local_path.is_symlink():
-                    # Rename direktori yang ada untuk backup
                     backup_path = local_path.with_name(f"{local_name}_backup")
-                    if self._logger:
-                        self._logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+                    if self.logger:
+                        self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+                    
+                    # Hapus backup yang sudah ada
+                    if backup_path.exists(): shutil.rmtree(backup_path)
+                    
+                    # Pindahkan direktori lokal ke backup
                     local_path.rename(backup_path)
                 
                 # Buat symlink jika belum ada
                 if not local_path.exists():
-                    # Pada Windows gunakan metode alternatif jika symlink tidak tersedia
-                    if os.name == 'nt':
-                        try:
-                            os.symlink(target_path, local_path, target_is_directory=True)
-                        except OSError:
-                            # Jika symlink gagal (misalnya hak admin), gunakan junction
-                            if self._logger:
-                                self._logger.warning(f"⚠️ Symlink gagal, mencoba junction pada Windows untuk: {local_name}")
-                            import subprocess
-                            subprocess.run(f'mklink /J "{local_path}" "{target_path}"', shell=True)
-                    else:
-                        local_path.symlink_to(target_path)
-                    
+                    local_path.symlink_to(target_path)
                     stats['created'] += 1
-                    if self._logger:
-                        self._logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                    if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
                 else:
                     stats['existing'] += 1
             except Exception as e:
                 stats['error'] += 1
-                if self._logger:
-                    self._logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
+                if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
         
         return stats
     
-    def get_directory_tree(self, root_dir: Optional[Union[str, Path]] = None, 
-                          max_depth: int = 3, 
-                          indent: int = 0, 
-                          _current_depth: int = 0) -> str:
+    def get_directory_tree(self, root_dir: Optional[Union[str, Path]] = None, max_depth: int = 3, 
+                         indent: int = 0, _current_depth: int = 0) -> str:
         """
         Dapatkan struktur direktori dalam format HTML.
         
@@ -328,32 +290,22 @@ class EnvironmentManager:
         Returns:
             String HTML yang menampilkan struktur direktori
         """
-        if root_dir is None:
-            root_dir = self._base_dir
+        # Menggunakan modul komponen file_utils
+        if self._file_utils and hasattr(self._file_utils, 'get_directory_tree'):
+            return self._file_utils.get_directory_tree(root_dir or self._base_dir, max_depth)
         
-        # Konversi ke Path jika string
-        root_dir = Path(root_dir) if isinstance(root_dir, str) else root_dir
+        # Implementasi default jika komponen tidak tersedia
+        root_dir = Path(root_dir or self._base_dir)
         
-        if not root_dir.exists():
-            return f"<span style='color:red'>❌ Direktori tidak ditemukan: {root_dir}</span>"
+        if not root_dir.exists(): return f"<span style='color:red'>❌ Direktori tidak ditemukan: {root_dir}</span>"
+        if _current_depth > max_depth: return "<span style='color:gray'>...</span>"
         
-        if _current_depth > max_depth:
-            return "<span style='color:gray'>...</span>"
+        result = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n" if indent == 0 else ""
         
-        # Mulai dengan pre tag
-        if indent == 0:
-            result = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n"
-        else:
-            result = ""
+        if indent == 0: result += f"<span style='color:#0366d6; font-weight:bold;'>{root_dir.name}/</span>\n"
         
-        # Tampilkan direktori current
-        if indent == 0:
-            result += f"<span style='color:#0366d6; font-weight:bold;'>{root_dir.name}/</span>\n"
-        
-        # Buat space indentasi
         spaces = "│  " * indent
         
-        # Dapatkan isi direktori, sortir direktori dulu
         try:
             items = sorted(root_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name))
         except PermissionError:
@@ -361,53 +313,33 @@ class EnvironmentManager:
         
         for i, item in enumerate(items):
             is_last = i == len(items) - 1
-            
-            # Pilih garis/karakter penghubung
             prefix = "└─ " if is_last else "├─ "
             
             if item.is_dir():
-                # Gunakan warna biru untuk direktori
                 result += f"{spaces}{prefix}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
                 
-                # Tambah garis penghubung untuk level berikutnya
                 next_spaces = spaces + ("   " if is_last else "│  ")
                 if _current_depth < max_depth:
-                    # Rekursi untuk subdirektori
-                    subdirs = self.get_directory_tree(
-                        root_dir=item,
-                        max_depth=max_depth,
-                        indent=indent + 1,
-                        _current_depth=_current_depth + 1
-                    )
-                    # Hapus tag pre dari hasil rekursi
+                    subdirs = self.get_directory_tree(item, max_depth, indent + 1, _current_depth + 1)
                     subdirs = subdirs.replace("<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n", "")
                     subdirs = subdirs.replace("</pre>", "")
                     result += subdirs
             else:
-                # File ekstensi untuk warna
                 ext = item.suffix.lower()
-                color = "#333"  # Default color
-                
-                # Set warna berdasarkan tipe file
-                if ext in ['.py']:
-                    color = "#3572A5"  # Python files
-                elif ext in ['.md', '.txt']:
-                    color = "#6A737D"  # Documentation files
-                elif ext in ['.jpg', '.jpeg', '.png', '.bmp']:
-                    color = "#E34F26"  # Image files
-                elif ext in ['.json', '.yaml', '.yml']:
-                    color = "#F1E05A"  # Config files
-                elif ext in ['.pt', '.pth']:
-                    color = "#9B4DCA"  # PyTorch model files
-                
-                # Tambahkan file ke hasil
+                color = self._get_color_for_extension(ext)
                 result += f"{spaces}{prefix}<span style='color:{color};'>{item.name}</span>\n"
         
-        # Tutup tag jika pada level teratas
-        if indent == 0:
-            result += "</pre>"
-        
+        if indent == 0: result += "</pre>"
         return result
+    
+    def _get_color_for_extension(self, ext: str) -> str:
+        """Mendapatkan warna berdasarkan ekstensi file."""
+        if ext in ['.py']: return "#3572A5"  # Python files
+        elif ext in ['.md', '.txt']: return "#6A737D"  # Documentation files
+        elif ext in ['.jpg', '.jpeg', '.png', '.bmp']: return "#E34F26"  # Image files
+        elif ext in ['.json', '.yaml', '.yml']: return "#F1E05A"  # Config files
+        elif ext in ['.pt', '.pth']: return "#9B4DCA"  # PyTorch model files
+        return "#333"  # Default color
     
     def get_system_info(self) -> Dict[str, Any]:
         """
@@ -416,6 +348,16 @@ class EnvironmentManager:
         Returns:
             Dictionary detail sistem
         """
+        # Gunakan utils jika tersedia
+        try:
+            from smartcash.common.utils import get_system_info
+            return get_system_info()
+        except ImportError:
+            pass
+            
+        # Implementasi default
+        import platform, sys
+        
         info = {
             'environment': 'Google Colab' if self._in_colab else 'Jupyter/IPython' if self._in_notebook else 'Local',
             'base_directory': str(self._base_dir),
@@ -437,9 +379,7 @@ class EnvironmentManager:
             
         # Informasi sistem
         try:
-            import platform
             import psutil
-            
             info['system'] = {
                 'platform': platform.platform(),
                 'processor': platform.processor(),
@@ -451,15 +391,15 @@ class EnvironmentManager:
         return info
     
     def install_requirements(self, requirements_file: Optional[Union[str, Path]] = None,
-                           additional_packages: Optional[List[str]] = None,
-                           progress_callback: Optional[Callable[[int, int, str], None]] = None) -> bool:
+                          additional_packages: Optional[List[str]] = None,
+                          progress_callback: Optional[Callable[[int, int, str], None]] = None) -> bool:
         """
         Install requirement packages menggunakan pip.
         
         Args:
             requirements_file: Path ke file requirements.txt
             additional_packages: List package tambahan untuk diinstall
-            progress_callback: Callback untuk menampilkan progres (current, total, message)
+            progress_callback: Callback untuk menampilkan progres
             
         Returns:
             Status keberhasilan instalasi
@@ -474,46 +414,33 @@ class EnvironmentManager:
         if requirements_file:
             req_path = Path(requirements_file)
             if req_path.exists():
-                if self._logger:
-                    self._logger.info(f"📦 Menginstall packages dari {req_path}...")
+                if self.logger: self.logger.info(f"📦 Menginstall packages dari {req_path}...")
+                if progress_callback: progress_callback(1, total_steps, f"Menginstall packages dari {req_path}")
                 
-                if progress_callback:
-                    progress_callback(1, total_steps, f"Menginstall packages dari {req_path}")
-                
-                cmd = [sys.executable, "-m", "pip", "install", "-r", str(req_path)]
-                process = subprocess.run(cmd, capture_output=True, text=True)
+                process = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_path)], capture_output=True, text=True)
+                success = success and process.returncode == 0
                 
                 if process.returncode != 0:
-                    if self._logger:
-                        self._logger.error(f"❌ Error instalasi requirements: {process.stderr}")
-                    success = False
+                    if self.logger: self.logger.error(f"❌ Error instalasi requirements: {process.stderr}")
                 else:
-                    if self._logger:
-                        self._logger.info(f"✅ Requirements berhasil diinstall")
+                    if self.logger: self.logger.info(f"✅ Requirements berhasil diinstall")
                     steps_completed += 1
             else:
-                if self._logger:
-                    self._logger.warning(f"⚠️ File requirements tidak ditemukan: {req_path}")
+                if self.logger: self.logger.warning(f"⚠️ File requirements tidak ditemukan: {req_path}")
                 success = False
         
         # Install package tambahan
         if additional_packages:
-            if self._logger:
-                self._logger.info(f"📦 Menginstall package tambahan: {', '.join(additional_packages)}")
-            
-            if progress_callback:
-                progress_callback(steps_completed + 1, total_steps, f"Menginstall package tambahan")
+            if self.logger: self.logger.info(f"📦 Menginstall package tambahan: {', '.join(additional_packages)}")
+            if progress_callback: progress_callback(steps_completed + 1, total_steps, f"Menginstall package tambahan")
                 
-            cmd = [sys.executable, "-m", "pip", "install"] + additional_packages
-            process = subprocess.run(cmd, capture_output=True, text=True)
+            process = subprocess.run([sys.executable, "-m", "pip", "install"] + additional_packages, capture_output=True, text=True)
+            success = success and process.returncode == 0
             
             if process.returncode != 0:
-                if self._logger:
-                    self._logger.error(f"❌ Error instalasi package tambahan: {process.stderr}")
-                success = False
+                if self.logger: self.logger.error(f"❌ Error instalasi package tambahan: {process.stderr}")
             else:
-                if self._logger:
-                    self._logger.info(f"✅ Package tambahan berhasil diinstall")
+                if self.logger: self.logger.info(f"✅ Package tambahan berhasil diinstall")
                     
         return success
     
@@ -539,11 +466,12 @@ class EnvironmentManager:
         """
         try:
             from IPython import get_ipython
-            if get_ipython() is not None:
-                return True
-            return False
+            return get_ipython() is not None
         except ImportError:
             return False
+
+# Singleton instance
+_environment_manager = None
 
 def get_environment_manager(base_dir: Optional[str] = None, logger = None) -> EnvironmentManager:
     """
@@ -556,4 +484,6 @@ def get_environment_manager(base_dir: Optional[str] = None, logger = None) -> En
     Returns:
         Singleton EnvironmentManager
     """
-    return EnvironmentManager(base_dir, logger)
+    global _environment_manager
+    if _environment_manager is None: _environment_manager = EnvironmentManager(base_dir, logger)
+    return _environment_manager

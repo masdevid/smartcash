@@ -10,9 +10,12 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple, Union, Callable
 from tqdm import tqdm
 
-from smartcash.common.utils import ensure_dir, get_timestamp
+from smartcash.common.utils import get_timestamp
 from smartcash.common.logger import SmartCashLogger, get_logger
 from smartcash.common.constants import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
+from smartcash.dataset.utils import (
+    ensure_dir
+)
 
 
 class VideoHandler:

@@ -26,7 +26,7 @@ class LayerConfigManager(ILayerConfigManager):
     _instance = None
     
     # Default layer configuration
-    DEFAULT_CONFIG = {
+    DEFAULT_LAYER_CONFIG = {
         'banknote': {
             'name': 'banknote',
             'description': 'Deteksi uang kertas utuh',
@@ -74,7 +74,7 @@ class LayerConfigManager(ILayerConfigManager):
         """
         if hasattr(self, '_initialized') and self._initialized: return
         self.logger = logger
-        self.config = config or (self.load_config(config_path) and self.config if config_path and os.path.exists(config_path) else self.DEFAULT_CONFIG)
+        self.config = config or (self.load_config(config_path) and self.config if config_path and os.path.exists(config_path) else self.DEFAULT_LAYER_CONFIG)
         self._initialized = True
         
         if self.logger:

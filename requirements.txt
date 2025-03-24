@@ -14,7 +14,6 @@ tensorboard>=2.5.0
 requests>=2.25.0
 pathlib>=1.0.1
 ultralytics>=8.0.0  # Untuk YOLOv5
-roboflow>=0.2.0
 pycocotools>=2.0.2
 seaborn>=0.11.0
 ipython>=7.23.0  # Untuk visualisasi notebook

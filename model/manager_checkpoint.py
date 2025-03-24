@@ -12,7 +12,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.interfaces.checkpoint_interface import ICheckpointService
 from smartcash.common.exceptions import ModelCheckpointError
 from smartcash.model.services.checkpoint.checkpoint_service import CheckpointService
-
+from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE
 
 class ModelCheckpointManager(ICheckpointService):
     """
@@ -89,7 +89,7 @@ class ModelCheckpointManager(ICheckpointService):
             merged_metadata = {
                 'model_type': self.model_manager.model_type,
                 'backbone': self.model_manager.config.get('backbone', 'unknown'),
-                'img_size': self.model_manager.config.get('img_size', [640, 640]),
+                'img_size': self.model_manager.config.get('img_size', DEFAULT_IMG_SIZE),
                 'detection_layers': self.model_manager.config.get('detection_layers', [])
             }
             
@@ -222,7 +222,7 @@ class ModelCheckpointManager(ICheckpointService):
             
             # Gunakan input shape dari config jika tidak disediakan
             if input_shape is None:
-                img_size = self.model_manager.config.get('img_size', [640, 640])
+                img_size = self.model_manager.config.get('img_size', DEFAULT_IMG_SIZE)
                 input_shape = [1, 3, img_size[0], img_size[1]]
             
             # Export model ke ONNX

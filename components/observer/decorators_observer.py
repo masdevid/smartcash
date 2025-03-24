@@ -1,11 +1,12 @@
 """
 File: smartcash/components/observer/decorators_observer.py
-Deskripsi: Decorator untuk observer pattern di SmartCash
+Deskripsi: Decorator untuk observer pattern di SmartCash dengan optimasi ThreadPoolExecutor
 """
 
 import functools
 import inspect
-import threading
+import concurrent.futures
+from threading import RLock
 from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, get_type_hints
 
 from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
@@ -17,13 +18,19 @@ from smartcash.common.logger import get_logger
 _logger = get_logger("observer_decorators")
 
 # Lock untuk thread-safety
-_lock = threading.RLock()
+_lock = RLock()
 
 # Set untuk menyimpan metode yang ditandai sebagai observable
 _observable_methods = set()
 
 # Dict untuk menyimpan cache class observer yang dibuat melalui decorator
 _observer_class_cache: Dict[str, Type[BaseObserver]] = {}
+
+# ThreadPoolExecutor untuk proses async
+_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=min(16, (concurrent.futures.cpu_count() or 4)),
+    thread_name_prefix="ObserverDecorator"
+)
 
 
 def observable(
@@ -32,12 +39,10 @@ def observable(
     include_result: bool = False,
     include_self: bool = False,
     include_self_attributes: Optional[List[str]] = None,
+    async_notify: bool = False
 ) -> Callable:
     """
-    Decorator untuk menandai metode sebagai observable.
-    
-    Ketika metode yang ditandai dengan decorator ini dipanggil, akan mengirimkan
-    notifikasi ke semua observer yang terdaftar untuk event yang sesuai.
+    Decorator untuk menandai metode sebagai observable dengan dukungan async notification.
     
     Args:
         event_type: Tipe event yang akan dikirim (default: nama kelas + "." + nama metode)
@@ -45,6 +50,7 @@ def observable(
         include_result: Sertakan hasil metode dalam notifikasi
         include_self: Sertakan instance kelas (self) dalam notifikasi sebagai 'instance'
         include_self_attributes: List atribut dari instance yang akan disertakan
+        async_notify: Gunakan ThreadPoolExecutor untuk notifikasi asinkron
         
     Returns:
         Fungsi yang dibungkus
@@ -75,7 +81,7 @@ def observable(
             # Gabungkan args ke kwargs untuk notifikasi
             notification_kwargs = {}
             
-            # Tambahkan argumen jika diperlukan
+            # Tambahkan argumen jika diperlukan dengan one-liner
             if include_args:
                 # Dapatkan nama parameter dari signature
                 parameters = list(sig.parameters.keys())
@@ -83,10 +89,8 @@ def observable(
                 # Jika instance bukan None, skip parameter pertama (self)
                 start_idx = 1 if instance is not None and not isinstance(func, staticmethod) else 0
                 
-                # Tambahkan positional args
-                for i, arg in enumerate(args[start_idx:], start=start_idx):
-                    if i < len(parameters):
-                        notification_kwargs[parameters[i]] = arg
+                # Tambahkan positional args dengan one-liner
+                notification_kwargs.update({parameters[i]: arg for i, arg in enumerate(args[start_idx:], start=start_idx) if i < len(parameters)})
                 
                 # Tambahkan keyword args
                 notification_kwargs.update(kwargs)
@@ -95,11 +99,9 @@ def observable(
             if include_self and instance is not None:
                 notification_kwargs['instance'] = instance
                 
-                # Tambahkan atribut tertentu dari instance
+                # Tambahkan atribut tertentu dari instance dengan one-liner
                 if include_self_attributes:
-                    for attr in include_self_attributes:
-                        if hasattr(instance, attr):
-                            notification_kwargs[f"instance_{attr}"] = getattr(instance, attr)
+                    notification_kwargs.update({f"instance_{attr}": getattr(instance, attr) for attr in include_self_attributes if hasattr(instance, attr)})
             
             # Panggil fungsi asli
             result = func(*args, **kwargs)
@@ -110,13 +112,24 @@ def observable(
             
             # Kirim notifikasi
             sender = instance if instance is not None else func
-            EventDispatcher.notify(actual_event_type, sender, **notification_kwargs)
+            
+            # Gunakan async notification jika diminta
+            if async_notify:
+                _executor.submit(
+                    EventDispatcher.notify,
+                    actual_event_type,
+                    sender,
+                    **notification_kwargs
+                )
+            else:
+                EventDispatcher.notify(actual_event_type, sender, **notification_kwargs)
             
             return result
         
         # Tambahkan atribut ke fungsi yang dibungkus
         wrapper.__observable__ = True
         wrapper.__event_type__ = event_type
+        wrapper.__async_notify__ = async_notify
         
         return wrapper
     
@@ -127,20 +140,18 @@ def observe(
     event_types: Union[str, List[str]],
     priority: int = 0,
     event_filter: Optional[Any] = None,
-    method_name: Optional[str] = None
+    method_name: Optional[str] = None,
+    async_update: bool = False
 ) -> Callable:
     """
-    Decorator untuk membuat metode kelas menjadi observer.
-    
-    Decorator ini akan membuat kelas dengan metode yang ditandai menjadi observer
-    untuk event yang ditentukan. Kelas yang menggunakan decorator ini harus memiliki
-    metode dengan nama `method_name` (default: "update").
+    Decorator untuk membuat metode kelas menjadi observer dengan dukungan async update.
     
     Args:
         event_types: Tipe event atau list tipe event yang akan diobservasi
         priority: Prioritas observer
         event_filter: Filter untuk event yang akan diproses
         method_name: Nama metode yang akan dipanggil (default: "update")
+        async_update: Gunakan ThreadPoolExecutor untuk update asinkron
         
     Returns:
         Decorator untuk kelas
@@ -150,8 +161,7 @@ def observe(
         event_types = [event_types]
     
     # Gunakan nama metode default jika tidak disebutkan
-    if method_name is None:
-        method_name = "update"
+    method_name = method_name or "update"
     
     def decorator(cls):
         # Buat nama kelas untuk observer
@@ -159,24 +169,31 @@ def observe(
         
         # Periksa apakah kelas sudah memiliki metode yang ditentukan
         if not hasattr(cls, method_name) or not callable(getattr(cls, method_name)):
-            raise AttributeError(
-                f"Kelas {cls.__name__} tidak memiliki metode '{method_name}' yang dapat dijadikan observer")
+            raise AttributeError(f"Kelas {cls.__name__} tidak memiliki metode '{method_name}' yang diperlukan")
         
         # Periksa apakah kelas observer sudah di-cache
         cache_key = f"{cls.__module__}.{cls.__name__}_{method_name}"
+        
+        # Gunakan kelas yang ada atau buat kelas baru dengan optimasi
         if cache_key in _observer_class_cache:
-            # Gunakan kelas yang sudah di-cache
             observer_class = _observer_class_cache[cache_key]
         else:
-            # Buat kelas observer baru yang mewarisi BaseObserver
+            # Buat kelas observer baru dengan dukungan async update
             class ClassMethodObserver(BaseObserver):
-                def __init__(self, instance, **kwargs):
+                def __init__(self, instance, async_update=False, **kwargs):
                     super().__init__(**kwargs)
                     self.instance = instance
+                    self.async_update = async_update
                 
                 def update(self, event_type, sender, **kwargs):
-                    # Panggil metode pada instance
-                    getattr(self.instance, method_name)(event_type, sender, **kwargs)
+                    # Panggil metode pada instance, async jika diperlukan
+                    if self.async_update:
+                        return _executor.submit(
+                            getattr(self.instance, method_name),
+                            event_type, sender, **kwargs
+                        )
+                    else:
+                        return getattr(self.instance, method_name)(event_type, sender, **kwargs)
             
             # Ganti nama kelas untuk debugging yang lebih mudah
             ClassMethodObserver.__name__ = observer_class_name
@@ -200,7 +217,8 @@ def observe(
                 instance=instance,
                 name=f"{instance.__class__.__name__}_{id(instance)}",
                 priority=priority,
-                event_filter=event_filter
+                event_filter=event_filter,
+                async_update=async_update
             )
             
             # Daftarkan observer ke dispatcher untuk semua event
@@ -211,6 +229,7 @@ def observe(
             if not hasattr(instance, '_observers'):
                 instance._observers = []
             instance._observers.append(observer)
+            
             return instance
         
         # Ganti metode __new__
@@ -236,3 +255,31 @@ def observe(
         return cls
     
     return decorator
+
+
+def async_observe(
+    event_types: Union[str, List[str]],
+    priority: int = 0,
+    event_filter: Optional[Any] = None,
+    method_name: Optional[str] = None
+) -> Callable:
+    """
+    Decorator untuk membuat metode kelas menjadi observer asinkron.
+    Shorthand untuk observe(..., async_update=True)
+    
+    Args:
+        event_types: Tipe event atau list tipe event yang akan diobservasi
+        priority: Prioritas observer
+        event_filter: Filter untuk event yang akan diproses
+        method_name: Nama metode yang akan dipanggil (default: "update")
+        
+    Returns:
+        Decorator untuk kelas
+    """
+    return observe(event_types, priority, event_filter, method_name, async_update=True)
+
+
+def shutdown_decorators() -> None:
+    """Shutdown thread pool executor."""
+    if _executor is not None:
+        _executor.shutdown(wait=True)

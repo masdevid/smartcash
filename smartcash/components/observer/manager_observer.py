@@ -1,36 +1,55 @@
 """
 File: smartcash/components/observer/manager_observer.py
-Deskripsi: Manager untuk observer pattern di SmartCash dengan perbaikan memory leak dan resource management
+Deskripsi: Manager untuk observer pattern di SmartCash dengan integrasi progress_tracker dan optimasi resource
 """
 import inspect
 import weakref
+import concurrent.futures
 from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
-import threading
+from threading import RLock
 
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.common.logger import get_logger
+from smartcash.common.progress_tracker import get_progress_tracker
+from smartcash.common.progress_observer import ProgressObserver, create_progress_tracker_observer
+from smartcash.components.observer.cleanup_observer import register_observer_manager
 
 
 class ObserverManager:
-    """Manager untuk observer pattern di SmartCash."""
+    """
+    Manager untuk observer pattern di SmartCash dengan integrasi common.
     
-    # Logger
-    _logger = get_logger("observer_manager")
+    Mengintegrasikan progress_tracker dan progress_observer dari common
+    untuk mengurangi duplikasi kode dan meningkatkan konsistensi.
+    """
     
-    # Lock untuk thread-safety
-    _lock = threading.RLock()
-    
-    # Menyimpan observer dengan weakref untuk mencegah memory leak
-    _observers = weakref.WeakSet()
-    
-    # Dictionary untuk menyimpan observer berdasarkan grupnya dengan weakref
-    _observer_groups = {}
-    
-    def __init__(self, auto_register: bool = True):
-        """Inisialisasi ObserverManager."""
+    def __init__(self, 
+                auto_register: bool = True, 
+                logger: Optional[Any] = None,
+                auto_cleanup: bool = True,
+                max_workers: Optional[int] = None):
+        """
+        Inisialisasi ObserverManager dengan dukungan auto-cleanup.
+        
+        Args:
+            auto_register: Otomatis daftarkan observer ke dispatcher
+            logger: Logger custom (optional)
+            auto_cleanup: Otomatis daftarkan manager untuk cleanup saat aplikasi selesai
+            max_workers: Jumlah maksimum worker thread (None untuk auto)
+        """
         self.auto_register = auto_register
-        self._progress_bars = {}  # Untuk melacak progress bar yang dibuat
+        self.logger = logger or get_logger("observer_manager")
+        self._observer_groups = {}  # Group -> set(observer_weakrefs)
+        self._observers = weakref.WeakSet()  # Semua observer
+        self._lock = RLock()
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+        
+        # Daftarkan manager untuk auto cleanup jika diminta
+        if auto_cleanup:
+            register_observer_manager(self)
+            
+        self.logger.debug("🔄 ObserverManager diinisialisasi")
     
     def create_simple_observer(
         self, 
@@ -41,41 +60,34 @@ class ObserverManager:
         event_filter: Optional[Any] = None,
         group: Optional[str] = None
     ) -> BaseObserver:
-        """Membuat simple observer dengan callback function."""
-        # Validasi callback
-        if not callable(callback):
-            raise TypeError("callback harus merupakan callable")
+        """
+        Membuat simple observer dengan callback function.
         
-        # Buat simple observer
-        class SimpleObserver(BaseObserver):
-            def update(self, event_type, sender, **kwargs):
-                return callback(event_type, sender, **kwargs)
+        Args:
+            event_type: Tipe event atau list tipe event
+            callback: Fungsi callback untuk observer
+            name: Nama observer (opsional)
+            priority: Prioritas observer
+            event_filter: Filter untuk event
+            group: Grup observer untuk manajemen
+            
+        Returns:
+            BaseObserver instance
+        """
+        # Validasi callback dengan one-liner
+        if not callable(callback): raise TypeError("callback harus callable")
         
-        # Gunakan nama function sebagai nama observer jika tidak disebutkan
-        if name is None and hasattr(callback, '__name__'):
-            name = f"SimpleObserver_{callback.__name__}"
-        elif name is None:
-            name = f"SimpleObserver_{id(callback)}"
+        # Buat anonymous class dengan inline lambda untuk update method
+        SimpleObserver = type('SimpleObserver', (BaseObserver,), {
+            'update': lambda self, event_type, sender, **kwargs: callback(event_type, sender, **kwargs)
+        })
         
-        # Buat instance observer
-        observer = SimpleObserver(name=name, priority=priority, event_filter=event_filter)
+        # Gunakan nama function sebagai nama observer dengan one-liner
+        observer_name = name or (callback.__name__ if hasattr(callback, '__name__') else f"SimpleObserver_{id(callback)}")
         
-        # Tambahkan ke set dan grup jika perlu
-        with self._lock:
-            self._observers.add(observer)
-            if group is not None:
-                if group not in self._observer_groups:
-                    self._observer_groups[group] = weakref.WeakSet()
-                self._observer_groups[group].add(observer)
-        
-        # Daftarkan ke event dispatcher jika auto_register
-        if self.auto_register:
-            if isinstance(event_type, list):
-                EventDispatcher.register_many(event_type, observer, priority)
-            else:
-                EventDispatcher.register(event_type, observer, priority)
-        
-        return observer
+        # Buat instance dan register dalam satu langkah
+        observer = SimpleObserver(name=observer_name, priority=priority, event_filter=event_filter)
+        return self._register_observer(observer, event_type, group)
     
     def create_observer(
         self,
@@ -87,29 +99,50 @@ class ObserverManager:
         group: Optional[str] = None,
         **kwargs
     ) -> BaseObserver:
-        """Membuat dan mendaftarkan observer dari kelas yang diberikan."""
-        # Validasi kelas
+        """
+        Membuat dan mendaftarkan observer dari kelas yang diberikan.
+        
+        Args:
+            observer_class: Kelas observer (subclass dari BaseObserver)
+            event_type: Tipe event atau list tipe event
+            name: Nama observer (opsional)
+            priority: Prioritas observer (opsional)
+            event_filter: Filter untuk event (opsional)
+            group: Grup observer untuk manajemen
+            **kwargs: Parameter tambahan untuk constructor observer
+            
+        Returns:
+            BaseObserver instance
+        """
+        # Validasi kelas observer
         if not inspect.isclass(observer_class) or not issubclass(observer_class, BaseObserver):
-            raise TypeError(f"observer_class harus merupakan subclass dari BaseObserver")
+            raise TypeError(f"observer_class harus subclass dari BaseObserver")
         
-        # Buat instance observer
-        init_params = {}
-        if name is not None:
-            init_params['name'] = name
-        if priority is not None:
-            init_params['priority'] = priority
-        if event_filter is not None:
-            init_params['event_filter'] = event_filter
+        # Buat parameter init dengan one-liner
+        init_params = {k: v for k, v in {'name': name, 'priority': priority, 'event_filter': event_filter}.items() if v is not None}
+        init_params.update(kwargs)  # Tambahkan parameter tambahan
         
-        # Tambahkan parameter tambahan
-        init_params.update(kwargs)
-        
-        # Instantiate observer
+        # Instantiate observer dan register dalam satu langkah
         observer = observer_class(**init_params)
+        return self._register_observer(observer, event_type, group)
+    
+    def _register_observer(self, observer: BaseObserver, event_type: Union[str, List[str]], group: Optional[str]) -> BaseObserver:
+        """
+        Helper internal untuk mendaftarkan observer ke registry dan grup.
         
-        # Tambahkan ke set dan grup jika perlu
+        Args:
+            observer: Observer yang akan didaftarkan
+            event_type: Tipe event atau list tipe event
+            group: Grup observer untuk manajemen
+            
+        Returns:
+            Observer yang didaftarkan
+        """
         with self._lock:
+            # Tambahkan ke set utama
             self._observers.add(observer)
+            
+            # Tambahkan ke grup jika perlu
             if group is not None:
                 if group not in self._observer_groups:
                     self._observer_groups[group] = weakref.WeakSet()
@@ -118,9 +151,9 @@ class ObserverManager:
         # Daftarkan ke event dispatcher jika auto_register
         if self.auto_register:
             if isinstance(event_type, list):
-                EventDispatcher.register_many(event_type, observer, observer.priority)
+                EventDispatcher.register_many(event_type, observer)
             else:
-                EventDispatcher.register(event_type, observer, observer.priority)
+                EventDispatcher.register(event_type, observer)
         
         return observer
     
@@ -130,65 +163,48 @@ class ObserverManager:
         total: int,
         desc: str = "Processing",
         name: Optional[str] = None,
-        use_tqdm: bool = True,
-        callback: Optional[Callable] = None,
-        group: Optional[str] = None
-    ) -> BaseObserver:
-        """Membuat observer untuk monitoring progress dengan tqdm."""
-        # Import tqdm jika perlu
-        if use_tqdm:
-            try:
-                from tqdm import tqdm
-            except ImportError:
-                self._logger.warning("⚠️ Package tqdm tidak tersedia, menggunakan mode tanpa tqdm")
-                use_tqdm = False
+        group: Optional[str] = None,
+        show_progress: bool = True
+    ) -> ProgressObserver:
+        """
+        Membuat observer untuk monitoring progress menggunakan common/progress_observer.
         
-        # Buat progress observer
-        class ProgressObserver(BaseObserver):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.progress = 0
-                self.total = total
-                self.pbar = tqdm(total=total, desc=desc) if use_tqdm else None
-                # Tambahkan referensi ke grup untuk pembersihan
-                self.group = group
+        Args:
+            event_types: List tipe event yang akan diobservasi
+            total: Total unit yang akan diproses
+            desc: Deskripsi progress
+            name: Nama observer (opsional)
+            group: Grup observer untuk manajemen
+            show_progress: Tampilkan progress bar
             
-            def update(self, event_type, sender, **kwargs):
-                # Update progres
-                increment = kwargs.get('increment', 1)
-                self.progress += increment
+        Returns:
+            ProgressObserver instance
+        """
+        # Gunakan fungsi helper dari common/progress_observer
+        tracker, observer = create_progress_tracker_observer(
+            name=name or desc,
+            total=total,
+            desc=desc,
+            display=show_progress
+        )
+        
+        # Simpan ke grup jika perlu
+        if group is not None:
+            with self._lock:
+                if group not in self._observer_groups:
+                    self._observer_groups[group] = weakref.WeakSet()
+                self._observer_groups[group].add(observer)
                 
-                # Update progress bar jika ada
-                if self.pbar is not None:
-                    self.pbar.update(increment)
-                
-                # Call callback jika ada
-                if callback is not None:
-                    callback(event_type, sender, progress=self.progress, total=self.total, **kwargs)
-                
-                # Tutup progress bar jika selesai
-                if self.progress >= self.total and self.pbar is not None:
-                    self.pbar.close()
-                    self.pbar = None
+            # Tambahkan atribut grup untuk referensi
+            observer.group = group
+        
+        # Tambahkan ke set utama
+        self._observers.add(observer)
+        
+        # Daftarkan ke event dispatcher jika auto_register
+        if self.auto_register:
+            EventDispatcher.register_many(event_types, observer)
             
-            def __del__(self):
-                # Pastikan progress bar ditutup
-                if hasattr(self, 'pbar') and self.pbar is not None:
-                    self.pbar.close()
-                    self.pbar = None
-        
-        # Gunakan nama default jika tidak disebutkan
-        if name is None:
-            name = f"ProgressObserver_{desc}"
-        
-        # Buat observer
-        observer = self.create_observer(ProgressObserver, event_types, name=name, group=group)
-        
-        # Simpan referensi ke progress bar untuk pembersihan
-        if group not in self._progress_bars:
-            self._progress_bars[group] = []
-        self._progress_bars[group].append(weakref.ref(observer))
-        
         return observer
     
     def create_logging_observer(
@@ -202,153 +218,195 @@ class ObserverManager:
         logger_name: Optional[str] = None,
         group: Optional[str] = None
     ) -> BaseObserver:
-        """Membuat observer untuk logging event."""
-        # Buat custom logger jika diperlukan
+        """
+        Membuat observer untuk logging event.
+        
+        Args:
+            event_types: List tipe event yang akan diobservasi
+            log_level: Level log yang akan digunakan
+            name: Nama observer (opsional)
+            format_string: Format string untuk pesan log (opsional)
+            include_timestamp: Sertakan timestamp dalam pesan
+            include_sender: Sertakan sender dalam pesan
+            logger_name: Nama logger kustom (opsional)
+            group: Grup observer untuk manajemen
+            
+        Returns:
+            BaseObserver instance
+        """
+        # Buat custom logger dengan one-liner
         logger = get_logger(logger_name or "event_logger")
         
-        # Dapatkan metode log berdasarkan level
-        log_method = getattr(logger, log_level.lower())
+        # Dapatkan metode log dengan getattr
+        log_method = getattr(logger, log_level.lower(), logger.info)
         
-        # Buat logging observer
-        class LoggingObserver(BaseObserver):
-            def update(self, event_type, sender, **kwargs):
-                # Format pesan
-                if format_string is not None:
-                    # Gunakan string template jika disediakan
-                    try:
-                        message = format_string.format(event_type=event_type, sender=sender, **kwargs)
-                    except KeyError as e:
-                        message = f"Event '{event_type}' terjadi (error format: {e})"
-                else:
-                    # Buat pesan default
-                    message = f"Event '{event_type}' terjadi"
-                    
-                    # Tambahkan timestamp jika diperlukan
-                    if include_timestamp and 'timestamp' in kwargs:
-                        message += f" pada {kwargs['timestamp']}"
-                    
-                    # Tambahkan sender jika diperlukan
-                    if include_sender:
-                        message += f" dari {sender}"
-                    
-                    # Tambahkan data lain jika ada
-                    if kwargs:
-                        # Filter data yang akan ditampilkan
-                        filtered_data = {k: v for k, v in kwargs.items()
-                                        if k not in ('timestamp', 'notification_id') 
-                                        and not k.startswith('_')}
-                        if filtered_data:
-                            message += f" dengan data: {filtered_data}"
-                
-                # Log pesan
-                log_method(message)
+        # Buat logging observer dengan class factory dan lambda expression
+        LoggingObserver = type('LoggingObserver', (BaseObserver,), {
+            'update': lambda self, event_type, sender, **kwargs: log_method(
+                format_string.format(event_type=event_type, sender=sender, **kwargs) if format_string else
+                self._format_message(event_type, sender, include_timestamp, include_sender, kwargs)
+            ),
+            '_format_message': lambda self, event_type, sender, include_timestamp, include_sender, kwargs: ''.join([
+                f"Event '{event_type}' terjadi",
+                f" pada {kwargs['timestamp']}" if include_timestamp and 'timestamp' in kwargs else "",
+                f" dari {sender}" if include_sender else "",
+                f" dengan data: {self._filter_data(kwargs)}" if kwargs else ""
+            ]),
+            '_filter_data': lambda self, kwargs: {k: v for k, v in kwargs.items() if k not in ('timestamp', 'notification_id') and not k.startswith('_')}
+        })
         
-        # Gunakan nama default jika tidak disebutkan
-        if name is None:
-            name = f"LoggingObserver_{log_level}"
+        # Buat instance observer
+        return self.create_observer(
+            LoggingObserver, 
+            event_types, 
+            name=name or f"LoggingObserver_{log_level}", 
+            group=group
+        )
+    
+    def execute_async(self, func: Callable, *args, **kwargs) -> concurrent.futures.Future:
+        """
+        Eksekusi fungsi secara asinkron menggunakan ThreadPoolExecutor internal.
         
-        # Buat observer
-        return self.create_observer(LoggingObserver, event_types, name=name, group=group)
+        Args:
+            func: Fungsi yang akan dieksekusi
+            *args: Argumen positional untuk fungsi
+            **kwargs: Argumen keyword untuk fungsi
+            
+        Returns:
+            Future yang mewakili hasil eksekusi
+        """
+        return self._executor.submit(func, *args, **kwargs)
+    
+    def execute_for_all_observers(
+        self, 
+        func: Callable[[BaseObserver], Any],
+        group: Optional[str] = None,
+        parallel: bool = True
+    ) -> List[Any]:
+        """
+        Eksekusi fungsi untuk semua observer atau observer dalam grup tertentu.
+        
+        Args:
+            func: Fungsi yang menerima observer sebagai argumen
+            group: Terbatas ke grup tertentu (opsional)
+            parallel: Eksekusi paralel menggunakan ThreadPoolExecutor
+            
+        Returns:
+            List hasil eksekusi
+        """
+        # Pilih observer dari grup atau semua
+        observers = self.get_observers_by_group(group) if group else self.get_all_observers()
+        
+        if not observers:
+            return []
+        
+        if parallel:
+            # Eksekusi paralel dengan ThreadPoolExecutor
+            futures = [self._executor.submit(func, obs) for obs in observers]
+            return [future.result() for future in concurrent.futures.as_completed(futures)]
+        else:
+            # Eksekusi sekuensial dengan list comprehension
+            return [func(obs) for obs in observers]
     
     def get_observers_by_group(self, group: str) -> List[BaseObserver]:
-        """Mendapatkan semua observer dalam grup tertentu."""
+        """Mendapatkan semua observer dalam grup tertentu dengan one-liner."""
         with self._lock:
-            if group not in self._observer_groups:
-                return []
-            # Konversi ke list untuk mencegah perubahan saat iterasi
-            return list(self._observer_groups[group])
+            return list(self._observer_groups.get(group, set()))
     
     def unregister_group(self, group: str) -> int:
-        """Membatalkan registrasi semua observer dalam grup tertentu."""
+        """
+        Membatalkan registrasi semua observer dalam grup tertentu.
+        
+        Args:
+            group: Nama grup
+            
+        Returns:
+            Jumlah observer yang dibatalkan
+        """
         observers = self.get_observers_by_group(group)
         count = 0
         
-        for observer in observers:
-            EventDispatcher.unregister_from_all(observer)
-            count += 1
+        if not observers:
+            return 0
         
-        # Bersihkan progress bar yang terkait dengan grup
-        self._cleanup_progress_bars(group)
+        # Unregister semua observer dalam grup dengan paralelisme
+        def unregister_observer(obs):
+            EventDispatcher.unregister_from_all(obs)
+            return 1
+            
+        results = self.execute_for_all_observers(unregister_observer, group=group)
+        count = sum(results)
         
         # Hapus grup
         with self._lock:
             if group in self._observer_groups:
                 self._observer_groups[group].clear()
                 del self._observer_groups[group]
-            
-            if group in self._progress_bars:
-                del self._progress_bars[group]
         
         return count
     
-    def _cleanup_progress_bars(self, group: str) -> None:
-        """Membersihkan progress bar milik grup tertentu."""
-        if group not in self._progress_bars:
-            return
-            
-        for ref in self._progress_bars[group]:
-            observer = ref()
-            if observer is not None and hasattr(observer, 'pbar') and observer.pbar is not None:
-                try:
-                    observer.pbar.close()
-                    observer.pbar = None
-                except:
-                    pass
-    
     def unregister_all(self) -> int:
-        """Membatalkan registrasi semua observer yang dikelola."""
+        """
+        Membatalkan registrasi semua observer yang dikelola.
+        
+        Returns:
+            Jumlah observer yang dibatalkan
+        """
         with self._lock:
             # Konversi ke list untuk mencegah perubahan saat iterasi
             observers = list(self._observers)
             count = len(observers)
             
+            # Unregister semua observer
             for observer in observers:
                 EventDispatcher.unregister_from_all(observer)
-            
-            # Bersihkan semua progress bar
-            for group in list(self._progress_bars.keys()):
-                self._cleanup_progress_bars(group)
             
             # Bersihkan set dan grup
             self._observers.clear()
             self._observer_groups.clear()
-            self._progress_bars.clear()
-        
-        return count
+            
+            # Shutdown executor
+            self._executor.shutdown(wait=False)
+            
+            return count
     
     def get_all_observers(self) -> List[BaseObserver]:
-        """Mendapatkan semua observer yang dikelola."""
+        """Mendapatkan semua observer yang dikelola dengan one-liner."""
         with self._lock:
-            # Konversi ke list untuk mencegah perubahan saat iterasi
             return list(self._observers)
     
     def get_observer_count(self) -> int:
-        """Mendapatkan jumlah observer yang dikelola."""
+        """Mendapatkan jumlah observer yang dikelola dengan one-liner."""
         with self._lock:
             return len(self._observers)
     
     def get_group_count(self) -> int:
-        """Mendapatkan jumlah grup observer."""
+        """Mendapatkan jumlah grup observer dengan one-liner."""
         with self._lock:
             return len(self._observer_groups)
     
     def get_stats(self) -> Dict[str, Any]:
-        """Mendapatkan statistik manager."""
+        """Mendapatkan statistik manager dengan one-liner."""
         with self._lock:
             stats = {
                 'observer_count': len(self._observers),
                 'group_count': len(self._observer_groups),
-                'groups': {group: len(observers) for group, observers in self._observer_groups.items()},
-                'progress_bars': {group: len(bars) for group, bars in self._progress_bars.items()}
+                'groups': {group: len(observers) for group, observers in self._observer_groups.items()}
             }
         
         # Tambahkan statistik dari dispatcher
         stats.update(EventDispatcher.get_stats())
         return stats
-        
+    
+    def shutdown(self):
+        """Shutdown manager dan lepaskan resources."""
+        self.unregister_all()
+        if not self._executor._shutdown:
+            self._executor.shutdown(wait=True)
+    
     def __del__(self):
         """Cleanup saat instance dihapus."""
         try:
-            self.unregister_all()
+            self.shutdown()
         except:
             pass

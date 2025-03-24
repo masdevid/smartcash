@@ -3,10 +3,10 @@ File: smartcash/common/default_config.py
 Deskripsi: Utilitas untuk membuat konfigurasi default jika belum ada file konfigurasi
 """
 
-import os
 import yaml
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
+from dataset.utils.dataset_constants import DEFAULT_IMG_SIZE, DEFAULT_PREPROCESSED_DIR, DEFAULT_AUGMENTED_DIR, DEFAULT_VISUALIZATION_DIR
 
 def generate_default_config() -> Dict[str, Any]:
     """
@@ -36,7 +36,7 @@ def generate_default_config() -> Dict[str, Any]:
         },
         "data": {
             "dir": "data",
-            "preprocessed_dir": "data/preprocessed",
+            "preprocessed_dir": DEFAULT_PREPROCESSED_DIR,
             "split_ratios": {
                 "train": 0.7,
                 "valid": 0.15,
@@ -59,7 +59,7 @@ def generate_default_config() -> Dict[str, Any]:
         ],
         "model": {
             "backbone": "EfficientNet-B4",
-            "input_size": [640, 640],
+            "input_size": DEFAULT_IMG_SIZE,
             "confidence": 0.25,
             "iou_threshold": 0.45,
             "max_detections": 100,
@@ -88,7 +88,7 @@ def generate_default_config() -> Dict[str, Any]:
             "num_variations": 2,
             "output_prefix": "aug",
             "process_bboxes": True,
-            "output_dir": "data/augmented",
+            "output_dir": DEFAULT_AUGMENTED_DIR,
             "validate_results": False,
             "resume": False,
             "types": [
@@ -131,9 +131,9 @@ def generate_default_config() -> Dict[str, Any]:
             }
         },
         "preprocessing": {
-            "output_dir": "data/preprocessed",
+            "output_dir": DEFAULT_PREPROCESSED_DIR,
             "save_visualizations": True,
-            "vis_dir": "visualizations",
+            "vis_dir": DEFAULT_VISUALIZATION_DIR,
             "sample_size": 0,
             "validate": {
                 "enabled": True,
@@ -147,7 +147,7 @@ def generate_default_config() -> Dict[str, Any]:
             "normalization": {
                 "enabled": True,
                 "method": "minmax",
-                "target_size": [640, 640],
+                "target_size": DEFAULT_IMG_SIZE,
                 "preserve_aspect_ratio": True,
                 "normalize_pixel_values": True,
                 "pixel_range": [0, 1]

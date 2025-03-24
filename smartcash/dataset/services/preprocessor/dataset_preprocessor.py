@@ -18,10 +18,10 @@ from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
 from smartcash.components.observer import notify, EventTopics
 
 # Import utils yang dioptimalkan
-from smartcash.dataset.utils.label_utils import extract_class_from_label
 from smartcash.dataset.utils.move_utils import get_source_dir, resolve_splits, calculate_total_images
 from smartcash.dataset.utils.progress_utils import update_progress
 from smartcash.dataset.utils.preprocessing_image_utils import preprocess_single_image
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class DatasetPreprocessor:
     """Layanan preprocessing dataset dengan pelaporan progres yang dioptimalkan."""
@@ -324,12 +324,12 @@ class DatasetPreprocessor:
             self.storage.clean_storage(split)
         else:
             self.logger.info(f"🧹 Membersihkan semua hasil preprocessing")
-            [self.storage.clean_storage(split_name) for split_name in ['train', 'valid', 'test']]
+            [self.storage.clean_storage(split_name) for split_name in DEFAULT_SPLITS]
     
     def get_preprocessed_stats(self) -> Dict[str, Any]:
         """Dapatkan statistik hasil preprocessing dengan dictionary comprehension."""
         return {split_name: self.storage.get_stats(split_name) 
-                for split_name in ['train', 'valid', 'test'] 
+                for split_name in DEFAULT_SPLITS 
                 if self.storage.get_stats(split_name)}
     
     def is_preprocessed(self, split: str) -> bool:

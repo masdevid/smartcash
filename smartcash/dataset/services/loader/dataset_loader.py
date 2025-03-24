@@ -12,7 +12,7 @@ from smartcash.common.logger import get_logger
 from smartcash.dataset.components.datasets.multilayer_dataset import MultilayerDataset
 from smartcash.dataset.utils.transform.image_transform import ImageTransformer
 from smartcash.dataset.components.collate.multilayer_collate import multilayer_collate_fn
-
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class DatasetLoaderService:
     """Service untuk loading dataset dan pembuatan dataloader."""
@@ -153,7 +153,7 @@ class DatasetLoaderService:
         start_time = time.time()
         dataloaders = {}
         
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_path = self._get_split_path(split)
             
             # Skip jika direktori tidak ada

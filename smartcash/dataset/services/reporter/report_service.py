@@ -12,9 +12,9 @@ from typing import Dict, List, Optional, Tuple, Union, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
-from smartcash.common.layer_config import get_layer_config
 from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.dataset.visualization.data import DataVisualizationHelper
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class ReportService:
     """Layanan untuk membuat laporan komprehensif tentang dataset."""
@@ -73,7 +73,7 @@ class ReportService:
         
         # Default ke semua split jika tidak disediakan
         if not splits:
-            splits = ['train', 'valid', 'test']
+            splits = DEFAULT_SPLITS
         
         # Default format ekspor
         if not export_formats:

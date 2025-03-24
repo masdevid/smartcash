@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Union, Any, Callable
 from pathlib import Path
 
 from smartcash.common.exceptions import DatasetError, DatasetFileError, DatasetProcessingError
-
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 class PreprocessingManager:
     """Manager khusus untuk fungsionalitas preprocessing dataset dengan SRP approach."""
     
@@ -211,7 +211,7 @@ class PreprocessingManager:
             if self.logger:
                 total_stats = sum(
                     stats.get(split, {}).get('processed', 0) 
-                    for split in ['train', 'valid', 'test'] 
+                    for split in DEFAULT_SPLITS 
                     if split in stats
                 )
                 self.logger.info(f"📊 Statistik dataset preprocessed: {total_stats} total gambar")

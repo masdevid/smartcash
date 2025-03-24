@@ -5,6 +5,7 @@ Deskripsi: Utilitas bersama untuk mendapatkan statistik dataset preprocessing/au
 
 from typing import Dict, Any
 from pathlib import Path
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 def get_preprocessing_stats(ui_components: Dict[str, Any], preprocessed_dir: str) -> Dict[str, Any]:
     """
@@ -26,7 +27,7 @@ def get_preprocessing_stats(ui_components: Dict[str, Any], preprocessed_dir: str
     }
     
     # Cek setiap split
-    for split in ['train', 'valid', 'test']:
+    for split in DEFAULT_SPLITS:
         split_dir = Path(preprocessed_dir) / split
         if not split_dir.exists():
             stats['splits'][split] = {'exists': False, 'images': 0, 'labels': 0}

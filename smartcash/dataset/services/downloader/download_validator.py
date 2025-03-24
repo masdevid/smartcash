@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
 
 from smartcash.common.logger import get_logger
-from smartcash.dataset.utils.dataset_utils import DEFAULT_SPLITS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 
 class DownloadValidator:
@@ -47,7 +47,7 @@ class DownloadValidator:
         
         try:
             # Cek struktur direktori
-            expected_dirs = ['train', 'valid', 'test']
+            expected_dirs = DEFAULT_SPLITS
             for split in expected_dirs:
                 split_dir = download_path / split
                 

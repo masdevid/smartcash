@@ -13,6 +13,7 @@ import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 from smartcash.ui.dataset.shared.status_panel import update_status_panel
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 def update_cleanup_progress(ui_components: Dict[str, Any], step: int, total_steps: int, message: str):
     """
@@ -317,7 +318,7 @@ def setup_shared_cleanup_handler(ui_components: Dict[str, Any], env=None, config
         
         # Step 1: Scan direktori (25%)
         update_cleanup_progress(ui_components, 1, 4, "Scanning direktori preprocessing...")
-        splits = [d for d in path.iterdir() if d.is_dir() and d.name in ['train', 'valid', 'test']]
+        splits = [d for d in path.iterdir() if d.is_dir() and d.name in DEFAULT_SPLITS]
         total_dirs = len(splits)
         
         if 'progress_bar' in ui_components:
@@ -412,7 +413,7 @@ def setup_shared_cleanup_handler(ui_components: Dict[str, Any], env=None, config
         preprocessed_files_to_delete = []
         if additional_dir:
             preproc_path = Path(additional_dir)
-            for split in ['train', 'valid', 'test']:
+            for split in DEFAULT_SPLITS:
                 for subdir in subdirs:
                     dir_path = preproc_path / split / subdir
                     if not dir_path.exists():

@@ -11,7 +11,7 @@ from collections import Counter
 
 from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
-
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class MetricsReporter:
     """Komponen untuk menghitung dan melaporkan metrik-metrik dataset."""
@@ -226,7 +226,7 @@ class MetricsReporter:
         
         # Faktor kecukupan data (20%)
         total_samples = 0
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_stats = metrics.get('split_stats', {}).get(split, {})
             total_samples += split_stats.get('images', 0)
         
@@ -260,7 +260,7 @@ class MetricsReporter:
         # Faktor keseimbangan split (15%)
         split_imbalance = 0
         split_counts = {}
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_stats = metrics.get('split_stats', {}).get(split, {})
             split_counts[split] = split_stats.get('images', 0)
             
@@ -285,7 +285,7 @@ class MetricsReporter:
         # Faktor kualitas anotasi (sisanya, 20%)
         # Kita bisa mengestimasi dari persentase gambar yang memiliki label
         label_ratio = 0
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_stats = metrics.get('split_stats', {}).get(split, {})
             images = split_stats.get('images', 0)
             labels = split_stats.get('labels', 0)
@@ -359,7 +359,7 @@ class MetricsReporter:
             
         # Rekomendasi berdasarkan ukuran dataset
         total_samples = 0
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_stats = metrics.get('split_stats', {}).get(split, {})
             total_samples += split_stats.get('images', 0)
             
@@ -380,7 +380,7 @@ class MetricsReporter:
             
         # Rekomendasi berdasarkan rasio split
         split_counts = {}
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_stats = metrics.get('split_stats', {}).get(split, {})
             split_counts[split] = split_stats.get('images', 0)
             

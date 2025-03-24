@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 def check_existing_dataset(data_dir: str = "data") -> bool:
     """
@@ -21,12 +22,12 @@ def check_existing_dataset(data_dir: str = "data") -> bool:
     # Gunakan utils standar untuk path handling
     from smartcash.ui.utils.file_utils import list_files
     
-    required_dirs = [os.path.join(data_dir, split, folder) for split in ['train', 'valid', 'test'] for folder in ['images', 'labels']]
+    required_dirs = [os.path.join(data_dir, split, folder) for split in DEFAULT_SPLITS for folder in ['images', 'labels']]
     existing_dirs = sum(1 for dir_path in required_dirs if os.path.isdir(dir_path))
     
     # Cek juga apakah ada file gambar dengan utils standar
     has_images = False
-    for split in ['train', 'valid', 'test']:
+    for split in DEFAULT_SPLITS:
         img_dir = os.path.join(data_dir, split, 'images')
         if os.path.isdir(img_dir):
             image_files = list_files(img_dir, pattern="*.jpg", recursive=False)
@@ -44,7 +45,7 @@ def get_dataset_stats(data_dir: str = "data") -> Dict[str, Any]:
     
     stats = {'total_images': 0, 'train': 0, 'valid': 0, 'test': 0}
     
-    for split in ['train', 'valid', 'test']:
+    for split in DEFAULT_SPLITS:
         img_dir = os.path.join(data_dir, split, 'images')
         if os.path.isdir(img_dir):
             image_files = list_files(img_dir, pattern="*.jpg", recursive=False)

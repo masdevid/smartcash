@@ -7,6 +7,7 @@ from typing import Dict, Any, Tuple, Optional
 import os
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
+from dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 class DatasetStatsManager:
     """Manages dataset statistics and visualization operations."""
@@ -36,7 +37,7 @@ class DatasetStatsManager:
         # Check if directory exists
         if not os.path.exists(dataset_dir): return stats
             
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             split_dir = Path(dataset_dir) / split
             
             # Initialize counters
@@ -91,7 +92,7 @@ class DatasetStatsManager:
                 return DatasetStatsManager._dummy_distribution()
 
             class_stats = {}
-            for split in ['train', 'valid', 'test']:
+            for split in DEFAULT_SPLITS:
                 labels_dir = Path(dataset_path) / split / 'labels'
                 if not labels_dir.exists():
                     class_stats[split] = {}
@@ -249,7 +250,7 @@ def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_pa
         
         # Membuat dictionary yang akan dikonversi ke DataFrame
         data = {
-            'Split': ['Train', 'Valid', 'Test'],
+            'Split': DEFAULT_SPLITS,
         }
         
         # Tambahkan data untuk setiap kelas

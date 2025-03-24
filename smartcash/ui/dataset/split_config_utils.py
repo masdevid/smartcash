@@ -7,21 +7,20 @@ from typing import Dict, Any
 import yaml
 from pathlib import Path
 from IPython.display import display, HTML, clear_output
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_SPLIT_RATIOS, DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH, DRIVE_BACKUP_PATH
 
 # Default paths untuk dataset
-DRIVE_DATASET_PATH = '/content/drive/MyDrive/SmartCash/data'
-DRIVE_PREPROCESSED_PATH = '/content/drive/MyDrive/SmartCash/data/preprocessed'
 
 class DatasetConfigManager:
     """Manages dataset configuration operations."""
     
     DEFAULT_CONFIG = {
         'data': {
-            'split_ratios': {'train': 0.7, 'valid': 0.15, 'test': 0.15},
+            'split_ratios': DEFAULT_SPLIT_RATIOS,
             'stratified_split': True,
             'random_seed': 42,
             'backup_before_split': True,
-            'backup_dir': 'data/splits_backup',
+            'backup_dir': DRIVE_BACKUP_PATH,
             'dataset_path': DRIVE_DATASET_PATH,
             'preprocessed_path': DRIVE_PREPROCESSED_PATH
         }
@@ -120,8 +119,8 @@ def initialize_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]
         # Update split sliders
         sliders = ui_components.get('split_sliders', [])
         if len(sliders) >= 3:
-            ratios = data.get('split_ratios', {'train': 0.7, 'valid': 0.15, 'test': 0.15})
-            for i, key in enumerate(['train', 'valid', 'test']):
+            ratios = data.get('split_ratios', DEFAULT_SPLIT_RATIOS)
+            for i, key in enumerate(DEFAULT_SPLITS):
                 sliders[i].value = ratios.get(key, 0.7 if i == 0 else 0.15) * 100
 
         # Update stratified checkbox

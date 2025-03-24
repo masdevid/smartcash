@@ -16,7 +16,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.interfaces.layer_config_interface import ILayerConfigManager
 from smartcash.common.layer_config import get_layer_config
 from smartcash.dataset.utils.dataset_constants import (
-    IMG_EXTENSIONS, DEFAULT_SPLITS, DEFAULT_SPLIT_RATIOS, DEFAULT_RANDOM_SEED
+    IMG_EXTENSIONS, DEFAULT_SPLITS, DEFAULT_RANDOM_SEED
 )
 
 class DatasetUtils:

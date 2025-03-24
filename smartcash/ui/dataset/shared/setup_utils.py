@@ -10,6 +10,7 @@ from IPython.display import display, clear_output
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.dataset.shared.status_panel import update_status_panel
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 def detect_module_state(ui_components: Dict[str, Any], module_type: str = 'preprocessing', 
                        file_pattern: str = None) -> Dict[str, Any]:
@@ -56,7 +57,7 @@ def detect_module_state(ui_components: Dict[str, Any], module_type: str = 'prepr
         if isinstance(file_pattern, str):
             file_pattern = [file_pattern]
             
-        for split in ['train', 'valid', 'test']:
+        for split in DEFAULT_SPLITS:
             images_path = Path(target_dir) / split / 'images'
             if not images_path.exists():
                 continue

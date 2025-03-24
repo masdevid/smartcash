@@ -62,13 +62,13 @@ def setup_click_handlers(ui_components: Dict[str, Any], env=None, config=None) -
         """Validasi struktur dataset dasar dengan utils standar."""
         # Import utils untuk validasi file
         from smartcash.ui.utils.file_utils import directory_tree
+        from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
         
-        splits = ['train', 'valid', 'test']
         valid_structure = True
         missing_parts = []
         
         # Validasi struktur dengan utils standar
-        for split in splits:
+        for split in DEFAULT_SPLITS:
             split_dir = Path(data_dir) / split
             images_dir = split_dir / 'images'
             labels_dir = split_dir / 'labels'

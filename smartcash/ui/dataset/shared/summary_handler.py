@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 from IPython.display import display, clear_output, HTML
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 def setup_shared_summary_handler(ui_components: Dict[str, Any], env=None, config=None, 
                                module_type: str = 'preprocessing') -> Dict[str, Any]:
@@ -218,7 +219,7 @@ def setup_shared_summary_handler(ui_components: Dict[str, Any], env=None, config
         preproc_files = 0
         preproc_path = Path(preprocessed_dir)
         if preproc_path.exists():
-            for split in ['train', 'valid', 'test']:
+            for split in DEFAULT_SPLITS:
                 images_dir = preproc_path / split / 'images'
                 if not images_dir.exists():
                     continue

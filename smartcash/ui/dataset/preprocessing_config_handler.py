@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 import os, yaml, json, copy
 from pathlib import Path
 from IPython.display import display
+from dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR
 
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
     """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY dan persistensi yang ditingkatkan."""
@@ -65,12 +66,12 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     if hasattr(split_selector, 'value'):
         # Map nilai UI ke konfigurasi dengan dictionary
         split_map = {
-            'All Splits': ['train', 'valid', 'test'],
+            'All Splits': DEFAULT_SPLITS,
             'Train Only': ['train'],
             'Validation Only': ['valid'],
             'Test Only': ['test']
         }
-        config['preprocessing']['splits'] = split_map.get(split_selector.value, ['train', 'valid', 'test'])
+        config['preprocessing']['splits'] = split_map.get(split_selector.value, DEFAULT_SPLITS)
     
     # PERBAIKAN: Simpan referensi config di ui_components untuk memastikan persistensi
     ui_components['config'] = config
@@ -239,7 +240,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     # Default config jika tidak ada file
     default_config = {
         "preprocessing": {
-            "output_dir": "data/preprocessed",
+            "output_dir": DEFAULT_PREPROCESSED_DIR,
             "img_size": [640, 640],
             "enabled": True,
             "num_workers": 4,
@@ -252,9 +253,9 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                 "enabled": True,
                 "fix_issues": True,
                 "move_invalid": True,
-                "invalid_dir": "data/invalid"
+                "invalid_dir": DEFAULT_INVALID_DIR
             },
-            "splits": ["train", "valid", "test"]
+            "splits": DEFAULT_SPLITS
         },
         "data": {
             "dir": "data"
@@ -325,12 +326,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     split_selector = ui_components.get('split_selector')
     if split_selector and hasattr(split_selector, 'value'):
         # Map dari config value ke UI value
-        split_list = preproc_config.get('splits', ['train', 'valid', 'test'])
+        split_list = preproc_config.get('splits', DEFAULT_SPLITS)
         split_str = str(sorted(split_list))
         
         split_map = {
-            str(sorted(['train', 'valid', 'test'])): 'All Splits',
-            str(['train']): 'Train Only',
+            str(sorted(DEFAULT_SPLITS)): 'All Splits',
+            str([DEFAULT_SPLITS[0]]): 'Train Only',
             str(['valid']): 'Validation Only',
             str(['test']): 'Test Only'
         }

@@ -8,6 +8,7 @@ import shutil
 import glob
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, IMG_EXTENSIONS
 
 def move_files_to_preprocessed(
     images_output_dir: str, 
@@ -93,7 +94,7 @@ def calculate_total_images(splits: List[str], config: Dict) -> Dict[str, int]:
     """
     total_by_split = {split: sum(len(list(Path(get_source_dir(split, config)) / 'images').glob(f'*{ext}'))) 
                      for split in splits 
-                     for ext in ['.jpg', '.jpeg', '.png'] 
+                     for ext in IMG_EXTENSIONS 
                      if (Path(get_source_dir(split, config)) / 'images').exists()}
     
     total_by_split['all'] = sum(total_by_split.values())
@@ -110,7 +111,7 @@ def resolve_splits(split: Optional[str]) -> List[str]:
         List nama split yang akan diproses
     """
     if not split or split.lower() == 'all': 
-        return ['train', 'valid', 'test']
+        return DEFAULT_SPLITS
     elif split.lower() == 'val': 
         return ['valid']
     else: 

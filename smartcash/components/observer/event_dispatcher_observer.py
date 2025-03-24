@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Set, Union, Callable
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.components.observer.event_registry_observer import EventRegistry
 from smartcash.common.logger import get_logger
-
+import os
 
 class EventDispatcher:
     """

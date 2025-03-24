@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Type, Union, get_ty
 from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.common.logger import get_logger
-
+import os
 
 # Logger
 _logger = get_logger("observer_decorators")
@@ -28,7 +28,7 @@ _observer_class_cache: Dict[str, Type[BaseObserver]] = {}
 
 # ThreadPoolExecutor untuk proses async
 _executor = concurrent.futures.ThreadPoolExecutor(
-    max_workers=min(16, (concurrent.futures.cpu_count() or 4)),
+    max_workers=min(16, (os.cpu_count() or 4)),
     thread_name_prefix="ObserverDecorator"
 )
 

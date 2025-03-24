@@ -7,7 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, Optional
 import os
 from pathlib import Path
-from smartcash.common.constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH
+from smartcash.dataset.utils.dataset_constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH, DEFAULT_PREPROCESSED_DIR
 
 def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     """
@@ -136,7 +136,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
             layout=widgets.Layout(width='70%')
         ),
         widgets.Text(
-            value=DRIVE_PREPROCESSED_PATH if drive_mounted else 'data/preprocessed',
+            value=DRIVE_PREPROCESSED_PATH if drive_mounted else DEFAULT_PREPROCESSED_DIR,
             description='Preprocessed:',
             style={'description_width': 'initial'},
             layout=widgets.Layout(width='70%')

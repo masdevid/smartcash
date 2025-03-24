@@ -1,14 +1,15 @@
 """
 File: smartcash/ui/dataset/dataset_downloader_component.py
-Deskripsi: Komponen UI untuk download dataset dengan komponen terpadu
+Deskripsi: Komponen UI untuk download dataset dengan komponen terpadu dan dukungan API key dari secrets
 """
 
 import ipywidgets as widgets
+import os
 from typing import Dict, Any, Optional
 
 def create_dataset_downloader_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk download dataset.
+    Buat komponen UI untuk download dataset dengan dukungan API key dari secrets.
     
     Args:
         env: Environment manager
@@ -42,30 +43,39 @@ def create_dataset_downloader_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         layout=widgets.Layout(margin='10px 0')
     )
     
+    # Ambil nilai default dari konfigurasi
+    roboflow_config = config.get('data', {}).get('roboflow', {})
+    rf_workspace_default = roboflow_config.get('workspace', '')
+    rf_project_default = roboflow_config.get('project', '')
+    rf_version_default = roboflow_config.get('version', '')
+    
+    # Coba dapatkan API key dari environment variables
+    api_key_env = os.environ.get('ROBOFLOW_API_KEY', '')
+    
     # Roboflow Config
     rf_workspace = widgets.Text(
-        value=config.get('data', {}).get('roboflow', {}).get('workspace', ''),
+        value=rf_workspace_default,
         placeholder='Workspace ID',
         description='Workspace:',
         layout=widgets.Layout(width='80%')
     )
     
     rf_project = widgets.Text(
-        value=config.get('data', {}).get('roboflow', {}).get('project', ''),
+        value=rf_project_default,
         placeholder='Project ID',
         description='Project:',
         layout=widgets.Layout(width='80%')
     )
     
     rf_version = widgets.Text(
-        value=config.get('data', {}).get('roboflow', {}).get('version', ''),
+        value=rf_version_default,
         placeholder='Version',
         description='Version:',
         layout=widgets.Layout(width='40%')
     )
     
     rf_apikey = widgets.Password(
-        value=config.get('data', {}).get('roboflow', {}).get('api_key', ''),
+        value=api_key_env,
         placeholder='API Key',
         description='API Key:',
         layout=widgets.Layout(width='80%')

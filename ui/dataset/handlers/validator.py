@@ -1,7 +1,9 @@
 """
 File: smartcash/ui/dataset/handlers/validator.py
-Deskripsi: Utilitas untuk validasi konfigurasi download dataset
+Deskripsi: Utilitas untuk validasi konfigurasi download dataset dengan dukungan format yolov5pytorch
 """
+
+import os
 
 from typing import Dict, Any, Tuple
 from pathlib import Path
@@ -63,35 +65,6 @@ def _validate_roboflow_config(config: Dict[str, Any]) -> Tuple[bool, str]:
     # Validasi output dir
     return _validate_output_config(config)
 
-def _validate_drive_config(config: Dict[str, Any]) -> Tuple[bool, str]:
-    """
-    Validasi konfigurasi Google Drive.
-    
-    Args:
-        config: Konfigurasi download dataset
-        
-    Returns:
-        Tuple (is_valid, error_message)
-    """
-    # Cek ketersediaan Google Drive
-    try:
-        from smartcash.common.environment import get_environment_manager
-        env = get_environment_manager()
-        if not env.is_drive_mounted:
-            return False, "Google Drive tidak terpasang"
-    except ImportError:
-        # Fallback check
-        import os
-        if not os.path.exists('/content/drive/MyDrive'):
-            return False, "Google Drive tidak terpasang"
-    
-    # Cek field wajib
-    if not config.get('folder'):
-        return False, "Folder Google Drive wajib diisi"
-    
-    # Validasi output dir
-    return _validate_output_config(config)
-
 def _validate_url_config(config: Dict[str, Any]) -> Tuple[bool, str]:
     """
     Validasi konfigurasi URL.
@@ -134,10 +107,32 @@ def _validate_output_config(config: Dict[str, Any]) -> Tuple[bool, str]:
     if not output_dir:
         return False, "Output directory wajib diisi"
     
-    # Cek format output
+    # Cek format output - sudah standardisasi ke yolov5pytorch
     output_format = config.get('output_format')
     if not output_format:
         return False, "Format output wajib diisi"
     
     # Semua validasi berhasil
     return True, ""
+
+def _validate_drive_config(config: Dict[str, Any]) -> Tuple[bool, str]:
+    """
+    Validasi konfigurasi Google Drive.
+    
+    Args:
+        config: Konfigurasi download dataset
+        
+    Returns:
+        Tuple (is_valid, error_message)
+    """
+    # Cek ketersediaan Google Drive
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env = get_environment_manager()
+        if not env.is_drive_mounted:
+            return False, "Google Drive tidak terpasang"
+    except ImportError:
+        # Fallback check
+        import os
+        if not os.path.exists('/content/drive/MyDrive'):
+            return False, "Google Drive tidak terpasang"

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/handlers/gdrive_handler.py
-Deskripsi: Handler untuk download dataset dari Google Drive
+Deskripsi: Handler untuk download dataset dari Google Drive dengan integrasi ke service downloader
 """
 
 import os
@@ -10,7 +10,7 @@ from typing import Dict, Any, Tuple, List
 
 def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
     """
-    Download dataset dari Google Drive.
+    Download dataset dari Google Drive dengan dukungan backup otomatis.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -33,6 +33,7 @@ def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -
         # Get konfigurasi
         drive_folder = config.get('folder', 'SmartCash/datasets')
         output_dir = config.get('output_dir', 'data')
+        backup_existing = config.get('backup_existing', False)
         
         # Pastikan drive_folder tidak dimulai dengan slash
         drive_folder = drive_folder.lstrip('/')
@@ -44,6 +45,47 @@ def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -
         if not source_path.exists():
             return False, f"Folder {drive_folder} tidak ditemukan di Google Drive"
         
+        # Coba gunakan DownloadService untuk import dari ZIP jika ada
+        try:
+            from smartcash.dataset.services.downloader.download_service import DownloadService
+            
+            # Cek jika ada file ZIP di folder tersebut
+            zip_files = list(source_path.glob("*.zip"))
+            if zip_files:
+                # Temukan file ZIP terbaru
+                newest_zip = max(zip_files, key=os.path.getmtime)
+                
+                # Import dataset dari ZIP menggunakan service
+                _update_progress(ui_components, 30, f"Mengimport dataset dari {newest_zip.name}...")
+                
+                # Setup service
+                download_service = DownloadService(output_dir=output_dir, logger=logger)
+                
+                result = download_service.import_from_zip(
+                    zip_file=newest_zip,
+                    target_dir=output_dir,
+                    remove_zip=False,
+                    show_progress=True,
+                    backup_existing=backup_existing
+                )
+                
+                success_msg = f"Dataset berhasil diimport dari {newest_zip.name}: {result.get('stats', {}).get('total_images', 0)} gambar"
+                return True, success_msg
+        
+        except (ImportError, Exception) as e:
+            # Log error tapi lanjutkan dengan implementasi fallback
+            if logger:
+                logger.debug(f"ℹ️ Menggunakan implementasi manual: {str(e)}")
+        
+        # Backup existing jika diperlukan
+        if backup_existing:
+            output_path = Path(output_dir)
+            if output_path.exists() and any(output_path.iterdir()):
+                _update_progress(ui_components, 20, "Membuat backup data yang sudah ada...")
+                backup_path = _backup_existing_data(output_dir)
+                if logger:
+                    logger.info(f"✅ Data yang ada dibackup ke {backup_path}")
+        
         # Pastikan direktori output ada
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -52,7 +94,7 @@ def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -
         _update_progress(ui_components, 30, f"Menyiapkan copy dari {drive_folder}...")
         
         # Dapatkan daftar file dataset yang akan disalin
-        files_to_copy = _get_dataset_files(source_path)
+        files_to_copy = _get_dataset_files(source_path, output_dir)
         
         if not files_to_copy:
             return False, f"Tidak ada file dataset ditemukan di {drive_folder}"
@@ -72,12 +114,13 @@ def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -
                 shutil.copy2(src_file, dst_file)
                 success_count += 1
                 
-                # Update progress
-                progress = 40 + int(50 * (idx + 1) / total_files)
-                if (idx + 1) % max(1, total_files // 10) == 0:  # Update setiap 10%
+                # Update progress - setiap 10% file atau minimal setiap 100 file
+                if (idx + 1) % max(1, min(total_files // 10, 100)) == 0:
+                    progress = 40 + int(50 * (idx + 1) / total_files)
                     _update_progress(ui_components, progress, f"Menyalin file {idx+1}/{total_files}...")
             except Exception as e:
-                if logger: logger.warning(f"⚠️ Error saat menyalin {src_file}: {str(e)}")
+                if logger:
+                    logger.warning(f"⚠️ Error saat menyalin {src_file}: {str(e)}")
         
         # Hitung statistik
         _update_progress(ui_components, 95, "Menghitung statistik dataset...")
@@ -90,22 +133,55 @@ def download_from_drive(ui_components: Dict[str, Any], config: Dict[str, Any]) -
         return True, success_msg
     
     except Exception as e:
-        if logger: logger.error(f"❌ Error saat copy dataset dari Drive: {str(e)}")
+        if logger:
+            logger.error(f"❌ Error saat copy dataset dari Drive: {str(e)}")
         return False, f"Error saat copy dataset dari Drive: {str(e)}"
+
+def _backup_existing_data(output_dir: str) -> str:
+    """
+    Backup data yang sudah ada sebelum overwrite.
+    
+    Args:
+        output_dir: Direktori output yang akan dibackup
+        
+    Returns:
+        Path direktori backup
+    """
+    from datetime import datetime
+    
+    # Buat nama backup dengan timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = Path(output_dir)
+    backup_name = f"{output_path.name}_backup_{timestamp}"
+    backup_path = output_path.parent / backup_name
+    
+    # Salin folder yang ada ke backup
+    shutil.copytree(output_dir, backup_path)
+    
+    return str(backup_path)
 
 def _get_drive_path() -> str:
     """
-    Dapatkan path Google Drive.
+    Dapatkan path Google Drive dengan pendekatan multi-source.
     
     Returns:
         Path Google Drive atau None jika tidak terpasang
     """
-    # Coba melalui environment manager
+    # Coba melalui environment manager - prioritas utama
     try:
         from smartcash.common.environment import get_environment_manager
         env = get_environment_manager()
         if env.is_drive_mounted:
-            return env.drive_path
+            return str(env.drive_path)
+    except ImportError:
+        pass
+    
+    # Fallback: coba utilitas drive_utils
+    try:
+        from smartcash.ui.utils.drive_utils import detect_drive_mount
+        is_mounted, drive_path = detect_drive_mount()
+        if is_mounted and drive_path:
+            return drive_path
     except ImportError:
         pass
     
@@ -123,53 +199,55 @@ def _get_drive_path() -> str:
     
     return None
 
-def _get_dataset_files(source_path: Path) -> List[Tuple[Path, Path]]:
+def _get_dataset_files(source_path: Path, output_dir: str = 'data') -> List[Tuple[Path, Path]]:
     """
     Dapatkan daftar file dataset yang akan disalin dari Drive ke local.
     
     Args:
         source_path: Path sumber di Drive
+        output_dir: Direktori output (default: 'data')
         
     Returns:
         List tuple (source_file, dest_file)
     """
     files_to_copy = []
+    output_path = Path(output_dir)
     
     # Cek jika path sumber adalah file ZIP
     if source_path.is_file() and source_path.suffix.lower() == '.zip':
-        # Import dari utils dan proses melalui ZIP handler
+        # Gunakan handler ZIP jika ada
         try:
             from smartcash.ui.dataset.handlers.zip_handler import extract_zip_dataset
             return [(source_path, Path(extract_zip_dataset(source_path)))]
         except ImportError:
             # Fallback: copy file ZIP saja
             zip_name = source_path.name
-            return [(source_path, Path('data') / zip_name)]
+            return [(source_path, output_path / zip_name)]
     
     # Struktur YOLO standar
     yolo_dirs = ['train/images', 'train/labels', 'valid/images', 'valid/labels', 'test/images', 'test/labels']
     
-    # Coba deteksi format dataset
+    # Coba deteksi format dataset berdasarkan struktur folder
     if any((source_path / d).exists() for d in yolo_dirs):
-        # Format YOLO terdeteksi
+        # Format YOLO terdeteksi - copy direktori yang ada
         for subdir in yolo_dirs:
             src_dir = source_path / subdir
             if not src_dir.exists():
                 continue
                 
-            dst_dir = Path('data') / subdir
+            dst_dir = output_path / subdir
             
             # Salin semua file dalam direktori
             for file_path in src_dir.glob('*.*'):
                 if file_path.is_file():
                     files_to_copy.append((file_path, dst_dir / file_path.name))
     else:
-        # Format tidak terdeteksi, salin semua file
+        # Format tidak terdeteksi, salin semua file ke struktur yang sama
         for file_path in source_path.glob('**/*.*'):
             if file_path.is_file():
                 # Relative path dari source
                 rel_path = file_path.relative_to(source_path)
-                files_to_copy.append((file_path, Path('data') / rel_path))
+                files_to_copy.append((file_path, output_path / rel_path))
     
     return files_to_copy
 
@@ -225,7 +303,7 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: str) ->
         tracker = ui_components[tracker_key]
         tracker.update(value, message)
         
-    # Log ke logger
+    # Log ke logger - hanya log pada perubahan signifikan (20% progress)
     logger = ui_components.get('logger')
-    if logger and value % 20 == 0:  # Log setiap 20%
+    if logger and value % 20 == 0:
         logger.info(f"🔄 {message} ({value}%)")

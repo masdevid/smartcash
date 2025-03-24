@@ -1,15 +1,18 @@
 """
 File: smartcash/ui/dataset/handlers/roboflow_handler.py
-Deskripsi: Handler untuk download dataset dari Roboflow
+Deskripsi: Handler untuk delegasi download dataset dari Roboflow ke service
 """
 
 import time
 from pathlib import Path
 from typing import Dict, Any, Tuple
 
+# CATATAN: File ini menjadi adapter/delegator ke service yang sudah ada
+# Implementasi langsung sudah digantikan oleh download_handler.py
+
 def download_from_roboflow(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
     """
-    Download dataset dari Roboflow.
+    Delegasi download dataset dari Roboflow ke DownloadService.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -21,73 +24,47 @@ def download_from_roboflow(ui_components: Dict[str, Any], config: Dict[str, Any]
     logger = ui_components.get('logger')
     
     try:
-        # Update progress
-        _update_progress(ui_components, 20, "Mempersiapkan koneksi ke Roboflow...")
-        
-        # Import roboflow
-        try:
-            import roboflow
-        except ImportError:
-            _update_progress(ui_components, 10, "Menginstall package roboflow...")
-            
-            # Install roboflow
-            import subprocess
-            import sys
-            result = subprocess.run([sys.executable, "-m", "pip", "install", "roboflow"], 
-                                   capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                return False, f"Gagal menginstall package roboflow: {result.stderr}"
-            
-            import roboflow
+        # Import service download
+        from smartcash.dataset.services.downloader.download_service import DownloadService
         
         # Get konfigurasi Roboflow
-        workspace_id = config.get('workspace')
-        project_id = config.get('project')
-        version = config.get('version')
         api_key = config.get('api_key')
+        workspace = config.get('workspace')
+        project = config.get('project')
+        version = config.get('version')
         output_dir = config.get('output_dir', 'data')
-        output_format = config.get('output_format', 'YOLO v5')
-        
-        # Map format output ke format Roboflow
-        format_mapping = {
-            'YOLO v5': 'yolov5pytorch',
-            'COCO': 'coco',
-            'VOC': 'voc'
-        }
-        
-        rf_format = format_mapping.get(output_format, 'yolov5pytorch')
+        backup_existing = config.get('backup_existing', False)
         
         # Update progress
-        _update_progress(ui_components, 30, f"Inisialisasi Roboflow API...")
+        _update_progress(ui_components, 30, f"Menggunakan DownloadService untuk {workspace}/{project}:{version}...")
         
-        # Initiate Roboflow API
-        rf = roboflow.Roboflow(api_key=api_key)
+        # Setup service
+        service_config = {'data': {'roboflow': {
+            'api_key': api_key,
+            'workspace': workspace,
+            'project': project,
+            'version': version
+        }}}
         
-        # Get workspace
-        _update_progress(ui_components, 40, f"Mengakses workspace {workspace_id}...")
-        workspace = rf.workspace(workspace_id)
+        download_service = DownloadService(output_dir=output_dir, config=service_config, logger=logger)
         
-        # Get project
-        _update_progress(ui_components, 50, f"Mengakses project {project_id}...")
-        project = workspace.project(project_id)
+        # Jalankan download
+        result = download_service.download_from_roboflow(
+            api_key=api_key,
+            workspace=workspace,
+            project=project,
+            version=version,
+            output_dir=output_dir,
+            show_progress=True,
+            backup_existing=backup_existing
+        )
         
-        # Get version
-        _update_progress(ui_components, 60, f"Mengakses version {version}...")
-        # Untuk mendukung format 'v1' dan '1'
-        version_number = version[1:] if version.startswith('v') else version
-        dataset = project.version(version_number).download(rf_format)
-        
-        # Pastikan direktori output ada
-        output_path = Path(output_dir)
-        if not output_path.exists():
-            output_path.mkdir(parents=True, exist_ok=True)
-        
-        # Log success
-        _update_progress(ui_components, 100, "Dataset berhasil didownload")
-        return True, f"Dataset berhasil didownload ke {output_dir}"
+        # Format pesan sukses
+        success_msg = f"Dataset berhasil didownload dari Roboflow: {result.get('stats', {}).get('total_images', 0)} gambar"
+        return True, success_msg
     
     except Exception as e:
+        # Log dan return error
         if logger: logger.error(f"❌ Error saat download dari Roboflow: {str(e)}")
         return False, f"Error saat download dari Roboflow: {str(e)}"
 

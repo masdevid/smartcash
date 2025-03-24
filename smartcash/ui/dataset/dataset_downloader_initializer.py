@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/dataset_downloader_initializer.py
-Deskripsi: Initializer untuk modul download dataset dengan pendekatan modular
+Deskripsi: Initializer untuk modul download dataset dengan integrasi konfigurasi dari file
 """
 
 from typing import Dict, Any
@@ -19,6 +19,9 @@ def initialize_dataset_downloader() -> Dict[str, Any]:
         from smartcash.ui.dataset.dataset_downloader_component import create_dataset_downloader_ui
         from smartcash.ui.dataset.dataset_downloader_handler import setup_dataset_downloader_handlers
         
+        # Import utils untuk load konfigurasi
+        from smartcash.ui.dataset.handlers.config_loader import load_dataset_config
+        
         # Inisialisasi async opsional untuk verifikasi konfigurasi
         def init_async(ui_components, env, config):
             try:
@@ -30,10 +33,30 @@ def initialize_dataset_downloader() -> Dict[str, Any]:
                 endpoints = get_available_endpoints(ui_components)
                 if logger and endpoints:
                     logger.info(f"🔍 {len(endpoints)} endpoint dataset terdeteksi")
+                    
+                # Load konfigurasi dataset
+                dataset_config = load_dataset_config(config, logger)
+                if dataset_config:
+                    # Simpan konfigurasi ke ui_components
+                    ui_components['dataset_config'] = dataset_config
+                    
+                    # Pre-populate form dari dataset_config jika belum diisi
+                    roboflow_config = dataset_config.get('roboflow', {})
+                    if 'rf_workspace' in ui_components and not ui_components['rf_workspace'].value:
+                        ui_components['rf_workspace'].value = roboflow_config.get('workspace', '')
+                    if 'rf_project' in ui_components and not ui_components['rf_project'].value:
+                        ui_components['rf_project'].value = roboflow_config.get('project', '')
+                    if 'rf_version' in ui_components and not ui_components['rf_version'].value:
+                        ui_components['rf_version'].value = roboflow_config.get('version', '')
+                    if 'rf_apikey' in ui_components and not ui_components['rf_apikey'].value:
+                        ui_components['rf_apikey'].value = roboflow_config.get('api_key', '')
+                    
+                    if logger:
+                        logger.info("✅ Form diisi dengan konfigurasi dari dataset_config")
             except Exception as e:
                 logger = ui_components.get('logger')
                 if logger:
-                    logger.warning(f"⚠️ Error saat mendapatkan endpoint: {str(e)}")
+                    logger.warning(f"⚠️ Error saat inisialisasi konfigurasi: {str(e)}")
         
         # Gunakan cell template untuk setup standar
         ui_components = setup_cell(

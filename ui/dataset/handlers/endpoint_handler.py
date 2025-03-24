@@ -3,6 +3,7 @@ File: smartcash/ui/dataset/handlers/endpoint_handler.py
 Deskripsi: Handler untuk manajemen endpoint download dataset
 """
 
+import os
 from typing import Dict, Any, List, Optional
 
 def handle_endpoint_change(change: Dict[str, Any], ui_components: Dict[str, Any]) -> None:
@@ -116,7 +117,7 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'workspace': ui_components.get('rf_workspace', {}).value,
             'project': ui_components.get('rf_project', {}).value,
             'version': ui_components.get('rf_version', {}).value,
-            'api_key': ui_components.get('rf_apikey', {}).value,
+            'api_key': ui_components.get('rf_apikey', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
         }
     elif endpoint == 'Google Drive':
         config = {

@@ -1,18 +1,12 @@
 """
-File: smartcash/ui/cells/cell_2_1_dataset_download.py
-Deskripsi: Cell untuk download dataset SmartCash dengan kode minimal
+File: smartcash/ui/cells/cell_2_1_dataset_downloader.py
+Deskripsi: Entry point untuk dataset downloader cell
 """
 
-import sys
-from IPython.display import display
-if '.' not in sys.path: sys.path.append('.')
+def setup_dataset_downloader():
+    """Setup dan tampilkan UI untuk download dataset."""
+    from smartcash.ui.dataset.dataset_downloader_initializer import initialize_dataset_downloader
+    return initialize_dataset_downloader()
 
-try:
-    from smartcash.ui.dataset.dataset_download import setup_dataset_download
-    # Setup dependency installer
-    ui_components = setup_dataset_download()
-    
-    # Tampilkan UI
-    display(ui_components['ui'])
-
-except ImportError as e: create_alert(e, 'error')
+# Eksekusi saat modul diimpor
+ui_components = setup_dataset_downloader()

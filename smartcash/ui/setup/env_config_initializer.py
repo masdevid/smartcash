@@ -5,6 +5,7 @@ Deskripsi: Initializer untuk modul konfigurasi environment dengan pendekatan mod
 
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
+from IPython.display import display, HTML
 
 def initialize_env_config_ui():
     """
@@ -43,15 +44,25 @@ def initialize_env_config_ui():
             init_async_func=init_async
         )
         
+        # Pastikan UI ditampilkan jika ada
+        if 'ui' in ui_components and ui_components['ui'] is not None:
+            display(ui_components['ui'])
+            
         return ui_components
         
     except Exception as e:
-        # Fallback jika cell template gagal
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        ui_components = {'module_name': 'env_config'}
-        ui_components = create_fallback_ui(
-            ui_components, 
-            f"❌ Error inisialisasi environment config: {str(e)}", 
-            "error"
-        )
-        return ui_components
+        # Fallback ultra-minimal jika semua gagal
+        error_html = f"""
+        <div style="padding:10px; background-color:#f8d7da; 
+                   color:#721c24; border-radius:4px; margin:5px 0;
+                   border-left:4px solid #721c24;">
+            <p style="margin:5px 0">❌ Error inisialisasi environment config: {str(e)}</p>
+        </div>
+        """
+        display(HTML(error_html))
+        
+        # Return minimal components
+        import ipywidgets as widgets
+        output = widgets.Output()
+        display(output)
+        return {'module_name': 'env_config', 'ui': output, 'status': output}

@@ -5,6 +5,7 @@ Deskripsi: Template utama untuk inisialisasi sel notebook dengan integrasi stand
 
 from typing import Dict, Any, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
+from IPython.display import display, HTML as DisplayHTML
 
 def setup_cell(
     cell_name: str,
@@ -76,18 +77,27 @@ def setup_cell(
                 pass
     
     except Exception as e:
-        # Fallback sederhana jika terjadi error
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui, show_status
-        ui_components = create_fallback_ui(
-            ui_components, 
-            f"❌ Error saat inisialisasi {cell_name}: {str(e)}", 
-            "error"
-        )
-        show_status(f"Error: {str(e)}", "error", ui_components)
+        # Fallback sederhana untuk error (tanpa widget kompleks)
+        # Langsung tampilkan pesan error HTML
+        error_html = f"""
+        <div style="padding:10px; background-color:#f8d7da; 
+                   color:#721c24; border-radius:4px; margin:5px 0;
+                   border-left:4px solid #721c24;">
+            <p style="margin:5px 0">❌ Error inisialisasi {cell_name}: {str(e)}</p>
+        </div>
+        """
         
-        # Log error jika logger tersedia
-        if 'logger' in ui_components:
-            ui_components['logger'].error(f"❌ Error setup {cell_name}: {str(e)}")
+        # Tampilkan error langsung
+        display(DisplayHTML(error_html))
+        
+        # Set UI components sederhana untuk dikembalikan
+        import ipywidgets as widgets
+        fallback_output = widgets.Output()
+        ui_components = {
+            'module_name': cell_name,
+            'ui': fallback_output,
+            'status': fallback_output
+        }
        
     # Return UI components
     return ui_components

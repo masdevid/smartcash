@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config.py
-Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan integrasi UI logger
+Deskripsi: Koordinator utama untuk konfigurasi environment SmartCash dengan intercept stdout
 """
 
 from typing import Dict, Any
@@ -8,7 +8,7 @@ from IPython.display import display
 from concurrent.futures import ThreadPoolExecutor
 
 def setup_environment_config():
-    """Koordinator utama setup dan konfigurasi environment dengan integrasi UI logger."""
+    """Koordinator utama setup dan konfigurasi environment dengan intercept stdout."""
     # Inisialisasi ui_components dengan nilai default
     ui_components = {'status': None, 'module_name': 'env_config'}
     
@@ -17,15 +17,19 @@ def setup_environment_config():
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handler import setup_env_config_handlers
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging, log_to_ui, capture_stdout_to_ui
+        from smartcash.ui.utils.fallback_utils import show_status
         
         # Setup environment dan komponen UI
         env, config = setup_notebook_environment("env_config")
         ui_components = create_env_config_ui(env, config)
         
-        # Setup logging dan log inisialisasi
+        # Setup logging dan direct ke UI
         if 'status' in ui_components: 
             log_to_ui(ui_components, "🚀 Inisialisasi environment config dimulai", "info")
+        
+        # Tangkap stdout ke UI
+        capture_stdout_to_ui(ui_components)
         
         # Setup logger dengan arahkan ke UI
         logger = setup_ipython_logging(ui_components, "env_config")

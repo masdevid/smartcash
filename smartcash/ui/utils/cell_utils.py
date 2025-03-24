@@ -29,7 +29,7 @@ def setup_notebook_environment(
         Tuple berisi (environment_manager, config_dict)
     """
     # Import logger terkait
-    from smartcash.ui.utils.logging_utils import setup_ipython_logging
+    from smartcash.ui.utils.ui_logger import redirect_logger_to_ui
     
     # Pastikan smartcash dalam path
     import sys

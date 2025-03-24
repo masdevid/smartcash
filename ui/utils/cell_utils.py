@@ -29,10 +29,9 @@ def setup_notebook_environment(
         Tuple berisi (environment_manager, config_dict)
     """
     # Import logger terkait
-    from smartcash.common.logger import SmartCashLogger, get_logger
+    from smartcash.common.logger import get_logger
     
     # Buat logger dummy sementara untuk log awal
-    logger = SmartCashLogger(f"cell_{cell_name}")
     
     # Pastikan smartcash dalam path
     import sys

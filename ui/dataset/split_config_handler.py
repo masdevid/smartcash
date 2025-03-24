@@ -4,7 +4,6 @@ Deskripsi: Handler utama untuk konfigurasi split dataset dengan visualisasi on-d
 """
 
 from typing import Dict, Any, Optional
-import logging
 from IPython.display import display, HTML
 
 def setup_split_config_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -27,7 +26,7 @@ def setup_split_config_handlers(ui_components: Dict[str, Any], env=None, config=
     logger = None
     try:
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging(ui_components, "split_config", log_level=logging.INFO)
+        logger = setup_ipython_logging(ui_components, "split_config")
         if logger:
             ui_components['logger'] = logger
             logger.info(f"🚀 Split config handler diinisialisasi")

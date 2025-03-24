@@ -197,7 +197,7 @@ def setup_shared_summary_handler(ui_components: Dict[str, Any], env=None, config
         Returns:
             Dictionary ringkasan hasil augmentasi
         """
-        from smartcash.ui.visualization.class_distribution_analyzer import count_files_by_prefix
+        from smartcash.ui.charts.class_distribution_analyzer import count_files_by_prefix
         
         # Gunakan default jika tidak disediakan
         augmented_dir = augmented_dir or ui_components.get('augmented_dir', 'data/augmented')

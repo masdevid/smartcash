@@ -38,7 +38,7 @@ def setup_shared_visualization_handlers(ui_components: Dict[str, Any], env=None,
             # Dapatkan direktori dan parameter berdasarkan module_type
             if module_type == 'preprocessing':
                 # Import dan parameter untuk preprocessing
-                from smartcash.ui.visualization.visualize_preprocessed_samples import visualize_preprocessed_samples
+                from smartcash.ui.charts.visualize_preprocessed_samples import visualize_preprocessed_samples
                 visualize_preprocessed_samples(
                     ui_components=ui_components,
                     preprocessed_dir=ui_components.get('preprocessed_dir', 'data/preprocessed'),
@@ -47,7 +47,7 @@ def setup_shared_visualization_handlers(ui_components: Dict[str, Any], env=None,
                 )
             else:
                 # Import dan parameter untuk augmentation
-                from smartcash.ui.visualization.visualize_augmented_samples import visualize_augmented_samples
+                from smartcash.ui.charts.visualize_augmented_samples import visualize_augmented_samples
                 # Cari lokasi yang memiliki data augmentasi (multiple locations)
                 primary_path = Path(ui_components.get('preprocessed_dir', 'data/preprocessed')) / 'train' / 'images'
                 secondary_path = Path(ui_components.get('augmented_dir', 'data/augmented')) / 'images'
@@ -80,7 +80,7 @@ def setup_shared_visualization_handlers(ui_components: Dict[str, Any], env=None,
             # Dapatkan direktori dataset dan parameter berdasarkan module_type
             if module_type == 'preprocessing':
                 # Import dan parameter untuk preprocessing
-                from smartcash.ui.visualization.compare_original_vs_preprocessed import compare_original_vs_preprocessed
+                from smartcash.ui.charts.compare_original_vs_preprocessed import compare_original_vs_preprocessed
                 compare_original_vs_preprocessed(
                     ui_components=ui_components,
                     raw_dir=ui_components.get('data_dir', 'data'),
@@ -88,7 +88,7 @@ def setup_shared_visualization_handlers(ui_components: Dict[str, Any], env=None,
                 )
             else:
                 # Import dan parameter untuk augmentation
-                from smartcash.ui.visualization.compare_original_vs_augmented import compare_original_vs_augmented
+                from smartcash.ui.charts.compare_original_vs_augmented import compare_original_vs_augmented
                 # Dapatkan lokasi original dan augmented
                 original_path = Path(ui_components.get('preprocessed_dir', 'data/preprocessed')) / 'train' / 'images'
                 # Cari lokasi yang memiliki data augmentasi
@@ -127,7 +127,7 @@ def setup_shared_visualization_handlers(ui_components: Dict[str, Any], env=None,
                 return
             
             # Import helper untuk distribusi kelas
-            from smartcash.ui.visualization.visualization_integrator import create_distribution_visualizations
+            from smartcash.ui.charts.visualization_integrator import create_distribution_visualizations
             
             # Buat wrapper untuk ui_components untuk visualization_integrator
             vis_ui_components = {

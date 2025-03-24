@@ -68,6 +68,7 @@ logs/
 *.csv
 visualizations/
 !handlers/dataset/visualizations/
+!smartcash/ui/visualizations/
 
 checkpoints/
 wandb/

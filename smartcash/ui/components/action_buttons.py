@@ -1,11 +1,10 @@
 """
-File: smartcash/ui/helpers/action_buttons.py
-Deskripsi: Komponen tombol aksi standar untuk preprocessing dan augmentasi dengan tampilan seragam
+File: smartcash/ui/components/action_buttons.py
+Deskripsi: Komponen tombol aksi reusable dengan tampilan standar
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional, List, Tuple, Callable
-from smartcash.ui.utils.constants import COLORS, ICONS
+from typing import Dict, Any, List, Tuple, Optional
 
 def create_action_buttons(
     primary_label: str = "Run Process", 
@@ -13,7 +12,7 @@ def create_action_buttons(
     secondary_buttons: List[Tuple[str, str, str]] = None, 
     cleanup_enabled: bool = True,
     layout: Optional[widgets.Layout] = None
-) -> Dict[str, widgets.Button]:
+) -> Dict[str, widgets.Widget]:
     """
     Buat set tombol aksi standar dengan tampilan seragam.
     
@@ -21,11 +20,11 @@ def create_action_buttons(
         primary_label: Label untuk tombol aksi utama
         primary_icon: Icon untuk tombol aksi utama
         secondary_buttons: List tuple (label, icon, button_style) untuk tombol sekunder
-        cleanup_enabled: Apakah tombol cleanup ditampilkan
-        layout: Layout optional untuk container
+        cleanup_enabled: Flag untuk menampilkan tombol cleanup
+        layout: Layout untuk container
         
     Returns:
-        Dictionary berisi semua button widget
+        Dictionary berisi tombol dan container widgets
     """
     # Tombol utama dengan gaya primary
     primary_button = widgets.Button(
@@ -36,7 +35,7 @@ def create_action_buttons(
         layout=widgets.Layout(margin='5px')
     )
     
-    # Tombol stop dengan hidden default
+    # Tombol stop (hidden by default)
     stop_button = widgets.Button(
         description='Stop',
         button_style='danger',
@@ -63,21 +62,24 @@ def create_action_buttons(
         layout=widgets.Layout(margin='5px')
     )
     
-    # Tombol cleanup dengan hidden default
+    # Tombol cleanup (optional)
     cleanup_button = widgets.Button(
         description='Hapus Data',
         button_style='danger',
         icon='trash',
         tooltip="Hapus data hasil proses",
-        layout=widgets.Layout(display='none' if not cleanup_enabled else 'inline-block', margin='5px')
+        layout=widgets.Layout(
+            display='none' if not cleanup_enabled else 'inline-block',
+            margin='5px'
+        )
     )
     
     # List untuk menyimpan semua tombol
-    all_buttons = [primary_button, stop_button, reset_button, save_button]
+    buttons = [primary_button, stop_button, reset_button, save_button]
     
-    # Tambahkan tombol cleanup jika diaktifkan
+    # Tambahkan cleanup jika enabled
     if cleanup_enabled:
-        all_buttons.append(cleanup_button)
+        buttons.append(cleanup_button)
     
     # Tambahkan tombol sekunder jika ada
     secondary_widget_buttons = []
@@ -91,9 +93,9 @@ def create_action_buttons(
                 layout=widgets.Layout(margin='5px')
             )
             secondary_widget_buttons.append(button)
-            all_buttons.append(button)
+            buttons.append(button)
     
-    # Default layout jika tidak ada yang diberikan
+    # Default layout
     if not layout:
         layout = widgets.Layout(
             display='flex',
@@ -104,11 +106,11 @@ def create_action_buttons(
             gap='5px'
         )
     
-    # Buat container untuk semua tombol
-    button_container = widgets.HBox(all_buttons, layout=layout)
+    # Container untuk tombol
+    button_container = widgets.HBox(buttons, layout=layout)
     
-    # Kembalikan dictionary berisi semua tombol dan container
-    buttons = {
+    # Kembalikan dictionary dengan semua komponen
+    buttons_dict = {
         'primary_button': primary_button,
         'stop_button': stop_button,
         'reset_button': reset_button,
@@ -119,16 +121,16 @@ def create_action_buttons(
     
     # Tambahkan tombol sekunder ke dictionary
     if secondary_buttons:
-        buttons['secondary_buttons'] = secondary_widget_buttons
+        buttons_dict['secondary_buttons'] = secondary_widget_buttons
     
-    return buttons
+    return buttons_dict
 
 def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dict[str, Any]:
     """
     Buat tombol visualisasi standar untuk tampilan hasil.
     
     Args:
-        layout: Layout optional untuk container
+        layout: Layout untuk container
         
     Returns:
         Dictionary berisi tombol visualisasi dan container
@@ -160,7 +162,7 @@ def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dic
         layout=widgets.Layout(margin='5px')
     )
     
-    # Default layout jika tidak ada yang diberikan
+    # Default layout
     if not layout:
         layout = widgets.Layout(
             display='none',  # Hidden by default
@@ -171,7 +173,7 @@ def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dic
             gap='5px'
         )
     
-    # Buat container untuk tombol visualisasi
+    # Container untuk tombol visualisasi
     button_container = widgets.HBox(
         [visualize_button, compare_button, distribution_button],
         layout=layout

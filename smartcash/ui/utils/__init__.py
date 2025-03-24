@@ -4,16 +4,10 @@ Deskripsi: Import utilitas dasar untuk komponen UI dan notebook dengan integrasi
 """
 
 from smartcash.ui.utils.cell_utils import (
-    setup_notebook_environment, 
-    setup_ui_component, 
-    create_default_ui_components,
-    cleanup_resources,
-    register_cleanup_resource,
-    display_ui
+    setup_notebook_environment
 )
 from smartcash.ui.utils.logging_utils import (
-    setup_ipython_logging, 
-    log_to_ui
+    setup_ipython_logging
 )
 from smartcash.ui.utils.visualization_utils import (
     create_metric_display, 
@@ -77,17 +71,10 @@ from smartcash.ui.utils.validator_utils import (
 __all__ = [
     # Cell Utils
     'setup_notebook_environment',
-    'setup_ui_component',
-    'create_default_ui_components',
-    'cleanup_resources',
-    'register_cleanup_resource',
-    'display_ui',
     
     # Logging Utils
     'setup_ipython_logging',
-    'log_to_ui',
-    'alert_to_ui'
-    
+
     # Visualization Utils
     'create_metric_display',
     'create_class_distribution_plot',

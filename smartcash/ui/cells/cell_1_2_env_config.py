@@ -1,17 +1,12 @@
 """
 File: smartcash/ui/cells/cell_1_2_env_config.py
-Deskripsi: Cell konfigurasi environment terintegrasi dengan sinkronisasi konfigurasi Drive
+Deskripsi: Entry point untuk environment configuration cell
 """
-import sys
-from IPython.display import display
-if '.' not in sys.path: sys.path.append('.')
 
-try:
-    # Import dan gunakan setup environment dari modul
-    from smartcash.ui.setup.env_config import setup_environment_config
-    
-    # Setup dan tampilkan UI environment config (termasuk inisialisasi Drive)
-    ui_components = setup_environment_config()
-    display(ui_components['ui'])
-    
-except ImportError as e: create_alert(f"Error: {str(e)}", 'error')
+def setup_env_config():
+    """Setup dan tampilkan UI untuk konfigurasi environment."""
+    from smartcash.ui.setup.env_config_initializer import initialize_env_config_ui
+    return initialize_env_config_ui()
+
+# Eksekusi saat modul diimpor
+ui_components = setup_env_config()

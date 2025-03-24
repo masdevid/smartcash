@@ -1,0 +1,150 @@
+"""
+File: smartcash/ui/setup/utils/package_installer.py
+Deskripsi: Utilitas untuk instalasi package dengan progress tracking
+"""
+
+import sys
+import time
+import subprocess
+from typing import Dict, List, Tuple, Any
+from IPython.display import display
+
+def install_single_package(package: str) -> Tuple[bool, str]:
+    """
+    Install package tunggal dengan pip.
+    
+    Args:
+        package: Nama package dengan atau tanpa versi
+        
+    Returns:
+        Tuple (success, error_message)
+    """
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "--upgrade", package],
+            capture_output=True, text=True, check=False
+        )
+        
+        if result.returncode == 0:
+            return True, ""
+        else:
+            return False, result.stderr.strip()
+    except Exception as e:
+        return False, str(e)
+
+def run_batch_installation(
+    packages: List[str], 
+    ui_components: Dict[str, Any], 
+    update_status: callable = None
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Jalankan instalasi batch packages dengan progress tracking.
+    
+    Args:
+        packages: List package yang akan diinstall
+        ui_components: Dictionary UI components
+        update_status: Fungsi untuk update status (opsional)
+        
+    Returns:
+        Tuple (success, stats)
+    """
+    from smartcash.ui.utils.alert_utils import create_status_indicator
+    
+    # Status output dan progress widgets
+    status_output = ui_components.get('status')
+    progress_bar = ui_components.get('install_progress')
+    progress_label = ui_components.get('progress_label')
+    logger = ui_components.get('logger')
+    
+    # Stats untuk instalasi
+    stats = {
+        'total': len(packages),
+        'success': 0,
+        'failed': 0,
+        'skipped': 0,
+        'duration': 0,
+        'errors': []
+    }
+    
+    if not packages:
+        if logger: logger.info("ℹ️ Tidak ada package yang perlu diinstall")
+        return True, stats
+        
+    # Setup progress
+    if progress_bar and hasattr(progress_bar, 'max'):
+        progress_bar.max = len(packages)
+        progress_bar.value = 0
+        
+    if progress_label:
+        progress_label.value = "Memulai instalasi packages..."
+    
+    # Track start time
+    start_time = time.time()
+    
+    # Install packages satu per satu
+    for i, package in enumerate(packages):
+        # Update progress
+        if progress_bar:
+            progress_bar.value = i
+            
+        # Extract package name for display
+        package_name = package.split('=')[0].split('>')[0].split('<')[0].strip()
+        
+        # Update progress label
+        if progress_label:
+            progress_label.value = f"Menginstall {package_name}... ({i+1}/{len(packages)})"
+        
+        # Display info di status output
+        if status_output:
+            with status_output:
+                display(create_status_indicator('info', f"Menginstall {package}"))
+        
+        # Install package
+        success, error_msg = install_single_package(package)
+        
+        # Update stats
+        if success:
+            stats['success'] += 1
+            if status_output:
+                with status_output:
+                    display(create_status_indicator('success', f"{package} berhasil diinstall"))
+        else:
+            stats['failed'] += 1
+            stats['errors'].append((package, error_msg))
+            if status_output:
+                with status_output:
+                    display(create_status_indicator('error', f"Gagal menginstall {package}: {error_msg}"))
+        
+        # Update progress tracker jika tersedia
+        tracker_key = 'dependency_installer_tracker'
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            tracker.update(1, f"Installed {i+1}/{len(packages)}: {package_name}")
+        
+        # Custom status update jika disediakan
+        if update_status:
+            update_status(i+1, len(packages), package_name, success)
+    
+    # Calculate duration
+    stats['duration'] = time.time() - start_time
+    
+    # Complete progress
+    if progress_bar:
+        progress_bar.value = len(packages)
+    
+    # Update progress tracker
+    tracker_key = 'dependency_installer_tracker'
+    if tracker_key in ui_components:
+        tracker = ui_components[tracker_key]
+        tracker.complete(f"Instalasi selesai: {stats['success']}/{stats['total']} berhasil")
+    
+    # Update progress label
+    if progress_label:
+        progress_label.value = f"Instalasi selesai dalam {stats['duration']:.1f} detik"
+        
+    # Log completion
+    if logger:
+        logger.info(f"✅ Instalasi selesai dalam {stats['duration']:.1f} detik: "
+                   f"{stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal")
+    
+    return stats['failed'] == 0, stats

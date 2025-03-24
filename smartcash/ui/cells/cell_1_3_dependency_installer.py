@@ -1,18 +1,12 @@
 """
 File: smartcash/ui/cells/cell_1_3_dependency_installer.py
-Deskripsi: Cell instalasi dependencies untuk SmartCash dengan pendekatan modular
+Deskripsi: Entry point untuk cell instalasi dependencies dengan sistem deteksi otomatis
 """
 
-import sys
-from IPython.display import display
-if '.' not in sys.path: sys.path.append('.')
+def setup_dependency_installer():
+    """Setup dan tampilkan UI untuk instalasi dependencies."""
+    from smartcash.ui.setup.dependency_installer_initializer import initialize_dependency_installer
+    return initialize_dependency_installer()
 
-try:
-    from smartcash.ui.setup.dependency_installer import setup_dependency_installer
-    # Setup dependency installer
-    ui_components = setup_dependency_installer()
-    
-    # Tampilkan UI
-    display(ui_components['ui'])
-
-except ImportError as e: create_alert(e, 'error')
+# Eksekusi saat modul diimpor
+ui_components = setup_dependency_installer()

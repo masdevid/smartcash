@@ -333,6 +333,7 @@
 |        ├── experiment_visualizer.py
 |        ├── research_visualizer.py
 |        └── scenario_visualizer.py
+├── panduan_cells.md
 ├── project-structure.txt
 └── ui
    ├── cell_template.py
@@ -347,6 +348,20 @@
    |  ├── cell_3_1_backbone_selection.py
    |  ├── cell_3_2_hyperparameters.py
    |  └── cell_3_3_training_strategy.py
+   ├── charts
+   |  ├── __init__.py
+   |  ├── class_distribution_analyzer.py
+   |  ├── compare_original_vs_augmented.py
+   |  ├── compare_original_vs_preprocessed.py
+   |  ├── distribution_summary_display.py
+   |  ├── get_preprocessing_stats.py
+   |  ├── plot_base.py
+   |  ├── plot_comparison.py
+   |  ├── plot_single.py
+   |  ├── plot_stacked.py
+   |  ├── visualization_integrator.py
+   |  ├── visualize_augmented_samples.py
+   |  └── visualize_preprocessed_samples.py
    ├── components
    |  ├── __init__.py
    |  └── action_buttons.py
@@ -394,7 +409,9 @@
    |  ├── __init__.py
    |  ├── download_progress_handler.py
    |  ├── error_handler.py
-   |  └── observer_handler.py
+   |  ├── multi_progress.py
+   |  ├── observer_handler.py
+   |  └── single_progress.py
    ├── helpers
    |  ├── __init__.py
    |  └── ui_helpers.py
@@ -408,17 +425,19 @@
    |  ├── preprocessing_info.py
    |  └── split_info.py
    ├── setup
-   |  ├── dependency_installer.py
    |  ├── dependency_installer_component.py
-   |  ├── dependency_installer_config.py
    |  ├── dependency_installer_handler.py
-   |  ├── directory_handler.py
-   |  ├── drive_handler.py
+   |  ├── dependency_installer_initializer.py
+   |  ├── directory_manager.py
+   |  ├── drive_connector.py
    |  ├── drive_sync_initializer.py
-   |  ├── env_config.py
    |  ├── env_config_component.py
-   |  ├── env_config_handler.py
-   |  └── env_detection.py
+   |  ├── env_config_handlers.py
+   |  ├── env_config_initializer.py
+   |  ├── environment_detector.py
+   |  ├── package_analyzer.py
+   |  ├── package_installer.py
+   |  └── package_requirements.py
    ├── training_config
    |  ├── __init__.py
    |  ├── backbone_selection_component.py
@@ -433,38 +452,24 @@
    |  ├── model_ui_updater.py
    |  ├── training_strategy_component.py
    |  └── training_strategy_handler.py
-   ├── utils
-   |  ├── __init__.py
-   |  ├── alert_utils.py
-   |  ├── cell_utils.py
-   |  ├── constants.py
-   |  ├── drive_utils.py
-   |  ├── fallback_utils.py
-   |  ├── file_utils.py
-   |  ├── header_utils.py
-   |  ├── info_utils.py
-   |  ├── layout_utils.py
-   |  ├── logging_utils.py
-   |  ├── metric_utils.py
-   |  ├── ui_logger.py
-   |  ├── validator_utils.py
-   |  └── visualization_utils.py
-   └── visualization
+   └── utils
       ├── __init__.py
-      ├── class_distribution_analyzer.py
-      ├── compare_original_vs_augmented.py
-      ├── compare_original_vs_preprocessed.py
-      ├── distribution_summary_display.py
-      ├── get_preprocessing_stats.py
-      ├── plot_base.py
-      ├── plot_comparison.py
-      ├── plot_single.py
-      ├── plot_stacked.py
-      ├── visualization_integrator.py
-      ├── visualize_augmented_samples.py
-      └── visualize_preprocessed_samples.py
+      ├── alert_utils.py
+      ├── cell_utils.py
+      ├── constants.py
+      ├── drive_utils.py
+      ├── fallback_utils.py
+      ├── file_utils.py
+      ├── header_utils.py
+      ├── info_utils.py
+      ├── layout_utils.py
+      ├── logging_utils.py
+      ├── metric_utils.py
+      ├── ui_logger.py
+      ├── validator_utils.py
+      └── visualization_utils.py
 
-directory: 73 file: 390
+directory: 73 file: 395
 
 
 

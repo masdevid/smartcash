@@ -3,15 +3,25 @@ File: smartcash/common/progress_observer.py
 Deskripsi: Implementasi observer pattern untuk progress tracking dengan integrasi event system
 """
 
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional, Callable, Tuple
 
 from smartcash.common.logger import get_logger
 from smartcash.common.progress_tracker import ProgressTracker, get_progress_tracker
-from smartcash.components.observer.base_observer import BaseObserver
-from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-from smartcash.components.observer.event_topics_observer import EventTopics
+# Hapus import BaseObserver untuk menghindari circular import
+# Gunakan string untuk type hinting
 
-class ProgressObserver(BaseObserver):
+# Import EventTopics dengan cara yang menghindari circular import
+try:
+    from smartcash.components.observer.event_topics_observer import EventTopics
+except ImportError:
+    # Fallback jika EventTopics tidak bisa diimpor
+    class EventTopics:
+        """Fallback EventTopics."""
+        PROGRESS_UPDATE = "progress.update"
+        PROGRESS_START = "progress.start"
+        PROGRESS_COMPLETE = "progress.complete"
+
+class ProgressObserver:
     """Observer untuk melacak progres dari event."""
     
     def __init__(
@@ -40,8 +50,7 @@ class ProgressObserver(BaseObserver):
             enabled: Apakah observer aktif
             logger: Logger kustom (opsional)
         """
-        super().__init__(enabled=enabled)
-        
+        self.enabled = enabled
         self.tracker = tracker or get_progress_tracker(tracker_name, total, desc)
         self.event_types = event_types or [
             EventTopics.PROGRESS_UPDATE,
@@ -51,6 +60,8 @@ class ProgressObserver(BaseObserver):
         self.progress_key = progress_key
         self.total_key = total_key
         self.logger = logger or get_logger("progress_observer")
+        self.name = f"ProgressObserver_{tracker_name}"
+        self.priority = 0  # Default priority
         
         # Setup tracker jika belum diset
         if self.tracker.total <= 0:
@@ -121,6 +132,10 @@ class ProgressObserver(BaseObserver):
             # Tandai progres sebagai selesai
             message = kwargs.get('message')
             self.tracker.complete(message)
+    
+    def should_process_event(self, event_type: str) -> bool:
+        """Method untuk kompatibilitas dengan BaseObserver."""
+        return self.enabled
 
 class ProgressEventEmitter:
     """Emitter untuk mengirim event progres ke EventDispatcher."""
@@ -178,8 +193,8 @@ class ProgressEventEmitter:
         self.current = 0
         self.metrics = {}
         
-        # Kirim event
-        EventDispatcher.notify(
+        # Kirim event dengan safe import
+        self._notify(
             event_type=self.start_event,
             sender=self,
             description=self.description,
@@ -213,7 +228,7 @@ class ProgressEventEmitter:
             self.metrics.update(metrics)
             
         # Kirim event
-        EventDispatcher.notify(
+        self._notify(
             event_type=self.update_event,
             sender=self,
             progress=self.current,
@@ -239,7 +254,7 @@ class ProgressEventEmitter:
             self.metrics.update(metrics)
             
         # Kirim event
-        EventDispatcher.notify(
+        self._notify(
             event_type=self.update_event,
             sender=self,
             progress=self.current,
@@ -264,7 +279,7 @@ class ProgressEventEmitter:
             self.metrics.update(final_metrics)
             
         # Kirim event
-        EventDispatcher.notify(
+        self._notify(
             event_type=self.complete_event,
             sender=self,
             progress=self.current,
@@ -275,13 +290,23 @@ class ProgressEventEmitter:
         )
         
         self.logger.info(f"✅ {self.description} selesai")
+    
+    def _notify(self, event_type: str, sender: Any, **kwargs):
+        """Safe notify yang menghindari circular import."""
+        try:
+            # Import di sini untuk menghindari circular import
+            from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
+            EventDispatcher.notify(event_type, sender, **kwargs)
+        except ImportError:
+            # Fallback jika EventDispatcher tidak bisa diimpor
+            pass
 
 def create_progress_tracker_observer(
     name: str,
     total: int = 100,
     desc: str = "Progress",
     display: bool = True
-) -> Tuple[ProgressTracker, ProgressObserver]:
+) -> Tuple[ProgressTracker, "ProgressObserver"]:
     """
     Buat ProgressTracker dan ProgressObserver yang terintegrasi.
     
@@ -297,9 +322,14 @@ def create_progress_tracker_observer(
     tracker = get_progress_tracker(name, total, desc, display=display)
     observer = ProgressObserver(tracker=tracker, total=total, desc=desc)
     
-    # Daftarkan ke EventDispatcher
-    for event_type in observer.event_types:
-        EventDispatcher.register(event_type, observer)
+    # Daftarkan ke EventDispatcher dengan lazy import
+    try:
+        from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
+        for event_type in observer.event_types:
+            EventDispatcher.register(event_type, observer)
+    except ImportError:
+        # Jika EventDispatcher tidak bisa diimpor, log warning
+        observer.logger.warning("⚠️ EventDispatcher tidak bisa diimpor, observer tidak didaftarkan")
         
     return tracker, observer
 

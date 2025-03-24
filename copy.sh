@@ -13,6 +13,7 @@ cp -r smartcash/ui .
 cp -r smartcash/dataset .
 cp -r smartcash/detection .
 cp -r smartcash/common .
+sleep 1
 git add .
 git commit -am "update"
 git push origin migration

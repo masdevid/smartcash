@@ -8,12 +8,13 @@ import concurrent.futures
 from typing import Dict, List, Optional, Type, Any, Set, Callable, Union
 from threading import RLock
 
+from smartcash.common.logger import get_logger
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
-from smartcash.common.logger import get_logger
-from smartcash.common.progress_tracker import get_progress_tracker
-from smartcash.common.progress_observer import ProgressObserver, create_progress_tracker_observer
 from smartcash.components.observer.cleanup_observer import register_observer_manager
+
+# Import progress_tracker tanpa circular dependency
+from smartcash.common.progress_tracker import get_progress_tracker
 
 
 class ObserverManager:
@@ -165,9 +166,9 @@ class ObserverManager:
         name: Optional[str] = None,
         group: Optional[str] = None,
         show_progress: bool = True
-    ) -> ProgressObserver:
+    ) -> Any:  # Return type Any untuk menghindari circular import
         """
-        Membuat observer untuk monitoring progress menggunakan common/progress_observer.
+        Membuat observer untuk monitoring progress.
         
         Args:
             event_types: List tipe event yang akan diobservasi
@@ -180,7 +181,10 @@ class ObserverManager:
         Returns:
             ProgressObserver instance
         """
-        # Gunakan fungsi helper dari common/progress_observer
+        # Import di sini untuk menghindari circular import
+        from smartcash.common.progress_observer import create_progress_tracker_observer
+        
+        # Gunakan fungsi helper untuk membuat observer
         tracker, observer = create_progress_tracker_observer(
             name=name or desc,
             total=total,
@@ -401,7 +405,7 @@ class ObserverManager:
     def shutdown(self):
         """Shutdown manager dan lepaskan resources."""
         self.unregister_all()
-        if not self._executor._shutdown:
+        if hasattr(self._executor, '_shutdown') and not self._executor._shutdown:
             self._executor.shutdown(wait=True)
     
     def __del__(self):

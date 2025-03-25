@@ -55,11 +55,6 @@ from smartcash.common.threadpools import (
     process_with_stats
 )
 
-# Inisialisasi Proyek
-from smartcash.common.initialization import (
-    initialize_config
-)
-
 __all__ = [
     # Konfigurasi
     'get_config_manager', 'ConfigManager',
@@ -103,6 +98,4 @@ __all__ = [
     'process_in_parallel', 
     'process_with_stats',
     
-    # Inisialisasi Proyek
-    'initialize_config'
 ]

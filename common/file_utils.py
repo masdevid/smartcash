@@ -1,6 +1,6 @@
 """
 File: smartcash/common/file_utils.py
-Deskripsi: Utilitas terpadu untuk operasi file dan path dengan pendekatan DRY
+Deskripsi: Utilitas terpadu untuk operasi file dan path dengan pendekatan DRY dan perbaikan progress bar
 """
 
 import os
@@ -17,7 +17,7 @@ from smartcash.common.threadpools import process_in_parallel, process_with_stats
 class FileUtils:
     """Utilitas terpadu untuk operasi file dan path."""
     
-    def __init__(self, config: Dict = None, logger = None, num_workers: int = None):
+    def __init__(self, config: Dict = None, logger = None, num_workers: int = None, silent_mode: bool = False):
         """
         Inisialisasi FileUtils.
         
@@ -25,10 +25,12 @@ class FileUtils:
             config: Konfigurasi aplikasi (opsional)
             logger: Logger kustom (opsional)
             num_workers: Jumlah worker untuk operasi paralel
+            silent_mode: Flag untuk mematikan output progress bar
         """
         self.config = config or {}
         self.logger = logger or get_logger("file_utils")
         self.num_workers = num_workers
+        self.silent_mode = silent_mode
         
     def ensure_dir(self, path: Union[str, Path]) -> Path:
         """Pastikan direktori ada, jika tidak buat."""
@@ -203,7 +205,7 @@ class FileUtils:
             copy_file,
             max_workers=self.num_workers,
             desc="📋 Menyalin file",
-            show_progress=show_progress
+            show_progress=(show_progress and not self.silent_mode)
         )
         
         # Default stats jika kosong
@@ -291,7 +293,7 @@ class FileUtils:
             move_file,
             max_workers=self.num_workers,
             desc="📋 Memindahkan file",
-            show_progress=show_progress
+            show_progress=(show_progress and not self.silent_mode)
         )
         
         # Default stats jika kosong
@@ -399,7 +401,8 @@ class FileUtils:
             # Progress bar
             total_size = sum(file.file_size for file in files)
             desc = f"📦 Mengekstrak {zip_path.name}" if show_progress else None
-            pbar = tqdm(total=total_size, unit='B', unit_scale=True, desc=desc) if show_progress else None
+            # Gunakan silent_mode untuk menghilangkan progress bar
+            pbar = tqdm(total=total_size, unit='B', unit_scale=True, desc=desc, disable=(not show_progress or self.silent_mode)) if show_progress else None
             
             # Ekstrak file
             for file in files:
@@ -478,7 +481,7 @@ class FileUtils:
             check_image,
             max_workers=self.num_workers,
             desc="🔍 Memeriksa integritas gambar",
-            show_progress=show_progress
+            show_progress=(show_progress and not self.silent_mode)
         ) if result is not None]
         
         self.logger.info(
@@ -492,7 +495,7 @@ class FileUtils:
 # Singleton instance
 _file_utils = None
 
-def get_file_utils(config: Dict = None, logger = None, num_workers: int = None) -> FileUtils:
+def get_file_utils(config: Dict = None, logger = None, num_workers: int = None, silent_mode: bool = False) -> FileUtils:
     """
     Dapatkan instance FileUtils (singleton).
     
@@ -500,11 +503,15 @@ def get_file_utils(config: Dict = None, logger = None, num_workers: int = None) 
         config: Konfigurasi aplikasi (opsional)
         logger: Logger kustom (opsional)
         num_workers: Jumlah worker untuk operasi paralel
+        silent_mode: Flag untuk mematikan output progress bar
         
     Returns:
         Instance FileUtils
     """
     global _file_utils
     if _file_utils is None:
-        _file_utils = FileUtils(config, logger, num_workers)
+        _file_utils = FileUtils(config, logger, num_workers, silent_mode)
+    # Update silent_mode jika berbeda dengan yang ada
+    elif _file_utils.silent_mode != silent_mode:
+        _file_utils.silent_mode = silent_mode
     return _file_utils

@@ -113,7 +113,8 @@ def sync_configs_with_drive(ui_components: Dict[str, Any], drive_path: Path) -> 
                 # Versi dari ui.setup (fallback)
                 try:
                     from smartcash.ui.setup.drive_sync_initializer import initialize_configs
-                    success, message = initialize_configs(logger)
+                    # Hubungkan ke UI dan matikan output console
+                    success, message = initialize_configs(logger=logger, ui_components=ui_components, silent=True)
                     _log_to_ui(ui_components, f"Sinkronisasi: {message}", "success" if success else "warning")
                     return success
                 except ImportError:

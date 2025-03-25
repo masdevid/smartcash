@@ -30,8 +30,9 @@ def initialize_env_config_ui():
                 # Tandai bahwa sinkronisasi sudah dimulai
                 if not hasattr(init_async, '_sync_started'):
                     init_async._sync_started = True
-                    # Jalankan sinkronisasi konfigurasi
-                    success, message = initialize_configs(logger)
+                    # Jalankan sinkronisasi konfigurasi dengan parameter silent=True
+                    # dan ui_components untuk mengalihkan output ke UI
+                    success, message = initialize_configs(logger=logger, ui_components=ui_components, silent=True)
                     if logger:
                         logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
             except Exception as e:

@@ -3,7 +3,6 @@ File: smartcash/ui/setup/env_config_initializer.py
 Deskripsi: Initializer untuk modul konfigurasi environment dengan pendekatan modular dan efisien
 """
 
-from time import sleep
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display, HTML
@@ -20,27 +19,25 @@ def initialize_env_config_ui():
         from smartcash.ui.cell_template import setup_cell
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handlers import setup_env_config_handlers
+        from smartcash.ui.setup.init_sequence_handler import setup_inisialisasi_berurutan, jalankan_sinkronisasi_tertunda
         
-        # Inisialisasi async opsional untuk verifikasi konfigurasi
+        # Inisialisasi async opsional untuk komponen visual
         def init_async(ui_components, env, config):
             try:
-                # Pastikan logger sudah siap sebelum menjalankan sinkronisasi
+                # Siapkan urutan inisialisasi yang benar
+                setup_inisialisasi_berurutan(ui_components)
+                
+                # Set auto sync tertunda
+                # jalankan_sinkronisasi_tertunda(ui_components, delay_seconds=5)
+                
+                # Pengaturan lain jika diperlukan...
                 logger = ui_components.get('logger')
-                sleep(1)
                 if logger:
-                    # Tandai bahwa sinkronisasi sudah dimulai
-                    if not hasattr(init_async, '_sync_started'):
-                        init_async._sync_started = True
-                        logger.info("🔄 Memulai sinkronisasi konfigurasi...")
-                        
-                        # Jalankan sinkronisasi konfigurasi SETELAH logger siap
-                        from smartcash.ui.setup.drive_sync_initializer import initialize_configs
-                        success, message = initialize_configs(logger)
-                        logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
+                    logger.debug("🔧 Inisialisasi asinkron selesai")
             except Exception as e:
                 logger = ui_components.get('logger')
                 if logger:
-                    logger.warning(f"⚠️ Error saat inisialisasi konfigurasi: {str(e)}")
+                    logger.warning(f"⚠️ Error saat inisialisasi UI: {str(e)}")
         
         # Gunakan cell template untuk setup standar
         ui_components = setup_cell(

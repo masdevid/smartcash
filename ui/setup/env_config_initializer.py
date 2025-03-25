@@ -3,6 +3,7 @@ File: smartcash/ui/setup/env_config_initializer.py
 Deskripsi: Initializer untuk modul konfigurasi environment dengan pendekatan modular dan efisien
 """
 
+from time import sleep
 from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display, HTML
@@ -23,17 +24,18 @@ def initialize_env_config_ui():
         # Inisialisasi async opsional untuk verifikasi konfigurasi
         def init_async(ui_components, env, config):
             try:
-                # Verifikasi konfigurasi default
-                from smartcash.ui.setup.drive_sync_initializer import initialize_configs
+                # Pastikan logger sudah siap sebelum menjalankan sinkronisasi
                 logger = ui_components.get('logger')
-                
-                # Tandai bahwa sinkronisasi sudah dimulai
-                if not hasattr(init_async, '_sync_started'):
-                    init_async._sync_started = True
-                    # Jalankan sinkronisasi konfigurasi dengan parameter silent=True
-                    # dan ui_components untuk mengalihkan output ke UI
-                    success, message = initialize_configs(logger=logger, ui_components=ui_components, silent=True)
-                    if logger:
+                sleep(1)
+                if logger:
+                    # Tandai bahwa sinkronisasi sudah dimulai
+                    if not hasattr(init_async, '_sync_started'):
+                        init_async._sync_started = True
+                        logger.info("🔄 Memulai sinkronisasi konfigurasi...")
+                        
+                        # Jalankan sinkronisasi konfigurasi SETELAH logger siap
+                        from smartcash.ui.setup.drive_sync_initializer import initialize_configs
+                        success, message = initialize_configs(logger)
                         logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
             except Exception as e:
                 logger = ui_components.get('logger')

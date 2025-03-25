@@ -27,10 +27,13 @@ def initialize_env_config_ui():
                 from smartcash.ui.setup.drive_sync_initializer import initialize_configs
                 logger = ui_components.get('logger')
                 
-                # Jalankan sinkronisasi konfigurasi
-                success, message = initialize_configs(logger)
-                if logger:
-                    logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
+                # Tandai bahwa sinkronisasi sudah dimulai
+                if not hasattr(init_async, '_sync_started'):
+                    init_async._sync_started = True
+                    # Jalankan sinkronisasi konfigurasi
+                    success, message = initialize_configs(logger)
+                    if logger:
+                        logger.info(f"🔄 Sinkronisasi konfigurasi: {message}")
             except Exception as e:
                 logger = ui_components.get('logger')
                 if logger:

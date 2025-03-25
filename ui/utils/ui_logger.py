@@ -145,7 +145,6 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
             icon = emoji or emoji_map.get(level, "ℹ️")
             display(HTML(f"<div><span>{icon}</span> {message}</div>"))
 
-
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     """
     Intercept stdout dan arahkan ke UI widget.
@@ -158,10 +157,16 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
         return
     
+    # Reset stdout ke aslinya terlebih dahulu jika sudah ada intercept sebelumnya
+    if 'original_stdout' in ui_components:
+        sys.stdout = ui_components['original_stdout']
+        # Hapus referensi ke custom stdout lama
+        ui_components.pop('custom_stdout', None)
+    
     # Pastikan tidak terjadi multiple intercepts
     if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
         return
-    
+        
     # Buat stdout interceptor dengan thread-safety
     class UIStdoutInterceptor:
         def __init__(self, ui_components):

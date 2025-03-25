@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/downloader/backup_service.py
-Deskripsi: Layanan backup dataset ringkas dengan fitur kompres ke ZIP dan opsi untuk menonaktifkan backup
+Deskripsi: Layanan backup dataset ringkas dengan fitur kompres ke ZIP dan integrasi dengan file_wrapper
 """
 
 import os
@@ -9,12 +9,11 @@ import zipfile
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any, Tuple
 from datetime import datetime
-from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
-from smartcash.components.observer.manager_observer import ObserverManager
-from smartcash.components.observer import notify, EventTopics
+from smartcash.dataset.utils.file_wrapper import ensure_dir
+from smartcash.dataset.services.downloader.notification_utils import notify_service_event
 
 
 class BackupService:
@@ -30,13 +29,7 @@ class BackupService:
         """
         self.logger = logger or get_logger("backup_service")
         self.backup_dir = Path(backup_dir or "data/backups")
-        os.makedirs(self.backup_dir, exist_ok=True)
-        
-        # Setup observer manager untuk tracking - PERBAIKAN: Ubah dari get_instance() ke inisialisasi langsung
-        try:
-            self.observer_manager = ObserverManager()
-        except (ImportError, AttributeError):
-            self.observer_manager = None
+        ensure_dir(self.backup_dir)
         
         self.logger.info(f"🗄️ BackupService diinisialisasi, backup dir: {self.backup_dir}")
     
@@ -59,11 +52,26 @@ class BackupService:
         Returns:
             Dictionary berisi informasi backup
         """
+        from tqdm.auto import tqdm
+        
         start_time = time.time()
         src_path = Path(src_dir)
         
         if not src_path.exists():
-            raise DatasetError(f"❌ Direktori sumber tidak ditemukan: {src_path}")
+            msg = f"❌ Direktori sumber tidak ditemukan: {src_path}"
+            self.logger.warning(msg)
+            return {"status": "error", "message": msg}
+        
+        # Hitung file untuk progress bar
+        files_to_backup = list(src_path.glob('**/*'))
+        files_to_backup = [f for f in files_to_backup if f.is_file()]
+        total_files = len(files_to_backup)
+        
+        # Cek apakah ada file untuk dibackup, jika tidak ada return error tanpa exception
+        if total_files == 0:
+            msg = f"❌ Tidak ada file ditemukan untuk dibackup di {src_path}"
+            self.logger.warning(msg)
+            return {"status": "empty", "message": msg}
         
         # Generate nama backup
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -73,25 +81,18 @@ class BackupService:
         # Siapkan untuk backup
         self.logger.info(f"📦 Membuat backup dataset: {src_path} → {zip_path}")
         
-        # Notifikasi backup dimulai
-        self._notify(
-            EventTopics.BACKUP_START,
+        total_size = sum(f.stat().st_size for f in files_to_backup)
+        
+        # Notifikasi backup dimulai menggunakan notify_service_event
+        notify_service_event(
+            "backup", "start",
+            self, None,
             message=f"Membuat backup dataset ke {zip_path.name}",
             source=str(src_path),
-            destination=str(zip_path),
-            status="info"
+            destination=str(zip_path)
         )
         
         try:
-            # Hitung file untuk progress bar
-            files_to_backup = list(src_path.glob('**/*'))
-            files_to_backup = [f for f in files_to_backup if f.is_file()]
-            total_files = len(files_to_backup)
-            total_size = sum(f.stat().st_size for f in files_to_backup)
-            
-            if total_files == 0:
-                raise DatasetError(f"❌ Tidak ada file ditemukan untuk dibackup di {src_path}")
-            
             # Buat ZIP file dengan progress tracking
             with zipfile.ZipFile(zip_path, 'w', compression) as zipf:
                 with tqdm(total=total_files, desc=f"📦 Backup ke ZIP", unit="file", disable=not show_progress) as pbar:
@@ -101,14 +102,14 @@ class BackupService:
                         zipf.write(file, arcname)
                         pbar.update(1)
                         
-                        # Notifikasi progress setiap 5% atau 20 file
+                        # Notifikasi progress setiap 5% atau 20 file menggunakan notify_service_event
                         if i % max(1, min(20, total_files // 20)) == 0:
-                            self._notify(
-                                EventTopics.BACKUP_PROGRESS,
+                            notify_service_event(
+                                "backup", "progress",
+                                self, None,
                                 progress=i,
                                 total=total_files,
-                                percentage=int((i / total_files) * 100),
-                                status="info"
+                                percentage=int((i / total_files) * 100)
                             )
             
             # Dapatkan statistik hasil
@@ -117,14 +118,14 @@ class BackupService:
             backup_size_mb = backup_size / (1024 * 1024)
             compression_ratio = (1 - (backup_size / total_size)) * 100 if total_size > 0 else 0
             
-            # Notifikasi selesai
-            self._notify(
-                EventTopics.BACKUP_COMPLETE,
+            # Notifikasi selesai menggunakan notify_service_event
+            notify_service_event(
+                "backup", "complete",
+                self, None,
                 message=f"Backup selesai: {backup_size_mb:.2f} MB (rasio kompresi: {compression_ratio:.1f}%)",
                 size_mb=backup_size_mb,
                 file_count=total_files,
-                duration=elapsed_time,
-                status="success"
+                duration=elapsed_time
             )
             
             self.logger.success(
@@ -146,11 +147,11 @@ class BackupService:
             }
             
         except Exception as e:
-            # Notifikasi error dan hapus backup tidak lengkap
-            self._notify(
-                EventTopics.BACKUP_ERROR,
-                message=f"Error saat backup dataset: {str(e)}",
-                status="error"
+            # Notifikasi error menggunakan notify_service_event
+            notify_service_event(
+                "backup", "error",
+                self, None,
+                message=f"Error saat backup dataset: {str(e)}"
             )
                 
             self.logger.error(f"❌ Error saat backup dataset: {str(e)}")
@@ -162,12 +163,8 @@ class BackupService:
                 except:
                     pass
                 
-            raise DatasetError(f"Error saat backup dataset: {str(e)}")
+            return {"status": "error", "message": f"Error saat backup dataset: {str(e)}"}
     
-    def _notify(self, event_type, **kwargs):
-        """Helper untuk mengirimkan notifikasi observer dengan one-liner."""
-        if self.observer_manager: notify(event_type, self, **kwargs)
-            
     def list_backups(self, filter_pattern: Optional[str] = None) -> Dict[str, Dict[str, Any]]:
         """
         Daftar semua backup ZIP yang tersedia.
@@ -219,3 +216,35 @@ class BackupService:
         except Exception as e:
             self.logger.error(f"❌ Error saat listing backup: {str(e)}")
             return {}
+    
+    def cleanup_old_backups(self, max_backups: int = 3) -> None:
+        """
+        Hapus backup lama untuk menghemat ruang penyimpanan.
+        
+        Args:
+            max_backups: Jumlah maksimum backup yang disimpan
+        """
+        try:
+            # Dapatkan daftar semua backup
+            backups = self.list_backups()
+            if len(backups) <= max_backups:
+                return
+                
+            # Urutkan berdasarkan waktu pembuatan (terlama di awal)
+            sorted_backups = sorted(
+                backups.items(), 
+                key=lambda x: datetime.strptime(x[1].get('created_at', '2000-01-01 00:00:00'), 
+                                              "%Y-%m-%d %H:%M:%S") 
+            )
+            
+            # Hapus backup lama yang melebihi jumlah maksimum
+            for name, info in sorted_backups[:-max_backups]:
+                try:
+                    backup_path = Path(info['path'])
+                    if backup_path.exists():
+                        backup_path.unlink()
+                        self.logger.info(f"🗑️ Menghapus backup lama: {name}")
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Gagal menghapus backup lama {name}: {str(e)}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error saat pembersihan backup lama: {str(e)}")

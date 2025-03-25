@@ -10,34 +10,27 @@ from pathlib import Path
 from typing import Dict, List, Union, Optional, Any, Callable
 from concurrent.futures import ThreadPoolExecutor
 from tqdm.auto import tqdm
+import time
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
-from smartcash.components.observer.manager_observer import ObserverManager
-from smartcash.components.observer import notify, EventTopics
+from smartcash.dataset.utils.file_wrapper import (
+    ensure_dir, copy_files, move_files, extract_zip as wrapper_extract_zip
+)
+from smartcash.dataset.services.downloader.notification_utils import notify_service_event
 
-class FileProcessor:
+class DownloadFileProcessor:
     """Processor untuk operasi file dataset dengan dukungan ZIP dan restrukturisasi."""
     
-    def __init__(self, logger=None, num_workers: int = 4, observer_manager=None):
+    def __init__(self, logger=None, num_workers: int = None, observer_manager=None):
         """
-        Inisialisasi FileProcessor.
-        
-        Args:
-            logger: Logger kustom (opsional)
-            num_workers: Jumlah worker untuk proses paralel
-            observer_manager: Observer manager untuk notifikasi progress
+        Inisialisasi file processor dengan optimasi thread count.
         """
         self.logger = logger or get_logger("file_processor")
-        self.num_workers = num_workers
+        # Optimasi: gunakan CPU count sebagai default tapi batasi maksimum
+        self.num_workers = min(num_workers or os.cpu_count() or 4, 16)
         self.observer_manager = observer_manager
-        
-        # Coba dapatkan observer_manager jika tidak disediakan
-        if self.observer_manager is None:
-            try:
-                self.observer_manager = ObserverManager() 
-            except (ImportError, AttributeError):
-                pass
+        self.logger.info(f"📂 DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers")
     
     def process_zip_file(
         self,
@@ -48,425 +41,393 @@ class FileProcessor:
         show_progress: bool = True
     ) -> Dict[str, Any]:
         """
-        Proses lengkap file ZIP: ekstrak, restrukturisasi, dan validasi.
-        
-        Args:
-            zip_path: Path ke file ZIP
-            output_dir: Direktori output
-            extract_only: Hanya ekstrak tanpa restrukturisasi
-            remove_zip: Hapus file ZIP setelah proses
-            show_progress: Tampilkan progress bar
-            
-        Returns:
-            Dictionary berisi hasil proses
+        Proses file ZIP dataset dengan ekstraksi dan strukturisasi.
         """
-        import time
         start_time = time.time()
+        zip_path, output_path = Path(zip_path), Path(output_dir)
         
-        # Notifikasi mulai proses
-        self._notify_event("ZIP_PROCESSING_START", message=f"Memulai proses file ZIP", 
-                         zip_file=str(zip_path), status="info")
+        notify_service_event("zip_processing", "start", self, self.observer_manager,
+                          message="Memulai proses file ZIP", zip_file=str(zip_path))
         
         self.logger.info(f"📦 Memproses file ZIP dataset: {zip_path}")
         
-        zip_path, output_path = Path(zip_path), Path(output_dir)
+        # Validasi cepat file ZIP
+        if not self._validate_zip_file(zip_path):
+            msg = f"File ZIP tidak valid: {zip_path}"
+            self.logger.error(f"❌ {msg}")
+            notify_service_event("zip_processing", "error", self, self.observer_manager, message=msg)
+            return {"status": "error", "message": msg}
         
-        # Validasi file ZIP
-        if not zip_path.exists() or not zipfile.is_zipfile(zip_path):
-            self.logger.error(f"❌ File ZIP tidak valid: {zip_path}")
-            self._notify_event("ZIP_PROCESSING_ERROR", message=f"File ZIP tidak valid", status="error")
-            return {"status": "error", "message": "File ZIP tidak valid"}
-        
-        # Setup direktori output
-        os.makedirs(output_path, exist_ok=True)
-        
-        # Direktori ekstraksi sementara
+        # Setup direktori
+        ensure_dir(output_path)
         tmp_extract_dir = output_path.with_name(f"{output_path.name}_extract_temp")
-        if tmp_extract_dir.exists():
-            shutil.rmtree(tmp_extract_dir)
-        tmp_extract_dir.mkdir(parents=True, exist_ok=True)
+        ensure_dir(tmp_extract_dir)
         
         try:
-            # Ekstrak ZIP
-            self._notify_event("ZIP_PROCESSING_PROGRESS", step="extract", message=f"Ekstraksi file ZIP",
-                            progress=1, total_steps=3, current_step=1, status="info")
+            # Step 1: Ekstraksi
+            notify_service_event("zip_processing", "progress", self, self.observer_manager,
+                              step="extract", message="Ekstraksi file ZIP",
+                              progress=1, total_steps=3, current_step=1)
             
-            self.logger.info(f"📂 Mengekstrak file ZIP ke {tmp_extract_dir}")
-            self.extract_zip(zip_path, tmp_extract_dir, remove_zip, show_progress)
+            extraction_result = self._extract_zip(zip_path, tmp_extract_dir, remove_zip, show_progress)
             
-            # Periksa hasil ekstraksi
-            extracted_files = list(tmp_extract_dir.glob('**/*'))
-            if not extracted_files:
-                raise ValueError(f"❌ Tidak ada file ditemukan setelah ekstraksi")
+            if extraction_result.get("errors", 0) > 0:
+                raise ValueError("Error saat ekstraksi file ZIP")
                 
-            self.logger.info(f"✅ Ekstraksi selesai: {len(extracted_files)} file")
+            self.logger.info(f"✅ Ekstraksi selesai: {extraction_result.get('extracted', 0)} file")
             
-            # Proses struktur dataset jika diperlukan
+            # Step 2: Strukturisasi (jika diperlukan)
             if not extract_only:
-                self._notify_event("ZIP_PROCESSING_PROGRESS", step="structure", 
-                               message="Menyesuaikan struktur dataset",
-                               progress=2, total_steps=3, current_step=2, status="info")
+                notify_service_event("zip_processing", "progress", self, self.observer_manager,
+                                  step="structure", message="Menyesuaikan struktur dataset",
+                                  progress=2, total_steps=3, current_step=2)
                 
-                self.logger.info(f"🔧 Menyesuaikan struktur dataset...")
-                self.fix_dataset_structure(tmp_extract_dir)
+                structure_fixed = self._fix_dataset_structure(tmp_extract_dir)
                 
-                # Pindahkan hasil ke direktori final
-                self._notify_event("ZIP_PROCESSING_PROGRESS", step="move", 
-                               message=f"Memindahkan dataset ke {output_path}",
-                               progress=3, total_steps=3, current_step=3, status="info")
+                # Step 3: Pindahkan ke output dir
+                notify_service_event("zip_processing", "progress", self, self.observer_manager,
+                                  step="move", message=f"Memindahkan dataset ke {output_path}",
+                                  progress=3, total_steps=3, current_step=3)
                 
-                self.logger.info(f"🔄 Memindahkan dataset ke {output_path}")
-                self.copy_dataset_to_data_dir(tmp_extract_dir, output_path)
+                copy_result = self._copy_dataset(
+                    tmp_extract_dir, output_path, clear_target=True, show_progress=show_progress
+                )
             else:
-                # Jika hanya ekstrak, pindahkan langsung semua file
+                # Jika hanya ekstrak, langsung pindahkan semua konten
                 self._copy_directory_contents(tmp_extract_dir, output_path, show_progress)
             
-            # Hapus direktori temporari
-            shutil.rmtree(tmp_extract_dir)
-            
-            # Dapatkan statistik
+            # Step 4: Dapatkan statistik dan selesaikan
             stats = self._get_dataset_stats(output_path)
             elapsed_time = time.time() - start_time
             
-            # Notifikasi selesai
-            self._notify_event("ZIP_PROCESSING_COMPLETE", 
-                            message=f"Proses file ZIP selesai: {stats.get('total_images', 0)} gambar",
-                            duration=elapsed_time, status="success")
-            
-            result = {
-                "status": "success",
-                "output_dir": str(output_path),
-                "file_count": len(extracted_files),
-                "stats": stats,
-                "duration": elapsed_time
-            }
+            notify_service_event("zip_processing", "complete", self, self.observer_manager,
+                              message=f"Proses file ZIP selesai: {stats.get('total_images', 0)} gambar",
+                              duration=elapsed_time)
             
             self.logger.success(
                 f"✅ Proses file ZIP selesai ({elapsed_time:.1f}s)\n"
-                f"   • Total file: {len(extracted_files)}\n"
+                f"   • Total file: {extraction_result.get('extracted', 0)}\n"
                 f"   • Gambar: {stats.get('total_images', 0)}\n"
                 f"   • Label: {stats.get('total_labels', 0)}\n"
                 f"   • Output: {output_path}"
             )
             
-            return result
+            return {
+                "status": "success",
+                "output_dir": str(output_path),
+                "file_count": extraction_result.get('extracted', 0),
+                "stats": stats,
+                "duration": elapsed_time
+            }
             
         except Exception as e:
-            self._notify_event("ZIP_PROCESSING_ERROR", message=f"Error memproses file ZIP: {str(e)}",
-                            status="error")
-            
-            # Hapus direktori temporari jika ada error
-            if tmp_extract_dir.exists():
-                shutil.rmtree(tmp_extract_dir)
-                
+            notify_service_event("zip_processing", "error", self, self.observer_manager,
+                              message=f"Error memproses file ZIP: {str(e)}")
+                              
             self.logger.error(f"❌ Error memproses file ZIP: {str(e)}")
             return {"status": "error", "message": str(e)}
-    
-    def extract_zip(
-        self, 
-        zip_path: Union[str, Path], 
-        output_dir: Union[str, Path],
-        remove_zip: bool = False,
-        show_progress: bool = True
-    ) -> bool:
-        """
-        Ekstrak file zip ke direktori output dengan progress tracking.
         
-        Args:
-            zip_path: Path ke file zip
-            output_dir: Direktori output
-            remove_zip: Apakah menghapus file zip setelah ekstraksi
-            show_progress: Tampilkan progress bar
-            
-        Returns:
-            Boolean menunjukkan keberhasilan
-        """
-        zip_path, output_dir = Path(zip_path), Path(output_dir)
-        
-        try:
-            # Buka file zip dan periksa strukturnya
-            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                files = zip_ref.infolist()
-                
-                if not files:
-                    self.logger.error(f"❌ File ZIP kosong: {zip_path}")
-                    return False
-                
-                # Ekstrak dengan progress
-                total_size = sum(f.file_size for f in files)
-                extracted_size = 0
-                
-                # Buat progress bar
-                progress = tqdm(total=total_size, unit='B', unit_scale=True, 
-                               desc=f"📦 Extract {zip_path.name}", disable=not show_progress)
-                
-                # Ekstrak file
-                for file in files:
-                    zip_ref.extract(file, output_dir)
-                    extracted_size += file.file_size
-                    progress.update(file.file_size)
-                    
-                    # Update progress observer setiap 5% atau 5MB 
-                    if (total_size > 0 and 
-                        (extracted_size % max(int(total_size * 0.05), 5*1024*1024) < file.file_size or 
-                         extracted_size >= total_size)):
-                        self._notify_event("ZIP_EXTRACT_PROGRESS", progress=extracted_size, 
-                                        total=total_size, percentage=int(100*extracted_size/total_size))
-                
-                progress.close()
-            
-            # Hapus zip jika diminta
-            if remove_zip:
-                zip_path.unlink()
-                self.logger.info(f"🗑️ Zip dihapus: {zip_path}")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"❌ Ekstraksi gagal: {str(e)}")
-            return False
+        finally:
+            # Cleanup temporary dir
+            if tmp_extract_dir.exists():
+                shutil.rmtree(tmp_extract_dir, ignore_errors=True)
     
     def export_to_local(
         self,
         source_dir: Union[str, Path],
         target_dir: Union[str, Path],
         show_progress: bool = True,
-        num_workers: Optional[int] = None,
-        clear_target: bool = True
+        num_workers: Optional[int] = None
     ) -> Dict[str, int]:
         """
-        Export dataset dari struktur Roboflow ke struktur lokal standar.
-        
-        Args:
-            source_dir: Direktori sumber
-            target_dir: Direktori target
-            show_progress: Tampilkan progress bar
-            num_workers: Jumlah worker untuk proses paralel
-            clear_target: Hapus file yang sudah ada di direktori target
-            
-        Returns:
-            Dictionary berisi statistik export
+        Export dataset dari format Roboflow ke struktur lokal standar.
         """
         source_path, target_path = Path(source_dir), Path(target_dir)
         self.logger.info(f"📤 Export dataset dari {source_path} ke {target_path}")
         
-        # Gunakan num_workers instance jika tidak ada parameter
-        num_workers = num_workers or self.num_workers
+        return self._copy_dataset(
+            source_path, 
+            target_path,
+            clear_target=True,
+            show_progress=show_progress,
+            num_workers=num_workers or self.num_workers
+        )
+    
+    def _validate_zip_file(self, zip_path: Path) -> bool:
+        """Validasi file ZIP cepat."""
+        try:
+            return zip_path.is_file() and zipfile.is_zipfile(zip_path)
+        except Exception:
+            return False
+    
+    def _extract_zip(
+        self, 
+        zip_path: Path, 
+        extract_dir: Path, 
+        remove_zip: bool, 
+        show_progress: bool
+    ) -> Dict[str, int]:
+        """Ekstrak file ZIP menggunakan wrapper."""
+        # Gunakan utility yang sudah ada dari file_wrapper
+        return wrapper_extract_zip(
+            zip_path=zip_path,
+            output_dir=extract_dir,
+            remove_zip=remove_zip,
+            show_progress=show_progress
+        )
+    
+    def _fix_dataset_structure(self, dataset_dir: Path) -> bool:
+        """
+        Perbaiki struktur dataset agar sesuai format YOLO standar.
+        Optimasi dengan deteksi struktur cerdas dan penanganan split.
+        """
+        dataset_path = Path(dataset_dir)
         
-        # Bersihkan direktori target jika diminta
-        if clear_target:
-            self._clean_target_directory(target_path)
+        # Deteksi struktur yang sudah benar
+        if self._is_valid_yolo_structure(dataset_path):
+            self.logger.info("✅ Struktur dataset sudah sesuai standar YOLO")
+            return True
+        
+        # Cek struktur dengan split tapi tanpa subdirektori images/labels
+        if all((dataset_path / split).exists() for split in DEFAULT_SPLITS):
+            self.logger.info("🔄 Menata ulang struktur dataset ke format standar YOLO")
             
-        # Inisialisasi statistik
+            # Perbaiki struktur setiap split secara paralel
+            with ThreadPoolExecutor(max_workers=len(DEFAULT_SPLITS)) as executor:
+                futures = {}
+                for split in DEFAULT_SPLITS:
+                    futures[split] = executor.submit(
+                        self._organize_split_directory, dataset_path / split
+                    )
+                # Tunggu semua selesai
+                for split, future in futures.items():
+                    if future.result():
+                        self.logger.debug(f"✅ Split {split} berhasil diorganisir")
+                        
+            self.logger.success("✅ Struktur dataset berhasil diperbaiki")
+            return True
+            
+        # Cek struktur flat (images dan labels di root tanpa split)
+        elif (dataset_path / 'images').exists() and (dataset_path / 'labels').exists():
+            self.logger.info("🔄 Memigrasikan struktur flat ke struktur split (train)")
+            
+            # Buat split train dengan subdirektori
+            train_img_dir = dataset_path / 'train' / 'images'
+            train_label_dir = dataset_path / 'train' / 'labels'
+            ensure_dir(train_img_dir)
+            ensure_dir(train_label_dir)
+            
+            # Copy files
+            copy_files(dataset_path / 'images', train_img_dir)
+            copy_files(
+                source_dir=dataset_path / 'labels',
+                target_dir=train_label_dir,
+                file_list=[f for f in (dataset_path / 'labels').glob('*.txt') 
+                         if f.stem.lower() not in {'readme', 'classes', 'data'}]
+            )
+            
+            self.logger.success("✅ Struktur dataset berhasil diperbaiki")
+            return True
+            
+        self.logger.warning("⚠️ Tidak dapat mengenali struktur dataset")
+        return False
+    
+    def _organize_split_directory(self, split_dir: Path) -> bool:
+        """Mengorganisir satu direktori split dengan pemindahan file ke subdirektori yang tepat."""
+        try:
+            img_dir, label_dir = split_dir / 'images', split_dir / 'labels'
+            ensure_dir(img_dir)
+            ensure_dir(label_dir)
+            
+            # Pindahkan file gambar ke subdirektori images
+            for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                for img_file in split_dir.glob(f'*{ext}'):
+                    if img_file.parent == split_dir:  # Hanya file langsung di split_dir
+                        shutil.move(str(img_file), str(img_dir / img_file.name))
+            
+            # Pindahkan file label ke subdirektori labels, kecuali README dll
+            for label_file in split_dir.glob('*.txt'):
+                if (label_file.parent == split_dir and  # Hanya file langsung di split_dir
+                    label_file.stem.lower() not in {'readme', 'classes', 'data'}):
+                    shutil.move(str(label_file), str(label_dir / label_file.name))
+                    
+            return True
+        except Exception as e:
+            self.logger.warning(f"⚠️ Error saat mengorganisir {split_dir}: {str(e)}")
+            return False
+    
+    def _is_valid_yolo_structure(self, dataset_path: Path) -> bool:
+        """Verifikasi apakah struktur dataset sudah sesuai format YOLO standard."""
+        # Valid jika setidaknya satu split memiliki struktur benar
+        for split in DEFAULT_SPLITS:
+            split_path = dataset_path / split
+            if not split_path.exists():
+                continue
+                
+            if not ((split_path / 'images').exists() and (split_path / 'labels').exists()):
+                return False
+        
+        # Setidaknya train harus ada
+        return (dataset_path / 'train' / 'images').exists() and (dataset_path / 'train' / 'labels').exists()
+    
+    def _copy_dataset(
+        self,
+        source_dir: Path,
+        target_dir: Path,
+        clear_target: bool = True,
+        show_progress: bool = True,
+        num_workers: Optional[int] = None
+    ) -> Dict[str, int]:
+        """Copy dataset dengan pemrosesan pair gambar dan label."""
+        num_workers = num_workers or self.num_workers
         stats = {'copied': 0, 'errors': 0}
         
-        # Buat direktori target
+        # Bersihkan target dir jika diminta
+        if clear_target:
+            self._clean_target_directory(target_dir)
+            
+        # Buat struktur direktori target
         for split in DEFAULT_SPLITS:
-            os.makedirs(target_path / split / 'images', exist_ok=True)
-            os.makedirs(target_path / split / 'labels', exist_ok=True)
+            ensure_dir(target_dir / split / 'images')
+            ensure_dir(target_dir / split / 'labels')
         
-        # Daftar file untuk disalin
+        # Ambil pairs gambar dan label untuk disalin
         copy_tasks = []
         
-        # Temukan semua gambar dan label
         for split in DEFAULT_SPLITS:
-            # Identifikasi direktori sumber
-            src_split = source_path / split if (source_path / split).exists() else source_path
+            src_split = source_dir / split
+            if not src_split.exists():
+                src_split = source_dir  # Fallback ke source dir jika split tidak ada
+                
             src_img_dir = src_split / 'images' if (src_split / 'images').exists() else src_split
             src_label_dir = src_split / 'labels' if (src_split / 'labels').exists() else src_split
             
-            # Target direktori
-            dst_img_dir = target_path / split / 'images'
-            dst_label_dir = target_path / split / 'labels'
+            dst_img_dir = target_dir / split / 'images'
+            dst_label_dir = target_dir / split / 'labels'
             
-            # Temukan pasangan file
-            for img_path in src_img_dir.glob('*.jpg'):
-                label_path = src_label_dir / f"{img_path.stem}.txt"
-                if label_path.exists():
-                    copy_tasks.append((img_path, label_path, dst_img_dir, dst_label_dir))
+            # Buat tasks untuk copy
+            self._gather_image_label_pairs(
+                src_img_dir, src_label_dir, dst_img_dir, dst_label_dir, copy_tasks
+            )
         
         # Progress bar
-        pbar = tqdm(total=len(copy_tasks), desc="📤 Export Dataset") if show_progress else None
+        pbar = tqdm(total=len(copy_tasks), desc="📤 Export Dataset", disable=not show_progress)
         
-        # Copy file secara paralel
-        def copy_file_pair(src_img, src_label, dst_img_dir, dst_label_dir):
-            try:
-                # Copy gambar dan label
-                shutil.copy2(src_img, dst_img_dir / src_img.name)
-                shutil.copy2(src_label, dst_label_dir / src_label.name)
-                return True
-            except Exception as e:
-                self.logger.debug(f"⚠️ Error saat menyalin file {src_img.name}: {str(e)}")
-                return False
-        
+        # Process tasks in batches for better performance
         with ThreadPoolExecutor(max_workers=num_workers) as executor:
-            futures = [executor.submit(copy_file_pair, *task) for task in copy_tasks]
+            futures = [executor.submit(self._copy_file_pair, task) for task in copy_tasks]
             
-            # Proses hasil
             for future in futures:
-                stats['copied' if future.result() else 'errors'] += 1
-                if pbar: pbar.update(1)
+                if future.result():
+                    stats['copied'] += 1
+                else:
+                    stats['errors'] += 1
+                pbar.update(1)
+                
+        pbar.close()
         
-        if pbar: pbar.close()
         self.logger.success(f"✅ Export selesai: {stats['copied']} file berhasil disalin")
         return stats
+        
+    def _gather_image_label_pairs(
+        self, 
+        src_img_dir: Path, 
+        src_label_dir: Path,
+        dst_img_dir: Path,
+        dst_label_dir: Path,
+        tasks: List
+    ) -> None:
+        """Kumpulkan pasangan gambar dan label untuk diproses."""
+        # Kumpulkan semua gambar dan periksa label yang bersesuaian
+        for img_ext in ['.jpg', '.jpeg', '.png', '.bmp', '.JPG', '.JPEG', '.PNG']:
+            for img_path in src_img_dir.glob(f'*{img_ext}'):
+                label_path = src_label_dir / f"{img_path.stem}.txt"
+                if label_path.is_file():
+                    tasks.append((img_path, label_path, dst_img_dir, dst_label_dir))
     
-    def fix_dataset_structure(self, dataset_dir: Union[str, Path]) -> bool:
-        """
-        Memperbaiki struktur dataset agar sesuai dengan format YOLOv5 standar.
-        
-        Args:
-            dataset_dir: Direktori dataset
-            
-        Returns:
-            Boolean menunjukkan keberhasilan perbaikan
-        """
-        dataset_path = Path(dataset_dir)
-        splits = DEFAULT_SPLITS
-        
-        # Cek struktur yang sudah benar
-        if all((dataset_path / split / 'images').exists() and 
-              (dataset_path / split / 'labels').exists() for split in splits):
-            self.logger.info("✅ Struktur dataset sudah sesuai standar YOLO")
+    def _copy_file_pair(self, task: tuple) -> bool:
+        """Copy satu pasangan file gambar dan label."""
+        src_img, src_label, dst_img_dir, dst_label_dir = task
+        try:
+            shutil.copy2(src_img, dst_img_dir)
+            shutil.copy2(src_label, dst_label_dir)
             return True
-            
-        # Cek struktur alternatif 1: train/, valid/, test/ tanpa subdirektori images/labels
-        if all((dataset_path / split).exists() for split in splits):
-            self.logger.info("🔄 Menata ulang struktur dataset ke format standar YOLO")
-            
-            for split in splits:
-                split_dir = dataset_path / split
-                img_dir = split_dir / 'images'
-                label_dir = split_dir / 'labels'
-                
-                img_dir.mkdir(exist_ok=True)
-                label_dir.mkdir(exist_ok=True)
-                
-                # Pindahkan file
-                for file in split_dir.glob('*.jpg'):
-                    shutil.move(file, img_dir / file.name)
-                    
-                for file in split_dir.glob('*.txt'):
-                    if file.stem.lower() not in ['readme', 'classes', 'data']:
-                        shutil.move(file, label_dir / file.name)
-                    
-            self.logger.success("✅ Struktur dataset berhasil diperbaiki")
-            return True
-            
-        # Cek struktur alternatif 2: images/ dan labels/ di root
-        elif (dataset_path / 'images').exists() and (dataset_path / 'labels').exists():
-            self.logger.info("🔄 Memigrasikan struktur flat ke struktur split")
-            
-            # Buat direktori split
-            for split in splits:
-                os.makedirs(dataset_path / split / 'images', exist_ok=True)
-                os.makedirs(dataset_path / split / 'labels', exist_ok=True)
-                
-            # Untuk kasus ini, tempatkan semua file di 'train'
-            for file in (dataset_path / 'images').glob('*.jpg'):
-                shutil.copy2(file, dataset_path / 'train' / 'images' / file.name)
-                
-            for file in (dataset_path / 'labels').glob('*.txt'):
-                if file.stem.lower() not in ['readme', 'classes', 'data']:
-                    shutil.copy2(file, dataset_path / 'train' / 'labels' / file.name)
-                
-            self.logger.success("✅ Struktur dataset berhasil diperbaiki")
-            return True
-            
-        else:
-            self.logger.warning("⚠️ Tidak dapat mengenali struktur dataset")
+        except Exception:
             return False
-    
-    def copy_dataset_to_data_dir(
-        self, 
-        source_dir: Union[str, Path], 
-        data_dir: Union[str, Path],
-        clear_target: bool = True
-    ) -> Dict[str, int]:
-        """Alias untuk export_to_local."""
-        return self.export_to_local(source_dir, data_dir, True, self.num_workers, clear_target)
-    
+            
     def _copy_directory_contents(
-        self, 
-        src_dir: Path, 
-        dst_dir: Path, 
+        self,
+        src_dir: Path,
+        dst_dir: Path,
         show_progress: bool = True
     ) -> None:
-        """Salin seluruh isi direktori sumber ke tujuan dengan progress."""
-        total_items = len([f for f in src_dir.iterdir()])
-        with tqdm(total=total_items, desc="🔄 Memindahkan file", disable=not show_progress) as pbar:
-            for item in src_dir.iterdir():
-                if item.is_file():
-                    shutil.copy2(item, dst_dir)
-                elif item.is_dir():
-                    shutil.copytree(item, dst_dir / item.name, dirs_exist_ok=True)
-                pbar.update(1)
+        """Copy seluruh isi direktori dengan progress tracking."""
+        items = list(src_dir.iterdir())
+        with tqdm(total=len(items), desc="🔄 Memindahkan file", disable=not show_progress) as pbar:
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                futures = []
+                for item in items:
+                    if item.is_file():
+                        futures.append(executor.submit(shutil.copy2, item, dst_dir))
+                    elif item.is_dir():
+                        dst_item = dst_dir / item.name
+                        ensure_dir(dst_item)
+                        futures.append(executor.submit(
+                            self._copy_directory_contents, item, dst_item, False
+                        ))
+                
+                for future in futures:
+                    try:
+                        future.result()
+                    except Exception:
+                        pass
+                    finally:
+                        pbar.update(1)
     
     def _clean_target_directory(self, target_path: Path) -> None:
-        """
-        Bersihkan direktori target sebelum export, hanya menghapus file di folder yang diharapkan.
-        
-        Args:
-            target_path: Path direktori target
-        """
-        # Hanya hapus direktori split yang tepat untuk keamanan
+        """Bersihkan direktori target untuk dataset baru."""
         for split in DEFAULT_SPLITS:
             split_path = target_path / split
             if split_path.exists():
-                # Hapus gambar dan label
                 for subdir in ['images', 'labels']:
                     subdir_path = split_path / subdir
                     if subdir_path.exists():
-                        self.logger.info(f"🧹 Membersihkan direktori {subdir}: {subdir_path}")
-                        for file in subdir_path.glob('*.*'):
-                            try:
-                                file.unlink()
-                            except Exception as e:
-                                self.logger.debug(f"⚠️ Gagal menghapus {file}: {str(e)}")
-                
-                # Buat direktori jika belum ada
-                (split_path / 'images').mkdir(parents=True, exist_ok=True)
-                (split_path / 'labels').mkdir(parents=True, exist_ok=True)
+                        # Hapus file secara paralel
+                        files = list(subdir_path.glob('*.*'))
+                        if files:
+                            self.logger.info(f"🧹 Membersihkan direktori {subdir}: {subdir_path}")
+                            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                                list(executor.map(lambda f: f.unlink(missing_ok=True), files))
+                    
+                    # Pastikan direktori ada
+                    ensure_dir(subdir_path)
     
     def _get_dataset_stats(self, dataset_dir: Path) -> Dict[str, Any]:
-        """
-        Hitung statistik dataset (jumlah gambar dan label per split).
-        
-        Args:
-            dataset_dir: Direktori dataset
-            
-        Returns:
-            Dictionary berisi statistik
-        """
+        """Dapatkan statistik dataset dengan pengukuran paralel."""
         stats = {'total_images': 0, 'total_labels': 0}
         
-        for split in DEFAULT_SPLITS:
-            images_dir = dataset_dir / split / 'images'
-            labels_dir = dataset_dir / split / 'labels'
-            
-            if images_dir.exists():
-                image_count = len(list(images_dir.glob('*.*')))
-                stats['total_images'] += image_count
-                stats[f'{split}_images'] = image_count
+        # Hitung jumlah file paralel untuk setiap split
+        with ThreadPoolExecutor(max_workers=len(DEFAULT_SPLITS)) as executor:
+            futures = {}
+            for split in DEFAULT_SPLITS:
+                images_dir = dataset_dir / split / 'images'
+                labels_dir = dataset_dir / split / 'labels'
                 
-            if labels_dir.exists():
-                label_count = len(list(labels_dir.glob('*.txt')))
-                stats['total_labels'] += label_count
-                stats[f'{split}_labels'] = label_count
+                if images_dir.exists():
+                    futures[split + '_images'] = executor.submit(len, list(images_dir.glob('*.*')))
+                if labels_dir.exists():
+                    futures[split + '_labels'] = executor.submit(len, list(labels_dir.glob('*.txt')))
+            
+            for key, future in futures.items():
+                count = future.result()
+                split, type_key = key.split('_')
+                
+                # Tambahkan ke total dan mapping
+                stats[key] = count
+                stats['total_' + type_key] += count
+                
+                if split not in stats:
+                    stats[split] = {}
+                stats[split][type_key] = count
         
         return stats
-    
-    def _notify_event(self, event_type: str, **kwargs) -> None:
-        """
-        Helper untuk mengirim notifikasi event secara aman.
-        
-        Args:
-            event_type: Tipe event
-            **kwargs: Parameter tambahan untuk event
-        """
-        if not self.observer_manager: return
-        try:
-            event_const = getattr(EventTopics, event_type, None)
-            if event_const: notify(event_const, self, **kwargs)
-        except (ImportError, AttributeError):
-            pass

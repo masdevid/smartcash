@@ -1,16 +1,16 @@
 """
 File: smartcash/dataset/services/downloader/download_validator.py
-Deskripsi: Komponen untuk memvalidasi integritas dan struktur dataset yang didownload
+Deskripsi: Komponen teroptimasi untuk memvalidasi integritas dan struktur dataset yang didownload
 """
 
 import os
-import json
-import glob
 from pathlib import Path
 from typing import Dict, List, Any, Optional, Union
+from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
+from smartcash.dataset.utils.file_wrapper import file_exists
 
 
 class DownloadValidator:
@@ -19,14 +19,17 @@ class DownloadValidator:
     Memastikan dataset lengkap dan sesuai dengan format yang diharapkan.
     """
     
-    def __init__(self, logger=None):
+    def __init__(self, logger=None, num_workers: int = None):
         """
-        Inisialisasi DownloadValidator.
+        Inisialisasi DownloadValidator dengan performa teroptimasi.
         
         Args:
             logger: Logger kustom (opsional)
+            num_workers: Jumlah worker untuk operasi paralel (opsional)
         """
         self.logger = logger or get_logger("download_validator")
+        # Optimasi: gunakan CPU count sebagai default tapi batasi maksimum
+        self.num_workers = min(num_workers or (os.cpu_count() or 2), 8)
     
     def verify_download(self, download_dir: Union[str, Path], metadata: Dict) -> bool:
         """
@@ -46,116 +49,38 @@ class DownloadValidator:
             return False
         
         try:
-            # Cek struktur direktori
-            expected_dirs = DEFAULT_SPLITS
-            for split in expected_dirs:
-                split_dir = download_path / split
+            # Cek struktur minimal
+            all_splits = self._get_valid_splits(download_path)
+            if not all_splits:
+                self.logger.error("❌ Tidak ada split yang valid dalam dataset")
+                return False
                 
-                if not split_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split} tidak ditemukan")
-                    continue
-                
-                # Cek subdirektori images dan labels
-                images_dir = split_dir / 'images'
-                labels_dir = split_dir / 'labels'
-                
-                if not images_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split}/images tidak ditemukan")
-                    continue
-                    
-                if not labels_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split}/labels tidak ditemukan")
-                    continue
-                
-                # Cek jumlah file
-                img_count = len(list(images_dir.glob('*.*')))
-                label_count = len(list(labels_dir.glob('*.txt')))
-                
-                # Verifikasi dengan metadata jika tersedia
-                expected_count = metadata.get('version', {}).get('splits', {}).get(split)
-                
-                if expected_count is not None:
-                    if img_count < expected_count:
-                        self.logger.warning(
-                            f"⚠️ Jumlah gambar di {split} ({img_count}) "
-                            f"kurang dari yang diharapkan ({expected_count})"
-                        )
-                
-                # Cek kecocokan gambar dan label
-                orphan_images = 0
-                orphan_labels = 0
-                
-                # Sampling jika jumlah file terlalu banyak
-                max_sample = 100
-                
-                if img_count > max_sample:
-                    # Sampling gambar
-                    image_files = list(images_dir.glob('*.*'))[:max_sample]
-                    
-                    for img_file in image_files:
-                        label_file = labels_dir / f"{img_file.stem}.txt"
-                        if not label_file.exists():
-                            orphan_images += 1
-                else:
-                    # Cek semua gambar
-                    for img_file in images_dir.glob('*.*'):
-                        label_file = labels_dir / f"{img_file.stem}.txt"
-                        if not label_file.exists():
-                            orphan_images += 1
-                
-                # Cek label yang tidak memiliki gambar
-                if label_count > max_sample:
-                    # Sampling label
-                    label_files = list(labels_dir.glob('*.txt'))[:max_sample]
-                    
-                    for label_file in label_files:
-                        # Cek semua kemungkinan ekstensi gambar
-                        found = False
-                        for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
-                            img_file = images_dir / f"{label_file.stem}{ext}"
-                            if img_file.exists():
-                                found = True
-                                break
-                        
-                        if not found:
-                            orphan_labels += 1
-                else:
-                    # Cek semua label
-                    for label_file in labels_dir.glob('*.txt'):
-                        found = False
-                        for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
-                            img_file = images_dir / f"{label_file.stem}{ext}"
-                            if img_file.exists():
-                                found = True
-                                break
-                        
-                        if not found:
-                            orphan_labels += 1
-                
-                # Log hasil
-                if orphan_images > 0 or orphan_labels > 0:
-                    self.logger.warning(
-                        f"⚠️ Ditemukan {orphan_images} gambar tanpa label dan "
-                        f"{orphan_labels} label tanpa gambar di {split}"
+            # Optimasi: periksa split secara paralel
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                results = {}
+                for split in all_splits:
+                    results[split] = executor.submit(
+                        self._verify_split, 
+                        download_path / split, 
+                        metadata.get('version', {}).get('splits', {}).get(split)
                     )
                 
-                # Log statistik
+                # Collect results
+                split_results = {split: result.result() for split, result in results.items()}
+            
+            # Log overall stats and results
+            for split, result in split_results.items():
+                if not result.get('valid', False):
+                    self.logger.warning(f"⚠️ Split {split} tidak valid: {result.get('reason', 'unknown')}")
+                
                 self.logger.info(
-                    f"📊 Statistik {split}: {img_count} gambar, {label_count} label, "
-                    f"orphan images: {orphan_images}, orphan labels: {orphan_labels}"
+                    f"📊 Statistik {split}: {result.get('image_count', 0)} gambar, "
+                    f"{result.get('label_count', 0)} label, "
+                    f"orphan images: {result.get('orphan_images', 0)}, "
+                    f"orphan labels: {result.get('orphan_labels', 0)}"
                 )
             
-            # Cek minimal satu split harus ada dan valid
-            valid_splits = []
-            for split in expected_dirs:
-                images_dir = download_path / split / 'images'
-                labels_dir = download_path / split / 'labels'
-                
-                if (images_dir.exists() and labels_dir.exists() and 
-                    len(list(images_dir.glob('*.*'))) > 0 and 
-                    len(list(labels_dir.glob('*.txt'))) > 0):
-                    valid_splits.append(split)
-            
+            valid_splits = [split for split, result in split_results.items() if result.get('valid', False)]
             if not valid_splits:
                 self.logger.error("❌ Tidak ada split yang valid dalam dataset")
                 return False
@@ -167,9 +92,112 @@ class DownloadValidator:
             self.logger.error(f"❌ Error saat verifikasi download: {str(e)}")
             return False
     
+    def _verify_split(self, split_dir: Path, expected_count: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Verifikasi satu split dataset.
+        
+        Args:
+            split_dir: Path ke direktori split
+            expected_count: Jumlah file yang diharapkan (dari metadata)
+            
+        Returns:
+            Dictionary berisi hasil verifikasi
+        """
+        result = {
+            'valid': False, 
+            'image_count': 0, 
+            'label_count': 0,
+            'orphan_images': 0,
+            'orphan_labels': 0
+        }
+        
+        if not split_dir.exists():
+            result['reason'] = f"Split direktori tidak ditemukan: {split_dir}"
+            return result
+            
+        # Cek struktur dasar
+        images_dir = split_dir / 'images'
+        labels_dir = split_dir / 'labels'
+        
+        if not images_dir.exists() or not labels_dir.exists():
+            result['reason'] = "Direktori images atau labels tidak ditemukan"
+            return result
+            
+        # Hitung jumlah file
+        image_files = list(images_dir.glob('*.*'))
+        label_files = list(labels_dir.glob('*.txt'))
+        
+        result['image_count'] = len(image_files)
+        result['label_count'] = len(label_files)
+        
+        # Validasi jumlah gambar dan label
+        if result['image_count'] == 0 or result['label_count'] == 0:
+            result['reason'] = f"Split kosong (images: {result['image_count']}, labels: {result['label_count']})"
+            return result
+            
+        # Check expected count
+        if expected_count is not None and result['image_count'] < expected_count:
+            self.logger.warning(
+                f"⚠️ Jumlah gambar di {split_dir.name} ({result['image_count']}) "
+                f"kurang dari yang diharapkan ({expected_count})"
+            )
+        
+        # Optimasi: Sampling jika jumlah file terlalu banyak
+        max_sample = 100
+        orphan_images, orphan_labels = 0, 0
+        
+        # Periksa sampel gambar tanpa label
+        sample_images = image_files[:max_sample] if len(image_files) > max_sample else image_files
+        for img_file in sample_images:
+            label_file = labels_dir / f"{img_file.stem}.txt"
+            if not label_file.exists():
+                orphan_images += 1
+                
+        # Periksa sampel label tanpa gambar
+        sample_labels = label_files[:max_sample] if len(label_files) > max_sample else label_files
+        for label_file in sample_labels:
+            found_image = False
+            for ext in ['.jpg', '.jpeg', '.png', '.bmp']:
+                img_file = images_dir / f"{label_file.stem}{ext}"
+                if img_file.exists():
+                    found_image = True
+                    break
+            
+            if not found_image:
+                orphan_labels += 1
+        
+        # Extrapolate untuk seluruh dataset jika sampling
+        if len(image_files) > max_sample:
+            orphan_images = int(orphan_images * (len(image_files) / len(sample_images)))
+        if len(label_files) > max_sample:
+            orphan_labels = int(orphan_labels * (len(label_files) / len(sample_labels)))
+            
+        result['orphan_images'] = orphan_images
+        result['orphan_labels'] = orphan_labels
+        
+        # Validasi berhasil jika tidak ada masalah serius
+        result['valid'] = True
+        
+        # Tapi masih warning jika banyak orphan files
+        if orphan_images > 0 or orphan_labels > 0:
+            threshold = 0.1  # 10% maksimum orphan files yang dianggap masih valid
+            if (orphan_images / max(1, len(image_files)) > threshold or 
+                orphan_labels / max(1, len(label_files)) > threshold):
+                self.logger.warning(
+                    f"⚠️ Terlalu banyak file orphan di {split_dir.name}: "
+                    f"{orphan_images} gambar tanpa label ({orphan_images / max(1, len(image_files)):.1%}), "
+                    f"{orphan_labels} label tanpa gambar ({orphan_labels / max(1, len(label_files)):.1%})"
+                )
+        
+        return result
+    
+    def _get_valid_splits(self, dataset_dir: Path) -> List[str]:
+        """Dapatkan daftar split yang ada di direktori dataset."""
+        return [split for split in DEFAULT_SPLITS if (dataset_dir / split).exists()]
+    
     def verify_local_dataset(self, data_dir: Union[str, Path]) -> bool:
         """
-        Verifikasi struktur dataset lokal.
+        Verifikasi struktur dataset lokal dengan optimasi.
         
         Args:
             data_dir: Direktori dataset
@@ -184,39 +212,16 @@ class DownloadValidator:
             return False
         
         try:
-            # Cek struktur direktori
-            valid_splits = []
-            
-            for split in DEFAULT_SPLITS:
-                split_dir = data_path / split
+            # Optimasi: periksa split secara paralel
+            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                results = {}
+                for split in DEFAULT_SPLITS:
+                    split_dir = data_path / split
+                    results[split] = executor.submit(self._verify_local_split, split_dir)
                 
-                if not split_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split} tidak ditemukan")
-                    continue
-                
-                # Cek subdirektori images dan labels
-                images_dir = split_dir / 'images'
-                labels_dir = split_dir / 'labels'
-                
-                if not images_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split}/images tidak ditemukan")
-                    continue
-                    
-                if not labels_dir.exists():
-                    self.logger.warning(f"⚠️ Direktori {split}/labels tidak ditemukan")
-                    continue
-                
-                # Cek jumlah file
-                img_count = len(list(images_dir.glob('*.*')))
-                label_count = len(list(labels_dir.glob('*.txt')))
-                
-                if img_count == 0 or label_count == 0:
-                    self.logger.warning(f"⚠️ Split {split} kosong: {img_count} gambar, {label_count} label")
-                    continue
-                
-                # Log statistik
-                self.logger.info(f"📊 Statistik {split}: {img_count} gambar, {label_count} label")
-                valid_splits.append(split)
+                # Collect results
+                valid_splits = [split for split, result in results.items() 
+                               if result.result().get('valid', False)]
             
             # Cek minimal satu split harus ada dan valid
             if not valid_splits:
@@ -230,62 +235,36 @@ class DownloadValidator:
             self.logger.error(f"❌ Error saat verifikasi dataset lokal: {str(e)}")
             return False
     
-    def verify_dataset_structure(self, dataset_dir: Union[str, Path]) -> bool:
-        """
-        Verifikasi struktur direktori dataset.
+    def _verify_local_split(self, split_dir: Path) -> Dict[str, Any]:
+        """Verifikasi satu split dataset lokal."""
+        result = {
+            'valid': False, 
+            'image_count': 0, 
+            'label_count': 0
+        }
         
-        Args:
-            dataset_dir: Direktori dataset
+        if not split_dir.exists():
+            return result
             
-        Returns:
-            Boolean yang menunjukkan hasil verifikasi
-        """
-        dataset_path = Path(dataset_dir)
+        # Cek struktur dasar
+        images_dir = split_dir / 'images'
+        labels_dir = split_dir / 'labels'
         
-        if not dataset_path.exists():
-            self.logger.error(f"❌ Direktori dataset tidak ditemukan: {dataset_path}")
-            return False
+        if not images_dir.exists() or not labels_dir.exists():
+            return result
+            
+        # Hitung jumlah file
+        img_count = len(list(images_dir.glob('*.*')))
+        label_count = len(list(labels_dir.glob('*.txt')))
         
-        try:
-            # Cek struktur direktori
-            valid_structure = True
+        result['image_count'] = img_count
+        result['label_count'] = label_count
+        
+        # Validasi jumlah gambar dan label
+        if img_count > 0 and label_count > 0:
+            result['valid'] = True
             
-            # Cek apakah ada struktur train/valid/test
-            has_splits = True
-            for split in DEFAULT_SPLITS:
-                if not (dataset_path / split).exists():
-                    has_splits = False
-                    break
-            
-            if has_splits:
-                # Cek struktur dengan split
-                for split in DEFAULT_SPLITS:
-                    split_dir = dataset_path / split
-                    
-                    # Cek subdirektori images dan labels
-                    images_dir = split_dir / 'images'
-                    labels_dir = split_dir / 'labels'
-                    
-                    if not images_dir.exists() or not labels_dir.exists():
-                        self.logger.warning(f"⚠️ Split {split} tidak lengkap")
-                        valid_structure = False
-            elif (dataset_path / 'images').exists() and (dataset_path / 'labels').exists():
-                # Struktur tanpa split (hanya images dan labels di root)
-                self.logger.warning(
-                    f"⚠️ Dataset memiliki struktur tanpa split, "
-                    f"sebaiknya gunakan struktur train/valid/test"
-                )
-                valid_structure = True
-            else:
-                # Struktur tidak dikenal
-                self.logger.error(f"❌ Struktur dataset tidak dikenal")
-                valid_structure = False
-            
-            return valid_structure
-            
-        except Exception as e:
-            self.logger.error(f"❌ Error saat verifikasi struktur dataset: {str(e)}")
-            return False
+        return result
     
     def is_dataset_available(
         self,
@@ -307,13 +286,14 @@ class DownloadValidator:
         if not data_path.exists():
             return False
         
-        # Cek struktur dasar
+        # Quick check struktur dasar
         for split in DEFAULT_SPLITS:
-            if not (data_path / split).exists():
+            split_dir = data_path / split
+            if not split_dir.exists():
                 return False
                 
-            # Cek subdirektori
-            if not (data_path / split / 'images').exists() or not (data_path / split / 'labels').exists():
+            # Cek subdirektori dengan operator and untuk short-circuit
+            if not (split_dir / 'images').exists() or not (split_dir / 'labels').exists():
                 return False
         
         # Jika tidak perlu verifikasi konten lebih lanjut
@@ -324,11 +304,11 @@ class DownloadValidator:
         train_images = list((data_path / 'train' / 'images').glob('*.*'))
         train_labels = list((data_path / 'train' / 'labels').glob('*.txt'))
         
-        return len(train_images) > 0 and len(train_labels) > 0
+        return bool(train_images) and bool(train_labels)
     
     def get_dataset_stats(self, dataset_dir: Union[str, Path]) -> Dict[str, Any]:
         """
-        Dapatkan statistik dataset.
+        Dapatkan statistik dataset dengan teroptimasi untuk performa.
         
         Args:
             dataset_dir: Direktori dataset
@@ -342,28 +322,39 @@ class DownloadValidator:
         if not dataset_path.exists():
             return stats
         
-        # Cek struktur dengan split
-        for split in DEFAULT_SPLITS:
-            split_dir = dataset_path / split
-            
-            if not split_dir.exists():
-                continue
+        # Optimasi: hitung secara paralel
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = {}
+            for split in DEFAULT_SPLITS:
+                split_dir = dataset_path / split
                 
-            # Cek subdirektori
-            images_dir = split_dir / 'images'
-            labels_dir = split_dir / 'labels'
+                if not split_dir.exists():
+                    continue
+                    
+                futures[split] = executor.submit(self._get_split_stats, split_dir)
             
-            if not images_dir.exists() or not labels_dir.exists():
-                continue
-                
-            # Hitung file
-            img_count = len(list(images_dir.glob('*.*')))
-            label_count = len(list(labels_dir.glob('*.txt')))
-            
-            stats['splits'][split] = {'images': img_count, 'labels': label_count}
-            stats['total_images'] += img_count
-            stats['total_labels'] += label_count
+            # Collect results
+            for split, future in futures.items():
+                split_stats = future.result()
+                stats['splits'][split] = split_stats
+                stats['total_images'] += split_stats.get('images', 0)
+                stats['total_labels'] += split_stats.get('labels', 0)
         
+        return stats
+    
+    def _get_split_stats(self, split_dir: Path) -> Dict[str, int]:
+        """Hitung statistik untuk satu split."""
+        stats = {'images': 0, 'labels': 0}
+        
+        images_dir = split_dir / 'images'
+        labels_dir = split_dir / 'labels'
+        
+        if images_dir.exists():
+            stats['images'] = len(list(images_dir.glob('*.*')))
+            
+        if labels_dir.exists():
+            stats['labels'] = len(list(labels_dir.glob('*.txt')))
+            
         return stats
     
     def get_local_stats(self, data_dir: Union[str, Path]) -> Dict[str, int]:
@@ -382,15 +373,20 @@ class DownloadValidator:
         if not data_path.exists():
             return stats
         
-        for split in DEFAULT_SPLITS:
-            images_dir = data_path / split / 'images'
+        # Optimasi: hitung secara paralel
+        with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+            futures = {}
+            for split in DEFAULT_SPLITS:
+                images_dir = data_path / split / 'images'
+                if not images_dir.exists():
+                    stats[split] = 0
+                    continue
+                    
+                futures[split] = executor.submit(len, list(images_dir.glob('*.*')))
             
-            if not images_dir.exists():
-                stats[split] = 0
-                continue
-                
-            # Hitung gambar
-            img_count = len(list(images_dir.glob('*.*')))
-            stats[split] = img_count
+            # Collect results
+            for split, future in futures.items():
+                if split in futures:  # Skip yang sudah di-set = 0
+                    stats[split] = future.result()
         
         return stats

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/handlers/download_progress_observer.py
-Deskripsi: Observer untuk memantau dan memperbarui progress download di UI
+Deskripsi: Observer untuk memantau dan memperbarui progress download di UI dengan perbaikan rekursi
 """
 
 from typing import Dict, Any, Optional
@@ -48,10 +48,23 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
         # Daftarkan observer untuk tiap event
         observer_group = ui_components.get('observer_group', 'dataset_downloader_observers')
         
+        # PERBAIKAN: Buat fungsi wrapper untuk menghindari rekursi maksimum
+        def safe_handle_download_event(event_type, sender, **kwargs):
+            # Filter sender untuk menghindari rekursi
+            if hasattr(sender, '_received_from_observer') and sender._received_from_observer:
+                return
+                
+            # PERBAIKAN: Gunakan try-except untuk menangkap error
+            try:
+                _handle_download_event(ui_components, event_type, **kwargs)
+            except Exception as e:
+                if logger:
+                    logger.warning(f"⚠️ Error pada observer handler: {str(e)}")
+        
         for event in events:
             observer_manager.create_simple_observer(
                 event_type=event,
-                callback=lambda event_type, sender, **kwargs: _handle_download_event(ui_components, event_type, **kwargs),
+                callback=safe_handle_download_event,
                 name=f"DownloadProgress_{event}_Observer",
                 group=observer_group
             )
@@ -72,6 +85,11 @@ def _handle_download_event(ui_components: Dict[str, Any], event_type: str, **kwa
         event_type: Tipe event
         **kwargs: Parameter tambahan dari event
     """
+    # PERBAIKAN: Set flag untuk menghindari rekursi
+    sender = kwargs.get('sender', None)
+    if hasattr(sender, '_received_from_observer'):
+        sender._received_from_observer = True
+    
     from smartcash.components.observer.event_topics_observer import EventTopics
     
     # Handler sesuai tipe event

@@ -15,7 +15,7 @@ from typing import Dict, Any, Tuple, Optional, List, Union, Callable
 _sync_lock = threading.RLock()
 # Flag untuk mencegah inisialisasi berulang
 _initialized = False
-# Logger dengan silence mode
+# Logger dengan silence mode# Simpan konfigurasi silent mode
 _silent_mode = True
 
 def _create_silent_logger():
@@ -33,9 +33,9 @@ def _create_silent_logger():
     
     return SilentLogger()
 
-def copy_configs_to_drive(logger=None, ui_components: Optional[Dict[str, Any]] = None, silent: bool = True):
+def initialize_configs(logger=None, ui_components: Optional[Dict[str, Any]] = None, silent: bool = True):
     """
-    Salin semua file konfigurasi dari modul smartcash ke Google Drive.
+    Inisialisasi konfigurasi dengan alur baru dan penanganan None value.
     
     Args:
         logger: Logger opsional untuk logging
@@ -45,12 +45,13 @@ def copy_configs_to_drive(logger=None, ui_components: Optional[Dict[str, Any]] =
     Returns:
         Tuple (success, message)
     """
-    global _silent_mode
+    global _initialized, _silent_mode
     _silent_mode = silent
     
     # Check if logger is None and silent mode is enabled, use silent logger
     if logger is None and _silent_mode:
         logger = _create_silent_logger()
+    
     
     try:
         # Dapatkan environment manager

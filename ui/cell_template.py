@@ -6,7 +6,6 @@ Deskripsi: Template utama untuk inisialisasi sel notebook dengan integrasi stand
 from typing import Dict, Any, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display, HTML as DisplayHTML
-
 def setup_cell(
     cell_name: str,
     create_ui_func: Callable[[Any, Dict[str, Any]], Dict[str, Any]],
@@ -77,8 +76,7 @@ def setup_cell(
                 pass
     
     except Exception as e:
-        # Fallback sederhana untuk error (tanpa widget kompleks)
-        # Langsung tampilkan pesan error HTML
+        # Fallback sederhana untuk error
         error_html = f"""
         <div style="padding:10px; background-color:#f8d7da; 
                    color:#721c24; border-radius:4px; margin:5px 0;

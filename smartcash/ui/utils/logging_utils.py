@@ -8,7 +8,6 @@ import sys
 import threading
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
-
 def setup_ipython_logging(ui_components: Dict[str, Any], module_name: Optional[str] = None) -> Any:
     """
     Setup logger untuk IPython notebook dengan output ke UI widget.
@@ -163,7 +162,6 @@ def reset_logging() -> None:
         for attr in ['_initialized', '_buffer', '_stdout_interceptor']:
             if hasattr(logger, attr):
                 setattr(logger, attr, None)
-
 
 def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
     """

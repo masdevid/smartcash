@@ -1,15 +1,14 @@
 """
 File: smartcash/ui/setup/env_config_handlers.py
-Deskripsi: Handler untuk komponen UI konfigurasi environment dengan delegasi ke handlers khusus
+Deskripsi: Setup handler untuk UI konfigurasi environment dengan penanganan cleanup yang ditingkatkan
 """
 
-from typing import Dict, Any, Optional
-from IPython.display import display
+from typing import Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
 def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup handler untuk komponen UI environment config dengan delegasi.
+    Setup handler untuk UI konfigurasi environment.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -19,236 +18,271 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env=None, config=No
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Tambahkan logger jika belum ada
+    # Setup environment detector
+    from smartcash.ui.setup.environment_detector import detect_environment
+    ui_components = detect_environment(ui_components, env)
+    
+    # Setup drive button handler
+    _setup_drive_button_handler(ui_components)
+    
+    # Setup directory button handler
+    _setup_directory_button_handler(ui_components)
+    
+    # Setup cleanup handler
+    _setup_cleanup_handler(ui_components)
+    
+    # Log sukses setup
     logger = ui_components.get('logger')
-    
-    # Setup observer untuk menerima event notifikasi
-    _setup_observers(ui_components)
-    
-    # Deteksi environment
-    _setup_environment_detection(ui_components, env)
-    
-    # Setup reset progress helper
-    ui_components['reset_progress'] = lambda: _reset_progress(ui_components)
-    
-    # Setup handlers untuk tombol-tombol
-    _setup_button_handlers(ui_components)
-    
-    # Setup cleanup function
-    _setup_cleanup(ui_components)
-    
-    # Log inisialisasi selesai
     if logger:
         logger.info("✅ Environment config handlers berhasil diinisialisasi")
     
     return ui_components
 
-def _setup_observers(ui_components: Dict[str, Any]) -> None:
-    """Setup observer handlers."""
-    try:
-        from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-        setup_observer_handlers(ui_components, "env_config_observers")
-    except ImportError:
-        pass
-
-def _setup_environment_detection(ui_components: Dict[str, Any], env) -> None:
-    """Setup environment detection."""
-    try:
-        from smartcash.ui.setup.environment_detector import detect_environment
-        detect_environment(ui_components, env)
-    except ImportError:
-        # Fallback ke pesan langsung
-        if 'status' in ui_components:
-            with ui_components['status']:
-                from IPython.display import HTML
-                display(HTML("<div style='color:orange'>⚠️ Environment detector tidak tersedia</div>"))
-
-def _reset_progress(ui_components: Dict[str, Any]) -> None:
-    """Reset progress bar dan message ke hidden."""
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-        ui_components['progress_message'].layout.visibility = 'hidden'
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = "Siap digunakan"
-
-def _setup_button_handlers(ui_components: Dict[str, Any]) -> None:
-    """Setup handlers untuk tombol-tombol."""
-    # Register handlers untuk tombol Drive dan Directory
-    if 'drive_button' in ui_components:
-        ui_components['drive_button'].on_click(lambda b: _on_drive_button_clicked(b, ui_components))
+def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol connect drive."""
+    from IPython.display import display, clear_output
     
-    if 'directory_button' in ui_components:
-        ui_components['directory_button'].on_click(lambda b: _on_directory_button_clicked(b, ui_components))
-
-def _on_drive_button_clicked(b, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk tombol hubungkan Google Drive.
-    
-    Args:
-        b: Button widget
-        ui_components: Dictionary komponen UI
-    """
-    logger = ui_components.get('logger')
-    
-    try:
-        # Nonaktifkan tombol selama proses berjalan
-        _disable_buttons(ui_components, True)
+    drive_button = ui_components.get('drive_button')
+    if not drive_button:
+        return
         
-        # Tampilkan progress bar
-        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_message'].value = "Memeriksa Google Drive..."
+    def on_drive_button_click(b):
+        """Handler untuk mount Google Drive."""
+        logger = ui_components.get('logger')
         
-        # Import drive_connector
-        from smartcash.ui.setup.drive_connector import connect_google_drive, create_drive_directory_structure, sync_configs_with_drive, create_symlinks_to_drive
-        
-        # Jalankan operasi dalam thread terpisah
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            # Connect to drive
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_message'].value = "Menghubungkan ke Google Drive..."
-            future = executor.submit(connect_google_drive, ui_components)
-            success, drive_path = future.result()
-            
-            if success and drive_path:
-                # Setup directory structure
-                ui_components['progress_bar'].value = 1
-                ui_components['progress_message'].value = "Menyiapkan struktur direktori..."
-                future = executor.submit(create_drive_directory_structure, drive_path, ui_components)
-                success_dir = future.result()
-                
-                # Symlinks
-                ui_components['progress_bar'].value = 2
-                ui_components['progress_message'].value = "Membuat symlinks..."
-                future = executor.submit(create_symlinks_to_drive, ui_components, drive_path)
-                success_symlinks = future.result()
-                
-                # Sync configs
-                ui_components['progress_bar'].value = 3
-                ui_components['progress_message'].value = "Sinkronisasi konfigurasi..."
-                future = executor.submit(sync_configs_with_drive, ui_components, drive_path)
-                success_sync = future.result()
-                
-                # Semua selesai
-                ui_components['progress_bar'].value = 4
-                ui_components['progress_message'].value = "Setup Google Drive selesai!"
-        
-        # Reset progress setelah selesai
-        _reset_progress(ui_components)
-        
-    except Exception as e:
-        # Log error
-        if logger:
-            logger.error(f"❌ Error saat menghubungkan Drive: {str(e)}")
-        
-        # Tampilkan error di UI
-        if 'status' in ui_components:
-            with ui_components['status']:
-                from smartcash.ui.utils.alert_utils import create_status_indicator
-                display(create_status_indicator("error", f"❌ Error saat menghubungkan Drive: {str(e)}"))
-    finally:
-        # Re-aktifkan tombol
-        _disable_buttons(ui_components, False)
-
-def _on_directory_button_clicked(b, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk tombol setup direktori lokal.
-    
-    Args:
-        b: Button widget
-        ui_components: Dictionary komponen UI
-    """
-    logger = ui_components.get('logger')
-    
-    try:
-        # Nonaktifkan tombol selama proses berjalan
-        _disable_buttons(ui_components, True)
-        
-        # Tampilkan progress bar
-        if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_message'].value = "Menyiapkan direktori lokal..."
-        
-        # Import module
-        from smartcash.ui.setup.directory_manager import create_project_structure_async
-        
-        # Jalankan operasi dalam thread terpisah
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(create_project_structure_async, ui_components)
-            future.result()  # Wait for completion
-            
-        # Reset progress setelah selesai
-        _reset_progress(ui_components)
-        
-    except Exception as e:
-        # Log error
-        if logger:
-            logger.error(f"❌ Error saat setup direktori: {str(e)}")
-        
-        # Tampilkan error di UI
-        if 'status' in ui_components:
-            with ui_components['status']:
-                from smartcash.ui.utils.alert_utils import create_status_indicator
-                display(create_status_indicator("error", f"❌ Error saat setup direktori: {str(e)}"))
-    finally:
-        # Re-aktifkan tombol
-        _disable_buttons(ui_components, False)
-
-def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
-    """
-    Nonaktifkan/aktifkan tombol-tombol.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        disabled: True untuk nonaktifkan, False untuk aktifkan
-    """
-    for button_name in ['drive_button', 'directory_button']:
-        if button_name in ui_components:
-            ui_components[button_name].disabled = disabled
-
-def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
-    """Setup cleanup function."""
-    def cleanup_resources():
-        """Fungsi untuk membersihkan resources."""
         try:
-            # Reset progress
-            _reset_progress(ui_components)
+            # Nonaktifkan tombol selama proses
+            drive_button.disabled = True
             
-            # Unregister observer group jika ada
-            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
-                try:
-                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
-                except Exception:
-                    pass
+            # Tampilkan status
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            log_to_ui(ui_components, "Menghubungkan ke Google Drive...", "info", "🔄")
             
-            # Reset logging
-            try:
-                from smartcash.ui.utils.logging_utils import reset_logging
-                reset_logging()
-            except ImportError:
-                pass
+            # Mount drive
+            from google.colab import drive
+            drive.mount('/content/drive')
             
-            # Log cleanup
-            logger = ui_components.get('logger')
+            # Update environment
+            from smartcash.ui.setup.environment_detector import detect_environment
+            detect_environment(ui_components)
+            
+            # Log sukses
+            log_to_ui(ui_components, "Berhasil terhubung ke Google Drive!", "success", "✅")
             if logger:
-                logger.debug("🧹 Cleanup env_config_handlers berhasil")
+                logger.success("✅ Berhasil terhubung ke Google Drive")
+            
+            # Sembunyikan tombol drive setelah sukses
+            drive_button.layout.display = 'none'
+        
         except Exception as e:
-            logger = ui_components.get('logger')
+            # Tampilkan error
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            log_to_ui(ui_components, f"Error saat menghubungkan ke Drive: {str(e)}", "error", "❌")
             if logger:
-                logger.warning(f"⚠️ Error saat cleanup: {str(e)}")
+                logger.error(f"❌ Error saat menghubungkan ke Drive: {str(e)}")
+        
+        finally:
+            # Aktifkan kembali tombol
+            drive_button.disabled = False
     
-    # Tetapkan fungsi cleanup ke ui_components
-    ui_components['cleanup'] = cleanup_resources
+    # Register handler
+    drive_button.on_click(on_drive_button_click)
+
+def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol setup direktori."""
+    directory_button = ui_components.get('directory_button')
+    if not directory_button:
+        return
+        
+    def on_directory_button_click(b):
+        """Handler untuk setup direktori proyek."""
+        logger = ui_components.get('logger')
+        
+        try:
+            # Nonaktifkan tombol selama proses
+            directory_button.disabled = True
+            
+            # Tampilkan status
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            log_to_ui(ui_components, "Membuat struktur direktori proyek...", "info", "🔄")
+            
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                # Setup direktori dalam thread terpisah
+                future = executor.submit(_setup_project_directory, ui_components)
+                result = future.result()
+                
+                # Update UI berdasarkan hasil
+                status_type = "success" if result.get('status') == 'success' else "warning"
+                icon = "✅" if result.get('status') == 'success' else "⚠️"
+                
+                log_to_ui(ui_components, result.get('message', 'Selesai setup direktori'), status_type, icon)
+                if logger:
+                    if status_type == "success":
+                        logger.success(f"{icon} {result.get('message')}")
+                    else:
+                        logger.warning(f"{icon} {result.get('message')}")
+        
+        except Exception as e:
+            # Tampilkan error
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            log_to_ui(ui_components, f"Error saat setup direktori: {str(e)}", "error", "❌")
+            if logger:
+                logger.error(f"❌ Error saat setup direktori: {str(e)}")
+        
+        finally:
+            # Aktifkan kembali tombol
+            directory_button.disabled = False
     
-    # Register cleanup dengan IPython event
+    # Register handler
+    directory_button.on_click(on_directory_button_click)
+
+def _setup_project_directory(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Setup direktori proyek.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary berisi status dan pesan
+    """
     try:
-        from IPython import get_ipython
-        ipython = get_ipython()
-        if ipython:
-            ipython.events.register('pre_run_cell', cleanup_resources)
-    except (ImportError, AttributeError):
-        pass
+        # Dapatkan environment manager
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        logger = ui_components.get('logger')
+        
+        # Setup direktori
+        stats = env_manager.setup_project_structure(
+            use_drive=env_manager.is_drive_mounted,
+            progress_callback=lambda current, total, message: _update_setup_progress(ui_components, current, total, message)
+        )
+        
+        # Buat symlinks jika di Colab dan drive terpasang
+        if env_manager.is_colab and env_manager.is_drive_mounted:
+            symlink_stats = env_manager.create_symlinks(
+                progress_callback=lambda current, total, message: _update_setup_progress(ui_components, current, total, message)
+            )
+            
+            # Gabungkan statistik
+            for key in symlink_stats:
+                if key in stats:
+                    stats[key] += symlink_stats[key]
+                else:
+                    stats[key] = symlink_stats[key]
+        
+        # Format pesan sukses
+        message = f"Berhasil membuat struktur direktori: {stats['created']} direktori baru, {stats['existing']} sudah ada"
+        if 'created' in stats and stats['created'] > 0:
+            return {'status': 'success', 'message': message}
+        else:
+            return {'status': 'info', 'message': 'Struktur direktori sudah lengkap'}
+    
+    except Exception as e:
+        return {'status': 'error', 'message': f"Error saat setup direktori: {str(e)}"}
+
+def _update_setup_progress(ui_components: Dict[str, Any], current: int, total: int, message: str) -> None:
+    """
+    Update progress setup direktori.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        current: Nilai progress saat ini
+        total: Total nilai progress
+        message: Pesan progress
+    """
+    # Update progress bar jika tersedia
+    progress_bar = ui_components.get('progress_bar')
+    progress_message = ui_components.get('progress_message')
+    
+    if progress_bar:
+        progress_bar.max = total
+        progress_bar.value = current
+        progress_bar.layout.visibility = 'visible'
+    
+    if progress_message:
+        progress_message.value = message
+        progress_message.layout.visibility = 'visible'
+    
+    # Coba update juga melalui progress tracker jika tersedia
+    tracker_key = 'env_config_tracker'
+    if tracker_key in ui_components:
+        tracker = ui_components[tracker_key]
+        tracker.update(current, message)
+
+def _setup_cleanup_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk cleanup saat cell dijalankan ulang."""
+    # Import komponen untuk cleanup dengan error handling
+    try:
+        from smartcash.ui.utils.logging_utils import create_cleanup_function, restore_stdout, reset_logging
+        
+        def enhanced_cleanup():
+            """Enhanced cleanup function dengan penanganan error yang lebih baik."""
+            try:
+                # Restore stdout ke aslinya
+                restore_stdout(ui_components)
+                
+                # Reset semua konfigurasi logging
+                reset_logging()
+                
+                # Unregister observer jika ada
+                if 'observer_manager' in ui_components and 'observer_group' in ui_components:
+                    try:
+                        ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
+                    except Exception:
+                        pass
+                
+                # Reset progress
+                if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                    ui_components['progress_bar'].layout.visibility = 'hidden'
+                    ui_components['progress_message'].layout.visibility = 'hidden'
+                
+                # Reset log handler
+                logger = ui_components.get('logger')
+                if logger and hasattr(logger, '_callbacks'):
+                    logger._callbacks = []
+                
+                # Hapus interceptor stdout
+                if 'custom_stdout' in ui_components:
+                    ui_components.pop('custom_stdout', None)
+                
+                # Log sukses cleanup
+                logger = ui_components.get('logger')
+                if logger:
+                    logger.debug("🧹 Cleanup env_config berhasil dijalankan")
+            except Exception:
+                # Ignore errors during cleanup
+                pass
+        
+        # Tetapkan fungsi cleanup ke ui_components
+        ui_components['cleanup'] = enhanced_cleanup
+        
+        # Register cleanup dengan IPython event
+        try:
+            from IPython import get_ipython
+            ipython = get_ipython()
+            if ipython:
+                # Unregister existing handlers terlebih dahulu untuk mencegah duplikasi
+                if hasattr(ipython.events, '_events'):
+                    for event_type in ipython.events._events:
+                        if event_type == 'pre_run_cell':
+                            existing_handlers = ipython.events._events[event_type]
+                            for handler in list(existing_handlers):
+                                if handler.__qualname__.endswith('cleanup'):
+                                    ipython.events.unregister('pre_run_cell', handler)
+                
+                # Register cleanup baru
+                ipython.events.register('pre_run_cell', enhanced_cleanup)
+        except (ImportError, AttributeError):
+            pass
+    
+    except ImportError:
+        # Fallback minimal jika komponen tidak tersedia
+        def minimal_cleanup():
+            # Reset stdout jika ada
+            if 'original_stdout' in ui_components:
+                import sys
+                sys.stdout = ui_components['original_stdout']
+        
+        # Tetapkan fungsi cleanup ke ui_components
+        ui_components['cleanup'] = minimal_cleanup

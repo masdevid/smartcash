@@ -1,67 +1,47 @@
 """
 File: smartcash/ui/info_boxes/environment_info.py
-Deskripsi: Konten info box untuk konfigurasi environment SmartCash
+Deskripsi: Konten info box untuk konfigurasi environment
 """
 
 import ipywidgets as widgets
 
 def get_environment_info(open_by_default: bool = False) -> widgets.Accordion:
-    """
-    Buat info box berisi panduan environment.
-    
-    Args:
-        open_by_default: Flag untuk membuka accordion secara default
-        
-    Returns:
-        Widget accordion berisi info environment
-    """
     from smartcash.ui.utils.info_utils import create_info_accordion
     from smartcash.ui.utils.constants import ICONS
-    
-    TITLE = "Tentang Environment SmartCash"
+
+    TITLE = "Tentang Konfigurasi Environment"
     content = f"""
     <h3 style="margin-top:0; color:inherit">{TITLE}</h3>
-    <p>SmartCash dapat berjalan di dua environment:</p>
+    <p>Environment setup dibutuhkan untuk:</p>
     <ul>
-        <li><strong>Google Colab</strong>: Environment cloud dengan dukungan GPU dan integrasi Google Drive.</li>
-        <li><strong>Local</strong>: Environment lokal untuk development dan testing.</li>
+        <li><strong>Google Drive</strong>: Penyimpanan dataset, model, dan konfigurasi</li>
+        <li><strong>Direktori Lokal</strong>: Struktur direktori yang konsisten untuk SmartCash</li>
+    </ul>
+    <p>Struktur direktori utama:</p>
+    <ul>
+        <li><code>data/</code>: Dataset dan hasil preprocessing</li>
+        <li><code>configs/</code>: File konfigurasi</li>
+        <li><code>runs/</code>: Hasil training dan evaluasi</li>
+        <li><code>logs/</code>: File log</li>
+        <li><code>checkpoints/</code>: Model checkpoint</li>
     </ul>
     
-    <h4 style="color:inherit">{ICONS.get('folder', '📁')} Struktur Direktori</h4>
-    <p>SmartCash membutuhkan struktur direktori berikut:</p>
-    <pre style="background-color:#f8f9fa; padding:10px; border-radius:4px;">
-SmartCash/
-├── configs/          - File konfigurasi YAML 
-├── data/             - Dataset
-│   ├── train/        - Data training
-│   ├── valid/        - Data validasi
-│   ├── test/         - Data testing
-│   └── preprocessed/ - Data hasil preprocessing
-├── runs/             - Output training
-├── logs/             - Log aplikasi
-└── checkpoints/      - Model checkpoint
-    </pre>
-    
-    <h4 style="color:inherit">{ICONS.get('drive', '🔄')} Integrasi Google Drive</h4>
-    <p>Saat berjalan di Google Colab, SmartCash menggunakan Google Drive untuk:</p>
+    <h4 style="color:inherit">{ICONS['folder']} Direktori Penting</h4>
+    <p>Beberapa direktori yang perlu dibuat:</p>
     <ul>
-        <li>Penyimpanan dataset yang persisten</li>
-        <li>Backup konfigurasi</li>
-        <li>Penyimpanan model terlatih</li>
-        <li>Symlinks otomatis ke direktori lokal</li>
+        <li><code>data/train/images</code> dan <code>data/train/labels</code></li>
+        <li><code>data/valid/images</code> dan <code>data/valid/labels</code></li>
+        <li><code>data/test/images</code> dan <code>data/test/labels</code></li>
+        <li><code>data/preprocessed</code></li>
     </ul>
     
-    <h4 style="color:inherit">{ICONS.get('config', '⚙️')} Konfigurasi Sinkronisasi</h4>
-    <p>Konfigurasi disinkronkan otomatis dengan strategi:</p>
+    <h4 style="color:inherit">{ICONS['drive']} Google Drive Integration</h4>
+    <p>Saat bekerja di Google Colab, SmartCash akan:</p>
     <ul>
-        <li><strong>Drive sebagai sumber kebenaran</strong>: Saat aplikasi pertama kali dijalankan</li>
-        <li><strong>Merge dua arah</strong>: Saat ada perubahan konfigurasi</li>
-        <li><strong>Backup lokal</strong>: Sebelum sinkronisasi untuk menjaga keamanan data</li>
+        <li>Membuat symlinks antara direktori lokal dan Google Drive</li>
+        <li>Sinkronisasi konfigurasi antara lokal dan Google Drive</li>
+        <li>Menyimpan dataset dan model di Google Drive untuk persistensi</li>
     </ul>
-    
-    <div style="margin-top:10px; padding:10px; background-color:#f8f9fa; border-left:4px solid #17a2b8; border-radius:4px;">
-        <p style="margin:0"><strong>Tip:</strong> Di Google Colab, tombol "Hubungkan Google Drive" akan otomatis mount Drive dan melakukan sinkronisasi konfigurasi.</p>
-    </div>
     """
     
     return create_info_accordion(TITLE, content, "info", "⚙️", open_by_default)

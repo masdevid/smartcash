@@ -5,6 +5,7 @@ Deskripsi: Utilitas terpadu untuk mengarahkan logging ke UI widget dengan integr
 
 import logging
 import sys
+import threading
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
 
@@ -102,8 +103,22 @@ def restore_stdout(ui_components: Dict[str, Any]) -> None:
         ui_components: Dictionary berisi komponen UI
     """
     if 'original_stdout' in ui_components:
+        # Simpan custom stdout untuk dibersihkan
+        custom_stdout = ui_components.get('custom_stdout')
+        
+        # Kembalikan ke aslinya
         sys.stdout = ui_components['original_stdout']
+        
+        # Hapus referensi di ui_components
+        ui_components.pop('original_stdout', None)
         ui_components.pop('custom_stdout', None)
+        
+        # Flush buffer stdout custom untuk memastikan tidak ada pesan yang tertinggal
+        if custom_stdout and hasattr(custom_stdout, 'flush'):
+            try:
+                custom_stdout.flush()
+            except:
+                pass
 
 
 def reset_logging() -> None:
@@ -114,10 +129,40 @@ def reset_logging() -> None:
     
     # Hapus semua handler
     for handler in root_logger.handlers[:]:
+        # Tutup handler sebelum dihapus
+        try:
+            handler.flush()
+            handler.close()
+        except:
+            pass
         root_logger.removeHandler(handler)
     
     # Reset level
     root_logger.setLevel(logging.INFO)
+    
+    # Reset semua logger yang sudah dibuat
+    loggers = [logging.getLogger(name) for name in logging.root.manager.loggerDict]
+    for logger in loggers:
+        # Hapus semua handler
+        for handler in logger.handlers[:]:
+            try:
+                handler.flush()
+                handler.close()
+            except:
+                pass
+            logger.removeHandler(handler)
+        
+        # Reset level
+        logger.setLevel(logging.NOTSET)
+        
+        # Hapus callbacks jika SmartCashLogger
+        if hasattr(logger, '_callbacks'):
+            logger._callbacks = []
+            
+        # Reset internal state jika ada
+        for attr in ['_initialized', '_buffer', '_stdout_interceptor']:
+            if hasattr(logger, attr):
+                setattr(logger, attr, None)
 
 
 def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
@@ -133,6 +178,9 @@ def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
     def cleanup():
         # Reset stdout jika diintercepti
         restore_stdout(ui_components)
+        
+        # Reset semua konfigurasi logging
+        reset_logging()
         
         # Unregister observer jika ada
         if 'observer_manager' in ui_components and 'observer_group' in ui_components:
@@ -152,6 +200,28 @@ def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
                 except Exception:
                     pass
             ui_components['resources'] = []
+        
+        # Reset progress tracker jika ada
+        for tracker_key in [k for k in ui_components if k.endswith('_tracker')]:
+            try:
+                tracker = ui_components[tracker_key]
+                if hasattr(tracker, 'complete'):
+                    tracker.complete("Dibersihkan")
+            except Exception:
+                pass
+        
+        # Reset progress UI
+        for key in ['progress_bar', 'progress_message']:
+            if key in ui_components and hasattr(ui_components[key], 'layout'):
+                ui_components[key].layout.visibility = 'hidden'
+        
+        # Log cleanup berhasil jika logger tersedia
+        logger = ui_components.get('logger')
+        if logger:
+            try:
+                logger.debug("🧹 Cleanup resources berhasil dijalankan")
+            except Exception:
+                pass
     
     return cleanup
 
@@ -170,6 +240,18 @@ def register_cleanup_on_cell_execution(ui_components: Dict[str, Any]) -> None:
         # Buat cleanup function
         cleanup_func = create_cleanup_function(ui_components)
         ui_components['cleanup'] = cleanup_func
+        
+        # Unregister existing handlers terlebih dahulu untuk mencegah duplikasi
+        if ipython and hasattr(ipython.events, '_events'):
+            for event_type in ipython.events._events:
+                if event_type == 'pre_run_cell':
+                    existing_handlers = ipython.events._events[event_type]
+                    for handler in list(existing_handlers):
+                        if handler.__qualname__.endswith('cleanup'):
+                            try:
+                                ipython.events.unregister('pre_run_cell', handler)
+                            except:
+                                pass
         
         # Register ke event IPython
         if ipython:

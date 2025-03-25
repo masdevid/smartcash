@@ -102,14 +102,21 @@ def _tambahkan_tombol_sync(ui_components: Dict[str, Any]) -> None:
     # Pasang handler
     sync_button.on_click(on_sync_clicked)
     
-    # Tambahkan tombol ke UI
-    if 'button_container' in ui_components:
-        # Tambahkan ke container tombol yang sudah ada
+    # Tambahkan tombol ke UI - dimasukkan ke button_container yang sudah ada
+    if 'button_container' in ui_components and hasattr(ui_components['button_container'], 'children'):
         children_list = list(ui_components['button_container'].children)
-        children_list.append(sync_button)
+        # Tambahkan setelah tombol drive dan sebelum tombol directory
+        # Jika tombol drive tersedia, tambahkan secara inline
+        if 'drive_button' in ui_components and ui_components['drive_button'] in children_list:
+            # Masukkan setelah tombol drive
+            drive_index = children_list.index(ui_components['drive_button'])
+            children_list.insert(drive_index + 1, sync_button)
+        else:
+            # Jika tidak ada tombol drive, tambahkan di awal
+            children_list.insert(0, sync_button)
         ui_components['button_container'].children = tuple(children_list)
     else:
-        # Buat container baru
+        # Buat container baru jika belum ada
         button_container = widgets.HBox([sync_button], 
                                       layout=widgets.Layout(
                                           display='flex',
@@ -136,23 +143,18 @@ def _tambahkan_tombol_sync(ui_components: Dict[str, Any]) -> None:
 
 def jalankan_sinkronisasi_tertunda(ui_components: Dict[str, Any], delay_seconds: int = 3) -> None:
     """
-    Jalankan sinkronisasi tertunda setelah menunggu beberapa detik.
+    Jalankan sinkronisasi tertunda tanpa menggunakan threading.
     
     Args:
         ui_components: Dictionary komponen UI
         delay_seconds: Jumlah detik untuk menunggu
     """
-    import threading
+    from IPython.display import display, clear_output
     
-    def _sinkronisasi_tertunda():
-        # Tunggu beberapa detik
-        time.sleep(delay_seconds)
-        
-        # Jalankan handler tombol sinkronisasi secara manual
-        if 'sync_button' in ui_components:
-            ui_components['sync_button'].click()
+    # Tampilkan pesan menunggu
+    with ui_components.get('status', None) or display():
+        display(f"⏱️ Menunggu {delay_seconds} detik sebelum sinkronisasi...")
     
-    # Jalankan dalam thread terpisah
-    thread = threading.Thread(target=_sinkronisasi_tertunda)
-    thread.daemon = True
-    thread.start()
+    # Jalankan sinkronisasi secara langsung
+    if 'sync_button' in ui_components:
+        ui_components['sync_button'].click()

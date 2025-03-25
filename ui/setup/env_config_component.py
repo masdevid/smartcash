@@ -54,14 +54,16 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         layout=widgets.Layout(margin='5px')
     )
     
-    # Button container
+    # Tombol-tombol dikemas dalam container fleksibel
     button_container = widgets.HBox(
         [drive_button, directory_button],
         layout=widgets.Layout(
             display='flex',
-            flex_flow='row',
+            flex_flow='row wrap',
+            align_items='center',
             justify_content='flex-start',
-            margin='10px 0'
+            margin='10px 0',
+            gap='5px'  # Menambahkan gap antara tombol
         )
     )
     
@@ -138,6 +140,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'colab_panel': colab_panel,
         'drive_button': drive_button,
         'directory_button': directory_button,
+        'button_container': button_container,
         'progress_bar': progress_bar,
         'progress_message': progress_message,
         'status': status,

@@ -35,7 +35,7 @@ def get_environment_info(open_by_default: bool = False) -> widgets.Accordion:
         <li><code>data/preprocessed</code></li>
     </ul>
     
-    <h4 style="color:inherit">{ICONS['drive']} Google Drive Integration</h4>
+    <h4 style="color:inherit">{ICONS['folder']} Google Drive Integration</h4>
     <p>Saat bekerja di Google Colab, SmartCash akan:</p>
     <ul>
         <li>Membuat symlinks antara direktori lokal dan Google Drive</li>

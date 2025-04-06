@@ -15,7 +15,7 @@ def notify_event(
     **kwargs
 ) -> None:
     """
-    Fungsi helper untuk mengirimkan notifikasi observer secara aman dengan penanganan error yang lebih baik.
+    Fungsi helper untuk mengirimkan notifikasi observer secara aman dengan penanganan error dan rekursi.
     
     Args:
         sender: Objek pengirim event
@@ -26,6 +26,13 @@ def notify_event(
         **kwargs: Parameter tambahan untuk event
     """
     try:
+        # Cek jika sudah dalam tahap notifikasi untuk mencegah rekursi
+        if hasattr(sender, '_notify_in_progress') and sender._notify_in_progress:
+            return
+            
+        # Set flag untuk mencegah rekursi
+        setattr(sender, '_notify_in_progress', True)
+        
         # Coba dapatkan EventTopics dari konstanta jika string
         if isinstance(event_type, str):
             try:
@@ -43,9 +50,13 @@ def notify_event(
         else:
             # Langsung notifikasi via fungsi global
             notify(event_type, sender, **params)
-    except Exception:
+    except Exception as e:
         # Jangan mengganggu proses jika notifikasi gagal
         pass
+    finally:
+        # Reset flag
+        setattr(sender, '_notify_in_progress', False)
+
 
 # Fungsi helper untuk semua event tipe download
 def notify_download(

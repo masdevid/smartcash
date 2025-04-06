@@ -99,40 +99,51 @@ class DownloadProgressHandler:
             message: Pesan event (opsional)
             **kwargs: Parameter tambahan
         """
-        # Tentukan tipe operasi dengan utils standar
-        operation_map = {
-            'download.': 'download', 'export.': 'export', 
-            'backup.': 'backup', 'zip_processing.': 'zip_processing',
-            'zip_import.': 'zip_import', 'pull_dataset.': 'pull_dataset',
-            'upload.': 'upload'
-        }
-        
-        operation = 'unknown'
-        for prefix, op_name in operation_map.items():
-            if event_type.startswith(prefix):
-                operation = op_name
-                break
-        
-        # Set current operation jika belum di-set
-        if self.current_operation is None and event_type.endswith(".start"):
-            self.current_operation = operation
-            self.is_downloading = True
+        # Cek jika handler sedang dalam proses (mencegah rekursi)
+        if hasattr(self, '_handling_event') and self._handling_event:
+            return
             
-        # Reset status jika operasi selesai atau error
-        if event_type.endswith(".complete") or event_type.endswith(".error"):
-            if self.current_operation == operation:
-                self.current_operation = None
-                self.is_downloading = False
-                self.progress_by_step = {}
+        # Set flag sedang memproses event
+        self._handling_event = True
         
-        # Update status UI dengan alert_utils standar
-        status = kwargs.get('status', 'info')
-        
-        # Handle tipe event dengan utils standar
-        if event_type.endswith(".start"): self._handle_start_event(operation, message, status)
-        elif event_type.endswith(".progress"): self._handle_progress_event(operation, message, status, **kwargs)
-        elif event_type.endswith(".complete"): self._handle_complete_event(operation, message, status, **kwargs)
-        elif event_type.endswith(".error"): self._handle_error_event(operation, message)
+        try:
+            # Tentukan tipe operasi dengan utils standar
+            operation_map = {
+                'download.': 'download', 'export.': 'export', 
+                'backup.': 'backup', 'zip_processing.': 'zip_processing',
+                'zip_import.': 'zip_import', 'pull_dataset.': 'pull_dataset',
+                'upload.': 'upload'
+            }
+            
+            operation = 'unknown'
+            for prefix, op_name in operation_map.items():
+                if event_type.startswith(prefix):
+                    operation = op_name
+                    break
+            
+            # Set current operation jika belum di-set
+            if self.current_operation is None and event_type.endswith(".start"):
+                self.current_operation = operation
+                self.is_downloading = True
+                
+            # Reset status jika operasi selesai atau error
+            if event_type.endswith(".complete") or event_type.endswith(".error"):
+                if self.current_operation == operation:
+                    self.current_operation = None
+                    self.is_downloading = False
+                    self.progress_by_step = {}
+            
+            # Update status UI dengan alert_utils standar
+            status = kwargs.get('status', 'info')
+            
+            # Handle tipe event dengan utils standar
+            if event_type.endswith(".start"): self._handle_start_event(operation, message, status)
+            elif event_type.endswith(".progress"): self._handle_progress_event(operation, message, status, **kwargs)
+            elif event_type.endswith(".complete"): self._handle_complete_event(operation, message, status, **kwargs)
+            elif event_type.endswith(".error"): self._handle_error_event(operation, message)
+        finally:
+            # Reset flag processing
+            self._handling_event = False
             
     def _handle_start_event(self, operation: str, message: Optional[str], status: str):
         """Handler untuk event start dengan utils standar."""

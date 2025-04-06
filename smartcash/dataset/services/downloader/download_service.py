@@ -78,14 +78,26 @@ class DownloadService:
             raise DatasetError(f"Error download dataset: {str(e)}")
     
     def _handle_backup(self, output_path: Path, backup_existing: bool, show_progress: bool) -> bool:
-        """Buat backup dataset yang ada jika diperlukan."""
-        if not (backup_existing and output_path.exists() and any(output_path.iterdir())): return False
-        notify_service_event("download", "progress", self, self.observer_manager, step="backup", message="Backup dataset yang ada", progress=1, total_steps=5, current_step=1)
+        """Buat backup dataset yang ada jika diperlukan dan bukan symlink."""
+        # Skip backup jika path tidak ada, kosong, atau merupakan symlink
+        if not backup_existing or not output_path.exists() or output_path.is_symlink() or not any(output_path.iterdir()):
+            return False
+            
+        notify_service_event("download", "progress", self, self.observer_manager, 
+                        step="backup", message="Backup dataset yang ada", 
+                        progress=1, total_steps=5, current_step=1)
+                        
         backup_result = self.backup_service.backup_dataset(output_path, show_progress=show_progress)
-        if backup_result.get("status") == "success": return True
-        elif backup_result.get("status") == "empty": self.logger.info("ℹ️ Direktori output ada tapi kosong, skip backup"); return False
-        else: self.logger.warning(f"⚠️ Gagal backup: {backup_result.get('message')}"); return False
-    
+        
+        if backup_result.get("status") == "success":
+            return True
+        elif backup_result.get("status") == "empty":
+            self.logger.info("ℹ️ Direktori output ada tapi kosong, skip backup")
+            return False
+        else:
+            self.logger.warning(f"⚠️ Gagal backup: {backup_result.get('message')}")
+            return False
+
     def export_to_local(self, source_dir: Union[str, Path], output_dir: Optional[Union[str, Path]] = None, show_progress: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
         """Export dataset dari format Roboflow ke struktur folder lokal standar."""
         start_time = time.time()

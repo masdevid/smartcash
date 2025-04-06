@@ -61,6 +61,8 @@ class DownloadFileProcessor:
         # Setup direktori
         ensure_dir(output_path)
         tmp_extract_dir = output_path.with_name(f"{output_path.name}_extract_temp")
+        # Hapus direktori temp jika ada untuk menghindari konflik
+        self._safe_remove_dir(tmp_extract_dir)
         ensure_dir(tmp_extract_dir)
         
         try:
@@ -89,11 +91,18 @@ class DownloadFileProcessor:
                                   step="move", message=f"Memindahkan dataset ke {output_path}",
                                   progress=3, total_steps=3, current_step=3)
                 
+                # Hapus direktori output jika sudah ada (untuk menghindari error symlink)
+                self._safe_remove_dir(output_path)
+                ensure_dir(output_path)
+                
                 copy_result = self._copy_dataset(
-                    tmp_extract_dir, output_path, clear_target=True, show_progress=show_progress
+                    tmp_extract_dir, output_path, clear_target=False, show_progress=show_progress
                 )
             else:
                 # Jika hanya ekstrak, langsung pindahkan semua konten
+                # Hapus direktori output jika sudah ada (untuk menghindari error symlink)
+                self._safe_remove_dir(output_path)
+                ensure_dir(output_path)
                 self._copy_directory_contents(tmp_extract_dir, output_path, show_progress)
             
             # Step 4: Dapatkan statistik dan selesaikan
@@ -129,8 +138,7 @@ class DownloadFileProcessor:
         
         finally:
             # Cleanup temporary dir
-            if tmp_extract_dir.exists():
-                shutil.rmtree(tmp_extract_dir, ignore_errors=True)
+            self._safe_remove_dir(tmp_extract_dir)
     
     def export_to_local(
         self,
@@ -270,6 +278,29 @@ class DownloadFileProcessor:
         # Setidaknya train harus ada
         return (dataset_path / 'train' / 'images').exists() and (dataset_path / 'train' / 'labels').exists()
     
+    def _safe_remove_dir(self, dir_path: Path) -> None:
+        """
+        Hapus direktori dengan aman termasuk menangani symlink.
+        
+        Args:
+            dir_path: Path direktori yang akan dihapus
+        """
+        if not dir_path.exists():
+            return
+            
+        try:
+            # Cek apakah directory adalah symlink
+            if dir_path.is_symlink():
+                # Hapus symlink, bukan kontennya
+                dir_path.unlink()
+                self.logger.debug(f"🔗 Symlink dihapus: {dir_path}")
+            else:
+                # Hapus direktori dan isinya
+                shutil.rmtree(dir_path, ignore_errors=True)
+                self.logger.debug(f"🗑️ Direktori dihapus: {dir_path}")
+        except Exception as e:
+            self.logger.warning(f"⚠️ Gagal menghapus direktori {dir_path}: {str(e)}")
+    
     def _copy_dataset(
         self,
         source_dir: Path,
@@ -389,18 +420,31 @@ class DownloadFileProcessor:
         for split in DEFAULT_SPLITS:
             split_path = target_path / split
             if split_path.exists():
-                for subdir in ['images', 'labels']:
-                    subdir_path = split_path / subdir
-                    if subdir_path.exists():
-                        # Hapus file secara paralel
-                        files = list(subdir_path.glob('*.*'))
-                        if files:
-                            self.logger.info(f"🧹 Membersihkan direktori {subdir}: {subdir_path}")
-                            with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
-                                list(executor.map(lambda f: f.unlink(missing_ok=True), files))
-                    
-                    # Pastikan direktori ada
-                    ensure_dir(subdir_path)
+                if split_path.is_symlink():
+                    # Jika symlink, hapus symlink saja
+                    split_path.unlink()
+                    # Buat ulang direktori
+                    ensure_dir(split_path)
+                else:
+                    # Bersihkan direktori biasa
+                    for subdir in ['images', 'labels']:
+                        subdir_path = split_path / subdir
+                        if subdir_path.exists():
+                            if subdir_path.is_symlink():
+                                # Hapus symlink
+                                subdir_path.unlink()
+                                # Buat ulang direktori
+                                ensure_dir(subdir_path)
+                            else:
+                                # Hapus file secara paralel
+                                files = list(subdir_path.glob('*.*'))
+                                if files:
+                                    self.logger.info(f"🧹 Membersihkan direktori {subdir}: {subdir_path}")
+                                    with ThreadPoolExecutor(max_workers=self.num_workers) as executor:
+                                        list(executor.map(lambda f: f.unlink(missing_ok=True), files))
+                        
+                        # Pastikan direktori ada
+                        ensure_dir(subdir_path)
     
     def _get_dataset_stats(self, dataset_dir: Path) -> Dict[str, Any]:
         """Dapatkan statistik dataset dengan pengukuran paralel."""

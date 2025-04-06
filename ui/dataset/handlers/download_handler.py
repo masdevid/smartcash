@@ -1,396 +1,172 @@
 """
 File: smartcash/ui/dataset/handlers/download_handler.py
-Deskripsi: Perbaikan penempatan dialog konfirmasi dan pengecekan dataset kosong pada UI dataset download
+Deskripsi: Handler teroptimasi untuk download dataset dengan validasi yang konsisten
 """
 
-import time
-import os
+from typing import Dict, Any, Tuple, Optional, Union
 from pathlib import Path
-from typing import Dict, Any, Tuple, Optional
+import os
 from concurrent.futures import ThreadPoolExecutor
-from IPython.display import display
 
-def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk tombol download dataset dengan konfirmasi.
+def handle_download_button_click(b, ui_components: Dict[str, Any]) -> None:
+    """Handle klik tombol download dengan validasi dan konfirmasi."""
+    from smartcash.ui.utils.fallback_utils import show_status
+    from smartcash.ui.dataset.handlers.confirmation_handler import confirm_download
     
-    Args:
-        b: Button widget
-        ui_components: Dictionary komponen UI
-    """
-    logger = ui_components.get('logger')
+    # Validasi berdasarkan endpoint yang dipilih (Roboflow/Drive/URL)
+    endpoint, is_valid, message = ui_components['endpoint_dropdown'].value, False, ""
     
-    # Validasi input
-    from smartcash.ui.dataset.handlers.validator import validate_download_config
+    if endpoint == 'Roboflow':
+        is_valid, message = _validate_roboflow_input(ui_components)
+    elif endpoint == 'Google Drive':
+        is_valid, message = _validate_drive_input(ui_components)
+    elif endpoint == 'URL Kustom':
+        is_valid, message = _validate_url_input(ui_components)
     
-    # Dapatkan konfigurasi endpoint dari UI
-    from smartcash.ui.dataset.handlers.endpoint_handler import get_endpoint_config
-    endpoint_config = get_endpoint_config(ui_components)
-    
-    # Cek API key untuk Roboflow jika diperlukan
-    if endpoint_config.get('type') == 'roboflow':
-        from smartcash.ui.dataset.handlers.api_key_handler import check_api_key
-        has_key, api_key = check_api_key(ui_components)
-        
-        if not has_key:
-            # Tampilkan pesan input API key
-            from smartcash.ui.dataset.handlers.api_key_handler import request_api_key_input
-            request_api_key_input(ui_components)
-            return
-        
-        # Update API key di konfigurasi
-        endpoint_config['api_key'] = api_key
-    
-    # Validasi konfigurasi
-    is_valid, error_msg = validate_download_config(endpoint_config)
-    if not is_valid:
-        # Update status panel utama selain log output
-        from smartcash.ui.utils.fallback_utils import update_status_panel
-        update_status_panel(ui_components, error_msg, "error")
-        
-        # Log ke UI output dan logger
-        from smartcash.ui.utils.ui_logger import log_to_ui
-        log_to_ui(ui_components, error_msg, "error", "❌")
-        if logger: logger.error(f"❌ {error_msg}")
+    # Tampilkan pesan validasi jika gagal dan returni
+    if not is_valid: 
+        show_status(message, "error", ui_components)
+        if logger := ui_components.get('logger'): logger.warning(f"⚠️ {message}")
         return
     
-    try:
-        # Nonaktifkan tombol selama proses
-        _disable_ui_buttons(ui_components, True)
-        
-        # Reset status panel ke mode info untuk memulai proses
-        from smartcash.ui.utils.fallback_utils import update_status_panel
-        update_status_panel(ui_components, "Memulai proses download dataset...", "info")
-        
-        # Buat fungsi untuk download dengan ThreadPoolExecutor
-        def execute_download(config):
-            # Tampilkan progress bar
-            _show_progress(ui_components, "Memulai download dataset...")
-            
-            # Cek apakah dataset sudah ada dan skip download jika sudah lengkap
-            from smartcash.dataset.services.downloader.download_validator import DownloadValidator
-            validator = DownloadValidator(logger=logger)
-            output_dir = config.get('output_dir', 'data')
-            
-            # PERBAIKAN: Cek apakah dataset sudah lengkap dan skip jika ya
-            if validator.is_dataset_available(output_dir, verify_content=True) and not config.get('force_download', False):
-                # Update status panel dengan info bahwa dataset sudah ada
-                _update_progress(ui_components, 100, "Dataset sudah tersedia di lokasi output")
-                from smartcash.ui.utils.fallback_utils import update_status_panel
-                update_status_panel(ui_components, "✅ Dataset sudah tersedia di lokasi output, proses download dilewati", "success")
-                
-                if logger: logger.success("✅ Dataset sudah tersedia, proses download dilewati")
-                
-                # Aktifkan kembali tombol
-                _disable_ui_buttons(ui_components, False)
-                return
-            
-            # Download dataset dengan service atau handler yang sesuai
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_download_dataset, ui_components, config)
-                success, message = future.result()
-                
-                # Update UI berdasarkan hasil
-                status_type = "success" if success else "error"
-                icon = "✅" if success else "❌"
-                
-                # Update status panel utama
-                from smartcash.ui.utils.fallback_utils import update_status_panel
-                update_status_panel(ui_components, f"{icon} {message}", status_type)
-                
-                # Log ke UI output
-                from smartcash.ui.utils.ui_logger import log_to_ui
-                log_to_ui(ui_components, message, status_type, icon)
-                
-                if logger:
-                    if success:
-                        logger.success(f"{icon} {message}")
-                    else:
-                        logger.error(f"{icon} {message}")
-                
-                # Aktifkan kembali tombol
-                _disable_ui_buttons(ui_components, False)
-        
-        # Import konfirmasi handler dan tampilkan konfirmasi jika perlu
-        from smartcash.ui.dataset.handlers.confirmation_handler import create_dataset_confirmation, prepare_dataset_confirmation
-        proceed_callback, cancel_callback = prepare_dataset_confirmation(ui_components, endpoint_config, execute_download)
-        
-        # Cek apakah dataset sudah ada dan perlu konfirmasi
-        output_dir = endpoint_config.get('output_dir', 'data')
-        
-        # PERBAIKAN: Periksa apakah direktori output benar-benar berisi data
-        has_existing_data = False
-        
-        # Cek keberadaan data di direktori output
-        if os.path.exists(output_dir):
-            # Periksa setiap split
-            for split in ['train', 'valid', 'test']:
-                split_dir = os.path.join(output_dir, split)
-                images_dir = os.path.join(split_dir, 'images')
-                
-                # Jika ada direktori images dan berisi file, tandai dataset sudah ada
-                if os.path.exists(images_dir) and any(os.scandir(images_dir)):
-                    has_existing_data = True
-                    break
-        
-        if has_existing_data:
-            # PERBAIKAN: Tampilkan dialog konfirmasi di atas output log
-            from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
-            
-            # Pesan konfirmasi
-            message = (f"Dataset sudah ada di {output_dir}. "
-                      f"Melanjutkan operasi akan menimpa data yang ada. "
-                      f"Apakah Anda yakin ingin melanjutkan?")
-            
-            # Buat dialog konfirmasi
-            dialog = create_confirmation_dialog(
-                message=message,
-                on_confirm=proceed_callback,
-                on_cancel=cancel_callback,
-                title="Dataset Sudah Ada",
-                confirm_label="Ya, Lanjutkan",
-                cancel_label="Batal"
-            )
-            
-            # Tampilkan dialog di atas status output dengan container terpisah
-            if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-                with ui_components['confirmation_area']:
-                    display(dialog)
-            else:
-                # Fallback ke area di atas status jika confirmation_area tidak tersedia
-                display(dialog)
-        else:
-            # Jika dataset belum ada, langsung jalankan callback
-            proceed_callback()
-    
-    except Exception as e:
-        # Tampilkan error, update status panel dan aktifkan kembali tombol
-        from smartcash.ui.utils.ui_logger import log_to_ui
-        error_msg = f"Error saat download dataset: {str(e)}"
-        
-        # Update status panel utama
-        from smartcash.ui.utils.fallback_utils import update_status_panel
-        update_status_panel(ui_components, f"❌ {error_msg}", "error")
-        
-        # Log ke UI output
-        log_to_ui(ui_components, error_msg, "error", "❌")
-        if logger: logger.error(f"❌ {error_msg}")
-        
-        _disable_ui_buttons(ui_components, False)
+    # Lanjut ke konfirmasi jika valid
+    confirm_download(ui_components, endpoint, b)
 
-def _download_dataset(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
-    """
-    Proses download dataset berdasarkan konfigurasi dengan dukungan services.
+def _validate_roboflow_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validasi input Roboflow."""
+    # Dapatkan nilai dari input fields
+    workspace = ui_components['rf_workspace'].value.strip()
+    project = ui_components['rf_project'].value.strip()
+    version = ui_components['rf_version'].value.strip()
+    api_key = ui_components['rf_apikey'].value.strip()
     
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi download
-        
-    Returns:
-        Tuple (success, message)
+    # Validasi masing-masing field
+    if not workspace: return False, "Workspace ID tidak boleh kosong"
+    if not project: return False, "Project ID tidak boleh kosong"
+    if not version: return False, "Version tidak boleh kosong"
+    if not api_key: return False, "API key tidak boleh kosong"
+    if len(api_key) < 10: return False, "API key tidak valid (terlalu pendek)"
+    
+    return True, "Validasi berhasil"
+
+def _validate_drive_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validasi input Google Drive."""
+    # TODO: Implementasi validasi Drive
+    return True, "Google Drive dipilih"
+
+def _validate_url_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
+    """Validasi input URL."""
+    # TODO: Implementasi validasi URL
+    return True, "URL kustom dipilih"
+
+def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
+    """Eksekusi download dataset berdasarkan endpoint."""
+    # Persiapkan UI untuk proses download
+    _prepare_ui_for_download(ui_components, endpoint)
+    
+    # Jalankan download secara asinkron berdasarkan endpoint
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            if endpoint == 'Roboflow': executor.submit(download_from_roboflow, ui_components)
+            elif endpoint == 'Google Drive': executor.submit(download_from_drive, ui_components)
+            elif endpoint == 'URL Kustom': executor.submit(download_from_url, ui_components)
+    except Exception as e:
+        # Tangani error dan reset UI
+        if logger := ui_components.get('logger'): logger.error(f"❌ Error saat memulai download: {str(e)}")
+        from smartcash.ui.utils.fallback_utils import show_status
+        show_status(f"Error saat memulai download: {str(e)}", "error", ui_components)
+        _reset_ui_after_download(ui_components, is_error=True)
+
+def _prepare_ui_for_download(ui_components: Dict[str, Any], endpoint: str) -> None:
+    """Persiapkan UI untuk proses download."""
+    # Tampilkan progress bar dan reset nilainya
+    ui_components['progress_bar'].layout.visibility = 'visible'
+    ui_components['progress_message'].layout.visibility = 'visible'
+    ui_components['progress_bar'].value = 0
+    ui_components['progress_message'].value = f"Memulai download dataset dari {endpoint}..."
+    
+    # Update status panel
+    from smartcash.ui.utils.constants import ALERT_STYLES
+    ui_components['status_panel'].value = f"""
+    <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
+               color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
+               border-left:4px solid {ALERT_STYLES['info']['text_color']};">
+        <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Proses download dimulai...</p>
+    </div>
     """
-    endpoint_type = config.get('type')
+    
+    # Log dimulainya download
+    if logger := ui_components.get('logger'): logger.info(f"🚀 Memulai download dataset dari {endpoint}")
+
+def _reset_ui_after_download(ui_components: Dict[str, Any], is_error: bool = False) -> None:
+    """Reset UI setelah proses download selesai."""
+    # Sembunyikan progress bar
+    ui_components['progress_bar'].layout.visibility = 'hidden'
+    ui_components['progress_message'].layout.visibility = 'hidden'
+
+def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
+    """Download dataset dari Roboflow."""
+    from smartcash.ui.utils.fallback_utils import show_status, get_dataset_manager
+    from smartcash.ui.utils.constants import ALERT_STYLES
+    
     logger = ui_components.get('logger')
-    start_time = time.time()
+    
+    # Ambil parameter dari UI components
+    workspace, project, version = ui_components['rf_workspace'].value, ui_components['rf_project'].value, ui_components['rf_version'].value
+    api_key, output_format, output_dir = ui_components['rf_apikey'].value, ui_components['output_format'].value.lower().replace(' ', ''), ui_components['output_dir'].value
+    
+    # Set API key sebagai environment variable
+    os.environ['ROBOFLOW_API_KEY'] = api_key
     
     try:
-        # Update progress
-        _update_progress(ui_components, 10, f"Mempersiapkan download dari {endpoint_type}...")
+        # Dapatkan dataset manager dengan konfigurasi yang tepat
+        download_service = get_dataset_manager({
+            'data': {
+                'dir': output_dir,
+                'roboflow': {'workspace': workspace, 'project': project, 'version': version, 'api_key': api_key}
+            }
+        }, logger)
         
-        # Coba menggunakan DownloadService yang sudah ada
-        try:
-            from smartcash.dataset.services.downloader.download_service import DownloadService
-            from smartcash.components.observer import notify, EventTopics
+        if not download_service: raise Exception("Tidak dapat membuat service dataset")
             
-            # Buat konfigurasi yang sesuai untuk service
-            output_dir = config.get('output_dir', 'data')
-            service_config = {'data': {'roboflow': {}}}
-            backup_existing = config.get('backup_existing', False)
-            
-            # Setup service dengan logger untuk integrasi
-            download_service = DownloadService(output_dir=output_dir, config=service_config, logger=logger)
-            
-            # Jalankan download berdasarkan tipe endpoint
-            if endpoint_type == 'roboflow':
-                # Pakai service untuk Roboflow
-                api_key = config.get('api_key')
-                workspace = config.get('workspace')
-                project = config.get('project')
-                version = config.get('version')
-                
-                # Setup progress tracking callback untuk integrasi
-                def progress_callback(progress=None, message=None, **kwargs):
-                    if progress is not None:
-                        _update_progress(ui_components, progress, message or "Download dataset...")
-                
-                # Link observer dengan callback lokal jika memungkinkan
-                observer_manager = ui_components.get('observer_manager')
-                if observer_manager:
-                    try:
-                        observer = observer_manager.create_simple_observer(
-                            EventTopics.DOWNLOAD_PROGRESS,
-                            lambda event_type, sender, **kwargs: progress_callback(**kwargs),
-                            name="UI_Download_Progress",
-                            group="dataset_download"
-                        )
-                    except Exception as e:
-                        if logger: logger.debug(f"ℹ️ Progress observer tidak tersedia: {str(e)}")
-                
-                # Update progress sebelum download
-                _update_progress(ui_components, 30, f"Mendownload dataset dari Roboflow: {workspace}/{project}:{version}")
-                
-                # Update status panel dengan progress
-                from smartcash.ui.utils.fallback_utils import update_status_panel
-                update_status_panel(ui_components, f"🔄 Mendownload dataset: {workspace}/{project}:{version}", "info")
-                
-                # PERBAIKAN: Aktifkan force_download untuk menghindari pengecekan yang sudah dilakukan sebelumnya
-                try:
-                    # Lakukan download
-                    result = download_service.download_from_roboflow(
-                        api_key=api_key,
-                        workspace=workspace,
-                        project=project,
-                        version=version,
-                        output_dir=output_dir,
-                        show_progress=True,
-                        backup_existing=backup_existing
-                    )
-                    
-                    # Pastikan progress mencapai 100%
-                    _update_progress(ui_components, 100, "Download selesai")
-                    
-                    # Format pesan sukses
-                    total_images = result.get('stats', {}).get('total_images', 0)
-                    elapsed_time = time.time() - start_time
-                    success_msg = f"Dataset berhasil didownload: {total_images} gambar ({elapsed_time:.1f}s)"
-                    return True, success_msg
-                    
-                except Exception as e:
-                    # Log error khusus untuk download
-                    if logger: 
-                        logger.error(f"❌ Error saat download dari Roboflow: {str(e)}")
-                    
-                    # Jika ini adalah error yang berkaitan dengan backup kosong, kita bisa lanjutkan
-                    if "Tidak ada file ditemukan untuk dibackup" in str(e):
-                        # Folder ada tapi kosong, abaikan error dan lanjutkan
-                        if logger: 
-                            logger.info("ℹ️ Folder dataset ada tapi kosong, melanjutkan download")
-                        
-                        # Lakukan download ulang tanpa backup
-                        result = download_service.download_from_roboflow(
-                            api_key=api_key,
-                            workspace=workspace,
-                            project=project,
-                            version=version,
-                            output_dir=output_dir,
-                            show_progress=True,
-                            backup_existing=False  # Matikan backup karena folder kosong
-                        )
-                        
-                        # Pastikan progress mencapai 100%
-                        _update_progress(ui_components, 100, "Download selesai")
-                        
-                        # Format pesan sukses
-                        total_images = result.get('stats', {}).get('total_images', 0)
-                        elapsed_time = time.time() - start_time
-                        success_msg = f"Dataset berhasil didownload: {total_images} gambar ({elapsed_time:.1f}s)"
-                        return True, success_msg
-                    else:
-                        # Error lain, lanjutkan ke fallback
-                        raise e
-                
-            elif endpoint_type == 'drive':
-                from smartcash.ui.dataset.handlers.gdrive_handler import download_from_drive
-                return download_from_drive(ui_components, config)
-                
-            elif endpoint_type == 'url':
-                from smartcash.ui.dataset.handlers.url_handler import download_from_url
-                return download_from_url(ui_components, config)
-                
-            else:
-                return False, f"Tipe endpoint tidak dikenal: {endpoint_type}"
-                
-        except ImportError:
-            # Fallback jika service tidak tersedia
-            if logger: logger.warning(f"⚠️ DownloadService tidak tersedia, menggunakan fallback handlers")
-            
-            # Fallback ke handler spesifik
-            if endpoint_type == 'roboflow':
-                from smartcash.ui.dataset.handlers.roboflow_handler import download_from_roboflow
-                return download_from_roboflow(ui_components, config)
-            elif endpoint_type == 'drive':
-                from smartcash.ui.dataset.handlers.gdrive_handler import download_from_drive
-                return download_from_drive(ui_components, config)
-            elif endpoint_type == 'url':
-                from smartcash.ui.dataset.handlers.url_handler import download_from_url
-                return download_from_url(ui_components, config)
-            else:
-                return False, f"Tipe endpoint tidak dikenal: {endpoint_type}"
-    
+        # Pull dataset (download dan export ke struktur lokal)
+        result = download_service.pull_dataset(
+            format=output_format, workspace=workspace, project=project, version=version, 
+            api_key=api_key, show_progress=True, force_download=True, backup_existing=True
+        )
+        
+        # Update UI berdasarkan hasil
+        if result.get('status') in ['downloaded', 'local']:
+            show_status(f"Download dataset berhasil! {result.get('stats', {}).get('total_images', 0)} gambar siap digunakan.", "success", ui_components)
+            ui_components['status_panel'].value = f"""
+            <div style="padding:10px; background-color:{ALERT_STYLES['success']['bg_color']}; 
+                       color:{ALERT_STYLES['success']['text_color']}; border-radius:4px; margin:5px 0;
+                       border-left:4px solid {ALERT_STYLES['success']['text_color']};">
+                <p style="margin:5px 0">{ALERT_STYLES['success']['icon']} Dataset berhasil didownload dan disiapkan!</p>
+            </div>
+            """
     except Exception as e:
-        if logger: logger.error(f"❌ Error saat download dataset: {str(e)}")
-        return False, f"Error saat download dataset: {str(e)}"
+        # Tangani error download
+        error_msg = f"Error saat download dataset: {str(e)}"
+        if logger: logger.error(f"❌ {error_msg}")
+        show_status(error_msg, "error", ui_components)
+        ui_components['status_panel'].value = f"""
+        <div style="padding:10px; background-color:{ALERT_STYLES['error']['bg_color']}; 
+                   color:{ALERT_STYLES['error']['text_color']}; border-radius:4px; margin:5px 0;
+                   border-left:4px solid {ALERT_STYLES['error']['text_color']};">
+            <p style="margin:5px 0">{ALERT_STYLES['error']['icon']} {error_msg}</p>
+        </div>
+        """
+    finally:
+        # Reset UI setelah selesai
+        _reset_ui_after_download(ui_components)
 
-def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
-    """
-    Tampilkan dan reset progress bar.
+def download_from_drive(ui_components: Dict[str, Any]) -> None:
+    """Download dataset dari Google Drive."""
+    if logger := ui_components.get('logger'): logger.info("ℹ️ Download dari Google Drive belum diimplementasikan")
+    _reset_ui_after_download(ui_components)
     
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan progress awal
-    """
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = message
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
-
-def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
-    """
-    Update progress bar dan progress tracker.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        value: Nilai progress (0-100)
-        message: Pesan progress opsional
-    """
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].value = value
-        
-    if message and 'progress_message' in ui_components:
-        ui_components['progress_message'].value = message
-        
-    # Update progress tracker jika tersedia
-    tracker_key = 'dataset_downloader_tracker'
-    if tracker_key in ui_components:
-        tracker = ui_components[tracker_key]
-        tracker.update(value, message)
-        
-    # Juga coba notify melalui observer jika tersedia
-    try:
-        from smartcash.components.observer import notify, EventTopics
-        notify(EventTopics.DOWNLOAD_PROGRESS, "ui_downloader", 
-              progress=value, total=100, message=message, status="info")
-    except ImportError:
-        pass
-    except Exception as e:
-        # PERBAIKAN: Tangkap error notifikasi
-        logger = ui_components.get('logger')
-        if logger: 
-            logger.warning(f"⚠️ Error pada notifikasi progress: {str(e)}")
-
-def _disable_ui_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
-    """
-    Nonaktifkan/aktifkan tombol-tombol UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        disabled: True untuk nonaktifkan, False untuk aktifkan
-    """
-    # Daftar tombol yang perlu dinonaktifkan
-    button_keys = ['download_button', 'check_button']
-    
-    # Set status disabled untuk semua tombol
-    for key in button_keys:
-        if key in ui_components:
-            ui_components[key].disabled = disabled
+def download_from_url(ui_components: Dict[str, Any]) -> None:
+    """Download dataset dari URL Kustom."""
+    if logger := ui_components.get('logger'): logger.info("ℹ️ Download dari URL kustom belum diimplementasikan")
+    _reset_ui_after_download(ui_components)

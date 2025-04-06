@@ -107,7 +107,7 @@ def _reset_ui_after_download(ui_components: Dict[str, Any], is_error: bool = Fal
 
 def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     """Download dataset dari Roboflow menggunakan service."""
-    from smartcash.ui.utils.fallback_utils import show_status, get_dataset_manager
+    from smartcash.ui.utils.fallback_utils import show_status
     from smartcash.ui.utils.constants import ALERT_STYLES
     
     logger = ui_components.get('logger')
@@ -126,20 +126,39 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     os.environ['ROBOFLOW_API_KEY'] = api_key
     
     try:
-        # Dapatkan dataset manager dengan konfigurasi yang tepat
-        download_service = get_dataset_manager({
-            'data': {
-                'dir': output_dir,
-                'roboflow': {'workspace': workspace, 'project': project, 'version': version, 'api_key': api_key}
-            }
-        }, logger)
+        # Gunakan DownloadService langsung, bukan melalui DatasetManager
+        from smartcash.dataset.services.downloader.download_service import DownloadService
         
-        if not download_service: raise Exception("Tidak dapat membuat service dataset")
+        # Buat instance DownloadService dengan konfigurasi yang tepat
+        download_service = DownloadService(
+            output_dir=output_dir,
+            config={
+                'data': {
+                    'dir': output_dir,
+                    'roboflow': {
+                        'workspace': workspace,
+                        'project': project,
+                        'version': version,
+                        'api_key': api_key
+                    }
+                }
+            },
+            logger=logger
+        )
+        
+        if not download_service:
+            raise Exception("Tidak dapat membuat download service")
             
         # Pull dataset (download dan export ke struktur lokal)
         result = download_service.pull_dataset(
-            format=output_format, workspace=workspace, project=project, version=version, 
-            api_key=api_key, show_progress=True, force_download=True, backup_existing=True
+            format=output_format,
+            workspace=workspace,
+            project=project,
+            version=version,
+            api_key=api_key,
+            show_progress=True,
+            force_download=True,
+            backup_existing=True
         )
         
         # Update UI berdasarkan hasil

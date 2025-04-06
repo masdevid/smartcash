@@ -1,268 +1,182 @@
 """
-File: smartcash/ui/dataset/download/handlers/download_handler.py
-Deskripsi: Handler untuk proses download dataset dengan integrasi langsung ke service
+File: smartcash/ui/dataset/download/download_handlers.py
+Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan observer pattern
 """
 
-from typing import Dict, Any, Tuple
-from concurrent.futures import ThreadPoolExecutor
-import os
+from typing import Dict, Any, Optional
 
-def handle_download_button_click(b, ui_components: Dict[str, Any]) -> None:
-    """Handle klik tombol download dengan validasi dan konfirmasi."""
-    from smartcash.ui.utils.fallback_utils import show_status
-    from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
-    
-    # Validasi berdasarkan endpoint yang dipilih
-    endpoint, is_valid, message = ui_components['endpoint_dropdown'].value, False, ""
-    
-    if endpoint == 'Roboflow':
-        is_valid, message = _validate_roboflow_input(ui_components)
-    elif endpoint == 'Google Drive':
-        is_valid, message = _validate_drive_input(ui_components)
-    
-    # Tampilkan pesan validasi jika gagal dan return
-    if not is_valid: 
-        show_status(message, "error", ui_components)
-        if logger := ui_components.get('logger'): logger.warning(f"⚠️ {message}")
-        return
-    
-    # Lanjut ke konfirmasi jika valid
-    confirm_download(ui_components, endpoint, b)
-
-def _validate_roboflow_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validasi input Roboflow."""
-    # Dapatkan nilai dari input fields
-    workspace = ui_components['rf_workspace'].value.strip()
-    project = ui_components['rf_project'].value.strip()
-    version = ui_components['rf_version'].value.strip()
-    api_key = ui_components['rf_apikey'].value.strip()
-    
-    # Validasi masing-masing field
-    if not workspace: return False, "Workspace ID tidak boleh kosong"
-    if not project: return False, "Project ID tidak boleh kosong"
-    if not version: return False, "Version tidak boleh kosong"
-    if not api_key: return False, "API key tidak boleh kosong"
-    if len(api_key) < 10: return False, "API key tidak valid (terlalu pendek)"
-    
-    return True, "Validasi berhasil"
-
-def _validate_drive_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validasi input Google Drive."""
-    # Validasi drive folder
-    drive_folder = ui_components['drive_folder'].value.strip()
-    if not drive_folder: return False, "Folder Google Drive tidak boleh kosong"
-    
-    # Validasi apakah drive terpasang
-    try:
-        from smartcash.common.environment import get_environment_manager
-        env = get_environment_manager()
-        if not env.is_drive_mounted: return False, "Google Drive tidak terpasang"
-    except ImportError:
-        if not os.path.exists('/content/drive/MyDrive'): return False, "Google Drive tidak terpasang"
-    
-    return True, "Validasi berhasil"
-
-def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
-    """Eksekusi download dataset berdasarkan endpoint."""
-    # Persiapkan UI untuk proses download
-    _prepare_ui_for_download(ui_components, endpoint)
-    
-    # Jalankan download secara asinkron berdasarkan endpoint
-    try:
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            if endpoint == 'Roboflow': 
-                # Jalankan langsung tanpa executor untuk debugging yang lebih mudah
-                download_from_roboflow(ui_components)
-            elif endpoint == 'Google Drive': 
-                download_from_drive(ui_components)
-    except Exception as e:
-        if logger := ui_components.get('logger'): logger.error(f"❌ Error saat memulai download: {str(e)}")
-        from smartcash.ui.utils.fallback_utils import show_status
-        show_status(f"Error saat memulai download: {str(e)}", "error", ui_components)
-        _reset_ui_after_download(ui_components, is_error=True)
-
-def _prepare_ui_for_download(ui_components: Dict[str, Any], endpoint: str) -> None:
-    """Persiapkan UI untuk proses download."""
-    # Tampilkan progress bar dan reset nilainya
-    ui_components['progress_bar'].layout.visibility = 'visible'
-    ui_components['progress_message'].layout.visibility = 'visible'
-    ui_components['progress_bar'].value = 0
-    ui_components['progress_message'].value = f"Memulai download dataset dari {endpoint}..."
-    
-    # Update status panel
-    from smartcash.ui.utils.constants import ALERT_STYLES
-    ui_components['status_panel'].value = f"""
-    <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
-               color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
-               border-left:4px solid {ALERT_STYLES['info']['text_color']};">
-        <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Proses download dimulai...</p>
-    </div>
+def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    
-    # Log dimulainya download
-    if logger := ui_components.get('logger'): logger.info(f"🚀 Memulai download dataset dari {endpoint}")
-
-def _reset_ui_after_download(ui_components: Dict[str, Any], is_error: bool = False) -> None:
-    """Reset UI setelah proses download selesai."""
-    # Sembunyikan progress bar
-    ui_components['progress_bar'].layout.visibility = 'hidden'
-    ui_components['progress_message'].layout.visibility = 'hidden'
-    
-    # Bersihkan area konfirmasi
-    ui_components['confirmation_area'].clear_output()
-    
-def _update_ui_progress(ui_components: Dict[str, Any], progress: int, total: int, message: Optional[str] = None) -> None:
-    """
-    Update UI progress bar dan message.
+    Setup handler untuk komponen UI dataset downloader.
     
     Args:
         ui_components: Dictionary komponen UI
-        progress: Nilai progress saat ini
-        total: Total progress
-        message: Pesan progress opsional
-    """
-    # Update progress bar
-    if 'progress_bar' in ui_components:
-        progress_bar = ui_components['progress_bar']
-        progress_bar.max = total
-        progress_bar.value = progress
+        env: Environment manager
+        config: Konfigurasi aplikasi
         
-        # Hitung persentase
-        if total > 0:
-            percentage = int((progress / total) * 100)
-            progress_bar.description = f"Proses: {percentage}%"
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Setup observer untuk menerima event notifikasi
+    _setup_observers(ui_components)
     
-    # Update message
-    if message and 'progress_message' in ui_components:
-        ui_components['progress_message'].value = message
+    # Setup API key handler dan verifikasi
+    _setup_api_key_handler(ui_components)
     
-    # Update trackers jika tersedia
-    step_tracker_key = 'download_step_tracker'
-    overall_tracker_key = 'download_tracker'
+    # Setup handlers untuk UI events
+    _setup_endpoint_handlers(ui_components)
+    _setup_download_button_handler(ui_components)
+    _setup_check_button_handler(ui_components)
     
-    if step_tracker_key in ui_components and 'step' in message.lower():
-        ui_components[step_tracker_key].update(progress, message)
-    elif overall_tracker_key in ui_components:
-        ui_components[overall_tracker_key].update(progress, message)
-
-def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
-    """Download dataset dari Roboflow menggunakan service."""
-    from smartcash.ui.utils.fallback_utils import show_status
-    from smartcash.ui.utils.constants import ALERT_STYLES
+    # Setup multi-progress tracking untuk download
+    _setup_progress_tracking(ui_components)
     
-    # Bersihkan konfirmasi area terlebih dahulu
-    ui_components['confirmation_area'].clear_output()
+    # Setup cleanup function
+    _setup_cleanup(ui_components)
+    
+    # Save config yang sudah ada ke UI components
+    ui_components['config'] = config or {}
     
     logger = ui_components.get('logger')
+    if logger:
+        logger.info("✅ Dataset downloader handlers berhasil diinisialisasi")
     
-    # Ambil parameter dari UI components
-    workspace = ui_components['rf_workspace'].value
-    project = ui_components['rf_project'].value
-    version = ui_components['rf_version'].value
-    api_key = ui_components['rf_apikey'].value
-    output_dir = ui_components['output_dir'].value
-    
-    # Format selalu yolov5pytorch (tetap)
-    output_format = "yolov5pytorch"
-    
-    # Set API key sebagai environment variable
-    os.environ['ROBOFLOW_API_KEY'] = api_key
-    
-    try:
-        # Gunakan DownloadService langsung, bukan melalui DatasetManager
-        from smartcash.dataset.services.downloader.download_service import DownloadService
-        # Nonaktifkan notifikasi otomatis untuk mencegah konflik parameter status
-        import smartcash.dataset.services.downloader.notification_utils
-        orig_notify_event = smartcash.dataset.services.downloader.notification_utils.notify_event
-        
-        # Monkeypatch fungsi notify_event untuk menangani parameter ganda
-        def safe_notify(*args, **kwargs):
-            # Hapus parameter status jika juga ada di kwargs
-            if 'status' in kwargs and len(args) > 2:
-                kwargs.pop('status', None)
-            return orig_notify_event(*args, **kwargs)
-        
-        # Ganti sementara fungsi notify_event
-        smartcash.dataset.services.downloader.notification_utils.notify_event = safe_notify
-        
-        # Buat instance DownloadService dengan konfigurasi yang tepat
-        download_service = DownloadService(
-            output_dir=output_dir,
-            config={
-                'data': {
-                    'dir': output_dir,
-                    'roboflow': {
-                        'workspace': workspace,
-                        'project': project,
-                        'version': version,
-                        'api_key': api_key
-                    }
-                }
-            },
-            logger=logger
-        )
-        
-        if not download_service:
-            raise Exception("Tidak dapat membuat download service")
-        
-        # Tambahkan callback untuk progress tracking
-        def progress_callback(event_type, sender, progress=None, total=None, message=None, **kwargs):
-            if progress is not None and total is not None:
-                # Update progress bar
-                _update_ui_progress(ui_components, progress, total, message)
-        
-        # Register callback ke download service jika memungkinkan
-        if hasattr(download_service, 'observer_manager') and download_service.observer_manager:
-            from smartcash.components.observer.event_topics_observer import EventTopics
-            download_service.observer_manager.create_simple_observer(
-                event_type="*", # Semua event 
-                callback=progress_callback,
-                name="UI_Download_Progress",
-                group="download_ui"
-            )
-        
-        # Pull dataset (download dan export ke struktur lokal)
-        result = download_service.pull_dataset(
-            format=output_format,
-            workspace=workspace,
-            project=project,
-            version=version,
-            api_key=api_key,
-            show_progress=True,
-            force_download=True,
-            backup_existing=True
-        )
-        
-        # Kembalikan fungsi notify_event ke aslinya
-        smartcash.dataset.services.downloader.notification_utils.notify_event = orig_notify_event
-        
-        # Update UI berdasarkan hasil
-        if result.get('status') in ['downloaded', 'local']:
-            show_status(f"Download dataset berhasil! {result.get('stats', {}).get('total_images', 0)} gambar siap digunakan.", "success", ui_components)
-            ui_components['status_panel'].value = f"""
-            <div style="padding:10px; background-color:{ALERT_STYLES['success']['bg_color']}; 
-                       color:{ALERT_STYLES['success']['text_color']}; border-radius:4px; margin:5px 0;
-                       border-left:4px solid {ALERT_STYLES['success']['text_color']};">
-                <p style="margin:5px 0">{ALERT_STYLES['success']['icon']} Dataset berhasil didownload dan disiapkan!</p>
-            </div>
-            """
-    except Exception as e:
-        # Tangani error download
-        error_msg = f"Error saat download dataset: {str(e)}"
-        if logger: logger.error(f"❌ {error_msg}")
-        show_status(error_msg, "error", ui_components)
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['error']['bg_color']}; 
-                   color:{ALERT_STYLES['error']['text_color']}; border-radius:4px; margin:5px 0;
-                   border-left:4px solid {ALERT_STYLES['error']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['error']['icon']} {error_msg}</p>
-        </div>
-        """
-    finally:
-        # Reset UI setelah selesai
-        _reset_ui_after_download(ui_components)
+    return ui_components
 
-def download_from_drive(ui_components: Dict[str, Any]) -> None:
-    """Download dataset dari Google Drive."""
-    from smartcash.ui.dataset.download.handlers.drive_handler import process_drive_download
-    process_drive_download(ui_components)
+def _setup_observers(ui_components: Dict[str, Any]) -> None:
+    """Setup observer handlers."""
+    try:
+        from smartcash.ui.handlers.observer_handler import setup_observer_handlers
+        from smartcash.ui.dataset.download.handlers.download_progress_observer import setup_download_progress_observer
+        
+        # Setup basic observers
+        ui_components = setup_observer_handlers(ui_components, "dataset_download_observers")
+        
+        # Setup download progress observer
+        setup_download_progress_observer(ui_components)
+    except ImportError:
+        pass
+
+def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup API key handler untuk Roboflow."""
+    try:
+        from smartcash.ui.dataset.download.handlers.api_key_handler import setup_api_key_input
+        setup_api_key_input(ui_components)
+    except ImportError:
+        # Log gagal import jika logger tersedia
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug("ℹ️ API key handler tidak tersedia")
+
+def _setup_endpoint_handlers(ui_components: Dict[str, Any]) -> None:
+    """Setup handlers untuk endpoint dropdown."""
+    # Import handler spesifik
+    from smartcash.ui.dataset.download.handlers.endpoint_handler import handle_endpoint_change
+    
+    # Bind handler ke dropdown
+    if 'endpoint_dropdown' in ui_components:
+        ui_components['endpoint_dropdown'].observe(
+            lambda change: handle_endpoint_change(change, ui_components),
+            names='value'
+        )
+        
+        # Inisialisasi tampilan awal
+        handle_endpoint_change({'new': ui_components['endpoint_dropdown'].value}, ui_components)
+
+def _setup_download_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol download."""
+    from smartcash.ui.dataset.download.handlers.download_handler import handle_download_button_click
+    
+    if 'download_button' in ui_components:
+        ui_components['download_button'].on_click(
+            lambda b: handle_download_button_click(b, ui_components)
+        )
+
+def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol check status."""
+    from smartcash.ui.dataset.download.handlers.check_handler import handle_check_button_click
+    
+    if 'check_button' in ui_components:
+        ui_components['check_button'].on_click(
+            lambda b: handle_check_button_click(b, ui_components)
+        )
+
+def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
+    """Setup progress tracking untuk download."""
+    try:
+        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
+        
+        # Setup multi-progress tracking dengan tracker untuk keseluruhan dan step
+        setup_multi_progress_tracking(
+            ui_components=ui_components,
+            overall_tracker_name="download",
+            step_tracker_name="download_step",
+            overall_progress_key='progress_bar',
+            step_progress_key='progress_bar',
+            overall_label_key='progress_message',
+            step_label_key='progress_message'
+        )
+        
+        # Log setup berhasil jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug("✅ Progress tracking berhasil disetup")
+    except Exception as e:
+        # Log error jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.warning(f"⚠️ Error saat setup progress tracking: {str(e)}")
+
+def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
+    """Setup cleanup function."""
+    def cleanup_resources():
+        """Fungsi untuk membersihkan resources."""
+        try:
+            # Reset progress
+            if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                ui_components['progress_bar'].layout.visibility = 'hidden'
+                ui_components['progress_message'].layout.visibility = 'hidden'
+                ui_components['progress_bar'].value = 0
+                ui_components['progress_message'].value = ""
+            
+            # Unregister observer group jika ada
+            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
+                try:
+                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
+                except Exception:
+                    pass
+            
+            # Reset API key highlight jika ada
+            if 'rf_apikey' in ui_components:
+                ui_components['rf_apikey'].layout.border = ""
+            
+            # Reset logging
+            try:
+                from smartcash.ui.utils.logging_utils import reset_logging
+                reset_logging()
+            except ImportError:
+                pass
+            
+            # Reset confirmation area
+            if 'confirmation_area' in ui_components:
+                ui_components['confirmation_area'].clear_output()
+            
+            # Log cleanup
+            logger = ui_components.get('logger')
+            if logger:
+                logger.debug("🧹 Cleanup dataset_downloader berhasil")
+        except Exception as e:
+            # Ignore exceptions during cleanup
+            pass
+    
+    # Tetapkan fungsi cleanup ke ui_components
+    ui_components['cleanup'] = cleanup_resources
+    
+    # Register cleanup dengan IPython event
+    try:
+        from IPython import get_ipython
+        ipython = get_ipython()
+        if ipython:
+            ipython.events.register('pre_run_cell', cleanup_resources)
+    except (ImportError, AttributeError):
+        pass

@@ -11,7 +11,6 @@ def notify_event(
     event_type: str,
     observer_manager=None,
     message: Optional[str] = None,
-    status: str = "info",
     **kwargs
 ) -> None:
     """
@@ -22,7 +21,6 @@ def notify_event(
         event_type: Tipe event (gunakan konstanta dari EventTopics)
         observer_manager: Observer manager opsional (akan mencoba impor jika None)
         message: Pesan untuk disertakan dengan event
-        status: Status event ('info', 'success', 'warning', 'error')
         **kwargs: Parameter tambahan untuk event
     """
     try:
@@ -42,7 +40,16 @@ def notify_event(
                 pass
                 
         # Pastikan observer_manager tersedia atau gunakan notifikasi langsung
-        params = {"message": message, "status": status, **kwargs} if message else {**kwargs, "status": status}
+        params = {}
+        if message:
+            params["message"] = message
+            
+        # Tambahkan status jika tidak ada dalam kwargs
+        if "status" not in kwargs:
+            params["status"] = "info"
+            
+        # Tambahkan kwargs ke params
+        params.update(kwargs)
         
         if observer_manager is not None:
             # Jika observer manager diberikan, gunakan itu
@@ -166,4 +173,5 @@ def notify_service_event(
                 if total > 0:
                     event_params.setdefault("percentage", int((progress / total) * 100))
         
-        notify_event(sender, event_name, observer_manager, status=status, **event_params)
+        # Panggil notify_event TANPA parameter duplikat status
+        notify_event(sender, event_name, observer_manager, **event_params)

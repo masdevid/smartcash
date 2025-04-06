@@ -53,7 +53,15 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
                 
             # PERBAIKAN: Gunakan try-except untuk menangkap error
             try:
+                # Set flag untuk menghindari rekursi
+                if sender:
+                    setattr(sender, '_received_from_observer', True)
+                    
                 _handle_download_event(ui_components, event_type, **kwargs)
+                
+                # Reset flag
+                if sender:
+                    setattr(sender, '_received_from_observer', False)
             except Exception as e:
                 if logger:
                     logger.warning(f"⚠️ Error pada observer handler: {str(e)}")
@@ -83,21 +91,19 @@ def _handle_download_event(ui_components: Dict[str, Any], event_type: str, **kwa
         event_type: Tipe event
         **kwargs: Parameter tambahan dari event
     """
-    # PERBAIKAN: Set flag untuk menghindari rekursi
-    sender = kwargs.get('sender', None)
-    if hasattr(sender, '_received_from_observer'):
-        sender._received_from_observer = True
+    # Hapus parameter status dari kwargs untuk mencegah duplikasi
+    kwargs.pop('status', None)
     
     from smartcash.components.observer.event_topics_observer import EventTopics
     
     # Handler sesuai tipe event
-    if event_type.endswith('start'):
+    if event_type in (EventTopics.DOWNLOAD_START, EventTopics.PULL_DATASET_START, EventTopics.ZIP_PROCESSING_START):
         _handle_start_event(ui_components, event_type, **kwargs)
-    elif event_type.endswith('progress'):
+    elif event_type in (EventTopics.DOWNLOAD_PROGRESS, EventTopics.PULL_DATASET_PROGRESS, EventTopics.ZIP_PROCESSING_PROGRESS):
         _handle_progress_event(ui_components, event_type, **kwargs)
-    elif event_type.endswith('complete'):
+    elif event_type in (EventTopics.DOWNLOAD_COMPLETE, EventTopics.PULL_DATASET_COMPLETE, EventTopics.ZIP_PROCESSING_COMPLETE):
         _handle_complete_event(ui_components, event_type, **kwargs)
-    elif event_type.endswith('error'):
+    elif event_type in (EventTopics.DOWNLOAD_ERROR, EventTopics.PULL_DATASET_ERROR, EventTopics.ZIP_PROCESSING_ERROR):
         _handle_error_event(ui_components, event_type, **kwargs)
 
 def _handle_start_event(ui_components: Dict[str, Any], event_type: str, **kwargs) -> None:
@@ -122,6 +128,18 @@ def _handle_start_event(ui_components: Dict[str, Any], event_type: str, **kwargs
     # Update UI dengan info
     from smartcash.ui.utils.ui_logger import log_to_ui
     log_to_ui(ui_components, message, "info", "🚀")
+    
+    # Update multi-progress trackers jika tersedia
+    for tracker_key in ['download_tracker', 'download_step_tracker']:
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            # Reset progress tracker
+            if hasattr(tracker, 'reset'):
+                tracker.reset()
+            tracker.current = 0
+            tracker.total = total
+            if hasattr(tracker, 'set_description'):
+                tracker.set_description(message)
 
 def _handle_progress_event(ui_components: Dict[str, Any], event_type: str, **kwargs) -> None:
     """Handler untuk event .progress."""
@@ -132,6 +150,9 @@ def _handle_progress_event(ui_components: Dict[str, Any], event_type: str, **kwa
     progress = kwargs.get('progress', 0)
     total = kwargs.get('total', 100)
     message = kwargs.get('message')
+    step = kwargs.get('step', '')
+    current_step = kwargs.get('current_step', 0)
+    total_steps = kwargs.get('total_steps', 0)
     
     # Update progress bar
     if progress_bar:
@@ -142,14 +163,24 @@ def _handle_progress_event(ui_components: Dict[str, Any], event_type: str, **kwa
     if message and progress_message:
         progress_message.value = message
     
-    # Update progress tracker jika tersedia
-    tracker_key = 'download_tracker'
-    if tracker_key in ui_components:
-        tracker = ui_components[tracker_key]
-        # Jalankan update hanya jika progress berubah signifikan (min 5%)
-        if not hasattr(tracker, '_last_progress') or abs(progress - getattr(tracker, '_last_progress', 0)) >= 5:
-            tracker.update(progress, message)
-            setattr(tracker, '_last_progress', progress)
+    # Update overall tracker
+    if 'download_tracker' in ui_components:
+        overall_tracker = ui_components['download_tracker']
+        # Update overall progress
+        if current_step > 0 and total_steps > 0:
+            # Calculate overall progress based on steps
+            overall_progress = (current_step - 1) * 100 / total_steps
+            overall_progress += progress * (100 / total_steps) / total
+            overall_tracker.update(overall_progress, message)
+        else:
+            # Use direct progress update
+            overall_tracker.update(progress, message)
+    
+    # Update step tracker jika ada
+    if 'download_step_tracker' in ui_components and step:
+        step_tracker = ui_components['download_step_tracker']
+        # Update step progress
+        step_tracker.update(progress, f"Step {current_step}/{total_steps}: {message}")
 
 def _handle_complete_event(ui_components: Dict[str, Any], event_type: str, **kwargs) -> None:
     """Handler untuk event .complete."""
@@ -167,10 +198,13 @@ def _handle_complete_event(ui_components: Dict[str, Any], event_type: str, **kwa
         progress_message.value = message
     
     # Update tracker
-    tracker_key = 'download_tracker'
-    if tracker_key in ui_components:
-        tracker = ui_components[tracker_key]
-        tracker.complete(message)
+    for tracker_key in ['download_tracker', 'download_step_tracker']:
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            if hasattr(tracker, 'complete'):
+                tracker.complete(message)
+            elif hasattr(tracker, 'update'):
+                tracker.update(100, message)
     
     # Update UI dengan success
     from smartcash.ui.utils.ui_logger import log_to_ui
@@ -195,3 +229,12 @@ def _handle_error_event(ui_components: Dict[str, Any], event_type: str, **kwargs
     logger = ui_components.get('logger')
     if logger:
         logger.error(f"❌ {error_msg}")
+        
+    # Update tracker ke error state jika tersedia
+    for tracker_key in ['download_tracker', 'download_step_tracker']:
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            if hasattr(tracker, 'complete'):
+                tracker.complete(f"Error: {error_msg}")
+            elif hasattr(tracker, 'update'):
+                tracker.update(0, f"Error: {error_msg}")

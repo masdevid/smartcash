@@ -392,6 +392,19 @@
    |  ├── dataset_downloader_component.py
    |  ├── dataset_downloader_handler.py
    |  ├── dataset_downloader_initializer.py
+   |  ├── download
+   |  |  ├── download_component.py
+   |  |  ├── download_handlers.py
+   |  |  ├── download_initializer.py
+   |  |  └── handlers
+   |  |     ├── api_key_handler.py
+   |  |     ├── check_handler.py
+   |  |     ├── confirmation_handler.py
+   |  |     ├── download_handler.py
+   |  |     ├── download_progress_observer.py
+   |  |     ├── drive_handler.py
+   |  |     ├── endpoint_handler.py
+   |  |     └── url_handler.py
    |  ├── handlers
    |  |  ├── api_key_handler.py
    |  |  ├── check_handler.py
@@ -431,7 +444,6 @@
    ├── detection
    ├── handlers
    |  ├── __init__.py
-   |  ├── download_progress_handler.py
    |  ├── error_handler.py
    |  ├── multi_progress.py
    |  ├── observer_handler.py
@@ -460,6 +472,7 @@
    |  ├── env_config_handlers.py
    |  ├── env_config_initializer.py
    |  ├── environment_detector.py
+   |  ├── environment_symlink_helper.py
    |  ├── init_sequence_handler.py
    |  ├── package_analyzer.py
    |  ├── package_installer.py
@@ -495,7 +508,7 @@
       ├── validator_utils.py
       └── visualization_utils.py
 
-directory: 78 file: 416
+directory: 80 file: 427
 
 
 

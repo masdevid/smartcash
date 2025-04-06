@@ -1,12 +1,12 @@
 """
-File: smartcash/ui/cells/cell_2_1_dataset_downloader.py
-Deskripsi: Entry point untuk dataset downloader cell
+File: smartcash/ui/cells/cell_2_1_dataset_download.py
+Deskripsi: Entry point untuk cell download dataset
 """
 
-def setup_dataset_downloader():
+def setup_dataset_download():
     """Setup dan tampilkan UI untuk download dataset."""
-    from smartcash.ui.dataset.dataset_downloader_initializer import initialize_dataset_downloader
-    return initialize_dataset_downloader()
+    from smartcash.ui.dataset.download.download_initializer import initialize_dataset_download_ui
+    return initialize_dataset_download_ui()
 
 # Eksekusi saat modul diimpor
-ui_components = setup_dataset_downloader()
+ui_components = setup_dataset_download()

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/multi_progress.py
-Deskripsi: Integrasi multiple progress tracker untuk UI dengan dukungan step dan overall progress
+Deskripsi: Integrasi multiple progress tracker untuk UI dengan dukungan step dan overall progress yang efisien
 """
 
 from typing import Dict, Any, List, Optional
@@ -40,8 +40,6 @@ def setup_multi_progress_tracking(
         step_label = ui_components.get(step_label_key)
         
         if not overall_progress or not step_progress:
-            if logger:
-                logger.warning("⚠️ Progress widgets tidak ditemukan")
             return
         
         # Buat progress trackers
@@ -100,13 +98,11 @@ def setup_multi_progress_tracking(
         
         # Register observer integration
         register_multi_progress_observer(ui_components, overall_tracker_name, step_tracker_name)
-        
-        if logger:
-            logger.debug(f"✅ Multi-progress tracking berhasil disetup: {overall_tracker_name} + {step_tracker_name}")
     
-    except ImportError as e:
+    except ImportError:
+        # Biarkan import error dengan notifikasi ringan
         if logger:
-            logger.warning(f"⚠️ Error saat setup multi-progress tracking: {str(e)}")
+            logger.debug("ℹ️ Progress tracking tidak tersedia")
 
 def register_multi_progress_observer(
     ui_components: Dict[str, Any], 
@@ -114,7 +110,7 @@ def register_multi_progress_observer(
     step_tracker_name: str
 ) -> None:
     """
-    Register observer untuk multi-level progress tracking.
+    Register observer untuk multi-level progress tracking dengan minimal overhead.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -204,10 +200,9 @@ def register_multi_progress_observer(
                 group=observer_group
             )
     
-    except (ImportError, Exception) as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"ℹ️ Multi-progress observer tidak disetup: {str(e)}")
+    except (ImportError, Exception):
+        # Biarkan error tanpa spam log
+        pass
 
 def _handle_progress_event(
     tracker, 

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/observer_handler.py
-Deskripsi: Handler untuk sistem observer dengan integrasi UI tanpa duplikasi implementasi
+Deskripsi: Handler untuk sistem observer dengan integrasi UI minimalis dan efisien
 """
 
 import ipywidgets as widgets
@@ -51,7 +51,7 @@ def setup_observer_handlers(
             except (ImportError, AttributeError):
                 pass
     except ImportError:
-        # Fallback jika ObserverManager tidak tersedia
+        # Fallback jika ObserverManager tidak tersedia tanpa log yang berisik
         pass
     
     return ui_components

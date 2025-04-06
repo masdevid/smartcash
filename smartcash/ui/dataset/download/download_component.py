@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/download_component.py
-Deskripsi: Komponen UI untuk download dataset
+Deskripsi: Komponen UI untuk download dataset dengan progres bar dan integrasi observer
 """
 
 import ipywidgets as widgets
@@ -33,7 +33,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Endpoint selection
     endpoint_label = widgets.HTML(f"<b>{ICONS['data']} Pilih Endpoint Dataset</b>")
     endpoint_dropdown = widgets.Dropdown(
-        options=['Roboflow', 'Google Drive', 'URL Kustom'],
+        options=['Roboflow', 'Google Drive'],
         value='Roboflow',
         description='Sumber:',
         layout=widgets.Layout(width='40%')
@@ -43,9 +43,9 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     
     # Ambil nilai default dari konfigurasi
     roboflow_config = config.get('data', {}).get('roboflow', {})
-    rf_workspace_default = roboflow_config.get('workspace', '')
-    rf_project_default = roboflow_config.get('project', '')
-    rf_version_default = roboflow_config.get('version', '')
+    rf_workspace_default = roboflow_config.get('workspace', 'smartcash-wo2us')
+    rf_project_default = roboflow_config.get('project', 'rupiah-emisi-2022')
+    rf_version_default = roboflow_config.get('version', '3')
     api_key_env = os.environ.get('ROBOFLOW_API_KEY', '')
     
     # Roboflow Config
@@ -69,27 +69,15 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     drive_accordion = widgets.Accordion([drive_container], selected_index=None, layout=widgets.Layout(width='100%', margin='10px 0'))
     drive_accordion.set_title(0, f"{ICONS['folder']} Konfigurasi Google Drive")
     
-    # URL Kustom Config
-    url_input = widgets.Text(value='', placeholder='https://example.com/dataset.zip', description='URL:', layout=widgets.Layout(width='80%'))
-    url_container = widgets.VBox([url_input], layout=widgets.Layout(margin='5px 0'))
-    url_accordion = widgets.Accordion([url_container], selected_index=None, layout=widgets.Layout(width='100%', margin='10px 0'))
-    url_accordion.set_title(0, f"{ICONS['link']} Konfigurasi URL")
-    
-    # Output lokasi dan format
+    # Output lokasi - hanya YOLO v5 format sebagai default
     output_label = widgets.HTML(f"<b>{ICONS['folder']} Output Dataset</b>")
-    output_format = widgets.Dropdown(
-        options=['YOLO v5', 'COCO', 'VOC'],
-        value='YOLO v5',
-        description='Format:',
-        layout=widgets.Layout(width='40%')
-    )
     output_dir = widgets.Text(
         value=config.get('data', {}).get('dir', 'data'),
         description='Output Dir:',
         layout=widgets.Layout(width='60%')
     )
     output_container = widgets.VBox(
-        [output_label, output_format, output_dir],
+        [output_label, output_dir],
         layout=widgets.Layout(margin='10px 0', padding='10px', border=f'1px solid {COLORS["border"]}', border_radius='5px')
     )
     
@@ -114,7 +102,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Area untuk konfirmasi dialog
     confirmation_area = widgets.Output(layout=widgets.Layout(width='100%', margin='10px 0'))
     
-    # Progress tracking
+    # PENTING: Progress tracking yang benar-benar ada
     progress_bar = widgets.IntProgress(
         value=0, min=0, max=100, description='Proses:',
         layout=widgets.Layout(width='100%', margin='10px 0', visibility='hidden'),
@@ -132,14 +120,14 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Container utama dengan semua komponen
     main = widgets.VBox(
         [
-            header, endpoint_container, rf_accordion, drive_accordion, url_accordion,
+            header, endpoint_container, rf_accordion, drive_accordion,
             output_container, button_container, status_panel, confirmation_area,
             progress_container, status, info_box
         ],
         layout=MAIN_CONTAINER
     )
     
-    # Struktur final komponen UI
+    # Struktur final komponen UI dengan format output tetap YOLO v5
     ui_components = {
         'ui': main,
         'endpoint_dropdown': endpoint_dropdown,
@@ -148,8 +136,6 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'rf_version': rf_version,
         'rf_apikey': rf_apikey,
         'drive_folder': drive_folder,
-        'url_input': url_input,
-        'output_format': output_format,
         'output_dir': output_dir,
         'download_button': download_button,
         'check_button': check_button,
@@ -158,10 +144,10 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         'status': status,
         'rf_accordion': rf_accordion,
         'drive_accordion': drive_accordion,
-        'url_accordion': url_accordion,
         'status_panel': status_panel,
         'confirmation_area': confirmation_area,
-        'module_name': 'dataset_download'
+        'module_name': 'dataset_download',
+        'format': 'yolov5pytorch'  # Default format tetap
     }
     
     return ui_components

@@ -131,13 +131,10 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             
             # Buat symlinks jika di Colab dan drive terpasang
             if env_manager.is_colab and env_manager.is_drive_mounted:
-                # Untuk symlinks, update offset dari progress sebelumnya
-                def symlink_progress(current, total, message):
-                    update_progress(current + 5, total + 5, message)
+                # Import symlink helper untuk membuat symlinks dengan path yang benar
+                from smartcash.ui.setup.environment_symlink_helper import create_drive_symlinks
                 
-                symlink_stats = env_manager.create_symlinks(
-                    progress_callback=symlink_progress
-                )
+                symlink_stats = create_drive_symlinks(env_manager.drive_path, ui_components)
                 
                 # Gabungkan statistik
                 for key in symlink_stats:

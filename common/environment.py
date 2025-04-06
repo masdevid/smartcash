@@ -229,7 +229,6 @@ class EnvironmentManager:
     def create_symlinks(self, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
         Buat symlink dari direktori lokal ke direktori Google Drive.
-        Menggunakan fungsi dari drive_utils jika tersedia.
         
         Args:
             progress_callback: Callback untuk menampilkan progres (current, total, message)
@@ -237,114 +236,59 @@ class EnvironmentManager:
         Returns:
             Statistik pembuatan symlink
         """
-        # Coba gunakan drive_utils.sync_directory
-        try:
-            from smartcash.ui.utils.drive_utils import sync_directory
-            
-            if not self._drive_mounted:
-                msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
-                if self.logger: self.logger.warning(msg)
-                return {'created': 0, 'existing': 0, 'error': 0}
-            
-            stats = {'created': 0, 'existing': 0, 'error': 0}
-            
-            # Mapping symlink
-            symlinks = {
-                'data': self._drive_path / 'data',
-                'configs': self._drive_path / 'configs', 
-                'runs': self._drive_path / 'runs',
-                'logs': self._drive_path / 'logs',
-                'checkpoints': self._drive_path / 'checkpoints'
-            }
-            
-            # Gunakan sync_directory untuk setiap symlink
-            for local_name, target_path in symlinks.items():
-                try:
-                    local_path = self._base_dir / local_name
-                    
-                    # Pastikan direktori target ada
-                    os.makedirs(target_path, exist_ok=True)
-                    
-                    # Jika lokal sudah ada tapi bukan symlink, backup dulu
-                    if local_path.exists() and not local_path.is_symlink():
-                        backup_path = local_path.with_name(f"{local_name}_backup")
-                        if self.logger:
-                            self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
-                        
-                        # Hapus backup yang sudah ada
-                        if backup_path.exists():
-                            import shutil
-                            shutil.rmtree(backup_path)
-                        
-                        # Pindahkan direktori lokal ke backup
-                        local_path.rename(backup_path)
-                    
-                    # Buat symlink jika belum ada
-                    if not local_path.exists():
-                        local_path.symlink_to(target_path)
-                        stats['created'] += 1
-                        if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
-                    else:
-                        stats['existing'] += 1
-                except Exception as e:
-                    stats['error'] += 1
-                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
-            
-            return stats
+        if not self._drive_mounted:
+            msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
+            if self.logger: self.logger.warning(msg)
+            return {'created': 0, 'existing': 0, 'error': 0}
+        
+        # Mapping symlink (koreksi: gunakan path /content, bukan /content/SmartCash)
+        symlinks = {
+            'data': self._drive_path / 'data',
+            'configs': self._drive_path / 'configs', 
+            'runs': self._drive_path / 'runs',
+            'logs': self._drive_path / 'logs',
+            'checkpoints': self._drive_path / 'checkpoints'
+        }
+        
+        stats = {'created': 0, 'existing': 0, 'error': 0}
+        total_symlinks = len(symlinks)
+        
+        import shutil, os
+        
+        for idx, (local_name, target_path) in enumerate(symlinks.items()):
+            if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
                 
-        except ImportError:
-            # Fallback jika drive_utils tidak tersedia
-            if not self._drive_mounted:
-                msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
-                if self.logger: self.logger.warning(msg)
-                return {'created': 0, 'existing': 0, 'error': 0}
-            
-            # Mapping symlink
-            symlinks = {
-                'data': self._drive_path / 'data',
-                'configs': self._drive_path / 'configs', 
-                'runs': self._drive_path / 'runs',
-                'logs': self._drive_path / 'logs',
-                'checkpoints': self._drive_path / 'checkpoints'
-            }
-            
-            stats = {'created': 0, 'existing': 0, 'error': 0}
-            total_symlinks = len(symlinks)
-            
-            import shutil
-            
-            for idx, (local_name, target_path) in enumerate(symlinks.items()):
-                if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
+            try:
+                # Pastikan direktori target ada
+                os.makedirs(target_path, exist_ok=True)
+                
+                # Gunakan path /content, bukan /content/SmartCash
+                local_path = Path('/content') / local_name
+                
+                # Cek jika path lokal ada dan bukan symlink
+                if local_path.exists() and not local_path.is_symlink():
+                    backup_path = local_path.with_name(f"{local_name}_backup")
+                    if self.logger:
+                        self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
                     
-                try:
-                    # Pastikan direktori target ada
-                    os.makedirs(target_path, exist_ok=True)
-                    local_path = self._base_dir / local_name
+                    # Hapus backup yang sudah ada
+                    if backup_path.exists(): shutil.rmtree(backup_path)
                     
-                    # Cek jika path lokal ada dan bukan symlink
-                    if local_path.exists() and not local_path.is_symlink():
-                        backup_path = local_path.with_name(f"{local_name}_backup")
-                        if self.logger:
-                            self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
-                        
-                        # Hapus backup yang sudah ada
-                        if backup_path.exists(): shutil.rmtree(backup_path)
-                        
-                        # Pindahkan direktori lokal ke backup
-                        local_path.rename(backup_path)
-                    
-                    # Buat symlink jika belum ada
-                    if not local_path.exists():
-                        local_path.symlink_to(target_path)
-                        stats['created'] += 1
-                        if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
-                    else:
-                        stats['existing'] += 1
-                except Exception as e:
-                    stats['error'] += 1
-                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
-            
-            return stats
+                    # Pindahkan direktori lokal ke backup
+                    local_path.rename(backup_path)
+                
+                # Buat symlink jika belum ada
+                if not local_path.exists():
+                    local_path.symlink_to(target_path)
+                    stats['created'] += 1
+                    if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                else:
+                    stats['existing'] += 1
+            except Exception as e:
+                stats['error'] += 1
+                if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
+        
+        return stats
     
     def get_directory_tree(self, root_dir: Optional[Union[str, Path]] = None, max_depth: int = 3, 
                          indent: int = 0, _current_depth: int = 0) -> str:

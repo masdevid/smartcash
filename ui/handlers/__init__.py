@@ -29,6 +29,4 @@ __all__ = [
     'register_ui_observer', 
     'create_progress_observer',
     
-    # Progress handlers
-    'DownloadProgressHandler',
 ]

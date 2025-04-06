@@ -15,7 +15,6 @@ from smartcash.ui.handlers.observer_handler import (
     register_ui_observer, 
     create_progress_observer
 )
-from smartcash.ui.handlers.download_progress_handler import DownloadProgressHandler
 
 __all__ = [
     # Error handlers

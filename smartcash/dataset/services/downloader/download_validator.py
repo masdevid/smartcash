@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
-from smartcash.dataset.utils.file_wrapper import file_exists
+from smartcash.common.io import file_exists
 
 
 class DownloadValidator:

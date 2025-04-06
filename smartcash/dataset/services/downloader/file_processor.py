@@ -14,7 +14,7 @@ import time
 
 from smartcash.common.logger import get_logger
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
-from smartcash.dataset.utils.file_wrapper import (
+from smartcash.common.io import (
     ensure_dir, copy_files, move_files, extract_zip as wrapper_extract_zip
 )
 from smartcash.dataset.services.downloader.notification_utils import notify_service_event

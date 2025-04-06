@@ -12,7 +12,7 @@ from datetime import datetime
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
-from smartcash.dataset.utils.file_wrapper import ensure_dir
+from smartcash.common.io import ensure_dir
 from smartcash.dataset.services.downloader.notification_utils import notify_service_event
 
 

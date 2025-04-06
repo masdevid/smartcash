@@ -288,4 +288,4 @@ def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     # Set status disabled untuk semua tombol
     for key in button_keys:
         if key in ui_components:
-            ui_components[key].disabled = disabled
+            ui_components[key].disabled = disabledtou

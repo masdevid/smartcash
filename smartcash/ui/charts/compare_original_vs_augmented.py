@@ -16,7 +16,7 @@ from smartcash.dataset.utils.denomination_utils import extract_info_from_filenam
 from smartcash.dataset.utils.data_utils import load_image
 from smartcash.ui.utils.file_utils import shorten_filename
 from smartcash.ui.utils.constants import COLORS, ICONS
-from smartcash.dataset.utils import format_size
+from smartcash.common.io import format_size
 
 def match_original_with_augmented(aug_filename: str, original_files: List[Path]) -> Optional[Path]:
     """

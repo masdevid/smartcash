@@ -110,16 +110,14 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             from smartcash.ui.utils.ui_logger import log_to_ui
             log_to_ui(ui_components, "Membuat struktur direktori proyek...", "info", "🔄")
             
-            # Menggunakan handler dari common/progress untuk tracking
-            from smartcash.ui.handlers.single_progress import setup_progress_tracking
-            tracker = setup_progress_tracking(
-                ui_components,
-                "directory_setup",
-                "progress_bar", 
-                "progress_message",
-                10,
-                "Setup direktori..."
-            )
+            # Fungsi callback untuk menjembatani progress tracking
+            def update_progress(current, total, message):
+                if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                    ui_components['progress_bar'].value = current
+                    ui_components['progress_bar'].max = total
+                    ui_components['progress_message'].value = message
+                    ui_components['progress_bar'].layout.visibility = 'visible'
+                    ui_components['progress_message'].layout.visibility = 'visible'
             
             # Dapatkan environment manager
             from smartcash.common.environment import get_environment_manager
@@ -128,13 +126,17 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             # Setup direktori proyek dengan progress tracking
             stats = env_manager.setup_project_structure(
                 use_drive=env_manager.is_drive_mounted,
-                progress_callback=lambda current, total, message: tracker.update(current, message)
+                progress_callback=update_progress
             )
             
             # Buat symlinks jika di Colab dan drive terpasang
             if env_manager.is_colab and env_manager.is_drive_mounted:
+                # Untuk symlinks, update offset dari progress sebelumnya
+                def symlink_progress(current, total, message):
+                    update_progress(current + 5, total + 5, message)
+                
                 symlink_stats = env_manager.create_symlinks(
-                    progress_callback=lambda current, total, message: tracker.update(current + 5, message)
+                    progress_callback=symlink_progress
                 )
                 
                 # Gabungkan statistik
@@ -150,8 +152,10 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             status_type = "success" if stats.get('created', 0) > 0 else "info"
             icon = "✅" if stats.get('created', 0) > 0 else "ℹ️"
             
-            # Selesaikan progress tracking
-            tracker.complete(message)
+            # Sembunyikan progress bar setelah selesai
+            if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+                ui_components['progress_bar'].layout.visibility = 'hidden'
+                ui_components['progress_message'].layout.visibility = 'hidden'
             
             # Log hasil
             log_to_ui(ui_components, message, status_type, icon)

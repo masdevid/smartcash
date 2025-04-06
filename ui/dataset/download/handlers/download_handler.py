@@ -24,7 +24,17 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         endpoint = ui_components.get('endpoint_dropdown', {}).value
         
         # Konfirmasi download
-        from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
+        from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download, cancel_download
+        # Sebelum menampilkan konfirmasi, persiapkan cancel_callback
+        def cancel_callback():
+            # Pastikan tombol diaktifkan kembali saat cancel
+            _disable_buttons(ui_components, False)
+            cancel_download(ui_components, logger)
+            
+        # Tetapkan callback ke ui_components agar bisa diakses di confirmation_handler
+        ui_components['cancel_download_callback'] = cancel_callback
+        
+        # Tampilkan konfirmasi
         confirm_download(ui_components, endpoint, b)
         
     except Exception as e:
@@ -69,7 +79,7 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
                 request_api_key_input(ui_components)
                 
                 # Reset UI
-                _disable_buttons(ui_components, False)
+                _reset_ui_after_download(ui_components)
                 return
             
             # Jalankan download dari Roboflow dalam thread terpisah
@@ -116,35 +126,26 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         </div>
         """
         
-        # Dapatkan dataset manager
-        _update_progress(ui_components, 10, "Mempersiapkan download manager...")
-        from smartcash.ui.utils.fallback_utils import get_dataset_manager
+        # Dapatkan download service
+        _update_progress(ui_components, 10, "Mempersiapkan download service...")
+        from smartcash.dataset.services.downloader.download_service import DownloadService
         
         output_dir = config.get('output_dir', 'data')
-        download_config = {'data': {'dir': output_dir, 'roboflow': config}}
-        
-        download_service = get_dataset_manager(download_config, logger)
+        download_service = DownloadService(output_dir=output_dir, config={'data': {'roboflow': config}}, logger=logger)
         
         if not download_service:
             raise ValueError("Tidak dapat membuat download service")
         
-        # Register progress callback (untuk memperbarui UI)
-        def progress_callback(progress, total, message):
-            _update_progress(ui_components, int(progress/total*100), message)
-            
-        download_service.register_progress_callback(progress_callback)
-        
-        # Jalankan download melalui dataset manager
+        # Jalankan download melalui download service
         _update_progress(ui_components, 20, "Memulai download dataset dari Roboflow...")
         
-        result = download_service.pull_dataset(
+        result = download_service.download_from_roboflow(
             api_key=config.get('api_key'),
             workspace=config.get('workspace'),
-            project=config.get('project'),
+            project=config.get('project'), 
             version=config.get('version'),
             format=config.get('format', 'yolov5pytorch'),
-            show_progress=True,
-            backup_existing=True
+            show_progress=True
         )
         
         # Analisis hasil
@@ -306,3 +307,9 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     """Reset UI setelah proses download selesai."""
     # Aktifkan kembali tombol
     _disable_buttons(ui_components, False)
+    
+    # Sembunyikan progress bar jika perlu
+    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
+        ui_components['progress_bar'].layout.visibility = 'hidden'
+    if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):
+        ui_components['progress_message'].layout.visibility = 'hidden'

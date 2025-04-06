@@ -20,6 +20,10 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
     message = f"Anda akan mengunduh dataset dalam format YOLO v5 ke direktori {output_dir}. "
     message += _get_endpoint_details(ui_components, endpoint)
     
+    # Ambil custom cancel callback jika tersedia
+    cancel_callback = ui_components.get('cancel_download_callback', 
+                                       lambda: cancel_download(ui_components, logger))
+    
     # Fungsi untuk menjalankan download dan membersihkan dialog
     def confirm_and_execute():
         ui_components['confirmation_area'].clear_output()
@@ -31,7 +35,7 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
         dialog = create_confirmation_dialog(
             title="Konfirmasi Download Dataset", message=message,
             on_confirm=confirm_and_execute,
-            on_cancel=lambda: cancel_download(ui_components, logger)
+            on_cancel=cancel_callback
         )
         display(dialog)
     

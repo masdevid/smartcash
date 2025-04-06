@@ -3,22 +3,39 @@
 ├── __init_.py
 ├── common
 |  ├── __init__.py
-|  ├── config.py
-|  ├── config_sync.py
-|  ├── constants.py
+|  ├── config
+|  |  ├── __init__.py
+|  |  ├── manager.py
+|  |  └── sync.py
+|  ├── constants
+|  |  ├── core.py
+|  |  ├── dataset.py
+|  |  ├── enums.py
+|  |  ├── environment.py
+|  |  ├── file_types.py
+|  |  ├── log_messages.py
+|  |  ├── model.py
+|  |  ├── paths.py
+|  |  └── ui.py
 |  ├── default_config.py
 |  ├── environment.py
 |  ├── exceptions.py
-|  ├── file_utils.py
 |  ├── interfaces
 |  |  ├── __init__.py
 |  |  ├── checkpoint_interface.py
 |  |  ├── layer_config_interface.py
 |  |  └── visualization_interface.py
+|  ├── io
+|  |  ├── __init__.py
+|  |  ├── file_utils.py
+|  |  ├── path_utils.py
+|  |  └── serialization.py
 |  ├── layer_config.py
 |  ├── logger.py
-|  ├── progress_observer.py
-|  ├── progress_tracker.py
+|  ├── progress
+|  |  ├── __init__.py
+|  |  ├── observer.py
+|  |  └── tracker.py
 |  ├── threadpools.py
 |  ├── types.py
 |  ├── utils.py
@@ -172,7 +189,6 @@
 |  |  |  ├── image_processor.py
 |  |  |  └── label_processor.py
 |  |  ├── file_mapping_utils.py
-|  |  ├── file_wrapper.py
 |  |  ├── image_analysis_utils.py
 |  |  ├── label_utils.py
 |  |  ├── move_utils.py
@@ -479,7 +495,7 @@
       ├── validator_utils.py
       └── visualization_utils.py
 
-directory: 74 file: 404
+directory: 78 file: 416
 
 
 

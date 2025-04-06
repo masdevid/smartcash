@@ -12,10 +12,8 @@ from tqdm import tqdm
 
 from smartcash.common.utils import get_timestamp
 from smartcash.common.logger import SmartCashLogger, get_logger
-from smartcash.common.constants import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
-from smartcash.dataset.utils import (
-    ensure_dir
-)
+from smartcash.common import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
+from smartcash.common.io import ensure_dir
 
 
 class VideoHandler:

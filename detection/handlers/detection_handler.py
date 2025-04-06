@@ -8,10 +8,9 @@ from typing import Dict, List, Optional, Tuple, Union
 import numpy as np
 from PIL import Image
 
-from smartcash.common.utils import ensure_dir
+from smartcash.common.io import ensure_dir
 from smartcash.common.logger import SmartCashLogger, get_logger
-from smartcash.common.types import Detection, ImageType
-from smartcash.common.constants import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
+from smartcash.common import Detection, ImageType, DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
 
 
 class DetectionHandler:

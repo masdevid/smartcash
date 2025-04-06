@@ -7,7 +7,7 @@ import os
 from typing import Dict, Optional, Union, Any
 
 from smartcash.common.logger import SmartCashLogger, get_logger
-from smartcash.common.constants import ModelFormat, MODEL_EXTENSIONS
+from smartcash.common import ModelFormat, MODEL_EXTENSIONS
 
 
 class ModelOptimizer:

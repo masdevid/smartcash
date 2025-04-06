@@ -9,8 +9,7 @@ import numpy as np
 
 from smartcash.common.logger import SmartCashLogger, get_logger
 from smartcash.common.types import Detection, ImageType
-from smartcash.common.constants import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
-
+from smartcash.common import DEFAULT_CONF_THRESHOLD, DEFAULT_IOU_THRESHOLD
 from smartcash.detection.services.inference import InferenceService
 from smartcash.detection.services.postprocessing import PostprocessingService
 from smartcash.detection.services.visualization_adapter import DetectionVisualizationAdapter

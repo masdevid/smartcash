@@ -1,15 +1,14 @@
 """
 File: smartcash/ui/setup/env_config_initializer.py
-Deskripsi: Initializer untuk modul konfigurasi environment dengan pendekatan modular dan efisien
+Deskripsi: Initializer untuk modul konfigurasi environment dengan implementasi DRY
 """
 
 from typing import Dict, Any
-from concurrent.futures import ThreadPoolExecutor
-from IPython.display import display, HTML
+from IPython.display import display
 
 def initialize_env_config_ui():
     """
-    Inisialisasi UI dan handler untuk konfigurasi environment dengan pendekatan cell template.
+    Inisialisasi UI dan handler untuk konfigurasi environment menggunakan cell template.
     
     Returns:
         Dictionary komponen UI yang terinisialisasi
@@ -19,53 +18,35 @@ def initialize_env_config_ui():
         from smartcash.ui.cell_template import setup_cell
         from smartcash.ui.setup.env_config_component import create_env_config_ui
         from smartcash.ui.setup.env_config_handlers import setup_env_config_handlers
-        from smartcash.ui.setup.init_sequence_handler import setup_inisialisasi_berurutan, jalankan_sinkronisasi_tertunda
         
-        # Inisialisasi async opsional untuk komponen visual
-        def init_async(ui_components, env, config):
-            try:
-                # Siapkan urutan inisialisasi yang benar
-                setup_inisialisasi_berurutan(ui_components)
-                
-                # Set auto sync tertunda
-                # jalankan_sinkronisasi_tertunda(ui_components, delay_seconds=5)
-                
-                # Pengaturan lain jika diperlukan...
-                logger = ui_components.get('logger')
-                if logger:
-                    logger.debug("🔧 Inisialisasi asinkron selesai")
-            except Exception as e:
-                logger = ui_components.get('logger')
-                if logger:
-                    logger.warning(f"⚠️ Error saat inisialisasi UI: {str(e)}")
+        # Gunakan UI logger yang ada
+        from smartcash.ui.utils.ui_logger import log_to_ui
         
-        # Gunakan cell template untuk setup standar
+        # Inisialisasi dengan cell template
         ui_components = setup_cell(
             cell_name="env_config",
             create_ui_func=create_env_config_ui,
-            setup_handlers_func=setup_env_config_handlers,
-            init_async_func=init_async
+            setup_handlers_func=setup_env_config_handlers
         )
         
-        # Pastikan UI ditampilkan jika ada
-        if 'ui' in ui_components and ui_components['ui'] is not None:
+        # Tampilkan UI
+        if 'ui' in ui_components:
             display(ui_components['ui'])
             
         return ui_components
         
     except Exception as e:
-        # Fallback ultra-minimal jika semua gagal
-        error_html = f"""
-        <div style="padding:10px; background-color:#f8d7da; 
-                   color:#721c24; border-radius:4px; margin:5px 0;
-                   border-left:4px solid #721c24;">
-            <p style="margin:5px 0">❌ Error inisialisasi environment config: {str(e)}</p>
-        </div>
-        """
-        display(HTML(error_html))
+        # Fallback minimal menggunakan alert_utils
+        from smartcash.ui.utils.alert_utils import create_info_alert
+        from smartcash.ui.utils.fallback_utils import create_fallback_ui
         
-        # Return minimal components
+        # Gunakan factory fallback yang ada
         import ipywidgets as widgets
-        output = widgets.Output()
-        display(output)
-        return {'module_name': 'env_config', 'ui': output, 'status': output}
+        error_ui = create_fallback_ui(
+            {'module_name': 'env_config'},
+            f"Error inisialisasi environment config: {str(e)}",
+            "error"
+        )
+        
+        display(error_ui['ui'])
+        return error_ui

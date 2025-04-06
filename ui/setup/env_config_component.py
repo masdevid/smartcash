@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment dengan struktur yang lebih modular dan terorganisir
+Deskripsi: Komponen UI untuk konfigurasi environment dengan pemanfaatan implementasi DRY
 """
 
 import ipywidgets as widgets
@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 
 def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi environment.
+    Buat komponen UI untuk konfigurasi environment dengan implementasi DRY.
     
     Args:
         env: Environment manager
@@ -20,7 +20,8 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     # Import komponen UI standar
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.info_boxes.environment_info import get_environment_info
+    from smartcash.ui.utils.layout_utils import STANDARD_LAYOUTS, OUTPUT_WIDGET, BUTTON
+    from smartcash.ui.info_boxes import get_environment_info
     
     # Header
     header = create_header(
@@ -28,15 +29,15 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         "Setup environment sistem untuk SmartCash"
     )
     
-    # Panel Colab Info
-    colab_panel = widgets.HTML(
-        """<div style="padding: 10px; background-color:#d1ecf1; color:#0c5460; 
-           border-radius:4px; margin:10px 0; border-left:4px solid #0c5460;">
-           <p style="margin:5px 0">ℹ️ Mendeteksi environment...</p>
-           </div>"""
+    # Panel Colab Info dengan style dari constants
+    info_style = 'info'
+    from smartcash.ui.utils.alert_utils import create_info_alert
+    colab_panel = create_info_alert(
+        "ℹ️ Mendeteksi environment...",
+        info_style
     )
     
-    # Tombol Connect Drive (untuk Colab)
+    # Tombol dengan layout standar
     drive_button = widgets.Button(
         description='Hubungkan Google Drive',
         button_style='info',
@@ -45,29 +46,21 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         layout=widgets.Layout(margin='5px', display='none')  # Hidden by default
     )
     
-    # Tombol Setup Direktori
     directory_button = widgets.Button(
         description='Setup Direktori Lokal',
         button_style='primary',
         icon='folder-plus',
         tooltip="Buat struktur direktori untuk SmartCash",
-        layout=widgets.Layout(margin='5px')
+        layout=BUTTON
     )
     
-    # Tombol-tombol dikemas dalam container fleksibel
+    # Container tombol menggunakan STANDARD_LAYOUTS
     button_container = widgets.HBox(
         [drive_button, directory_button],
-        layout=widgets.Layout(
-            display='flex',
-            flex_flow='row wrap',
-            align_items='center',
-            justify_content='flex-start',
-            margin='10px 0',
-            gap='5px'  # Menambahkan gap antara tombol
-        )
+        layout=STANDARD_LAYOUTS['hbox']
     )
     
-    # Progress tracking
+    # Progress tracking menggunakan style dari constants
     progress_bar = widgets.IntProgress(
         value=0,
         min=0,
@@ -91,20 +84,12 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     
     progress_container = widgets.VBox(
         [progress_bar, progress_message],
-        layout=widgets.Layout(margin='10px 0')
+        layout=STANDARD_LAYOUTS['vbox']
     )
     
-    # Status output area
+    # Status output area menggunakan layout standar
     status = widgets.Output(
-        layout=widgets.Layout(
-            width='100%',
-            border=f'1px solid {COLORS["border"]}',
-            min_height='100px',
-            max_height='300px',
-            margin='10px 0',
-            padding='10px',
-            overflow='auto'
-        )
+        layout=OUTPUT_WIDGET
     )
     
     # Reset progress helper
@@ -115,7 +100,7 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
         progress_bar.value = 0
         progress_message.value = ""
     
-    # Info box
+    # Info box menggunakan komponen yang ada
     info_box = get_environment_info()
     
     # Container utama dengan semua komponen
@@ -128,13 +113,10 @@ def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
             status,
             info_box
         ],
-        layout=widgets.Layout(
-            width='100%',
-            padding='10px'
-        )
+        layout=STANDARD_LAYOUTS['container']
     )
     
-    # Struktur final komponen UI dengan struktur objek yang konsisten
+    # Struktur final komponen UI
     ui_components = {
         'ui': main,
         'colab_panel': colab_panel,

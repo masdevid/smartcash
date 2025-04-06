@@ -41,10 +41,12 @@ class EnvironmentManager:
         try:
             from smartcash.common.utils import is_colab, is_notebook
             from smartcash.common.logger import get_logger
+            from smartcash.common.io import file_utils
             
             self._in_colab = is_colab()
             self._in_notebook = is_notebook()
             self.logger = logger or get_logger("environment_manager")
+            self._file_utils = file_utils
         except ImportError:
             self._in_colab = self._detect_colab()
             self._in_notebook = self._detect_notebook()
@@ -190,36 +192,34 @@ class EnvironmentManager:
         # Tentukan direktori dasar
         base = (self._drive_path if use_drive and self._drive_mounted else self._base_dir)
         
-        # Buat direktori menggunakan file_utils jika tersedia
+        # Buat direktori dengan fallback ke method langsung
         stats = {'created': 0, 'existing': 0, 'error': 0}
         total_dirs = len(directories)
         
-        if self._file_utils:
-            for idx, dir_path in enumerate(directories):
-                if progress_callback: progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
+        # Fungsi sederhana untuk membuat direktori
+        def ensure_dir(path):
+            try:
+                os.makedirs(path, exist_ok=True)
+                return path
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Error pembuatan direktori: {path} - {str(e)}")
+                raise e
+        
+        # Buat direktori
+        for idx, dir_path in enumerate(directories):
+            if progress_callback: 
+                progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
                 
-                full_path = base / dir_path
-                try:
-                    path = self._file_utils.ensure_dir(full_path)
-                    stats['created' if not path.exists() else 'existing'] += 1
-                except Exception as e:
-                    stats['error'] += 1
-                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan direktori: {dir_path} - {str(e)}")
-        else:
-            # Fallback jika file_utils tidak tersedia
-            for idx, dir_path in enumerate(directories):
-                if progress_callback: progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
-                
-                full_path = base / dir_path
-                try:
-                    if not full_path.exists():
-                        full_path.mkdir(parents=True, exist_ok=True)
-                        stats['created'] += 1
-                    else:
-                        stats['existing'] += 1
-                except Exception as e:
-                    stats['error'] += 1
-                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan direktori: {dir_path} - {str(e)}")
+            full_path = base / dir_path
+            try:
+                if not full_path.exists():
+                    ensure_dir(full_path)
+                    stats['created'] += 1
+                else:
+                    stats['existing'] += 1
+            except Exception:
+                stats['error'] += 1
         
         if self.logger:
             self.logger.info(f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada")
@@ -360,10 +360,6 @@ class EnvironmentManager:
         Returns:
             String HTML yang menampilkan struktur direktori
         """
-        # Menggunakan modul komponen file_utils
-        if self._file_utils and hasattr(self._file_utils, 'get_directory_tree'):
-            return self._file_utils.get_directory_tree(root_dir or self._base_dir, max_depth)
-        
         # Implementasi default jika komponen tidak tersedia
         root_dir = Path(root_dir or self._base_dir)
         

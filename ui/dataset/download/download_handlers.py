@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/download_handlers.py
-Deskripsi: Setup handler untuk UI dataset download
+Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan observer pattern
 """
 
 from typing import Dict, Any, Optional
@@ -27,6 +27,9 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     _setup_endpoint_handlers(ui_components)
     _setup_download_button_handler(ui_components)
     _setup_check_button_handler(ui_components)
+    
+    # Setup multi-progress tracking untuk download
+    _setup_progress_tracking(ui_components)
     
     # Setup cleanup function
     _setup_cleanup(ui_components)
@@ -97,6 +100,32 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
         ui_components['check_button'].on_click(
             lambda b: handle_check_button_click(b, ui_components)
         )
+
+def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
+    """Setup progress tracking untuk download."""
+    try:
+        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
+        
+        # Setup multi-progress tracking dengan tracker untuk keseluruhan dan step
+        setup_multi_progress_tracking(
+            ui_components=ui_components,
+            overall_tracker_name="download",
+            step_tracker_name="download_step",
+            overall_progress_key='progress_bar',
+            step_progress_key='progress_bar',
+            overall_label_key='progress_message',
+            step_label_key='progress_message'
+        )
+        
+        # Log setup berhasil jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug("✅ Progress tracking berhasil disetup")
+    except Exception as e:
+        # Log error jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.warning(f"⚠️ Error saat setup progress tracking: {str(e)}")
 
 def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
     """Setup cleanup function."""

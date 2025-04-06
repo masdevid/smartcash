@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/download_initializer.py
-Deskripsi: Initializer untuk modul download dataset
+Deskripsi: Initializer untuk modul download dataset dengan integrasi progress tracking
 """
 
 from typing import Dict, Any
@@ -29,17 +29,9 @@ def initialize_dataset_download_ui() -> Dict[str, Any]:
         logger = setup_ipython_logging(ui_components)
         ui_components['logger'] = logger
         
-        # Setup progress tracking
-        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
-        setup_multi_progress_tracking(
-            ui_components, 
-            overall_tracker_name="download", 
-            step_tracker_name="download_step"
-        )
-        
-        # Setup handlers
+        # Setup handlers (otomatis setup progress tracking)
         from smartcash.ui.dataset.download.download_handlers import setup_download_handlers
-        setup_download_handlers(ui_components, env, config)
+        ui_components = setup_download_handlers(ui_components, env, config)
         
         # Tampilkan UI
         display(ui_components['ui'])

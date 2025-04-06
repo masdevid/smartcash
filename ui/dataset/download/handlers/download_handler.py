@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/download_handler.py
-Deskripsi: Handler untuk proses download dataset
+Deskripsi: Handler untuk proses download dataset dengan integrasi langsung ke service
 """
 
 from typing import Dict, Any, Tuple
@@ -19,8 +19,6 @@ def handle_download_button_click(b, ui_components: Dict[str, Any]) -> None:
         is_valid, message = _validate_roboflow_input(ui_components)
     elif endpoint == 'Google Drive':
         is_valid, message = _validate_drive_input(ui_components)
-    elif endpoint == 'URL Kustom':
-        is_valid, message = _validate_url_input(ui_components)
     
     # Tampilkan pesan validasi jika gagal dan return
     if not is_valid: 
@@ -64,20 +62,6 @@ def _validate_drive_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
     
     return True, "Validasi berhasil"
 
-def _validate_url_input(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
-    """Validasi input URL."""
-    # Validasi URL
-    url = ui_components['url_input'].value.strip()
-    if not url: return False, "URL tidak boleh kosong"
-    if not (url.startswith('http://') or url.startswith('https://')): return False, "URL harus dimulai dengan http:// atau https://"
-    
-    # Validasi ekstensi file
-    supported_extensions = ['.zip', '.tar', '.gz', '.tar.gz']
-    if not any(url.lower().endswith(ext) for ext in supported_extensions):
-        return False, "URL harus mengarah ke file arsip (.zip, .tar, .gz, atau .tar.gz)"
-    
-    return True, "Validasi berhasil"
-
 def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
     """Eksekusi download dataset berdasarkan endpoint."""
     # Persiapkan UI untuk proses download
@@ -88,7 +72,6 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
         with ThreadPoolExecutor(max_workers=1) as executor:
             if endpoint == 'Roboflow': executor.submit(download_from_roboflow, ui_components)
             elif endpoint == 'Google Drive': executor.submit(download_from_drive, ui_components)
-            elif endpoint == 'URL Kustom': executor.submit(download_from_url, ui_components)
     except Exception as e:
         if logger := ui_components.get('logger'): logger.error(f"❌ Error saat memulai download: {str(e)}")
         from smartcash.ui.utils.fallback_utils import show_status
@@ -134,8 +117,10 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     project = ui_components['rf_project'].value
     version = ui_components['rf_version'].value
     api_key = ui_components['rf_apikey'].value
-    output_format = ui_components['output_format'].value.lower().replace(' ', '')
     output_dir = ui_components['output_dir'].value
+    
+    # Format selalu yolov5pytorch
+    output_format = "yolov5pytorch"
     
     # Set API key sebagai environment variable
     os.environ['ROBOFLOW_API_KEY'] = api_key
@@ -187,8 +172,3 @@ def download_from_drive(ui_components: Dict[str, Any]) -> None:
     """Download dataset dari Google Drive."""
     from smartcash.ui.dataset.download.handlers.drive_handler import process_drive_download
     process_drive_download(ui_components)
-    
-def download_from_url(ui_components: Dict[str, Any]) -> None:
-    """Download dataset dari URL Kustom."""
-    from smartcash.ui.dataset.download.handlers.url_handler import process_url_download
-    process_url_download(ui_components)

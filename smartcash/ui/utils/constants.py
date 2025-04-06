@@ -6,7 +6,7 @@ Deskripsi: Utilitas UI yang digunakan di seluruh aplikasi dengan penggunaan kons
 from typing import Dict, Any
 
 # Import konstanta UI dari common/constants
-from smartcash.common import (
+from smartcash.common.constants.ui import (
     STATUS_ICONS, ACTION_ICONS, DOMAIN_ICONS, UI_COLORS
 )
 

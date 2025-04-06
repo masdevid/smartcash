@@ -70,8 +70,11 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
     # Jalankan download secara asinkron berdasarkan endpoint
     try:
         with ThreadPoolExecutor(max_workers=1) as executor:
-            if endpoint == 'Roboflow': executor.submit(download_from_roboflow, ui_components)
-            elif endpoint == 'Google Drive': executor.submit(download_from_drive, ui_components)
+            if endpoint == 'Roboflow': 
+                # Jalankan langsung tanpa executor untuk debugging yang lebih mudah
+                download_from_roboflow(ui_components)
+            elif endpoint == 'Google Drive': 
+                download_from_drive(ui_components)
     except Exception as e:
         if logger := ui_components.get('logger'): logger.error(f"❌ Error saat memulai download: {str(e)}")
         from smartcash.ui.utils.fallback_utils import show_status
@@ -104,11 +107,51 @@ def _reset_ui_after_download(ui_components: Dict[str, Any], is_error: bool = Fal
     # Sembunyikan progress bar
     ui_components['progress_bar'].layout.visibility = 'hidden'
     ui_components['progress_message'].layout.visibility = 'hidden'
+    
+    # Bersihkan area konfirmasi
+    ui_components['confirmation_area'].clear_output()
+    
+def _update_ui_progress(ui_components: Dict[str, Any], progress: int, total: int, message: Optional[str] = None) -> None:
+    """
+    Update UI progress bar dan message.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        progress: Nilai progress saat ini
+        total: Total progress
+        message: Pesan progress opsional
+    """
+    # Update progress bar
+    if 'progress_bar' in ui_components:
+        progress_bar = ui_components['progress_bar']
+        progress_bar.max = total
+        progress_bar.value = progress
+        
+        # Hitung persentase
+        if total > 0:
+            percentage = int((progress / total) * 100)
+            progress_bar.description = f"Proses: {percentage}%"
+    
+    # Update message
+    if message and 'progress_message' in ui_components:
+        ui_components['progress_message'].value = message
+    
+    # Update trackers jika tersedia
+    step_tracker_key = 'download_step_tracker'
+    overall_tracker_key = 'download_tracker'
+    
+    if step_tracker_key in ui_components and 'step' in message.lower():
+        ui_components[step_tracker_key].update(progress, message)
+    elif overall_tracker_key in ui_components:
+        ui_components[overall_tracker_key].update(progress, message)
 
 def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     """Download dataset dari Roboflow menggunakan service."""
     from smartcash.ui.utils.fallback_utils import show_status
     from smartcash.ui.utils.constants import ALERT_STYLES
+    
+    # Bersihkan konfirmasi area terlebih dahulu
+    ui_components['confirmation_area'].clear_output()
     
     logger = ui_components.get('logger')
     
@@ -128,6 +171,19 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     try:
         # Gunakan DownloadService langsung, bukan melalui DatasetManager
         from smartcash.dataset.services.downloader.download_service import DownloadService
+        # Nonaktifkan notifikasi otomatis untuk mencegah konflik parameter status
+        import smartcash.dataset.services.downloader.notification_utils
+        orig_notify_event = smartcash.dataset.services.downloader.notification_utils.notify_event
+        
+        # Monkeypatch fungsi notify_event untuk menangani parameter ganda
+        def safe_notify(*args, **kwargs):
+            # Hapus parameter status jika juga ada di kwargs
+            if 'status' in kwargs and len(args) > 2:
+                kwargs.pop('status', None)
+            return orig_notify_event(*args, **kwargs)
+        
+        # Ganti sementara fungsi notify_event
+        smartcash.dataset.services.downloader.notification_utils.notify_event = safe_notify
         
         # Buat instance DownloadService dengan konfigurasi yang tepat
         download_service = DownloadService(
@@ -148,7 +204,23 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         
         if not download_service:
             raise Exception("Tidak dapat membuat download service")
-            
+        
+        # Tambahkan callback untuk progress tracking
+        def progress_callback(event_type, sender, progress=None, total=None, message=None, **kwargs):
+            if progress is not None and total is not None:
+                # Update progress bar
+                _update_ui_progress(ui_components, progress, total, message)
+        
+        # Register callback ke download service jika memungkinkan
+        if hasattr(download_service, 'observer_manager') and download_service.observer_manager:
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            download_service.observer_manager.create_simple_observer(
+                event_type="*", # Semua event 
+                callback=progress_callback,
+                name="UI_Download_Progress",
+                group="download_ui"
+            )
+        
         # Pull dataset (download dan export ke struktur lokal)
         result = download_service.pull_dataset(
             format=output_format,
@@ -160,6 +232,9 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             force_download=True,
             backup_existing=True
         )
+        
+        # Kembalikan fungsi notify_event ke aslinya
+        smartcash.dataset.services.downloader.notification_utils.notify_event = orig_notify_event
         
         # Update UI berdasarkan hasil
         if result.get('status') in ['downloaded', 'local']:

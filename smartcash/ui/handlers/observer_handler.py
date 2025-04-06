@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/observer_handler.py
-Deskripsi: Handler untuk sistem observer dengan integrasi UI minimalis dan efisien
+Deskripsi: Handler untuk sistem observer dengan integrasi UI tanpa duplikasi implementasi
 """
 
 import ipywidgets as widgets
@@ -42,16 +42,9 @@ def setup_observer_handlers(
             
             ui_components['cleanup'] = cleanup
             
-            # Daftarkan ke IPython events jika dalam notebook environment
-            try:
-                from IPython import get_ipython
-                ipython = get_ipython()
-                if ipython:
-                    ipython.events.register('pre_run_cell', cleanup)
-            except (ImportError, AttributeError):
-                pass
+            # Tidak perlu register cleanup di sini, dilakukan di cell_template
     except ImportError:
-        # Fallback jika ObserverManager tidak tersedia tanpa log yang berisik
+        # Fallback jika ObserverManager tidak tersedia
         pass
     
     return ui_components

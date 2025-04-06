@@ -1,18 +1,17 @@
 """
 File: smartcash/ui/utils/logging_utils.py
-Deskripsi: Utilitas terpadu untuk mengarahkan logging ke UI widget dengan penundaan inisiasi untuk mencegah logging terlalu dini
+Deskripsi: Utilitas terpadu untuk mengarahkan logging ke UI widget dengan integrasi ke observer pattern
 """
 
 import logging
 import sys
 import threading
-import time
 from typing import Dict, Any, Optional
 from IPython.display import display, HTML
 
 def setup_ipython_logging(ui_components: Dict[str, Any], module_name: Optional[str] = None) -> Any:
     """
-    Setup logger untuk IPython notebook dengan output ke UI widget dan penundaan untuk mencegah log terlalu dini.
+    Setup logger untuk IPython notebook dengan output ke UI widget.
     
     Args:
         ui_components: Dictionary berisi komponen UI
@@ -29,39 +28,34 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: Optional[s
         # Default ke 'ipython' jika masih tidak ada nama modul
         module_name = module_name or 'ipython'
         
-        # Tunda eksekusi untuk memastikan output area siap
-        time.sleep(0.5)
-        
         # Import komponen UI logger
-        from smartcash.ui.utils.ui_logger import create_direct_ui_logger, intercept_stdout_to_ui
-        
-        # Pastikan intercept stdout dilakukan terlebih dahulu, sebelum membuat logger
-        intercept_stdout_to_ui(ui_components)
+        from smartcash.ui.utils.ui_logger import create_direct_ui_logger
         
         # Buat logger yang langsung ke UI
         logger = create_direct_ui_logger(ui_components, module_name)
         
-        # Log success tapi lebih minimalis
-        logger.info(f"{module_name} siap digunakan")
-        
-        # Setup observer integration jika tersedia
-        setup_observer_integration(ui_components, logger)
+        # Setup observer integration jika tersedia, tapi dengan logging minimal
+        _setup_observer_integration_minimal(ui_components, logger)
         
         return logger
         
     except Exception as e:
         # Fallback minimal: tampilkan error di UI dan kembalikan logger standar
+        error_message = f"Error setup logger: {str(e)}"
+        
         if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
             with ui_components['status']:
-                display(HTML(f"<div style='color:orange'>⚠️ Error setup logger: {str(e)}</div>"))
+                display(HTML(f"<div style='color:orange'>⚠️ {error_message}</div>"))
+        else:
+            print(f"⚠️ {error_message}")
         
         # Return standard logger
         return logging.getLogger(module_name or 'ipython')
 
 
-def setup_observer_integration(ui_components: Dict[str, Any], logger: Any = None) -> None:
+def _setup_observer_integration_minimal(ui_components: Dict[str, Any], logger: Any = None) -> None:
     """
-    Siapkan integrasi dengan observer pattern jika tersedia.
+    Siapkan integrasi dengan observer pattern minimal tanpa log yang berlebihan.
     
     Args:
         ui_components: Dictionary berisi komponen UI
@@ -74,20 +68,16 @@ def setup_observer_integration(ui_components: Dict[str, Any], logger: Any = None
         # Set group name dari module_name atau default
         observer_group = f"{ui_components.get('module_name', 'default')}_observers"
         
-        # Setup observers dengan group yang spesifik untuk cell ini
+        # Setup observers dengan group yang spesifik untuk cell ini - tidak perlu log debug
         ui_components_updated = setup_observer_handlers(ui_components, observer_group)
         
         # Update ui_components dengan observer manager dan group
         for key in ['observer_manager', 'observer_group']:
             if key in ui_components_updated and key not in ui_components:
                 ui_components[key] = ui_components_updated[key]
-    except (ImportError, AttributeError):
-        # Tidak ada observer handler, tidak perlu log
+    except Exception:
+        # Tidak perlu log error - observer adalah opsional
         pass
-    except Exception as e:
-        # Error lain saat setup observer
-        if logger:
-            logger.debug(f"Observer integration tidak aktif: {str(e)}")
 
 
 def restore_stdout(ui_components: Dict[str, Any]) -> None:
@@ -161,7 +151,7 @@ def reset_logging() -> None:
 
 def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
     """
-    Buat fungsi cleanup untuk resource logger dan observer tanpa log berlebihan.
+    Buat fungsi cleanup untuk resource logger dan observer.
     
     Args:
         ui_components: Dictionary berisi komponen UI
@@ -170,13 +160,11 @@ def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
         Callable untuk membersihkan resources
     """
     def cleanup():
+        """Membersihkan resources saat sel baru dieksekusi."""
         # Reset stdout jika diintercepti
         restore_stdout(ui_components)
         
-        # Reset semua konfigurasi logging
-        reset_logging()
-        
-        # Unregister observer jika ada
+        # Unregister observer jika ada - dengan pengecekan keberadaan observer_manager untuk menghindari error
         if 'observer_manager' in ui_components and 'observer_group' in ui_components:
             try:
                 ui_components['observer_manager'].unregister_group(ui_components['observer_group'])

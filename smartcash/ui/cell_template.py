@@ -1,12 +1,11 @@
 """
 File: smartcash/ui/cell_template.py
-Deskripsi: Template utama untuk inisialisasi sel notebook dengan integrasi standar dan optimasi logger
+Deskripsi: Template utama untuk inisialisasi sel notebook dengan integrasi standar dan tanpa duplikasi
 """
 
 from typing import Dict, Any, Optional, Callable
 from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display, HTML as DisplayHTML
-import time
 
 def setup_cell(
     cell_name: str,
@@ -15,7 +14,7 @@ def setup_cell(
     init_async_func: Optional[Callable[[Dict[str, Any], Any, Dict[str, Any]], None]] = None
 ) -> Dict[str, Any]:
     """
-    Setup sel notebook dengan standarisasi dan optimasi logger.
+    Setup sel notebook dengan standarisasi dan menghindari duplikasi.
     
     Args:
         cell_name: Nama sel/modul
@@ -42,42 +41,44 @@ def setup_cell(
         ui_components = create_ui_func(env, config)
         ui_components['module_name'] = cell_name
         
-        # Tangkap stdout ke UI untuk mencegah duplikasi di konsol dan UI
-        intercept_stdout_to_ui(ui_components)
+        # Tangkap stdout ke UI segera untuk mencegah log inisialisasi ke konsol
+        if 'status' in ui_components:
+            intercept_stdout_to_ui(ui_components)
         
-        # Setup logger dengan delay untuk mencegah log muncul sebelum UI siap
-        def setup_logger_with_delay():
-            time.sleep(0.5)  # Delay kecil agar UI output siap
-            logger = setup_ipython_logging(ui_components, cell_name)
-            if logger: 
-                ui_components['logger'] = logger
-                # Kurangi log inisialisasi yang bertele-tele
-                logger.info(f"✅ {cell_name} diinisialisasi")
+        # Setup logger dengan arahkan ke UI
+        logger = setup_ipython_logging(ui_components, cell_name)
+        if logger: 
+            ui_components['logger'] = logger
+            # Hanya log level info atau lebih tinggi untuk mengurangi noise
+            logger.info(f"✅ {cell_name} dimulai")
         
-        # Jalankan setup logger dalam thread terpisah
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            executor.submit(setup_logger_with_delay)
+        # Setup handlers
+        ui_components = setup_handlers_func(ui_components, env, config)
         
         # Jalankan inisialisasi asinkron jika disediakan
         if init_async_func:
             with ThreadPoolExecutor(max_workers=1) as executor:
                 executor.submit(init_async_func, ui_components, env, config)
         
-        # Setup handlers
-        ui_components = setup_handlers_func(ui_components, env, config)
-        
-        # Setup cleanup for IPython events - lebih minimalis tanpa logging berlebihan
+        # Setup cleanup for IPython events - gunakan implementasi yang lebih sederhana
         if 'cleanup' in ui_components and callable(ui_components['cleanup']):
             try:
                 from IPython import get_ipython
                 ipython = get_ipython()
                 if ipython:
+                    # Jangan daftarkan cleanup dua kali
+                    if hasattr(ipython.events, '_events') and 'pre_run_cell' in ipython.events._events:
+                        existing_handlers = ipython.events._events['pre_run_cell']
+                        for handler in list(existing_handlers):
+                            if getattr(handler, '__name__', '') == ui_components['cleanup'].__name__:
+                                ipython.events.unregister('pre_run_cell', handler)
+                    # Daftarkan cleanup baru
                     ipython.events.register('pre_run_cell', ui_components['cleanup'])
             except (ImportError, AttributeError):
                 pass
     
     except Exception as e:
-        # Fallback sederhana untuk error tanpa debug yang bertele-tele
+        # Fallback sederhana untuk error
         error_html = f"""
         <div style="padding:10px; background-color:#f8d7da; 
                    color:#721c24; border-radius:4px; margin:5px 0;

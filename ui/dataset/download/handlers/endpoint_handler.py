@@ -46,6 +46,7 @@ def log_change_to_ui(ui_components: Dict[str, Any], endpoint: str) -> None:
         endpoint: Endpoint yang dipilih
     """
     from smartcash.ui.utils.ui_logger import log_to_ui
+    from smartcash.ui.components.status_panel import update_status_panel
     
     # Map emoji berdasarkan endpoint
     endpoint_emoji = {
@@ -54,7 +55,16 @@ def log_change_to_ui(ui_components: Dict[str, Any], endpoint: str) -> None:
     }
     
     emoji = endpoint_emoji.get(endpoint, '📌')
+    
+    # Log ke output area
     log_to_ui(ui_components, f"Endpoint diubah ke {endpoint}", "info", emoji)
+    
+    # Update status panel
+    update_status_panel(
+        ui_components['status_panel'],
+        f"Siap untuk download dari {endpoint}",
+        "info"
+    )
 
 def get_available_endpoints(ui_components: Dict[str, Any]) -> List[str]:
     """

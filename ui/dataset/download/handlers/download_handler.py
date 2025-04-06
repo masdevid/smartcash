@@ -20,6 +20,9 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     _disable_buttons(ui_components, True)
     
     try:
+        # Reset progress bar terlebih dahulu
+        _reset_progress_bar(ui_components)
+        
         # Dapatkan endpoint yang dipilih
         endpoint = ui_components.get('endpoint_dropdown', {}).value
         
@@ -116,15 +119,9 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         from smartcash.ui.dataset.download.handlers.endpoint_handler import get_endpoint_config
         config = get_endpoint_config(ui_components)
         
-        # Update status panel
-        from smartcash.ui.utils.constants import ALERT_STYLES
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
-                   color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
-                   border-left:4px solid {ALERT_STYLES['info']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Downloading dataset dari Roboflow...</p>
-        </div>
-        """
+        # Update status panel menggunakan komponen reusable
+        from smartcash.ui.components.status_panel import update_status_panel
+        update_status_panel(ui_components['status_panel'], "Downloading dataset dari Roboflow...", "info")
         
         # Dapatkan download service
         _update_progress(ui_components, 10, "Mempersiapkan download service...")
@@ -152,11 +149,15 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         _process_download_result(ui_components, result)
         
     except Exception as e:
-        # Tampilkan error
+        # Tampilkan error - gunakan string error yang spesifik
         from smartcash.ui.utils.ui_logger import log_to_ui
         error_msg = f"Error saat download dataset: {str(e)}"
         log_to_ui(ui_components, error_msg, "error", "❌")
         if logger: logger.error(f"❌ {error_msg}")
+        
+        # Update status panel dengan error
+        from smartcash.ui.components.status_panel import update_status_panel
+        update_status_panel(ui_components['status_panel'], f"Error saat download dataset: {str(e)}", "error")
     
     finally:
         # Reset UI
@@ -178,22 +179,16 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     # Cek status hasil
     status = result.get('status')
     
-    from smartcash.ui.utils.constants import ALERT_STYLES
     from smartcash.ui.utils.fallback_utils import show_status
+    from smartcash.ui.components.status_panel import update_status_panel
     
-    if status == 'downloaded':
+    if status == 'success':
         # Sukses download
         stats = result.get('stats', {})
         message = f"Dataset berhasil didownload: {stats.get('total_images', 0)} gambar"
         
         # Update status panel
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['success']['bg_color']}; 
-                  color:{ALERT_STYLES['success']['text_color']}; border-radius:4px; margin:5px 0;
-                  border-left:4px solid {ALERT_STYLES['success']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['success']['icon']} {message}</p>
-        </div>
-        """
+        update_status_panel(ui_components['status_panel'], message, "success")
         
         # Show status
         show_status(message, "success", ui_components)
@@ -205,13 +200,7 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         message = f"Dataset sudah tersedia di lokal: {stats.get('total_images', 0)} gambar"
         
         # Update status panel
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
-                  color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
-                  border-left:4px solid {ALERT_STYLES['info']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} {message}</p>
-        </div>
-        """
+        update_status_panel(ui_components['status_panel'], message, "info")
         
         # Show status
         show_status(message, "info", ui_components)
@@ -223,34 +212,46 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         message = f"Dataset tersedia sebagian: {stats.get('total_images', 0)} gambar. Error: {result.get('error')}"
         
         # Update status panel
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['warning']['bg_color']}; 
-                  color:{ALERT_STYLES['warning']['text_color']}; border-radius:4px; margin:5px 0;
-                  border-left:4px solid {ALERT_STYLES['warning']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['warning']['icon']} {message}</p>
-        </div>
-        """
+        update_status_panel(ui_components['status_panel'], message, "warning")
         
         # Show status
         show_status(message, "warning", ui_components)
         if logger: logger.warning(f"⚠️ {message}")
         
     else:
-        # Error lainnya
-        message = f"Error tidak diketahui saat download: {result.get('error', 'Unknown error')}"
+        # Error lainnya - pastikan pesan error lengkap
+        error_message = result.get('error') or result.get('message') or "Tidak ada detail error tersedia"
+        message = f"Error saat download dataset: {error_message}"
         
         # Update status panel
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['error']['bg_color']}; 
-                  color:{ALERT_STYLES['error']['text_color']}; border-radius:4px; margin:5px 0;
-                  border-left:4px solid {ALERT_STYLES['error']['text_color']};">
-            <p style="margin:5px 0">{ALERT_STYLES['error']['icon']} {message}</p>
-        </div>
-        """
+        update_status_panel(ui_components['status_panel'], message, "error")
         
         # Show status
         show_status(message, "error", ui_components)
         if logger: logger.error(f"❌ {message}")
+
+def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
+    """
+    Reset progress bar ke nilai awal.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
+        ui_components['progress_bar'].value = 0
+        ui_components['progress_message'].value = ""
+        ui_components['progress_bar'].layout.visibility = 'hidden'
+        ui_components['progress_message'].layout.visibility = 'hidden'
+        
+        # Reset tracker jika ada
+        for tracker_key in ['download_tracker', 'download_step_tracker']:
+            if tracker_key in ui_components:
+                tracker = ui_components[tracker_key]
+                if hasattr(tracker, 'reset'):
+                    tracker.reset()
+                tracker.current = 0
+                if hasattr(tracker, 'set_description'):
+                    tracker.set_description("")
 
 def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
     """
@@ -308,7 +309,7 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     # Aktifkan kembali tombol
     _disable_buttons(ui_components, False)
     
-    # Sembunyikan progress bar jika perlu
+    # Sembunyikan progress bar
     if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
         ui_components['progress_bar'].layout.visibility = 'hidden'
     if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):

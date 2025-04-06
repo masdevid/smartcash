@@ -28,30 +28,18 @@ def process_drive_download(ui_components: Dict[str, Any]) -> None:
             future = executor.submit(download_from_drive, ui_components, config)
             success, message = future.result()
         
-        # Update UI berdasarkan hasil
+        # Update UI berdasarkan hasil menggunakan komponen reusable
         from smartcash.ui.utils.fallback_utils import show_status
-        from smartcash.ui.utils.constants import ALERT_STYLES
+        from smartcash.ui.components.status_panel import update_status_panel
         
         if success:
             # Sukses
             show_status(message, "success", ui_components)
-            ui_components['status_panel'].value = f"""
-            <div style="padding:10px; background-color:{ALERT_STYLES['success']['bg_color']}; 
-                      color:{ALERT_STYLES['success']['text_color']}; border-radius:4px; margin:5px 0;
-                      border-left:4px solid {ALERT_STYLES['success']['text_color']};">
-                <p style="margin:5px 0">{ALERT_STYLES['success']['icon']} {message}</p>
-            </div>
-            """
+            update_status_panel(ui_components['status_panel'], message, "success")
         else:
             # Error
             show_status(message, "error", ui_components)
-            ui_components['status_panel'].value = f"""
-            <div style="padding:10px; background-color:{ALERT_STYLES['error']['bg_color']}; 
-                      color:{ALERT_STYLES['error']['text_color']}; border-radius:4px; margin:5px 0;
-                      border-left:4px solid {ALERT_STYLES['error']['text_color']};">
-                <p style="margin:5px 0">{ALERT_STYLES['error']['icon']} {message}</p>
-            </div>
-            """
+            update_status_panel(ui_components['status_panel'], message, "error")
     except Exception as e:
         # Error
         error_msg = f"Error saat download dari Google Drive: {str(e)}"
@@ -61,7 +49,10 @@ def process_drive_download(ui_components: Dict[str, Any]) -> None:
         
         # Update UI dengan error
         from smartcash.ui.utils.fallback_utils import show_status
+        from smartcash.ui.components.status_panel import update_status_panel
+        
         show_status(error_msg, "error", ui_components)
+        update_status_panel(ui_components['status_panel'], error_msg, "error")
     finally:
         # Reset UI setelah selesai
         _reset_ui_after_download(ui_components)
@@ -358,6 +349,10 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: str) ->
 
 def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     """Reset UI setelah proses download selesai."""
+    # Aktifkan kembali tombol
+    from smartcash.ui.dataset.download.handlers.download_handler import _disable_buttons
+    _disable_buttons(ui_components, False)
+    
     # Sembunyikan progress bar
     if 'progress_bar' in ui_components:
         ui_components['progress_bar'].layout.visibility = 'hidden'

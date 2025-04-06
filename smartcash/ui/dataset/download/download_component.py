@@ -23,6 +23,7 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.utils.layout_utils import MAIN_CONTAINER, OUTPUT_WIDGET, BUTTON
     from smartcash.ui.info_boxes.dataset_info import get_dataset_info
+    from smartcash.ui.components.status_panel import create_status_panel
     
     # Header
     header = create_header(
@@ -86,17 +87,10 @@ def create_dataset_download_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
     check_button = widgets.Button(description='Cek Status', button_style='info', icon='info', tooltip="Cek status dan validasi dataset", layout=BUTTON)
     button_container = widgets.HBox([download_button, check_button], layout=widgets.Layout(display='flex', flex_flow='row', justify_content='flex-start', margin='10px 0'))
     
-    # Status panel
-    from smartcash.ui.utils.constants import ALERT_STYLES
-    status_panel = widgets.HTML(
-        value=f"""
-        <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
-                   color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
-                   border-left:4px solid {ALERT_STYLES['info']['text_color']};">
-           <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Siap untuk memulai download dataset</p>
-        </div>
-        """,
-        layout=widgets.Layout(width='100%', margin='10px 0')
+    # Status panel - menggunakan komponen reusable
+    status_panel = create_status_panel(
+        message="Siap untuk memulai download dataset",
+        status_type="info"
     )
     
     # Area untuk konfirmasi dialog

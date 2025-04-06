@@ -129,6 +129,10 @@ def _handle_start_event(ui_components: Dict[str, Any], event_type: str, **kwargs
     from smartcash.ui.utils.ui_logger import log_to_ui
     log_to_ui(ui_components, message, "info", "🚀")
     
+    # Update status panel menggunakan komponen reusable
+    from smartcash.ui.components.status_panel import update_status_panel
+    update_status_panel(ui_components['status_panel'], message, "info")
+    
     # Update multi-progress trackers jika tersedia
     for tracker_key in ['download_tracker', 'download_step_tracker']:
         if tracker_key in ui_components:
@@ -136,6 +140,7 @@ def _handle_start_event(ui_components: Dict[str, Any], event_type: str, **kwargs
             # Reset progress tracker
             if hasattr(tracker, 'reset'):
                 tracker.reset()
+            # Update atau inisialisasi tracker
             tracker.current = 0
             tracker.total = total
             if hasattr(tracker, 'set_description'):
@@ -209,6 +214,10 @@ def _handle_complete_event(ui_components: Dict[str, Any], event_type: str, **kwa
     # Update UI dengan success
     from smartcash.ui.utils.ui_logger import log_to_ui
     log_to_ui(ui_components, message, "success", "✅")
+    
+    # Update status panel menggunakan komponen reusable
+    from smartcash.ui.components.status_panel import update_status_panel
+    update_status_panel(ui_components['status_panel'], message, "success")
 
 def _handle_error_event(ui_components: Dict[str, Any], event_type: str, **kwargs) -> None:
     """Handler untuk event .error."""
@@ -224,6 +233,10 @@ def _handle_error_event(ui_components: Dict[str, Any], event_type: str, **kwargs
     # Update UI dengan error
     from smartcash.ui.utils.ui_logger import log_to_ui
     log_to_ui(ui_components, error_msg, "error", "❌")
+    
+    # Update status panel menggunakan komponen reusable
+    from smartcash.ui.components.status_panel import update_status_panel
+    update_status_panel(ui_components['status_panel'], error_msg, "error")
     
     # Log juga ke logger
     logger = ui_components.get('logger')

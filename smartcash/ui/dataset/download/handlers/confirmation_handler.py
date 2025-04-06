@@ -10,7 +10,7 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
     """Tampilkan dialog konfirmasi untuk download dataset."""
     # Import modul yang diperlukan
     from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
-    from smartcash.ui.utils.constants import ICONS, ALERT_STYLES
+    from smartcash.ui.components.status_panel import update_status_panel
     from smartcash.ui.dataset.download.handlers.download_handler import execute_download
     
     logger = ui_components.get('logger')
@@ -39,14 +39,12 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
         )
         display(dialog)
     
-    # Update status panel
-    ui_components['status_panel'].value = f"""
-    <div style="padding:10px; background-color:{ALERT_STYLES['warning']['bg_color']}; 
-               color:{ALERT_STYLES['warning']['text_color']}; border-radius:4px; margin:5px 0;
-               border-left:4px solid {ALERT_STYLES['warning']['text_color']};">
-        <p style="margin:5px 0">{ALERT_STYLES['warning']['icon']} Silakan konfirmasi untuk melanjutkan download dataset</p>
-    </div>
-    """
+    # Update status panel menggunakan komponen reusable
+    update_status_panel(
+        ui_components['status_panel'],
+        "Silakan konfirmasi untuk melanjutkan download dataset",
+        "warning"
+    )
     
     if logger: logger.info(f"ℹ️ Menunggu konfirmasi download dataset dari {endpoint}")
 
@@ -64,18 +62,16 @@ def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
 
 def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
     """Cancel download dan reset UI."""
-    from smartcash.ui.utils.constants import ALERT_STYLES
+    from smartcash.ui.components.status_panel import update_status_panel
     
     # Clear konfirmasi area
     ui_components['confirmation_area'].clear_output()
     
-    # Update status panel
-    ui_components['status_panel'].value = f"""
-    <div style="padding:10px; background-color:{ALERT_STYLES['info']['bg_color']}; 
-               color:{ALERT_STYLES['info']['text_color']}; border-radius:4px; margin:5px 0;
-               border-left:4px solid {ALERT_STYLES['info']['text_color']};">
-        <p style="margin:5px 0">{ALERT_STYLES['info']['icon']} Download dibatalkan</p>
-    </div>
-    """
+    # Update status panel menggunakan komponen reusable
+    update_status_panel(
+        ui_components['status_panel'],
+        "Download dibatalkan",
+        "info"
+    )
     
     if logger: logger.info("ℹ️ Download dataset dibatalkan")

@@ -1,20 +1,29 @@
 """
-File: smartcash/common/config.py
+File: smartcash/common/config/manager.py
 Deskripsi: Manager konfigurasi dengan dukungan YAML, environment variables, dan dependency injection
 """
 
 import os
-import yaml
-import json
 import copy
 from pathlib import Path
-from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, List
+from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple
+
+# Import dari IO module
+from smartcash.common.io import (
+    load_json,
+    save_json,
+    load_yaml,
+    save_yaml,
+    load_config,
+    save_config,
+    ensure_dir
+)
 
 # Type variable untuk dependency injection
 T = TypeVar('T')
 
 class ConfigManager:
-    """Manager untuk konfigurasi aplikasi dengan dukungan untuk loading dari file YAML/JSON, environment variable overrides, hierarchical configs, dan dependency injection"""
+    """Manager untuk konfigurasi aplikasi dengan dukungan untuk loading dari file, environment variable overrides, dan dependency injection"""
     
     DEFAULT_CONFIG_DIR = 'configs'
     
@@ -26,6 +35,14 @@ class ConfigManager:
         self.config = {}
         self._dependencies = {}
         self._factory_functions = {}
+        
+        # Setup logger jika tersedia
+        try:
+            from smartcash.common.logger import get_logger
+            self.logger = get_logger("config_manager")
+        except ImportError:
+            self.logger = None
+            
         if config_file: 
             self.load_config(config_file)
     
@@ -35,28 +52,34 @@ class ConfigManager:
         if not config_path.exists():
             raise FileNotFoundError(f"File konfigurasi tidak ditemukan: {config_path}")
         
-        # Load berdasarkan ekstensi file
-        if config_path.suffix.lower() in ('.yml', '.yaml'): 
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = yaml.safe_load(f) or {}
-        elif config_path.suffix.lower() == '.json': 
-            with open(config_path, 'r', encoding='utf-8') as f:
-                self.config = json.load(f)
-        else:
-            raise ValueError(f"Format file konfigurasi tidak didukung: {config_path.suffix}")
+        # Load konfigurasi menggunakan fungsi dari io module
+        self.config = load_config(config_path, {})
         
+        # Override dengan environment variables
         self._override_with_env_vars()
+        
+        if self.logger:
+            self.logger.info(f"✅ Konfigurasi dimuat dari: {config_path}")
+            
         return self.config
     
     def _resolve_config_path(self, config_file: str) -> Path:
         """Resolve path konfigurasi relatif atau absolut ke Path lengkap"""
         config_path = Path(config_file)
+        
+        # Check absolute path
         if config_path.is_absolute(): 
             return config_path
+            
+        # Check relative to config_dir
         if (self.config_dir / config_path).exists(): 
             return self.config_dir / config_path
+            
+        # Check relative to current working directory
         if (Path.cwd() / config_path).exists(): 
             return Path.cwd() / config_path
+            
+        # Default to config_dir
         return self.config_dir / config_path
     
     def _override_with_env_vars(self) -> None:
@@ -65,6 +88,7 @@ class ConfigManager:
             if not env_name.startswith(self.env_prefix): 
                 continue
             
+            # Konversi nama environment variable ke path config
             config_path = env_name[len(self.env_prefix):].lower().split('_')
             
             # Traverse & update config dict
@@ -74,18 +98,23 @@ class ConfigManager:
                     current[part] = {}
                 current = current[part]
             
+            # Update nilai
             current[config_path[-1]] = self._parse_env_value(env_value)
     
     def _parse_env_value(self, value: str) -> Any:
         """Parse nilai environment variable ke tipe yang sesuai (bool, number, list, string)"""
+        # Boolean values
         if value.lower() in ('true', 'yes', '1'): 
             return True
-        elif value.lower() in ('false', 'no', '0'): 
+        if value.lower() in ('false', 'no', '0'): 
             return False
             
         # Numbers
         try: 
-            return float(value) if '.' in value else int(value)
+            if '.' in value:
+                return float(value)
+            else:
+                return int(value)
         except ValueError: 
             pass
             
@@ -93,26 +122,33 @@ class ConfigManager:
         if ',' in value: 
             return [self._parse_env_value(item.strip()) for item in value.split(',')]
             
+        # Default: string
         return value
     
     def get(self, key: str, default=None) -> Any:
         """Ambil nilai konfigurasi dengan dot notation (e.g., 'model.img_size.width')"""
         parts = key.split('.')
         current = self.config
+        
         for part in parts:
             if not isinstance(current, dict) or part not in current:
                 return default
             current = current[part]
+            
         return current
     
     def set(self, key: str, value: Any) -> None:
         """Set nilai konfigurasi dengan dot notation (e.g., 'model.img_size.width')"""
         parts = key.split('.')
         current = self.config
+        
+        # Traverse dan buat path jika perlu
         for part in parts[:-1]:
             if part not in current:
                 current[part] = {}
             current = current[part]
+            
+        # Set nilai
         current[parts[-1]] = value
     
     def merge_config(self, config: Union[Dict, str]) -> Dict[str, Any]:
@@ -120,16 +156,16 @@ class ConfigManager:
         # Load dari file jika string
         if isinstance(config, str):
             config_path = self._resolve_config_path(config)
-            if config_path.suffix.lower() in ('.yml', '.yaml'):
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f) or {}
-            elif config_path.suffix.lower() == '.json':
-                with open(config_path, 'r', encoding='utf-8') as f:
-                    config = json.load(f)
-            else:
-                raise ValueError(f"Format file tidak didukung: {config_path.suffix}")
+            loaded_config = load_config(config_path, {})
+        else:
+            loaded_config = config
         
-        self._deep_merge(self.config, config)
+        # Merge configs
+        self._deep_merge(self.config, loaded_config)
+        
+        if self.logger:
+            self.logger.info(f"✅ Konfigurasi berhasil digabungkan")
+            
         return self.config
     
     def _deep_merge(self, target: Dict, source: Dict) -> None:
@@ -140,23 +176,34 @@ class ConfigManager:
             else:
                 target[key] = value
     
-    def save_config(self, config_file: str, create_dirs: bool = True) -> None:
+    def save_config(self, config_file: str, create_dirs: bool = True) -> bool:
         """Simpan konfigurasi ke file YAML/JSON"""
-        config_path = Path(config_file)
-        if create_dirs and not config_path.parent.exists():
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Simpan berdasarkan ekstensi
-        if config_path.suffix.lower() in ('.yml', '.yaml'):
-            with open(config_path, 'w', encoding='utf-8') as f:
-                yaml.dump(self.config, f, default_flow_style=False)
-        elif config_path.suffix.lower() == '.json':
-            with open(config_path, 'w', encoding='utf-8') as f:
-                json.dump(self.config, f, indent=2)
-        else:
-            with open(f"{config_path}.yaml", 'w', encoding='utf-8') as f:
-                yaml.dump(self.config, f, default_flow_style=False)
-    
+        try:
+            config_path = Path(config_file)
+            
+            # Buat direktori jika perlu
+            if create_dirs and not config_path.parent.exists():
+                ensure_dir(config_path.parent)
+            
+            # Simpan berdasarkan ekstensi file
+            if config_path.suffix.lower() in ('.yml', '.yaml'):
+                save_yaml(self.config, config_path)
+            elif config_path.suffix.lower() == '.json':
+                save_json(self.config, config_path, pretty=True)
+            else:
+                # Default ke YAML
+                yaml_path = f"{config_path}.yaml"
+                save_yaml(self.config, yaml_path)
+                
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi disimpan ke: {config_path}")
+                
+            return True
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+            return False
+            
     # ===== Dependency Injection Methods =====
     
     def register(self, interface_type: Type[T], implementation: Type[T]) -> None:
@@ -193,25 +240,14 @@ class ConfigManager:
         """
         try:
             # Import modul config_sync
-            try:
-                from smartcash.common.config_sync import sync_config_with_drive
-            except ImportError:
-                return False, "❌ Module config_sync tidak tersedia", {}
+            from smartcash.common.config.sync import sync_config_with_drive
                 
-            # Dapatkan logger jika tersedia
-            logger = None
-            try: 
-                from smartcash.common.logger import get_logger
-                logger = get_logger("config_manager")
-            except ImportError:
-                pass
-            
             # Panggil fungsi sinkronisasi dengan create_backup=True
             success, message, merged_config = sync_config_with_drive(
                 config_file=config_file, 
                 sync_strategy=sync_strategy, 
-                create_backup=True,  # Boolean, bukan callable
-                logger=logger
+                create_backup=True,
+                logger=self.logger
             )
             
             # Update config saat ini jika sukses
@@ -219,28 +255,27 @@ class ConfigManager:
                 self.config = merged_config
             return success, message, merged_config
             
+        except ImportError:
+            error_msg = f"❌ Module config_sync tidak tersedia"
+            if self.logger:
+                self.logger.error(error_msg)
+            return False, error_msg, {}
         except Exception as e:
             error_msg = f"❌ Error saat sinkronisasi konfigurasi: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
             return False, error_msg, {}
 
     def use_drive_as_source_of_truth(self) -> bool:
         """Sinkronisasi semua konfigurasi dengan Drive sebagai sumber kebenaran."""
         try:
-            from smartcash.common.config_sync import sync_all_configs
-            
-            # Dapatkan logger jika tersedia
-            logger = None
-            try: 
-                from smartcash.common.logger import get_logger
-                logger = get_logger("config_manager")
-            except ImportError:
-                pass
+            from smartcash.common.config.sync import sync_all_configs
             
             # Sinkronisasi semua konfigurasi dengan Drive sebagai prioritas
             results = sync_all_configs(
                 sync_strategy='drive_priority',
-                create_backup=True,  # Boolean, bukan callable
-                logger=logger
+                create_backup=True,
+                logger=self.logger
             )
             
             # Muat ulang konfigurasi utama setelah sinkronisasi
@@ -255,16 +290,21 @@ class ConfigManager:
             failure_count = len(results.get("failure", []))
             
             # Log hasil operasi
-            if logger:
-                logger.info(f"🔄 Sinkronisasi selesai: {success_count} berhasil, {failure_count} gagal")
+            if self.logger:
+                self.logger.info(f"🔄 Sinkronisasi selesai: {success_count} berhasil, {failure_count} gagal")
                 if failure_count > 0:
                     for failure in results.get("failure", []): 
-                        logger.warning(f"⚠️ Gagal sinkronisasi {failure.get('file', 'unknown')}: {failure.get('message', 'unknown error')}")
+                        self.logger.warning(f"⚠️ Gagal sinkronisasi {failure.get('file', 'unknown')}: {failure.get('message', 'unknown error')}")
             
             return failure_count == 0
             
+        except ImportError:
+            if self.logger:
+                self.logger.error("❌ Module config_sync tidak tersedia")
+            return False
         except Exception as e:
-            error_msg = f"❌ Error saat menggunakan Drive sebagai sumber kebenaran: {str(e)}"
+            if self.logger:
+                self.logger.error(f"❌ Error saat menggunakan Drive sebagai sumber kebenaran: {str(e)}")
             return False
 
     def get_drive_config_path(self, config_file: str = None) -> Optional[str]:
@@ -281,46 +321,30 @@ class ConfigManager:
             
         except Exception:
             return None
-        
-    def _merge_configs_smart(self, config1: Any, config2: Any) -> Any:
-        """Menggabungkan dua konfigurasi dengan strategi smart."""
-        # Handle None cases
-        if config1 is None: return copy.deepcopy(config2)
-        if config2 is None: return copy.deepcopy(config1)
-        
-        # Dict: gabungkan rekursif
-        if isinstance(config1, dict) and isinstance(config2, dict):
-            result = copy.deepcopy(config1)
-            for key, value in config2.items():
-                result[key] = self._merge_configs_smart(result.get(key), value) if key in result else copy.deepcopy(value)
-            return result
-        
-        # List: gabungkan dengan filter duplikat jika perlu
-        if isinstance(config1, list) and isinstance(config2, list):
-            # Untuk list sederhana, gabungkan dengan unik
-            if all(not isinstance(x, (dict, list)) for x in config1 + config2):
-                # Hanya gunakan set untuk elemen yang hashable
-                try:
-                    return list(set(config1 + config2))
-                except TypeError:
-                    pass
-            # Untuk list kompleks atau unhashable, gabungkan saja
-            return copy.deepcopy(config1) + copy.deepcopy(config2)
-        
-        # Nilai skalar: prioritaskan nilai yang tidak kosong
-        return copy.deepcopy(config2) if config1 == "" or config1 is None or config1 == 0 else copy.deepcopy(config1)
-    
+            
     def __getitem__(self, key):
+        """Operator [] untuk mengakses konfigurasi."""
         return self.get(key)
         
     def __setitem__(self, key, value):
+        """Operator [] untuk mengatur konfigurasi."""
         self.set(key, value)
 
 # Singleton instance
 _config_manager = None
 
 def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_'):
-    """Dapatkan instance ConfigManager (singleton)."""
+    """
+    Dapatkan instance ConfigManager (singleton).
+    
+    Args:
+        base_dir: Direktori dasar
+        config_file: File konfigurasi utama
+        env_prefix: Prefix untuk environment variables
+        
+    Returns:
+        Instance singleton ConfigManager
+    """
     global _config_manager
     if _config_manager is None:
         _config_manager = ConfigManager(base_dir, config_file, env_prefix)

@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Any
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
-from smartcash.dataset.utils import find_image_files, ensure_dir
+from smartcash.common.io import ensure_dir
+from smartcash.dataset.utils.data_utils import find_image_files
 from smartcash.dataset.utils.progress_wrapper import update_progress
 from smartcash.common.threadpools import process_in_parallel
 
@@ -32,7 +32,6 @@ class ImageProcessor:
         self.data_dir = Path(data_dir or self.config.get('data_dir', 'data'))
         self.logger = logger or get_logger("image_processor")
         self.num_workers = num_workers
-        self.file_utils = get_file_utils(config, logger, num_workers)
         
         self.logger.info(f"🖼️ ImageProcessor diinisialisasi dengan data_dir: {self.data_dir}")
     

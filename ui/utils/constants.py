@@ -1,20 +1,26 @@
 """
 File: smartcash/ui/utils/constants.py
-Author: Refactored
-Deskripsi: Konstanta untuk komponen UI dengan struktur yang lebih terorganisir dan warna konsisten
+Deskripsi: Utilitas UI yang digunakan di seluruh aplikasi dengan penggunaan konstanta yang konsisten
 """
+
+from typing import Dict, Any
+
+# Import konstanta UI dari common/constants
+from smartcash.common.constants.ui import (
+    STATUS_ICONS, ACTION_ICONS, DOMAIN_ICONS, UI_COLORS
+)
 
 # Color palette
 COLORS = {
-    'primary': '#3498db',
-    'secondary': '#2c3e50',
-    'success': '#28a745',
-    'warning': '#ffc107',
-    'danger': '#dc3545',
-    'info': '#17a2b8',
-    'light': '#f8f9fa',
-    'dark': '#2F58CD',
-    'muted': '#6c757d',
+    'primary': UI_COLORS['primary'],
+    'secondary': UI_COLORS['secondary'],
+    'success': UI_COLORS['success'],
+    'warning': UI_COLORS['warning'],
+    'danger': UI_COLORS['danger'],
+    'info': UI_COLORS['info'],
+    'light': UI_COLORS['light'],
+    'dark': UI_COLORS['dark'],
+    'muted': UI_COLORS['muted'],
     'highlight': '#e65100',
     'background': '#ffffff',
     'card': '#f8f9fa',
@@ -105,33 +111,37 @@ FA_ICONS = {
     'arrow-right': 'arrow-right',
 }
 
-# Emoji icons
+# Emoji icons - Menggunakan konstanta dari common/constants/ui
 ICONS = {
     # Status icons
-    'success': '✅',
-    'warning': '⚠️',
-    'error': '❌',
-    'info': 'ℹ️',
+    'success': STATUS_ICONS['success'],
+    'warning': STATUS_ICONS['warning'],
+    'error': STATUS_ICONS['error'],
+    'info': STATUS_ICONS['info'],
+    'debug': STATUS_ICONS['debug'],
+    'processing': STATUS_ICONS['processing'],
+    'waiting': STATUS_ICONS['waiting'],
+    'complete': STATUS_ICONS['complete'],
     
     # Action icons
-    'config': '⚙️',
-    'data': '📊',
-    'processing': '🔄',
-    'start': '🚀',
-    'download': '📥',
-    'upload': '📤',
-    'save': '💾',
-    'add': '➕',
-    'remove': '➖',
-    'edit': '✏️',
-    'delete': '🗑️',
-    'search': '🔍',
-    'refresh': '🔄',
+    'config': ACTION_ICONS['config'],
+    'data': DOMAIN_ICONS['dataset'],
+    'processing': ACTION_ICONS['refresh'],
+    'start': ACTION_ICONS['start'],
+    'download': ACTION_ICONS['download'],
+    'upload': ACTION_ICONS['upload'],
+    'save': ACTION_ICONS['save'],
+    'add': ACTION_ICONS['add'],
+    'remove': ACTION_ICONS['remove'],
+    'edit': ACTION_ICONS['edit'],
+    'delete': ACTION_ICONS['delete'],
+    'search': ACTION_ICONS['search'],
+    'refresh': ACTION_ICONS['refresh'],
     
     # Object icons
     'folder': '📁',
     'file': '📄',
-    'model': '🧠',
+    'model': DOMAIN_ICONS['model'],
     'time': '⏱️',
     'calendar': '📅',
     'metric': '📈',
@@ -143,11 +153,11 @@ ICONS = {
     'settings': '🔧',
     'tools': '🛠️',
     'split': '✂️',
-    'augmentation': '🎨',
-    'training': '🏋️',
-    'evaluation': '🔍',
+    'augmentation': DOMAIN_ICONS['augmentation'],
+    'training': DOMAIN_ICONS['training'],
+    'evaluation': DOMAIN_ICONS['evaluation'],
     'cleanup': '🧹',
-    'dataset': '📚',
+    'dataset': DOMAIN_ICONS['dataset'],
     'cache': '💽',
     
     # Control icons
@@ -234,11 +244,16 @@ MARGINS = {
     'xl': '20px'
 }
 
-# File Related
-IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'tiff', 'webp']
-VIDEO_EXTENSIONS = ['mp4', 'avi', 'mov', 'mkv', 'webm', 'flv', 'wmv']
-DOCUMENT_EXTENSIONS = ['pdf', 'doc', 'docx', 'txt', 'csv', 'xls', 'xlsx', 'ppt', 'pptx']
-CODE_EXTENSIONS = ['py', 'js', 'java', 'cpp', 'c', 'h', 'html', 'css', 'json', 'xml']
+# Import konstanta file dari common/constants
+from smartcash.common.constants.file_types import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+
+# Ekstensi file untuk UI
+FILE_EXTENSIONS = {
+    'image': IMAGE_EXTENSIONS,
+    'video': VIDEO_EXTENSIONS,
+    'document': ['.pdf', '.doc', '.docx', '.txt', '.csv', '.xls', '.xlsx', '.ppt', '.pptx'],
+    'code': ['.py', '.js', '.java', '.cpp', '.c', '.h', '.html', '.css', '.json', '.xml']
+}
 
 # For file size formatting
 FILE_SIZE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']

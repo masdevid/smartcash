@@ -13,8 +13,8 @@ from typing import Dict, Optional, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
 from smartcash.common.threadpools import get_optimal_thread_count
+from smartcash.common.io import ensure_dir, file_exists
 
 class CacheStorage:
     """Utilitas penyimpanan cache dengan optimasi thread."""
@@ -29,7 +29,6 @@ class CacheStorage:
         """
         self.cache_dir = Path(cache_dir)
         self.logger = logger or get_logger("cache_storage")
-        self.file_utils = get_file_utils(logger=self.logger)
         self._thread_pool = ThreadPoolExecutor(max_workers=get_optimal_thread_count(), thread_name_prefix="CacheStorage")
     
     def create_cache_key(self, file_path: str, params: Dict) -> str:
@@ -68,7 +67,7 @@ class CacheStorage:
         
         try:
             # Pastikan direktori cache ada
-            self.file_utils.ensure_dir(cache_path.parent)
+            ensure_dir(cache_path.parent)
             
             # Pickle dan simpan data secara langsung
             with open(cache_path, 'wb') as f:
@@ -150,7 +149,7 @@ class CacheStorage:
         Returns:
             Boolean sukses/gagal
         """
-        return self.file_utils.file_exists(cache_path) and [cache_path.unlink(), True][1] if cache_path.exists() else False
+        return file_exists(cache_path) and [cache_path.unlink(), True][1] if cache_path.exists() else False
     
     def shutdown(self):
         """Shutdown thread pool."""

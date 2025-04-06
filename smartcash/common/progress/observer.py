@@ -1,25 +1,25 @@
 """
-File: smartcash/common/progress_observer.py
+File: smartcash/common/progress/observer.py
 Deskripsi: Implementasi observer pattern untuk progress tracking dengan integrasi event system
 """
 
 from typing import Dict, Any, List, Optional, Callable, Tuple
 
-from smartcash.common.logger import get_logger
-from smartcash.common.progress_tracker import ProgressTracker, get_progress_tracker
-# Hapus import BaseObserver untuk menghindari circular import
-# Gunakan string untuk type hinting
+from smartcash.common.progress.tracker import ProgressTracker, get_progress_tracker
 
-# Import EventTopics dengan cara yang menghindari circular import
+# Event topics yang akan dibuat dynamic untuk menghindari circular import
+class _EventTopics:
+    """Placeholder untuk event topics."""
+    PROGRESS_UPDATE = "progress.update"
+    PROGRESS_START = "progress.start"
+    PROGRESS_COMPLETE = "progress.complete"
+
+# Dapatkan EventTopics jika tersedia
 try:
     from smartcash.components.observer.event_topics_observer import EventTopics
 except ImportError:
     # Fallback jika EventTopics tidak bisa diimpor
-    class EventTopics:
-        """Fallback EventTopics."""
-        PROGRESS_UPDATE = "progress.update"
-        PROGRESS_START = "progress.start"
-        PROGRESS_COMPLETE = "progress.complete"
+    EventTopics = _EventTopics
 
 class ProgressObserver:
     """Observer untuk melacak progres dari event."""
@@ -59,10 +59,20 @@ class ProgressObserver:
         ]
         self.progress_key = progress_key
         self.total_key = total_key
-        self.logger = logger or get_logger("progress_observer")
         self.name = f"ProgressObserver_{tracker_name}"
         self.priority = 0  # Default priority
         
+        # Setup logger jika tersedia
+        if logger is None:
+            try:
+                from smartcash.common.logger import get_logger
+                self.logger = get_logger("progress_observer")
+            except ImportError:
+                import logging
+                self.logger = logging.getLogger("progress_observer")
+        else:
+            self.logger = logger
+            
         # Setup tracker jika belum diset
         if self.tracker.total <= 0:
             self.tracker.set_total(total)
@@ -135,7 +145,7 @@ class ProgressObserver:
     
     def should_process_event(self, event_type: str) -> bool:
         """Method untuk kompatibilitas dengan BaseObserver."""
-        return self.enabled
+        return self.enabled and event_type in self.event_types
 
 class ProgressEventEmitter:
     """Emitter untuk mengirim event progres ke EventDispatcher."""
@@ -160,20 +170,30 @@ class ProgressEventEmitter:
         self.description = description
         self.current = 0
         self.event_topic_prefix = event_topic_prefix
-        self.logger = logger or get_logger("progress_emitter")
         self.metrics = {}
         
+        # Setup logger
+        if logger is None:
+            try:
+                from smartcash.common.logger import get_logger
+                self.logger = get_logger("progress_emitter")
+            except ImportError:
+                import logging
+                self.logger = logging.getLogger("progress_emitter")
+        else:
+            self.logger = logger
+            
         # Event topics
-        self.start_event = f"{event_topic_prefix}_start"
-        if self.start_event != EventTopics.PROGRESS_START:
+        self.start_event = f"{event_topic_prefix}.start"
+        if hasattr(EventTopics, 'PROGRESS_START'):
             self.start_event = EventTopics.PROGRESS_START
             
-        self.update_event = f"{event_topic_prefix}_update"
-        if self.update_event != EventTopics.PROGRESS_UPDATE:
+        self.update_event = f"{event_topic_prefix}.update"
+        if hasattr(EventTopics, 'PROGRESS_UPDATE'):
             self.update_event = EventTopics.PROGRESS_UPDATE
             
-        self.complete_event = f"{event_topic_prefix}_complete"
-        if self.complete_event != EventTopics.PROGRESS_COMPLETE:
+        self.complete_event = f"{event_topic_prefix}.complete"
+        if hasattr(EventTopics, 'PROGRESS_COMPLETE'):
             self.complete_event = EventTopics.PROGRESS_COMPLETE
     
     def start(self, description: Optional[str] = None, total: Optional[int] = None) -> None:
@@ -306,7 +326,7 @@ def create_progress_tracker_observer(
     total: int = 100,
     desc: str = "Progress",
     display: bool = True
-) -> Tuple[ProgressTracker, "ProgressObserver"]:
+) -> Tuple[ProgressTracker, ProgressObserver]:
     """
     Buat ProgressTracker dan ProgressObserver yang terintegrasi.
     
@@ -372,7 +392,6 @@ def update_progress(
     if not suppress_notify:
         try:
             from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
             
             # Bersihkan kwargs duplikasi
             notify_kwargs = {k: v for k, v in kwargs.items() if k not in ('current_progress', 'current_total')}
@@ -385,5 +404,5 @@ def update_progress(
                 total=total, 
                 **notify_kwargs
             )
-        except Exception:
+        except ImportError:
             pass

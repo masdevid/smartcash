@@ -31,7 +31,7 @@ def setup_multi_progress_tracking(
     
     try:
         # Import progress tracker
-        from smartcash.common.progress_tracker import get_progress_tracker
+        from smartcash.common.progress import get_progress_tracker
         
         # Dapatkan widgets
         overall_progress = ui_components.get(overall_progress_key)

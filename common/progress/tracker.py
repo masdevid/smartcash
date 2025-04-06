@@ -1,13 +1,22 @@
 """
-File: smartcash/common/progress_tracker.py
-Deskripsi: Implementasi terpadu untuk progress tracking dengan dukungan tqdm, callback dan observer
+File: smartcash/common/progress/tracker.py
+Deskripsi: Implementasi terpadu untuk progress tracking dengan dukungan tqdm, callback dan clean API
 """
 
 import time
 from typing import Dict, Any, List, Optional, Callable, Union
 from tqdm.auto import tqdm
 
-from smartcash.common.logger import get_logger
+def format_time(seconds: float) -> str:
+    """Format waktu dalam detik ke string yang mudah dibaca."""
+    if seconds < 60:
+        return f"{seconds:.1f}s"
+    elif seconds < 3600:
+        minutes = seconds / 60
+        return f"{minutes:.1f}m"
+    else:
+        hours = seconds / 3600
+        return f"{hours:.1f}h"
 
 class ProgressTracker:
     """Tracker progres untuk operasi dengan dukungan tqdm, callback dan reporting."""
@@ -36,7 +45,18 @@ class ProgressTracker:
         self.desc = desc
         self.unit = unit
         self.display = display
-        self.logger = logger or get_logger("progress_tracker")
+        
+        # Setup logger jika tersedia
+        if logger is None:
+            try:
+                from smartcash.common.logger import get_logger
+                self.logger = get_logger("progress_tracker")
+            except ImportError:
+                import logging
+                self.logger = logging.getLogger("progress_tracker")
+        else:
+            self.logger = logger
+            
         self.parent_tracker = parent_tracker
         
         # Init state
@@ -136,9 +156,9 @@ class ProgressTracker:
             'progress': progress,
             'progress_pct': progress * 100,
             'elapsed': elapsed,
-            'elapsed_str': self._format_time(elapsed),
+            'elapsed_str': format_time(elapsed),
             'remaining': remaining,
-            'remaining_str': self._format_time(remaining),
+            'remaining_str': format_time(remaining),
             'is_completed': self.is_completed,
             'metrics': self.metrics.copy()
         }
@@ -170,7 +190,7 @@ class ProgressTracker:
             self.pbar = None
             
         elapsed = time.time() - self.start_time
-        self.logger.info(f"✅ {self.desc} selesai dalam {self._format_time(elapsed)}")
+        self.logger.info(f"✅ {self.desc} selesai dalam {format_time(elapsed)}")
         
         self._execute_callbacks()
     
@@ -182,18 +202,6 @@ class ProgressTracker:
                 callback(progress_info)
             except Exception as e:
                 self.logger.warning(f"⚠️ Error pada callback: {str(e)}")
-    
-    @staticmethod
-    def _format_time(seconds: float) -> str:
-        """Format waktu dalam detik ke string yang mudah dibaca."""
-        if seconds < 60:
-            return f"{seconds:.1f}s"
-        elif seconds < 3600:
-            minutes = seconds / 60
-            return f"{minutes:.1f}m"
-        else:
-            hours = seconds / 3600
-            return f"{hours:.1f}h"
     
     def __enter__(self):
         """Context manager entry."""

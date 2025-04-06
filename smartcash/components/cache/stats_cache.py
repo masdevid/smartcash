@@ -6,9 +6,8 @@ Deskripsi: Modul statistik cache yang dioptimasi dengan DRY principles
 import threading
 from typing import Dict, Any, Optional
 from pathlib import Path
-
+from smartcash.common.io import format_size
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
 
 class CacheStats:
     """Utilitas statistik cache dengan thread-safety dan laporan statistik lengkap."""
@@ -21,7 +20,6 @@ class CacheStats:
             logger: Logger kustom (opsional)
         """
         self.logger = logger or get_logger("cache_stats")
-        self.file_utils = get_file_utils(logger=self.logger)
         self._lock = threading.RLock()
         self.reset()
     
@@ -126,8 +124,8 @@ class CacheStats:
             if abs(actual_size - index_size) > 1024 * 1024:  # > 1MB
                 self.logger.warning(
                     f"⚠️ Perbedaan ukuran cache: "
-                    f"index={self.file_utils.format_size(index_size)}, "
-                    f"disk={self.file_utils.format_size(actual_size)}"
+                    f"index={format_size(index_size)}, "
+                    f"disk={format_size(actual_size)}"
                 )
                 cache_index.set_total_size(actual_size)
             
@@ -143,9 +141,9 @@ class CacheStats:
                 'saved_time': self._stats['saved_time'],
                 'cache_size_bytes': index_size,
                 'cache_size_mb': index_size / 1024 / 1024,
-                'cache_size_formatted': self.file_utils.format_size(index_size),
+                'cache_size_formatted': format_size(index_size),
                 'max_size_mb': max_size_bytes / 1024 / 1024,
-                'max_size_formatted': self.file_utils.format_size(max_size_bytes),
+                'max_size_formatted': format_size(max_size_bytes),
                 'usage_percent': (index_size / max(1, max_size_bytes)) * 100,
                 'file_count': file_count,
                 'efficiency': {

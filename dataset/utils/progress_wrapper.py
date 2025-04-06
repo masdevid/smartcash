@@ -5,8 +5,8 @@ Deskripsi: Wrapper untuk progress tracking dari common untuk memastikan backward
 
 from typing import Dict, Any, List, Optional, Callable, Tuple
 
-from smartcash.common.progress_tracker import ProgressTracker, get_progress_tracker
-from smartcash.common.progress_observer import (
+from smartcash.common.progress import ProgressTracker, get_progress_tracker
+from smartcash.common.progress import (
     ProgressObserver, ProgressEventEmitter, create_progress_tracker_observer,
     update_progress as common_update_progress
 )

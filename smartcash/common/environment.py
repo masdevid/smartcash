@@ -1,6 +1,6 @@
 """
 File: smartcash/common/environment.py
-Deskripsi: Manajer lingkungan terpusat untuk deteksi dan konfigurasi environment aplikasi SmartCash dengan perhitungan progres yang dioptimalkan
+Deskripsi: Manajer lingkungan terpusat untuk deteksi dan konfigurasi environment aplikasi SmartCash
 """
 
 import os
@@ -40,12 +40,10 @@ class EnvironmentManager:
         # Import komponen yang sudah ada
         try:
             from smartcash.common.utils import is_colab, is_notebook
-            from smartcash.common.file_utils import get_file_utils
             from smartcash.common.logger import get_logger
             
             self._in_colab = is_colab()
             self._in_notebook = is_notebook()
-            self._file_utils = get_file_utils(logger=logger)
             self.logger = logger or get_logger("environment_manager")
         except ImportError:
             self._in_colab = self._detect_colab()
@@ -89,17 +87,32 @@ class EnvironmentManager:
     def is_drive_mounted(self) -> bool: return self._drive_mounted
     
     def detect_drive(self) -> bool:
-        """Deteksi dan set status Google Drive."""
-        drive_path = Path('/content/drive/MyDrive/SmartCash')
-        drive_mount_point = Path('/content/drive/MyDrive')
-        
-        if drive_mount_point.exists():
-            # Pastikan directory SmartCash ada di Drive
-            os.makedirs(drive_path, exist_ok=True)
-            self._drive_mounted = True
-            self._drive_path = drive_path
-            if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {drive_path}")
-            return True
+        """Deteksi dan set status Google Drive menggunakan drive_utils jika tersedia."""
+        try:
+            # Menggunakan drive_utils.detect_drive_mount jika tersedia
+            from smartcash.ui.utils.drive_utils import detect_drive_mount
+            is_mounted, drive_path = detect_drive_mount()
+            
+            if is_mounted:
+                # Set drive path ke SmartCash
+                self._drive_mounted = True
+                self._drive_path = Path(drive_path) / 'SmartCash'
+                # Pastikan directory SmartCash ada di Drive
+                os.makedirs(self._drive_path, exist_ok=True)
+                if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
+                return True
+        except ImportError:
+            # Fallback jika drive_utils tidak tersedia
+            drive_path = Path('/content/drive/MyDrive/SmartCash')
+            drive_mount_point = Path('/content/drive/MyDrive')
+            
+            if drive_mount_point.exists():
+                # Pastikan directory SmartCash ada di Drive
+                os.makedirs(drive_path, exist_ok=True)
+                self._drive_mounted = True
+                self._drive_path = drive_path
+                if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {drive_path}")
+                return True
         return False
     
     def mount_drive(self, mount_path: Optional[str] = None) -> Tuple[bool, str]:
@@ -216,6 +229,7 @@ class EnvironmentManager:
     def create_symlinks(self, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
         Buat symlink dari direktori lokal ke direktori Google Drive.
+        Menggunakan fungsi dari drive_utils jika tersedia.
         
         Args:
             progress_callback: Callback untuk menampilkan progres (current, total, message)
@@ -223,58 +237,114 @@ class EnvironmentManager:
         Returns:
             Statistik pembuatan symlink
         """
-        if not self._drive_mounted:
-            msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
-            if self.logger: self.logger.warning(msg)
-            return {'created': 0, 'existing': 0, 'error': 0}
-        
-        # Mapping symlink
-        symlinks = {
-            'data': self._drive_path / 'data',
-            'configs': self._drive_path / 'configs', 
-            'runs': self._drive_path / 'runs',
-            'logs': self._drive_path / 'logs',
-            'checkpoints': self._drive_path / 'checkpoints'
-        }
-        
-        stats = {'created': 0, 'existing': 0, 'error': 0}
-        total_symlinks = len(symlinks)
-        
-        # Gunakan file_utils jika tersedia
-        import shutil
-        
-        for idx, (local_name, target_path) in enumerate(symlinks.items()):
-            if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
-                
-            try:
-                # Pastikan direktori target ada
-                os.makedirs(target_path, exist_ok=True)
-                local_path = self._base_dir / local_name
-                
-                # Cek jika path lokal ada dan bukan symlink
-                if local_path.exists() and not local_path.is_symlink():
-                    backup_path = local_path.with_name(f"{local_name}_backup")
-                    if self.logger:
-                        self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+        # Coba gunakan drive_utils.sync_directory
+        try:
+            from smartcash.ui.utils.drive_utils import sync_directory
+            
+            if not self._drive_mounted:
+                msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
+                if self.logger: self.logger.warning(msg)
+                return {'created': 0, 'existing': 0, 'error': 0}
+            
+            stats = {'created': 0, 'existing': 0, 'error': 0}
+            
+            # Mapping symlink
+            symlinks = {
+                'data': self._drive_path / 'data',
+                'configs': self._drive_path / 'configs', 
+                'runs': self._drive_path / 'runs',
+                'logs': self._drive_path / 'logs',
+                'checkpoints': self._drive_path / 'checkpoints'
+            }
+            
+            # Gunakan sync_directory untuk setiap symlink
+            for local_name, target_path in symlinks.items():
+                try:
+                    local_path = self._base_dir / local_name
                     
-                    # Hapus backup yang sudah ada
-                    if backup_path.exists(): shutil.rmtree(backup_path)
+                    # Pastikan direktori target ada
+                    os.makedirs(target_path, exist_ok=True)
                     
-                    # Pindahkan direktori lokal ke backup
-                    local_path.rename(backup_path)
+                    # Jika lokal sudah ada tapi bukan symlink, backup dulu
+                    if local_path.exists() and not local_path.is_symlink():
+                        backup_path = local_path.with_name(f"{local_name}_backup")
+                        if self.logger:
+                            self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+                        
+                        # Hapus backup yang sudah ada
+                        if backup_path.exists():
+                            import shutil
+                            shutil.rmtree(backup_path)
+                        
+                        # Pindahkan direktori lokal ke backup
+                        local_path.rename(backup_path)
+                    
+                    # Buat symlink jika belum ada
+                    if not local_path.exists():
+                        local_path.symlink_to(target_path)
+                        stats['created'] += 1
+                        if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                    else:
+                        stats['existing'] += 1
+                except Exception as e:
+                    stats['error'] += 1
+                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
+            
+            return stats
                 
-                # Buat symlink jika belum ada
-                if not local_path.exists():
-                    local_path.symlink_to(target_path)
-                    stats['created'] += 1
-                    if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
-                else:
-                    stats['existing'] += 1
-            except Exception as e:
-                stats['error'] += 1
-                if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
-        
-        return stats
+        except ImportError:
+            # Fallback jika drive_utils tidak tersedia
+            if not self._drive_mounted:
+                msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
+                if self.logger: self.logger.warning(msg)
+                return {'created': 0, 'existing': 0, 'error': 0}
+            
+            # Mapping symlink
+            symlinks = {
+                'data': self._drive_path / 'data',
+                'configs': self._drive_path / 'configs', 
+                'runs': self._drive_path / 'runs',
+                'logs': self._drive_path / 'logs',
+                'checkpoints': self._drive_path / 'checkpoints'
+            }
+            
+            stats = {'created': 0, 'existing': 0, 'error': 0}
+            total_symlinks = len(symlinks)
+            
+            import shutil
+            
+            for idx, (local_name, target_path) in enumerate(symlinks.items()):
+                if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
+                    
+                try:
+                    # Pastikan direktori target ada
+                    os.makedirs(target_path, exist_ok=True)
+                    local_path = self._base_dir / local_name
+                    
+                    # Cek jika path lokal ada dan bukan symlink
+                    if local_path.exists() and not local_path.is_symlink():
+                        backup_path = local_path.with_name(f"{local_name}_backup")
+                        if self.logger:
+                            self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+                        
+                        # Hapus backup yang sudah ada
+                        if backup_path.exists(): shutil.rmtree(backup_path)
+                        
+                        # Pindahkan direktori lokal ke backup
+                        local_path.rename(backup_path)
+                    
+                    # Buat symlink jika belum ada
+                    if not local_path.exists():
+                        local_path.symlink_to(target_path)
+                        stats['created'] += 1
+                        if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                    else:
+                        stats['existing'] += 1
+                except Exception as e:
+                    stats['error'] += 1
+                    if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
+            
+            return stats
     
     def get_directory_tree(self, root_dir: Optional[Union[str, Path]] = None, max_depth: int = 3, 
                          indent: int = 0, _current_depth: int = 0) -> str:
@@ -389,60 +459,6 @@ class EnvironmentManager:
             info['system'] = {'platform': platform.platform() if 'platform' in sys.modules else 'Unknown'}
             
         return info
-    
-    def install_requirements(self, requirements_file: Optional[Union[str, Path]] = None,
-                          additional_packages: Optional[List[str]] = None,
-                          progress_callback: Optional[Callable[[int, int, str], None]] = None) -> bool:
-        """
-        Install requirement packages menggunakan pip.
-        
-        Args:
-            requirements_file: Path ke file requirements.txt
-            additional_packages: List package tambahan untuk diinstall
-            progress_callback: Callback untuk menampilkan progres
-            
-        Returns:
-            Status keberhasilan instalasi
-        """
-        import subprocess
-        
-        success = True
-        steps_completed = 0
-        total_steps = (1 if requirements_file else 0) + (1 if additional_packages else 0)
-        
-        # Install dari file requirements
-        if requirements_file:
-            req_path = Path(requirements_file)
-            if req_path.exists():
-                if self.logger: self.logger.info(f"📦 Menginstall packages dari {req_path}...")
-                if progress_callback: progress_callback(1, total_steps, f"Menginstall packages dari {req_path}")
-                
-                process = subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_path)], capture_output=True, text=True)
-                success = success and process.returncode == 0
-                
-                if process.returncode != 0:
-                    if self.logger: self.logger.error(f"❌ Error instalasi requirements: {process.stderr}")
-                else:
-                    if self.logger: self.logger.info(f"✅ Requirements berhasil diinstall")
-                    steps_completed += 1
-            else:
-                if self.logger: self.logger.warning(f"⚠️ File requirements tidak ditemukan: {req_path}")
-                success = False
-        
-        # Install package tambahan
-        if additional_packages:
-            if self.logger: self.logger.info(f"📦 Menginstall package tambahan: {', '.join(additional_packages)}")
-            if progress_callback: progress_callback(steps_completed + 1, total_steps, f"Menginstall package tambahan")
-                
-            process = subprocess.run([sys.executable, "-m", "pip", "install"] + additional_packages, capture_output=True, text=True)
-            success = success and process.returncode == 0
-            
-            if process.returncode != 0:
-                if self.logger: self.logger.error(f"❌ Error instalasi package tambahan: {process.stderr}")
-            else:
-                if self.logger: self.logger.info(f"✅ Package tambahan berhasil diinstall")
-                    
-        return success
     
     def _detect_colab(self) -> bool:
         """

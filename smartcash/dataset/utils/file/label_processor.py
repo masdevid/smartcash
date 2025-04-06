@@ -13,8 +13,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.layer_config import get_layer_config
 from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.common.threadpools import process_in_parallel
-from smartcash.dataset.utils.file_wrapper import ensure_dir
-
+from smartcash.common.io import ensure_dir
 
 class LabelProcessor:
     """Utilitas untuk pemrosesan dan manipulasi file label dataset."""

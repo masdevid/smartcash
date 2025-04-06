@@ -14,7 +14,7 @@ from smartcash.components.observer.event_dispatcher_observer import EventDispatc
 from smartcash.components.observer.cleanup_observer import register_observer_manager
 
 # Import progress_tracker tanpa circular dependency
-from smartcash.common.progress_tracker import get_progress_tracker
+from smartcash.common.progress import get_progress_tracker
 
 
 class ObserverManager:
@@ -182,7 +182,7 @@ class ObserverManager:
             ProgressObserver instance
         """
         # Import di sini untuk menghindari circular import
-        from smartcash.common.progress_observer import create_progress_tracker_observer
+        from smartcash.common.progress import create_progress_tracker_observer
         
         # Gunakan fungsi helper untuk membuat observer
         tracker, observer = create_progress_tracker_observer(

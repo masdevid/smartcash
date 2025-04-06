@@ -10,7 +10,6 @@
 |  ├── environment.py
 |  ├── exceptions.py
 |  ├── file_utils.py
-|  ├── initialization.py
 |  ├── interfaces
 |  |  ├── __init__.py
 |  |  ├── checkpoint_interface.py
@@ -122,6 +121,7 @@
 |  |  |  ├── download_service.py
 |  |  |  ├── download_validator.py
 |  |  |  ├── file_processor.py
+|  |  |  ├── notification_utils.py
 |  |  |  └── roboflow_downloader.py
 |  |  ├── explorer
 |  |  |  ├── __init__.py

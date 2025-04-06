@@ -36,7 +36,7 @@ def setup_progress_tracking(
     
     try:
         # Import progress tracker
-        from smartcash.common.progress_tracker import get_progress_tracker, ProgressTracker
+        from smartcash.common.progress import get_progress_tracker, ProgressTracker
         
         # Buat progress tracker
         tracker = get_progress_tracker(tracker_name, total, description)
@@ -97,7 +97,7 @@ def register_progress_observer(ui_components: Dict[str, Any], tracker_name: str)
     """
     try:
         # Import progress observer
-        from smartcash.common.progress_observer import ProgressObserver
+        from smartcash.common.progress import ProgressObserver
         
         # Dapatkan observer manager
         observer_manager = ui_components.get('observer_manager')

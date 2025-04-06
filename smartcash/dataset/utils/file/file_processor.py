@@ -8,13 +8,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
-from smartcash.dataset.utils.file_wrapper import (
-    find_image_files, find_corrupted_images, copy_files, 
+from smartcash.common.io import (
+    find_corrupted_images, copy_files, 
     move_files, extract_zip, ensure_dir
 )
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
-
+from smartcash.dataset.utils.data_utils import find_image_files
 
 class FileProcessor:
     """Wrapper untuk operasi file dataset menggunakan common/file_utils."""
@@ -33,9 +32,6 @@ class FileProcessor:
         self.data_dir = Path(data_dir or self.config.get('data_dir', 'data'))
         self.logger = logger or get_logger("file_processor")
         self.num_workers = num_workers
-        
-        # Dapatkan file_utils dari common
-        self.file_utils = get_file_utils(config, logger, num_workers)
         
         self.logger.info(f"📂 FileProcessor diinisialisasi dengan data_dir: {self.data_dir}")
     

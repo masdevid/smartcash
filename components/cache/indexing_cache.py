@@ -11,7 +11,6 @@ from typing import Dict, Optional, List
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
 
 class CacheIndex:
     """Pengindeksan untuk cache dengan optimasi thread-safety dan efisiensi."""
@@ -26,7 +25,6 @@ class CacheIndex:
         """
         self.cache_dir = Path(cache_dir)
         self.logger = logger or get_logger("cache_index")
-        self.file_utils = get_file_utils(logger=self.logger)
         self.index_path = cache_dir / "cache_index.json"
         self._lock = threading.RLock()
         self.index = {}

@@ -9,11 +9,11 @@ from typing import Dict, Optional, Any, Tuple
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
 from smartcash.components.cache.indexing_cache import CacheIndex
 from smartcash.components.cache.storage_cache import CacheStorage
 from smartcash.components.cache.cleanup_cache import CacheCleanup
 from smartcash.components.cache.stats_cache import CacheStats
+from smartcash.common.io import ensure_dir
 
 class CacheManager:
     """
@@ -47,8 +47,8 @@ class CacheManager:
         self.ttl_seconds = ttl_hours * 3600
         
         # Pastikan direktori cache ada
-        self.file_utils = get_file_utils(logger=self.logger)
-        self.file_utils.ensure_dir(self.cache_dir)
+        ensure_dir(self.cache_dir)
+
         
         # Lock untuk operasi thread-safe
         self._lock = threading.RLock()

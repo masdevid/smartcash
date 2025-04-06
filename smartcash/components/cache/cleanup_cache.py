@@ -13,7 +13,6 @@ from typing import Dict, Optional, List, Any
 from concurrent.futures import ThreadPoolExecutor
 
 from smartcash.common.logger import get_logger
-from smartcash.common.file_utils import get_file_utils
 from smartcash.common.threadpools import process_in_parallel, get_optimal_thread_count
 
 class CacheCleanup:
@@ -48,7 +47,6 @@ class CacheCleanup:
         self.cleanup_interval = cleanup_interval
         self.cache_stats = cache_stats
         self.logger = logger or get_logger("cache_cleanup")
-        self.file_utils = get_file_utils(logger=self.logger)
         
         # Setup threading
         self._lock = threading.RLock()

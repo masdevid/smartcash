@@ -10,7 +10,6 @@ from smartcash.common.default_config import (
     ensure_base_config_exists, 
     ensure_colab_config_exists
 )
-from smartcash.common.config_sync import sync_config_with_drive, sync_all_configs
 
 # Lingkungan
 from smartcash.common.environment import get_environment_manager, EnvironmentManager
@@ -61,8 +60,6 @@ __all__ = [
     'generate_default_config', 
     'ensure_base_config_exists', 
     'ensure_colab_config_exists',
-    'sync_config_with_drive', 
-    'sync_all_configs',
     
     # Lingkungan
     'get_environment_manager', 'EnvironmentManager',

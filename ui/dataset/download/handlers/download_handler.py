@@ -119,7 +119,7 @@ def download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     api_key = ui_components['rf_apikey'].value
     output_dir = ui_components['output_dir'].value
     
-    # Format selalu yolov5pytorch
+    # Format selalu yolov5pytorch (tetap)
     output_format = "yolov5pytorch"
     
     # Set API key sebagai environment variable

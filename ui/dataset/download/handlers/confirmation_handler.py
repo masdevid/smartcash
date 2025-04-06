@@ -14,11 +14,10 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
     from smartcash.ui.dataset.download.handlers.download_handler import execute_download
     
     logger = ui_components.get('logger')
-    output_format = ui_components['output_format'].value
     output_dir = ui_components['output_dir'].value
     
     # Buat pesan konfirmasi berdasarkan endpoint
-    message = f"Anda akan mengunduh dataset dalam format {output_format} ke direktori {output_dir}. "
+    message = f"Anda akan mengunduh dataset dalam format YOLO v5 ke direktori {output_dir}. "
     message += _get_endpoint_details(ui_components, endpoint)
     
     # Tampilkan dialog konfirmasi
@@ -52,9 +51,6 @@ def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
     elif endpoint == 'Google Drive':
         drive_folder = ui_components['drive_folder'].value
         return f"Dataset akan disinkronkan dari Google Drive folder: {drive_folder}."
-    elif endpoint == 'URL Kustom':
-        url = ui_components['url_input'].value
-        return f"Dataset akan diunduh dari URL: {url}."
     return ""
 
 def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:

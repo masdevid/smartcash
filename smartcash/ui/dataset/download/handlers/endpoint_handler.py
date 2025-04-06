@@ -27,16 +27,13 @@ def handle_endpoint_change(change: Dict[str, Any], ui_components: Dict[str, Any]
     elif new_endpoint == 'Google Drive':
         ui_components['drive_accordion'].selected_index = 0
         if logger: logger.info("ℹ️ Endpoint diubah ke Google Drive")
-    elif new_endpoint == 'URL Kustom':
-        ui_components['url_accordion'].selected_index = 0
-        if logger: logger.info("ℹ️ Endpoint diubah ke URL Kustom")
     
     # Gunakan custom logging UI
     log_change_to_ui(ui_components, new_endpoint)
 
 def _reset_accordion_visibility(ui_components: Dict[str, Any]) -> None:
     """Reset visibility untuk semua accordion."""
-    for accordion_key in ['rf_accordion', 'drive_accordion', 'url_accordion']:
+    for accordion_key in ['rf_accordion', 'drive_accordion']:
         if accordion_key in ui_components:
             ui_components[accordion_key].selected_index = None
 
@@ -53,8 +50,7 @@ def log_change_to_ui(ui_components: Dict[str, Any], endpoint: str) -> None:
     # Map emoji berdasarkan endpoint
     endpoint_emoji = {
         'Roboflow': '🧩',
-        'Google Drive': '📁', 
-        'URL Kustom': '🔗'
+        'Google Drive': '📁'
     }
     
     emoji = endpoint_emoji.get(endpoint, '📌')
@@ -70,8 +66,8 @@ def get_available_endpoints(ui_components: Dict[str, Any]) -> List[str]:
     Returns:
         List endpoint yang tersedia
     """
-    # Default endpoints
-    endpoints = ['Roboflow', 'Google Drive', 'URL Kustom']
+    # Default endpoints - hanya Roboflow dan Google Drive
+    endpoints = ['Roboflow', 'Google Drive']
     
     # Cek ketersediaan tiap endpoint
     try:
@@ -111,22 +107,18 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'project': ui_components.get('rf_project', {}).value,
             'version': ui_components.get('rf_version', {}).value,
             'api_key': ui_components.get('rf_apikey', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
+            'format': 'yolov5pytorch'  # Format tetap
         }
     elif endpoint == 'Google Drive':
         config = {
             'type': 'drive',
-            'folder': ui_components.get('drive_folder', {}).value
-        }
-    elif endpoint == 'URL Kustom':
-        config = {
-            'type': 'url',
-            'url': ui_components.get('url_input', {}).value
+            'folder': ui_components.get('drive_folder', {}).value,
+            'format': 'yolov5pytorch'  # Format tetap
         }
     
     # Tambahkan konfigurasi output yang sama untuk semua endpoint
     config.update({
         'output_dir': ui_components.get('output_dir', {}).value,
-        'output_format': ui_components.get('output_format', {}).value
     })
     
     return config

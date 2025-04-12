@@ -1,18 +1,12 @@
 """
 File: smartcash/ui/cells/cell_2_4_augmentation.py
-Deskripsi: Cell untuk augmentasi dataset SmartCash dengan kode minimal
+Deskripsi: Entry point untuk cell augmentasi dataset
 """
 
-import sys
-from IPython.display import display
-if '.' not in sys.path: sys.path.append('.')
+def setup_augmentation():
+    """Setup dan tampilkan UI untuk augmentasi dataset."""
+    from smartcash.ui.dataset.augmentation.augmentation_initializer import initialize_augmentation_ui
+    return initialize_augmentation_ui()
 
-try:
-    from smartcash.ui.dataset.augmentation import setup_augmentation
-    # Setup dependency installer
-    ui_components = setup_augmentation()
-    
-    # Tampilkan UI
-    display(ui_components['ui'])
-
-except ImportError as e: create_alert(e, 'error')
+# Eksekusi saat modul diimpor
+ui_components = setup_augmentation()

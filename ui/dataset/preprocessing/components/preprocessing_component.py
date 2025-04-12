@@ -1,21 +1,36 @@
 """
-File: smartcash/ui/dataset/preprocessing_component.py
-Deskripsi: Komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan dan tombol yang diseragamkan
+File: smartcash/ui/dataset/preprocessing/components/preprocessing_component.py
+Deskripsi: Komponen UI utama untuk preprocessing dataset
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
-    """Buat komponen UI untuk preprocessing dataset dengan antarmuka yang disederhanakan."""
+    """
+    Buat komponen UI untuk preprocessing dataset.
     
+    Args:
+        env: Environment manager
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary berisi widget UI
+    """
     # Import komponen UI standar 
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, BUTTON
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
+    
+    # Import komponen submodules preprocessing
+    from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
+    from smartcash.ui.dataset.preprocessing.components.validation_options import create_validation_options
+    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
+    
+    # Import komponen button standar
     from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
-
+    
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
                           "Preprocessing dataset untuk training model SmartCash")
@@ -29,36 +44,16 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         </div>"""
     )
     
-    # Preprocessing options dengan struktur yang lebih ringkas
-    preprocess_options = widgets.VBox([
-        widgets.IntSlider(value=640, min=320, max=640, step=32, description='Image size:',
-                         style={'description_width': 'initial'}, layout=widgets.Layout(width='70%')),
-        widgets.Checkbox(value=True, description='Enable normalization', style={'description_width': 'initial'}),
-        widgets.Checkbox(value=True, description='Preserve aspect ratio', style={'description_width': 'initial'}),
-        widgets.Checkbox(value=True, description='Enable caching', style={'description_width': 'initial'}),
-        widgets.IntSlider(value=4, min=1, max=16, description='Workers:',
-                         style={'description_width': 'initial'}, layout=widgets.Layout(width='50%'))
-    ])
+    # Preprocessing options (split dari komponen besar)
+    preprocess_options = create_preprocessing_options(config)
+    split_selector = create_split_selector()
     
     # Validation options dalam accordion
-    validation_options = widgets.VBox([
-        widgets.Checkbox(value=True, description='Validate dataset integrity', style={'description_width': 'initial'}),
-        widgets.Checkbox(value=True, description='Fix issues automatically', style={'description_width': 'initial'}),
-        widgets.Checkbox(value=True, description='Move invalid files', style={'description_width': 'initial'}),
-        widgets.Text(value='data/invalid', description='Invalid dir:', 
-                    style={'description_width': 'initial'}, layout=widgets.Layout(width='60%'))
-    ])
+    validation_options = create_validation_options(config)
     
     # Accordion untuk validation options - selalu tertutup di awal
     advanced_accordion = widgets.Accordion(children=[validation_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
-    
-    # Split selector untuk preprocessing
-    split_selector = widgets.RadioButtons(
-        options=['All Splits', 'Train Only', 'Validation Only', 'Test Only'],
-        value='All Splits', description='Process:', style={'description_width': 'initial'},
-        layout=widgets.Layout(margin='10px 0')
-    )
     
     # Buat tombol-tombol preprocessing dengan komponen standar
     action_buttons = create_action_buttons(
@@ -87,11 +82,17 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(visibility='hidden', width='100%')
     )
     
+    # Labels untuk progress
+    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
+    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
+    
     # Container progress dengan styling yang lebih konsisten
     progress_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
-        progress_bar, 
-        current_progress
+        progress_bar,
+        overall_label,
+        current_progress,
+        step_label
     ])
     
     # Status output dengan layout standar
@@ -153,6 +154,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
         'split_selector': split_selector,
+        'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
         'reset_button': action_buttons['reset_button'],
@@ -161,6 +163,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'button_container': action_buttons['container'],
         'progress_bar': progress_bar,
         'current_progress': current_progress,
+        'overall_label': overall_label,
+        'step_label': step_label,
         'status': status,
         'log_accordion': log_accordion,
         'summary_container': summary_container,

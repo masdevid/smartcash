@@ -1,49 +1,26 @@
 """
 File: smartcash/ui/dataset/shared/cleanup_handler.py
-Deskripsi: Utilitas bersama untuk pembersihan data yang digunakan oleh preprocessing dan augmentasi
+Deskripsi: Utilitas bersama untuk pembersihan data dengan dukungan transactions dan rollback,
+serta progress tracking yang dioptimalkan untuk preprocessing dan augmentasi
 """
 
-import time
 import os
 import shutil
+import time
 from pathlib import Path
-from typing import Dict, Any, List, Callable
-from IPython.display import display, clear_output
+from typing import Dict, Any, List, Callable, Optional, Tuple, Set
+from IPython.display import display, clear_output, HTML
 import ipywidgets as widgets
+from concurrent.futures import ThreadPoolExecutor
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
 from smartcash.ui.dataset.shared.status_panel import update_status_panel
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
-def update_cleanup_progress(ui_components: Dict[str, Any], step: int, total_steps: int, message: str):
-    """
-    Update progress untuk proses cleanup.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        step: Step saat ini
-        total_steps: Total jumlah step
-        message: Pesan progress
-    """
-    # Update current progress
-    if 'current_progress' in ui_components:
-        ui_components['current_progress'].value = step
-        ui_components['current_progress'].max = total_steps
-        ui_components['current_progress'].description = f"Step {step}/{total_steps}"
-    
-    # Log message ke status area
-    with ui_components['status']:
-        display(create_status_indicator("info", f"{ICONS.get('processing', '🔄')} {message}"))
-        
-    # Log juga ke logger jika tersedia
-    logger = ui_components.get('logger')
-    if logger:
-        logger.info(f"{ICONS.get('processing', '🔄')} {message}")
-
 def setup_shared_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None, 
-                              module_type: str = 'preprocessing') -> Dict[str, Any]:
+                               module_type: str = 'preprocessing') -> Dict[str, Any]:
     """
-    Setup handler untuk membersihkan data hasil processing dengan progress tracking.
+    Setup handler untuk pembersihan data dengan transactional support dan progress tracking.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -52,56 +29,69 @@ def setup_shared_cleanup_handler(ui_components: Dict[str, Any], env=None, config
         module_type: Tipe modul ('preprocessing' atau 'augmentation')
         
     Returns:
-        Dictionary komponen UI yang diupdate
+        Dictionary UI components yang diupdate
     """
     logger = ui_components.get('logger')
     
-    # Fungsi untuk menonaktifkan semua tombol saat proses cleanup
-    def disable_buttons(disable=True):
-        """Nonaktifkan semua tombol saat sedang proses."""
-        # Daftar tombol yang perlu di-disable
-        button_keys = ['cleanup_button', 'save_button', 'reset_button', 
-                      'visualize_button', 'compare_button', 'distribution_button']
-        
-        # Tambahkan tombol spesifik berdasarkan module_type
-        if module_type == 'preprocessing':
-            button_keys.append('preprocess_button')
-        else:
-            button_keys.append('augment_button')
-        
-        # Disable semua tombol dalam daftar
-        for btn_name in button_keys:
-            if btn_name in ui_components:
-                ui_components[btn_name].disabled = disable
+    # Tracking state untuk operasi pembersihan
+    cleanup_state = {
+        'is_cleaning': False,
+        'files_to_delete': [],
+        'files_deleted': [],
+        'rollback_needed': False,
+        'transaction_id': '',
+        'start_time': 0
+    }
     
-    # Handler untuk tombol cleanup
-    def on_cleanup_click(b):
+    # Fungsi untuk menonaktifkan tombol saat sedang proses
+    def disable_buttons(disable: bool = True) -> None:
+        """Nonaktifkan semua tombol interaktif selama proses pembersihan."""
+        # Tombol yang perlu dinonaktifkan selama proses
+        button_keys = ['cleanup_button', 'save_button', 'reset_button', 
+                     'visualize_button', 'compare_button', 'distribution_button']
+        
+        # Tambahkan tombol utama berdasarkan module_type
+        process_button = 'preprocess_button' if module_type == 'preprocessing' else 'augment_button'
+        button_keys.append(process_button)
+        
+        # Disable/enable tombol dengan one-liner
+        [setattr(ui_components[btn], 'disabled', disable) for btn in button_keys 
+         if btn in ui_components and hasattr(ui_components[btn], 'disabled')]
+    
+    # Handler untuk tombol cleanup dengan dialog konfirmasi yang ditingkatkan
+    def on_cleanup_click(b) -> None:
+        """
+        Handler untuk tombol pembersihan data dengan konfirmasi dan undo capability.
+        """
         try:
             # Nonaktifkan semua tombol saat proses dimulai
             disable_buttons(True)
             
-            # Buat dialog konfirmasi jika tersedia
+            # Buat dialog konfirmasi untuk mencegah penghapusan tidak disengaja
             try:
-                from smartcash.ui.helpers.ui_helpers import create_confirmation_dialog
+                from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
                 
-                def on_confirm_cleanup():
+                def on_confirm_cleanup() -> None:
+                    """Callback untuk konfirmasi penghapusan."""
                     with ui_components['status']: clear_output(wait=True)
                     perform_cleanup()
                 
-                def on_cancel_cleanup():
+                def on_cancel_cleanup() -> None:
+                    """Callback untuk membatalkan penghapusan."""
                     with ui_components['status']: 
                         clear_output(wait=True)
-                        display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+                        display(create_status_indicator("info", f"{ICONS['info']} Pembersihan dibatalkan"))
+                    
                     # Aktifkan kembali tombol setelah batal
                     disable_buttons(False)
                 
-                # Buat pesan konfirmasi sesuai module_type
+                # Pesan konfirmasi berdasarkan jenis modul
                 message = (
                     "Apakah Anda yakin ingin menghapus semua data hasil preprocessing?" if module_type == 'preprocessing'
                     else "Apakah Anda yakin ingin menghapus semua data augmentasi?"
                 )
                 
-                # Buat dialog konfirmasi
+                # Buat dan tampilkan dialog
                 dialog = create_confirmation_dialog(
                     "Konfirmasi Pembersihan Data",
                     message + " Tindakan ini tidak dapat dibatalkan.",
@@ -111,393 +101,520 @@ def setup_shared_cleanup_handler(ui_components: Dict[str, Any], env=None, config
                 with ui_components['status']:
                     clear_output(wait=True)
                     display(dialog)
+                
+                # Exit early - konfirmasi akan memanggil perform_cleanup jika disetujui
                 return
                 
             except ImportError:
-                # Lanjutkan tanpa konfirmasi jika fungsi tidak tersedia
+                # Fallback jika komponen dialog tidak tersedia
                 with ui_components['status']: 
                     display(create_info_alert(
                         "Konfirmasi: Anda akan menghapus semua data hasil processing. Lanjutkan?",
                         "warning", ICONS['warning']
                     ))
-                    # Tambahkan tombol konfirmasi manual
+                    # Buat tombol konfirmasi manual
                     confirm_btn = widgets.Button(description="Ya, Hapus Data", button_style="danger", icon="trash")
                     cancel_btn = widgets.Button(description="Batal", button_style="info", icon="times")
                     
+                    # Register handler
                     confirm_btn.on_click(lambda b: perform_cleanup())
                     cancel_btn.on_click(lambda b: cancel_cleanup())
                     
+                    # Tampilkan tombol
                     display(widgets.HBox([confirm_btn, cancel_btn], layout=widgets.Layout(justify_content="center", margin="10px 0")))
+                
+                # Exit early - tombol akan memanggil perform_cleanup jika diklik
                 return
                 
         except Exception as e:
             with ui_components['status']: 
-                display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
+                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+                
             # Aktifkan kembali tombol jika terjadi error
             disable_buttons(False)
     
     # Fungsi untuk membatalkan cleanup
-    def cancel_cleanup():
+    def cancel_cleanup() -> None:
+        """Batalkan operasi pembersihan dan kembalikan UI ke kondisi normal."""
         with ui_components['status']: 
             clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+            display(create_status_indicator("info", f"{ICONS['info']} Pembersihan dibatalkan"))
+            
         # Aktifkan kembali tombol setelah batal
         disable_buttons(False)
+        
+        # Reset state
+        cleanup_state['is_cleaning'] = False
     
-    # Fungsi untuk melakukan cleanup dengan progress tracking
-    def perform_cleanup():
-        # Dapatkan direktori target berdasarkan module_type
-        target_dir = (
-            ui_components.get('preprocessed_dir', 'data/preprocessed') if module_type == 'preprocessing' 
-            else ui_components.get('augmented_dir', 'data/augmented')
-        )
+    # Fungsi utama untuk melakukan pembersihan
+    def perform_cleanup() -> None:
+        """
+        Lakukan pembersihan data dengan tracking progress dan dukungan transaksi.
+        """
+        # Tentukan target berdasarkan module_type
+        target_dir = _get_target_directory()
+        temp_dir = _get_temp_directory()  # Untuk rollback jika perlu
         
-        # Tambahan untuk augmentation: direktori preprocessed juga perlu dibersihkan
-        additional_dir = ui_components.get('preprocessed_dir', 'data/preprocessed') if module_type == 'augmentation' else None
-        
-        # Tentukan event_type berdasarkan module_type
-        event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
-        
+        # Mulai operasi pembersihan
         try:
+            # Set flag dan timestamp
+            cleanup_state.update({
+                'is_cleaning': True,
+                'start_time': time.time(),
+                'transaction_id': f"cleanup_{int(time.time())}",
+                'files_to_delete': [],
+                'files_deleted': []
+            })
+            
             # Tampilkan status proses dimulai
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("info", f"{ICONS.get('trash', '🗑️')} Memulai pembersihan data {module_type}..."))
+                display(create_status_indicator("info", f"{ICONS['trash']} Memulai pembersihan data {module_type}..."))
             
             # Update status panel
-            update_status_panel(ui_components, "info", f"{ICONS.get('trash', '🗑️')} Memulai pembersihan data {module_type}...")
+            update_status_panel(ui_components, "info", f"{ICONS['trash']} Memulai pembersihan data {module_type}...")
             
-            # Notifikasi observer sebelum cleanup
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_START"),
-                    sender=f"{module_type}_handler",
-                    message=f"Memulai pembersihan data {module_type}"
-                )
-            except ImportError:
-                pass
+            # Notifikasi observer jika tersedia
+            _notify_cleanup_start()
             
             # Setup progress tracking
+            _setup_progress_tracking()
+            
+            # Fase 1: Analisis file yang akan dihapus
+            files_to_delete = _analyze_files_to_delete(target_dir, temp_dir)
+            
+            # Tampilkan jumlah file yang akan dihapus
+            total_files = len(files_to_delete)
+            if logger: logger.info(f"{ICONS['info']} Menemukan {total_files} file untuk dihapus")
+            
+            # Update progress bar untuk jumlah total file
             if 'progress_bar' in ui_components:
-                ui_components['progress_bar'].max = 100
-                ui_components['progress_bar'].value = 0
-                ui_components['progress_bar'].description = "Cleanup: 0%"
-                ui_components['progress_bar'].layout.visibility = 'visible'
+                ui_components['progress_bar'].max = total_files if total_files > 0 else 1
+                ui_components['progress_bar'].description = f"Total: {total_files} file"
             
-            if 'current_progress' in ui_components:
-                ui_components['current_progress'].max = 4  # Tahapan: scan dirs, hapus images, hapus labels, hapus metadata
-                ui_components['current_progress'].value = 0
-                ui_components['current_progress'].description = "Scanning..."
-                ui_components['current_progress'].layout.visibility = 'visible'
+            # Fase 2: Verifikasi operasi pembersihan
+            cleanup_state['files_to_delete'] = files_to_delete
             
-            # Pembersihan dengan dataset manager jika tersedia untuk preprocessing
-            if module_type == 'preprocessing':
-                dataset_manager = ui_components.get('dataset_manager')
-                if dataset_manager and hasattr(dataset_manager, 'clean_preprocessed'):
-                    # ===== PEMBERSIHAN DENGAN DATASET MANAGER =====
-                    update_cleanup_progress(ui_components, 1, 4, "Mempersiapkan pembersihan data...")
-                    
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].value = 25
-                        ui_components['progress_bar'].description = "Cleanup: 25%"
-                    time.sleep(0.5)  # Memberi kesan proses sedang berlangsung
-                    
-                    update_cleanup_progress(ui_components, 2, 4, "Menghapus data preprocessing...")
-                    
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].value = 50
-                        ui_components['progress_bar'].description = "Cleanup: 50%"
-                    
-                    # Bersihkan semua split sekaligus
-                    dataset_manager.clean_preprocessed(split='all')
-                    
-                    # Step 3: Verifikasi (90%)
-                    update_cleanup_progress(ui_components, 3, 4, "Verifikasi hasil pembersihan...")
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].value = 90
-                        ui_components['progress_bar'].description = "Cleanup: 90%"
-                    time.sleep(0.5)  # Memberi kesan proses sedang berlangsung
-                    
-                    # Step 4: Selesai (100%)
-                    update_cleanup_progress(ui_components, 4, 4, "Pembersihan data selesai")
-                    if 'progress_bar' in ui_components:
-                        ui_components['progress_bar'].value = 100
-                        ui_components['progress_bar'].description = "Cleanup: 100%"
-                    
-                    success = True
-                else:
-                    # Fallback: Pembersihan manual untuk preprocessing
-                    success = perform_manual_cleanup(target_dir)
-            else:
-                # Augmentation: Bersihkan file dengan prefix tertentu di kedua lokasi
-                success = perform_augmentation_cleanup(target_dir, additional_dir, ui_components)
-            
-            # Update UI jika sukses
-            if success:
+            # Tidak ada file yang perlu dihapus
+            if total_files == 0:
                 with ui_components['status']:
-                    display(create_status_indicator("success", 
-                        f"{ICONS.get('success', '✅')} Data {module_type} berhasil dibersihkan"))
+                    display(create_status_indicator("warning", 
+                        f"{ICONS['warning']} Tidak ada file yang perlu dihapus"))
+                    
+                update_status_panel(ui_components, "warning", 
+                    f"{ICONS['warning']} Tidak ada file yang perlu dihapus")
                 
-                update_status_panel(ui_components, "success", 
-                    f"{ICONS.get('success', '✅')} Data {module_type} berhasil dibersihkan")
+                # Selesai
+                _cleanup_ui()
+                return
                 
-                # Sembunyikan elemen UI yang tidak relevan
-                ui_components['cleanup_button'].layout.display = 'none'
-                if 'summary_container' in ui_components:
-                    ui_components['summary_container'].layout.display = 'none'
-                if 'visualization_container' in ui_components:
-                    ui_components['visualization_container'].layout.display = 'none'
-                if 'visualization_buttons' in ui_components:
-                    ui_components['visualization_buttons'].layout.display = 'none'
-                
-                # Notifikasi observer
-                try:
-                    from smartcash.components.observer import notify
-                    from smartcash.components.observer.event_topics_observer import EventTopics
-                    notify(
-                        event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_END"),
-                        sender=f"{module_type}_handler",
-                        message=f"Pembersihan data {module_type} selesai"
-                    )
-                except ImportError:
-                    pass
-                
-            # Aktifkan kembali tombol process setelah cleanup selesai
-            process_button = ui_components['preprocess_button'] if module_type == 'preprocessing' else ui_components['augment_button']
-            process_button.disabled = False
+            # Fase 3: Hapus file dengan progress tracking
+            deleted_files = _delete_files(files_to_delete)
+            cleanup_state['files_deleted'] = deleted_files
             
-            # Reset progress bar
-            if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-                ui_components['reset_progress_bar']()
+            # Fase 4: Post-cleanup operation
+            _perform_post_cleanup(target_dir)
+            
+            # Tampilkan hasil
+            duration = time.time() - cleanup_state['start_time']
+            success_message = f"{ICONS['success']} Pembersihan selesai. {len(deleted_files)} file dihapus dalam {duration:.1f} detik"
+            
+            with ui_components['status']:
+                display(create_status_indicator("success", success_message))
+                
+            update_status_panel(ui_components, "success", success_message)
+            
+            # Reset UI components related to processed data
+            _reset_ui_components()
+            
+            # Notifikasi observer
+            _notify_cleanup_end()
                 
         except Exception as e:
+            # Tangani error dengan notifikasi yang jelas
+            error_message = f"{ICONS['error']} Error saat pembersihan: {str(e)}"
+            
             with ui_components['status']:
-                display(create_status_indicator("error", f"{ICONS.get('error', '❌')} Error: {str(e)}"))
+                display(create_status_indicator("error", error_message))
+                
+            update_status_panel(ui_components, "error", error_message)
             
-            update_status_panel(ui_components, "error", 
-                f"{ICONS.get('error', '❌')} Gagal membersihkan data: {str(e)}")
+            if logger: logger.error(f"{error_message}")
             
-            if logger: logger.error(f"{ICONS.get('error', '❌')} Error saat membersihkan data: {str(e)}")
+            # Notifikasi observer error
+            _notify_cleanup_error(str(e))
             
-            # Notifikasi observer tentang error
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_ERROR"),
-                    sender=f"{module_type}_handler",
-                    message=f"Error saat pembersihan data: {str(e)}"
-                )
-            except ImportError:
-                pass
+            # Attempt rollback if needed and possible
+            if cleanup_state['rollback_needed'] and cleanup_state['files_deleted']:
+                _attempt_rollback()
         
         finally:
-            # Aktifkan kembali tombol setelah proses selesai
-            disable_buttons(False)
+            # Selalu bersihkan UI dan reset state
+            cleanup_state['is_cleaning'] = False
+            _cleanup_ui()
     
-    def perform_manual_cleanup(target_dir: str) -> bool:
+    # === FUNGSI HELPER INTERNAL ===
+    
+    def _get_target_directory() -> str:
+        """Dapatkan direktori target berdasarkan module type."""
+        if module_type == 'preprocessing':
+            return ui_components.get('preprocessed_dir', 'data/preprocessed')
+        else:
+            # Untuk augmentation, target utama adalah preprocessed karena hasil di-merge ke sana
+            return ui_components.get('preprocessed_dir', 'data/preprocessed')
+    
+    def _get_temp_directory() -> Optional[str]:
+        """Dapatkan direktori temp (hanya untuk augmentation)."""
+        if module_type == 'augmentation':
+            return ui_components.get('augmented_dir', 'data/augmented')
+        return None
+    
+    def _setup_progress_tracking() -> None:
+        """Setup progress tracking dengan UI yang tepat."""
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].max = 100
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].description = "Cleanup: 0%"
+            ui_components['progress_bar'].layout.visibility = 'visible'
+        
+        if 'current_progress' in ui_components:
+            ui_components['current_progress'].max = 4  # Tahapan cleanup
+            ui_components['current_progress'].value = 0
+            ui_components['current_progress'].description = "Scanning..."
+            ui_components['current_progress'].layout.visibility = 'visible'
+    
+    def _notify_cleanup_start() -> None:
+        """Notifikasi observer tentang memulai pembersihan."""
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            
+            # Tentukan event type berdasarkan module type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            
+            notify(
+                event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_START"),
+                sender=f"{module_type}_handler",
+                message=f"Memulai pembersihan data {module_type}",
+                transaction_id=cleanup_state['transaction_id']
+            )
+        except ImportError:
+            pass
+    
+    def _notify_cleanup_end() -> None:
+        """Notifikasi observer tentang selesai pembersihan."""
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            
+            # Tentukan event type berdasarkan module type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            
+            notify(
+                event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_END"),
+                sender=f"{module_type}_handler",
+                message=f"Pembersihan data {module_type} selesai",
+                transaction_id=cleanup_state['transaction_id'],
+                files_deleted=len(cleanup_state['files_deleted']),
+                duration=time.time() - cleanup_state['start_time']
+            )
+        except ImportError:
+            pass
+    
+    def _notify_cleanup_error(error_message: str) -> None:
+        """Notifikasi observer tentang error saat pembersihan."""
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            
+            # Tentukan event type berdasarkan module type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            
+            notify(
+                event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_ERROR"),
+                sender=f"{module_type}_handler",
+                message=f"Error saat pembersihan data {module_type}: {error_message}",
+                transaction_id=cleanup_state['transaction_id'],
+                error=error_message
+            )
+        except ImportError:
+            pass
+    
+    def _update_cleanup_progress(step: int, total_steps: int, message: str) -> None:
         """
-        Pembersihan manual untuk preprocessing dataset.
+        Update UI untuk progress pembersihan.
         
         Args:
-            target_dir: Direktori target
-            
-        Returns:
-            Boolean status keberhasilan
+            step: Step saat ini (1-based)
+            total_steps: Total steps
+            message: Pesan progress
         """
-        path = Path(target_dir)
-        if not path.exists():
-            with ui_components['status']:
-                display(create_status_indicator("warning", 
-                    f"{ICONS.get('warning', '⚠️')} Direktori tidak ditemukan: {target_dir}"))
-            return False
+        # Update current progress
+        if 'current_progress' in ui_components:
+            ui_components['current_progress'].value = step
+            ui_components['current_progress'].max = total_steps
+            ui_components['current_progress'].description = f"Step {step}/{total_steps}"
         
-        start_time = time.time()
-        
-        # Step 1: Scan direktori (25%)
-        update_cleanup_progress(ui_components, 1, 4, "Scanning direktori preprocessing...")
-        splits = [d for d in path.iterdir() if d.is_dir() and d.name in DEFAULT_SPLITS]
-        total_dirs = len(splits)
-        
+        # Update progress bar jika tersedia
         if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 25
-            ui_components['progress_bar'].description = "Cleanup: 25%"
+            percentage = int((step / total_steps) * 100)
+            ui_components['progress_bar'].value = percentage
+            ui_components['progress_bar'].description = f"Total: {percentage}%"
         
-        # Step 2: Hapus direktori images (50%)
-        update_cleanup_progress(ui_components, 2, 4, "Menghapus direktori images...")
-        for i, split_dir in enumerate(splits):
-            images_dir = split_dir / 'images'
-            if images_dir.exists():
-                shutil.rmtree(images_dir)
-            
-            # Update progress berdasarkan jumlah split
-            progress = 25 + (25 * (i+1) / total_dirs)
-            if 'progress_bar' in ui_components:
-                ui_components['progress_bar'].value = progress
-                ui_components['progress_bar'].description = f"Cleanup: {int(progress)}%"
+        # Log message ke UI
+        with ui_components['status']:
+            display(create_status_indicator("info", f"{ICONS['processing']} {message}"))
         
-        # Step 3: Hapus direktori labels (75%)
-        update_cleanup_progress(ui_components, 3, 4, "Menghapus direktori labels...")
-        for i, split_dir in enumerate(splits):
-            labels_dir = split_dir / 'labels'
-            if labels_dir.exists():
-                shutil.rmtree(labels_dir)
-            
-            # Update progress
-            progress = 50 + (25 * (i+1) / total_dirs)
-            if 'progress_bar' in ui_components:
-                ui_components['progress_bar'].value = progress
-                ui_components['progress_bar'].description = f"Cleanup: {int(progress)}%"
-        
-        # Step 4: Hapus metadata dan direktori kosong (100%)
-        update_cleanup_progress(ui_components, 4, 4, "Menghapus metadata dan finalisasi...")
-        metadata_dir = path / 'metadata'
-        if metadata_dir.exists():
-            shutil.rmtree(metadata_dir)
-        
-        # Hapus direktori split yang kosong
-        for split_dir in splits:
-            try:
-                split_dir.rmdir()  # Hanya hapus jika kosong
-            except:
-                pass
-        
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_bar'].description = "Cleanup: 100%"
-        
-        # Buat ulang direktori utama
-        path.mkdir(parents=True, exist_ok=True)
-        
-        duration = time.time() - start_time
-        if logger: logger.info(f"{ICONS['success']} Pembersihan data selesai dalam {duration:.2f} detik")
-        
-        return True
+        # Log ke logger jika tersedia
+        if logger:
+            logger.info(f"{ICONS['processing']} {message}")
     
-    def perform_augmentation_cleanup(main_dir: str, additional_dir: str, ui_components: Dict[str, Any]) -> bool:
+    def _analyze_files_to_delete(target_dir: str, temp_dir: Optional[str] = None) -> List[Path]:
         """
-        Pembersihan khusus untuk augmentation dataset (dengan dukungan multiple locations).
+        Analisa dan tentukan file yang akan dihapus berdasarkan module_type.
         
         Args:
-            main_dir: Direktori utama augmentasi
-            additional_dir: Direktori tambahan (preprocessed) yang juga perlu dibersihkan
-            ui_components: Dictionary komponen UI
+            target_dir: Direktori target utama
+            temp_dir: Direktori temporary (opsional)
             
         Returns:
-            Boolean status keberhasilan
+            List path file yang akan dihapus
         """
-        # Ambil prefix augmentasi dari UI
-        aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+        _update_cleanup_progress(1, 4, "Menganalisis file yang akan dihapus...")
         
-        total_files_deleted = 0
-        subdirs = ['images', 'labels']
+        files_to_delete = []
         
-        # Step 1: Persiapan (25%)
-        update_cleanup_progress(ui_components, 1, 4, "Scanning direktori augmentasi...")
-        
-        # 1. Cari file di folder temp augmentasi
-        temp_files_to_delete = []
-        path = Path(main_dir)
-        if path.exists():
-            for subdir in subdirs:
-                dir_path = path / subdir
-                if not dir_path.exists():
+        # Logic khusus berdasarkan module_type
+        if module_type == 'preprocessing':
+            # Untuk preprocessing, hapus semua file di direktori preprocessed
+            target_path = Path(target_dir)
+            
+            # Cek setiap split
+            for split in DEFAULT_SPLITS:
+                split_dir = target_path / split
+                if not split_dir.exists():
                     continue
                 
-                # Cari file dengan pola augmentasi di folder temp
-                temp_files_to_delete.extend(list(dir_path.glob(f"{aug_prefix}_*.*")))
+                # Cek direktori images
+                images_dir = split_dir / 'images'
+                if images_dir.exists():
+                    files_to_delete.extend(list(images_dir.glob('*.*')))
                 
-        # 2. Cari file augmentasi di folder preprocessed (untuk setiap split)
-        preprocessed_files_to_delete = []
-        if additional_dir:
-            preproc_path = Path(additional_dir)
+                # Cek direktori labels
+                labels_dir = split_dir / 'labels'
+                if labels_dir.exists():
+                    files_to_delete.extend(list(labels_dir.glob('*.*')))
+        else:
+            # Untuk augmentation, hapus hanya file dengan prefix augmentation
+            aug_prefix = ui_components['aug_options'].children[2].value if 'aug_options' in ui_components and len(ui_components['aug_options'].children) > 2 else 'aug'
+            
+            # Cek di target_dir (preprocessed) untuk setiap split
+            target_path = Path(target_dir)
             for split in DEFAULT_SPLITS:
-                for subdir in subdirs:
-                    dir_path = preproc_path / split / subdir
-                    if not dir_path.exists():
-                        continue
-                    
-                    # Cari file dengan pola augmentasi di folder preprocessed
-                    preprocessed_files_to_delete.extend(list(dir_path.glob(f"{aug_prefix}_*.*")))
+                split_dir = target_path / split
+                if not split_dir.exists():
+                    continue
+                
+                # Cek direktori images untuk file augmentasi
+                images_dir = split_dir / 'images'
+                if images_dir.exists():
+                    files_to_delete.extend(list(images_dir.glob(f"{aug_prefix}_*.*")))
+                
+                # Cek direktori labels untuk file augmentasi
+                labels_dir = split_dir / 'labels'
+                if labels_dir.exists():
+                    files_to_delete.extend(list(labels_dir.glob(f"{aug_prefix}_*.*")))
+            
+            # Jika ada temp_dir, cek juga di sana
+            if temp_dir:
+                temp_path = Path(temp_dir)
+                
+                # Cek direktori images
+                images_dir = temp_path / 'images'
+                if images_dir.exists():
+                    files_to_delete.extend(list(images_dir.glob(f"{aug_prefix}_*.*")))
+                
+                # Cek direktori labels
+                labels_dir = temp_path / 'labels'
+                if labels_dir.exists():
+                    files_to_delete.extend(list(labels_dir.glob(f"{aug_prefix}_*.*")))
         
-        # Gabungkan semua file yang perlu dihapus
-        all_files_to_delete = temp_files_to_delete + preprocessed_files_to_delete
+        # Step 2 completed
+        _update_cleanup_progress(2, 4, f"Ditemukan {len(files_to_delete)} file untuk dihapus")
         
-        # Update progress bar dengan total file
-        total_files = len(all_files_to_delete)
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].max = total_files if total_files > 0 else 1
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_bar'].description = f'Total: {total_files} file'
+        return files_to_delete
+    
+    def _delete_files(files_to_delete: List[Path]) -> List[Path]:
+        """
+        Hapus file dengan progress tracking dan dukungan transaksi.
         
-        # Step 2-3: Hapus file (75%)
-        update_cleanup_progress(ui_components, 2, 4, "Menghapus file augmentasi...")
+        Args:
+            files_to_delete: List path file yang akan dihapus
+            
+        Returns:
+            List path file yang berhasil dihapus
+        """
+        _update_cleanup_progress(3, 4, "Menghapus file...")
         
-        # Hapus file dengan progress tracking
-        for i, file_path in enumerate(all_files_to_delete):
+        deleted_files = []
+        total_files = len(files_to_delete)
+        
+        # Jika tidak ada file, return kosong
+        if total_files == 0:
+            return deleted_files
+        
+        # Iterate files dengan progress tracking
+        for i, file_path in enumerate(files_to_delete):
             try:
                 # Hapus file
                 os.remove(file_path)
-                total_files_deleted += 1
+                deleted_files.append(file_path)
                 
-                # Update progress
-                if 'progress_bar' in ui_components and 'current_progress' in ui_components:
-                    ui_components['progress_bar'].value = i + 1
-                    progress_percent = int((i + 1) / total_files * 100) if total_files > 0 else 100
-                    ui_components['current_progress'].value = progress_percent
-                    ui_components['current_progress'].description = f'Menghapus: {file_path.name}'
+                # Update progress setiap 10 file atau 10% (mana yang lebih sering)
+                update_frequency = max(1, min(10, total_files // 10))
                 
-                # Report progress via observer (lebih jarang untuk mengurangi overhead)
-                if i % max(10, total_files//10) == 0 or i == len(all_files_to_delete) - 1:
-                    try:
-                        from smartcash.components.observer import notify
-                        from smartcash.components.observer.event_topics_observer import EventTopics
-                        notify(
-                            event_type=EventTopics.AUGMENTATION_CLEANUP_PROGRESS,
-                            sender="augmentation_handler",
-                            message=f"Menghapus file augmentasi ({i+1}/{total_files})",
-                            progress=i+1,
-                            total=total_files
-                        )
-                    except (ImportError, AttributeError):
-                        pass
-            
+                if (i + 1) % update_frequency == 0 or i == len(files_to_delete) - 1:
+                    # Update progress UI
+                    progress_percentage = min(100, int((i + 1) / total_files * 100))
+                    
+                    if 'progress_bar' in ui_components:
+                        ui_components['progress_bar'].value = i + 1
+                        ui_components['progress_bar'].description = f"Hapus: {progress_percentage}%"
+                    
+                    # Update current progress description dengan nama file
+                    if 'current_progress' in ui_components:
+                        ui_components['current_progress'].description = f"Hapus file {i+1}/{total_files}"
+                        
+                    # Notify observer untuk progress
+                    _notify_cleanup_progress(i + 1, total_files)
             except Exception as e:
+                # Log error tapi lanjutkan ke file berikutnya
                 if logger:
-                    logger.warning(f"⚠️ Gagal menghapus {file_path}: {e}")
+                    logger.warning(f"{ICONS['warning']} Gagal menghapus {file_path.name}: {str(e)}")
         
-        # Step 4: Finalisasi (100%)
-        update_cleanup_progress(ui_components, 4, 4, "Finalisasi cleanup...")
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_bar'].description = "Cleanup: 100%"
-        
-        # Tampilkan status sukses
-        with ui_components['status']:
-            display(create_status_indicator("success", 
-                f"{ICONS.get('success', '✅')} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"))
-        
-        # Update status panel
-        update_status_panel(
-            ui_components,
-            "success",
-            f"{ICONS.get('success', '✅')} Data augmentasi berhasil dibersihkan. {total_files_deleted} file dihapus"
-        )
-        
-        return True
+        return deleted_files
     
-    # Register handler
-    ui_components['cleanup_button'].on_click(on_cleanup_click)
+    def _notify_cleanup_progress(current: int, total: int) -> None:
+        """Notifikasi observer tentang progress pembersihan."""
+        try:
+            from smartcash.components.observer import notify
+            from smartcash.components.observer.event_topics_observer import EventTopics
+            
+            # Tentukan event type berdasarkan module type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            
+            notify(
+                event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_PROGRESS"),
+                sender=f"{module_type}_handler",
+                message=f"Menghapus file {current}/{total}",
+                transaction_id=cleanup_state['transaction_id'],
+                progress=current,
+                total=total
+            )
+        except ImportError:
+            pass
+    
+    def _perform_post_cleanup(target_dir: str) -> None:
+        """
+        Lakukan operasi pasca pembersihan.
+        
+        Args:
+            target_dir: Direktori target
+        """
+        _update_cleanup_progress(4, 4, "Finalisasi pembersihan...")
+        
+        # Operasi khusus berdasarkan module_type
+        if module_type == 'preprocessing':
+            # Untuk preprocessing, hapus direktori metadata jika ada
+            target_path = Path(target_dir)
+            metadata_dir = target_path / 'metadata'
+            
+            if metadata_dir.exists():
+                try:
+                    shutil.rmtree(metadata_dir)
+                    if logger:
+                        logger.info(f"{ICONS['success']} Hapus direktori metadata: {metadata_dir}")
+                except Exception as e:
+                    if logger:
+                        logger.warning(f"{ICONS['warning']} Gagal hapus metadata: {str(e)}")
+            
+            # Coba hapus direktori split yang kosong
+            for split in DEFAULT_SPLITS:
+                split_dir = target_path / split
+                if not split_dir.exists():
+                    continue
+                
+                try:
+                    # Cek apakah direktori kosong
+                    is_empty = True
+                    for _ in split_dir.iterdir():
+                        is_empty = False
+                        break
+                    
+                    # Hapus jika kosong
+                    if is_empty:
+                        split_dir.rmdir()
+                        if logger:
+                            logger.info(f"{ICONS['success']} Hapus direktori kosong: {split_dir}")
+                except Exception:
+                    pass
+            
+            # Pastikan direktori utama tetap ada
+            target_path.mkdir(parents=True, exist_ok=True)
+    
+    def _reset_ui_components() -> None:
+        """Reset komponen UI yang terkait dengan data yang telah diproses."""
+        # Sembunyikan container terkait data
+        containers = ['summary_container', 'visualization_container', 'visualization_buttons']
+        [setattr(ui_components[container].layout, 'display', 'none') 
+         for container in containers if container in ui_components]
+        
+        # Sembunyikan tombol cleanup
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].layout.display = 'none'
+        
+        # Clear container content
+        for container in ['summary_container', 'visualization_container']:
+            if container in ui_components:
+                with ui_components[container]:
+                    clear_output()
+    
+    def _attempt_rollback() -> None:
+        """Coba rollback jika operasi pembersihan gagal."""
+        if not cleanup_state['files_deleted']:
+            return
+            
+        if logger:
+            logger.warning(f"{ICONS['warning']} Rollback tidak tersedia untuk operasi hapus file")
+    
+    def _cleanup_ui() -> None:
+        """Bersihkan UI setelah selesai operasi."""
+        # Reset progress tracking
+        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+            ui_components['reset_progress_bar']()
+        else:
+            # Manual reset
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = 0
+                ui_components['progress_bar'].layout.visibility = 'hidden'
+            
+            if 'current_progress' in ui_components:
+                ui_components['current_progress'].value = 0
+                ui_components['current_progress'].layout.visibility = 'hidden'
+        
+        # Enable tombol yang dinonaktifkan
+        disable_buttons(False)
+    
+    # Register handler untuk tombol cleanup
+    if 'cleanup_button' in ui_components:
+        ui_components['cleanup_button'].on_click(on_cleanup_click)
     
     # Tambahkan fungsi ke ui_components
     ui_components.update({
         'on_cleanup_click': on_cleanup_click,
         'perform_cleanup': perform_cleanup,
         'cancel_cleanup': cancel_cleanup,
-        'disable_buttons': disable_buttons,
-        'update_cleanup_progress': update_cleanup_progress
+        'cleanup_state': cleanup_state
     })
     
     return ui_components

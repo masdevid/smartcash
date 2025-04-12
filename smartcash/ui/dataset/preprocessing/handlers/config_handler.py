@@ -1,21 +1,98 @@
 """
-File: smartcash/ui/dataset/preprocessing_config_handler.py
-Deskripsi: Handler untuk konfigurasi preprocessing dataset dengan persistensi yang ditingkatkan
+File: smartcash/ui/dataset/preprocessing/handlers/config_handler.py
+Deskripsi: Handler konfigurasi untuk preprocessing dataset
 """
 
 from typing import Dict, Any, Optional
-import os, yaml, json, copy
+import os
+import yaml
+import copy
 from pathlib import Path
 from IPython.display import display
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR, DEFAULT_IMG_SIZE
 
+def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
+    """
+    Setup handler untuk konfigurasi preprocessing dengan persistensi yang ditingkatkan.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi
+        env: Environment manager
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    logger = ui_components.get('logger')
+    from smartcash.ui.utils.constants import ICONS
+    
+    # Load konfigurasi jika belum tersedia
+    if config is None:
+        config = load_preprocessing_config(ui_components=ui_components)
+    
+    # Update UI dari konfigurasi
+    ui_components = update_ui_from_config(ui_components, config)
+    
+    # Handler untuk tombol save config
+    def on_save_config(b):
+        from smartcash.ui.utils.alert_utils import create_status_indicator
+        
+        # Update config dari UI dan simpan
+        updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
+        success = save_preprocessing_config(updated_config)
+        
+        # Simpan kembali config yang diupdate ke ui_components
+        ui_components['config'] = updated_config
+        
+        # Tampilkan status
+        status_type = 'success' if success else 'error'
+        message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
+        
+        # Update status
+        with ui_components['status']: 
+            display(create_status_indicator(status_type, message))
+            
+        # Update status panel
+        from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
+        update_status_panel(ui_components, status_type, message)
+        
+        # Log
+        if logger: 
+            log_method = logger.success if success else logger.error
+            log_method(message)
+    
+    # Register handler untuk tombol save
+    if 'save_button' in ui_components:
+        ui_components['save_button'].on_click(on_save_config)
+    
+    # Tambahkan referensi fungsi ke UI components
+    ui_components.update({
+        'update_config_from_ui': update_config_from_ui,
+        'save_preprocessing_config': save_preprocessing_config,
+        'load_preprocessing_config': load_preprocessing_config,
+        'update_ui_from_config': update_ui_from_config,
+        'on_save_config': on_save_config,
+        'config': config  # Simpan referensi config di ui_components
+    })
+    
+    return ui_components
+
 def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY dan persistensi yang ditingkatkan."""
+    """
+    Ekstrak dan update konfigurasi dari UI dengan pendekatan DRY.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary konfigurasi yang diupdate
+    """
     # Inisialisasi config dengan deep copy untuk mencegah modifikasi tidak sengaja
     config = copy.deepcopy(config or {})
     logger = ui_components.get('logger')
     
-    # Pastikan section preprocessing ada
+    # Pastikan section preprocessing dan data ada
     if 'preprocessing' not in config: config['preprocessing'] = {}
     if 'data' not in config: config['data'] = {}
     
@@ -73,7 +150,7 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         }
         config['preprocessing']['splits'] = split_map.get(split_selector.value, DEFAULT_SPLITS)
     
-    # PERBAIKAN: Simpan referensi config di ui_components untuk memastikan persistensi
+    # Simpan referensi config di ui_components untuk memastikan persistensi
     ui_components['config'] = config
     
     if logger: logger.debug(f"🔄 Konfigurasi preprocessing berhasil diupdate dari UI")
@@ -81,7 +158,16 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     return config
 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
-    """Simpan konfigurasi preprocessing dengan penanganan persistensi yang lebih baik."""
+    """
+    Simpan konfigurasi preprocessing dengan penanganan persistensi yang lebih baik.
+    
+    Args:
+        config: Konfigurasi aplikasi
+        config_path: Path file konfigurasi
+        
+    Returns:
+        Boolean status keberhasilan
+    """
     logger = None
     try:
         # Ambil logger dari lingkungan jika tersedia
@@ -156,7 +242,16 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         return False
 
 def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """Load konfigurasi preprocessing dengan persistensi yang disempurnakan."""
+    """
+    Load konfigurasi preprocessing dengan persistensi yang disempurnakan.
+    
+    Args:
+        config_path: Path file konfigurasi
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi
+    """
     logger = None
     try:
         # Ambil logger dari lingkungan atau ui_components
@@ -169,7 +264,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             except ImportError:
                 pass
             
-        # PERBAIKAN: Cek apakah ada config tersimpan di ui_components
+        # Cek apakah ada config tersimpan di ui_components
         if ui_components and 'config' in ui_components and ui_components['config']:
             if logger: logger.info("ℹ️ Menggunakan konfigurasi dari UI components")
             return ui_components['config']
@@ -198,7 +293,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                             
                         if logger: logger.info(f"📥 Konfigurasi dimuat dari drive: {drive_config_path}")
                         
-                        # PERBAIKAN: Simpan ke ui_components jika tersedia
+                        # Simpan ke ui_components jika tersedia
                         if ui_components: ui_components['config'] = drive_config
                         return drive_config
         except (ImportError, AttributeError) as e:
@@ -215,7 +310,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
             if full_config and ('preprocessing' in full_config or 'data' in full_config):
                 if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path} via ConfigManager")
                 
-                # PERBAIKAN: Simpan ke ui_components jika tersedia
+                # Simpan ke ui_components jika tersedia
                 if ui_components: ui_components['config'] = full_config
                 return full_config
         except (ImportError, AttributeError):
@@ -231,7 +326,7 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                 if 'preprocessing' not in config: config['preprocessing'] = {}
                 if 'data' not in config: config['data'] = {}
                 
-                # PERBAIKAN: Simpan ke ui_components jika tersedia
+                # Simpan ke ui_components jika tersedia
                 if ui_components: ui_components['config'] = config
                 return config
     except Exception as e:
@@ -264,13 +359,22 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     
     if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
     
-    # PERBAIKAN: Simpan default config ke ui_components jika tersedia
+    # Simpan default config ke ui_components jika tersedia
     if ui_components: ui_components['config'] = default_config
     
     return default_config
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """Update komponen UI dari konfigurasi dengan pendekatan DRY dan persistensi yang ditingkatkan."""
+    """
+    Update komponen UI dari konfigurasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
     logger = ui_components.get('logger')
     
     # Update data paths dan simpan di UI components
@@ -338,68 +442,9 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         
         split_selector.value = split_map.get(split_str, 'All Splits')
     
-    # PERBAIKAN: Simpan referensi config di ui_components untuk persistensi
+    # Simpan referensi config di ui_components untuk persistensi
     ui_components['config'] = config
     
     if logger: logger.debug(f"🔄 UI berhasil diupdate dari konfigurasi")
-    
-    return ui_components
-
-def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
-    """Setup handler untuk konfigurasi preprocessing dengan persistensi yang ditingkatkan."""
-    logger = ui_components.get('logger')
-    from smartcash.ui.utils.constants import ICONS
-    
-    # PERBAIKAN: Cek apakah ada config tersimpan di ui_components
-    if 'config' in ui_components and ui_components['config']:
-        config = ui_components['config']
-    else:
-        # Load config jika belum tersedia
-        config = config or load_preprocessing_config(ui_components=ui_components)
-    
-    # Update UI dari config
-    ui_components = update_ui_from_config(ui_components, config)
-    
-    # Handler untuk tombol save config dengan persistensi yang diperbaiki
-    def on_save_config(b):
-        from smartcash.ui.utils.alert_utils import create_status_indicator
-        from smartcash.ui.dataset.shared.status_panel import update_status_panel
-        
-        # Update config dari UI dan simpan
-        updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
-        success = save_preprocessing_config(updated_config)
-        
-        # PERBAIKAN: Simpan kembali config yang diupdate ke ui_components
-        ui_components['config'] = updated_config
-        
-        # Tampilkan status
-        status_type = 'success' if success else 'error'
-        message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
-        
-        # Update status
-        with ui_components['status']: 
-            display(create_status_indicator(status_type, message))
-            
-        # Update status panel
-        update_status_panel(ui_components, status_type, message)
-        
-        # Log
-        if logger: 
-            log_method = logger.success if success else logger.error
-            log_method(message)
-    
-    # Register handler untuk tombol save
-    if 'save_button' in ui_components:
-        ui_components['save_button'].on_click(on_save_config)
-    
-    # Tambahkan referensi fungsi ke UI components
-    ui_components.update({
-        'update_config_from_ui': update_config_from_ui,
-        'save_preprocessing_config': save_preprocessing_config,
-        'load_preprocessing_config': load_preprocessing_config,
-        'update_ui_from_config': update_ui_from_config,
-        'on_save_config': on_save_config,
-        'config': config  # Simpan referensi config di ui_components
-    })
     
     return ui_components

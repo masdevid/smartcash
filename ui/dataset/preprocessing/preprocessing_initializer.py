@@ -4,7 +4,7 @@ Deskripsi: Initializer untuk modul preprocessing dataset
 """
 
 from typing import Dict, Any
-from IPython.display import display, clear_output
+from IPython.display import display
 
 def initialize_preprocessing_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul preprocessing dataset."""
@@ -15,16 +15,13 @@ def initialize_preprocessing_ui() -> Dict[str, Any]:
         from smartcash.ui.utils.cell_utils import setup_notebook_environment
         env, config = setup_notebook_environment('preprocessing')
         
-        # Setup logging untuk UI
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging({'module_name': 'preprocessing'}, 'preprocessing')
-        ui_components['logger'] = logger
-        
         # Buat komponen UI
         from smartcash.ui.dataset.preprocessing.components.preprocessing_component import create_preprocessing_ui
         ui_components = create_preprocessing_ui(env, config)
         
-        # Tambahkan logger ke ui_components
+        # Setup logging untuk UI
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        logger = setup_ipython_logging(ui_components, 'preprocessing')
         ui_components['logger'] = logger
         
         # Setup config handler dengan pendekatan granular
@@ -36,11 +33,7 @@ def initialize_preprocessing_ui() -> Dict[str, Any]:
         setup_multi_progress_tracking(
             ui_components, 
             "preprocessing", 
-            "preprocessing_step", 
-            "progress_bar", 
-            "current_progress", 
-            "overall_label", 
-            "step_label"
+            "preprocessing_step"
         )
         
         # Setup button handlers dengan pendekatan granular
@@ -58,7 +51,6 @@ def initialize_preprocessing_ui() -> Dict[str, Any]:
         try:
             from smartcash.ui.handlers.observer_handler import setup_observer_handlers
             ui_components = setup_observer_handlers(ui_components, "preprocessing_observers")
-            if logger: logger.debug("🔄 Observer berhasil diinisialisasi")
         except ImportError:
             pass
         
@@ -72,9 +64,13 @@ def initialize_preprocessing_ui() -> Dict[str, Any]:
         
         if logger: logger.info("🚀 Preprocessing UI berhasil diinisialisasi")
         
+        # Tampilkan UI
+        display(ui_components['ui'])
+        
     except Exception as e:
         # Fallback jika ada error
         from smartcash.ui.utils.fallback_utils import create_fallback_ui
         ui_components = create_fallback_ui(ui_components, f"⚠️ Error saat inisialisasi preprocessing: {str(e)}", "error")
+        display(ui_components['ui'])
     
     return ui_components

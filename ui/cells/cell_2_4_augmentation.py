@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/cells/cell_2_4_augmentation.py
-Deskripsi: Entry point untuk cell augmentasi dataset
+Deskripsi: Entry point untuk augmentation cell
 """
 
 def setup_augmentation():

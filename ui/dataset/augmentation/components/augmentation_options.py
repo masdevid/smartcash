@@ -1,10 +1,10 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_options.py
-Deskripsi: Komponen opsi augmentasi dataset
+Deskripsi: Komponen opsi augmentasi untuk augmentasi dataset
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """
@@ -14,78 +14,90 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         config: Konfigurasi aplikasi
         
     Returns:
-        Widget VBox dengan opsi augmentasi
+        Widget VBox berisi opsi augmentasi
     """
-    # Default values dari config jika tersedia
-    aug_config = config.get('augmentation', {}) if config else {}
+    # Dapatkan nilai default dari config jika tersedia
+    augmentations = ['Combined (Recommended)']
+    augmentation_factor = 2
+    aug_prefix = 'aug'
+    target_split = 'train'
+    balance_classes = True
+    num_workers = 4
     
-    # Nilai default
-    default_types = aug_config.get('types', ['combined'])
-    default_variations = aug_config.get('num_variations', 2)
-    default_prefix = aug_config.get('output_prefix', 'aug')
-    default_process_bboxes = aug_config.get('process_bboxes', True)
-    default_validate = aug_config.get('validate_results', True)
-    default_workers = aug_config.get('num_workers', 4)
-    default_balance = aug_config.get('target_balance', True)
+    if config and 'augmentation' in config:
+        aug_config = config['augmentation']
+        augmentations = aug_config.get('types', augmentations)
+        augmentation_factor = aug_config.get('factor', augmentation_factor)
+        aug_prefix = aug_config.get('prefix', aug_prefix)
+        target_split = aug_config.get('target_split', target_split)
+        balance_classes = aug_config.get('balance_classes', balance_classes)
+        num_workers = aug_config.get('num_workers', num_workers)
     
-    # Map config types ke UI options
-    type_map = {
-        'combined': 'Combined (Recommended)', 
-        'position': 'Position Variations', 
-        'lighting': 'Lighting Variations', 
-        'extreme_rotation': 'Extreme Rotation'
-    }
-    ui_types = [type_map.get(t, 'Combined (Recommended)') for t in default_types if t in type_map]
-    if not ui_types:
-        ui_types = ['Combined (Recommended)']
+    # Buat komponen-komponen UI
+    aug_type_selector = widgets.SelectMultiple(
+        options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
+        value=augmentations if isinstance(augmentations, list) else [augmentations],
+        description='Jenis:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='70%', height='80px')
+    )
     
-    # Buat komponen dengan nilai dari config
-    aug_options = widgets.VBox([
-        widgets.SelectMultiple(
-            options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
-            value=ui_types,
-            description='Types:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%', height='100px')
-        ),
-        widgets.BoundedIntText(
-            value=default_variations,
-            min=1,
-            max=10,
-            description='Variations:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='40%')
-        ),
-        widgets.Text(
-            value=default_prefix,
-            description='Prefix:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='40%')
-        ),
-        widgets.Checkbox(
-            value=default_process_bboxes,
-            description='Process bboxes',
-            style={'description_width': 'initial'}
-        ),
-        widgets.Checkbox(
-            value=default_validate,
-            description='Validate results',
-            style={'description_width': 'initial'}
-        ),
-        widgets.IntSlider(
-            value=default_workers,
-            min=1,
-            max=16,
-            step=1,
-            description='Workers:',
-            style={'description_width': 'initial'},
-            layout=widgets.Layout(width='70%')
-        ),
-        widgets.Checkbox(
-            value=default_balance,
-            description='Balance classes',
-            style={'description_width': 'initial'}
-        )
+    factor_slider = widgets.IntSlider(
+        value=augmentation_factor,
+        min=1,
+        max=10,
+        step=1,
+        description='Faktor:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%')
+    )
+    
+    prefix_text = widgets.Text(
+        value=aug_prefix,
+        description='File prefix:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%')
+    )
+    
+    split_dropdown = widgets.Dropdown(
+        options=['train', 'valid', 'test', 'all'],
+        value=target_split,
+        description='Target split:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%')
+    )
+    
+    balance_checkbox = widgets.Checkbox(
+        value=balance_classes,
+        description='Balance kelas',
+        style={'description_width': 'initial'}
+    )
+    
+    num_workers_slider = widgets.IntSlider(
+        value=num_workers,
+        min=1,
+        max=16,
+        step=1,
+        description='Workers:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='50%')
+    )
+    
+    # Deskripsi singkat
+    description = widgets.HTML(
+        value=f"""<div style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;">
+            <p style="margin: 0;"><strong>Augmentasi</strong> akan memperbanyak data training dengan variasi posisi, 
+            pencahayaan, dan rotasi untuk meningkatkan akurasi model.</p>
+        </div>"""
+    )
+    
+    # Gabungkan dalam container
+    return widgets.VBox([
+        description,
+        aug_type_selector,
+        prefix_text,
+        factor_slider,
+        split_dropdown,
+        balance_checkbox,
+        num_workers_slider
     ])
-    
-    return aug_options

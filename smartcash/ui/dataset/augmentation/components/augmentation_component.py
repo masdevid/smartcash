@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_component.py
-Deskripsi: Komponen utama UI untuk augmentasi dataset
+Deskripsi: Komponen UI utama untuk augmentasi dataset
 """
 
 import ipywidgets as widgets
@@ -17,73 +17,152 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     Returns:
         Dictionary berisi widget UI
     """
-    # Import utilitas UI standar
+    # Import komponen UI standar 
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
+    
+    # Import komponen submodules augmentasi
+    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
+    
+    # Import komponen button standar
+    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
+    
+    # Header dengan komponen standar
+    header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
+                          "Augmentasi dataset untuk memperkaya data training")
+    
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']};">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi augmentasi dataset</p>
+        </div>"""
+    )
+    
+    # Augmentation options
+    aug_options = create_augmentation_options(config)
+    
+    # Buat tombol-tombol augmentasi dengan komponen standar
+    action_buttons = create_action_buttons(
+        primary_label="Run Augmentation",
+        primary_icon="cog",
+        cleanup_enabled=True
+    )
+    
+    # Tombol-tombol visualisasi dengan komponen standar
+    visualization_buttons = create_visualization_buttons()
+    
+    # Progress tracking dengan styling standar
+    progress_bar = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Total:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    current_progress = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Step:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    # Labels untuk progress
+    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
+    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
+    
+    # Container progress dengan styling yang lebih konsisten
+    progress_container = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
+        progress_bar,
+        overall_label,
+        current_progress,
+        step_label
+    ])
+    
+    # Status output dengan layout standar
+    status = widgets.Output(layout=OUTPUT_WIDGET)
+    
+    # Log accordion dengan styling standar
+    log_accordion = widgets.Accordion(children=[status], selected_index=0)
+    log_accordion.set_title(0, f"{ICONS['file']} Augmentation Logs")
+    
+    # Summary stats container dengan styling yang konsisten
+    summary_container = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd', 
+            padding='10px', 
+            margin='10px 0', 
+            display='none'
+        )
+    )
+    
+    # Container visualisasi
+    visualization_container = widgets.Output(
+        layout=widgets.Layout(
+            border='1px solid #ddd', 
+            padding='10px', 
+            margin='10px 0', 
+            display='none'
+        )
+    )
+    
+    # Help panel dengan komponen info_box standar
+    help_panel = get_augmentation_info()
+    
+    # Layout UI dengan divider standar
     from smartcash.ui.utils.layout_utils import create_divider
     
-    # Buat komponen-komponen UI
-    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
-    from smartcash.ui.dataset.augmentation.components.action_buttons import create_action_buttons
-    from smartcash.ui.dataset.augmentation.components.progress_component import create_progress_component
-    from smartcash.ui.dataset.augmentation.components.output_component import create_output_component
-    from smartcash.ui.dataset.augmentation.components.info_component import create_info_component
-    
-    # Header dengan styling konsisten
-    header = create_header(
-        f"{ICONS['augmentation']} Dataset Augmentation", 
-        "Menambah variasi data dari hasil preprocessing untuk balancing distribusi kelas"
-    )
-    
-    # Status panel untuk menampilkan status konfigurasi
-    from smartcash.ui.components.status_panel import create_status_panel
-    status_panel = create_status_panel(
-        "Konfigurasi augmentasi dataset dari data preprocessed", 
-        "info"
-    )
-    
-    # Buat komponen-komponen UI
-    aug_options = create_augmentation_options(config)
-    button_components = create_action_buttons()
-    progress_components = create_progress_component()
-    output_components = create_output_component()
-    info_component = create_info_component()
-    
-    # Tentukan default path
-    preprocessed_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed')
-    augmented_dir = config.get('augmentation', {}).get('output_dir', 'data/augmented')
-    
-    # Container utama
+    # Rakit komponen UI
     ui = widgets.VBox([
         header,
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
         aug_options,
         create_divider(),
-        button_components['container'],
-        progress_components['container'],
-        output_components['log_accordion'],
-        output_components['summary_container'],
-        button_components['visualization_container'],
-        output_components['visualization_container'],
-        info_component
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+        action_buttons['container'],
+        progress_container,
+        log_accordion,
+        summary_container,
+        visualization_buttons['container'],
+        visualization_container,
+        help_panel
+    ])
     
-    # Gabungkan semua komponen dalam dictionary
+    # Komponen UI dengan konsolidasi semua referensi
     ui_components = {
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
         'aug_options': aug_options,
+        'augment_button': action_buttons['primary_button'],
+        'stop_button': action_buttons['stop_button'],
+        'reset_button': action_buttons['reset_button'],
+        'cleanup_button': action_buttons['cleanup_button'],
+        'save_button': action_buttons['save_button'],
+        'button_container': action_buttons['container'],
+        'progress_bar': progress_bar,
+        'current_progress': current_progress,
+        'overall_label': overall_label,
+        'step_label': step_label,
+        'status': status,
+        'log_accordion': log_accordion,
+        'summary_container': summary_container,
+        'visualization_buttons': visualization_buttons['container'],
+        'visualize_button': visualization_buttons['visualize_button'],
+        'compare_button': visualization_buttons['compare_button'],
+        'distribution_button': visualization_buttons['distribution_button'],
+        'visualization_container': visualization_container,
         'module_name': 'augmentation',
-        'preprocessed_dir': preprocessed_dir,
-        'augmented_dir': augmented_dir,
-        'augmentation_running': False,
+        # Default dataset paths
+        'data_dir': 'data',
+        'preprocessed_dir': 'data/preprocessed',
+        'augmented_dir': 'data/augmented'
     }
-    
-    # Tambahkan semua komponen dari sub-component
-    ui_components.update(button_components)
-    ui_components.update(progress_components)
-    ui_components.update(output_components)
     
     return ui_components

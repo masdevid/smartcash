@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/button_handlers.py
-Deskripsi: Handler tombol untuk preprocessing dataset
+Deskripsi: Handler tombol untuk preprocessing dataset dengan perbaikan PosixPath error
 """
 
 from typing import Dict, Any
@@ -118,12 +118,19 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Log awal preprocessing
             if logger: logger.info(f"{ICONS['start']} Memulai preprocessing {split_info}")
             
+            # PERBAIKAN: Pastikan data_dir dan preprocessed_dir adalah string, bukan PosixPath
+            data_dir_str = str(data_dir) if isinstance(data_dir, Path) else data_dir
+            preprocessed_dir_str = str(preprocessed_dir) if isinstance(preprocessed_dir, Path) else preprocessed_dir
+            
             # Jalankan preprocessing dengan parameter yang ditingkatkan
             preprocess_result = dataset_manager.preprocess_dataset(
                 split=split, 
                 force_reprocess=True,
                 normalize=normalize,
-                preserve_aspect_ratio=preserve_aspect_ratio
+                preserve_aspect_ratio=preserve_aspect_ratio,
+                # PERBAIKAN: Jika dataset_manager mendukung parameter berikut, tambahkan secara eksplisit
+                raw_dataset_dir=data_dir_str,
+                preprocessed_dir=preprocessed_dir_str
             )
             
             # Tambahkan path output jika tidak ada

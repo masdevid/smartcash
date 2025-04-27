@@ -27,7 +27,17 @@ def save_config(ui_components: Dict[str, Any], config: Dict[str, Any],
     """
     try:
         # Update config dari UI
-        config = update_func(config)
+        # Pastikan config adalah dictionary dan update_func mengembalikan dictionary
+        if not isinstance(config, dict):
+            config = {}
+            
+        updated_config = update_func(config)
+        
+        # Pastikan hasil update adalah dictionary
+        if isinstance(updated_config, dict):
+            config = updated_config
+        else:
+            raise TypeError(f"Update function harus mengembalikan dictionary, bukan {type(updated_config).__name__}")
         
         # Dapatkan config manager
         config_manager = get_config_manager()
@@ -52,7 +62,7 @@ def save_config(ui_components: Dict[str, Any], config: Dict[str, Any],
         if 'status' in ui_components:
             with ui_components['status']:
                 display(HTML(
-                    f"<div style='color:{COLORS['error']}; padding:5px;'>"
+                    f"<div style='color:{COLORS['danger']}; padding:5px;'>"
                     f"{ICONS['error']} Error menyimpan {title.lower()}: {str(e)}</div>"
                 ))
         
@@ -108,7 +118,7 @@ def reset_config(ui_components: Dict[str, Any], config: Dict[str, Any],
         if 'status' in ui_components:
             with ui_components['status']:
                 display(HTML(
-                    f"<div style='color:{COLORS['error']}; padding:5px;'>"
+                    f"<div style='color:{COLORS['danger']}; padding:5px;'>"
                     f"{ICONS['error']} Error mereset {title.lower()}: {str(e)}</div>"
                 ))
         

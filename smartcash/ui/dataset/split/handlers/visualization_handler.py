@@ -484,19 +484,19 @@ def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, 
             # Gunakan create_card_html jika tersedia
             cards_html += create_card_html(title="Dataset Raw", icon=ICONS['folder'], 
                                           content=_generate_stats_table(stats['raw']['stats']),
-                                          color=COLORS['card_bg'])
+                                          color=COLORS['card'])
         except (ImportError, AttributeError):
             # Fallback ke implementasi lokal
-            cards_html += _generate_card("Dataset Raw", ICONS['folder'], COLORS['card_bg'], stats['raw']['stats'])
+            cards_html += _generate_card("Dataset Raw", ICONS['folder'], COLORS['card'], stats['raw']['stats'])
     
     # Tampilkan kartu untuk dataset preprocessed jika ada
     if stats['preprocessed']['exists'] and stats['preprocessed']['stats']:
         try:
             cards_html += create_card_html(title="Dataset Preprocessed", icon=ICONS['processing'], 
                                           content=_generate_stats_table(stats['preprocessed']['stats']),
-                                          color=COLORS['card_bg'])
+                                          color=COLORS['card'])
         except (ImportError, AttributeError):
-            cards_html += _generate_card("Dataset Preprocessed", ICONS['processing'], COLORS['card_bg'], 
+            cards_html += _generate_card("Dataset Preprocessed", ICONS['processing'], COLORS['card'], 
                                        stats['preprocessed']['stats'])
     
     # Tampilkan pesan jika tidak ada dataset

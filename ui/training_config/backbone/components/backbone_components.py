@@ -189,18 +189,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         backbone_config_card
     ])
     
-    # Kolom kanan: Fitur optimasi dan info backbone
-    right_column = widgets.VBox([
-        optimization_card,
-        ui_components['info_box']
-    ])
-    
-    # Gabungkan dalam layout grid
-    ui_components['form'] = widgets.HBox([
-        left_column,
-        right_column
-    ], layout=widgets.Layout(padding='10px'))
-    
+    # Buat info_box terlebih dahulu
     ui_components['info_box'] = widgets.VBox(
         [widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['info']} Informasi Model</h4>"),
          ui_components['backbone_info']],
@@ -213,6 +202,20 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         )
     )
     
+    # Kolom kanan: Fitur optimasi dan info backbone
+    right_column = widgets.VBox([
+        optimization_card,
+        ui_components['info_box']
+    ])
+    
+    # Gabungkan dalam layout grid
+    ui_components['form'] = widgets.HBox([
+        left_column,
+        right_column
+    ], layout=widgets.Layout(padding='10px'))
+    
+    # Info box sudah dibuat sebelumnya
+    
     ui_components['buttons'] = widgets.HBox(
         [ui_components['save_button'], ui_components['reset_button']],
         layout=widgets.Layout(padding='10px')
@@ -222,7 +225,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     ui_components['main_container'] = widgets.VBox([
         ui_components['title'],
         ui_components['form'],
-        ui_components['info_box'],
         ui_components['buttons'],
         ui_components['status']
     ])

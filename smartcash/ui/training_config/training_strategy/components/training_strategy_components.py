@@ -71,6 +71,18 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     
     # Tab 2: Validasi dan Evaluasi
     
+    # Tambahkan val_split dengan nilai default 15% (0.15)
+    ui_components['val_split'] = widgets.FloatSlider(
+        value=0.15,
+        min=0.05,
+        max=0.3,
+        step=0.01,
+        description='Val split:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='400px'),
+        readout_format='.0%'
+    )
+    
     ui_components['val_frequency'] = widgets.IntSlider(
         value=1,
         min=1,
@@ -136,6 +148,7 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     ])
     
     validation_box = widgets.VBox([
+        ui_components['val_split'],
         ui_components['val_frequency'],
         ui_components['early_stopping'],
         ui_components['patience']

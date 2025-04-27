@@ -17,7 +17,7 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         Widget VBox berisi opsi augmentasi
     """
     # Dapatkan nilai default dari config jika tersedia
-    augmentations = ('Combined (Recommended)',)  # Default sebagai tuple
+    augmentations = ['Combined (Recommended)']  # Default sebagai list
     augmentation_factor = 2
     aug_prefix = 'aug'
     target_split = 'train'
@@ -48,7 +48,7 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     # Buat komponen-komponen UI
     aug_type_selector = widgets.SelectMultiple(
         options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
-        value=('Combined (Recommended)',),  # Gunakan tuple bukan list untuk nilai default
+        value=['Combined (Recommended)'],  # Gunakan list untuk nilai default
         description='Jenis:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='70%', height='80px')
@@ -63,17 +63,17 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
             # Filter nilai yang valid
             valid_values = [val for val in augmentations if val in valid_options]
             if valid_values:
-                # Pastikan nilai adalah tuple
-                aug_type_selector.value = tuple(valid_values)
+                # Pastikan nilai adalah list
+                aug_type_selector.value = valid_values
             else:
                 # Jika tidak ada nilai valid, gunakan default
-                aug_type_selector.value = ('Combined (Recommended)',)
+                aug_type_selector.value = ['Combined (Recommended)']
         else:
             # Jika augmentations bukan list atau tuple, gunakan default
-            aug_type_selector.value = ('Combined (Recommended)',)
+            aug_type_selector.value = ['Combined (Recommended)']
     except Exception as e:
         # Jika terjadi error, gunakan nilai default
-        aug_type_selector.value = ('Combined (Recommended)',)
+        aug_type_selector.value = ['Combined (Recommended)']
     
     factor_slider = widgets.IntSlider(
         value=augmentation_factor,

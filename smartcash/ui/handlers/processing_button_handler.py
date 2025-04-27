@@ -234,7 +234,7 @@ def setup_processing_button_handlers(
         # Reset status panel
         with ui_components['status']:
             clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS['ready']} Siap untuk memulai {module_type}"))
+            display(create_status_indicator("info", f"{ICONS['info']} Siap untuk memulai {module_type}"))
     
     # Register handlers untuk tombol-tombol
     button_handlers = {

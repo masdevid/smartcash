@@ -20,15 +20,51 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Inisialisasi komponen
     ui_components = {}
     
+    # Tambahkan komponen status dan tombol yang diperlukan
+    ui_components['status'] = widgets.Output()
+    ui_components['save_button'] = widgets.Button(
+        description='Simpan Konfigurasi',
+        button_style='success',
+        icon='save'
+    )
+    ui_components['reset_button'] = widgets.Button(
+        description='Reset',
+        button_style='warning',
+        icon='refresh'
+    )
+    
     # Import ModelManager untuk mendapatkan model yang dioptimalkan
-    from smartcash.model.manager import ModelManager
-    from smartcash.model.config.backbone_config import BackboneConfig
-    
-    # Daftar backbone yang didukung
-    backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
-    
-    # Daftar model yang dioptimalkan
-    optimized_models = ModelManager.OPTIMIZED_MODELS
+    try:
+        from smartcash.model.manager import ModelManager
+        from smartcash.model.config.backbone_config import BackboneConfig
+        
+        # Daftar backbone yang didukung
+        backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+        
+        # Daftar model yang dioptimalkan
+        optimized_models = ModelManager.OPTIMIZED_MODELS
+    except Exception as e:
+        # Fallback jika terjadi error saat mengakses ModelManager
+        print(f"⚠️ Error mengakses ModelManager: {str(e)}")
+        backbone_options = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'cspdarknet_s', 'cspdarknet_m']
+        
+        # Buat optimized_models fallback
+        optimized_models = {
+            'efficient_optimized': {
+                'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                'backbone': 'efficientnet_b4',
+                'use_attention': True,
+                'use_residual': False,
+                'use_ciou': False
+            },
+            'yolov5s': {
+                'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                'backbone': 'cspdarknet_s',
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False
+            }
+        }
     
     # Import konstanta untuk styling yang konsisten
     from smartcash.ui.utils.constants import COLORS, ICONS

@@ -59,43 +59,58 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         # Update config dari UI
         def update_config_from_ui(current_config=None):
-            if current_config is None: current_config = config
+            # Validasi input config
+            if current_config is None: 
+                current_config = config
+            
+            # Pastikan current_config adalah dictionary
+            if not isinstance(current_config, dict):
+                if logger: logger.warning(f"⚠️ Config bukan dictionary: {type(current_config).__name__}")
+                current_config = {}
+            
+            # Buat deep copy untuk menghindari referensi yang tidak diinginkan
+            import copy
+            updated_config = copy.deepcopy(current_config)
             
             # Update config dari nilai UI
-            if 'hyperparameters' not in current_config:
-                current_config['hyperparameters'] = {}
+            if 'hyperparameters' not in updated_config:
+                updated_config['hyperparameters'] = {}
                 
             # Optimizer
-            if 'optimizer' not in current_config['hyperparameters']:
-                current_config['hyperparameters']['optimizer'] = {}
+            if 'optimizer' not in updated_config['hyperparameters']:
+                updated_config['hyperparameters']['optimizer'] = {}
                 
-            current_config['hyperparameters']['optimizer']['type'] = ui_components['optimizer_type'].value
-            current_config['hyperparameters']['optimizer']['lr'] = ui_components['learning_rate'].value
-            current_config['hyperparameters']['optimizer']['weight_decay'] = ui_components['weight_decay'].value
-            current_config['hyperparameters']['optimizer']['momentum'] = ui_components['momentum'].value
+            updated_config['hyperparameters']['optimizer']['type'] = ui_components['optimizer_type'].value
+            updated_config['hyperparameters']['optimizer']['lr'] = ui_components['learning_rate'].value
+            updated_config['hyperparameters']['optimizer']['weight_decay'] = ui_components['weight_decay'].value
+            updated_config['hyperparameters']['optimizer']['momentum'] = ui_components['momentum'].value
             
             # Scheduler
-            if 'scheduler' not in current_config['hyperparameters']:
-                current_config['hyperparameters']['scheduler'] = {}
+            if 'scheduler' not in updated_config['hyperparameters']:
+                updated_config['hyperparameters']['scheduler'] = {}
                 
-            current_config['hyperparameters']['scheduler']['type'] = ui_components['scheduler_type'].value
-            current_config['hyperparameters']['scheduler']['warmup_epochs'] = ui_components['warmup_epochs'].value
-            current_config['hyperparameters']['scheduler']['step_size'] = ui_components['step_size'].value
-            current_config['hyperparameters']['scheduler']['gamma'] = ui_components['gamma'].value
+            updated_config['hyperparameters']['scheduler']['type'] = ui_components['scheduler_type'].value
+            updated_config['hyperparameters']['scheduler']['warmup_epochs'] = ui_components['warmup_epochs'].value
+            updated_config['hyperparameters']['scheduler']['step_size'] = ui_components['step_size'].value
+            updated_config['hyperparameters']['scheduler']['gamma'] = ui_components['gamma'].value
             
             # Augmentation
-            if 'augmentation' not in current_config['hyperparameters']:
-                current_config['hyperparameters']['augmentation'] = {}
+            if 'augmentation' not in updated_config['hyperparameters']:
+                updated_config['hyperparameters']['augmentation'] = {}
                 
-            current_config['hyperparameters']['augmentation']['use_augmentation'] = ui_components['use_augmentation'].value
-            current_config['hyperparameters']['augmentation']['mosaic'] = ui_components['mosaic'].value
-            current_config['hyperparameters']['augmentation']['mixup'] = ui_components['mixup'].value
-            current_config['hyperparameters']['augmentation']['flip'] = ui_components['flip'].value
-            current_config['hyperparameters']['augmentation']['hsv_h'] = ui_components['hsv_h'].value
-            current_config['hyperparameters']['augmentation']['hsv_s'] = ui_components['hsv_s'].value
-            current_config['hyperparameters']['augmentation']['hsv_v'] = ui_components['hsv_v'].value
+            updated_config['hyperparameters']['augmentation']['use_augmentation'] = ui_components['use_augmentation'].value
+            updated_config['hyperparameters']['augmentation']['mosaic'] = ui_components['mosaic'].value
+            updated_config['hyperparameters']['augmentation']['mixup'] = ui_components['mixup'].value
+            updated_config['hyperparameters']['augmentation']['flip'] = ui_components['flip'].value
+            updated_config['hyperparameters']['augmentation']['hsv_h'] = ui_components['hsv_h'].value
+            updated_config['hyperparameters']['augmentation']['hsv_s'] = ui_components['hsv_s'].value
+            updated_config['hyperparameters']['augmentation']['hsv_v'] = ui_components['hsv_v'].value
             
             # Update info hyperparameter
+            update_hyperparameters_info()
+            
+            # Penting: Kembalikan config yang sudah diupdate
+            return updated_config
             update_hyperparameters_info()
             
             return current_config

@@ -359,35 +359,88 @@ def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[s
     try:
         # Validasi input
         if ui_components is None:
-            if logger: logger.error("❌ ui_components tidak boleh None")
             return
-            
-        if config is None: config = {}
-            
-        # Get stats
-        stats = get_dataset_stats(config, env, logger)
         
-        # Update UI jika ada
-        if 'current_stats_html' in ui_components:
-            from smartcash.ui.utils.constants import COLORS, ICONS
-            update_stats_cards(ui_components['current_stats_html'], stats, COLORS, ICONS)
-            
-        if logger: logger.info("✅ Statistik dasar dataset berhasil ditampilkan")
+        # Tampilkan status loading
+        if 'stats_container' in ui_components:
+            ui_components['stats_container'].value = f"""
+                <div style="text-align:center; padding:15px;">
+                    <p>{ICONS['processing']} Memuat statistik dataset...</p>
+                </div>
+            """
+        
+        # Import dengan timeout untuk menghindari hanging
+        import threading
+        import time
+        
+        # Variabel untuk menyimpan hasil dan status
+        result = {'stats': None, 'done': False, 'error': None}
+        
+        # Fungsi untuk mendapatkan statistik dengan timeout
+        def get_stats_with_timeout():
+            try:
+                result['stats'] = get_dataset_stats(config, env, logger)
+                result['done'] = True
+            except Exception as e:
+                result['error'] = str(e)
+                result['done'] = True
+        
+        # Jalankan di thread terpisah
+        stats_thread = threading.Thread(target=get_stats_with_timeout)
+        stats_thread.daemon = True
+        stats_thread.start()
+        
+        # Tunggu maksimal 10 detik
+        timeout = 10
+        start_time = time.time()
+        while not result['done'] and time.time() - start_time < timeout:
+            time.sleep(0.5)
+        
+        # Cek hasil
+        if not result['done']:
+            # Timeout terjadi
+            if logger: logger.warning(f"⚠️ Timeout saat memuat statistik dataset setelah {timeout} detik")
+            if 'stats_container' in ui_components:
+                ui_components['stats_container'].value = f"""
+                    <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                         color:{COLORS['alert_warning_text']}; border-radius:4px;">
+                        <p>{ICONS['warning']} Timeout saat memuat statistik dataset. Silakan coba lagi nanti.</p>
+                    </div>
+                """
+            return
+        
+        # Cek error
+        if result['error']:
+            raise Exception(result['error'])
+        
+        # Update UI dengan statistik
+        if 'stats_container' in ui_components and result['stats']:
+            update_stats_cards(ui_components['stats_container'], result['stats'], COLORS, ICONS)
+            if logger: logger.info("✅ Statistik dataset berhasil dimuat")
+        else:
+            # Fallback jika tidak ada statistik
+            if 'stats_container' in ui_components:
+                ui_components['stats_container'].value = f"""
+                    <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
+                         color:{COLORS['alert_warning_text']}; border-radius:4px;">
+                        <p>{ICONS['warning']} Tidak ada statistik dataset yang tersedia. Pastikan dataset Anda sudah benar.</p>
+                    </div>
+                """
+            if logger: logger.warning("⚠️ Tidak ada statistik dataset yang tersedia")
+        
     except Exception as e:
-        if logger: logger.error(f"❌ Error menampilkan statistik dataset: {str(e)}")
+        # Handle error
+        if logger: logger.error(f"❌ Error menampilkan statistik: {str(e)}")
         
-        # Tampilkan error jika ada output widget
-        if ui_components is not None and 'output_box' in ui_components:
-            with ui_components['output_box']:
-                from smartcash.ui.utils.constants import ICONS, COLORS
-                from smartcash.ui.utils.alert_utils import create_alert_html
-                clear_output(wait=True)  # Pastikan loading message dihapus
-                try:
-                    display(HTML(create_alert_html(f"Error menampilkan statistik: {str(e)}", "error")))
-                except (ImportError, AttributeError):
-                    display(HTML(f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; '
-                                f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'
-                                f'<p>{ICONS["error"]} Error menampilkan statistik: {str(e)}</p></div>'))
+        # Tampilkan pesan error
+        if 'stats_container' in ui_components:
+            from smartcash.ui.utils.alert_utils import create_alert_html
+            try:
+                ui_components['stats_container'].value = create_alert_html(f"Error menampilkan statistik: {str(e)}", "error")
+            except (ImportError, AttributeError):
+                ui_components['stats_container'].value = f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; '\
+                                f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'\
+                                f'<p>{ICONS["error"]} Error menampilkan statistik: {str(e)}</p></div>')
 
 def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """
@@ -483,7 +536,7 @@ def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, 
         try:
             # Gunakan create_card_html jika tersedia
             cards_html += create_card_html(title="Dataset Raw", icon=ICONS['folder'], 
-                                          content=_generate_stats_table(stats['raw']['stats']),
+                                          value=_generate_stats_table(stats['raw']['stats']),
                                           color=COLORS['card'])
         except (ImportError, AttributeError):
             # Fallback ke implementasi lokal
@@ -493,7 +546,7 @@ def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, 
     if stats['preprocessed']['exists'] and stats['preprocessed']['stats']:
         try:
             cards_html += create_card_html(title="Dataset Preprocessed", icon=ICONS['processing'], 
-                                          content=_generate_stats_table(stats['preprocessed']['stats']),
+                                          value=_generate_stats_table(stats['preprocessed']['stats']),
                                           color=COLORS['card'])
         except (ImportError, AttributeError):
             cards_html += _generate_card("Dataset Preprocessed", ICONS['processing'], COLORS['card'], 

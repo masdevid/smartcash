@@ -58,54 +58,101 @@ def setup_training_strategy_form_handlers(ui_components: Dict[str, Any], env=Non
                 if 'update_config_from_ui' in ui_components:
                     ui_components['update_config_from_ui']()
         
-        # Register observers untuk semua komponen
-        ui_components['batch_size'].observe(on_component_change)
-        ui_components['epochs'].observe(on_component_change)
-        ui_components['image_size'].observe(on_component_change)
-        ui_components['workers'].observe(on_component_change)
+        # Register observers untuk semua komponen dengan pengecekan keberadaan
+        # Parameter dasar
+        if 'batch_size' in ui_components:
+            ui_components['batch_size'].observe(on_component_change)
+        if 'epochs' in ui_components:
+            ui_components['epochs'].observe(on_component_change)
+        if 'image_size' in ui_components:
+            ui_components['image_size'].observe(on_component_change)
+        if 'workers' in ui_components:
+            ui_components['workers'].observe(on_component_change)
         
-        ui_components['val_split'].observe(on_component_change)
-        ui_components['val_frequency'].observe(on_component_change)
-        ui_components['early_stopping'].observe(on_early_stopping_change)
-        ui_components['patience'].observe(on_component_change)
+        # Parameter validasi
+        if 'val_split' in ui_components:
+            ui_components['val_split'].observe(on_component_change)
+        if 'val_frequency' in ui_components:
+            ui_components['val_frequency'].observe(on_component_change)
+        if 'early_stopping' in ui_components:
+            ui_components['early_stopping'].observe(on_early_stopping_change)
+        if 'patience' in ui_components:
+            ui_components['patience'].observe(on_component_change)
         
-        ui_components['experiment_name'].observe(on_component_change)
-        ui_components['save_period'].observe(on_component_change)
-        ui_components['resume'].observe(on_resume_change)
-        ui_components['checkpoint_path'].observe(on_component_change)
+        # Parameter eksperimen (mungkin tidak ada karena tab dihapus)
+        if 'experiment_name' in ui_components:
+            ui_components['experiment_name'].observe(on_component_change)
+        if 'save_period' in ui_components:
+            ui_components['save_period'].observe(on_component_change)
+        if 'resume' in ui_components:
+            ui_components['resume'].observe(on_resume_change)
+        if 'checkpoint_path' in ui_components:
+            ui_components['checkpoint_path'].observe(on_component_change)
         
-        ui_components['use_multi_gpu'].observe(on_use_multi_gpu_change)
-        ui_components['sync_bn'].observe(on_component_change)
-        ui_components['distributed'].observe(on_component_change)
+        # Parameter multi-GPU (mungkin tidak ada karena tab dihapus)
+        if 'use_multi_gpu' in ui_components:
+            ui_components['use_multi_gpu'].observe(on_use_multi_gpu_change)
+        if 'sync_bn' in ui_components:
+            ui_components['sync_bn'].observe(on_component_change)
+        if 'distributed' in ui_components:
+            ui_components['distributed'].observe(on_component_change)
         
-        # Inisialisasi state komponen
-        ui_components['patience'].disabled = not ui_components['early_stopping'].value
-        ui_components['checkpoint_path'].disabled = not ui_components['resume'].value
-        ui_components['sync_bn'].disabled = not ui_components['use_multi_gpu'].value
-        ui_components['distributed'].disabled = not ui_components['use_multi_gpu'].value
+        # Inisialisasi state komponen dengan pengecekan keberadaan
+        # Patience dinonaktifkan jika early stopping tidak aktif
+        if 'patience' in ui_components and 'early_stopping' in ui_components:
+            ui_components['patience'].disabled = not ui_components['early_stopping'].value
+        
+        # Checkpoint path dinonaktifkan jika resume tidak aktif
+        if 'checkpoint_path' in ui_components and 'resume' in ui_components:
+            ui_components['checkpoint_path'].disabled = not ui_components['resume'].value
+        
+        # Opsi multi-GPU dinonaktifkan jika use_multi_gpu tidak aktif
+        if 'sync_bn' in ui_components and 'use_multi_gpu' in ui_components:
+            ui_components['sync_bn'].disabled = not ui_components['use_multi_gpu'].value
+        if 'distributed' in ui_components and 'use_multi_gpu' in ui_components:
+            ui_components['distributed'].disabled = not ui_components['use_multi_gpu'].value
         
         # Cleanup function
         def cleanup():
             try:
-                # Hapus semua observer
-                ui_components['batch_size'].unobserve(on_component_change)
-                ui_components['epochs'].unobserve(on_component_change)
-                ui_components['image_size'].unobserve(on_component_change)
-                ui_components['workers'].unobserve(on_component_change)
+                # Hapus semua observer dengan pengecekan keberadaan
+                # Parameter dasar
+                if 'batch_size' in ui_components:
+                    ui_components['batch_size'].unobserve(on_component_change)
+                if 'epochs' in ui_components:
+                    ui_components['epochs'].unobserve(on_component_change)
+                if 'image_size' in ui_components:
+                    ui_components['image_size'].unobserve(on_component_change)
+                if 'workers' in ui_components:
+                    ui_components['workers'].unobserve(on_component_change)
                 
-                ui_components['val_split'].unobserve(on_component_change)
-                ui_components['val_frequency'].unobserve(on_component_change)
-                ui_components['early_stopping'].unobserve(on_early_stopping_change)
-                ui_components['patience'].unobserve(on_component_change)
+                # Parameter validasi
+                if 'val_split' in ui_components:
+                    ui_components['val_split'].unobserve(on_component_change)
+                if 'val_frequency' in ui_components:
+                    ui_components['val_frequency'].unobserve(on_component_change)
+                if 'early_stopping' in ui_components:
+                    ui_components['early_stopping'].unobserve(on_early_stopping_change)
+                if 'patience' in ui_components:
+                    ui_components['patience'].unobserve(on_component_change)
                 
-                ui_components['experiment_name'].unobserve(on_component_change)
-                ui_components['save_period'].unobserve(on_component_change)
-                ui_components['resume'].unobserve(on_resume_change)
-                ui_components['checkpoint_path'].unobserve(on_component_change)
+                # Parameter eksperimen (mungkin tidak ada karena tab dihapus)
+                if 'experiment_name' in ui_components:
+                    ui_components['experiment_name'].unobserve(on_component_change)
+                if 'save_period' in ui_components:
+                    ui_components['save_period'].unobserve(on_component_change)
+                if 'resume' in ui_components:
+                    ui_components['resume'].unobserve(on_resume_change)
+                if 'checkpoint_path' in ui_components:
+                    ui_components['checkpoint_path'].unobserve(on_component_change)
                 
-                ui_components['use_multi_gpu'].unobserve(on_use_multi_gpu_change)
-                ui_components['sync_bn'].unobserve(on_component_change)
-                ui_components['distributed'].unobserve(on_component_change)
+                # Parameter multi-GPU (mungkin tidak ada karena tab dihapus)
+                if 'use_multi_gpu' in ui_components:
+                    ui_components['use_multi_gpu'].unobserve(on_use_multi_gpu_change)
+                if 'sync_bn' in ui_components:
+                    ui_components['sync_bn'].unobserve(on_component_change)
+                if 'distributed' in ui_components:
+                    ui_components['distributed'].unobserve(on_component_change)
                 
                 if logger: logger.info("✅ Training strategy form handlers cleaned up")
             except Exception as e:

@@ -103,7 +103,9 @@ def initialize_module_ui(
         
         # Attach UI components ke tombol utama untuk akses data
         if button_keys:
-            [setattr(ui_components[k], 'ui_components', ui_components) for k in button_keys if k in ui_components]
+            for k in button_keys:
+                if k in ui_components and ui_components[k] is not None:
+                    setattr(ui_components[k], 'ui_components', ui_components)
         
         if logger: logger.info(f"🚀 {module_name.capitalize()} UI berhasil diinisialisasi")
         

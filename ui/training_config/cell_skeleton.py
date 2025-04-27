@@ -46,8 +46,23 @@ def run_cell(cell_name, config_path):
         try:
             # Tentukan path initializer berdasarkan struktur folder baru
             if cell_name == 'backbone':
-                from smartcash.ui.training_config.backbone.backbone_initializer import initialize_backbone_ui
-                ui_components = initialize_backbone_ui(env, config)
+                try:
+                    from smartcash.ui.training_config.backbone.backbone_initializer import initialize_backbone_ui
+                    if logger: logger.info(f"🔍 Menginisialisasi backbone UI dengan config: {config.get('model', {})}")
+                    ui_components = initialize_backbone_ui(env, config)
+                    if logger: logger.info(f"✅ Backbone UI berhasil diinisialisasi dengan komponen: {list(ui_components.keys())}")
+                except Exception as e:
+                    if logger: logger.error(f"❌ Error inisialisasi backbone UI: {str(e)}")
+                    display(HTML(f"<div style='color:red; padding:10px; border:1px solid red; border-radius:5px; margin:10px 0;'>❌ Error inisialisasi backbone UI: {str(e)}</div>"))
+                    # Coba tampilkan komponen yang tersedia
+                    from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
+                    ui_components.update(create_backbone_ui(config))
+                    if 'form' in ui_components:
+                        display(ui_components['form'])
+                    if 'buttons' in ui_components:
+                        display(ui_components['buttons'])
+                    if 'status' in ui_components:
+                        display(ui_components['status'])
             elif cell_name == 'hyperparameters':
                 from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import initialize_hyperparameters_ui
                 ui_components = initialize_hyperparameters_ui(env, config)

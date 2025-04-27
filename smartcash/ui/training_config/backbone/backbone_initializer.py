@@ -47,6 +47,20 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         # Tampilkan container utama
         if 'main_container' in ui_components:
             display(ui_components['main_container'])
+        else:
+            # Fallback jika main_container tidak ada
+            from smartcash.ui.utils.alert_utils import create_alert_html
+            display(HTML(create_alert_html(
+                "Container utama tidak ditemukan. Mencoba menampilkan komponen yang tersedia.",
+                "warning"
+            )))
+            # Coba tampilkan komponen yang tersedia
+            if 'form' in ui_components:
+                display(ui_components['form'])
+            if 'buttons' in ui_components:
+                display(ui_components['buttons'])
+            if 'status' in ui_components:
+                display(ui_components['status'])
         
     except Exception as e:
         # Gunakan utilitas fallback yang ada

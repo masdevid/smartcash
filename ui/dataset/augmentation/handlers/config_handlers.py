@@ -9,6 +9,7 @@ import yaml
 import copy
 from pathlib import Path
 from IPython.display import display
+import ipywidgets as widgets
 
 def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
@@ -368,13 +369,40 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             balance_classes = aug_config.get('balance_classes', True)
             num_workers = aug_config.get('num_workers', 4)
             
-            # Update nilai UI (perlu dikonversi ke tuple untuk SelectMultiple)
-            aug_options.children[0].value = aug_types if isinstance(aug_types, (list, tuple)) else [aug_types]
-            aug_options.children[2].value = aug_prefix
-            aug_options.children[3].value = aug_factor
-            aug_options.children[4].value = target_split
-            aug_options.children[5].value = balance_classes
-            aug_options.children[6].value = num_workers
+            # Update nilai UI berdasarkan urutan komponen di augmentation_options.py
+            try:
+                # Pastikan nilai aug_types adalah list
+                if isinstance(aug_types, str):
+                    aug_types = [aug_types]
+                elif isinstance(aug_types, tuple):
+                    aug_types = list(aug_types)
+                elif not isinstance(aug_types, list):
+                    aug_types = ['Combined (Recommended)']
+                    
+                # Pastikan nilai valid untuk SelectMultiple
+                valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
+                valid_values = [val for val in aug_types if val in valid_options]
+                
+                # Jika tidak ada nilai valid, gunakan default
+                if not valid_values:
+                    valid_values = ['Combined (Recommended)']
+                
+                # Dapatkan komponen berdasarkan tipe widget, bukan indeks
+                for child in aug_options.children:
+                    if isinstance(child, widgets.SelectMultiple):
+                        child.value = valid_values
+                    elif isinstance(child, widgets.Text) and child.description == 'File prefix:':
+                        child.value = aug_prefix
+                    elif isinstance(child, widgets.IntSlider) and child.description == 'Faktor:':
+                        child.value = aug_factor
+                    elif isinstance(child, widgets.Dropdown) and child.description == 'Target split:':
+                        child.value = target_split
+                    elif isinstance(child, widgets.Checkbox) and child.description == 'Balance kelas':
+                        child.value = balance_classes
+                    elif isinstance(child, widgets.IntSlider) and child.description == 'Workers:':
+                        child.value = num_workers
+            except Exception as e:
+                if logger: logger.warning(f"⚠️ Error saat mengupdate komponen UI: {str(e)}")
     
     # Simpan referensi config di ui_components untuk persistensi
     ui_components['config'] = config

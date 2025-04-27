@@ -438,9 +438,7 @@ def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[s
             try:
                 ui_components['stats_container'].value = create_alert_html(f"Error menampilkan statistik: {str(e)}", "error")
             except (ImportError, AttributeError):
-                ui_components['stats_container'].value = f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; '\
-                                f'color:{COLORS["alert_danger_text"]}; border-radius:4px;">'\
-                                f'<p>{ICONS["error"]} Error menampilkan statistik: {str(e)}</p></div>')
+                ui_components['stats_container'].value = f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; color:{COLORS["alert_danger_text"]}; border-radius:4px;"><p>{ICONS["error"]} Error menampilkan statistik: {str(e)}</p></div>'
 
 def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """

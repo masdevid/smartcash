@@ -36,11 +36,23 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     # Buat komponen-komponen UI
     aug_type_selector = widgets.SelectMultiple(
         options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
-        value=augmentations if isinstance(augmentations, list) else [augmentations],
+        value=['Combined (Recommended)'],  # Selalu gunakan list dengan nilai default
         description='Jenis:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='70%', height='80px')
     )
+    
+    # Set nilai dari config jika tersedia
+    try:
+        if isinstance(augmentations, list) and all(isinstance(item, str) for item in augmentations):
+            # Pastikan semua nilai dalam list adalah string dan ada dalam options
+            valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
+            valid_values = [val for val in augmentations if val in valid_options]
+            if valid_values:
+                aug_type_selector.value = valid_values
+    except Exception:
+        # Jika terjadi error, gunakan nilai default
+        pass
     
     factor_slider = widgets.IntSlider(
         value=augmentation_factor,

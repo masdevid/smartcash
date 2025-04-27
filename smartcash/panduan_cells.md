@@ -27,17 +27,16 @@
 ui/
 ├── cells/                         # Cell sederhana entry point
 │   └── cell_x_y_name.py           # Cell sederhana (5-10 baris)
-├── module/                        # Modul specific implementasi
-│   ├── name_initializer.py        # Main initializer
-│   ├── name_component.py          # Definisi UI components
-│   ├── name_handlers.py           # Definisi UI handlers awal dengan logic handler yang terpisah
-│   ├── handlers/                  # Handler implementations
-│   │   ├── button_handlers.py     # Handler untuk tombol UI
-│   │   ├── form_handlers.py       # Handler untuk form UI
-│   ├── charts/                    # Modul specific chart/visualizations
-│   │   └── specific_plot.py       # plot spesifik modul
-│   └── components/                # UI Components spesifik modul
-│       └── module_components.py   # Komponen spesifik modul
+├── {module_group}/                # Grup modul    
+│   └── {module}/                  # Modul specific implementasi
+│       ├── {module}_initializer.py    # Main initializer
+│       ├── handlers/                  # Handler implementations    
+│       │   ├── button_handlers.py     # Handler untuk tombol UI
+│       │   ├── form_handlers.py       # Handler untuk form UI
+│       ├── charts/                    # Modul specific chart/visualizations
+│       │   └── specific_plot.py       # plot spesifik modul
+│       └── components/                # UI Components spesifik modul
+│           └── {module}_components.py   # Komponen spesifik modul
 ├── components/                    # Shared UI Components
 │   └── action_buttons.py          # Shared button components
 ├── info_boxes/                    # Kumpulan panduan info

@@ -7,4 +7,4 @@ Deskripsi: Cell untuk pemilihan model, backbone dan konfigurasi layer SmartCash 
 from smartcash.ui.training_config.cell_skeleton import run_cell
 
 # Jalankan cell dengan parameter konfigurasi
-ui_components = run_cell("backbone_selection", "configs/model_config.yaml")
+ui_components = run_cell("backbone", "configs/model_config.yaml")

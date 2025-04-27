@@ -15,47 +15,77 @@ def run_cell(cell_name, config_path):
     Args:
         cell_name: Nama modul/komponen
         config_path: Path ke file konfigurasi
+        
+    Returns:
+        Dict berisi komponen UI
     """
+    ui_components = {'module_name': cell_name}
+    
     try:
         # Setup environment dan load config
-        from smartcash.ui.utils.cell_utils import setup_notebook_environment, setup_ui_component, display_ui
-        env, config = setup_notebook_environment(cell_name, config_path)
+        from smartcash.common.environment import get_environment_manager
+        from smartcash.common.config import get_config_manager
         
-        # Setup UI components
-        ui_components = setup_ui_component(env, config, cell_name)
+        # Dapatkan environment dan config
+        env = get_environment_manager()
+        config_manager = get_config_manager()
+        config = config_manager.load_config(config_path) if config_path else config_manager.config
         
         # Tambahkan logging yang terintegrasi
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging, alert_to_ui
-
+        from smartcash.ui.utils.logging_utils import setup_ipython_logging
+        
         logger = setup_ipython_logging(ui_components, f"cell_{cell_name}")
         if logger:
             ui_components['logger'] = logger
             logger.info(f"🚀 Inisialisasi komponen {cell_name}")
         
-        # Setup handler secara manual dengan error handling yang lebih baik
+        # Tampilkan header
+        display(HTML(f"<h2>Konfigurasi {cell_name.replace('_', ' ').title()}</h2>"))
+        
+        # Setup UI components berdasarkan jenis komponen
         try:
-            handler_module = f"smartcash.ui.training_config.{cell_name}_handler"
-            handler_function = f"setup_{cell_name}_handlers"
-            
-            module = __import__(handler_module, fromlist=[handler_function])
-            handler_func = getattr(module, handler_function)
-            
-            ui_components = handler_func(ui_components, env, config)
+            # Tentukan path initializer berdasarkan struktur folder baru
+            if cell_name == 'backbone':
+                from smartcash.ui.training_config.backbone.backbone_initializer import initialize_backbone_ui
+                ui_components = initialize_backbone_ui(env, config)
+            elif cell_name == 'hyperparameters':
+                from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import initialize_hyperparameters_ui
+                ui_components = initialize_hyperparameters_ui(env, config)
+            elif cell_name == 'training_strategy':
+                from smartcash.ui.training_config.training_strategy.training_strategy_initializer import initialize_training_strategy_ui
+                ui_components = initialize_training_strategy_ui(env, config)
+            else:
+                # Fallback untuk komponen yang belum direfaktor
+                handler_module = f"smartcash.ui.training_config.{cell_name}_handler"
+                handler_function = f"setup_{cell_name}_handlers"
+                
+                module = __import__(handler_module, fromlist=[handler_function])
+                handler_func = getattr(module, handler_function)
+                
+                ui_components = handler_func(ui_components, env, config)
             
             # Cek apakah handler berhasil setup
             if logger: logger.info(f"✅ Cell {cell_name} berhasil diinisialisasi")
-
-        except Exception as e:
-            alert_to_ui(f"Error Setup Handler: {str(e)}", 'error', ui_components)
             
-        # Tampilkan UI
-        display_ui(ui_components)
+        except Exception as e:
+            # Tampilkan error
+            from smartcash.ui.utils.alert_utils import create_alert
+            error_msg = f"Error Setup {cell_name}: {str(e)}"
+            if logger: logger.error(f"❌ {error_msg}")
+            
+            if 'status' in ui_components:
+                with ui_components['status']:
+                    display(HTML(f"<p style='color:red'>❌ {error_msg}</p>"))
+            else:
+                display(HTML(f"<div style='color:red; padding:10px; border:1px solid red; border-radius:5px; margin:10px 0;'>❌ {error_msg}</div>"))
         
         return ui_components
 
     except ImportError as e:
-        from smartcash.ui.utils.fallback_utils import show_status
-        show_status(f"⚠️ Beberapa komponen tidak tersedia: {str(e)}", 'warning', ui_components)
+        error_msg = f"⚠️ Beberapa komponen tidak tersedia: {str(e)}"
+        display(HTML(f"<div style='color:orange; padding:10px; border:1px solid orange; border-radius:5px; margin:10px 0;'>{error_msg}</div>"))
+        return ui_components
     except Exception as e:
-        from smartcash.ui.utils.fallback_utils import create_status_message
-        create_status_message(f"{str(e)}", 'Error Inisialisasi', 'error')
+        error_msg = f"❌ Error inisialisasi: {str(e)}"
+        display(HTML(f"<div style='color:red; padding:10px; border:1px solid red; border-radius:5px; margin:10px 0;'>{error_msg}</div>"))
+        return ui_components

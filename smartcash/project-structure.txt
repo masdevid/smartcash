@@ -352,6 +352,8 @@
 ├── panduan_cells.md
 ├── project-structure.txt
 └── ui
+   ├── backbone_selection
+   |  └── handlers
    ├── cell_template.py
    ├── cells
    |  ├── cell_1_1_repo_clone.py
@@ -382,19 +384,38 @@
    |  ├── __init__.py
    |  ├── action_buttons.py
    |  ├── confirmation_dialog.py
-   |  └── status_panel.py
+   |  ├── progress_component.py
+   |  ├── status_panel.py
+   |  └── visualization_buttons.py
    ├── dataset
    |  ├── .DS_Store
-   |  ├── augmentation.py
-   |  ├── augmentation_click_handler.py
-   |  ├── augmentation_component.py
-   |  ├── augmentation_config_handler.py
-   |  ├── augmentation_handler.py
+   |  ├── __init__.py
+   |  ├── augmentation
+   |  |  ├── __init__.py
+   |  |  ├── augmentation_initializer.py
+   |  |  ├── components
+   |  |  |  ├── __init__.py
+   |  |  |  ├── action_buttons.py
+   |  |  |  ├── augmentation_component.py
+   |  |  |  ├── augmentation_options.py
+   |  |  |  ├── info_component.py
+   |  |  |  ├── output_component.py
+   |  |  |  └── progress_component.py
+   |  |  └── handlers
+   |  |     ├── __init__.py
+   |  |     ├── button_handlers.py
+   |  |     ├── cleanup_handler.py
+   |  |     ├── config_handlers.py
+   |  |     ├── state_handler.py
+   |  |     ├── status_handler.py
+   |  |     └── visualization_handler.py
    |  ├── download
+   |  |  ├── __init__.py
    |  |  ├── download_component.py
    |  |  ├── download_handlers.py
    |  |  ├── download_initializer.py
    |  |  └── handlers
+   |  |     ├── __init__.py
    |  |     ├── api_key_handler.py
    |  |     ├── check_handler.py
    |  |     ├── confirmation_handler.py
@@ -402,35 +423,42 @@
    |  |     ├── download_progress_observer.py
    |  |     ├── drive_handler.py
    |  |     └── endpoint_handler.py
-   |  ├── preprocessing.py
-   |  ├── preprocessing_click_handler.py
-   |  ├── preprocessing_component.py
-   |  ├── preprocessing_config_handler.py
-   |  ├── preprocessing_handler.py
-   |  ├── shared
+   |  ├── preprocessing
    |  |  ├── __init__.py
-   |  |  ├── cleanup_handler.py
-   |  |  ├── get_preprocessing_stats.py
-   |  |  ├── integration.py
-   |  |  ├── progress_handler.py
-   |  |  ├── reset_handler.py
-   |  |  ├── setup_utils.py
-   |  |  ├── status_panel.py
-   |  |  ├── summary_handler.py
-   |  |  └── visualization_handler.py
-   |  ├── split_config.py
-   |  ├── split_config_component.py
-   |  ├── split_config_handler.py
-   |  ├── split_config_initialization.py
-   |  ├── split_config_utils.py
-   |  └── split_config_visualization.py
+   |  |  ├── components
+   |  |  |  ├── __init__.py
+   |  |  |  ├── input_options.py
+   |  |  |  ├── preprocessing_component.py
+   |  |  |  ├── split_selector.py
+   |  |  |  └── validation_options.py
+   |  |  ├── handlers
+   |  |  |  ├── __init__.py
+   |  |  |  ├── button_handlers.py
+   |  |  |  ├── cleanup_handler.py
+   |  |  |  ├── config_handler.py
+   |  |  |  ├── state_handler.py
+   |  |  |  └── visualization_handler.py
+   |  |  └── preprocessing_initializer.py
+   |  └── split
+   |     ├── components
+   |     |  └── split_component.py
+   |     ├── handlers
+   |     |  ├── button_handlers.py
+   |     |  └── visualization_handler.py
+   |     └── split_initializer.py
    ├── detection
+   |  └── __init_.py
    ├── handlers
    |  ├── __init__.py
    |  ├── error_handler.py
    |  ├── multi_progress.py
    |  ├── observer_handler.py
-   |  └── single_progress.py
+   |  ├── processing_button_handler.py
+   |  ├── processing_cleanup_handler.py
+   |  ├── progress_handler.py
+   |  ├── single_progress.py
+   |  ├── status_handler.py
+   |  └── visualization_handler.py
    ├── helpers
    |  ├── __init__.py
    |  └── ui_helpers.py
@@ -445,6 +473,7 @@
    |  ├── preprocessing_info.py
    |  └── split_info.py
    ├── setup
+   |  ├── __init__.py
    |  ├── dependency_installer_component.py
    |  ├── dependency_installer_handler.py
    |  ├── dependency_installer_initializer.py
@@ -467,16 +496,23 @@
    |  ├── cell_skeleton.py
    |  ├── config_buttons.py
    |  ├── config_handler.py
+   |  ├── handlers
+   |  |  ├── optimization_handler.py
+   |  |  ├── policy_handler.py
+   |  |  └── summary_handler.py
    |  ├── hyperparameters_component.py
    |  ├── hyperparameters_handler.py
    |  ├── model_config_definitions.py
    |  ├── model_config_extractor.py
    |  ├── model_ui_updater.py
+   |  ├── training_initializer.py
    |  ├── training_strategy_component.py
    |  └── training_strategy_handler.py
    └── utils
       ├── __init__.py
       ├── alert_utils.py
+      ├── base_initializer.py
+      ├── card_utils.py
       ├── cell_utils.py
       ├── constants.py
       ├── drive_utils.py
@@ -489,9 +525,10 @@
       ├── metric_utils.py
       ├── ui_logger.py
       ├── validator_utils.py
-      └── visualization_utils.py
+      ├── visualization_utils.py
+      └── widget_utils.py
 
-directory: 79 file: 411
+directory: 90 file: 437
 
 
 

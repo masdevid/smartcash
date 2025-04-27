@@ -39,7 +39,7 @@ def create_card_html(
     <div style="
         width: {width}; 
         height: {height}; 
-        background-color: {COLORS['card_bg']}; 
+        background-color: {COLORS['card']}; 
         border-radius: 8px; 
         padding: 15px; 
         margin: 10px; 
@@ -47,15 +47,15 @@ def create_card_html(
         border-top: 3px solid {color};
     ">
         <div style="font-size: 1.5em; margin-bottom: 5px;">{icon}</div>
-        <div style="font-size: 0.9em; color: {COLORS['text_secondary']}; margin-bottom: 5px;">{title}</div>
+        <div style="font-size: 0.9em; color: {COLORS['dark']}; margin-bottom: 5px;">{title}</div>
         <div style="font-size: 1.4em; font-weight: bold; color: {color}; margin-bottom: 5px;">{value}</div>
     '''
     
     if description:
-        card_html += f'<div style="font-size: 0.8em; color: {COLORS["text_secondary"]}; margin-bottom: 5px;">{description}</div>'
+        card_html += f'<div style="font-size: 0.8em; color: {COLORS["muted"]}; margin-bottom: 5px;">{description}</div>'
     
     if footer:
-        card_html += f'<div style="font-size: 0.8em; color: {COLORS["text_secondary"]}; margin-top: 10px; padding-top: 5px; border-top: 1px solid {COLORS["border"]};">{footer}</div>'
+        card_html += f'<div style="font-size: 0.8em; color: {COLORS["muted"]}; margin-top: 10px; padding-top: 5px; border-top: 1px solid {COLORS["border"]};">{footer}</div>'
     
     card_html += '</div>'
     

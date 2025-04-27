@@ -27,7 +27,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
     
     # Import komponen button standar
-    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.action_buttons import create_action_buttons
+    from smartcash.ui.components.visualization_buttons import create_visualization_buttons
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
@@ -53,37 +54,18 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Tombol-tombol visualisasi dengan komponen standar
-    visualization_buttons = create_visualization_buttons()
+    visualization_buttons = create_visualization_buttons(module_name="augmentation")
     
-    # Progress tracking dengan styling standar
-    progress_bar = widgets.IntProgress(
-        value=0, min=0, max=100, 
-        description='Total:',
-        bar_style='info', 
-        orientation='horizontal',
-        layout=widgets.Layout(visibility='hidden', width='100%')
-    )
+    # Progress tracking dengan komponen standar
+    from smartcash.ui.components.progress_component import create_progress_component
+    progress_components = create_progress_component(module_name="augmentation")
     
-    current_progress = widgets.IntProgress(
-        value=0, min=0, max=100, 
-        description='Step:',
-        bar_style='info', 
-        orientation='horizontal',
-        layout=widgets.Layout(visibility='hidden', width='100%')
-    )
-    
-    # Labels untuk progress
-    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
-    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
-    
-    # Container progress dengan styling yang lebih konsisten
-    progress_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
-        progress_bar,
-        overall_label,
-        current_progress,
-        step_label
-    ])
+    # Ekstrak komponen progress untuk kemudahan akses
+    progress_container = progress_components['container']
+    progress_bar = progress_components['progress_bar']
+    current_progress = progress_components['current_progress']
+    overall_label = progress_components['overall_label']
+    step_label = progress_components['step_label']
     
     # Status output dengan layout standar
     status = widgets.Output(layout=OUTPUT_WIDGET)

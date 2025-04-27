@@ -1,76 +1,40 @@
 """
 File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
-Deskripsi: Initializer untuk modul preprocessing dataset
+Deskripsi: Initializer untuk modul preprocessing dataset dengan pendekatan DRY
 """
 
 from typing import Dict, Any
-from IPython.display import display
+from smartcash.ui.utils.base_initializer import initialize_module_ui
+from smartcash.ui.dataset.preprocessing.components.preprocessing_component import create_preprocessing_ui
+from smartcash.ui.dataset.preprocessing.handlers.config_handler import setup_preprocessing_config_handler
+from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
+# Import visualization handler dari modul preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.visualization_handler import setup_visualization_handlers
 
 def initialize_preprocessing_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul preprocessing dataset."""
-    ui_components = {'module_name': 'preprocessing'}
     
-    try:
-        # Setup environment dan config (gunakan singleton)
-        from smartcash.ui.utils.cell_utils import setup_notebook_environment
-        env, config = setup_notebook_environment('preprocessing')
-        
-        # Buat komponen UI
-        from smartcash.ui.dataset.preprocessing.components.preprocessing_component import create_preprocessing_ui
-        ui_components = create_preprocessing_ui(env, config)
-        
-        # Setup logging untuk UI
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging(ui_components, 'preprocessing')
-        ui_components['logger'] = logger
-        
-        # Setup config handler dengan pendekatan granular
-        from smartcash.ui.dataset.preprocessing.handlers.config_handler import setup_preprocessing_config_handler
-        ui_components = setup_preprocessing_config_handler(ui_components, config, env)
-        
-        # Setup progress tracking
-        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
-        setup_multi_progress_tracking(
-            ui_components, 
-            "preprocessing", 
-            "preprocessing_step"
-        )
-        
-        # Setup button handlers dengan pendekatan granular
-        from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
-        ui_components = setup_button_handlers(ui_components, env, config)
-        
-        # Setup visualization dan cleanup handlers
-        from smartcash.ui.dataset.preprocessing.handlers.visualization_handler import setup_visualization_handlers
-        ui_components = setup_visualization_handlers(ui_components, env, config)
-        
-        from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import setup_cleanup_handler
-        ui_components = setup_cleanup_handler(ui_components, env, config)
-        
-        # Setup observer integration
-        try:
-            from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-            ui_components = setup_observer_handlers(ui_components, "preprocessing_observers")
-        except ImportError:
-            pass
-        
-        # Deteksi status data preprocessing
-        from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
-        ui_components = detect_preprocessing_state(ui_components)
-        
-        # Register cleanup function untuk cell execution
-        from smartcash.ui.utils.logging_utils import register_cleanup_on_cell_execution
-        register_cleanup_on_cell_execution(ui_components)
-        
-        if logger: logger.info("🚀 Preprocessing UI berhasil diinisialisasi")
-        
-        # Tampilkan UI
-        display(ui_components['ui'])
-        
-    except Exception as e:
-        # Fallback jika ada error
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        ui_components = create_fallback_ui(ui_components, f"⚠️ Error saat inisialisasi preprocessing: {str(e)}", "error")
-        display(ui_components['ui'])
+    # Konfigurasi multi-progress tracking
+    multi_progress_config = {
+        "module_name": "preprocessing",
+        "step_key": "preprocessing_step",
+        "progress_bar_key": "progress_bar",
+        "current_progress_key": "current_progress",
+        "overall_label_key": "overall_label",
+        "step_label_key": "step_label"
+    }
     
-    return ui_components
+    # Tombol yang perlu diattach dengan ui_components
+    button_keys = ['preprocess_button', 'stop_button', 'reset_button', 'cleanup_button', 'save_button']
+    
+    # Gunakan base initializer
+    return initialize_module_ui(
+        module_name='preprocessing',
+        create_ui_func=create_preprocessing_ui,
+        setup_config_handler_func=setup_preprocessing_config_handler,
+        setup_specific_handlers_func=lambda ui_components, env, config: setup_visualization_handlers(ui_components, env=env, config=config),
+        detect_state_func=detect_preprocessing_state,
+        button_keys=button_keys,
+        multi_progress_config=multi_progress_config,
+        observer_group="preprocessing_observers"
+    )

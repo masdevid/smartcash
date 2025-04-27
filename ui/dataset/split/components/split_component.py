@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/split_config_component.py
+File: smartcash/ui/dataset/split/components/split_component.py
 Deskripsi: Komponen UI untuk konfigurasi pembagian dataset dengan tombol visualisasi on-demand
 """
 
@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from smartcash.dataset.utils.dataset_constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH, DEFAULT_PREPROCESSED_DIR
 
-def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
+def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     """
     Buat komponen UI untuk konfigurasi split dataset dengan visualisasi on-demand.
     
@@ -109,26 +109,25 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_options = widgets.VBox([
         widgets.IntText(
             value=42,
-            description='Random seed:',
+            description='Random Seed:',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='40%')
+            layout=widgets.Layout(width='70%')
         ),
         widgets.Checkbox(
             value=True,
-            description='Backup dataset sebelum split',
+            description='Backup sebelum split',
             style={'description_width': 'initial'}
         ),
         widgets.Text(
             value='data/splits_backup',
-            description='Direktori backup:',
+            description='Backup Dir:',
             style={'description_width': 'initial'},
-            layout=widgets.Layout(width='60%')
+            layout=widgets.Layout(width='70%')
         )
     ])
     
-    # Pathways configuration
+    # Data paths panel
     data_paths = widgets.VBox([
-        widgets.HTML(f"<h3 style='color:{COLORS['dark']}; margin-top:10px; margin-bottom:10px;'>{ICONS['folder']} Lokasi Dataset</h3>"),
         widgets.Text(
             value=DRIVE_DATASET_PATH if drive_mounted else 'data',
             description='Dataset Path:',
@@ -165,7 +164,7 @@ def create_split_config_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Button container
     try:
-        from smartcash.ui.training_config.config_buttons import create_config_buttons
+        from smartcash.ui.components.config_buttons import create_config_buttons
         buttons_container = create_config_buttons("Split Dataset")
     except ImportError:
         # Fallback jika config_buttons tidak tersedia

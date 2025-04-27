@@ -4,7 +4,9 @@ Deskripsi: Initializer untuk modul download dataset dengan integrasi progress tr
 """
 
 from typing import Dict, Any
-from IPython.display import display
+from smartcash.ui.utils.base_initializer import initialize_module_ui
+from smartcash.ui.dataset.download.download_component import create_dataset_download_ui
+from smartcash.ui.dataset.download.download_handlers import setup_download_handlers
 
 def initialize_dataset_download_ui() -> Dict[str, Any]:
     """
@@ -13,33 +15,10 @@ def initialize_dataset_download_ui() -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang terinisialisasi
     """
-    try:
-        # Setup environment dan config
-        from smartcash.common.environment import get_environment_manager
-        from smartcash.common.config import get_config_manager
-        env = get_environment_manager()
-        config = get_config_manager().config
-        
-        # Buat komponen UI
-        from smartcash.ui.dataset.download.download_component import create_dataset_download_ui
-        ui_components = create_dataset_download_ui(env, config)
-        
-        # Setup logging
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging(ui_components)
-        ui_components['logger'] = logger
-        
-        # Setup handlers (otomatis setup progress tracking)
-        from smartcash.ui.dataset.download.download_handlers import setup_download_handlers
-        ui_components = setup_download_handlers(ui_components, env, config)
-        
-        # Tampilkan UI
-        display(ui_components['ui'])
-        logger.info(f"✅ UI download dataset berhasil diinisialisasi")
-        
-        return ui_components
-        
-    except Exception as e:
-        # Fallback minimal jika terjadi error
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        return create_fallback_ui({}, str(e), "error")
+    # Gunakan base initializer dengan konfigurasi minimal
+    return initialize_module_ui(
+        module_name='download',
+        create_ui_func=create_dataset_download_ui,
+        setup_specific_handlers_func=setup_download_handlers,
+        button_keys=['download_button', 'stop_button', 'reset_button']
+    )

@@ -1,80 +1,44 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer untuk modul augmentasi dataset
+Deskripsi: Initializer untuk modul augmentasi dataset dengan pendekatan DRY
 """
 
 from typing import Dict, Any
-from IPython.display import display, clear_output
+from smartcash.ui.utils.base_initializer import initialize_module_ui
+from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
+from smartcash.ui.dataset.augmentation.handlers.config_handler import setup_augmentation_config_handler
+from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
+from smartcash.ui.handlers.visualization_handler import setup_visualization_handlers
+
+def setup_augmentation_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
+    """Setup handler spesifik untuk modul augmentasi"""
+    # Setup visualization handlers dengan shared handler
+    return setup_visualization_handlers(ui_components, module_name='augmentation', env=env, config=config)
 
 def initialize_augmentation_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul augmentasi dataset."""
-    ui_components = {'module_name': 'augmentation'}
     
-    try:
-        # Setup environment dan config (gunakan singleton)
-        from smartcash.ui.utils.cell_utils import setup_notebook_environment
-        env, config = setup_notebook_environment('augmentation')
-        
-        # Setup logging untuk UI
-        from smartcash.ui.utils.logging_utils import setup_ipython_logging
-        logger = setup_ipython_logging({'module_name': 'augmentation'}, 'augmentation')
-        ui_components['logger'] = logger
-        
-        # Buat komponen UI
-        from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
-        ui_components = create_augmentation_ui(env, config)
-        
-        # Tambahkan logger ke ui_components
-        ui_components['logger'] = logger
-        
-        # Setup config handler dengan pendekatan granular
-        from smartcash.ui.dataset.augmentation.handlers.config_handler import setup_augmentation_config_handler
-        ui_components = setup_augmentation_config_handler(ui_components, config, env)
-        
-        # Setup progress tracking
-        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
-        setup_multi_progress_tracking(
-            ui_components, 
-            "augmentation", 
-            "augmentation_step", 
-            "progress_bar", 
-            "current_progress", 
-            "overall_label", 
-            "step_label"
-        )
-        
-        # Setup button handlers dengan pendekatan granular
-        from smartcash.ui.dataset.augmentation.handlers.button_handlers import setup_button_handlers
-        ui_components = setup_button_handlers(ui_components, env, config)
-        
-        # Setup visualization dan cleanup handlers
-        from smartcash.ui.dataset.augmentation.handlers.visualization_handler import setup_visualization_handlers
-        ui_components = setup_visualization_handlers(ui_components, env, config)
-        
-        from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import setup_cleanup_handler
-        ui_components = setup_cleanup_handler(ui_components, env, config)
-        
-        # Setup observer integration
-        try:
-            from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-            ui_components = setup_observer_handlers(ui_components, "augmentation_observers")
-            if logger: logger.debug("🔄 Observer berhasil diinisialisasi")
-        except ImportError:
-            pass
-        
-        # Deteksi status data augmentasi
-        from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
-        ui_components = detect_augmentation_state(ui_components)
-        
-        # Register cleanup function untuk cell execution
-        from smartcash.ui.utils.logging_utils import register_cleanup_on_cell_execution
-        register_cleanup_on_cell_execution(ui_components)
-        
-        if logger: logger.info("🚀 Augmentation UI berhasil diinisialisasi")
-        
-    except Exception as e:
-        # Fallback jika ada error
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        ui_components = create_fallback_ui(ui_components, f"⚠️ Error saat inisialisasi augmentasi: {str(e)}", "error")
+    # Konfigurasi multi-progress tracking
+    multi_progress_config = {
+        "module_name": "augmentation",
+        "step_key": "augmentation_step",
+        "progress_bar_key": "progress_bar",
+        "current_progress_key": "current_progress",
+        "overall_label_key": "overall_label",
+        "step_label_key": "step_label"
+    }
     
-    return ui_components
+    # Tombol yang perlu diattach dengan ui_components
+    button_keys = ['augment_button', 'stop_button', 'reset_button', 'cleanup_button', 'save_button']
+    
+    # Gunakan base initializer
+    return initialize_module_ui(
+        module_name='augmentation',
+        create_ui_func=create_augmentation_ui,
+        setup_config_handler_func=setup_augmentation_config_handler,
+        setup_specific_handlers_func=setup_augmentation_handlers,
+        detect_state_func=detect_augmentation_state,
+        button_keys=button_keys,
+        multi_progress_config=multi_progress_config,
+        observer_group="augmentation_observers"
+    )

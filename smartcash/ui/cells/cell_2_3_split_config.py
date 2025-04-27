@@ -1,18 +1,12 @@
 """
 File: smartcash/ui/cells/cell_2_3_split_config.py
-Deskripsi: Cell untuk konfigurasi pembagian dataset SmartCash dengan visualisasi yang disederhanakan
+Deskripsi: Entry point untuk konfigurasi split dataset
 """
 
-import sys
-from IPython.display import display
-if '.' not in sys.path: sys.path.append('.')
+def setup_split_config():
+    """Setup dan tampilkan UI untuk konfigurasi split dataset."""
+    from smartcash.ui.dataset.split.split_initializer import initialize_split_ui
+    return initialize_split_ui()
 
-try:
-    from smartcash.ui.dataset.split_config import setup_split_config
-    # Setup dependency installer
-    ui_components = setup_split_config()
-    
-    # Tampilkan UI
-    display(ui_components['ui'])
-
-except ImportError as e: create_alert(e, 'error')
+# Eksekusi saat modul diimpor
+ui_components = setup_split_config()

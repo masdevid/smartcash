@@ -22,6 +22,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
+    from smartcash.ui.handlers.status_handler import create_status_panel
     
     # Import komponen submodules preprocessing
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
@@ -36,13 +37,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
                           "Preprocessing dataset untuk training model SmartCash")
     
     # Panel info status
-    status_panel = widgets.HTML(
-        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} Konfigurasi preprocessing dataset</p>
-        </div>"""
-    )
+    status_panel = create_status_panel("Konfigurasi preprocessing dataset", "info")
     
     # Preprocessing options (split dari komponen besar)
     preprocess_options = create_preprocessing_options(config)
@@ -83,8 +78,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Labels untuk progress
-    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
-    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0'))
+    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
+    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
     
     # Container progress dengan styling yang lebih konsisten
     progress_container = widgets.VBox([
@@ -99,7 +94,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     status = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Log accordion dengan styling standar
-    log_accordion = widgets.Accordion(children=[status], selected_index=0)
+    log_accordion = widgets.Accordion(children=[status], selected_index=None)
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")
     
     # Summary stats container dengan styling yang konsisten

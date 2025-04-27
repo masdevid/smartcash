@@ -10,6 +10,13 @@ from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 
+# Import status handler yang konsisten
+try:
+    from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel as _update_status_panel
+except ImportError:
+    # Fallback jika tidak ditemukan
+    from smartcash.ui.handlers.processing_cleanup_handler import _update_status_panel
+
 def setup_processing_button_handlers(
     ui_components: Dict[str, Any], 
     module_type: str = 'preprocessing',

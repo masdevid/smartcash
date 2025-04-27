@@ -17,7 +17,7 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         Widget VBox berisi opsi augmentasi
     """
     # Dapatkan nilai default dari config jika tersedia
-    augmentations = ['Combined (Recommended)']
+    augmentations = ('Combined (Recommended)',)  # Default sebagai tuple
     augmentation_factor = 2
     aug_prefix = 'aug'
     target_split = 'train'
@@ -26,7 +26,19 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     
     if config and 'augmentation' in config:
         aug_config = config['augmentation']
-        augmentations = aug_config.get('types', augmentations)
+        
+        # Pastikan types selalu dalam format yang benar
+        if 'types' in aug_config:
+            # Jika nilai dari config adalah list, konversi ke tuple
+            if isinstance(aug_config['types'], list):
+                augmentations = tuple(aug_config['types'])
+            # Jika nilai dari config adalah string tunggal, buat tuple dengan satu item
+            elif isinstance(aug_config['types'], str):
+                augmentations = (aug_config['types'],)
+            # Jika nilai dari config sudah tuple, gunakan langsung
+            elif isinstance(aug_config['types'], tuple):
+                augmentations = aug_config['types']
+        
         augmentation_factor = aug_config.get('factor', augmentation_factor)
         aug_prefix = aug_config.get('prefix', aug_prefix)
         target_split = aug_config.get('target_split', target_split)
@@ -44,16 +56,24 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     
     # Set nilai dari config jika tersedia
     try:
-        if isinstance(augmentations, list) and all(isinstance(item, str) for item in augmentations):
-            # Pastikan semua nilai dalam list adalah string dan ada dalam options
-            valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
+        valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
+        
+        # Validasi nilai augmentations
+        if isinstance(augmentations, (list, tuple)) and len(augmentations) > 0:
+            # Filter nilai yang valid
             valid_values = [val for val in augmentations if val in valid_options]
             if valid_values:
-                # Konversi list ke tuple untuk SelectMultiple
+                # Pastikan nilai adalah tuple
                 aug_type_selector.value = tuple(valid_values)
-    except Exception:
+            else:
+                # Jika tidak ada nilai valid, gunakan default
+                aug_type_selector.value = ('Combined (Recommended)',)
+        else:
+            # Jika augmentations bukan list atau tuple, gunakan default
+            aug_type_selector.value = ('Combined (Recommended)',)
+    except Exception as e:
         # Jika terjadi error, gunakan nilai default
-        pass
+        aug_type_selector.value = ('Combined (Recommended)',)
     
     factor_slider = widgets.IntSlider(
         value=augmentation_factor,

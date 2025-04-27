@@ -30,24 +30,16 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         # Validasi config
         if config is None: config = {}
         
-        # Default config
+        # Default config (sudah dihapus komponen yang tidak digunakan)
         default_config = {
             'training': {
                 'batch_size': 16,
                 'epochs': 100,
                 'image_size': 640,
                 'workers': 4,
-                'val_split': 0.2,
                 'val_frequency': 1,
                 'early_stopping': True,
-                'patience': 10,
-                'experiment_name': 'yolov5_efficientnet_b4',
-                'save_period': 10,
-                'resume': False,
-                'checkpoint_path': '',
-                'use_multi_gpu': False,
-                'sync_bn': True,
-                'distributed': False
+                'patience': 10
             }
         }
         
@@ -63,17 +55,9 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
             current_config['training']['epochs'] = ui_components['epochs'].value
             current_config['training']['image_size'] = ui_components['image_size'].value
             current_config['training']['workers'] = ui_components['workers'].value
-            current_config['training']['val_split'] = ui_components['val_split'].value
             current_config['training']['val_frequency'] = ui_components['val_frequency'].value
             current_config['training']['early_stopping'] = ui_components['early_stopping'].value
             current_config['training']['patience'] = ui_components['patience'].value
-            current_config['training']['experiment_name'] = ui_components['experiment_name'].value
-            current_config['training']['save_period'] = ui_components['save_period'].value
-            current_config['training']['resume'] = ui_components['resume'].value
-            current_config['training']['checkpoint_path'] = ui_components['checkpoint_path'].value
-            current_config['training']['use_multi_gpu'] = ui_components['use_multi_gpu'].value
-            current_config['training']['sync_bn'] = ui_components['sync_bn'].value
-            current_config['training']['distributed'] = ui_components['distributed'].value
             
             # Update info strategi pelatihan
             update_training_strategy_info()
@@ -93,33 +77,12 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                     ui_components['image_size'].value = config['training']['image_size']
                 if 'workers' in config['training']:
                     ui_components['workers'].value = config['training']['workers']
-                if 'val_split' in config['training']:
-                    ui_components['val_split'].value = config['training']['val_split']
                 if 'val_frequency' in config['training']:
                     ui_components['val_frequency'].value = config['training']['val_frequency']
                 if 'early_stopping' in config['training']:
                     ui_components['early_stopping'].value = config['training']['early_stopping']
                 if 'patience' in config['training']:
                     ui_components['patience'].value = config['training']['patience']
-                if 'experiment_name' in config['training']:
-                    ui_components['experiment_name'].value = config['training']['experiment_name']
-                if 'save_period' in config['training']:
-                    ui_components['save_period'].value = config['training']['save_period']
-                if 'resume' in config['training']:
-                    ui_components['resume'].value = config['training']['resume']
-                if 'checkpoint_path' in config['training']:
-                    ui_components['checkpoint_path'].value = config['training']['checkpoint_path']
-                if 'use_multi_gpu' in config['training']:
-                    ui_components['use_multi_gpu'].value = config['training']['use_multi_gpu']
-                if 'sync_bn' in config['training']:
-                    ui_components['sync_bn'].value = config['training']['sync_bn']
-                if 'distributed' in config['training']:
-                    ui_components['distributed'].value = config['training']['distributed']
-                
-                # Update state komponen berdasarkan nilai
-                ui_components['checkpoint_path'].disabled = not ui_components['resume'].value
-                ui_components['sync_bn'].disabled = not ui_components['use_multi_gpu'].value
-                ui_components['distributed'].disabled = not ui_components['use_multi_gpu'].value
                 
                 # Update info strategi pelatihan
                 update_training_strategy_info()
@@ -136,13 +99,13 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 epochs = ui_components['epochs'].value
                 image_size = ui_components['image_size'].value
                 early_stopping = ui_components['early_stopping'].value
-                experiment_name = ui_components['experiment_name'].value
-                use_multi_gpu = ui_components['use_multi_gpu'].value
+                val_frequency = ui_components['val_frequency'].value
+                patience = ui_components['patience'].value
                 
                 # Estimasi jumlah iterasi
                 # Asumsikan dataset berisi 1000 gambar (ganti dengan jumlah sebenarnya jika diketahui)
                 dataset_size = 1000
-                val_split = ui_components['val_split'].value
+                val_split = 0.2  # Default value since we removed the slider
                 train_size = int(dataset_size * (1 - val_split))
                 iterations_per_epoch = train_size // batch_size
                 total_iterations = iterations_per_epoch * epochs
@@ -151,12 +114,12 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 info_html = f"""
                 <h4>Ringkasan Strategi Pelatihan</h4>
                 <ul>
-                    <li><b>Eksperimen:</b> {experiment_name}</li>
                     <li><b>Batch Size:</b> {batch_size}</li>
                     <li><b>Epochs:</b> {epochs}</li>
                     <li><b>Resolusi Gambar:</b> {image_size}x{image_size}</li>
                     <li><b>Early Stopping:</b> {'Aktif' if early_stopping else 'Nonaktif'}</li>
-                    <li><b>Multi-GPU:</b> {'Aktif' if use_multi_gpu else 'Nonaktif'}</li>
+                    <li><b>Validasi Setiap:</b> {val_frequency} epoch</li>
+                    <li><b>Patience:</b> {patience} epoch</li>
                     <li><b>Estimasi Iterasi:</b> ~{total_iterations} (berdasarkan asumsi dataset)</li>
                 </ul>
                 <p><i>Catatan: Pastikan parameter pelatihan sesuai dengan kebutuhan dan kapasitas hardware.</i></p>

@@ -30,9 +30,12 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Daftar model yang dioptimalkan
     optimized_models = ModelManager.OPTIMIZED_MODELS
     
+    # Import konstanta untuk styling yang konsisten
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    
     # Buat komponen UI
     ui_components['title'] = widgets.HTML(
-        value="<h3>🔄 Konfigurasi Backbone Model</h3>"
+        value=f"<h3>{ICONS['model']} Konfigurasi Backbone Model</h3>"
     )
     
     # Dropdown untuk memilih model yang dioptimalkan
@@ -137,28 +140,77 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(width='100%', padding='10px')
     )
     
-    # Susun layout
-    ui_components['form_items'] = [
-        ui_components['model_type'],
+    # Susun layout dengan cards
+    
+    # Card untuk model selection
+    model_selection_card = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['model']} Pilihan Model</h4>"),
+        ui_components['model_type']
+    ], layout=widgets.Layout(
+        border='1px solid #ddd',
+        border_radius='5px',
+        padding='15px',
+        margin='0 0 15px 0',
+        background_color='#f8f9fa'
+    ))
+    
+    # Card untuk konfigurasi backbone
+    backbone_config_card = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['settings']} Konfigurasi Backbone</h4>"),
         ui_components['backbone_type'],
         ui_components['pretrained'],
         ui_components['freeze_backbone'],
-        ui_components['freeze_layers'],
-        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
-        widgets.HTML("<h4>Fitur Optimasi</h4>"),
+        ui_components['freeze_layers']
+    ], layout=widgets.Layout(
+        border='1px solid #ddd',
+        border_radius='5px',
+        padding='15px',
+        margin='0 0 15px 0',
+        background_color='#f8f9fa'
+    ))
+    
+    # Card untuk fitur optimasi
+    optimization_card = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['optimization']} Fitur Optimasi</h4>"),
         ui_components['use_attention'],
         ui_components['use_residual'],
         ui_components['use_ciou']
-    ]
+    ], layout=widgets.Layout(
+        border='1px solid #ddd',
+        border_radius='5px',
+        padding='15px',
+        margin='0 0 15px 0',
+        background_color='#f8f9fa'
+    ))
     
-    ui_components['form'] = widgets.VBox(
-        ui_components['form_items'],
-        layout=widgets.Layout(padding='10px')
-    )
+    # Kolom kiri: Model selection dan backbone config
+    left_column = widgets.VBox([
+        model_selection_card,
+        backbone_config_card
+    ])
+    
+    # Kolom kanan: Fitur optimasi dan info backbone
+    right_column = widgets.VBox([
+        optimization_card,
+        ui_components['info_box']
+    ])
+    
+    # Gabungkan dalam layout grid
+    ui_components['form'] = widgets.HBox([
+        left_column,
+        right_column
+    ], layout=widgets.Layout(padding='10px'))
     
     ui_components['info_box'] = widgets.VBox(
-        [ui_components['backbone_info']],
-        layout=widgets.Layout(padding='10px', border='1px solid #ddd', margin='10px 0')
+        [widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['info']} Informasi Model</h4>"),
+         ui_components['backbone_info']],
+        layout=widgets.Layout(
+            padding='15px', 
+            border='1px solid #ddd', 
+            border_radius='5px',
+            margin='0 0 15px 0',
+            background_color='#f8f9fa'
+        )
     )
     
     ui_components['buttons'] = widgets.HBox(

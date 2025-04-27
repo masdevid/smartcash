@@ -240,7 +240,11 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     if isinstance(buttons_container, widgets.HBox):
         ui_components['save_button'] = buttons_container.children[0]
         ui_components['reset_button'] = buttons_container.children[1]
-    else:
+    elif isinstance(buttons_container, dict) and 'save_button' in buttons_container and 'reset_button' in buttons_container:
+        # Jika buttons_container adalah dictionary dengan tombol-tombol
+        ui_components['save_button'] = buttons_container['save_button']
+        ui_components['reset_button'] = buttons_container['reset_button']
+    elif hasattr(buttons_container, 'children'):
         # Extract buttons jika menggunakan create_config_buttons
         for child in buttons_container.children:
             if isinstance(child, widgets.Button):

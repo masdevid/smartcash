@@ -1,10 +1,15 @@
 """
 File: smartcash/ui/cells/cell_3_1_backbone_selection.py
-Deskripsi: Cell untuk pemilihan model, backbone dan konfigurasi layer SmartCash yang kompatibel dengan ModelManager
+Deskripsi: Entry point untuk pemilihan model, backbone dan konfigurasi layer SmartCash
 """
 
-# Import dan jalankan skeleton cell dengan parameter yang sesuai
-from smartcash.ui.training_config.cell_skeleton import run_cell
+def setup_backbone_selection():
+    """Setup dan tampilkan UI untuk pemilihan backbone model."""
+    # Import modul backbone
+    from smartcash.ui.training_config.backbone.backbone_initializer import initialize_backbone_ui
+    
+    # Inisialisasi UI dan kembalikan komponen
+    return initialize_backbone_ui()
 
-# Jalankan cell dengan parameter konfigurasi
-ui_components = run_cell("backbone", "configs/model_config.yaml")
+# Eksekusi saat modul diimpor
+ui_components = setup_backbone_selection()

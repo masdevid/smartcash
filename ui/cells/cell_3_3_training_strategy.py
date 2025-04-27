@@ -1,10 +1,15 @@
 """
 File: smartcash/ui/cells/cell_3_3_training_strategy.py
-Deskripsi: Cell untuk konfigurasi strategi training model SmartCash dengan memanfaatkan skeleton
+Deskripsi: Entry point untuk konfigurasi strategi training model SmartCash
 """
 
-# Import dan jalankan skeleton cell dengan parameter yang sesuai
-from smartcash.ui.training_config.cell_skeleton import run_cell
+def setup_training_strategy():
+    """Setup dan tampilkan UI untuk konfigurasi strategi training."""
+    # Import modul training strategy
+    from smartcash.ui.training_config.training_strategy.training_strategy_initializer import initialize_training_strategy_ui
+    
+    # Inisialisasi UI dan kembalikan komponen
+    return initialize_training_strategy_ui()
 
-# Jalankan cell dengan parameter konfigurasi
-ui_components = run_cell("training_strategy", "configs/training_config.yaml")
+# Eksekusi saat modul diimpor
+ui_components = setup_training_strategy()

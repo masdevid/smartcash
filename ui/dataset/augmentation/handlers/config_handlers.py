@@ -64,6 +64,10 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     # Register handler untuk tombol save
     if 'save_button' in ui_components:
         ui_components['save_button'].on_click(on_save_config)
+        
+    # Register handler untuk tombol augment (jika ada)
+    if 'augment_button' in ui_components:
+        ui_components['augment_button'].on_click(lambda b: None)
     
     # Tambahkan referensi fungsi ke UI components
     ui_components.update({

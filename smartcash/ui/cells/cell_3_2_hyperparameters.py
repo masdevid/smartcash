@@ -1,10 +1,15 @@
 """
 File: smartcash/ui/cells/cell_3_2_hyperparameters.py
-Deskripsi: Cell untuk konfigurasi hyperparameter model SmartCash
+Deskripsi: Entry point untuk konfigurasi hyperparameter model SmartCash
 """
 
-# Import dan jalankan skeleton cell dengan parameter yang sesuai
-from smartcash.ui.training_config.cell_skeleton import run_cell
+def setup_hyperparameters():
+    """Setup dan tampilkan UI untuk konfigurasi hyperparameter model."""
+    # Import modul hyperparameters
+    from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import initialize_hyperparameters_ui
+    
+    # Inisialisasi UI dan kembalikan komponen
+    return initialize_hyperparameters_ui()
 
-# Jalankan cell dengan parameter konfigurasi
-ui_components = run_cell("hyperparameters", "configs/hyperparameters_config.yaml")
+# Eksekusi saat modul diimpor
+ui_components = setup_hyperparameters()

@@ -30,13 +30,23 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
         # Validasi config
         if config is None: config = {}
         
-        # Default config
+        # Import ModelManager untuk mendapatkan model yang dioptimalkan
+        from smartcash.model.manager import ModelManager
+        
+        # Default config berdasarkan model yang dioptimalkan
+        default_model_type = 'efficient_optimized'
+        default_model_config = ModelManager.OPTIMIZED_MODELS[default_model_type]
+        
         default_config = {
             'model': {
-                'backbone': 'efficientnet_b4',
+                'model_type': default_model_type,
+                'backbone': default_model_config['backbone'],
                 'pretrained': True,
                 'freeze_backbone': True,
-                'freeze_layers': 3
+                'freeze_layers': 3,
+                'use_attention': default_model_config.get('use_attention', False),
+                'use_residual': default_model_config.get('use_residual', False),
+                'use_ciou': default_model_config.get('use_ciou', False)
             }
         }
         
@@ -47,14 +57,20 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
             # Update config dari nilai UI
             if 'model' not in current_config:
                 current_config['model'] = {}
+            
+            # Simpan model_type yang dipilih
+            current_config['model']['model_type'] = ui_components['model_type'].value
                 
+            # Simpan backbone dan pengaturan dasar
             current_config['model']['backbone'] = ui_components['backbone_type'].value
             current_config['model']['pretrained'] = ui_components['pretrained'].value
             current_config['model']['freeze_backbone'] = ui_components['freeze_backbone'].value
             current_config['model']['freeze_layers'] = ui_components['freeze_layers'].value
             
-            # Update info backbone
-            update_backbone_info()
+            # Simpan fitur optimasi
+            current_config['model']['use_attention'] = ui_components['use_attention'].value
+            current_config['model']['use_residual'] = ui_components['use_residual'].value
+            current_config['model']['use_ciou'] = ui_components['use_ciou'].value
             
             return current_config
         
@@ -63,6 +79,15 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
             if not config or 'model' not in config: return
             
             try:
+                # Update model_type jika tersedia
+                if 'model_type' in config['model']:
+                    model_type = config['model']['model_type']
+                    if model_type in ModelManager.OPTIMIZED_MODELS:
+                        ui_components['model_type'].value = model_type
+                    else:
+                        # Jika model_type tidak valid, gunakan default
+                        ui_components['model_type'].value = default_model_type
+                
                 # Update nilai UI dari config
                 if 'backbone' in config['model']:
                     ui_components['backbone_type'].value = config['model']['backbone']
@@ -76,38 +101,24 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                 if 'freeze_layers' in config['model']:
                     ui_components['freeze_layers'].value = config['model']['freeze_layers']
                 
-                # Update info backbone
-                update_backbone_info()
+                # Update fitur optimasi
+                if 'use_attention' in config['model']:
+                    ui_components['use_attention'].value = config['model']['use_attention']
+                    
+                if 'use_residual' in config['model']:
+                    ui_components['use_residual'].value = config['model']['use_residual']
+                    
+                if 'use_ciou' in config['model']:
+                    ui_components['use_ciou'].value = config['model']['use_ciou']
                 
                 if logger: logger.info("✅ UI backbone diperbarui dari config")
             except Exception as e:
                 if logger: logger.error(f"❌ Error update UI: {e}")
         
-        # Update informasi backbone
+        # Update informasi backbone sudah tidak diperlukan karena sudah dihandle oleh on_model_change
         def update_backbone_info():
-            try:
-                from smartcash.model.config.backbone_config import BackboneConfig
-                
-                # Buat instance BackboneConfig
-                backbone_type = ui_components['backbone_type'].value
-                backbone_config = BackboneConfig(backbone_type=backbone_type)
-                
-                # Dapatkan informasi backbone
-                info_html = f"""
-                <h4>Informasi Backbone: {backbone_type}</h4>
-                <ul>
-                    <li><b>Stride:</b> {backbone_config.stride}</li>
-                    <li><b>Features:</b> {backbone_config.features}</li>
-                    <li><b>Stages:</b> {backbone_config.stages}</li>
-                    <li><b>Width Coefficient:</b> {backbone_config.width_coefficient}</li>
-                    <li><b>Depth Coefficient:</b> {backbone_config.depth_coefficient}</li>
-                    <li><b>Pretrained:</b> {'Ya' if backbone_config.pretrained else 'Tidak'}</li>
-                </ul>
-                """
-                
-                ui_components['backbone_info'].value = info_html
-            except Exception as e:
-                ui_components['backbone_info'].value = f"<p style='color:red'>❌ Error: {str(e)}</p>"
+            # Tidak melakukan apa-apa karena sudah dihandle oleh on_model_change
+            pass
         
         # Handler buttons
         def on_save_click(b): 

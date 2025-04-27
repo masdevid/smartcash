@@ -56,13 +56,37 @@ def run_cell(cell_name, config_path):
                 ui_components = initialize_training_strategy_ui(env, config)
             else:
                 # Fallback untuk komponen yang belum direfaktor
-                handler_module = f"smartcash.ui.training_config.{cell_name}_handler"
-                handler_function = f"setup_{cell_name}_handlers"
-                
-                module = __import__(handler_module, fromlist=[handler_function])
-                handler_func = getattr(module, handler_function)
-                
-                ui_components = handler_func(ui_components, env, config)
+                try:
+                    # Coba cari handler di direktori training_config/{cell_name}/handlers
+                    handler_module = f"smartcash.ui.training_config.{cell_name}.handlers.button_handlers"
+                    handler_function = f"setup_{cell_name}_button_handlers"
+                    
+                    module = __import__(handler_module, fromlist=[handler_function])
+                    handler_func = getattr(module, handler_function)
+                    
+                    ui_components = handler_func(ui_components, env, config)
+                except (ImportError, AttributeError):
+                    # Jika tidak ditemukan, coba di ui/handlers/config_handler
+                    try:
+                        handler_module = "smartcash.ui.handlers.config_handlers"
+                        handler_function = f"setup_{cell_name}_handlers"
+                        
+                        module = __import__(handler_module, fromlist=[handler_function])
+                        handler_func = getattr(module, handler_function)
+                        
+                        ui_components = handler_func(ui_components, env, config)
+                    except (ImportError, AttributeError):
+                        # Jika masih tidak ditemukan, coba format lama
+                        try:
+                            handler_module = f"smartcash.ui.training_config.{cell_name}_handler"
+                            handler_function = f"setup_{cell_name}_handlers"
+                            
+                            module = __import__(handler_module, fromlist=[handler_function])
+                            handler_func = getattr(module, handler_function)
+                            
+                            ui_components = handler_func(ui_components, env, config)
+                        except (ImportError, AttributeError) as e:
+                            raise ImportError(f"Tidak dapat menemukan handler untuk {cell_name}: {str(e)}")
             
             # Cek apakah handler berhasil setup
             if logger: logger.info(f"✅ Cell {cell_name} berhasil diinisialisasi")

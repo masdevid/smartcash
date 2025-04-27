@@ -49,7 +49,8 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
             valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
             valid_values = [val for val in augmentations if val in valid_options]
             if valid_values:
-                aug_type_selector.value = valid_values
+                # Konversi list ke tuple untuk SelectMultiple
+                aug_type_selector.value = tuple(valid_values)
     except Exception:
         # Jika terjadi error, gunakan nilai default
         pass

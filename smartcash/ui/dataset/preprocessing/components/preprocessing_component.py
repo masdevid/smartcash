@@ -151,6 +151,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'split_selector': split_selector,
         'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],
+        'preprocessing_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],
         'reset_button': action_buttons['reset_button'],
         'cleanup_button': action_buttons['cleanup_button'],

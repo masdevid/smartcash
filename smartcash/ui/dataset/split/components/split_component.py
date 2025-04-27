@@ -186,9 +186,15 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
             layout=widgets.Layout(display='flex', justify_content='flex-end'))
     
     # Kombinasikan semua tombol dalam satu baris
+    # Pastikan buttons_container adalah widget, bukan dictionary
+    if isinstance(buttons_container, dict) and 'container' in buttons_container:
+        buttons_widget = buttons_container['container']
+    else:
+        buttons_widget = buttons_container
+        
     all_buttons = widgets.HBox([
         visualize_button,
-        buttons_container
+        buttons_widget
     ], layout=widgets.Layout(
         display='flex', 
         justify_content='space-between',

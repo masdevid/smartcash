@@ -20,23 +20,40 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Inisialisasi komponen
     ui_components = {}
     
-    # Dapatkan konfigurasi backbone yang tersedia
+    # Import ModelManager untuk mendapatkan model yang dioptimalkan
+    from smartcash.model.manager import ModelManager
     from smartcash.model.config.backbone_config import BackboneConfig
     
     # Daftar backbone yang didukung
     backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+    
+    # Daftar model yang dioptimalkan
+    optimized_models = ModelManager.OPTIMIZED_MODELS
     
     # Buat komponen UI
     ui_components['title'] = widgets.HTML(
         value="<h3>🔄 Konfigurasi Backbone Model</h3>"
     )
     
+    # Dropdown untuk memilih model yang dioptimalkan
+    model_options = [(f"{key}: {value['description']}", key) for key, value in optimized_models.items()]
+    
+    ui_components['model_type'] = widgets.Dropdown(
+        options=model_options,
+        value='efficient_optimized',
+        description='Model:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='500px')
+    )
+    
+    # Dropdown backbone akan otomatis diupdate berdasarkan model yang dipilih
     ui_components['backbone_type'] = widgets.Dropdown(
         options=backbone_options,
-        value='efficientnet_b4',
+        value=optimized_models['efficient_optimized']['backbone'],
         description='Backbone:',
         style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='400px'),
+        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
     )
     
     ui_components['pretrained'] = widgets.Checkbox(
@@ -68,6 +85,31 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(width='400px')
     )
     
+    # Fitur optimasi
+    ui_components['use_attention'] = widgets.Checkbox(
+        value=optimized_models['efficient_optimized']['use_attention'],
+        description='Gunakan FeatureAdapter (Attention)',
+        style={'description_width': '250px'},
+        layout=widgets.Layout(width='400px'),
+        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
+    )
+    
+    ui_components['use_residual'] = widgets.Checkbox(
+        value=optimized_models['efficient_optimized']['use_residual'],
+        description='Gunakan ResidualAdapter',
+        style={'description_width': '250px'},
+        layout=widgets.Layout(width='400px'),
+        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
+    )
+    
+    ui_components['use_ciou'] = widgets.Checkbox(
+        value=optimized_models['efficient_optimized']['use_ciou'],
+        description='Gunakan CIoU Loss',
+        style={'description_width': '250px'},
+        layout=widgets.Layout(width='400px'),
+        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
+    )
+    
     # Informasi backbone
     ui_components['backbone_info'] = widgets.HTML(
         value="<p>Informasi backbone akan ditampilkan di sini</p>"
@@ -97,10 +139,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Susun layout
     ui_components['form_items'] = [
+        ui_components['model_type'],
         ui_components['backbone_type'],
         ui_components['pretrained'],
         ui_components['freeze_backbone'],
-        ui_components['freeze_layers']
+        ui_components['freeze_layers'],
+        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
+        widgets.HTML("<h4>Fitur Optimasi</h4>"),
+        ui_components['use_attention'],
+        ui_components['use_residual'],
+        ui_components['use_ciou']
     ]
     
     ui_components['form'] = widgets.VBox(
@@ -126,5 +174,40 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         ui_components['buttons'],
         ui_components['status']
     ])
+    
+    # Handler untuk mengupdate UI berdasarkan model yang dipilih
+    def on_model_change(change):
+        model_key = change['new']
+        model_config = optimized_models[model_key]
+        
+        # Update backbone
+        ui_components['backbone_type'].value = model_config['backbone']
+        
+        # Update fitur optimasi
+        ui_components['use_attention'].value = model_config.get('use_attention', False)
+        ui_components['use_residual'].value = model_config.get('use_residual', False)
+        ui_components['use_ciou'].value = model_config.get('use_ciou', False)
+        
+        # Update informasi backbone
+        backbone_info = f"""
+        <div style='padding: 10px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;'>
+            <h4>{model_key.replace('_', ' ').title()}</h4>
+            <p><strong>Deskripsi:</strong> {model_config['description']}</p>
+            <p><strong>Backbone:</strong> {model_config['backbone']}</p>
+            <p><strong>Fitur Optimasi:</strong></p>
+            <ul>
+                <li>FeatureAdapter (Attention): {'✅ Aktif' if model_config.get('use_attention', False) else '❌ Tidak aktif'}</li>
+                <li>ResidualAdapter: {'✅ Aktif' if model_config.get('use_residual', False) else '❌ Tidak aktif'}</li>
+                <li>CIoU Loss: {'✅ Aktif' if model_config.get('use_ciou', False) else '❌ Tidak aktif'}</li>
+            </ul>
+        </div>
+        """
+        ui_components['backbone_info'].value = backbone_info
+    
+    # Daftarkan handler
+    ui_components['model_type'].observe(on_model_change, names='value')
+    
+    # Trigger handler untuk inisialisasi awal
+    on_model_change({'new': ui_components['model_type'].value})
     
     return ui_components

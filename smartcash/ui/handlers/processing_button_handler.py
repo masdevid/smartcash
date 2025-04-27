@@ -183,6 +183,52 @@ def setup_processing_button_handlers(
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
     
+    # Definisi fungsi helper untuk UI
+    def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True) -> None:
+        """Menonaktifkan atau mengaktifkan komponen UI selama proses berjalan."""
+        # Daftar komponen yang perlu dinonaktifkan
+        disable_components = [
+            'split_selector', 'config_accordion', 'options_accordion',
+            'reset_button', primary_button_key, 'save_button'
+        ]
+        
+        # Tambahan komponen untuk augmentation
+        if module_type == 'augmentation':
+            disable_components.extend(['aug_options', 'aug_factor_slider'])
+        
+        # Disable/enable komponen
+        for component in disable_components:
+            if component in ui_components and hasattr(ui_components[component], 'disabled'):
+                ui_components[component].disabled = disable
+    
+    def _cleanup_ui(ui_components: Dict[str, Any]) -> None:
+        """Membersihkan UI setelah proses selesai."""
+        # Aktifkan kembali UI
+        _disable_ui_during_processing(ui_components, False)
+        
+        # Tampilkan tombol utama, sembunyikan tombol stop
+        ui_components[primary_button_key].layout.display = 'block'
+        ui_components['stop_button'].layout.display = 'none'
+        
+        # Reset progress bar
+        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+            ui_components['reset_progress_bar']()
+    
+    def _reset_ui(ui_components: Dict[str, Any]) -> None:
+        """Reset UI ke kondisi awal."""
+        # Bersihkan UI
+        _cleanup_ui(ui_components)
+        
+        # Sembunyikan visualisasi dan summary
+        for component in ['visualization_container', 'summary_container', 'visualization_buttons']:
+            if component in ui_components:
+                ui_components[component].layout.display = 'none'
+        
+        # Reset status panel
+        with ui_components['status']:
+            clear_output(wait=True)
+            display(create_status_indicator("info", f"{ICONS['ready']} Siap untuk memulai {module_type}"))
+    
     # Register handlers untuk tombol-tombol
     button_handlers = {
         primary_button_key: on_primary_click,

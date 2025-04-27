@@ -6,8 +6,9 @@ Deskripsi: Utility untuk mengarahkan output logger ke UI widget dengan integrasi
 import logging
 import sys
 import threading
-from typing import Dict, Any, Optional, Union
-from IPython.display import display, HTML
+from typing import Dict, Any, Callable, Optional, List, Union
+from IPython.display import display, HTML, clear_output
+import ipywidgets as widgets
 
 def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger"):
     """
@@ -31,21 +32,41 @@ def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logge
     # Setup LogLevel ke INFO untuk mengurangi debug log
     logger = get_logger(name, LogLevel.INFO)
     
-    # Override fungsi log
+    # Simpan referensi ke fungsi log asli
     original_log = logger.log
+    
+    # Dapatkan referensi ke logger Python standar
+    python_logger = None
+    if hasattr(logger, 'logger'):
+        python_logger = logger.logger
+        
+        # Hapus semua console handlers dari logger
+        for handler in list(python_logger.handlers):
+            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
+                python_logger.removeHandler(handler)
     
     def ui_log(level, message):
         # Jangan log debug message ke UI untuk mengurangi noise
         level_name = level.name.lower() if hasattr(level, 'name') else 'info'
+        
+        # Konversi ke level logging standar
+        std_level = logger.LEVEL_MAPPING[level] if hasattr(logger, 'LEVEL_MAPPING') else logging.INFO
+        
+        # Format pesan untuk file
+        if hasattr(logger, '_format_message'):
+            _, file_msg = logger._format_message(level, message)
+        else:
+            file_msg = message
+            
+        # Log ke file melalui Python logger (tanpa console output karena handlers sudah dihapus)
+        if python_logger:
+            python_logger.log(std_level, file_msg)
+        
+        # Skip UI display untuk debug messages
         if level_name == 'debug':
-            # Jangan tampilkan debug ke UI, tapi tetap log ke file jika perlu
-            original_log(level, message)
             return
             
-        # Call asli untuk konsistensi dan file logging
-        original_log(level, message)
-        
-        # Log ke UI
+        # Log ke UI untuk non-debug messages
         with ui_components['status']:
             from smartcash.ui.utils.alert_utils import create_status_indicator
             # Map LogLevel ke status type

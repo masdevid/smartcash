@@ -111,3 +111,28 @@ def create_info_box(title: str, content: str, style: str = 'info',
         f'</div>'
     )
     return widgets.HTML(value=html_content)
+
+def create_alert_html(message: str, alert_type: str = 'info', icon: Optional[str] = None) -> str:
+    """Create a styled alert HTML string.
+
+    Args:
+        message: Alert message
+        alert_type: Alert type ('info', 'success', 'warning', 'error')
+        icon: Optional custom emoji icon (defaults to type-specific icon)
+
+    Returns:
+        HTML string with styled alert
+    """
+    style = ALERT_STYLES.get(alert_type, ALERT_STYLES['info'])
+    icon_str = icon or style['icon']
+    
+    html_content = (
+        f'<div style="padding: 10px; background-color: {style["bg_color"]}; '
+        f'color: {style["text_color"]}; border-left: 4px solid {style["border_color"]}; '
+        f'border-radius: 5px; margin: 4px 0;">'
+        f'<div style="display: flex; align-items: flex-start;">'
+        f'<div style="margin-right: 10px; font-size: 1.2em;">{icon_str}</div>'
+        f'<div>{message}</div>'
+        f'</div></div>'
+    )
+    return html_content

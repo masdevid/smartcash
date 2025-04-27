@@ -6,7 +6,7 @@ Deskripsi: Initializer untuk modul augmentasi dataset dengan pendekatan DRY
 from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
-from smartcash.ui.dataset.augmentation.handlers.config_handler import setup_augmentation_config_handler
+from smartcash.ui.dataset.augmentation.handlers.config_handlers import setup_augmentation_config_handler
 from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
 from smartcash.ui.handlers.visualization_handler import setup_visualization_handlers
 

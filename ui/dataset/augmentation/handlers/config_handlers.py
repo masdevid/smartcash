@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
+File: smartcash/ui/dataset/augmentation/handlers/config_handlers.py
 Deskripsi: Handler konfigurasi untuk augmentasi dataset
 """
 

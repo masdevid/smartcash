@@ -6,10 +6,13 @@ Deskripsi: Komponen tombol yang digunakan pada berbagai UI konfigurasi
 import ipywidgets as widgets
 from typing import Dict, Any
 
-def create_config_buttons() -> Dict[str, Any]:
+def create_config_buttons(title: str = None) -> Dict[str, Any]:
     """
     Membuat tombol-tombol standar untuk UI konfigurasi.
     
+    Args:
+        title: Judul untuk konteks tombol (opsional)
+        
     Returns:
         Dict berisi tombol-tombol konfigurasi
     """

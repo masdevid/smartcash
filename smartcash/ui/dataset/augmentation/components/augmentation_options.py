@@ -36,7 +36,7 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     # Buat komponen-komponen UI
     aug_type_selector = widgets.SelectMultiple(
         options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
-        value=['Combined (Recommended)'],  # Selalu gunakan list dengan nilai default
+        value=('Combined (Recommended)',),  # Gunakan tuple bukan list untuk nilai default
         description='Jenis:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='70%', height='80px')

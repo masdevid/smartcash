@@ -1,0 +1,68 @@
+# File: configs/hyperparameters_config.yaml
+# Konfigurasi hyperparameter untuk model YOLOv5 dengan EfficientNet-B4 backbone
+
+hyperparameters:
+  # Parameter dasar
+  batch_size: 16
+  image_size: 640
+  epochs: 100
+  
+  # Parameter optimasi
+  optimizer: 'Adam'
+  learning_rate: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  
+  # Parameter penjadwalan
+  lr_scheduler: 'cosine'
+  warmup_epochs: 3
+  warmup_momentum: 0.8
+  warmup_bias_lr: 0.1
+  
+  # Parameter regularisasi
+  augment: true
+  dropout: 0.0
+  
+  # Parameter loss
+  box_loss_gain: 0.05
+  cls_loss_gain: 0.5
+  obj_loss_gain: 1.0
+  
+  # Parameter anchor
+  anchor_t: 4.0
+  fl_gamma: 0.0
+  
+  # EfficientNet-B4 specific
+  efficientnet:
+    width_coefficient: 1.4
+    depth_coefficient: 1.8
+    resolution: 380
+    dropout_rate: 0.4
+    
+  # Parameter early stopping
+  early_stopping:
+    enabled: true
+    patience: 15
+    min_delta: 0.001
+    
+  # Parameter checkpoint
+  checkpoint:
+    save_period: 10
+    save_best: true
+    metric: 'mAP'
+    
+  # Parameter validasi
+  validation:
+    frequency: 1
+    iou_thres: 0.6
+    conf_thres: 0.001
+    
+  # Parameter multi-scale training
+  multi_scale: true
+  
+  # Parameter transfer learning
+  transfer_learning:
+    enabled: true
+    freeze_backbone: false
+    freeze_batch_norm: false
+    unfreeze_after_epochs: 10

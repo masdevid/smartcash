@@ -69,15 +69,47 @@ class ConfigManager:
         
         # Check absolute path
         if config_path.is_absolute(): 
-            return config_path
+            if config_path.exists():
+                return config_path
+            
+            # Jika di Colab, coba cari di direktori project
+            is_colab = 'google.colab' in str(globals())
+            if is_colab and '/content/' in str(config_path):
+                # Coba cari di direktori smartcash/configs
+                project_config_path = Path('smartcash') / 'configs' / config_path.name
+                if project_config_path.exists():
+                    if self.logger:
+                        self.logger.info(f"📁 Menggunakan file konfigurasi dari: {project_config_path}")
+                    return project_config_path
             
         # Check relative to config_dir
         if (self.config_dir / config_path).exists(): 
             return self.config_dir / config_path
+        
+        # Check relative to project root (smartcash/configs)
+        project_config_path = Path('smartcash') / 'configs' / config_path.name
+        if project_config_path.exists():
+            if self.logger:
+                self.logger.info(f"📁 Menggunakan file konfigurasi dari: {project_config_path}")
+            return project_config_path
             
         # Check relative to current working directory
         if (Path.cwd() / config_path).exists(): 
             return Path.cwd() / config_path
+        
+        # Coba cari di berbagai lokasi umum
+        common_paths = [
+            Path('configs') / config_path.name,
+            Path('smartcash/configs') / config_path.name,
+            Path('/content/smartcash/configs') / config_path.name,
+            Path('/content/configs') / config_path.name,
+        ]
+        
+        for path in common_paths:
+            if path.exists():
+                if self.logger:
+                    self.logger.info(f"📁 Menggunakan file konfigurasi dari: {path}")
+                return path
             
         # Default to config_dir
         return self.config_dir / config_path

@@ -133,10 +133,23 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
         import logging
         root_logger = logging.getLogger()
         
-        # Hapus handler stdout untuk mencegah duplikasi
+        # Hapus semua stream handlers untuk mencegah output ke console
         for handler in root_logger.handlers[:]:
-            if isinstance(handler, logging.StreamHandler) and handler.stream == sys.__stdout__:
+            if isinstance(handler, logging.StreamHandler):
                 root_logger.removeHandler(handler)
+                
+        # Tambahkan file handler jika diperlukan untuk tetap menyimpan log
+        has_file_handler = any(isinstance(h, logging.FileHandler) for h in root_logger.handlers)
+        if not has_file_handler:
+            try:
+                from pathlib import Path
+                log_dir = Path('logs')
+                log_dir.mkdir(exist_ok=True)
+                file_handler = logging.FileHandler(log_dir / 'colab.log')
+                file_handler.setLevel(logging.INFO)
+                root_logger.addHandler(file_handler)
+            except Exception:
+                pass
     except Exception:
         pass
     
@@ -148,14 +161,43 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
             self.buffer = ""
             self.lock = threading.RLock()
             self.buffer_limit = 1000  # Batasi buffer untuk mencegah memory leak
-            self.ignore_debug_prefix = ['[DEBUG]', 'DEBUG:']  # Prefiks untuk mengidentifikasi debug message
+            # Tambahkan lebih banyak prefiks untuk difilter
+            self.ignore_debug_prefix = [
+                '[DEBUG]', 'DEBUG:', 'INFO:', '[INFO]',
+                'Using TensorFlow backend', 'Colab notebook',
+                'Your session crashed', 'Executing in eager mode',
+                'TensorFlow', 'NumExpr', 'Running on',
+                '/usr/local/lib', 'WARNING:', '[WARNING]',
+                'This TensorFlow binary', 'For more info',
+                'Welcome to', 'This notebook', 'The Jupyter',
+                'IPython', 'torch._C', 'matplotlib', 'numpy',
+                'Requirement already satisfied', 'Downloading',
+                'Collecting', 'Building wheel', 'Installing',
+                'Successfully installed', 'Preparing metadata',
+                'Extracting', 'Processing', 'Looking in',
+                'Copying', 'Cloning', 'Pulling', 'Pushing',
+                'Fetching', 'Checking out', 'HEAD is now at',
+                'Already up to date', 'Your branch is',
+                'Mounted at', 'Drive already mounted',
+                'FutureWarning', 'DeprecationWarning',
+                'UserWarning', 'RuntimeWarning'
+            ]  # Prefiks untuk mengidentifikasi pesan yang tidak perlu ditampilkan di UI
             
         def write(self, message):
             # Write ke terminal asli
             self.terminal.write(message)
             
-            # Skip debug messages yang diidentifikasi dari prefiks
-            if any(message.strip().startswith(prefix) for prefix in self.ignore_debug_prefix):
+            # Skip pesan yang tidak perlu ditampilkan di UI
+            msg_strip = message.strip()
+            if not msg_strip or len(msg_strip) < 2:  # Skip pesan kosong atau terlalu pendek
+                return
+                
+            # Filter berdasarkan prefiks yang umum untuk log yang tidak perlu
+            if any(prefix in msg_strip for prefix in self.ignore_debug_prefix):
+                return
+                
+            # Filter tambahan untuk pesan pertama kali cell dijalankan
+            if 'Executing:' in msg_strip or 'In [' in msg_strip:
                 return
                 
             # Buffer output sampai ada newline, dengan thread-safety

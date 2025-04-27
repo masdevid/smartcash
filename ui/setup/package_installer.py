@@ -19,6 +19,10 @@ def install_single_package(package: str) -> Tuple[bool, str]:
     Returns:
         Tuple (success, error_message)
     """
+    # Skip instalasi tqdm
+    if package.lower().startswith('tqdm'):
+        return True, "Instalasi tqdm dilewati sesuai konfigurasi"
+        
     try:
         result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "--upgrade", package],
@@ -56,15 +60,28 @@ def run_batch_installation(
     progress_label = ui_components.get('progress_label')
     logger = ui_components.get('logger')
     
+    # Filter out tqdm dari packages yang akan diinstal
+    filtered_packages = [pkg for pkg in packages if not pkg.lower().startswith('tqdm')]
+    
+    # Hitung berapa package yang dilewati
+    skipped_count = len(packages) - len(filtered_packages)
+    
     # Stats untuk instalasi
     stats = {
         'total': len(packages),
         'success': 0,
         'failed': 0,
-        'skipped': 0,
+        'skipped': skipped_count,  # Inisialisasi dengan jumlah paket yang dilewati
         'duration': 0,
         'errors': []
     }
+    
+    # Log packages yang dilewati
+    if skipped_count > 0 and logger:
+        logger.info(f"ℹ️ Melewati instalasi {skipped_count} package (tqdm)")  
+    
+    # Gunakan filtered_packages untuk instalasi
+    packages = filtered_packages
     
     if not packages:
         if logger: logger.info("ℹ️ Tidak ada package yang perlu diinstall")

@@ -36,9 +36,13 @@ def get_project_requirements(project_name: str) -> List[str]:
             "scipy>=1.4.1",
             "torch>=1.7.0", 
             "torchvision>=0.8.1", 
-            "tqdm>=4.64.0"
+            # tqdm dikomentari karena akan dilewati
+            # "tqdm>=4.64.0"
         ]
     }
+    
+    # Paket yang akan dilewati (skip) saat instalasi
+    skip_packages = ['tqdm']
     
     # Coba baca dari file requirements.txt
     potential_paths = [
@@ -57,7 +61,17 @@ def get_project_requirements(project_name: str) -> List[str]:
                         # Skip comments dan baris kosong
                         if line and not line.startswith('#'):
                             # Ambil hanya package name dan versi
-                            requirements.append(line.split('#')[0].strip())
+                            package_line = line.split('#')[0].strip()
+                            
+                            # Skip tqdm dan paket lain yang perlu dilewati
+                            should_skip = False
+                            for skip_pkg in skip_packages:
+                                if package_line.lower().startswith(skip_pkg.lower()):
+                                    should_skip = True
+                                    break
+                            
+                            if not should_skip:
+                                requirements.append(package_line)
                     if requirements:
                         return requirements
             except Exception:

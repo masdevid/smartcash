@@ -70,8 +70,9 @@ class EnvironmentManager:
         
         if self.logger:
             env_type = "Google Colab" if self._in_colab else "Notebook" if self._in_notebook else "Lokal"
-            self.logger.info(f"🔍 Environment terdeteksi: {env_type}")
-            self.logger.info(f"📂 Direktori dasar: {self._base_dir}")
+            # Ubah ke debug untuk mengurangi verbose log
+            self.logger.debug(f"🔍 Environment terdeteksi: {env_type}")
+            self.logger.debug(f"📂 Direktori dasar: {self._base_dir}")
     
     @property
     def is_colab(self) -> bool: return self._in_colab
@@ -101,7 +102,7 @@ class EnvironmentManager:
                 self._drive_path = Path(drive_path) / 'SmartCash'
                 # Pastikan directory SmartCash ada di Drive
                 os.makedirs(self._drive_path, exist_ok=True)
-                if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
+                if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
                 return True
         except ImportError:
             # Fallback jika drive_utils tidak tersedia
@@ -113,7 +114,7 @@ class EnvironmentManager:
                 os.makedirs(drive_path, exist_ok=True)
                 self._drive_mounted = True
                 self._drive_path = drive_path
-                if self.logger: self.logger.info(f"✅ Google Drive terdeteksi pada: {drive_path}")
+                if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {drive_path}")
                 return True
         return False
     
@@ -148,7 +149,7 @@ class EnvironmentManager:
             self._drive_mounted = True
             
             msg = f"✅ Google Drive berhasil di-mount pada {self._drive_path}"
-            if self.logger: self.logger.info(msg)
+            if self.logger: self.logger.debug(msg)
             
             return True, msg
         
@@ -221,7 +222,8 @@ class EnvironmentManager:
             except Exception:
                 stats['error'] += 1
         
-        if self.logger:
+        if self.logger and stats['created'] > 0:
+            # Hanya log jika ada direktori yang dibuat
             self.logger.info(f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada")
         
         return stats
@@ -269,7 +271,7 @@ class EnvironmentManager:
                 if local_path.exists() and not local_path.is_symlink():
                     backup_path = local_path.with_name(f"{local_name}_backup")
                     if self.logger:
-                        self.logger.info(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
+                        self.logger.debug(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
                     
                     # Hapus backup yang sudah ada
                     if backup_path.exists(): shutil.rmtree(backup_path)
@@ -281,7 +283,7 @@ class EnvironmentManager:
                 if not local_path.exists():
                     local_path.symlink_to(target_path)
                     stats['created'] += 1
-                    if self.logger: self.logger.info(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                    if self.logger: self.logger.debug(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
                 else:
                     stats['existing'] += 1
             except Exception as e:

@@ -34,16 +34,25 @@ def setup_cell(
         from smartcash.ui.utils.logging_utils import setup_ipython_logging
         from smartcash.ui.utils.ui_logger import log_to_ui, intercept_stdout_to_ui
         
-        # Setup environment dan load konfigurasi
+        # Buat UI dasar minimal untuk intercept stdout sebelum inisialisasi lainnya
+        import ipywidgets as widgets
+        if 'status' not in ui_components:
+            ui_components['status'] = widgets.Output()
+            
+        # Tangkap stdout ke UI segera sebelum inisialisasi lainnya
+        intercept_stdout_to_ui(ui_components)
+        
+        # Setup environment dan load konfigurasi (setelah intercept stdout)
         env, config = setup_notebook_environment(cell_name)
         
         # Buat komponen UI dengan fungsi yang diberikan
         ui_components = create_ui_func(env, config)
         ui_components['module_name'] = cell_name
         
-        # Tangkap stdout ke UI segera untuk mencegah log inisialisasi ke konsol
-        if 'status' in ui_components:
-            intercept_stdout_to_ui(ui_components)
+        # Pastikan stdout tetap terintercept setelah UI dibuat
+        if 'custom_stdout' in ui_components and 'status' in ui_components:
+            # Perbarui referensi ke output widget jika berubah
+            ui_components['custom_stdout'].ui_components = ui_components
         
         # Setup logger dengan arahkan ke UI
         logger = setup_ipython_logging(ui_components, cell_name)

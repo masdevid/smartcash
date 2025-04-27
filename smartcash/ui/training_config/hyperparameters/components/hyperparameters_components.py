@@ -9,16 +9,24 @@ from IPython.display import display, HTML
 
 def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Membuat komponen UI untuk konfigurasi hyperparameter model.
+    Membuat komponen UI untuk pengaturan hyperparameter.
     
     Args:
-        config: Konfigurasi model
+        config: Konfigurasi training
         
     Returns:
         Dict berisi komponen UI
     """
+    # Import komponen UI standar 
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    
     # Inisialisasi komponen
     ui_components = {}
+    
+    # Tambahkan komponen status
+    ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Buat komponen UI
     ui_components['title'] = widgets.HTML(
@@ -174,11 +182,6 @@ def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Tombol aksi akan ditambahkan dari initializer
     
-    # Status indicator
-    ui_components['status'] = widgets.Output(
-        layout=widgets.Layout(width='100%', padding='10px')
-    )
-    
     # Susun layout
     optimizer_box = widgets.VBox([
         ui_components['optimizer_type'],
@@ -221,13 +224,40 @@ def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(padding='10px')
     )
     
+    # Header dengan komponen standar
+    header = create_header(f"{ICONS['settings']} Hyperparameters Configuration", 
+                          "Konfigurasi hyperparameter untuk training model deteksi mata uang")
+    
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']};">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi hyperparameter training</p>
+        </div>"""
+    )
+    
+    # Log accordion dengan styling standar
+    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=0)
+    log_accordion.set_title(0, f"{ICONS['file']} Hyperparameters Logs")
+    
     # Container utama
     ui_components['main_container'] = widgets.VBox([
-        ui_components['title'],
+        header,
+        status_panel,
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Training Parameters</h4>"),
         ui_components['tabs'],
-        ui_components['info_box'],
+        create_divider(),
         ui_components['buttons_placeholder'],
-        ui_components['status']
+        log_accordion
     ])
+    
+    # Tambahkan referensi komponen tambahan ke ui_components
+    ui_components.update({
+        'header': header,
+        'status_panel': status_panel,
+        'log_accordion': log_accordion,
+        'module_name': 'hyperparameters'
+    })
     
     return ui_components

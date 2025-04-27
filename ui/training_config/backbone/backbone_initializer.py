@@ -86,7 +86,8 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         
         def on_reset_config(b):
             # Reset ke default config
-            default_config = config_manager.get_default_config().get('model', {})
+            from smartcash.common.default_config import generate_default_config
+            default_config = generate_default_config().get('model', {})
             ui_components = update_ui_from_config(ui_components, default_config)
             
             # Tampilkan status

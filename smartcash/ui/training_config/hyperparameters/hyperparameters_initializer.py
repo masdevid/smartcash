@@ -86,7 +86,8 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         
         def on_reset_config(b):
             # Reset ke default config
-            default_config = config_manager.get_default_config().get('hyperparameters', {})
+            from smartcash.common.default_config import generate_default_config
+            default_config = generate_default_config().get('training', {})
             ui_components = update_ui_from_config(ui_components, default_config)
             
             # Tampilkan status

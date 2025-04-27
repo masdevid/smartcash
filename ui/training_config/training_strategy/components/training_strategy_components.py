@@ -17,6 +17,11 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     Returns:
         Dict berisi komponen UI
     """
+    # Import komponen UI standar 
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    
     # Inisialisasi komponen
     ui_components = {}
     
@@ -120,9 +125,7 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Tombol aksi akan ditambahkan dari initializer
     
     # Status indicator
-    ui_components['status'] = widgets.Output(
-        layout=widgets.Layout(width='100%', padding='10px')
-    )
+    ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Susun layout
     basic_box = widgets.VBox([
@@ -155,13 +158,40 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         layout=widgets.Layout(padding='10px')
     )
     
+    # Header dengan komponen standar
+    header = create_header(f"{ICONS['training']} Training Strategy Configuration", 
+                          "Konfigurasi strategi pelatihan untuk model deteksi mata uang")
+    
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']};">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi strategi pelatihan model</p>
+        </div>"""
+    )
+    
+    # Log accordion dengan styling standar
+    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=0)
+    log_accordion.set_title(0, f"{ICONS['file']} Training Strategy Logs")
+    
     # Container utama
     ui_components['main_container'] = widgets.VBox([
-        ui_components['title'],
+        header,
+        status_panel,
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Training Strategy</h4>"),
         ui_components['tabs'],
-        ui_components['info_box'],
+        create_divider(),
         ui_components['buttons_placeholder'],
-        ui_components['status']
+        log_accordion
     ])
+    
+    # Tambahkan referensi komponen tambahan ke ui_components
+    ui_components.update({
+        'header': header,
+        'status_panel': status_panel,
+        'log_accordion': log_accordion,
+        'module_name': 'training_strategy'
+    })
     
     return ui_components

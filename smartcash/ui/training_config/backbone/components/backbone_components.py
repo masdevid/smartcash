@@ -17,11 +17,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
+    # Import komponen UI standar 
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.constants import COLORS, ICONS 
+    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    
     # Inisialisasi komponen
     ui_components = {}
     
     # Tambahkan komponen status
-    ui_components['status'] = widgets.Output()
+    ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Import ModelManager untuk mendapatkan model yang dioptimalkan
     try:
@@ -248,13 +253,41 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(padding='10px')
     )
     
+    # Header dengan komponen standar
+    header = create_header(f"{ICONS['model']} Backbone Model Selection", 
+                          "Pilih backbone model dan konfigurasi layer untuk deteksi mata uang")
+    
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']};">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi backbone model</p>
+        </div>"""
+    )
+    
+    # Log accordion dengan styling standar
+    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=0)
+    log_accordion.set_title(0, f"{ICONS['file']} Backbone Selection Logs")
+    
     # Container utama
     ui_components['main_container'] = widgets.VBox([
-        ui_components['title'],
+        header,
+        status_panel,
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Model Configuration</h4>"),
         ui_components['form'],
+        create_divider(),
         ui_components['buttons_placeholder'],
-        ui_components['status']
+        log_accordion
     ])
+    
+    # Tambahkan referensi komponen tambahan ke ui_components
+    ui_components.update({
+        'header': header,
+        'status_panel': status_panel,
+        'log_accordion': log_accordion,
+        'module_name': 'backbone'
+    })
     
     # Handler untuk mengupdate UI berdasarkan model yang dipilih
     def on_model_change(change):

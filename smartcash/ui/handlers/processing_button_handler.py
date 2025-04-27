@@ -214,8 +214,16 @@ def setup_processing_button_handlers(
         _disable_ui_during_processing(ui_components, False)
         
         # Tampilkan tombol utama, sembunyikan tombol stop
-        ui_components[primary_button_key].layout.display = 'block'
-        ui_components['stop_button'].layout.display = 'none'
+        # Periksa keberadaan tombol primary sebelum mengakses
+        if primary_button_key in ui_components:
+            ui_components[primary_button_key].layout.display = 'block'
+        elif 'augment_button' in ui_components:
+            # Fallback untuk augmentation module
+            ui_components['augment_button'].layout.display = 'block'
+        
+        # Sembunyikan tombol stop jika ada
+        if 'stop_button' in ui_components:
+            ui_components['stop_button'].layout.display = 'none'
         
         # Reset progress bar
         if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):

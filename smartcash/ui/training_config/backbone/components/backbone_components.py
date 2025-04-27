@@ -20,18 +20,8 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Inisialisasi komponen
     ui_components = {}
     
-    # Tambahkan komponen status dan tombol yang diperlukan
+    # Tambahkan komponen status
     ui_components['status'] = widgets.Output()
-    ui_components['save_button'] = widgets.Button(
-        description='Simpan Konfigurasi',
-        button_style='success',
-        icon='save'
-    )
-    ui_components['reset_button'] = widgets.Button(
-        description='Reset',
-        button_style='warning',
-        icon='refresh'
-    )
     
     # Import ModelManager untuk mendapatkan model yang dioptimalkan
     try:
@@ -252,8 +242,9 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Info box sudah dibuat sebelumnya
     
-    ui_components['buttons'] = widgets.HBox(
-        [ui_components['save_button'], ui_components['reset_button']],
+    # Placeholder untuk tombol konfigurasi yang akan ditambahkan dari initializer
+    ui_components['buttons_placeholder'] = widgets.HBox(
+        [],
         layout=widgets.Layout(padding='10px')
     )
     
@@ -261,7 +252,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     ui_components['main_container'] = widgets.VBox([
         ui_components['title'],
         ui_components['form'],
-        ui_components['buttons'],
+        ui_components['buttons_placeholder'],
         ui_components['status']
     ])
     

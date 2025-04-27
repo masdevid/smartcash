@@ -118,18 +118,24 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         
         # Tampilkan container utama
         if 'main_container' in ui_components:
-            # Tambahkan config_buttons ke main_container
-            from ipywidgets import VBox
-            if isinstance(ui_components['main_container'].children, tuple):
+            # Ganti placeholder tombol dengan config_buttons
+            if 'buttons_placeholder' in ui_components and hasattr(ui_components['main_container'], 'children'):
+                # Dapatkan indeks buttons_placeholder dalam children
                 children_list = list(ui_components['main_container'].children)
-                # Tambahkan config_buttons sebelum status atau di akhir
-                if 'status' in ui_components:
-                    status_idx = next((i for i, child in enumerate(children_list) 
-                                     if child is ui_components['status']), len(children_list))
-                    children_list.insert(status_idx, config_buttons['container'])
+                placeholder_idx = next((i for i, child in enumerate(children_list) 
+                                    if child is ui_components['buttons_placeholder']), -1)
+                
+                if placeholder_idx >= 0:
+                    # Ganti placeholder dengan config_buttons
+                    children_list[placeholder_idx] = config_buttons['container']
+                    ui_components['main_container'].children = tuple(children_list)
                 else:
-                    children_list.append(config_buttons['container'])
-                ui_components['main_container'].children = tuple(children_list)
+                    # Jika placeholder tidak ditemukan, tambahkan sebelum status
+                    if 'status' in ui_components:
+                        status_idx = next((i for i, child in enumerate(children_list) 
+                                        if child is ui_components['status']), len(children_list))
+                        children_list.insert(status_idx, config_buttons['container'])
+                        ui_components['main_container'].children = tuple(children_list)
             
             display(ui_components['main_container'])
         else:

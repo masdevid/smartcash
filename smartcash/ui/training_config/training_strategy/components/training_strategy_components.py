@@ -117,22 +117,7 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         value="<p style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'><b>ℹ️ Info:</b> Konfigurasi strategi pelatihan dasar untuk model YOLOv5 dengan EfficientNet backbone.</p>"
     )
     
-    # Buat tombol aksi
-    ui_components['save_button'] = widgets.Button(
-        description='Simpan Konfigurasi',
-        button_style='success',
-        icon='save',
-        tooltip='Simpan konfigurasi strategi pelatihan',
-        layout=widgets.Layout(width='200px')
-    )
-    
-    ui_components['reset_button'] = widgets.Button(
-        description='Reset',
-        button_style='warning',
-        icon='refresh',
-        tooltip='Reset ke default',
-        layout=widgets.Layout(width='100px')
-    )
+    # Tombol aksi akan ditambahkan dari initializer
     
     # Status indicator
     ui_components['status'] = widgets.Output(
@@ -164,8 +149,9 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         layout=widgets.Layout(padding='10px', border='1px solid #ddd', margin='10px 0')
     )
     
-    ui_components['buttons'] = widgets.HBox(
-        [ui_components['save_button'], ui_components['reset_button']],
+    # Placeholder untuk tombol konfigurasi yang akan ditambahkan dari initializer
+    ui_components['buttons_placeholder'] = widgets.HBox(
+        [],
         layout=widgets.Layout(padding='10px')
     )
     
@@ -174,7 +160,7 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ui_components['title'],
         ui_components['tabs'],
         ui_components['info_box'],
-        ui_components['buttons'],
+        ui_components['buttons_placeholder'],
         ui_components['status']
     ])
     

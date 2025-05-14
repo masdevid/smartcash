@@ -370,8 +370,32 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         if len(aug_options) >= 7:  # Pastikan jumlah komponen sesuai
             # Update aug types
             if 'types' in aug_config and hasattr(aug_options[0], 'value'):
-                aug_options[0].value = aug_config['types']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set aug_types: {aug_config['types']}")
+                try:
+                    # Periksa tipe widget dan pastikan nilai yang sesuai
+                    if hasattr(aug_options[0], '_trait_values') and aug_options[0]._trait_values.get('_model_name') == 'SelectMultipleModel':
+                        # Widget SelectMultiple menerima list
+                        aug_types = aug_config['types']
+                        if not isinstance(aug_types, list):
+                            aug_types = [aug_types] if aug_types else []
+                        aug_options[0].value = aug_types
+                    elif hasattr(aug_options[0], '_trait_values') and aug_options[0]._trait_values.get('_model_name') == 'HTMLModel':
+                        # Widget HTML menerima string
+                        aug_types = aug_config['types']
+                        if isinstance(aug_types, list):
+                            aug_options[0].value = ', '.join(aug_types)
+                        else:
+                            aug_options[0].value = str(aug_types) if aug_types is not None else ''
+                    else:
+                        # Default behavior
+                        aug_options[0].value = aug_config['types']
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set aug_types: {aug_config['types']}")
+                except Exception as e:
+                    if logger: logger.warning(f"{ICONS['warning']} Error saat set aug_types: {str(e)}")
+                    # Fallback: coba set dengan nilai default
+                    try:
+                        aug_options[0].value = ['Combined (Recommended)']
+                    except:
+                        pass
             
             # Update prefix
             if 'prefix' in aug_config and hasattr(aug_options[2], 'value'):

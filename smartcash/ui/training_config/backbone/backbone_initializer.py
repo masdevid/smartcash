@@ -251,11 +251,31 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     # Dapatkan konfigurasi model
     model_config = config.get('model', {})
     
-    # Update dropdown backbone
+    # Update dropdown backbone dengan pengecekan nilai yang lebih aman
     if 'backbone_dropdown' in ui_components:
-        backbone = model_config.get('backbone', 'efficientnet-b4')
-        if backbone in ui_components['backbone_dropdown'].options:
-            ui_components['backbone_dropdown'].value = backbone
+        try:
+            backbone = model_config.get('backbone', 'cspdarknet_s')  # Default ke cspdarknet_s (yolov5s)
+            
+            # Pastikan backbone ada dalam opsi dropdown
+            if backbone in ui_components['backbone_dropdown'].options:
+                ui_components['backbone_dropdown'].value = backbone
+            else:
+                # Jika tidak ada, gunakan opsi pertama yang tersedia
+                logger = ui_components.get('logger')
+                if logger: 
+                    logger.warning(f"⚠️ Backbone '{backbone}' tidak ditemukan dalam opsi dropdown, menggunakan default")
+                
+                # Gunakan opsi default yang aman (cspdarknet_s untuk yolov5s)
+                if 'cspdarknet_s' in ui_components['backbone_dropdown'].options:
+                    ui_components['backbone_dropdown'].value = 'cspdarknet_s'
+                elif len(ui_components['backbone_dropdown'].options) > 0:
+                    # Fallback ke opsi pertama jika cspdarknet_s tidak tersedia
+                    ui_components['backbone_dropdown'].value = ui_components['backbone_dropdown'].options[0]
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger: 
+                logger.error(f"❌ Error saat update dropdown backbone: {str(e)}")
+            # Tidak perlu throw exception, biarkan proses berlanjut
     
     # Update checkbox pretrained
     if 'pretrained_checkbox' in ui_components:

@@ -100,8 +100,20 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         split_info = f"Split {split_option}"
         update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai augmentasi {split_info}...")
         
-        # Dapatkan opsi augmentasi dari UI
-        aug_types = ui_components['aug_options'].children[0].value  # SelectMultiple
+        # Dapatkan opsi augmentasi dari UI dengan pengecekan nilai
+        try:
+            aug_types = ui_components['aug_options'].children[0].value  # SelectMultiple
+            # Pastikan aug_types adalah list dan tidak None
+            if aug_types is None:
+                aug_types = ['Combined (Recommended)']  # Default value
+                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types adalah None, menggunakan default: {aug_types}")
+            elif not isinstance(aug_types, list):
+                aug_types = [aug_types]  # Konversi ke list jika bukan list
+                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types bukan list, mengkonversi ke: {aug_types}")
+        except Exception as e:
+            aug_types = ['Combined (Recommended)']  # Default value jika terjadi error
+            if logger: logger.warning(f"{ICONS['warning']} Error saat mendapatkan aug_types: {str(e)}, menggunakan default: {aug_types}")
+            
         aug_prefix = ui_components['aug_options'].children[2].value  # Text
         aug_factor = ui_components['aug_options'].children[3].value  # IntSlider
         balance_classes = ui_components['aug_options'].children[5].value  # Checkbox

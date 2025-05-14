@@ -174,16 +174,7 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                     </div>
                 </div>
                 
-                <div style="margin-top:15px; padding-top:10px; border-top:1px solid #eee;">
-                    <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status Dataset:</strong> 
-                        <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
-                        {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span>
-                        {split_info_html}
-                    </p>
-                    <p style="margin:8px 0; font-size:0.9em; color:#666;">
-                        <strong>Catatan:</strong> Dataset dianggap siap digunakan jika minimal split train dan val sudah lengkap.
-                    </p>
-                </div>
+                <!-- Status dataset dihilangkan sesuai permintaan -->
             </div>
             """))
             

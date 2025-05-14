@@ -31,7 +31,19 @@ def create_training_components() -> Dict[str, Any]:
     )
     
     # Status panel untuk log
-    status_panel, ui_log = create_status_panel()
+    status_panel = create_status_panel()
+    
+    # Output untuk UI log
+    ui_log = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            max_height='200px',
+            overflow_y='auto',
+            border='1px solid #ddd',
+            padding='10px',
+            margin='5px 0'
+        )
+    )
     
     # Informasi model dan konfigurasi
     info_box = widgets.Output(

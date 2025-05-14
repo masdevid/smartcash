@@ -17,7 +17,7 @@ def initialize_training_ui() -> Dict[str, Any]:
     try:
         # Import komponen dan handler
         from smartcash.ui.training.components.training_components import create_training_components
-        from smartcash.ui.training.handlers.button_handlers import setup_training_button_handlers
+        from smartcash.ui.training.handlers.setup_handler import setup_training_handlers
         from smartcash.common.config.manager import get_config_manager
         from smartcash.common.logger import get_logger
         
@@ -41,7 +41,7 @@ def initialize_training_ui() -> Dict[str, Any]:
             ui_components['logger'] = logger
         
         # Setup handler untuk tombol
-        ui_components = setup_training_button_handlers(ui_components)
+        ui_components = setup_training_handlers(ui_components)
         
         # Tampilkan UI
         display(ui_components['main_box'])

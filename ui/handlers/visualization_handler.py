@@ -58,17 +58,59 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             
             # Pilih lokasi yang memiliki sampel
             target_dir = None
-            if train_images_dir.exists() and list(train_images_dir.glob(f"{aug_prefix}_*.jpg")):
-                target_dir = train_images_dir
-            elif augmented_images_dir.exists() and list(augmented_images_dir.glob(f"{aug_prefix}_*.jpg")):
-                target_dir = augmented_images_dir
-            else:
-                # Coba cari di data_dir jika modul bukan augmentasi
-                if module_name != 'augmentation':
+            
+            # Jika modul adalah preprocessing, prioritaskan mencari gambar di preprocessed_dir
+            if module_name == 'preprocessing':
+                # Cari gambar di preprocessed_dir tanpa memperhatikan prefix
+                if train_images_dir.exists() and any(train_images_dir.glob('*.jpg')):
+                    target_dir = train_images_dir
+                    if logger: logger.info(f"✅ Menggunakan gambar dari {train_images_dir}")
+                # Jika tidak ada di preprocessed, cari di data_dir
+                else:
                     for root, _, files in os.walk(data_dir):
                         if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
                             target_dir = Path(root)
+                            if logger: logger.info(f"✅ Menggunakan gambar dari {root}")
                             break
+            # Untuk modul augmentasi, cari gambar dengan prefix augmentasi
+            elif module_name == 'augmentation':
+                # Cari gambar dengan prefix augmentasi di berbagai lokasi
+                aug_files_train = []
+                aug_files_augmented = []
+                
+                # Cek di direktori train/images
+                if train_images_dir.exists():
+                    aug_files_train = list(train_images_dir.glob(f"{aug_prefix}_*.jpg")) + \
+                                    list(train_images_dir.glob(f"{aug_prefix}_*.jpeg")) + \
+                                    list(train_images_dir.glob(f"{aug_prefix}_*.png"))
+                
+                # Cek di direktori augmented/images
+                if augmented_images_dir.exists():
+                    aug_files_augmented = list(augmented_images_dir.glob(f"{aug_prefix}_*.jpg")) + \
+                                        list(augmented_images_dir.glob(f"{aug_prefix}_*.jpeg")) + \
+                                        list(augmented_images_dir.glob(f"{aug_prefix}_*.png"))
+                
+                # Pilih lokasi yang memiliki sampel augmentasi
+                if aug_files_train:
+                    target_dir = train_images_dir
+                    if logger: logger.info(f"✅ Menggunakan {len(aug_files_train)} gambar augmentasi dari {train_images_dir}")
+                elif aug_files_augmented:
+                    target_dir = augmented_images_dir
+                    if logger: logger.info(f"✅ Menggunakan {len(aug_files_augmented)} gambar augmentasi dari {augmented_images_dir}")
+                else:
+                    # Jika tidak ada gambar augmentasi, gunakan gambar biasa
+                    if train_images_dir.exists() and any(train_images_dir.glob('*.jpg')):
+                        target_dir = train_images_dir
+                        if logger: logger.info(f"⚠️ Tidak ada gambar augmentasi, menggunakan gambar biasa dari {train_images_dir}")
+                    elif augmented_images_dir.exists() and any(augmented_images_dir.glob('*.jpg')):
+                        target_dir = augmented_images_dir
+                        if logger: logger.info(f"⚠️ Tidak ada gambar augmentasi, menggunakan gambar biasa dari {augmented_images_dir}")
+            # Untuk modul lain, cari di data_dir
+            else:
+                for root, _, files in os.walk(data_dir):
+                    if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
+                        target_dir = Path(root)
+                        break
             
             if target_dir is None:
                 with output_widget:
@@ -81,7 +123,13 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                 visualize_augmented_samples(target_dir, output_widget, ui_components, 5)
             except ImportError:
                 # Fallback: Visualisasi standar
-                visualize_samples(target_dir, output_widget, 5, aug_prefix)
+                if module_name == 'augmentation':
+                    # Untuk modul augmentasi, teruskan prefix augmentasi
+                    visualize_samples(target_dir, output_widget, 5, aug_prefix)
+                    if logger: logger.info(f"🔍 Menampilkan sampel dengan prefix augmentasi: {aug_prefix}")
+                else:
+                    # Untuk modul lain, tidak perlu prefix
+                    visualize_samples(target_dir, output_widget, 5)
             
             # Tampilkan container visualisasi
             if 'visualization_container' in ui_components:
@@ -222,38 +270,58 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
     return ui_components
 
 # Fungsi helper untuk visualisasi sampel
-def visualize_samples(image_dir: Path, output_widget: widgets.Output, num_samples: int = 5, prefix: str = None):
+def visualize_samples(target_dir, output_widget: widgets.Output, num_samples: int = 4, aug_prefix: str = None):
     """
     Visualisasi sampel gambar dari direktori.
     
     Args:
-        image_dir: Direktori gambar
+        target_dir: Direktori target (Path atau str)
         output_widget: Widget output untuk menampilkan visualisasi
-        num_samples: Jumlah sampel yang ditampilkan
-        prefix: Prefix nama file (opsional)
+        num_samples: Jumlah sampel yang akan ditampilkan
+        aug_prefix: Prefix untuk gambar augmentasi (jika ada)
     """
     try:
         # Cari file gambar
         image_files = []
+        augmented_files = []
+        original_files = []
+        
+        # Cari semua file gambar
         for ext in ['.jpg', '.jpeg', '.png']:
-            if prefix:
-                image_files.extend(list(image_dir.glob(f"{prefix}*{ext}")))
-            else:
-                image_files.extend(list(image_dir.glob(f"*{ext}")))
+            all_files = list(Path(target_dir).glob(f"*{ext}"))
+            image_files.extend(all_files)
+            
+            # Pisahkan file augmentasi dan original jika ada aug_prefix
+            if aug_prefix:
+                for f in all_files:
+                    if f.name.startswith(f"{aug_prefix}_"):
+                        augmented_files.append(f)
+                    else:
+                        original_files.append(f)
         
         if not image_files:
             with output_widget:
-                display(create_status_indicator('warning', f"{ICONS['warning']} Tidak ada gambar ditemukan di {image_dir}"))
+                display(create_status_indicator('warning', f"{ICONS['warning']} Tidak ditemukan file gambar di {target_dir}"))
             return
         
+        # Prioritaskan file augmentasi jika tersedia dan diminta
+        samples_to_use = []
+        if aug_prefix and augmented_files:
+            # Gunakan file augmentasi jika tersedia
+            samples_to_use = augmented_files
+            sample_type = "augmentasi"
+        else:
+            # Gunakan semua file jika tidak ada augmentasi atau tidak diminta
+            samples_to_use = image_files
+            sample_type = "original"
+        
         # Ambil sampel acak
-        samples = random.sample(image_files, min(num_samples, len(image_files)))
+        samples = random.sample(samples_to_use, min(num_samples, len(samples_to_use)))
         
         # Tampilkan sampel
         with output_widget:
             clear_output(wait=True)
             
-            # Gunakan ThreadPoolExecutor untuk loading gambar secara paralel
             fig, axes = plt.subplots(1, len(samples), figsize=(15, 4))
             if len(samples) == 1:
                 axes = [axes]
@@ -263,7 +331,18 @@ def visualize_samples(image_dir: Path, output_widget: widgets.Output, num_sample
                     from PIL import Image
                     img = Image.open(img_path)
                     axes[idx].imshow(np.array(img))
-                    axes[idx].set_title(f"Sample {idx+1}")
+                    
+                    # Ekstrak nama file yang lebih pendek dan informatif
+                    filename = Path(img_path).name
+                    # Tentukan tipe gambar (augmentasi atau original)
+                    img_type = "Aug" if aug_prefix and filename.startswith(f"{aug_prefix}_") else "Orig"
+                    
+                    # Truncate nama file jika terlalu panjang (max 15 karakter)
+                    if len(filename) > 15:
+                        filename = filename[:12] + '...'
+                    
+                    # Tampilkan informasi yang lebih jelas
+                    axes[idx].set_title(f"{img_type}: {filename}", fontsize=9)
                     axes[idx].axis('off')
                 except Exception as e:
                     axes[idx].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -277,11 +356,14 @@ def visualize_samples(image_dir: Path, output_widget: widgets.Output, num_sample
             plt.tight_layout()
             plt.show()
             
+            # Tampilkan informasi yang lebih jelas tentang jenis gambar
+            sample_type_info = "augmentasi" if aug_prefix and any(s.name.startswith(f"{aug_prefix}_") for s in samples) else "original"
+            
             display(widgets.HTML(f"""
                 <div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
                 color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
-                border-left:4px solid {COLORS['alert_success_text']};">
-                <p style="margin:5px 0">{ICONS['success']} Berhasil menampilkan {len(samples)} sampel dari {len(image_files)} gambar.</p>
+                border-left:4px solid {COLORS['alert_success_text']}">
+                <p style="margin:5px 0">{ICONS['success']} Berhasil menampilkan {len(samples)} sampel gambar {sample_type_info} dari total {len(image_files)} gambar.</p>
                 </div>
             """))
     except Exception as e:
@@ -336,10 +418,37 @@ def compare_original_vs_processed_fallback(data_dir: str, processed_dir: str, ou
                 display(create_status_indicator('warning', f"{ICONS['warning']} Tidak cukup gambar untuk komparasi"))
             return
         
-        # Ambil sampel acak
+        # Mencoba mencari pasangan gambar yang sesuai berdasarkan nama file
+        matched_pairs = []
         num_samples = 3
-        original_samples = random.sample(original_files, min(num_samples, len(original_files)))
-        processed_samples = random.sample(processed_files, min(num_samples, len(processed_files)))
+        
+        # Ekstrak nama file tanpa ekstensi dan path
+        original_names = {f.stem.split('_')[0]: f for f in original_files}
+        processed_names = {f.stem.split('_')[0]: f for f in processed_files}
+        
+        # Cari pasangan yang cocok
+        common_names = set(original_names.keys()) & set(processed_names.keys())
+        
+        # Jika ada pasangan yang cocok, gunakan itu
+        if common_names:
+            # Ambil sampel dari pasangan yang cocok
+            sample_names = random.sample(list(common_names), min(num_samples, len(common_names)))
+            matched_pairs = [(original_names[name], processed_names[name]) for name in sample_names]
+        
+        # Jika tidak ada pasangan yang cocok atau tidak cukup, gunakan sampel acak
+        if len(matched_pairs) < num_samples:
+            # Ambil sampel acak untuk sisa yang dibutuhkan
+            remaining = num_samples - len(matched_pairs)
+            original_samples = random.sample(original_files, min(remaining, len(original_files)))
+            processed_samples = random.sample(processed_files, min(remaining, len(processed_files)))
+            
+            # Tambahkan ke pasangan yang sudah ada
+            for i in range(min(len(original_samples), len(processed_samples))):
+                matched_pairs.append((original_samples[i], processed_samples[i]))
+        
+        # Pisahkan pasangan menjadi dua list
+        original_samples = [pair[0] for pair in matched_pairs]
+        processed_samples = [pair[1] for pair in matched_pairs]
         
         # Tampilkan komparasi
         with output_widget:
@@ -353,7 +462,18 @@ def compare_original_vs_processed_fallback(data_dir: str, processed_dir: str, ou
                         from PIL import Image
                         img = Image.open(img_path)
                         axes[row_idx, col_idx].imshow(np.array(img))
-                        axes[row_idx, col_idx].set_title(f"{'Original' if row_idx == 0 else 'Processed'} {col_idx+1}")
+                        
+                        # Ekstrak nama file yang lebih pendek dan informatif
+                        filename = Path(img_path).name
+                        # Truncate nama file jika terlalu panjang (max 15 karakter)
+                        if len(filename) > 15:
+                            filename = filename[:12] + '...'
+                            
+                        # Tampilkan tipe dan nama file
+                        axes[row_idx, col_idx].set_title(
+                            f"{'Original' if row_idx == 0 else 'Processed'} {col_idx+1}\n{filename}", 
+                            fontsize=8
+                        )
                         axes[row_idx, col_idx].axis('off')
                     except Exception as e:
                         axes[row_idx, col_idx].text(0.5, 0.5, f"Error: {str(e)}", ha='center', va='center')
@@ -373,8 +493,10 @@ def compare_original_vs_processed_fallback(data_dir: str, processed_dir: str, ou
             display(widgets.HTML(f"""
                 <div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
                 color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
-                border-left:4px solid {COLORS['alert_success_text']};">
-                <p style="margin:5px 0">{ICONS['success']} Berhasil menampilkan komparasi {num_samples} sampel gambar.</p>
+                border-left:4px solid {COLORS['alert_success_text']}">
+                <p style="margin:5px 0">{ICONS['success']} Berhasil menampilkan komparasi {len(original_samples)} pasang gambar (original vs processed).</p>
+                <p style="margin:5px 0; font-size:0.9em;">Direktori original: {original_dir}</p>
+                <p style="margin:5px 0; font-size:0.9em;">Direktori processed: {processed_train_dir}</p>
                 </div>
             """))
     except Exception as e:
@@ -408,23 +530,23 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
         class_counts = {}
         label_files = list(labels_dir.glob('*.txt'))
         
-        def process_label_file(file_path):
+        # Proses file label secara langsung tanpa ThreadPoolExecutor untuk menghindari rekursi
+        for file_path in label_files:
             try:
                 with open(file_path, 'r') as f:
                     for line in f:
                         parts = line.strip().split()
-                        if parts:
-                            class_id = int(parts[0])
-                            return class_id
-            except Exception:
-                return None
-        
-        with ThreadPoolExecutor(max_workers=min(os.cpu_count() or 4, 8)) as executor:
-            class_ids = list(executor.map(process_label_file, label_files))
-        
-        for class_id in class_ids:
-            if class_id is not None:
-                class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                        if parts and len(parts) > 0:
+                            try:
+                                class_id = int(parts[0])
+                                class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                                # Hanya proses baris pertama dari setiap file
+                                break
+                            except (ValueError, IndexError):
+                                continue
+            except Exception as e:
+                # Lewati file yang bermasalah
+                continue
         
         if not class_counts:
             with output_widget:
@@ -441,15 +563,20 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
             
             bars = ax.bar(classes, counts, color='skyblue')
             
-            # Tambahkan label di atas bar
-            for bar in bars:
+            # Tambahkan label di atas bar dan warna berbeda untuk setiap bar
+            colors = plt.cm.viridis(np.linspace(0, 0.8, len(classes)))
+            for i, (bar, count) in enumerate(zip(bars, counts)):
+                bar.set_color(colors[i])
                 height = bar.get_height()
                 ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
-                        f'{int(height)}', ha='center', va='bottom')
+                        f'{count}', ha='center', va='bottom', fontweight='bold')
             
-            ax.set_xlabel('Class ID')
-            ax.set_ylabel('Count')
-            ax.set_title('Distribusi Kelas Dataset')
+            ax.set_xlabel('Kelas', fontweight='bold')
+            ax.set_ylabel('Jumlah', fontweight='bold')
+            ax.set_title('Distribusi Kelas Dataset', fontsize=14, fontweight='bold')
+            
+            # Tambahkan grid untuk memudahkan pembacaan
+            ax.grid(axis='y', linestyle='--', alpha=0.7)
             ax.set_xticks(classes)
             
             plt.tight_layout()
@@ -461,6 +588,8 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
                 color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
                 border-left:4px solid {COLORS['alert_success_text']};">
                 <p style="margin:5px 0">{ICONS['success']} Berhasil menampilkan distribusi {len(classes)} kelas dari {total_samples} sampel.</p>
+                <p style="margin:5px 0; font-size:0.9em;">Direktori label: {labels_dir}</p>
+                <p style="margin:5px 0; font-size:0.9em;">Total file label: {len(label_files)}</p>
                 </div>
             """))
     except Exception as e:

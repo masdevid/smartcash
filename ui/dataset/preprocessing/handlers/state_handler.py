@@ -133,7 +133,7 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 <p><strong>🖼️ Total Gambar:</strong> {stats['total']['images']}</p>
                 <p><strong>🏷️ Total Label:</strong> {stats['total']['labels']}</p>
                 <p><strong>✅ Status:</strong> {
-                    "Siap digunakan" if stats['valid'] else "Belum lengkap"}</p>
+                    "Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</p>
             </div>
             
             <h4 style="color:{COLORS['dark']}">📊 Detail Split</h4>
@@ -164,7 +164,13 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
             display(HTML("</table>"))
             
             # Tambahkan informasi tentang langkah selanjutnya
-            if stats['valid']:
+            # Periksa apakah kunci 'valid' ada di stats, jika tidak, cek apakah ada split yang lengkap
+            is_valid = stats.get('valid', False)
+            if 'valid' not in stats and 'splits' in stats:
+                # Hitung apakah valid berdasarkan split yang lengkap
+                is_valid = any(split_info.get('complete', False) for split_info in stats['splits'].values()) if stats['splits'] else False
+                
+            if is_valid:
                 display(HTML(f"""
                 <div style="padding:10px; background:{COLORS['alert_success_bg']}; color:{COLORS['alert_success_text']}; 
                             border-radius:5px; margin-top:10px; border-left:4px solid {COLORS['alert_success_text']};">

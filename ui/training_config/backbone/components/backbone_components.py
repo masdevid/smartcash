@@ -244,7 +244,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Card untuk fitur optimasi
     optimization_card = widgets.VBox([
-        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['optimization']} Fitur Optimasi</h4>"),
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS.get('optimization', '⚙️')} Fitur Optimasi</h4>"),
         ui_components['use_attention'],
         ui_components['use_residual'],
         ui_components['use_ciou']

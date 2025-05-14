@@ -140,6 +140,9 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
                     pass
         
         def on_reset_config(b):
+            # Deklarasikan ui_components sebagai nonlocal untuk mencegah UnboundLocalError
+            nonlocal ui_components
+            
             # Reset ke default config
             from smartcash.common.default_config import generate_default_config
             default_config = generate_default_config().get('model', {})

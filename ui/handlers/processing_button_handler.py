@@ -110,19 +110,23 @@ def _get_dataset_manager(ui_components: Dict[str, Any], module_type: str) -> Any
     try:
         if module_type == 'preprocessing':
             # Import dan buat preprocessing manager
-            from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
+            from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
             
             # Dapatkan parameter dari ui_components
             data_dir = ui_components.get('data_dir', 'data')
             config = ui_components.get('config', {})
-            num_workers = ui_components.get('num_workers', 4)
+            
+            # Buat konfigurasi preprocessing
+            preproc_config = config.copy()
+            if 'preprocessing' not in preproc_config:
+                preproc_config['preprocessing'] = {}
+            preproc_config['preprocessing']['output_dir'] = ui_components.get('preprocessed_dir', 'data/preprocessed')
+            preproc_config['dataset_dir'] = data_dir
             
             # Buat instance service
-            manager = PreprocessingService(
-                config=config,
-                data_dir=data_dir,
-                logger=logger,
-                num_workers=num_workers
+            manager = DatasetPreprocessor(
+                config=preproc_config,
+                logger=logger
             )
             
         elif module_type == 'augmentation':

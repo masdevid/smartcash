@@ -28,16 +28,27 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         aug_config = config['augmentation']
         
         # Pastikan types selalu dalam format yang benar
-        if 'types' in aug_config:
+        if 'types' in aug_config and aug_config['types'] is not None:
             # Jika nilai dari config adalah list, konversi ke tuple
             if isinstance(aug_config['types'], list):
-                augmentations = tuple(aug_config['types'])
+                # Pastikan list tidak kosong
+                if aug_config['types']:
+                    augmentations = tuple(aug_config['types'])
+                else:
+                    augmentations = ('Combined (Recommended)',)
             # Jika nilai dari config adalah string tunggal, buat tuple dengan satu item
             elif isinstance(aug_config['types'], str):
                 augmentations = (aug_config['types'],)
             # Jika nilai dari config sudah tuple, gunakan langsung
             elif isinstance(aug_config['types'], tuple):
-                augmentations = aug_config['types']
+                # Pastikan tuple tidak kosong
+                if aug_config['types']:
+                    augmentations = aug_config['types']
+                else:
+                    augmentations = ('Combined (Recommended)',)
+            else:
+                # Jika tipe tidak dikenali, gunakan default
+                augmentations = ('Combined (Recommended)',)
         
         augmentation_factor = aug_config.get('factor', augmentation_factor)
         aug_prefix = aug_config.get('prefix', aug_prefix)
@@ -59,7 +70,7 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
         
         # Validasi nilai augmentations
-        if isinstance(augmentations, (list, tuple)) and len(augmentations) > 0:
+        if isinstance(augmentations, (list, tuple)):
             # Filter nilai yang valid
             valid_values = [val for val in augmentations if val in valid_options]
             if valid_values:
@@ -74,6 +85,13 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     except Exception as e:
         # Jika terjadi error, gunakan nilai default
         aug_type_selector.value = ['Combined (Recommended)']
+        # Log error jika ada logger di global scope
+        try:
+            import logging
+            logger = logging.getLogger('ui_logger')
+            logger.warning(f"🔶 Error saat set aug_types: {str(e)}, menggunakan nilai default")
+        except:
+            pass
     
     factor_slider = widgets.IntSlider(
         value=augmentation_factor,

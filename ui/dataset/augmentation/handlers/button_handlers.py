@@ -100,24 +100,54 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         split_info = f"Split {split_option}"
         update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai augmentasi {split_info}...")
         
-        # Dapatkan opsi augmentasi dari UI dengan pengecekan nilai
+        # Dapatkan opsi augmentasi dari UI dengan validasi yang lebih kuat
+        # Inisialisasi dengan nilai default yang aman
+        aug_types = ['Combined (Recommended)']  # Default value yang aman
+        aug_prefix = 'aug'
+        aug_factor = 2
+        balance_classes = True
+        num_workers = 4
+        
         try:
-            aug_types = ui_components['aug_options'].children[0].value  # SelectMultiple
-            # Pastikan aug_types adalah list dan tidak None
-            if aug_types is None:
-                aug_types = ['Combined (Recommended)']  # Default value
+            # Ekstrak aug_types dengan validasi ketat
+            extracted_types = ui_components['aug_options'].children[0].value  # SelectMultiple
+            if extracted_types is not None:
+                if isinstance(extracted_types, (list, tuple)):
+                    if len(extracted_types) > 0:
+                        aug_types = list(extracted_types)  # Konversi ke list untuk konsistensi
+                    else:
+                        if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types adalah list kosong, menggunakan default: {aug_types}")
+                elif isinstance(extracted_types, str):
+                    aug_types = [extracted_types]  # Konversi string tunggal ke list
+                    if logger: logger.info(f"{ICONS['info']} Mengkonversi aug_types dari string ke list: {aug_types}")
+                else:
+                    if logger: logger.warning(f"{ICONS['warning']} Tipe aug_types tidak valid: {type(extracted_types)}, menggunakan default: {aug_types}")
+            else:
                 if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types adalah None, menggunakan default: {aug_types}")
-            elif not isinstance(aug_types, list):
-                aug_types = [aug_types]  # Konversi ke list jika bukan list
-                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types bukan list, mengkonversi ke: {aug_types}")
-        except Exception as e:
-            aug_types = ['Combined (Recommended)']  # Default value jika terjadi error
-            if logger: logger.warning(f"{ICONS['warning']} Error saat mendapatkan aug_types: {str(e)}, menggunakan default: {aug_types}")
+                
+            # Ekstrak parameter lain dengan validasi
+            if hasattr(ui_components['aug_options'].children[2], 'value'):
+                extracted_prefix = ui_components['aug_options'].children[2].value
+                if extracted_prefix is not None and isinstance(extracted_prefix, str) and extracted_prefix.strip():
+                    aug_prefix = extracted_prefix
             
-        aug_prefix = ui_components['aug_options'].children[2].value  # Text
-        aug_factor = ui_components['aug_options'].children[3].value  # IntSlider
-        balance_classes = ui_components['aug_options'].children[5].value  # Checkbox
-        num_workers = ui_components['aug_options'].children[6].value  # IntSlider
+            if hasattr(ui_components['aug_options'].children[3], 'value'):
+                extracted_factor = ui_components['aug_options'].children[3].value
+                if extracted_factor is not None and isinstance(extracted_factor, (int, float)) and extracted_factor > 0:
+                    aug_factor = extracted_factor
+            
+            if hasattr(ui_components['aug_options'].children[5], 'value'):
+                extracted_balance = ui_components['aug_options'].children[5].value
+                if extracted_balance is not None:
+                    balance_classes = bool(extracted_balance)
+            
+            if hasattr(ui_components['aug_options'].children[6], 'value'):
+                extracted_workers = ui_components['aug_options'].children[6].value
+                if extracted_workers is not None and isinstance(extracted_workers, int) and extracted_workers > 0:
+                    num_workers = extracted_workers
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Error saat mendapatkan parameter augmentasi: {str(e)}, menggunakan nilai default")
+            # Nilai default sudah diinisialisasi di awal
         
         # Verifikasi direktori dataset
         data_dir = ui_components.get('data_dir', 'data')
@@ -156,28 +186,32 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Dapatkan config manager
             config_manager = get_config_manager()
             
-            # Pastikan aug_types memiliki nilai awal yang valid
-            if aug_types is None:
+            # Double check: pastikan aug_types memiliki nilai yang valid
+            if aug_types is None or not aug_types:
                 aug_types = ['Combined (Recommended)']
-                if logger: logger.warning(f"⚠️ Parameter aug_types adalah None, menggunakan nilai default: {aug_types}")
+                if logger: logger.warning(f"⚠️ Parameter aug_types tidak valid, menggunakan nilai default: {aug_types}")
             
             # Validasi semua parameter dengan utilitas validasi yang lebih kuat
-            aug_types = validate_ui_param(
-                aug_types, 
-                ['Combined (Recommended)'], 
-                (list, tuple, str),
-                ['Combined (Recommended)'],  # Nilai default yang valid jika validasi gagal
-                logger
-            )
-            
-            # Jika aug_types adalah string, konversi ke list
-            if isinstance(aug_types, str):
-                aug_types = [aug_types]
+            try:
+                aug_types = validate_ui_param(
+                    aug_types, 
+                    ['Combined (Recommended)'], 
+                    (list, tuple, str),
+                    ['Combined (Recommended)'],  # Nilai default yang valid jika validasi gagal
+                    logger
+                )
                 
-            # Pastikan aug_types tidak None dan tidak kosong setelah validasi
-            if not aug_types:
+                # Jika aug_types adalah string, konversi ke list
+                if isinstance(aug_types, str):
+                    aug_types = [aug_types]
+                    
+                # Pastikan aug_types tidak None dan tidak kosong setelah validasi
+                if not aug_types:
+                    aug_types = ['Combined (Recommended)']
+                    if logger: logger.warning(f"⚠️ Parameter aug_types kosong setelah validasi, menggunakan nilai default: {aug_types}")
+            except Exception as e:
                 aug_types = ['Combined (Recommended)']
-                if logger: logger.warning(f"⚠️ Parameter aug_types kosong setelah validasi, menggunakan nilai default: {aug_types}")
+                if logger: logger.error(f"{ICONS['error']} Error saat validasi aug_types: {str(e)}, menggunakan nilai default: {aug_types}")
                 
             split_option = validate_ui_param(
                 split_option, 
@@ -228,10 +262,15 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             }
             config_manager.save_module_config('augmentation', aug_config)
             
-            # Log parameter yang akan digunakan
-            if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split={split_option}, types={aug_types}, prefix={aug_prefix}, factor={aug_factor}, balance={balance_classes}, workers={num_workers}")
+            # Verifikasi final sebelum augmentasi
+            if not isinstance(aug_types, list) or not aug_types:
+                aug_types = ['Combined (Recommended)']
+                if logger: logger.warning(f"{ICONS['warning']} Verifikasi final: aug_types tidak valid, menggunakan nilai default: {aug_types}")
             
-            # Jalankan augmentasi dengan parameter dari UI yang sudah divalidasi
+            # Log parameter final yang akan digunakan
+            if logger: logger.info(f"{ICONS['info']} Parameter augmentasi final: aug_types={aug_types}, split={split_option}, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}")
+            
+            # Lakukan augmentasi dengan parameter yang sudah divalidasi
             augment_result = augmentation_service.augment_dataset(
                 split=split_option,
                 augmentation_types=aug_types,

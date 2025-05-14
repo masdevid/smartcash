@@ -101,6 +101,20 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     if 'augmentation' not in config: config['augmentation'] = {}
     if 'data' not in config: config['data'] = {}
     
+    # Validasi config manager jika tersedia
+    try:
+        from smartcash.common.config.manager import ConfigManager
+        config_manager = ConfigManager.get_instance()
+        if config_manager and hasattr(config_manager, 'validate_param'):
+            # Pastikan section augmentation ada dan valid
+            config['augmentation'] = config_manager.validate_param(
+                config.get('augmentation', {}), 
+                default={}, 
+                param_name='augmentation'
+            )
+    except Exception as e:
+        if logger: logger.debug(f"🔶 Tidak dapat menggunakan ConfigManager: {str(e)}")
+    
     # Ekstrak paths dari ui_components
     data_dir = ui_components.get('data_dir', 'data')
     preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
@@ -111,20 +125,60 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     config['augmentation']['input_dir'] = preprocessed_dir
     config['augmentation']['output_dir'] = augmented_dir
     
-    # Ekstrak nilai dari aug_options
+    # Ekstrak nilai dari aug_options dengan validasi yang lebih kuat
     options = ui_components.get('aug_options', {})
     if hasattr(options, 'children') and len(options.children) >= 7:
-        # Ekstrak nilai dengan list comprehension
-        aug_types = options.children[0].value  # SelectMultiple
-        aug_prefix = options.children[2].value  # Text
-        aug_factor = options.children[3].value  # IntSlider
-        target_split = options.children[4].value  # Dropdown
-        balance_classes = options.children[5].value  # Checkbox
-        num_workers = options.children[6].value  # IntSlider
+        # Inisialisasi nilai default yang aman
+        aug_types = ['Combined (Recommended)']
+        aug_prefix = 'aug'
+        aug_factor = 2
+        target_split = 'train'
+        balance_classes = True
+        num_workers = 4
         
-        # Update konfigurasi augmentation
+        # Ekstrak nilai dengan validasi untuk mencegah None
+        try:
+            # Ekstrak aug_types dengan validasi ketat
+            extracted_types = options.children[0].value  # SelectMultiple
+            if extracted_types is not None and isinstance(extracted_types, (list, tuple)) and len(extracted_types) > 0:
+                aug_types = list(extracted_types)
+            if logger: logger.debug(f"🔍 Ekstrak aug_types: {aug_types}")
+            
+            # Ekstrak prefix dengan validasi
+            extracted_prefix = options.children[2].value  # Text
+            if extracted_prefix is not None and isinstance(extracted_prefix, str) and extracted_prefix.strip():
+                aug_prefix = extracted_prefix
+            if logger: logger.debug(f"🔍 Ekstrak prefix: {aug_prefix}")
+            
+            # Ekstrak factor dengan validasi
+            extracted_factor = options.children[3].value  # IntSlider
+            if extracted_factor is not None and isinstance(extracted_factor, (int, float)) and extracted_factor > 0:
+                aug_factor = extracted_factor
+            if logger: logger.debug(f"🔍 Ekstrak factor: {aug_factor}")
+            
+            # Ekstrak target split dengan validasi
+            extracted_split = options.children[4].value  # Dropdown
+            if extracted_split is not None and extracted_split in ['train', 'valid', 'test', 'all']:
+                target_split = extracted_split
+            if logger: logger.debug(f"🔍 Ekstrak target_split: {target_split}")
+            
+            # Ekstrak balance_classes dengan validasi
+            extracted_balance = options.children[5].value  # Checkbox
+            if extracted_balance is not None:
+                balance_classes = bool(extracted_balance)
+            if logger: logger.debug(f"🔍 Ekstrak balance_classes: {balance_classes}")
+            
+            # Ekstrak num_workers dengan validasi
+            extracted_workers = options.children[6].value  # IntSlider
+            if extracted_workers is not None and isinstance(extracted_workers, int) and extracted_workers > 0:
+                num_workers = extracted_workers
+            if logger: logger.debug(f"🔍 Ekstrak num_workers: {num_workers}")
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Error saat ekstrak nilai dari UI: {str(e)}")
+        
+        # Update konfigurasi augmentation dengan nilai yang sudah divalidasi
         config['augmentation'].update({
-            'types': list(aug_types) if aug_types else ['Combined (Recommended)'],
+            'types': aug_types,  # Sudah divalidasi, tidak perlu cek lagi
             'prefix': aug_prefix,
             'factor': aug_factor,
             'split': target_split,  # Ubah 'target_split' menjadi 'split' agar konsisten dengan kunci yang digunakan di update_ui_from_config
@@ -135,6 +189,11 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     # Simpan referensi config di ui_components untuk memastikan persistensi
     ui_components['config'] = config
+    
+    # Validasi final untuk memastikan aug_types tidak None
+    if config['augmentation'].get('types') is None:
+        config['augmentation']['types'] = ['Combined (Recommended)']
+        if logger: logger.warning(f"{ICONS['warning']} Memperbaiki aug_types yang None dengan nilai default")
     
     if logger: logger.debug(f"🔄 Konfigurasi augmentasi berhasil diupdate dari UI")
     

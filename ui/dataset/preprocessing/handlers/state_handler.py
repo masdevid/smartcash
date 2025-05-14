@@ -131,6 +131,13 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 class_count = len(stats['classes'])
                 class_info = f"<p style=\"margin:8px 0;\"><strong style=\"color:{COLORS['dark']}\">🏷️ Jumlah Kelas:</strong> <span style=\"font-weight:bold;\">{class_count}</span></p>"
             
+            # Buat informasi split yang lengkap
+            if any(info.get('complete', False) for s, info in stats['splits'].items()):
+                complete_splits = [s for s, info in stats['splits'].items() if info.get('complete', False)]
+                split_info_html = f'<span style="margin-left:10px; font-size:0.9em; color:#666;">({", ".join(complete_splits)} lengkap)</span>'
+            else:
+                split_info_html = '<span style="margin-left:10px; font-size:0.9em; color:#666;">(Tidak ada split yang lengkap)</span>'
+            
             # Tampilkan summary dengan format lebih baik dan responsif
             display(HTML(f"""
             <h3 style="color:{COLORS['dark']}; font-weight:bold;">📊 Preprocessing Summary</h3>
@@ -142,7 +149,7 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status Dataset:</strong> 
                     <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
                     {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span>
-                    {f"<span style=\"margin-left:10px; font-size:0.9em; color:#666;\">({', '.join([s for s, info in stats['splits'].items() if info.get('complete', False)])} lengkap)</span>" if any(info.get('complete', False) for s, info in stats['splits'].items()) else "<span style=\"margin-left:10px; font-size:0.9em; color:#666;\">(Tidak ada split yang lengkap)</span>"}
+                    {split_info_html}
                 </p>
                 <p style="margin:8px 0; font-size:0.9em; color:#666;">
                     <strong>Catatan:</strong> Dataset dianggap siap digunakan jika minimal split train dan val sudah lengkap.

@@ -127,49 +127,37 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     # Ekstrak nilai dari aug_options dengan validasi yang lebih kuat
     options = ui_components.get('aug_options', {})
-    if hasattr(options, 'children') and len(options.children) >= 7:
+    if hasattr(options, 'children') and len(options.children) >= 6:  # Sekarang hanya 6 children karena menghilangkan 2 komponen dan menambahkan 1 komponen info
         # Inisialisasi nilai default yang aman
-        aug_types = ['Combined (Recommended)']
+        aug_types = ['Combined (Recommended)']  # Nilai tetap
         aug_prefix = 'aug'
         aug_factor = 2
-        target_split = 'train'
+        target_split = 'train'  # Nilai tetap
         balance_classes = True
         num_workers = 4
         
         # Ekstrak nilai dengan validasi untuk mencegah None
         try:
-            # Ekstrak aug_types dengan validasi ketat
-            extracted_types = options.children[0].value  # SelectMultiple
-            if extracted_types is not None and isinstance(extracted_types, (list, tuple)) and len(extracted_types) > 0:
-                aug_types = list(extracted_types)
-            if logger: logger.debug(f"🔍 Ekstrak aug_types: {aug_types}")
-            
-            # Ekstrak prefix dengan validasi
-            extracted_prefix = options.children[2].value  # Text
+            # Ekstrak prefix dengan validasi (sekarang di posisi 1)
+            extracted_prefix = options.children[1].value  # Text
             if extracted_prefix is not None and isinstance(extracted_prefix, str) and extracted_prefix.strip():
                 aug_prefix = extracted_prefix
             if logger: logger.debug(f"🔍 Ekstrak prefix: {aug_prefix}")
             
-            # Ekstrak factor dengan validasi
-            extracted_factor = options.children[3].value  # IntSlider
+            # Ekstrak factor dengan validasi (sekarang di posisi 2)
+            extracted_factor = options.children[2].value  # IntSlider
             if extracted_factor is not None and isinstance(extracted_factor, (int, float)) and extracted_factor > 0:
                 aug_factor = extracted_factor
             if logger: logger.debug(f"🔍 Ekstrak factor: {aug_factor}")
             
-            # Ekstrak target split dengan validasi
-            extracted_split = options.children[4].value  # Dropdown
-            if extracted_split is not None and extracted_split in ['train', 'valid', 'test', 'all']:
-                target_split = extracted_split
-            if logger: logger.debug(f"🔍 Ekstrak target_split: {target_split}")
-            
-            # Ekstrak balance_classes dengan validasi
-            extracted_balance = options.children[5].value  # Checkbox
+            # Ekstrak balance_classes dengan validasi (sekarang di posisi 4)
+            extracted_balance = options.children[4].value  # Checkbox
             if extracted_balance is not None:
                 balance_classes = bool(extracted_balance)
             if logger: logger.debug(f"🔍 Ekstrak balance_classes: {balance_classes}")
             
-            # Ekstrak num_workers dengan validasi
-            extracted_workers = options.children[6].value  # IntSlider
+            # Ekstrak num_workers dengan validasi (sekarang di posisi 5)
+            extracted_workers = options.children[5].value  # IntSlider
             if extracted_workers is not None and isinstance(extracted_workers, int) and extracted_workers > 0:
                 num_workers = extracted_workers
             if logger: logger.debug(f"🔍 Ekstrak num_workers: {num_workers}")
@@ -178,10 +166,10 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
         # Update konfigurasi augmentation dengan nilai yang sudah divalidasi
         config['augmentation'].update({
-            'types': aug_types,  # Sudah divalidasi, tidak perlu cek lagi
+            'types': aug_types,  # Nilai tetap
             'prefix': aug_prefix,
             'factor': aug_factor,
-            'split': target_split,  # Ubah 'target_split' menjadi 'split' agar konsisten dengan kunci yang digunakan di update_ui_from_config
+            'split': target_split,  # Nilai tetap
             'balance_classes': balance_classes,
             'num_workers': num_workers,
             'enabled': True
@@ -426,61 +414,33 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         aug_options = ui_components['aug_options'].children
         
         # Update UI components sesuai config
-        if len(aug_options) >= 7:  # Pastikan jumlah komponen sesuai
-            # Update aug types
-            if 'types' in aug_config and hasattr(aug_options[0], 'value'):
-                try:
-                    # Periksa tipe widget dan pastikan nilai yang sesuai
-                    if hasattr(aug_options[0], '_trait_values') and aug_options[0]._trait_values.get('_model_name') == 'SelectMultipleModel':
-                        # Widget SelectMultiple menerima list
-                        aug_types = aug_config['types']
-                        if not isinstance(aug_types, list):
-                            aug_types = [aug_types] if aug_types else []
-                        aug_options[0].value = aug_types
-                    elif hasattr(aug_options[0], '_trait_values') and aug_options[0]._trait_values.get('_model_name') == 'HTMLModel':
-                        # Widget HTML menerima string
-                        aug_types = aug_config['types']
-                        if isinstance(aug_types, list):
-                            aug_options[0].value = ', '.join(aug_types)
-                        else:
-                            aug_options[0].value = str(aug_types) if aug_types is not None else ''
-                    else:
-                        # Default behavior
-                        aug_options[0].value = aug_config['types']
-                    if logger: logger.debug(f"{ICONS['success']} Berhasil set aug_types: {aug_config['types']}")
-                except Exception as e:
-                    if logger: logger.warning(f"{ICONS['warning']} Error saat set aug_types: {str(e)}")
-                    # Fallback: coba set dengan nilai default
-                    try:
-                        aug_options[0].value = ['Combined (Recommended)']
-                    except:
-                        pass
+        if len(aug_options) >= 6:  # Pastikan jumlah komponen sesuai (sekarang 6 children)
+            # Jenis augmentasi dan target split sekarang tetap, tidak perlu diupdate dari config
             
-            # Update prefix
-            if 'prefix' in aug_config and hasattr(aug_options[2], 'value'):
-                aug_options[2].value = aug_config['prefix']
+            # Update prefix (sekarang di posisi 1)
+            if 'prefix' in aug_config and hasattr(aug_options[1], 'value'):
+                aug_options[1].value = aug_config['prefix']
                 if logger: logger.debug(f"{ICONS['success']} Berhasil set prefix: {aug_config['prefix']}")
             
-            # Update factor
-            if 'factor' in aug_config and hasattr(aug_options[3], 'value'):
-                aug_options[3].value = aug_config['factor']
+            # Update factor (sekarang di posisi 2)
+            if 'factor' in aug_config and hasattr(aug_options[2], 'value'):
+                aug_options[2].value = aug_config['factor']
                 if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {aug_config['factor']}")
             
-            # Update split
-            if 'split' in aug_config and hasattr(aug_options[4], 'value'):
-                aug_options[4].value = aug_config['split']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set split: {aug_config['split']}")
-            
-            # Update balance_classes
-            if 'balance_classes' in aug_config and hasattr(aug_options[5], 'value'):
-                aug_options[5].value = aug_config['balance_classes']
+            # Update balance_classes (sekarang di posisi 4)
+            if 'balance_classes' in aug_config and hasattr(aug_options[4], 'value'):
+                aug_options[4].value = aug_config['balance_classes']
                 if logger: logger.debug(f"{ICONS['success']} Berhasil set balance_classes: {aug_config['balance_classes']}")
             
-            # Update num_workers
-            if 'num_workers' in aug_config and hasattr(aug_options[6], 'value'):
-                aug_options[6].value = aug_config['num_workers']
+            # Update num_workers (sekarang di posisi 5)
+            if 'num_workers' in aug_config and hasattr(aug_options[5], 'value'):
+                aug_options[5].value = aug_config['num_workers']
                 if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {aug_config['num_workers']}")
-            
+                
+            # Pastikan nilai tetap selalu tersimpan di config
+            aug_config['types'] = ['Combined (Recommended)']
+            aug_config['split'] = 'train'
+        
         # Simpan referensi config ke ui_components untuk memastikan persistensi
         ui_components['config'] = config
         

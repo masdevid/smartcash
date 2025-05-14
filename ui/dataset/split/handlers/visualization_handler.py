@@ -97,18 +97,32 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
             import pandas as pd
             
             # Dapatkan distribusi kelas dari dataset dengan penanganan error yang lebih baik
-            is_dummy = False
             try:
                 class_distribution = get_class_distribution(config, env, logger)
                 # Cek apakah data yang didapat valid
                 if not class_distribution or len(class_distribution) == 0:
-                    if logger: logger.warning(f"⚠️ Tidak ada data distribusi kelas yang valid, menggunakan data dummy")
-                    class_distribution = _dummy_distribution()
-                    is_dummy = True
+                    if logger: logger.warning(f"⚠️ Tidak ada data distribusi kelas yang valid")
+                    # Tampilkan pesan informatif
+                    clear_output(wait=True)
+                    display(HTML(f"""
+                        <div style="text-align:center; padding:15px; background-color:{COLORS['alert_warning_bg']}; color:{COLORS['alert_warning_text']}; border-radius:8px; margin:10px 0;">
+                            <h3>{ICONS['warning']} Tidak Ada Data</h3>
+                            <p>Tidak ada data distribusi kelas yang ditemukan. Silakan pastikan dataset telah diupload dengan benar.</p>
+                        </div>
+                    """))
+                    return
             except Exception as e:
-                if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas: {str(e)}")
-                class_distribution = _dummy_distribution()
-                is_dummy = True
+                if logger: logger.warning(f"⚠️ Error saat mendapatkan distribusi kelas: {str(e)}")
+                # Tampilkan pesan error
+                clear_output(wait=True)
+                display(HTML(f"""
+                    <div style="text-align:center; padding:15px; background-color:{COLORS['alert_error_bg']}; color:{COLORS['alert_error_text']}; border-radius:8px; margin:10px 0;">
+                        <h3>{ICONS['error']} Error</h3>
+                        <p>Terjadi error saat memuat distribusi kelas: {str(e)}</p>
+                        <p>Silakan pastikan dataset telah diupload dengan benar.</p>
+                    </div>
+                """))
+                return
             
             if not class_distribution:
                 display(HTML(f"""
@@ -141,8 +155,7 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 ax = sns.barplot(x="Class", y="Count", hue="Split", data=df)
                 
                 # Styling plot
-                status_text = "(Data Contoh)" if is_dummy else "(Data Aktual)"
-                plt.title(f"Distribusi Kelas Dataset {status_text}")
+                plt.title(f"Distribusi Kelas Dataset")
                 plt.xlabel("Kelas")
                 plt.ylabel("Jumlah Sampel")
                 plt.xticks(rotation=45)
@@ -153,19 +166,14 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 plt.show()
                 
                 # Tampilkan informasi tambahan tentang status visualisasi
-                status_color = COLORS['alert_info_text'] if is_dummy else COLORS['success']
-                status_bg = COLORS['alert_info_bg'] if is_dummy else '#f0fff0'
-                status_icon = ICONS['info'] if is_dummy else ICONS['success']
-                status_message = "Data contoh digunakan karena dataset asli tidak tersedia atau tidak valid" if is_dummy else "Visualisasi menggunakan data aktual dari dataset"
-                
                 display(HTML(f"""
-                    <div style="padding:8px; background-color:{status_bg}; color:{status_color}; 
-                                border-radius:4px; margin-top:10px; font-size:0.9em; border-left:3px solid {status_color};">
-                        <p style="margin:0;">{status_icon} <strong>Status Visualisasi:</strong> {status_message}</p>
+                    <div style="padding:8px; background-color:{COLORS['alert_info_bg']}; color:{COLORS['alert_info_text']}; 
+                                border-radius:4px; margin-top:10px; font-size:0.9em; border-left:3px solid {COLORS['alert_info_text']};">
+                        <p style="margin:0;">{ICONS['info']} <strong>Status Visualisasi:</strong> Visualisasi menggunakan data aktual dari dataset</p>
                     </div>
                 """))
                 
-                if logger: logger.info(f"✅ Visualisasi distribusi kelas berhasil ditampilkan ({status_text})")
+                if logger: logger.info(f"✅ Visualisasi distribusi kelas berhasil ditampilkan")
                 
                 
             except Exception as plot_error:
@@ -232,7 +240,7 @@ def get_class_distribution(config: Dict[str, Any], env=None, logger=None) -> Dic
         # Cek jika dataset ada
         if not os.path.exists(dataset_path):
             if logger: logger.warning(f"⚠️ Dataset path tidak ditemukan: {dataset_path}")
-            return _dummy_distribution()
+            return {}
         
         # Dictionary untuk menyimpan distribusi kelas per split
         class_distribution = {}
@@ -249,15 +257,15 @@ def get_class_distribution(config: Dict[str, Any], env=None, logger=None) -> Dic
             # Map class IDs ke nama kelas yang lebih deskriptif
             class_distribution[split] = _map_class_names(split_classes, logger)
         
-        # Jika tidak ada data yang valid, gunakan dummy data
+        # Jika tidak ada data yang valid, return kosong
         if not any(class_distribution.values()):
-            if logger: logger.warning("⚠️ Tidak ada data kelas yang valid, menggunakan data dummy")
-            return _dummy_distribution()
+            if logger: logger.warning("⚠️ Tidak ada data kelas yang valid")
+            return {}
             
         return class_distribution
     except Exception as e:
         if logger: logger.error(f"❌ Error mendapatkan distribusi kelas: {str(e)}")
-        return _dummy_distribution()
+        return {}
 
 def _map_class_names(split_classes: Dict[int, int], logger=None) -> Dict[str, int]:
     """
@@ -302,34 +310,6 @@ def _map_class_names(split_classes: Dict[int, int], logger=None) -> Dict[str, in
     except Exception as e:
         if logger: logger.warning(f"⚠️ Error mapping class names: {str(e)}")
         return {f"Class {class_id}": count for class_id, count in split_classes.items()}
-
-def _dummy_distribution() -> Dict[str, Dict[str, int]]:
-    """
-    Kembalikan distribusi kelas dummy dengan nama kelas yang diformat dengan benar.
-    
-    Returns:
-        Dictionary berisi distribusi kelas dummy
-    """
-    return {
-        'train': {
-            '001:0': 120, '002:1': 110, '003:2': 130, '004:3': 140, 
-            '005:4': 125, '006:5': 115, '007:6': 135,
-            'l2_001:7': 80, 'l2_002:8': 85, 'l2_003:9': 75,
-            'l3_001:16': 60, 'l3_002:17': 55
-        },
-        'valid': {
-            '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 40, 
-            '005:4': 35, '006:5': 28, '007:6': 32,
-            'l2_001:7': 20, 'l2_002:8': 22, 'l2_003:9': 18,
-            'l3_001:16': 15, 'l3_002:17': 12
-        },
-        'test': {
-            '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 35, 
-            '005:4': 30, '006:5': 27, '007:6': 33,
-            'l2_001:7': 18, 'l2_002:8': 20, 'l2_003:9': 19,
-            'l3_001:16': 14, 'l3_002:17': 13
-        }
-    }
 
 def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_path: str, logger=None) -> None:
     """

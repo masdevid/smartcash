@@ -85,6 +85,9 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
                     display(create_status_indicator(status_type, message))
         
         def on_reset_config(b):
+            # Deklarasikan ui_components sebagai nonlocal untuk mencegah UnboundLocalError
+            nonlocal ui_components
+            
             # Reset ke default config
             from smartcash.common.default_config import generate_default_config
             default_config = generate_default_config().get('training', {})

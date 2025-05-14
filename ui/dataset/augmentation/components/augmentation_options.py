@@ -17,81 +17,25 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         Widget VBox berisi opsi augmentasi
     """
     # Dapatkan nilai default dari config jika tersedia
-    augmentations = ['Combined (Recommended)']  # Default sebagai list
     augmentation_factor = 2
     aug_prefix = 'aug'
-    target_split = 'train'
     balance_classes = True
     num_workers = 4
     
+    # Nilai tetap untuk augmentasi
+    augmentations = ['Combined (Recommended)']  # Selalu menggunakan Combined
+    target_split = 'train'  # Selalu menggunakan train split
+    
     if config and 'augmentation' in config:
         aug_config = config['augmentation']
-        
-        # Pastikan types selalu dalam format yang benar
-        if 'types' in aug_config and aug_config['types'] is not None:
-            # Jika nilai dari config adalah list, konversi ke tuple
-            if isinstance(aug_config['types'], list):
-                # Pastikan list tidak kosong
-                if aug_config['types']:
-                    augmentations = tuple(aug_config['types'])
-                else:
-                    augmentations = ('Combined (Recommended)',)
-            # Jika nilai dari config adalah string tunggal, buat tuple dengan satu item
-            elif isinstance(aug_config['types'], str):
-                augmentations = (aug_config['types'],)
-            # Jika nilai dari config sudah tuple, gunakan langsung
-            elif isinstance(aug_config['types'], tuple):
-                # Pastikan tuple tidak kosong
-                if aug_config['types']:
-                    augmentations = aug_config['types']
-                else:
-                    augmentations = ('Combined (Recommended)',)
-            else:
-                # Jika tipe tidak dikenali, gunakan default
-                augmentations = ('Combined (Recommended)',)
-        
         augmentation_factor = aug_config.get('factor', augmentation_factor)
         aug_prefix = aug_config.get('prefix', aug_prefix)
-        target_split = aug_config.get('target_split', target_split)
         balance_classes = aug_config.get('balance_classes', balance_classes)
         num_workers = aug_config.get('num_workers', num_workers)
-    
-    # Buat komponen-komponen UI
-    aug_type_selector = widgets.SelectMultiple(
-        options=['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation'],
-        value=['Combined (Recommended)'],  # Gunakan list untuk nilai default
-        description='Jenis:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%', height='80px')
-    )
-    
-    # Set nilai dari config jika tersedia
-    try:
-        valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
         
-        # Validasi nilai augmentations
-        if isinstance(augmentations, (list, tuple)):
-            # Filter nilai yang valid
-            valid_values = [val for val in augmentations if val in valid_options]
-            if valid_values:
-                # Pastikan nilai adalah list
-                aug_type_selector.value = valid_values
-            else:
-                # Jika tidak ada nilai valid, gunakan default
-                aug_type_selector.value = ['Combined (Recommended)']
-        else:
-            # Jika augmentations bukan list atau tuple, gunakan default
-            aug_type_selector.value = ['Combined (Recommended)']
-    except Exception as e:
-        # Jika terjadi error, gunakan nilai default
-        aug_type_selector.value = ['Combined (Recommended)']
-        # Log error jika ada logger di global scope
-        try:
-            import logging
-            logger = logging.getLogger('ui_logger')
-            logger.warning(f"🔶 Error saat set aug_types: {str(e)}, menggunakan nilai default")
-        except:
-            pass
+        # Simpan nilai default untuk jenis augmentasi dan target split
+        aug_config['types'] = augmentations
+        aug_config['split'] = target_split
     
     factor_slider = widgets.IntSlider(
         value=augmentation_factor,
@@ -110,12 +54,16 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         layout=widgets.Layout(width='50%')
     )
     
-    split_dropdown = widgets.Dropdown(
-        options=['train', 'valid', 'test', 'all'],
-        value=target_split,
-        description='Target split:',
-        style={'description_width': 'initial'},
+    # Informasi tentang target split (tidak lagi sebagai dropdown)
+    split_info = widgets.HTML(
+        value=f"<div style='padding: 5px; margin: 5px 0;'><b>Target split:</b> train (default)</div>",
         layout=widgets.Layout(width='50%')
+    )
+    
+    # Informasi tentang jenis augmentasi (tidak lagi sebagai selector)
+    aug_type_info = widgets.HTML(
+        value=f"<div style='padding: 5px; margin: 5px 0;'><b>Jenis augmentasi:</b> Combined (Recommended)</div>",
+        layout=widgets.Layout(width='70%')
     )
     
     balance_checkbox = widgets.Checkbox(
@@ -134,21 +82,21 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         layout=widgets.Layout(width='50%')
     )
     
-    # Deskripsi singkat
+    # Deskripsi singkat dengan informasi tambahan tentang default values
     description = widgets.HTML(
         value=f"""<div style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;">
-            <p style="margin: 0;"><strong>Augmentasi</strong> akan memperbanyak data training dengan variasi posisi, 
+            <p style="margin: 0;"><strong>Augmentasi</strong> akan memperbanyak data training dengan kombinasi variasi posisi, 
             pencahayaan, dan rotasi untuk meningkatkan akurasi model.</p>
         </div>"""
     )
     
-    # Gabungkan dalam container
+    # Gabungkan dalam container dengan komponen yang diperbarui
     return widgets.VBox([
         description,
-        aug_type_selector,
+        aug_type_info,  # Informasi jenis augmentasi (bukan selector)
         prefix_text,
         factor_slider,
-        split_dropdown,
+        split_info,     # Informasi target split (bukan dropdown)
         balance_checkbox,
         num_workers_slider
     ])

@@ -111,8 +111,13 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         env: Environment manager
         logger: Logger untuk logging
     """
-    from smartcash.ui.utils.alert_utils import create_status_indicator
+    from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
     from smartcash.ui.utils.constants import COLORS, ICONS
+    
+    # Validasi ui_components untuk mencegah KeyError
+    if ui_components is None:
+        if logger: logger.error("❌ ui_components adalah None saat reset split_config")
+        return
     
     # Validasi komponen yang diperlukan
     if 'output_box' not in ui_components:
@@ -132,15 +137,31 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
             # Initialize UI dari config
             initialize_ui_from_config(ui_components, config)
             
-            display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi split berhasil direset"))
-            if 'status_panel' in ui_components:
-                ui_components['status_panel'].value = (
-                    f'<div style="padding:10px; background-color:{COLORS["alert_success_bg"]}; '
-                    f'color:{COLORS["alert_success_text"]}; margin:10px 0; border-radius:4px; '
-                    f'border-left:4px solid {COLORS["alert_success_text"]};">'
-                    f'<p style="margin:5px 0">{ICONS["success"]} Konfigurasi split berhasil direset</p>'
-                    '</div>'
-                )
+            # Tampilkan pesan sukses dengan cara yang lebih aman
+            success_message = f"{ICONS['success']} Konfigurasi split berhasil direset"
+            display(create_status_indicator("success", success_message))
+            
+            # Update status panel jika ada
+            if 'status_panel' in ui_components and ui_components['status_panel'] is not None:
+                try:
+                    ui_components['status_panel'].value = (
+                        f'<div style="padding:10px; background-color:{COLORS["alert_success_bg"]}; '
+                        f'color:{COLORS["alert_success_text"]}; margin:10px 0; border-radius:4px; '
+                        f'border-left:4px solid {COLORS["alert_success_text"]};">' 
+                        f'<p style="margin:5px 0">{ICONS["success"]} Konfigurasi split berhasil direset</p>'
+                        '</div>'
+                    )
+                except Exception as panel_error:
+                    if logger: logger.warning(f"⚠️ Error saat update status panel: {str(panel_error)}")
+            
+            # Update status jika ada
+            if 'status' in ui_components and ui_components['status'] is not None:
+                try:
+                    with ui_components['status']:
+                        display(create_info_alert(success_message, alert_type="success"))
+                except Exception as status_error:
+                    if logger: logger.warning(f"⚠️ Error saat update status: {str(status_error)}")
+                    
             if logger: logger.info("✅ Konfigurasi split berhasil direset")
         
         except Exception as e:

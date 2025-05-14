@@ -180,7 +180,10 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                 'Already up to date', 'Your branch is',
                 'Mounted at', 'Drive already mounted',
                 'FutureWarning', 'DeprecationWarning',
-                'UserWarning', 'RuntimeWarning'
+                'UserWarning', 'RuntimeWarning',
+                # Filter tambahan untuk mengurangi log INFO dari config_sync
+                'INFO:config_sync', 'INFO:root', 'INFO:smartcash.ui.setup',
+                'Environment config handlers', 'berhasil diinisialisasi'
             ]  # Prefiks untuk mengidentifikasi pesan yang tidak perlu ditampilkan di UI
             
         def write(self, message):

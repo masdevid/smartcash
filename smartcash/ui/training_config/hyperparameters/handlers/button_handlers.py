@@ -131,48 +131,50 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
             return current_config
         
         # Update UI dari config
-        def update_ui_from_config():
-            if not config or 'hyperparameters' not in config: return
+        def update_ui_from_config(config_to_use=None):
+            # Gunakan config_to_use jika disediakan, jika tidak gunakan config global atau default_config
+            current_config = config_to_use if config_to_use else (config if config else default_config)
+            if not current_config or 'hyperparameters' not in current_config: return
             
             try:
                 # Optimizer
-                if 'optimizer' in config['hyperparameters']:
-                    if 'type' in config['hyperparameters']['optimizer']:
-                        ui_components['optimizer_type'].value = config['hyperparameters']['optimizer']['type']
-                    if 'lr' in config['hyperparameters']['optimizer']:
-                        ui_components['learning_rate'].value = config['hyperparameters']['optimizer']['lr']
-                    if 'weight_decay' in config['hyperparameters']['optimizer']:
-                        ui_components['weight_decay'].value = config['hyperparameters']['optimizer']['weight_decay']
-                    if 'momentum' in config['hyperparameters']['optimizer']:
-                        ui_components['momentum'].value = config['hyperparameters']['optimizer']['momentum']
+                if 'optimizer' in current_config['hyperparameters']:
+                    if 'type' in current_config['hyperparameters']['optimizer']:
+                        ui_components['optimizer_type'].value = current_config['hyperparameters']['optimizer']['type']
+                    if 'lr' in current_config['hyperparameters']['optimizer']:
+                        ui_components['learning_rate'].value = current_config['hyperparameters']['optimizer']['lr']
+                    if 'weight_decay' in current_config['hyperparameters']['optimizer']:
+                        ui_components['weight_decay'].value = current_config['hyperparameters']['optimizer']['weight_decay']
+                    if 'momentum' in current_config['hyperparameters']['optimizer']:
+                        ui_components['momentum'].value = current_config['hyperparameters']['optimizer']['momentum']
                 
                 # Scheduler
-                if 'scheduler' in config['hyperparameters']:
-                    if 'type' in config['hyperparameters']['scheduler']:
-                        ui_components['scheduler_type'].value = config['hyperparameters']['scheduler']['type']
-                    if 'warmup_epochs' in config['hyperparameters']['scheduler']:
-                        ui_components['warmup_epochs'].value = config['hyperparameters']['scheduler']['warmup_epochs']
-                    if 'step_size' in config['hyperparameters']['scheduler']:
-                        ui_components['step_size'].value = config['hyperparameters']['scheduler']['step_size']
-                    if 'gamma' in config['hyperparameters']['scheduler']:
-                        ui_components['gamma'].value = config['hyperparameters']['scheduler']['gamma']
+                if 'scheduler' in current_config['hyperparameters']:
+                    if 'type' in current_config['hyperparameters']['scheduler']:
+                        ui_components['lr_scheduler'].value = current_config['hyperparameters']['scheduler']['type']
+                    if 'warmup_epochs' in current_config['hyperparameters']['scheduler']:
+                        ui_components['warmup_epochs'].value = current_config['hyperparameters']['scheduler']['warmup_epochs']
+                    if 'warmup_momentum' in current_config['hyperparameters']['scheduler']:
+                        ui_components['warmup_momentum'].value = current_config['hyperparameters']['scheduler']['warmup_momentum']
+                    if 'warmup_bias_lr' in current_config['hyperparameters']['scheduler']:
+                        ui_components['warmup_bias_lr'].value = current_config['hyperparameters']['scheduler']['warmup_bias_lr']
                 
                 # Augmentation
-                if 'augmentation' in config['hyperparameters']:
-                    if 'use_augmentation' in config['hyperparameters']['augmentation']:
-                        ui_components['use_augmentation'].value = config['hyperparameters']['augmentation']['use_augmentation']
-                    if 'mosaic' in config['hyperparameters']['augmentation']:
-                        ui_components['mosaic'].value = config['hyperparameters']['augmentation']['mosaic']
-                    if 'mixup' in config['hyperparameters']['augmentation']:
-                        ui_components['mixup'].value = config['hyperparameters']['augmentation']['mixup']
-                    if 'flip' in config['hyperparameters']['augmentation']:
-                        ui_components['flip'].value = config['hyperparameters']['augmentation']['flip']
-                    if 'hsv_h' in config['hyperparameters']['augmentation']:
-                        ui_components['hsv_h'].value = config['hyperparameters']['augmentation']['hsv_h']
-                    if 'hsv_s' in config['hyperparameters']['augmentation']:
-                        ui_components['hsv_s'].value = config['hyperparameters']['augmentation']['hsv_s']
-                    if 'hsv_v' in config['hyperparameters']['augmentation']:
-                        ui_components['hsv_v'].value = config['hyperparameters']['augmentation']['hsv_v']
+                if 'augmentation' in current_config['hyperparameters']:
+                    if 'use_augmentation' in current_config['hyperparameters']['augmentation']:
+                        ui_components['augment'].value = current_config['hyperparameters']['augmentation']['use_augmentation']
+                    if 'mosaic' in current_config['hyperparameters']['augmentation']:
+                        ui_components['mosaic'].value = current_config['hyperparameters']['augmentation']['mosaic']
+                    if 'mixup' in current_config['hyperparameters']['augmentation']:
+                        ui_components['mixup'].value = current_config['hyperparameters']['augmentation']['mixup']
+                    if 'flip' in current_config['hyperparameters']['augmentation']:
+                        ui_components['flip'].value = current_config['hyperparameters']['augmentation']['flip']
+                    if 'hsv_h' in current_config['hyperparameters']['augmentation']:
+                        ui_components['hsv_h'].value = current_config['hyperparameters']['augmentation']['hsv_h']
+                    if 'hsv_s' in current_config['hyperparameters']['augmentation']:
+                        ui_components['hsv_s'].value = current_config['hyperparameters']['augmentation']['hsv_s']
+                    if 'hsv_v' in current_config['hyperparameters']['augmentation']:
+                        ui_components['hsv_v'].value = current_config['hyperparameters']['augmentation']['hsv_v']
                 
                 # Update info hyperparameter
                 update_hyperparameters_info()
@@ -233,41 +235,87 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 updated_config = update_config_from_ui()
                 
                 # Simpan ke config manager
-                config_manager.save_module_config('hyperparameters', updated_config)
+                success = config_manager.save_module_config('hyperparameters', updated_config)
                 
                 # Register UI components untuk persistensi
                 config_manager.register_ui_components('hyperparameters', ui_components)
                 
+                # Pastikan UI components tetap terdaftar untuk persistensi
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'hyperparameters', logger)
+                except Exception as persist_error:
+                    if logger: logger.warning(f"⚠️ Error saat memastikan persistensi UI: {persist_error}")
+                
                 # Tampilkan pesan sukses
                 with ui_components['status']:
-                    display(create_info_alert("Konfigurasi hyperparameter berhasil disimpan", alert_type='success'))
+                    if success:
+                        display(create_info_alert("Konfigurasi hyperparameter berhasil disimpan", alert_type='success'))
+                    else:
+                        display(create_info_alert("Konfigurasi hyperparameter mungkin tidak tersimpan dengan benar", alert_type='warning'))
                 
-                if logger: logger.info("✅ Konfigurasi hyperparameter berhasil disimpan")
+                if logger: 
+                    if success:
+                        logger.info("✅ Konfigurasi hyperparameter berhasil disimpan")
+                    else:
+                        logger.warning("⚠️ Konfigurasi hyperparameter mungkin tidak tersimpan dengan benar")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal menyimpan konfigurasi: {str(e)}", alert_type='error'))
                 if logger: logger.error(f"❌ Error menyimpan konfigurasi hyperparameter: {e}")
+                
+                # Pastikan UI components tetap terdaftar untuk persistensi meskipun terjadi error
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'hyperparameters', logger)
+                except Exception:
+                    pass
         
         def on_reset_click(b):
             try:
                 # Dapatkan config manager
                 config_manager = get_config_manager()
                 
-                # Reset ke default config
-                config_manager.reset_module_config('hyperparameters', default_config)
+                # Dapatkan konfigurasi saat ini dan update dengan nilai default
+                current_config = config_manager.get_module_config('hyperparameters') or {}
+                current_config.update(default_config)
+                
+                # Simpan konfigurasi default
+                success = config_manager.save_module_config('hyperparameters', default_config)
                 
                 # Update UI dari default config
-                update_ui_from_config()
+                update_ui_from_config(default_config)
                 
-                # Tampilkan pesan sukses
+                # Pastikan UI components tetap terdaftar untuk persistensi
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'hyperparameters', logger)
+                except Exception as persist_error:
+                    if logger: logger.warning(f"⚠️ Error saat memastikan persistensi UI: {persist_error}")
+                
+                # Tampilkan pesan sukses atau warning
                 with ui_components['status']:
-                    display(create_info_alert("Konfigurasi hyperparameter berhasil direset ke default", alert_type='success'))
+                    if success:
+                        display(create_info_alert("Konfigurasi hyperparameter berhasil direset ke default", alert_type='success'))
+                    else:
+                        display(create_info_alert("Konfigurasi hyperparameter direset di UI tetapi mungkin tidak tersimpan ke file", alert_type='warning'))
                 
-                if logger: logger.info("✅ Konfigurasi hyperparameter berhasil direset ke default")
+                if logger: 
+                    if success:
+                        logger.info("✅ Konfigurasi hyperparameter berhasil direset ke default")
+                    else:
+                        logger.warning("⚠️ Konfigurasi direset di UI tetapi mungkin tidak tersimpan ke file")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal mereset konfigurasi: {str(e)}", alert_type='error'))
                 if logger: logger.error(f"❌ Error mereset konfigurasi hyperparameter: {e}")
+                
+                # Pastikan UI components tetap terdaftar untuk persistensi meskipun terjadi error
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'hyperparameters', logger)
+                except Exception:
+                    pass
         
         # Register handlers
         ui_components['save_button'].on_click(on_save_click)

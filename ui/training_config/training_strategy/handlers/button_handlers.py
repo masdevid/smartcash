@@ -176,41 +176,87 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 updated_config = update_config_from_ui()
                 
                 # Simpan ke config manager
-                config_manager.save_module_config('training_strategy', updated_config)
+                success = config_manager.save_module_config('training_strategy', updated_config)
                 
                 # Register UI components untuk persistensi
                 config_manager.register_ui_components('training_strategy', ui_components)
                 
-                # Tampilkan pesan sukses
-                with ui_components['status']:
-                    display(create_info_alert("Konfigurasi strategi pelatihan berhasil disimpan", alert_type='success'))
+                # Pastikan UI components tetap terdaftar untuk persistensi
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'training_strategy', logger)
+                except Exception as persist_error:
+                    if logger: logger.warning(f"⚠️ Error saat memastikan persistensi UI: {persist_error}")
                 
-                if logger: logger.info("✅ Konfigurasi strategi pelatihan berhasil disimpan")
+                # Tampilkan pesan sukses atau warning
+                with ui_components['status']:
+                    if success:
+                        display(create_info_alert("Konfigurasi strategi pelatihan berhasil disimpan", alert_type='success'))
+                    else:
+                        display(create_info_alert("Konfigurasi strategi pelatihan mungkin tidak tersimpan dengan benar", alert_type='warning'))
+                
+                if logger: 
+                    if success:
+                        logger.info("✅ Konfigurasi strategi pelatihan berhasil disimpan")
+                    else:
+                        logger.warning("⚠️ Konfigurasi strategi pelatihan mungkin tidak tersimpan dengan benar")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal menyimpan konfigurasi: {str(e)}", alert_type='error'))
                 if logger: logger.error(f"❌ Error menyimpan konfigurasi strategi pelatihan: {e}")
+                
+                # Pastikan UI components tetap terdaftar untuk persistensi meskipun terjadi error
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'training_strategy', logger)
+                except Exception:
+                    pass
         
         def on_reset_click(b):
             try:
                 # Dapatkan config manager
                 config_manager = get_config_manager()
                 
-                # Reset ke default config
-                config_manager.reset_module_config('training_strategy', default_config)
+                # Dapatkan konfigurasi saat ini dan update dengan nilai default
+                current_config = config_manager.get_module_config('training_strategy') or {}
+                current_config.update(default_config)
+                
+                # Simpan konfigurasi default
+                success = config_manager.save_module_config('training_strategy', default_config)
                 
                 # Update UI dari default config
                 update_ui_from_config(default_config)
                 
-                # Tampilkan pesan sukses
-                with ui_components['status']:
-                    display(create_info_alert("Konfigurasi strategi pelatihan berhasil direset ke default", alert_type='success'))
+                # Pastikan UI components tetap terdaftar untuk persistensi
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'training_strategy', logger)
+                except Exception as persist_error:
+                    if logger: logger.warning(f"⚠️ Error saat memastikan persistensi UI: {persist_error}")
                 
-                if logger: logger.info("✅ Konfigurasi strategi pelatihan berhasil direset ke default")
+                # Tampilkan pesan sukses atau warning
+                with ui_components['status']:
+                    if success:
+                        display(create_info_alert("Konfigurasi strategi pelatihan berhasil direset ke default", alert_type='success'))
+                    else:
+                        display(create_info_alert("Konfigurasi strategi pelatihan direset di UI tetapi mungkin tidak tersimpan ke file", alert_type='warning'))
+                
+                if logger: 
+                    if success:
+                        logger.info("✅ Konfigurasi strategi pelatihan berhasil direset ke default")
+                    else:
+                        logger.warning("⚠️ Konfigurasi direset di UI tetapi mungkin tidak tersimpan ke file")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal mereset konfigurasi: {str(e)}", alert_type='error'))
                 if logger: logger.error(f"❌ Error mereset konfigurasi strategi pelatihan: {e}")
+                
+                # Pastikan UI components tetap terdaftar untuk persistensi meskipun terjadi error
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'training_strategy', logger)
+                except Exception:
+                    pass
         
         # Register handlers
         ui_components['save_button'].on_click(on_save_click)

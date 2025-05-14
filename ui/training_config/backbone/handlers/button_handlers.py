@@ -7,18 +7,21 @@ from typing import Dict, Any, Optional, Callable
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
-def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+def setup_backbone_button_handlers(ui_components: Dict[str, Any], env: Any, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Setup handler untuk tombol pada komponen UI backbone.
+    Setup handlers untuk tombol-tombol di UI backbone.
     
     Args:
-        ui_components: Komponen UI
+        ui_components: Dictionary berisi komponen UI
         env: Environment manager
-        config: Konfigurasi model
+        config: Konfigurasi untuk model
         
     Returns:
-        Dict berisi komponen UI dengan handler terpasang
+        Dictionary berisi komponen UI yang diupdate
     """
+    # Import LogLevel untuk logging
+    from smartcash.common.logger import LogLevel
+    
     try:
         # Import dengan penanganan error minimal
         from smartcash.ui.training_config.config_handler import save_config, reset_config
@@ -99,7 +102,7 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                             _ui_components['model_type'].value = model_type
                             if logger:
                                 if hasattr(logger, 'log'):
-                                    logger.log(logger.DEBUG, f"Model type diperbarui ke: {model_type}")
+                                    logger.log(LogLevel.DEBUG, f"Model type diperbarui ke: {model_type}")
                                 else:
                                     logger.debug(f"✅ Model type diperbarui ke: {model_type}")
                         else:
@@ -107,13 +110,13 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                             _ui_components['model_type'].value = default_model_type
                             if logger: 
                                 if hasattr(logger, 'log'):
-                                    logger.log(logger.INFO, f"Model type tidak valid, menggunakan default: {default_model_type}")
+                                    logger.log(LogLevel.INFO, f"Model type tidak valid, menggunakan default: {default_model_type}")
                                 else:
                                     logger.info(f"ℹ️ Model type tidak valid, menggunakan default: {default_model_type}")
                     except Exception as e:
                         if logger:
                             if hasattr(logger, 'log'):
-                                logger.log(logger.WARNING, f"Error saat update model_type: {str(e)}")
+                                logger.log(LogLevel.WARNING, f"Error saat update model_type: {str(e)}")
                             else:
                                 logger.warning(f"⚠️ Error saat update model_type: {str(e)}")
                 
@@ -127,7 +130,7 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                         if not backbone in available_options:
                             if logger:
                                 if hasattr(logger, 'log'):
-                                    logger.log(logger.WARNING, f"Backbone '{backbone}' tidak ditemukan dalam opsi dropdown")
+                                    logger.log(LogLevel.WARNING, f"Backbone '{backbone}' tidak ditemukan dalam opsi dropdown")
                                 else:
                                     logger.warning(f"⚠️ Backbone '{backbone}' tidak ditemukan dalam opsi dropdown")
                             
@@ -136,27 +139,27 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                                 backbone = 'efficientnet_b4'
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.INFO, f"Menggunakan backbone alternatif: efficientnet_b4")
+                                        logger.log(LogLevel.INFO, f"Menggunakan backbone alternatif: efficientnet_b4")
                                     else:
                                         logger.info(f"ℹ️ Menggunakan backbone alternatif: efficientnet_b4")
                             elif 'cspdarknet_s' in available_options:
                                 backbone = 'cspdarknet_s'
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.INFO, f"Menggunakan backbone alternatif: cspdarknet_s")
+                                        logger.log(LogLevel.INFO, f"Menggunakan backbone alternatif: cspdarknet_s")
                                     else:
                                         logger.info(f"ℹ️ Menggunakan backbone alternatif: cspdarknet_s")
                             elif available_options:
                                 backbone = available_options[0]
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.INFO, f"Menggunakan backbone alternatif: {backbone}")
+                                        logger.log(LogLevel.INFO, f"Menggunakan backbone alternatif: {backbone}")
                                     else:
                                         logger.info(f"ℹ️ Menggunakan backbone alternatif: {backbone}")
                             else:
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.ERROR, f"Tidak ada opsi backbone yang tersedia")
+                                        logger.log(LogLevel.ERROR, f"Tidak ada opsi backbone yang tersedia")
                                     else:
                                         logger.error(f"❌ Tidak ada opsi backbone yang tersedia")
                                 return  # Keluar dari fungsi jika tidak ada opsi yang tersedia
@@ -181,7 +184,7 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                                 
                             if logger:
                                 if hasattr(logger, 'log'):
-                                    logger.log(logger.DEBUG, f"Backbone diperbarui ke: {backbone}")
+                                    logger.log(LogLevel.DEBUG, f"Backbone diperbarui ke: {backbone}")
                                 else:
                                     logger.debug(f"✅ Backbone diperbarui ke: {backbone}")
                         except Exception as set_error:
@@ -204,19 +207,19 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                                 _ui_components['backbone_type'] = new_dropdown
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.INFO, f"Berhasil mengatur backbone dengan metode alternatif")
+                                        logger.log(LogLevel.INFO, f"Berhasil mengatur backbone dengan metode alternatif")
                                     else:
                                         logger.info(f"✅ Berhasil mengatur backbone dengan metode alternatif")
                             except Exception as alt_error:
                                 if logger:
                                     if hasattr(logger, 'log'):
-                                        logger.log(logger.ERROR, f"Gagal mengatur backbone dengan metode alternatif: {str(alt_error)}")
+                                        logger.log(LogLevel.ERROR, f"Gagal mengatur backbone dengan metode alternatif: {str(alt_error)}")
                                     else:
                                         logger.error(f"❌ Gagal mengatur backbone dengan metode alternatif: {str(alt_error)}")
                     except Exception as e:
                         if logger:
                             if hasattr(logger, 'log'):
-                                logger.log(logger.WARNING, f"Error saat update backbone: {str(e)}")
+                                logger.log(LogLevel.WARNING, f"Error saat update backbone: {str(e)}")
                             else:
                                 logger.warning(f"⚠️ Error saat update backbone: {str(e)}")
                     
@@ -262,13 +265,13 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
                 
                 if logger:
                     if hasattr(logger, 'log'):
-                        logger.log(logger.INFO, "UI backbone diperbarui dari config")
+                        logger.log(LogLevel.INFO, "UI backbone diperbarui dari config")
                     else:
                         logger.info("✅ UI backbone diperbarui dari config")
             except Exception as e:
                 if logger:
                     if hasattr(logger, 'log'):
-                        logger.log(logger.ERROR, f"Error update UI: {e}")
+                        logger.log(LogLevel.ERROR, f"Error update UI: {e}")
                     else:
                         logger.error(f"❌ Error update UI: {e}")
         

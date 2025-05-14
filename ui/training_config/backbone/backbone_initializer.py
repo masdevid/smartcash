@@ -22,17 +22,12 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
     """
     ui_components = {'module_name': 'backbone'}
     
-    # Setup logging
-    import logging
-    logger = logging.getLogger('backbone_ui')
-    logger.setLevel(logging.INFO)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-        logger.addHandler(handler)
+    # Setup UI logger
+    from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+    logger = create_direct_ui_logger(ui_components, 'backbone_ui')
     ui_components['logger'] = logger
     
-    logger.info("🚀 Memulai inisialisasi UI backbone model")
+    logger.log(logger.INFO, "🚀 Memulai inisialisasi UI backbone model")
     
     try:
         # Import dependency

@@ -34,49 +34,169 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             from smartcash.model.manager import ModelManager
             from smartcash.model.config.backbone_config import BackboneConfig
             
-            # Daftar backbone yang didukung
+            # Daftar backbone yang didukung - hanya menggunakan yang tersedia di BackboneConfig
             backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+            
+            # Pastikan backbone_options tidak kosong
+            if not backbone_options:
+                backbone_options = ['efficientnet_b4', 'cspdarknet_s']
+                # Log ke UI components status jika tersedia
+                if 'status' in ui_components:
+                    with ui_components['status']:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        from IPython.display import display
+                        display(create_status_indicator("warning", "BackboneConfig.BACKBONE_CONFIGS kosong, menggunakan opsi default"))
+                else:
+                    print(f"⚠️ BackboneConfig.BACKBONE_CONFIGS kosong, menggunakan opsi default")
             
             # Daftar model yang dioptimalkan
-            optimized_models = ModelManager.OPTIMIZED_MODELS
-            import_success = True
-        except ImportError:
-            # Coba impor alternatif jika struktur modul berubah
-            from smartcash.model.config.backbone_config import BackboneConfig
-            backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+            optimized_models = {}
             
-            # Definisi model yang dioptimalkan secara manual
-            optimized_models = {
-                'efficient_optimized': {
-                    'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
-                    'backbone': 'efficientnet_b4',
-                    'use_attention': True,
-                    'use_residual': False,
-                    'use_ciou': False
-                },
-                'yolov5s': {
-                    'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
-                    'backbone': 'cspdarknet_s',
-                    'use_attention': False,
-                    'use_residual': False,
-                    'use_ciou': False
-                },
-                'efficient_advanced': {
-                    'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
-                    'backbone': 'efficientnet_b4',
-                    'use_attention': True,
-                    'use_residual': True,
-                    'use_ciou': True
+            # Salin model dari ModelManager.OPTIMIZED_MODELS dengan validasi backbone
+            for model_key, model_config in ModelManager.OPTIMIZED_MODELS.items():
+                # Salin konfigurasi model
+                optimized_models[model_key] = model_config.copy()
+                
+                # Validasi backbone ada dalam opsi yang tersedia
+                if 'backbone' in model_config and model_config['backbone'] not in backbone_options:
+                    # Jika backbone tidak valid, gunakan default yang tersedia
+                    # Log ke UI components status jika tersedia
+                    if 'status' in ui_components:
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("warning", f"Backbone '{model_config['backbone']}' untuk model '{model_key}' tidak tersedia dalam opsi"))
+                    else:
+                        print(f"⚠️ Backbone '{model_config['backbone']}' untuk model '{model_key}' tidak tersedia dalam opsi")
+                    if 'efficientnet_b4' in backbone_options:
+                        optimized_models[model_key]['backbone'] = 'efficientnet_b4'
+                        print(f"  ℹ️ Menggunakan 'efficientnet_b4' sebagai pengganti")
+                    elif 'cspdarknet_s' in backbone_options:
+                        optimized_models[model_key]['backbone'] = 'cspdarknet_s'
+                        print(f"  ℹ️ Menggunakan 'cspdarknet_s' sebagai pengganti")
+                    elif backbone_options:
+                        optimized_models[model_key]['backbone'] = backbone_options[0]
+                        # Log ke UI components status jika tersedia
+                    if 'status' in ui_components:
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("info", f"Menggunakan '{backbone_options[0]}' sebagai pengganti"))
+                    else:
+                        print(f"  ℹ️ Menggunakan '{backbone_options[0]}' sebagai pengganti")
+            
+            # Jika tidak ada model yang dioptimalkan, buat default
+            if not optimized_models:
+                # Log ke UI components status jika tersedia
+                if 'status' in ui_components:
+                    with ui_components['status']:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        from IPython.display import display
+                        display(create_status_indicator("warning", "ModelManager.OPTIMIZED_MODELS kosong, menggunakan model default"))
+                else:
+                    print(f"⚠️ ModelManager.OPTIMIZED_MODELS kosong, menggunakan model default")
+                optimized_models = {
+                    'efficient_optimized': {
+                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                        'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
+                        'use_attention': True,
+                        'use_residual': False,
+                        'use_ciou': False
+                    },
+                    'yolov5s': {
+                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                        'backbone': 'cspdarknet_s' if 'cspdarknet_s' in backbone_options else backbone_options[0],
+                        'use_attention': False,
+                        'use_residual': False,
+                        'use_ciou': False
+                    }
                 }
-            }
-            import_success = False
-            print(f"⚠️ Menggunakan definisi model alternatif karena ModelManager tidak dapat diimpor")
+            
+            import_success = True
+        except ImportError as ie:
+            # Coba impor alternatif jika struktur modul berubah
+            try:
+                from smartcash.model.config.backbone_config import BackboneConfig
+                backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+                
+                # Pastikan backbone_options tidak kosong
+                if not backbone_options:
+                    backbone_options = ['efficientnet_b4', 'cspdarknet_s']
+                    print(f"⚠️ BackboneConfig.BACKBONE_CONFIGS kosong, menggunakan opsi default")
+                
+                # Definisi model yang dioptimalkan secara manual dengan backbone yang valid
+                optimized_models = {
+                    'efficient_optimized': {
+                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                        'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
+                        'use_attention': True,
+                        'use_residual': False,
+                        'use_ciou': False
+                    },
+                    'yolov5s': {
+                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                        'backbone': 'cspdarknet_s' if 'cspdarknet_s' in backbone_options else backbone_options[0],
+                        'use_attention': False,
+                        'use_residual': False,
+                        'use_ciou': False
+                    },
+                    'efficient_advanced': {
+                        'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
+                        'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
+                        'use_attention': True,
+                        'use_residual': True,
+                        'use_ciou': True
+                    }
+                }
+                import_success = False
+                # Log ke UI components status jika tersedia
+                if 'status' in ui_components:
+                    with ui_components['status']:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        from IPython.display import display
+                        display(create_status_indicator("warning", f"Menggunakan definisi model alternatif karena ModelManager tidak dapat diimpor: {str(ie)}"))
+                else:
+                    print(f"⚠️ Menggunakan definisi model alternatif karena ModelManager tidak dapat diimpor: {str(ie)}")
+            except Exception as inner_e:
+                # Log ke UI components status jika tersedia
+                if 'status' in ui_components:
+                    with ui_components['status']:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        from IPython.display import display
+                        display(create_status_indicator("error", f"Error saat mengakses BackboneConfig: {str(inner_e)}"))
+                else:
+                    print(f"⚠️ Error saat mengakses BackboneConfig: {str(inner_e)}")
+                backbone_options = ['efficientnet_b4', 'cspdarknet_s']
+                optimized_models = {
+                    'efficient_optimized': {
+                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                        'backbone': 'efficientnet_b4',
+                        'use_attention': True,
+                        'use_residual': False,
+                        'use_ciou': False
+                    },
+                    'yolov5s': {
+                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                        'backbone': 'cspdarknet_s',
+                        'use_attention': False,
+                        'use_residual': False,
+                        'use_ciou': False
+                    }
+                }
+                import_success = False
     except Exception as e:
         # Fallback jika terjadi error saat mengakses ModelManager dan BackboneConfig
-        print(f"⚠️ Error mengakses konfigurasi backbone: {str(e)}")
+        # Log ke UI components status jika tersedia
+        if 'status' in ui_components:
+            with ui_components['status']:
+                from smartcash.ui.utils.alert_utils import create_status_indicator
+                from IPython.display import display
+                display(create_status_indicator("error", f"Error mengakses konfigurasi backbone: {str(e)}"))
+        else:
+            print(f"⚠️ Error mengakses konfigurasi backbone: {str(e)}")
         backbone_options = ['efficientnet_b4', 'cspdarknet_s']
         
-        # Buat optimized_models fallback
+        # Buat optimized_models fallback dengan backbone yang valid
         optimized_models = {
             'efficient_optimized': {
                 'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
@@ -88,13 +208,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             'yolov5s': {
                 'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
                 'backbone': 'cspdarknet_s',
-                'use_attention': False,
-                'use_residual': False,
-                'use_ciou': False
-            },
-            'efficient_basic': {
-                'description': 'Model dasar tanpa optimasi khusus',
-                'backbone': 'efficientnet_b4',
                 'use_attention': False,
                 'use_residual': False,
                 'use_ciou': False
@@ -432,36 +545,116 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             # Validasi model_key ada dalam optimized_models
             if model_key not in optimized_models:
                 with ui_components['status']:
-                    print(f"⚠️ Model {model_key} tidak ditemukan dalam daftar model yang dioptimalkan")
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    from IPython.display import display
+                    display(create_status_indicator("warning", f"Model {model_key} tidak ditemukan dalam daftar model yang dioptimalkan"))
                 return
                 
             model_config = optimized_models[model_key]
             
-            # Update backbone dengan penanganan error
+            # Update backbone dengan penanganan error yang lebih kuat
             try:
                 backbone_value = model_config.get('backbone', 'efficientnet_b4')
+                available_options = ui_components['backbone_type'].options
                 
-                # Pastikan backbone ada dalam opsi dropdown
-                if backbone_value in ui_components['backbone_type'].options:
+                # Periksa apakah backbone ada dalam opsi dropdown
+                if backbone_value in available_options:
                     # Simpan status disabled saat ini
                     was_disabled = ui_components['backbone_type'].disabled
                     
-                    # Aktifkan sementara jika dinonaktifkan
-                    if was_disabled:
-                        ui_components['backbone_type'].disabled = False
+                    try:
+                        # Aktifkan sementara jika dinonaktifkan
+                        if was_disabled:
+                            ui_components['backbone_type'].disabled = False
+                            
+                        # Update nilai dengan penanganan error
+                        ui_components['backbone_type'].value = backbone_value
                         
-                    # Update nilai
-                    ui_components['backbone_type'].value = backbone_value
-                    
-                    # Kembalikan status disabled
-                    if was_disabled:
-                        ui_components['backbone_type'].disabled = was_disabled
+                        # Kembalikan status disabled
+                        if was_disabled:
+                            ui_components['backbone_type'].disabled = was_disabled
+                            
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("success", f"Berhasil mengatur backbone ke: {backbone_value}"))
+                    except Exception as set_error:
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("warning", f"Error saat mengatur nilai backbone: {str(set_error)}"))
+                            display(create_status_indicator("info", "Mencoba metode alternatif..."))
+                            
+                        # Jika gagal, coba metode alternatif dengan membuat ulang dropdown
+                        try:
+                            # Buat dropdown baru dengan nilai yang benar
+                            new_dropdown = widgets.Dropdown(
+                                options=available_options,
+                                value=backbone_value,
+                                description='Backbone:',
+                                style={'description_width': 'initial'},
+                                layout=widgets.Layout(width='100%'),
+                                disabled=was_disabled
+                            )
+                            
+                            # Ganti dropdown lama dengan yang baru
+                            ui_components['backbone_type'] = new_dropdown
+                            with ui_components['status']:
+                                from smartcash.ui.utils.alert_utils import create_status_indicator
+                                from IPython.display import display
+                                display(create_status_indicator("success", "Berhasil mengatur backbone dengan metode alternatif"))
+                        except Exception as alt_error:
+                            with ui_components['status']:
+                                from smartcash.ui.utils.alert_utils import create_status_indicator
+                                from IPython.display import display
+                                display(create_status_indicator("error", f"Gagal mengatur backbone dengan metode alternatif: {str(alt_error)}"))
                 else:
+                    # Jika backbone tidak ada dalam opsi, gunakan nilai yang tersedia
                     with ui_components['status']:
-                        print(f"⚠️ Backbone {backbone_value} tidak ditemukan dalam opsi dropdown")
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        from IPython.display import display
+                        display(create_status_indicator("warning", f"Backbone '{backbone_value}' tidak ditemukan dalam opsi dropdown"))
+                    
+                    # Cari backbone alternatif yang valid
+                    if 'efficientnet_b4' in available_options:
+                        alternative = 'efficientnet_b4'
+                    elif 'cspdarknet_s' in available_options:
+                        alternative = 'cspdarknet_s'
+                    elif available_options:
+                        alternative = available_options[0]
+                    else:
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("error", "Tidak ada opsi backbone yang tersedia"))
+                        return
+                    
+                    # Update model_config dengan backbone alternatif
+                    model_config['backbone'] = alternative
+                    optimized_models[model_key]['backbone'] = alternative
+                    
+                    # Coba set nilai dengan backbone alternatif
+                    try:
+                        was_disabled = ui_components['backbone_type'].disabled
+                        if was_disabled:
+                            ui_components['backbone_type'].disabled = False
+                        ui_components['backbone_type'].value = alternative
+                        if was_disabled:
+                            ui_components['backbone_type'].disabled = was_disabled
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("info", f"Menggunakan backbone alternatif: {alternative}"))
+                    except Exception as alt_error:
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            from IPython.display import display
+                            display(create_status_indicator("error", f"Error saat mengatur backbone alternatif: {str(alt_error)}"))
             except Exception as e:
                 with ui_components['status']:
-                    print(f"❌ Error saat mengupdate backbone: {str(e)}")
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    from IPython.display import display
+                    display(create_status_indicator("error", f"Error umum saat mengupdate backbone: {str(e)}"))
             
             # Update fitur optimasi dengan penanganan error
             try:
@@ -470,7 +663,9 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                 ui_components['use_ciou'].value = model_config.get('use_ciou', False)
             except Exception as e:
                 with ui_components['status']:
-                    print(f"❌ Error saat mengupdate fitur optimasi: {str(e)}")
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    from IPython.display import display
+                    display(create_status_indicator("error", f"Error saat mengupdate fitur optimasi: {str(e)}"))
                     
             # Update informasi backbone
             try:
@@ -490,10 +685,14 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                 ui_components['backbone_info'].value = backbone_info
             except Exception as e:
                 with ui_components['status']:
-                    print(f"❌ Error saat mengupdate informasi backbone: {str(e)}")
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    from IPython.display import display
+                    display(create_status_indicator("error", f"Error saat mengupdate informasi backbone: {str(e)}"))
         except Exception as e:
             with ui_components['status']:
-                print(f"❌ Error umum saat mengubah model: {str(e)}")
+                from smartcash.ui.utils.alert_utils import create_status_indicator
+                from IPython.display import display
+                display(create_status_indicator("error", f"Error umum saat mengubah model: {str(e)}"))
         
         # Catatan: Bagian ini telah dipindahkan ke dalam blok try-except di atas
     

@@ -42,8 +42,8 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Card panel di awal
     card_panel = widgets.HTML(value=f"""
-        <div style="padding:15px; background-color:{COLORS['bg_light']}; 
-                    color:{COLORS['text_dark']}; margin:10px 0; border-radius:8px; 
+        <div style="padding:15px; background-color:{COLORS['card']}; 
+                    color:{COLORS['dark']}; margin:10px 0; border-radius:8px; 
                     box-shadow:0 2px 5px rgba(0,0,0,0.1);">
             <h3 style="margin-top:0">{ICONS['dataset']} Konfigurasi Split Dataset</h3>
             <p>Konfigurasi pembagian dataset untuk training, validation, dan testing.</p>

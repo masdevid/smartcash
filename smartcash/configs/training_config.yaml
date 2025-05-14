@@ -23,3 +23,4 @@ training_utils:
   visualize_batch_every: 100  # Visualisasi batch setiap 100 batch
   gradient_clipping: 1.0  # Clipping gradien maksimum
   mixed_precision: true  # Gunakan mixed precision training
+  layer_mode: 'single'  # Opsi: 'single' atau 'multilayer'

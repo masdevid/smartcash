@@ -92,6 +92,14 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         layout=widgets.Layout(width='300px')
     )
     
+    ui_components['layer_mode'] = widgets.RadioButtons(
+        options=['single', 'multilayer'],
+        value='single',
+        description='Layer mode:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
     # Tab 2: Validasi dan Evaluasi
     ui_components['validation_frequency'] = widgets.IntSlider(
         value=1,
@@ -151,7 +159,8 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         ui_components['log_metrics_every'],
         ui_components['visualize_batch_every'],
         ui_components['gradient_clipping'],
-        ui_components['mixed_precision']
+        ui_components['mixed_precision'],
+        ui_components['layer_mode']
     ])
     
     validation_box = widgets.VBox([

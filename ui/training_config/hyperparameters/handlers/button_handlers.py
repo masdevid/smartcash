@@ -21,7 +21,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
     """
     try:
         # Import dengan penanganan error minimal
-        from smartcash.common.config.manager import ConfigManager
+        from smartcash.common.config.manager import ConfigManager, get_config_manager
         from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
         # Dapatkan logger jika tersedia
@@ -227,7 +227,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         def on_save_click(b):
             try:
                 # Dapatkan config manager
-                config_manager = ConfigManager.get_instance()
+                config_manager = get_config_manager()
                 
                 # Update config dari UI
                 updated_config = update_config_from_ui()
@@ -251,7 +251,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         def on_reset_click(b):
             try:
                 # Dapatkan config manager
-                config_manager = ConfigManager.get_instance()
+                config_manager = get_config_manager()
                 
                 # Reset ke default config
                 config_manager.reset_module_config('hyperparameters', default_config)

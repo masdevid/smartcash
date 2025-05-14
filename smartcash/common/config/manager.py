@@ -475,13 +475,37 @@ class ConfigManager:
             else:
                 return {}
     
+    def reset_module_config(self, module_name: str, default_config: Dict[str, Any]) -> bool:
+        """
+        Reset konfigurasi modul ke nilai default.
+        
+        Args:
+            module_name: Nama modul
+            default_config: Konfigurasi default
+            
+        Returns:
+            Boolean status keberhasilan
+        """
+        try:
+            # Simpan konfigurasi default
+            success = self.save_module_config(module_name, default_config)
+            
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi {module_name} berhasil direset ke default")
+                
+            return success
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error saat reset konfigurasi {module_name}: {str(e)}")
+            return False
+    
     def save_module_config(self, module_name: str, config: Dict[str, Any]) -> bool:
         """
         Simpan konfigurasi untuk modul tertentu.
         
         Args:
             module_name: Nama modul
-            config: Konfigurasi yang akan disimpan
+            config: Dictionary konfigurasi
             
         Returns:
             Boolean status keberhasilan

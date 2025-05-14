@@ -21,7 +21,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
     """
     try:
         # Import dengan penanganan error minimal
-        from smartcash.common.config.manager import ConfigManager
+        from smartcash.common.config.manager import ConfigManager, get_config_manager
         from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
         # Dapatkan logger jika tersedia
@@ -80,6 +80,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
             current_config['training_utils']['visualize_batch_every'] = ui_components['visualize_batch_every'].value
             current_config['training_utils']['gradient_clipping'] = ui_components['gradient_clipping'].value
             current_config['training_utils']['mixed_precision'] = ui_components['mixed_precision'].value
+            current_config['training_utils']['layer_mode'] = ui_components['layer_mode'].value
             
             # Update info strategi pelatihan
             update_training_strategy_info()
@@ -120,6 +121,8 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                         ui_components['gradient_clipping'].value = current_config['training_utils']['gradient_clipping']
                     if 'mixed_precision' in current_config['training_utils']:
                         ui_components['mixed_precision'].value = current_config['training_utils']['mixed_precision']
+                    if 'layer_mode' in current_config['training_utils']:
+                        ui_components['layer_mode'].value = current_config['training_utils']['layer_mode']
                 
                 # Update info strategi pelatihan
                 update_training_strategy_info()
@@ -140,6 +143,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 conf_threshold = ui_components['conf_threshold'].value
                 multi_scale = ui_components['multi_scale'].value
                 mixed_precision = ui_components['mixed_precision'].value
+                layer_mode = ui_components['layer_mode'].value
                 
                 # Buat informasi HTML
                 info_html = f"""
@@ -150,9 +154,10 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                     <li><b>TensorBoard:</b> {'Aktif' if tensorboard else 'Nonaktif'}</li>
                     <li><b>Validasi Setiap:</b> {validation_frequency} epoch</li>
                     <li><b>IoU Threshold:</b> {iou_threshold}</li>
-                    <li><b>Confidence Threshold:</b> {conf_threshold}</li>
+                    <li><b>Conf Threshold:</b> {conf_threshold}</li>
                     <li><b>Multi-scale Training:</b> {'Aktif' if multi_scale else 'Nonaktif'}</li>
                     <li><b>Mixed Precision:</b> {'Aktif' if mixed_precision else 'Nonaktif'}</li>
+                    <li><b>Layer Mode:</b> {layer_mode}</li>
                 </ul>
                 <p><i>Catatan: Pastikan parameter pelatihan sesuai dengan kebutuhan dan kapasitas hardware.</i></p>
                 """
@@ -165,7 +170,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         def on_save_click(b):
             try:
                 # Dapatkan config manager
-                config_manager = ConfigManager.get_instance()
+                config_manager = get_config_manager()
                 
                 # Update config dari UI
                 updated_config = update_config_from_ui()
@@ -189,7 +194,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         def on_reset_click(b):
             try:
                 # Dapatkan config manager
-                config_manager = ConfigManager.get_instance()
+                config_manager = get_config_manager()
                 
                 # Reset ke default config
                 config_manager.reset_module_config('training_strategy', default_config)

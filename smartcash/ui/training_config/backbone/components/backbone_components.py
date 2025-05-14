@@ -243,6 +243,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             'use_residual': False,
             'use_ciou': False
         }
+        
+    # Tambahkan model efficient_basic sebagai model default
+    if 'efficient_basic' not in optimized_models:
+        optimized_models['efficient_basic'] = {
+            'description': 'Model dasar dengan EfficientNet-B4 tanpa optimasi tambahan',
+            'backbone': 'efficientnet_b4',
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False
+        }
     
     # Dropdown untuk memilih model yang dioptimalkan
     model_options = list(optimized_models.keys())
@@ -273,9 +283,9 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             }
     
     # Pastikan nilai default selalu ada dalam opsi
-    default_model = config.get('model_type', 'efficient_optimized')
+    default_model = config.get('model_type', 'efficient_basic')
     if default_model not in model_options:
-        default_model = 'efficient_optimized' if 'efficient_optimized' in model_options else model_options[0]
+        default_model = 'efficient_basic' if 'efficient_basic' in model_options else ('efficient_optimized' if 'efficient_optimized' in model_options else model_options[0])
         with ui_components['status']:
             print(f"⚠️ Model default tidak ditemukan dalam opsi, menggunakan: {default_model}")
     
@@ -299,6 +309,10 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         backbone_options = ['efficientnet_b4', 'cspdarknet_s']
         with ui_components['status']:
             print(f"⚠️ Tidak ada opsi backbone yang tersedia, menggunakan opsi default: {backbone_options}")
+    
+    # Pastikan backbone options hanya menggunakan format lowercase_underscore
+    # Ini untuk mengatasi masalah dengan 'EfficientNet-B4' vs 'efficientnet_b4'
+    backbone_options = [option.lower().replace('-', '_') for option in backbone_options]
     
     # Pastikan nilai default selalu ada dalam opsi
     default_backbone = config.get('backbone', 'efficientnet_b4')

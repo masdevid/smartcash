@@ -477,8 +477,8 @@ class ConfigManager:
             config_path = os.path.join(self.config_dir, f"{module_name}_config.yaml")
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             
-            with open(config_path, 'w') as f:
-                save_yaml(config_copy, f)
+            # Perbaikan: gunakan path langsung untuk save_yaml, bukan file object
+            save_yaml(config_copy, config_path)
             
             if self.logger:
                 self.logger.info(f"✅ Konfigurasi {module_name} berhasil disimpan ke {config_path}")

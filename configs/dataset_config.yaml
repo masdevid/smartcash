@@ -1,0 +1,64 @@
+# File: configs/dataset_config.yaml
+# Author: Alfrida Sabar (direvisi)
+# Deskripsi: Konfigurasi dataset dengan struktur yang kompatibel dengan base_config.yaml yang direvisi
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
+
+# Konfigurasi dataset yang diselaraskan
+data:
+  source: "roboflow"  # 'local' atau 'roboflow'
+  # Roboflow config
+  roboflow:
+    api_key: ""  # API key diisi oleh pengguna atau dari Google Secret
+    workspace: "smartcash-wo2us"
+    project: "rupiah-emisi-2022"
+    version: "3"
+  
+  # Split ratios
+  split_ratios:
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  
+  # Split settings
+  stratified_split: true
+  random_seed: 42
+  
+  # Pengaturan validasi dataset
+  validation:
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+    invalid_dir: 'data/invalid'
+    visualize_issues: false
+
+# Konfigurasi untuk akses dan backup dataset
+dataset:
+  backup:
+    enabled: true
+    dir: 'data/backup/dataset'
+    count: 3
+    auto: false  # Tidak backup otomatis
+  
+  export:
+    enabled: true
+    formats:
+      - 'yolo'
+      - 'coco'
+    dir: 'data/exported'
+  
+  import:
+    allowed_formats:
+      - 'yolo'
+      - 'coco'
+      - 'voc'
+    temp_dir: 'data/temp'
+
+# Konfigurasi cache spesifik untuk dataset
+cache:
+  enabled: true
+  dir: '.cache/smartcash/dataset'
+  max_size_gb: 1.0
+  ttl_hours: 24
+  auto_cleanup: true

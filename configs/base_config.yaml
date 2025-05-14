@@ -1,0 +1,243 @@
+# File: configs/base_config.yaml
+# Author: Alfrida Sabar (direvisi)
+# Deskripsi: Konfigurasi dasar untuk sistem SmartCash dengan path yang terstandarisasi
+
+# Informasi project
+project:
+  name: 'SmartCash'
+  version: '1.0.0'
+  description: 'Sistem deteksi denominasi mata uang dengan YOLOv5 dan EfficientNet'
+
+# Konfigurasi integrasi dengan Google Drive
+drive:
+  use_drive: false              # Apakah menggunakan Google Drive untuk storage
+  sync_on_start: true           # Sinkronisasi saat aplikasi dimulai
+  sync_strategy: 'drive_priority' # Strategi sinkronisasi ('drive_priority', 'local_priority', 'newest', 'merge')
+  symlinks: false               # Buat symlinks ke direktori Drive
+  paths:
+    smartcash_dir: 'SmartCash'  # Direktori SmartCash di Drive
+    configs_dir: 'configs'      # Direktori konfigurasi di Drive
+    data_dir: 'data'            # Direktori data di Drive
+    runs_dir: 'runs'            # Direktori runs di Drive
+    logs_dir: 'logs'            # Direktori logs di Drive
+
+# Struktur dasar data - Dengan variabel path
+data:
+  dir: 'data'                    # Direktori utama data (path relatif)
+  preprocessed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessed (path relatif)
+  split_ratios:                  # Rasio split dataset
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  stratified_split: true         # Gunakan stratified split
+  random_seed: 42                # Random seed untuk reproduksibilitas
+  source: 'roboflow'             # Sumber dataset ('roboflow', 'local')
+  roboflow:                      # Konfigurasi Roboflow
+    api_key: ''                  # Diisi oleh user atau dari Google Secret
+    workspace: 'smartcash-wo2us'
+    project: 'rupiah-emisi-2022'
+    version: '3'
+
+# Konfigurasi layer deteksi
+layers:
+  - 'banknote'  # Deteksi uang kertas utuh
+  - 'nominal'   # Deteksi area nominal
+  - 'security'  # Deteksi fitur keamanan
+
+# Konfigurasi model
+model:
+  backbone: 'EfficientNet-B4'     # Backbone yang digunakan
+  input_size: [640, 640]          # Ukuran input model
+  confidence: 0.25                # Threshold untuk deteksi
+  iou_threshold: 0.45             # Threshold untuk NMS
+  max_detections: 100             # Jumlah maksimum deteksi
+  transfer_learning: true         # Menggunakan transfer learning
+  pretrained: true                # Menggunakan bobot pre-trained
+  workers: 4                      # Jumlah worker untuk dataloader
+  freeze_backbone: false          # Apakah backbone dibekukan saat training
+  unfreeze_epoch: 0               # Epoch untuk unfreeze backbone
+
+# Konfigurasi training
+training:
+  epochs: 30
+  batch_size: 16
+  early_stopping_patience: 10
+  optimizer: 'Adam'
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  lr_scheduler: 'ReduceLROnPlateau'
+  lr_patience: 3
+  lr_factor: 0.1
+  save_best_only: false           # Hanya menyimpan model terbaik
+  save_every: 0                   # Simpan checkpoint setiap N epoch (0 = disable)
+
+# Konfigurasi augmentasi
+augmentation:
+  enabled: true
+  num_variations: 2
+  output_prefix: 'aug'
+  process_bboxes: true            # Proses bbox saat augmentasi
+  output_dir: 'data/augmented'    # Direktori output augmentasi (path relatif)
+  validate_results: false         # Validasi hasil augmentasi
+  resume: false                   # Lanjutkan augmentasi dari sebelumnya
+  types:
+    - 'position'
+    - 'lighting'
+    - 'combined'
+  position:
+    fliplr: 0.5                   # Probabilitas flip horizontal
+    flipud: 0.0                   # Probabilitas flip vertical
+    degrees: 10                   # Derajat maksimum rotasi
+    translate: 0.1                # Maksimum translasi (fraksi)
+    scale: 0.1                    # Maksimum scaling (fraksi)
+    shear: 0.0                    # Maksimum shearing (0.0 = disabled)
+    rotation_prob: 0.5            # Probabilitas rotasi
+    max_angle: 10                 # Sudut maksimum
+    flip_prob: 0.5                # Probabilitas flip
+    scale_ratio: 0.1              # Rasio scaling
+  lighting:
+    hsv_h: 0.015                  # Hue shift (0-1)
+    hsv_s: 0.7                    # Saturation multiplication (0-1)
+    hsv_v: 0.4                    # Value (brightness) multiplication (0-1)
+    contrast: 0.3                 # Contrast adjustment (0-1)
+    brightness: 0.3               # Brightness adjustment (0-1)
+    compress: 0.0                 # Probabilitas efek blur
+    brightness_prob: 0.5          # Probabilitas perubahan brightness
+    brightness_limit: 0.3         # Batasan perubahan brightness
+    contrast_prob: 0.5            # Probabilitas perubahan contrast
+    contrast_limit: 0.3           # Batasan perubahan contrast
+  extreme:
+    rotation_min: 30              # Rotasi minimum (derajat)
+    rotation_max: 90              # Rotasi maksimum (derajat)
+    probability: 0.3              # Probabilitas
+  combined:
+    enabled: true
+    prob: 0.5
+
+# Konfigurasi preprocessing
+preprocessing:
+  output_dir: 'data/preprocessed'  # Path relatif
+  save_visualizations: true
+  vis_dir: 'visualizations'        # Path relatif
+  sample_size: 0                   # 0 = semua
+  validate:
+    enabled: true
+    fix_issues: true
+    move_invalid: true
+    visualize: false
+    check_image_quality: true
+    check_labels: true
+    check_coordinates: true
+  normalization:
+    enabled: true
+    method: 'minmax'
+    target_size: [640, 640]
+    preserve_aspect_ratio: true
+    normalize_pixel_values: true
+    pixel_range: [0, 1]
+  analysis:
+    enabled: false
+    class_balance: true
+    image_size_distribution: true
+    bbox_statistics: true
+    layer_balance: true
+  balance:
+    enabled: false
+    target_distribution: 'auto'
+    methods:
+      undersampling: false
+      oversampling: true
+      augmentation: true
+    min_samples_per_class: 100
+    max_samples_per_class: 1000
+
+# Konfigurasi untuk pembersihan dataset
+cleanup:
+  augmentation_patterns:
+    - 'aug_.*'
+    - '.*_augmented.*'
+    - '.*_modified.*'
+    - '.*_processed.*'
+  ignored_patterns:
+    - '.*\.gitkeep'
+    - '.*\.DS_Store'
+  backup_dir: 'data/backup'       # Path relatif
+  backup_enabled: true
+  backup_count: 3                 # Jumlah backup yang disimpan
+  auto_cleanup_preprocessed: false
+
+# Konfigurasi evaluasi
+evaluation:
+  metrics:
+    - 'precision'
+    - 'recall'
+    - 'mAP'
+    - 'f1'
+    - 'accuracy'
+    - 'confusion_matrix'
+  test_batch_size: 8
+  save_predictions: true
+  visualize_results: true
+  confidence_thresholds: [0.25, 0.5]
+  per_class_metrics: false
+  per_layer_metrics: false
+  visualization:
+    max_samples: 20
+    plot_confusion_matrix: true
+    plot_precision_recall_curve: false
+    plot_class_distribution: false
+    save_misclassified: false
+
+# Konfigurasi logger
+logging:
+  level: 'INFO'
+  use_colors: true
+  use_emojis: true
+  log_to_file: true
+  logs_dir: 'logs'                # Path relatif
+
+# Konfigurasi cache
+cache:
+  enabled: true
+  dir: '.cache/smartcash'         # Path relatif
+  max_size_gb: 1.0
+  ttl_hours: 24
+  auto_cleanup: true
+  cleanup_interval_mins: 30
+
+# Konfigurasi UI
+ui:
+  theme: 'default'                # default, dark, light
+  plot_style: 'seaborn'
+  max_displayed_items: 20
+  enable_animations: true
+
+# Pengaturan environment (tambahan dari colab_config.yaml)
+environment:
+  colab: false                    # True jika berjalan di Google Colab
+  create_dirs_on_start: true      # Buat direktori yang diperlukan saat startup
+
+# Pengaturan performance 
+performance:
+  num_workers: 4
+  batch_size: 16
+  use_gpu: true
+  compression_level: 90
+  max_memory_usage_gb: 4.0
+  use_mixed_precision: false
+  auto_garbage_collect: false
+  release_memory: false
+
+# Pengaturan skenario evaluasi
+scenarios: []
+
+# Pengaturan training utils
+training_utils:
+  experiment_name: 'training'
+  checkpoint_dir: 'runs/train/checkpoints'  # Path relatif
+  tensorboard: false
+  log_metrics_every: 10
+  visualize_batch_every: 0
+  gradient_clipping: 0.0
+  mixed_precision: false

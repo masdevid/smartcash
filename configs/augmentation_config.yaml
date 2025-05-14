@@ -1,0 +1,36 @@
+# File: configs/augmentation_config.yaml
+# Author: Refactored (direvisi)
+# Deskripsi: Konfigurasi augmentasi yang disederhanakan dengan fokus hanya pada parameter utama
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
+
+# Konfigurasi augmentasi yang disederhanakan
+augmentation:
+  enabled: true
+  num_variations: 2
+  output_prefix: 'aug'
+  process_bboxes: true
+  output_dir: 'data/augmented'
+  validate_results: true
+  resume: false
+  types: 
+    - 'combined'
+    - 'position'
+    - 'lighting'
+
+# Pengaturan pengelolaan data augmentasi
+cleanup:
+  backup_enabled: true
+  backup_dir: 'data/backup/augmentation'
+  backup_count: 5
+  patterns:
+    - 'aug_*'
+    - '*_augmented*'
+
+# Pengaturan visualisasi
+visualization:
+  enabled: true
+  sample_count: 5
+  save_visualizations: true
+  vis_dir: 'visualizations/augmentation'

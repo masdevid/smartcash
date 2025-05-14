@@ -287,31 +287,65 @@ def create_fallback_ui(ui_components: Dict[str, Any], message: str, status_type:
     Returns:
         Dictionary ui_components yang diperbarui
     """
-    import ipywidgets as widgets
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Pastikan ui_components valid
-    if ui_components is None: ui_components = {'module_name': 'fallback'}
-    
-    # Buat status output jika belum ada
-    if 'status' not in ui_components or ui_components['status'] is None:
-        ui_components['status'] = widgets.Output(layout=widgets.Layout(
-            width='100%', border='1px solid #ddd', min_height='100px', padding='10px'))
-    
-    # Buat UI container jika belum ada
-    if 'ui' not in ui_components:
-        header = widgets.HTML("<h2>SmartCash UI (Fallback Mode)</h2>")
-        ui_components['ui'] = widgets.VBox([header, ui_components['status']], 
-                                          layout=widgets.Layout(width='100%', padding='10px'))
-    
-    # Tampilkan pesan status
-    show_status(message, status_type, ui_components)
-    
-    # Reset logging jika mungkin
     try:
-        from smartcash.ui.utils.logging_utils import reset_logging
-        reset_logging()
-    except: pass
+        import ipywidgets as widgets
+        from smartcash.ui.utils.constants import COLORS, ICONS
+        
+        # Pastikan ui_components valid
+        if ui_components is None or not isinstance(ui_components, dict): 
+            ui_components = {'module_name': 'fallback'}
+        
+        # Buat status output jika belum ada
+        if 'status' not in ui_components or ui_components['status'] is None:
+            ui_components['status'] = widgets.Output(layout=widgets.Layout(
+                width='100%', border='1px solid #ddd', min_height='100px', padding='10px'))
+        
+        # Buat UI container jika belum ada
+        if 'ui' not in ui_components:
+            header = widgets.HTML(f"<h2>{ICONS.get('warning', '⚠️')} SmartCash UI (Fallback Mode)</h2>")
+            ui_components['ui'] = widgets.VBox([header, ui_components['status']], 
+                                              layout=widgets.Layout(width='100%', padding='10px'))
+        
+        # Tambahkan komponen aug_options dengan nilai default yang aman jika tidak ada
+        # Ini untuk mencegah error 'NoneType' is not iterable
+        if 'aug_options' not in ui_components:
+            # Buat dummy aug_options dengan nilai default yang aman
+            dummy_selector = widgets.SelectMultiple(
+                options=['Combined (Recommended)'],
+                value=['Combined (Recommended)'],
+                description='Jenis:',
+                layout=widgets.Layout(width='70%', height='80px')
+            )
+            ui_components['aug_options'] = widgets.VBox([dummy_selector])
+        
+        # Tampilkan pesan status
+        show_status(message, status_type, ui_components)
+        
+        # Reset logging jika mungkin
+        try:
+            from smartcash.ui.utils.logging_utils import reset_logging
+            reset_logging()
+        except Exception as e:
+            print(f"Error saat reset logging: {str(e)}")
+            
+        # Log error ke file jika memungkinkan
+        try:
+            import logging
+            import traceback
+            logger = logging.getLogger('ui_logger')
+            logger.error(f"{ICONS.get('error', '❌')} {message}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+        except Exception:
+            pass
+    except Exception as e:
+        # Fallback terakhir jika semua gagal
+        print(f"Critical error in fallback UI: {str(e)}")
+        from IPython.display import HTML
+        ui_components = {
+            'ui': HTML(f"<div style='color:red; padding:10px; border:1px solid red;'>⚠️ Error: {message}</div>"),
+            'status': None,
+            'aug_options': {'children': [{'value': ['Combined (Recommended)']}]}
+        }
     
     return ui_components
 

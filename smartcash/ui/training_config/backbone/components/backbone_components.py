@@ -132,10 +132,44 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         }
     
     # Dropdown untuk memilih model yang dioptimalkan
+    model_options = list(optimized_models.keys())
+    
+    # Pastikan model_options tidak kosong
+    if not model_options or len(model_options) == 0:
+        model_options = ['efficient_optimized', 'yolov5s']
+        with ui_components['status']:
+            print(f"⚠️ Tidak ada opsi model yang tersedia, menggunakan opsi default: {model_options}")
+        
+        # Jika optimized_models kosong, tambahkan model default
+        if not optimized_models:
+            optimized_models = {
+                'efficient_optimized': {
+                    'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                    'backbone': 'efficientnet_b4',
+                    'use_attention': True,
+                    'use_residual': False,
+                    'use_ciou': False
+                },
+                'yolov5s': {
+                    'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                    'backbone': 'cspdarknet_s',
+                    'use_attention': False,
+                    'use_residual': False,
+                    'use_ciou': False
+                }
+            }
+    
+    # Pastikan nilai default selalu ada dalam opsi
+    default_model = config.get('model_type', 'efficient_optimized')
+    if default_model not in model_options:
+        default_model = 'efficient_optimized' if 'efficient_optimized' in model_options else model_options[0]
+        with ui_components['status']:
+            print(f"⚠️ Model default tidak ditemukan dalam opsi, menggunakan: {default_model}")
+    
     ui_components['model_type'] = widgets.Dropdown(
-        options=list(optimized_models.keys()),
-        value='efficient_optimized',  # Default ke EfficientNet model
-        description='Model Type:',
+        options=model_options,
+        value=default_model,
+        description='Model:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='100%')
     )
@@ -147,13 +181,26 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         backbone_options.append('efficientnet_b4')
     
     # Dropdown backbone akan otomatis diupdate berdasarkan model yang dipilih
+    # Pastikan opsi backbone tidak kosong dan selalu memiliki nilai default yang valid
+    if not backbone_options or len(backbone_options) == 0:
+        backbone_options = ['efficientnet_b4', 'cspdarknet_s']
+        with ui_components['status']:
+            print(f"⚠️ Tidak ada opsi backbone yang tersedia, menggunakan opsi default: {backbone_options}")
+    
+    # Pastikan nilai default selalu ada dalam opsi
+    default_backbone = config.get('backbone', 'efficientnet_b4')
+    if default_backbone not in backbone_options:
+        default_backbone = 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0]
+        with ui_components['status']:
+            print(f"⚠️ Backbone default tidak ditemukan dalam opsi, menggunakan: {default_backbone}")
+    
     ui_components['backbone_type'] = widgets.Dropdown(
         options=backbone_options,
-        value='efficientnet_b4',  # Default ke EfficientNet-B4
+        value=default_backbone,
         description='Backbone:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px'),
-        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%'),
+        disabled=False  # Diubah menjadi tidak dinonaktifkan untuk menghindari masalah saat update nilai
     )
     
     ui_components['pretrained'] = widgets.Checkbox(
@@ -379,32 +426,76 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Handler untuk mengupdate UI berdasarkan model yang dipilih
     def on_model_change(change):
-        model_key = change['new']
-        model_config = optimized_models[model_key]
+        try:
+            model_key = change['new']
+            
+            # Validasi model_key ada dalam optimized_models
+            if model_key not in optimized_models:
+                with ui_components['status']:
+                    print(f"⚠️ Model {model_key} tidak ditemukan dalam daftar model yang dioptimalkan")
+                return
+                
+            model_config = optimized_models[model_key]
+            
+            # Update backbone dengan penanganan error
+            try:
+                backbone_value = model_config.get('backbone', 'efficientnet_b4')
+                
+                # Pastikan backbone ada dalam opsi dropdown
+                if backbone_value in ui_components['backbone_type'].options:
+                    # Simpan status disabled saat ini
+                    was_disabled = ui_components['backbone_type'].disabled
+                    
+                    # Aktifkan sementara jika dinonaktifkan
+                    if was_disabled:
+                        ui_components['backbone_type'].disabled = False
+                        
+                    # Update nilai
+                    ui_components['backbone_type'].value = backbone_value
+                    
+                    # Kembalikan status disabled
+                    if was_disabled:
+                        ui_components['backbone_type'].disabled = was_disabled
+                else:
+                    with ui_components['status']:
+                        print(f"⚠️ Backbone {backbone_value} tidak ditemukan dalam opsi dropdown")
+            except Exception as e:
+                with ui_components['status']:
+                    print(f"❌ Error saat mengupdate backbone: {str(e)}")
+            
+            # Update fitur optimasi dengan penanganan error
+            try:
+                ui_components['use_attention'].value = model_config.get('use_attention', False)
+                ui_components['use_residual'].value = model_config.get('use_residual', False)
+                ui_components['use_ciou'].value = model_config.get('use_ciou', False)
+            except Exception as e:
+                with ui_components['status']:
+                    print(f"❌ Error saat mengupdate fitur optimasi: {str(e)}")
+                    
+            # Update informasi backbone
+            try:
+                backbone_info = f"""
+                <div style='padding: 10px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;'>
+                    <h4>{model_key.replace('_', ' ').title()}</h4>
+                    <p><strong>Deskripsi:</strong> {model_config['description']}</p>
+                    <p><strong>Backbone:</strong> {model_config['backbone']}</p>
+                    <p><strong>Fitur Optimasi:</strong></p>
+                    <ul>
+                        <li>FeatureAdapter (Attention): {'✅ Aktif' if model_config.get('use_attention', False) else '❌ Tidak aktif'}</li>
+                        <li>ResidualAdapter: {'✅ Aktif' if model_config.get('use_residual', False) else '❌ Tidak aktif'}</li>
+                        <li>CIoU Loss: {'✅ Aktif' if model_config.get('use_ciou', False) else '❌ Tidak aktif'}</li>
+                    </ul>
+                </div>
+                """
+                ui_components['backbone_info'].value = backbone_info
+            except Exception as e:
+                with ui_components['status']:
+                    print(f"❌ Error saat mengupdate informasi backbone: {str(e)}")
+        except Exception as e:
+            with ui_components['status']:
+                print(f"❌ Error umum saat mengubah model: {str(e)}")
         
-        # Update backbone
-        ui_components['backbone_type'].value = model_config['backbone']
-        
-        # Update fitur optimasi
-        ui_components['use_attention'].value = model_config.get('use_attention', False)
-        ui_components['use_residual'].value = model_config.get('use_residual', False)
-        ui_components['use_ciou'].value = model_config.get('use_ciou', False)
-        
-        # Update informasi backbone
-        backbone_info = f"""
-        <div style='padding: 10px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;'>
-            <h4>{model_key.replace('_', ' ').title()}</h4>
-            <p><strong>Deskripsi:</strong> {model_config['description']}</p>
-            <p><strong>Backbone:</strong> {model_config['backbone']}</p>
-            <p><strong>Fitur Optimasi:</strong></p>
-            <ul>
-                <li>FeatureAdapter (Attention): {'✅ Aktif' if model_config.get('use_attention', False) else '❌ Tidak aktif'}</li>
-                <li>ResidualAdapter: {'✅ Aktif' if model_config.get('use_residual', False) else '❌ Tidak aktif'}</li>
-                <li>CIoU Loss: {'✅ Aktif' if model_config.get('use_ciou', False) else '❌ Tidak aktif'}</li>
-            </ul>
-        </div>
-        """
-        ui_components['backbone_info'].value = backbone_info
+        # Catatan: Bagian ini telah dipindahkan ke dalam blok try-except di atas
     
     # Daftarkan handler
     ui_components['model_type'].observe(on_model_change, names='value')

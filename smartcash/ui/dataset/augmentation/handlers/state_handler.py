@@ -121,6 +121,25 @@ def detect_augmentation_state(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         # Log error
         if logger: logger.warning(f"⚠️ Error saat mendeteksi status augmentasi: {str(e)}")
+        
+        # Tampilkan pesan error di status panel
+        try:
+            update_status_panel(ui_components, "warning", f"{ICONS['warning']} Error saat mendeteksi status augmentasi")
+        except Exception:
+            pass
+        
+        # Pastikan UI tetap berfungsi meskipun ada error
+        ui_components['is_augmented'] = False
+        
+        # Sembunyikan tombol yang tidak perlu
+        for btn_name in ['cleanup_button', 'visualization_buttons']:
+            if btn_name in ui_components:
+                ui_components[btn_name].layout.display = 'none'
+        
+        # Sembunyikan container
+        for container in ['visualization_container', 'summary_container']:
+            if container in ui_components:
+                ui_components[container].layout.display = 'none'
     
     return ui_components
 
@@ -133,6 +152,11 @@ def generate_augmentation_summary(ui_components: Dict[str, Any], preprocessed_di
         preprocessed_dir: Direktori dataset preprocessed
         augmented_dir: Direktori dataset augmented
     """
+    # Validasi parameter untuk mencegah error
+    if not ui_components:
+        return
+    
+    # Dapatkan logger jika tersedia
     logger = ui_components.get('logger')
     
     try:
@@ -170,10 +194,26 @@ def generate_augmentation_summary(ui_components: Dict[str, Any], preprocessed_di
         # Hitung durasi (tidak diketahui dari loaded files)
         duration = 0
         
-        # Dapatkan jenis augmentasi
+        # Dapatkan jenis augmentasi dengan validasi yang lebih kuat
         aug_types = []
         if 'aug_options' in ui_components and hasattr(ui_components['aug_options'], 'children'):
-            aug_types = list(ui_components['aug_options'].children[0].value)
+            try:
+                aug_value = ui_components['aug_options'].children[0].value
+                if aug_value is not None:
+                    if isinstance(aug_value, (list, tuple)):
+                        aug_types = list(aug_value)
+                    elif isinstance(aug_value, str):
+                        aug_types = [aug_value]
+                    else:
+                        # Jika tipe tidak dikenali, gunakan default
+                        aug_types = ['Combined (Recommended)']
+                else:
+                    # Jika nilai None, gunakan default
+                    aug_types = ['Combined (Recommended)']
+            except Exception as e:
+                # Jika terjadi error, gunakan default
+                aug_types = ['Combined (Recommended)']
+                if logger: logger.warning(f"{ICONS['warning']} Error saat mendapatkan aug_types: {str(e)}, menggunakan default")
         
         # Buat summary
         summary = {
@@ -209,13 +249,15 @@ def generate_augmentation_summary(ui_components: Dict[str, Any], preprocessed_di
                 
                 display(metrics_container)
                 
-                # Jenis augmentasi
-                if aug_types:
-                    display(widgets.HTML(f"""
-                    <div style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-radius: 5px;">
-                        <p style="margin: 0;"><strong>Jenis augmentasi:</strong> {', '.join(aug_types)}</p>
-                    </div>
-                    """))
+                # Jenis augmentasi - pastikan aug_types selalu valid
+                if not aug_types:
+                    aug_types = ['Combined (Recommended)']
+                
+                display(widgets.HTML(f"""
+                <div style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-radius: 5px;">
+                    <p style="margin: 0;"><strong>Jenis augmentasi:</strong> {', '.join(aug_types)}</p>
+                </div>
+                """))
                 
                 # Path output
                 display(widgets.HTML(f"""

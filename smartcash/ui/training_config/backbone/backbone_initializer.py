@@ -4,7 +4,7 @@ Deskripsi: Initializer untuk UI pemilihan backbone model
 """
 
 from typing import Dict, Any, Optional
-from IPython.display import display, HTML
+# Import display dipindahkan ke dalam fungsi untuk menghindari masalah scope
 import os
 import yaml
 import copy
@@ -39,6 +39,8 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config.manager import get_config_manager
         from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+        # Import display di dalam fungsi untuk menghindari masalah scope
+        from IPython.display import display, HTML
         
         # Dapatkan environment jika belum tersedia
         env = env or get_environment_manager()
@@ -328,7 +330,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             # Validasi nilai backbone
             backbone = validate_ui_param(
                 model_config.get('backbone'), 
-                'cspdarknet_s',  # Default ke cspdarknet_s (yolov5s)
+                'efficientnet_b4',  # Default ke efficientnet_b4 sebagai backbone utama
                 str,
                 None,  # Validasi terhadap options akan dilakukan di bawah
                 logger
@@ -337,20 +339,51 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
             # Pastikan backbone ada dalam opsi dropdown
             if hasattr(ui_components['backbone_dropdown'], 'options'):
                 options = ui_components['backbone_dropdown'].options
+                
+                # Periksa apakah dropdown dinonaktifkan
+                is_disabled = getattr(ui_components['backbone_dropdown'], 'disabled', False)
+                
+                # Jika backbone ada dalam opsi, gunakan nilai tersebut
                 if backbone in options:
-                    ui_components['backbone_dropdown'].value = backbone
+                    try:
+                        ui_components['backbone_dropdown'].value = backbone
+                        if logger: logger.debug(f"✅ Berhasil mengatur backbone ke: {backbone}")
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Tidak dapat mengatur nilai backbone dropdown: {str(e)}")
+                        # Jika gagal mengatur nilai dan dropdown dinonaktifkan, coba aktifkan sementara
+                        if is_disabled:
+                            try:
+                                ui_components['backbone_dropdown'].disabled = False
+                                ui_components['backbone_dropdown'].value = backbone
+                                ui_components['backbone_dropdown'].disabled = True
+                                if logger: logger.info(f"✅ Berhasil mengatur backbone dengan menonaktifkan disabled sementara")
+                            except Exception as disable_error:
+                                if logger: logger.error(f"❌ Gagal mengatur backbone meskipun mencoba menonaktifkan disabled: {str(disable_error)}")
                 else:
                     # Jika tidak ada, gunakan opsi default yang aman
                     if logger: 
                         logger.warning(f"⚠️ Backbone '{backbone}' tidak ditemukan dalam opsi dropdown, menggunakan default")
                     
-                    # Gunakan opsi default yang aman (cspdarknet_s untuk yolov5s)
-                    if 'cspdarknet_s' in options:
-                        ui_components['backbone_dropdown'].value = 'cspdarknet_s'
+                    # Prioritaskan efficientnet_b4 sebagai default, lalu cspdarknet_s sebagai fallback
+                    if 'efficientnet_b4' in options:
+                        try:
+                            ui_components['backbone_dropdown'].value = 'efficientnet_b4'
+                            if logger: logger.info(f"ℹ️ Menggunakan backbone default: efficientnet_b4")
+                        except Exception as e:
+                            if logger: logger.warning(f"⚠️ Tidak dapat mengatur nilai backbone dropdown ke efficientnet_b4: {str(e)}")
+                    elif 'cspdarknet_s' in options:
+                        try:
+                            ui_components['backbone_dropdown'].value = 'cspdarknet_s'
+                            if logger: logger.info(f"ℹ️ Menggunakan backbone fallback: cspdarknet_s")
+                        except Exception as e:
+                            if logger: logger.warning(f"⚠️ Tidak dapat mengatur nilai backbone dropdown ke cspdarknet_s: {str(e)}")
                     elif options and len(options) > 0:
-                        # Fallback ke opsi pertama jika cspdarknet_s tidak tersedia
-                        ui_components['backbone_dropdown'].value = options[0]
-                        if logger: logger.info(f"ℹ️ Menggunakan backbone: {options[0]}")
+                        # Fallback ke opsi pertama jika tidak ada opsi yang dikenal
+                        try:
+                            ui_components['backbone_dropdown'].value = options[0]
+                            if logger: logger.info(f"ℹ️ Menggunakan backbone dari opsi pertama: {options[0]}")
+                        except Exception as e:
+                            if logger: logger.warning(f"⚠️ Tidak dapat mengatur nilai backbone dropdown ke opsi pertama: {str(e)}")
             else:
                 if logger: logger.warning(f"⚠️ Dropdown backbone tidak memiliki opsi")
         except Exception as e:

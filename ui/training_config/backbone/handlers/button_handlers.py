@@ -79,37 +79,81 @@ def setup_backbone_button_handlers(ui_components: Dict[str, Any], env=None, conf
             if not config or 'model' not in config: return
             
             try:
-                # Update model_type jika tersedia
+                # Import display di dalam fungsi untuk menghindari masalah scope
+                from IPython.display import display, HTML
+                
+                # Update model_type jika tersedia dengan penanganan error
                 if 'model_type' in config['model']:
-                    model_type = config['model']['model_type']
-                    if model_type in ModelManager.OPTIMIZED_MODELS:
-                        ui_components['model_type'].value = model_type
-                    else:
-                        # Jika model_type tidak valid, gunakan default
-                        ui_components['model_type'].value = default_model_type
+                    try:
+                        model_type = config['model']['model_type']
+                        if hasattr(ModelManager, 'OPTIMIZED_MODELS') and model_type in ModelManager.OPTIMIZED_MODELS:
+                            ui_components['model_type'].value = model_type
+                            if logger: logger.debug(f"✅ Model type diperbarui ke: {model_type}")
+                        else:
+                            # Jika model_type tidak valid, gunakan default
+                            ui_components['model_type'].value = default_model_type
+                            if logger: logger.info(f"ℹ️ Model type tidak valid, menggunakan default: {default_model_type}")
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update model_type: {str(e)}")
                 
-                # Update nilai UI dari config
+                # Update nilai UI dari config dengan penanganan error
                 if 'backbone' in config['model']:
-                    ui_components['backbone_type'].value = config['model']['backbone']
+                    try:
+                        backbone = config['model']['backbone']
+                        # Periksa apakah dropdown dinonaktifkan
+                        is_disabled = getattr(ui_components['backbone_type'], 'disabled', False)
+                        
+                        if is_disabled:
+                            # Aktifkan sementara untuk mengubah nilai
+                            ui_components['backbone_type'].disabled = False
+                            ui_components['backbone_type'].value = backbone
+                            ui_components['backbone_type'].disabled = True
+                        else:
+                            ui_components['backbone_type'].value = backbone
+                            
+                        if logger: logger.debug(f"✅ Backbone diperbarui ke: {backbone}")
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update backbone: {str(e)}")
                     
+                # Update checkbox pretrained dengan penanganan error
                 if 'pretrained' in config['model']:
-                    ui_components['pretrained'].value = config['model']['pretrained']
+                    try:
+                        ui_components['pretrained'].value = config['model']['pretrained']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update pretrained: {str(e)}")
                     
+                # Update checkbox freeze_backbone dengan penanganan error
                 if 'freeze_backbone' in config['model']:
-                    ui_components['freeze_backbone'].value = config['model']['freeze_backbone']
+                    try:
+                        ui_components['freeze_backbone'].value = config['model']['freeze_backbone']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update freeze_backbone: {str(e)}")
                     
+                # Update slider freeze_layers dengan penanganan error
                 if 'freeze_layers' in config['model']:
-                    ui_components['freeze_layers'].value = config['model']['freeze_layers']
+                    try:
+                        ui_components['freeze_layers'].value = config['model']['freeze_layers']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update freeze_layers: {str(e)}")
                 
-                # Update fitur optimasi
+                # Update fitur optimasi dengan penanganan error
                 if 'use_attention' in config['model']:
-                    ui_components['use_attention'].value = config['model']['use_attention']
+                    try:
+                        ui_components['use_attention'].value = config['model']['use_attention']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update use_attention: {str(e)}")
                     
                 if 'use_residual' in config['model']:
-                    ui_components['use_residual'].value = config['model']['use_residual']
+                    try:
+                        ui_components['use_residual'].value = config['model']['use_residual']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update use_residual: {str(e)}")
                     
                 if 'use_ciou' in config['model']:
-                    ui_components['use_ciou'].value = config['model']['use_ciou']
+                    try:
+                        ui_components['use_ciou'].value = config['model']['use_ciou']
+                    except Exception as e:
+                        if logger: logger.warning(f"⚠️ Error saat update use_ciou: {str(e)}")
                 
                 if logger: logger.info("✅ UI backbone diperbarui dari config")
             except Exception as e:

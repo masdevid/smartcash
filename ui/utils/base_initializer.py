@@ -114,8 +114,29 @@ def initialize_module_ui(
         
     except Exception as e:
         # Fallback jika ada error
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        ui_components = create_fallback_ui(ui_components, f"⚠️ Error saat inisialisasi {module_name}: {str(e)}", "error")
-        display(ui_components['ui'])
+        try:
+            # Coba import logger untuk logging error
+            try:
+                from smartcash.common.logger import get_logger
+                logger = get_logger(f"{module_name}_initializer")
+                logger.error(f"⚠️ Error saat inisialisasi {module_name}: {str(e)}")
+                logger.error(f"Traceback: {__import__('traceback').format_exc()}")
+            except ImportError:
+                # Jika tidak bisa import logger, print error ke console
+                print(f"⚠️ Error saat inisialisasi {module_name}: {str(e)}")
+                print(f"Traceback: {__import__('traceback').format_exc()}")
+            
+            # Buat UI fallback dengan pesan error
+            from smartcash.ui.utils.fallback_utils import create_fallback_ui
+            ui_components = create_fallback_ui(ui_components, f"⚠️ Error saat inisialisasi {module_name}: {str(e)}", "error")
+            display(ui_components['ui'])
+        except Exception as inner_e:
+            # Jika fallback juga error, buat UI minimal
+            print(f"⚠️ Error saat membuat fallback UI: {str(inner_e)}")
+            from IPython.display import HTML
+            display(HTML(f"<div style='color:red; padding:10px; border:1px solid red;'>⚠️ Error saat inisialisasi {module_name}: {str(e)}</div>"))
+            # Pastikan ui_components memiliki minimal UI untuk mencegah error lanjutan
+            if 'ui' not in ui_components:
+                ui_components['ui'] = HTML(f"<div>Error UI</div>")
     
     return ui_components

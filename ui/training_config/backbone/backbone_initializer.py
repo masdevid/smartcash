@@ -147,10 +147,14 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             """Handler untuk tombol reset konfigurasi."""
             try:
                 # Reset ke konfigurasi default dengan efficient_basic
-                from smartcash.common.default_config import generate_default_config
-                default_config = generate_default_config()
+                try:
+                    from smartcash.common.default_config import generate_default_config
+                    default_config = generate_default_config()
+                except Exception as config_error:
+                    logger.warning(f"⚠️ Error saat generate default config: {str(config_error)}")
+                    default_config = {}
                 
-                # Set model type ke efficient_basic
+                # Pastikan struktur konfigurasi ada
                 if 'model' not in default_config:
                     default_config['model'] = {}
                 
@@ -160,24 +164,36 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
                 default_config['model']['pretrained'] = True
                 default_config['model']['freeze_backbone'] = False
                 
-                # Pastikan tidak ada referensi ke properti yang sudah dihapus
-                if 'use_attention' in default_config['model']:
-                    del default_config['model']['use_attention']
-                if 'use_residual' in default_config['model']:
-                    del default_config['model']['use_residual']
-                if 'use_ciou' in default_config['model']:
-                    del default_config['model']['use_ciou']
+                # Tambahkan nilai default untuk properti yang sudah dihapus dari UI
+                # untuk menghindari error saat mengakses
+                default_config['model']['use_attention'] = False
+                default_config['model']['use_residual'] = False
+                default_config['model']['use_ciou'] = False
                 
-                # Update UI dengan konfigurasi default
-                # Gunakan update manual untuk menghindari error
-                if 'model_type' in ui_components:
-                    ui_components['model_type'].value = default_config['model']['type']
-                if 'backbone_type' in ui_components:
-                    ui_components['backbone_type'].value = default_config['model']['backbone']
-                if 'pretrained_checkbox' in ui_components:
-                    ui_components['pretrained_checkbox'].value = default_config['model']['pretrained']
-                if 'freeze_backbone_checkbox' in ui_components:
-                    ui_components['freeze_backbone_checkbox'].value = default_config['model']['freeze_backbone']
+                # Update UI dengan konfigurasi default secara satu per satu dengan penanganan error
+                try:
+                    if 'model_type' in ui_components:
+                        ui_components['model_type'].value = default_config['model']['type']
+                except Exception as e1:
+                    logger.warning(f"⚠️ Error saat update model_type: {str(e1)}")
+                    
+                try:
+                    if 'backbone_type' in ui_components:
+                        ui_components['backbone_type'].value = default_config['model']['backbone']
+                except Exception as e2:
+                    logger.warning(f"⚠️ Error saat update backbone_type: {str(e2)}")
+                    
+                try:
+                    if 'pretrained_checkbox' in ui_components:
+                        ui_components['pretrained_checkbox'].value = default_config['model']['pretrained']
+                except Exception as e3:
+                    logger.warning(f"⚠️ Error saat update pretrained_checkbox: {str(e3)}")
+                    
+                try:
+                    if 'freeze_backbone_checkbox' in ui_components:
+                        ui_components['freeze_backbone_checkbox'].value = default_config['model']['freeze_backbone']
+                except Exception as e4:
+                    logger.warning(f"⚠️ Error saat update freeze_backbone_checkbox: {str(e4)}")
                 
                 # Tampilkan pesan sukses
                 logger.info("✅ Berhasil mereset konfigurasi ke efficient_basic")

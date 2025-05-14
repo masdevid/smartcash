@@ -24,19 +24,21 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Validasi ui_components untuk mencegah error NoneType is not iterable
+    # Pastikan ui_components tidak None
     if ui_components is None:
-        # Inisialisasi ui_components kosong jika None
         ui_components = {}
-        # Tambahkan logger dummy jika diperlukan
-        import logging
-        ui_components['logger'] = logging.getLogger('augmentation')
-        ui_components['logger'].warning("⚠️ ui_components adalah None, membuat dictionary kosong")
-    
+        
+    # Dapatkan logger jika tersedia
     logger = ui_components.get('logger')
-    from smartcash.ui.utils.constants import ICONS
+    if logger is None:
+        try:
+            from smartcash.common.logger import get_logger
+            logger = get_logger("augmentation_config")
+            ui_components['logger'] = logger
+        except ImportError:
+            pass
     
-    # Load konfigurasi jika belum tersedia
+    # Load konfigurasi jika belum ada
     if config is None:
         config = load_augmentation_config(ui_components=ui_components)
     
@@ -53,16 +55,37 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     def on_save_config(b):
         from smartcash.ui.utils.alert_utils import create_status_indicator
         
-        # Update config dari UI dan simpan
-        updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
-        success = save_augmentation_config(updated_config)
-        
-        # Simpan kembali config yang diupdate ke ui_components
-        ui_components['config'] = updated_config
-        
-        # Tampilkan status
-        status_type = 'success' if success else 'error'
-        message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
+        try:
+            # Pastikan ui_components tidak None dan memiliki config
+            if 'config' not in ui_components or ui_components['config'] is None:
+                ui_components['config'] = {}
+                if 'augmentation' not in ui_components['config']:
+                    ui_components['config']['augmentation'] = {}
+                if 'data' not in ui_components['config']:
+                    ui_components['config']['data'] = {}
+            
+            # Update config dari UI dan simpan
+            updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
+            
+            # Pastikan updated_config memiliki struktur yang benar
+            if 'augmentation' not in updated_config:
+                updated_config['augmentation'] = {}
+            if 'data' not in updated_config:
+                updated_config['data'] = {}
+                
+            # Simpan konfigurasi
+            success = save_augmentation_config(updated_config)
+            
+            # Simpan kembali config yang diupdate ke ui_components
+            ui_components['config'] = updated_config
+            
+            # Tampilkan status
+            status_type = 'success' if success else 'error'
+            message = "✅ Konfigurasi augmentasi berhasil disimpan" if success else "❌ Gagal menyimpan konfigurasi augmentasi"
+        except Exception as e:
+            status_type = 'error'
+            message = f"❌ Error saat menyimpan konfigurasi: {str(e)}"
+            if logger: logger.error(message)
         
         # Update status jika ada
         if 'status' in ui_components:
@@ -276,14 +299,17 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
                 
                 # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
                 if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
+                    # Meskipun path identik, kita tetap perlu memastikan konten diperbarui
+                    # karena mungkin ada perubahan yang belum tersimpan
+                    with open(drive_config_path, 'w') as f:
+                        yaml.dump(save_config, f, default_flow_style=False)
+                    if logger: logger.info(f"🔄 File lokal dan drive identik, memperbarui konten: {config_path}")
                 else:
                     # Buat direktori jika belum ada
                     os.makedirs(Path(drive_config_path).parent, exist_ok=True)
                     
-                    # Salin file ke Google Drive
-                    with open(drive_config_path, 'w') as f:
-                        yaml.dump(save_config, f, default_flow_style=False)
+                    # Salin file ke drive
+                    shutil.copy2(config_path, drive_config_path)
                     if logger: logger.info(f"📤 Konfigurasi disimpan ke drive: {drive_config_path}")
         except (ImportError, AttributeError) as e:
             if logger: logger.debug(f"ℹ️ Tidak dapat menyalin ke drive: {str(e)}")
@@ -318,6 +344,13 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
             import logging
             logger = logging.getLogger('augmentation_config')
             logger.warning("⚠️ ui_components adalah None saat load_augmentation_config")
+            
+            # Coba dapatkan logger dari environment jika tersedia
+            try:
+                from smartcash.common.logger import get_logger
+                logger = get_logger("augmentation_config")
+            except ImportError:
+                pass
         except Exception:
             pass
     

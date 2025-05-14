@@ -100,16 +100,17 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                         display(create_status_indicator("warning", "ModelManager.OPTIMIZED_MODELS kosong, menggunakan model default"))
                 else:
                     print(f"⚠️ ModelManager.OPTIMIZED_MODELS kosong, menggunakan model default")
+                # Definisi model berdasarkan model_config.yaml
                 optimized_models = {
-                    'efficient_optimized': {
-                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                    'efficient_basic': {
+                        'description': 'Model dasar tanpa optimasi khusus',
                         'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
-                        'use_attention': True,
+                        'use_attention': False,
                         'use_residual': False,
                         'use_ciou': False
                     },
                     'yolov5s': {
-                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)',
                         'backbone': 'cspdarknet_s' if 'cspdarknet_s' in backbone_options else backbone_options[0],
                         'use_attention': False,
                         'use_residual': False,
@@ -128,27 +129,21 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     print(f"⚠️ BackboneConfig.BACKBONE_CONFIGS kosong, menggunakan opsi default")
                 
                 # Definisi model yang dioptimalkan secara manual dengan backbone yang valid
+                # Definisi model berdasarkan model_config.yaml
                 optimized_models = {
-                    'efficient_optimized': {
-                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                    'efficient_basic': {
+                        'description': 'Model dasar tanpa optimasi khusus',
                         'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
-                        'use_attention': True,
-                        'use_residual': False,
-                        'use_ciou': False
-                    },
-                    'yolov5s': {
-                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
-                        'backbone': 'cspdarknet_s' if 'cspdarknet_s' in backbone_options else backbone_options[0],
                         'use_attention': False,
                         'use_residual': False,
                         'use_ciou': False
                     },
-                    'efficient_advanced': {
-                        'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
-                        'backbone': 'efficientnet_b4' if 'efficientnet_b4' in backbone_options else backbone_options[0],
-                        'use_attention': True,
-                        'use_residual': True,
-                        'use_ciou': True
+                    'yolov5s': {
+                        'description': 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)',
+                        'backbone': 'cspdarknet_s' if 'cspdarknet_s' in backbone_options else backbone_options[0],
+                        'use_attention': False,
+                        'use_residual': False,
+                        'use_ciou': False
                     }
                 }
                 import_success = False
@@ -171,16 +166,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     print(f"⚠️ Error saat mengakses BackboneConfig: {str(inner_e)}")
                 backbone_options = ['efficientnet_b4', 'cspdarknet_s']
                 optimized_models = {
-                    'efficient_optimized': {
-                        'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
-                        'backbone': 'efficientnet_b4',
-                        'use_attention': True,
-                        'use_residual': False,
-                        'use_ciou': False
-                    },
                     'yolov5s': {
                         'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
                         'backbone': 'cspdarknet_s',
+                        'use_attention': False,
+                        'use_residual': False,
+                        'use_ciou': False
+                    },
+                    'efficient_basic': {
+                        'description': 'Model dasar dengan EfficientNet-B4 tanpa optimasi tambahan',
+                        'backbone': 'efficientnet_b4',
                         'use_attention': False,
                         'use_residual': False,
                         'use_ciou': False
@@ -521,7 +516,19 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     display(create_status_indicator("warning", f"Model {model_key} tidak ditemukan dalam daftar model yang dioptimalkan"))
                 return
                 
+            # Dapatkan model_config dan pastikan memiliki nilai default untuk properti yang diperlukan
             model_config = optimized_models[model_key]
+            
+            # Pastikan model_config memiliki nilai default untuk properti yang diperlukan
+            # Ini akan mencegah error saat mengakses properti yang tidak ada
+            if 'description' not in model_config:
+                model_config['description'] = f"Model {model_key}"
+                
+            # Pastikan properti yang sudah dihapus dari UI tetap ada di model_config
+            # untuk menghindari error saat mengakses
+            model_config['use_attention'] = model_config.get('use_attention', False)
+            model_config['use_residual'] = model_config.get('use_residual', False)
+            model_config['use_ciou'] = model_config.get('use_ciou', False)
             
             # Update backbone dengan penanganan error yang lebih kuat
             try:

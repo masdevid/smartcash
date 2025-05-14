@@ -149,7 +149,31 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Log awal augmentasi
             if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
             
-            # Jalankan augmentasi dengan parameter dari UI
+            # Pastikan semua parameter valid sebelum menjalankan augmentasi
+            if aug_types is None:
+                aug_types = ['Combined (Recommended)']
+                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types adalah None, menggunakan default: {aug_types}")
+            
+            if split_option is None:
+                split_option = 'train'
+                if logger: logger.warning(f"{ICONS['warning']} Nilai split_option adalah None, menggunakan default: {split_option}")
+            
+            if aug_prefix is None:
+                aug_prefix = 'aug'
+                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_prefix adalah None, menggunakan default: {aug_prefix}")
+            
+            if aug_factor is None:
+                aug_factor = 2
+                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_factor adalah None, menggunakan default: {aug_factor}")
+            
+            if num_workers is None:
+                num_workers = 4
+                if logger: logger.warning(f"{ICONS['warning']} Nilai num_workers adalah None, menggunakan default: {num_workers}")
+            
+            # Log parameter yang akan digunakan
+            if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split={split_option}, types={aug_types}, prefix={aug_prefix}, factor={aug_factor}, balance={balance_classes}, workers={num_workers}")
+            
+            # Jalankan augmentasi dengan parameter dari UI yang sudah divalidasi
             augment_result = augmentation_service.augment_dataset(
                 split=split_option,
                 augmentation_types=aug_types,

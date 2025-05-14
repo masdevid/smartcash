@@ -55,9 +55,35 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             else:
                 config = config_manager.config
         
-        # Buat komponen UI
-        from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
-        ui_components.update(create_backbone_ui(config))
+        # Buat komponen UI dengan penanganan error yang lebih baik
+        try:
+            from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
+            # Pastikan config memiliki nilai default yang valid untuk backbone
+            if 'model' not in config:
+                config['model'] = {}
+            if 'backbone' not in config['model']:
+                config['model']['backbone'] = 'cspdarknet_s'  # Default ke YOLOv5s backbone
+                logger.info(f"🔧 Menggunakan default backbone: cspdarknet_s")
+            
+            # Buat UI components
+            ui_components.update(create_backbone_ui(config))
+        except Exception as ui_error:
+            logger.error(f"❌ Error saat membuat komponen UI backbone: {str(ui_error)}")
+            # Fallback ke config default
+            from smartcash.common.default_config import generate_default_config
+            default_config = generate_default_config()
+            if 'model' not in default_config:
+                default_config['model'] = {}
+            if 'backbone' not in default_config['model']:
+                default_config['model']['backbone'] = 'cspdarknet_s'
+            
+            # Coba lagi dengan config default
+            try:
+                ui_components.update(create_backbone_ui(default_config))
+                logger.info(f"✅ Berhasil membuat UI dengan config default")
+            except Exception as fallback_error:
+                logger.error(f"❌ Error fallback UI backbone: {str(fallback_error)}")
+                # Jika masih gagal, gunakan fallback minimal
         
         # Tambahkan tombol konfigurasi dari komponen standar
         from smartcash.ui.components.config_buttons import create_config_buttons

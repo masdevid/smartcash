@@ -72,7 +72,7 @@ def handle_visualize_button(b, ui_components: Dict[str, Any], config: Dict[str, 
 
 def show_distribution_visualization(output_widget, config: Dict[str, Any], env=None, logger=None) -> None:
     """
-    Tampilkan visualisasi distribusi kelas dataset dengan pendekatan yang lebih aman.
+    Tampilkan visualisasi distribusi kelas dataset.
     
     Args:
         output_widget: Widget output untuk menampilkan visualisasi
@@ -95,17 +95,18 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
             import matplotlib.pyplot as plt
             import seaborn as sns
             import pandas as pd
-            import numpy as np
             
-            # Dapatkan distribusi kelas dari dataset dengan pendekatan yang aman
+            # Dapatkan distribusi kelas dari dataset dengan penanganan error yang lebih baik
             is_dummy = False
             try:
                 class_distribution = get_class_distribution(config, env, logger)
-                # Cek apakah distribusi adalah dummy
-                if class_distribution and '_is_dummy' in class_distribution:
-                    is_dummy = class_distribution.pop('_is_dummy', False)
-            except Exception as dist_error:
-                if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas: {str(dist_error)}")
+                # Cek apakah data yang didapat valid
+                if not class_distribution or len(class_distribution) == 0:
+                    if logger: logger.warning(f"⚠️ Tidak ada data distribusi kelas yang valid, menggunakan data dummy")
+                    class_distribution = _dummy_distribution()
+                    is_dummy = True
+            except Exception as e:
+                if logger: logger.warning(f"⚠️ Error mendapatkan distribusi kelas: {str(e)}")
                 class_distribution = _dummy_distribution()
                 is_dummy = True
             
@@ -118,26 +119,14 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 """))
                 return
             
-            # Tampilkan peringatan jika menggunakan data dummy
-            if is_dummy:
-                display(HTML(f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                                color:{COLORS['alert_info_text']}; border-radius:4px; margin-bottom:15px;">
-                        <p>{ICONS['info']} <strong>Visualisasi Contoh:</strong> Menampilkan data dummy karena dataset asli tidak tersedia atau tidak valid.</p>
-                    </div>
-                """))
-            
             # Dapatkan path dataset untuk ditampilkan
             try:
                 dataset_path, _ = get_dataset_paths(config, env)
             except Exception:
                 dataset_path = "Contoh Dataset"
             
-            # Plot distribusi kelas dengan pendekatan yang aman
+            # Implementasi visualisasi yang lebih aman untuk menghindari maximum recursion depth
             try:
-                # Buat visualisasi sederhana tanpa memanggil fungsi yang kompleks
-                # Ini menghindari maximum recursion depth
-                
                 # Persiapkan data untuk plot
                 df_data = []
                 for split, classes in class_distribution.items():
@@ -152,7 +141,8 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 ax = sns.barplot(x="Class", y="Count", hue="Split", data=df)
                 
                 # Styling plot
-                plt.title(f"Distribusi Kelas Dataset: {dataset_path}")
+                status_text = "(Data Contoh)" if is_dummy else "(Data Aktual)"
+                plt.title(f"Distribusi Kelas Dataset {status_text}")
                 plt.xlabel("Kelas")
                 plt.ylabel("Jumlah Sampel")
                 plt.xticks(rotation=45)
@@ -162,18 +152,21 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
                 # Tampilkan plot
                 plt.show()
                 
-                # Tambahkan informasi tambahan
-                total_samples = df["Count"].sum()
-                total_classes = len(df["Class"].unique())
+                # Tampilkan informasi tambahan tentang status visualisasi
+                status_color = COLORS['alert_info_text'] if is_dummy else COLORS['success']
+                status_bg = COLORS['alert_info_bg'] if is_dummy else '#f0fff0'
+                status_icon = ICONS['info'] if is_dummy else ICONS['success']
+                status_message = "Data contoh digunakan karena dataset asli tidak tersedia atau tidak valid" if is_dummy else "Visualisasi menggunakan data aktual dari dataset"
                 
                 display(HTML(f"""
-                    <div style="padding:10px; background-color:#f8f9fa; border-radius:4px; margin-top:15px;">
-                        <p><strong>Total Sampel:</strong> {total_samples}</p>
-                        <p><strong>Total Kelas:</strong> {total_classes}</p>
-                        <p><strong>Dataset Path:</strong> {dataset_path}</p>
-                        <p><strong>Status:</strong> {'Data Contoh' if is_dummy else 'Data Aktual'}</p>
+                    <div style="padding:8px; background-color:{status_bg}; color:{status_color}; 
+                                border-radius:4px; margin-top:10px; font-size:0.9em; border-left:3px solid {status_color};">
+                        <p style="margin:0;">{status_icon} <strong>Status Visualisasi:</strong> {status_message}</p>
                     </div>
                 """))
+                
+                if logger: logger.info(f"✅ Visualisasi distribusi kelas berhasil ditampilkan ({status_text})")
+                
                 
             except Exception as plot_error:
                 if logger: logger.error(f"❌ Error saat membuat plot: {str(plot_error)}")
@@ -313,44 +306,30 @@ def _map_class_names(split_classes: Dict[int, int], logger=None) -> Dict[str, in
 def _dummy_distribution() -> Dict[str, Dict[str, int]]:
     """
     Kembalikan distribusi kelas dummy dengan nama kelas yang diformat dengan benar.
-    Menambahkan flag untuk menandai bahwa ini adalah data dummy.
     
     Returns:
-        Dictionary berisi distribusi kelas dummy dengan flag _is_dummy
+        Dictionary berisi distribusi kelas dummy
     """
-    # Buat distribusi kelas dummy yang realistis
-    dummy_distribution = {
+    return {
         'train': {
-            'Rp1000': 120,
-            'Rp2000': 100,
-            'Rp5000': 150,
-            'Rp10000': 130,
-            'Rp20000': 110,
-            'Rp50000': 90,
-            'Rp100000': 80
+            '001:0': 120, '002:1': 110, '003:2': 130, '004:3': 140, 
+            '005:4': 125, '006:5': 115, '007:6': 135,
+            'l2_001:7': 80, 'l2_002:8': 85, 'l2_003:9': 75,
+            'l3_001:16': 60, 'l3_002:17': 55
         },
-        'val': {
-            'Rp1000': 30,
-            'Rp2000': 25,
-            'Rp5000': 35,
-            'Rp10000': 30,
-            'Rp20000': 25,
-            'Rp50000': 20,
-            'Rp100000': 15
+        'valid': {
+            '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 40, 
+            '005:4': 35, '006:5': 28, '007:6': 32,
+            'l2_001:7': 20, 'l2_002:8': 22, 'l2_003:9': 18,
+            'l3_001:16': 15, 'l3_002:17': 12
         },
         'test': {
-            'Rp1000': 15,
-            'Rp2000': 12,
-            'Rp5000': 18,
-            'Rp10000': 15,
-            'Rp20000': 12,
-            'Rp50000': 10,
-            'Rp100000': 8
-        },
-        # Tambahkan flag untuk menandai bahwa ini adalah data dummy
-        '_is_dummy': True
+            '001:0': 30, '002:1': 25, '003:2': 35, '004:3': 35, 
+            '005:4': 30, '006:5': 27, '007:6': 33,
+            'l2_001:7': 18, 'l2_002:8': 20, 'l2_003:9': 19,
+            'l3_001:16': 14, 'l3_002:17': 13
+        }
     }
-    return dummy_distribution
 
 def _plot_distribution(class_distribution: Dict[str, Dict[str, int]], dataset_path: str, logger=None) -> None:
     """

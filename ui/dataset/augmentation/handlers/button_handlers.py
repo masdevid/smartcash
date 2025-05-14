@@ -156,18 +156,28 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Dapatkan config manager
             config_manager = get_config_manager()
             
+            # Pastikan aug_types memiliki nilai awal yang valid
+            if aug_types is None:
+                aug_types = ['Combined (Recommended)']
+                if logger: logger.warning(f"⚠️ Parameter aug_types adalah None, menggunakan nilai default: {aug_types}")
+            
             # Validasi semua parameter dengan utilitas validasi yang lebih kuat
             aug_types = validate_ui_param(
                 aug_types, 
                 ['Combined (Recommended)'], 
                 (list, tuple, str),
-                None,
+                ['Combined (Recommended)'],  # Nilai default yang valid jika validasi gagal
                 logger
             )
             
             # Jika aug_types adalah string, konversi ke list
             if isinstance(aug_types, str):
                 aug_types = [aug_types]
+                
+            # Pastikan aug_types tidak None dan tidak kosong setelah validasi
+            if not aug_types:
+                aug_types = ['Combined (Recommended)']
+                if logger: logger.warning(f"⚠️ Parameter aug_types kosong setelah validasi, menggunakan nilai default: {aug_types}")
                 
             split_option = validate_ui_param(
                 split_option, 

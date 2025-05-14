@@ -5,7 +5,6 @@ Deskripsi: Komponen UI untuk pemilihan backbone model
 
 from typing import Dict, Any, List, Optional
 import ipywidgets as widgets
-from IPython.display import display, HTML
 
 def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
@@ -111,19 +110,46 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         value=f"<h3>{ICONS['model']} Konfigurasi Backbone Model</h3>"
     )
     
+    # Pastikan model yang dioptimalkan memiliki kunci yang valid
+    if 'yolov5s' not in optimized_models:
+        # Tambahkan model yolov5s jika tidak ada
+        optimized_models['yolov5s'] = {
+            'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+            'backbone': 'cspdarknet_s',
+            'use_attention': False,
+            'use_residual': False,
+            'use_ciou': False
+        }
+    
+    # Pastikan efficient_optimized juga tersedia
+    if 'efficient_optimized' not in optimized_models:
+        optimized_models['efficient_optimized'] = {
+            'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+            'backbone': 'efficientnet_b4',
+            'use_attention': True,
+            'use_residual': False,
+            'use_ciou': False
+        }
+    
     # Dropdown untuk memilih model yang dioptimalkan
     ui_components['model_type'] = widgets.Dropdown(
         options=list(optimized_models.keys()),
-        value='yolov5s',  # Jadikan YOLOv5s sebagai opsi default
+        value='efficient_optimized',  # Default ke EfficientNet model
         description='Model Type:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='100%')
     )
     
+    # Pastikan backbone_options berisi semua backbone yang digunakan
+    if 'cspdarknet_s' not in backbone_options:
+        backbone_options.append('cspdarknet_s')
+    if 'efficientnet_b4' not in backbone_options:
+        backbone_options.append('efficientnet_b4')
+    
     # Dropdown backbone akan otomatis diupdate berdasarkan model yang dipilih
     ui_components['backbone_type'] = widgets.Dropdown(
         options=backbone_options,
-        value=optimized_models['yolov5s']['backbone'],  # Gunakan backbone dari model yolov5s
+        value='efficientnet_b4',  # Default ke EfficientNet-B4
         description='Backbone:',
         style={'description_width': '120px'},
         layout=widgets.Layout(width='400px'),

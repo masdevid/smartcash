@@ -25,6 +25,9 @@ def save_config(ui_components: Dict[str, Any], config: Dict[str, Any],
         update_func: Fungsi untuk mengupdate config dari UI
         title: Judul untuk pesan status
     """
+    logger = ui_components.get('logger')
+    if logger: logger.debug(f"{ICONS['info']} Menyimpan konfigurasi {title}...")
+    
     try:
         # Update config dari UI
         # Pastikan config adalah dictionary dan update_func mengembalikan dictionary
@@ -44,6 +47,10 @@ def save_config(ui_components: Dict[str, Any], config: Dict[str, Any],
         
         # Simpan ke file
         config_manager.save_config(config_path, config)
+        
+        # Simpan referensi konfigurasi di ui_components untuk memastikan persistensi
+        ui_components['config'] = config
+        if logger: logger.debug(f"{ICONS['success']} Konfigurasi {title} berhasil disimpan di ui_components")
         
         # Tampilkan pesan sukses
         if 'status' in ui_components:

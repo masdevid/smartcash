@@ -252,8 +252,13 @@ def initialize_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, A
         ui_components: Dictionary komponen UI
         config: Konfigurasi aplikasi
     """
+    # Dapatkan logger jika tersedia
+    logger = ui_components.get('logger')
+    if logger: logger.debug(f"🔄 Menginisialisasi UI dari konfigurasi: {config}")
+    
     # Validasi komponen yang diperlukan
     if 'split_sliders' not in ui_components or not ui_components['split_sliders'] or len(ui_components['split_sliders']) < 3:
+        if logger: logger.warning("⚠️ Komponen split_sliders tidak tersedia")
         return
     
     # Split sliders dengan validasi
@@ -278,3 +283,8 @@ def initialize_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, A
             and len(ui_components['data_paths'].children) >= 2):
         ui_components['data_paths'].children[0].value = config.get('data', {}).get('dataset_path', 'data')
         ui_components['data_paths'].children[1].value = config.get('data', {}).get('preprocessed_path', 'data/preprocessed')
+    
+    # Simpan referensi konfigurasi di ui_components untuk memastikan persistensi
+    ui_components['config'] = config
+    
+    if logger: logger.debug("✅ UI berhasil diinisialisasi dari konfigurasi")

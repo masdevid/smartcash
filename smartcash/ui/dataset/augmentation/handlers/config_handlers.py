@@ -126,7 +126,7 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
             'types': list(aug_types) if aug_types else ['Combined (Recommended)'],
             'prefix': aug_prefix,
             'factor': aug_factor,
-            'target_split': target_split,
+            'split': target_split,  # Ubah 'target_split' menjadi 'split' agar konsisten dengan kunci yang digunakan di update_ui_from_config
             'balance_classes': balance_classes,
             'num_workers': num_workers,
             'enabled': True
@@ -339,78 +339,68 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
     
     return default_config
 
-def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
-    Update komponen UI dari konfigurasi.
+    Update komponen UI dari konfigurasi dengan pendekatan yang lebih robust.
     
     Args:
         ui_components: Dictionary komponen UI
         config: Konfigurasi aplikasi
-        
-    Returns:
-        Dictionary UI components yang telah diupdate
     """
     logger = ui_components.get('logger')
+    if logger: logger.debug(f"{ICONS['info']} Updating UI from config...")
     
-    # Update data paths dan simpan di UI components
-    data_dir = config.get('data', {}).get('dir', 'data')
-    preprocessed_dir = config.get('augmentation', {}).get('input_dir', 'data/preprocessed')
-    augmented_dir = config.get('augmentation', {}).get('output_dir', 'data/augmented')
-    ui_components.update({'data_dir': data_dir, 'preprocessed_dir': preprocessed_dir, 'augmented_dir': augmented_dir})
+    # Pastikan ada komponen aug_options
+    if 'aug_options' not in ui_components or not ui_components['aug_options']:
+        if logger: logger.warning(f"{ICONS['warning']} Tidak dapat menemukan komponen aug_options")
+        return
     
-    # Update aug_options dengan nilai dari config
-    aug_config = config.get('augmentation', {})
-    aug_options = ui_components.get('aug_options')
-    
-    if aug_options and hasattr(aug_options, 'children'):
-        # Pastikan ada cukup children untuk diupdate
-        if len(aug_options.children) >= 7:
-            # Dapatkan nilai dari config
-            aug_types = aug_config.get('types', ['Combined (Recommended)'])
-            aug_prefix = aug_config.get('prefix', 'aug')
-            aug_factor = aug_config.get('factor', 2)
-            target_split = aug_config.get('target_split', 'train')
-            balance_classes = aug_config.get('balance_classes', True)
-            num_workers = aug_config.get('num_workers', 4)
+    try:
+        # Ambil bagian augmentation dari config
+        aug_config = config.get('augmentation', {})
+        
+        # Log konfigurasi yang ditemukan
+        if logger: logger.debug(f"{ICONS['info']} Konfigurasi augmentasi ditemukan: {aug_config}")
+        
+        # Dapatkan komponen UI
+        aug_options = ui_components['aug_options'].children
+        
+        # Update UI components sesuai config
+        if len(aug_options) >= 7:  # Pastikan jumlah komponen sesuai
+            # Update aug types
+            if 'types' in aug_config and hasattr(aug_options[0], 'value'):
+                aug_options[0].value = aug_config['types']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set aug_types: {aug_config['types']}")
             
-            # Update nilai UI berdasarkan urutan komponen di augmentation_options.py
-            try:
-                # Pastikan nilai aug_types adalah list
-                if isinstance(aug_types, str):
-                    aug_types = [aug_types]
-                elif isinstance(aug_types, tuple):
-                    aug_types = list(aug_types)
-                elif not isinstance(aug_types, list):
-                    aug_types = ['Combined (Recommended)']
-                    
-                # Pastikan nilai valid untuk SelectMultiple
-                valid_options = ['Combined (Recommended)', 'Position Variations', 'Lighting Variations', 'Extreme Rotation']
-                valid_values = [val for val in aug_types if val in valid_options]
-                
-                # Jika tidak ada nilai valid, gunakan default
-                if not valid_values:
-                    valid_values = ['Combined (Recommended)']
-                
-                # Dapatkan komponen berdasarkan tipe widget, bukan indeks
-                for child in aug_options.children:
-                    if isinstance(child, widgets.SelectMultiple):
-                        child.value = valid_values
-                    elif isinstance(child, widgets.Text) and child.description == 'File prefix:':
-                        child.value = aug_prefix
-                    elif isinstance(child, widgets.IntSlider) and child.description == 'Faktor:':
-                        child.value = aug_factor
-                    elif isinstance(child, widgets.Dropdown) and child.description == 'Target split:':
-                        child.value = target_split
-                    elif isinstance(child, widgets.Checkbox) and child.description == 'Balance kelas':
-                        child.value = balance_classes
-                    elif isinstance(child, widgets.IntSlider) and child.description == 'Workers:':
-                        child.value = num_workers
-            except Exception as e:
-                if logger: logger.warning(f"⚠️ Error saat mengupdate komponen UI: {str(e)}")
+            # Update prefix
+            if 'prefix' in aug_config and hasattr(aug_options[2], 'value'):
+                aug_options[2].value = aug_config['prefix']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set prefix: {aug_config['prefix']}")
+            
+            # Update factor
+            if 'factor' in aug_config and hasattr(aug_options[3], 'value'):
+                aug_options[3].value = aug_config['factor']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {aug_config['factor']}")
+            
+            # Update split
+            if 'split' in aug_config and hasattr(aug_options[4], 'value'):
+                aug_options[4].value = aug_config['split']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set split: {aug_config['split']}")
+            
+            # Update balance_classes
+            if 'balance_classes' in aug_config and hasattr(aug_options[5], 'value'):
+                aug_options[5].value = aug_config['balance_classes']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set balance_classes: {aug_config['balance_classes']}")
+            
+            # Update num_workers
+            if 'num_workers' in aug_config and hasattr(aug_options[6], 'value'):
+                aug_options[6].value = aug_config['num_workers']
+                if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {aug_config['num_workers']}")
+            
+        # Simpan referensi config ke ui_components untuk memastikan persistensi
+        ui_components['config'] = config
+        
+    except Exception as e:
+        if logger: logger.warning(f"{ICONS['warning']} Error saat update UI dari config: {str(e)}")
     
-    # Simpan referensi config di ui_components untuk persistensi
-    ui_components['config'] = config
-    
-    if logger: logger.debug(f"🔄 UI berhasil diupdate dari konfigurasi")
-    
-    return ui_components
+    if logger: logger.debug(f"{ICONS['success']} UI berhasil diupdate dari konfigurasi")

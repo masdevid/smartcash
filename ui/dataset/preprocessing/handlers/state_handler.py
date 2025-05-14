@@ -139,8 +139,14 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🖼️ Total Gambar:</strong> <span style="font-weight:bold;">{stats['total']['images']}</span></p>
                 <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🏷️ Total Label:</strong> <span style="font-weight:bold;">{stats['total']['labels']}</span></p>
                 {class_info}
-                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status:</strong> <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
-                    {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span></p>
+                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status Dataset:</strong> 
+                    <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
+                    {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span>
+                    {f"<span style=\"margin-left:10px; font-size:0.9em; color:#666;\">({', '.join([s for s, info in stats['splits'].items() if info.get('complete', False)])} lengkap)</span>" if any(info.get('complete', False) for s, info in stats['splits'].items()) else "<span style=\"margin-left:10px; font-size:0.9em; color:#666;\">(Tidak ada split yang lengkap)</span>"}
+                </p>
+                <p style="margin:8px 0; font-size:0.9em; color:#666;">
+                    <strong>Catatan:</strong> Dataset dianggap siap digunakan jika minimal split train dan val sudah lengkap.
+                </p>
             </div>
             
             <h4 style="color:{COLORS['dark']}">📊 Detail Split</h4>
@@ -276,7 +282,9 @@ def get_preprocessing_stats(ui_components: Dict[str, Any], preprocessed_dir: str
         stats['total']['images'] += num_images
         stats['total']['labels'] += num_labels
     
-    # Dataset dianggap valid jika minimal ada 1 split dengan data lengkap (one-liner)
-    stats['valid'] = any(split_info.get('complete', False) for split_info in stats['splits'].values())
+    # Dataset dianggap valid jika semua split yang diperlukan sudah lengkap
+    # Minimal harus ada train dan val yang lengkap
+    required_splits = ['train', 'val']
+    stats['valid'] = all(stats['splits'].get(split, {}).get('complete', False) for split in required_splits)
     
     return stats

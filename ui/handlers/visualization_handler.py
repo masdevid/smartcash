@@ -530,19 +530,27 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
         output_widget: Widget output untuk menampilkan visualisasi
     """
     try:
+        with output_widget:
+            clear_output(wait=True)
+            display(create_status_indicator('info', f"{ICONS['processing']} Mencari direktori label..."))
+        
         # Cari direktori label
         labels_dir = None
-        train_labels_dir = Path(dataset_dir) / 'train' / 'labels'
+        dataset_path = Path(dataset_dir)
         
-        # Cek beberapa lokasi potensial untuk label
-        if train_labels_dir.exists() and any(train_labels_dir.glob('*.txt')):
-            labels_dir = train_labels_dir
-        else:
-            # Cari di direktori dataset dan subdirektorinya
-            for root, dirs, files in os.walk(dataset_dir):
-                if any(f.endswith('.txt') for f in files):
-                    labels_dir = Path(root)
-                    break
+        # Cek lokasi potensial untuk label secara langsung tanpa rekursi
+        potential_label_dirs = [
+            dataset_path / 'train' / 'labels',
+            dataset_path / 'labels',
+            dataset_path / 'val' / 'labels',
+            dataset_path / 'test' / 'labels'
+        ]
+        
+        # Cek setiap direktori potensial
+        for dir_path in potential_label_dirs:
+            if dir_path.exists() and any(dir_path.glob('*.txt')):
+                labels_dir = dir_path
+                break
         
         if not labels_dir:
             with output_widget:
@@ -559,23 +567,37 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
             if logger: logger.info(f"⚠️ Membatasi pemrosesan ke {max_files_to_process} dari {len(label_files)} file label")
             label_files = random.sample(label_files, max_files_to_process)
         
+        # Update status
+        with output_widget:
+            clear_output(wait=True)
+            display(create_status_indicator('info', f"{ICONS['processing']} Menghitung distribusi kelas dari {len(label_files)} file..."))
+        
         # Proses file label secara langsung dan sederhana (tanpa rekursi atau threading)
+        # Batasi jumlah file yang diproses untuk menghindari masalah performa
+        processed_count = 0
         for file_path in label_files:
             try:
-                # Baca hanya baris pertama untuk efisiensi
+                # Baca file secara efisien
                 with open(file_path, 'r') as f:
-                    first_line = f.readline().strip()
-                    if first_line:
-                        parts = first_line.split()
-                        if parts and len(parts) > 0:
-                            try:
-                                class_id = int(parts[0])
-                                class_counts[class_id] = class_counts.get(class_id, 0) + 1
-                            except (ValueError, IndexError):
-                                pass  # Abaikan baris yang tidak valid
+                    for line in f:
+                        line = line.strip()
+                        if line:
+                            parts = line.split()
+                            if parts and len(parts) > 0:
+                                try:
+                                    class_id = int(parts[0])
+                                    class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                                except (ValueError, IndexError):
+                                    continue  # Abaikan baris yang tidak valid
+                processed_count += 1
+                # Update progress setiap 100 file
+                if processed_count % 100 == 0:
+                    with output_widget:
+                        clear_output(wait=True)
+                        display(create_status_indicator('info', f"{ICONS['processing']} Menghitung distribusi kelas... ({processed_count}/{len(label_files)} file)"))
             except Exception as e:
                 # Abaikan file yang bermasalah
-                pass
+                continue
         
         if not class_counts:
             with output_widget:

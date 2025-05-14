@@ -141,11 +141,10 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             augment_result = augmentation_service.augment_dataset(
                 split=split_option,
                 augmentation_types=aug_types,
-                augmentation_factor=aug_factor,
-                target_dir=preprocessed_dir,
-                output_dir=augmented_dir,
-                prefix=aug_prefix,
-                balance_classes=balance_classes
+                num_variations=aug_factor,
+                output_prefix=aug_prefix,
+                target_balance=balance_classes,
+                num_workers=num_workers
             )
             
             # Tambahkan path output jika tidak ada

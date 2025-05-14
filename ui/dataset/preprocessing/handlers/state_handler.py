@@ -125,6 +125,12 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 stats = get_preprocessing_stats(ui_components, preprocessed_dir)
                 ui_components['preprocessing_stats'] = stats
             
+            # Inisialisasi class_info sebelum digunakan
+            class_info = ""
+            if 'classes' in stats and stats['classes']:
+                class_count = len(stats['classes'])
+                class_info = f"<p style=\"margin:8px 0;\"><strong style=\"color:{COLORS['dark']}\">🏷️ Jumlah Kelas:</strong> <span style=\"font-weight:bold;\">{class_count}</span></p>"
+            
             # Tampilkan summary dengan format lebih baik dan responsif
             display(HTML(f"""
             <h3 style="color:{COLORS['dark']}; font-weight:bold;">📊 Preprocessing Summary</h3>

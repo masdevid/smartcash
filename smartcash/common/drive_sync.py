@@ -40,16 +40,34 @@ def sync_from_drive(source_dir: str, target_dir: str, create_dirs: bool = True):
             print("🔄 Mounting Google Drive...")
             drive.mount('/content/drive')
         
-        # Buat direktori jika belum ada
+        # Cek apakah direktori parent ada
         source_path = Path(source_dir)
         target_path = Path(target_dir)
         
+        if not source_path.parent.exists():
+            print(f"⚠️ Direktori parent {source_path.parent} tidak ditemukan di Drive")
+            return False
+            
+        if not target_path.parent.exists():
+            print(f"⚠️ Direktori parent {target_path.parent} tidak ditemukan di lokal")
+            return False
+        
+        # Buat direktori jika belum ada dan create_dirs=True
         if create_dirs:
             source_path.mkdir(parents=True, exist_ok=True)
             target_path.mkdir(parents=True, exist_ok=True)
+        else:
+            # Jika create_dirs=False, cek apakah direktori ada
+            if not source_path.exists():
+                print(f"⚠️ Direktori sumber {source_dir} tidak ditemukan di Drive")
+                return False
+                
+            if not target_path.exists():
+                print(f"⚠️ Direktori target {target_dir} tidak ditemukan di lokal")
+                return False
         
         # Cek apakah ada file di Drive
-        if any(source_path.iterdir()):
+        if source_path.exists() and any(source_path.iterdir()):
             print(f"📂 File ditemukan di {source_dir}, menyinkronkan...")
             
             # Salin file dari Drive ke lokal
@@ -88,12 +106,32 @@ def sync_to_drive(source_dir: str, target_dir: str, files_info: dict = None, sho
     try:
         # Pastikan Drive sudah di-mount
         if not os.path.exists('/content/drive'):
-            from google.colab import drive
-            drive.mount('/content/drive')
+            try:
+                from google.colab import drive
+                print("🔄 Mounting Google Drive...")
+                drive.mount('/content/drive')
+            except Exception as e:
+                print(f"❌ Gagal mounting Google Drive: {str(e)}")
+                return False
         
         source_path = Path(source_dir)
         target_path = Path(target_dir)
         
+        # Cek apakah direktori parent ada
+        if not source_path.parent.exists():
+            print(f"⚠️ Direktori parent {source_path.parent} tidak ditemukan di lokal")
+            return False
+            
+        if not target_path.parent.exists():
+            print(f"⚠️ Direktori parent {target_path.parent} tidak ditemukan di Drive")
+            return False
+        
+        # Cek apakah direktori sumber ada
+        if not source_path.exists():
+            print(f"⚠️ Direktori sumber {source_dir} tidak ditemukan di lokal")
+            return False
+        
+        # Buat direktori target jika belum ada
         target_path.mkdir(parents=True, exist_ok=True)
         
         # Salin file dari lokal ke Drive
@@ -101,6 +139,7 @@ def sync_to_drive(source_dir: str, target_dir: str, files_info: dict = None, sho
         
         # Jika ada informasi file spesifik
         if files_info:
+            files_synced = False
             for file_name, file_data in files_info.items():
                 file_path = Path(file_data.get('path', ''))
                 if file_path.exists():
@@ -111,8 +150,13 @@ def sync_to_drive(source_dir: str, target_dir: str, files_info: dict = None, sho
                         print(f"📤 Menyalin {file_path.name} ke Drive...")
                         shutil.copy2(file_path, target_file)
                         print(f"✅ {file_path.name} berhasil disimpan di Drive")
+                        files_synced = True
+            
+            if not files_synced:
+                print("ℹ️ Semua file sudah sinkron, tidak ada yang perlu disalin")
         else:
             # Salin semua file dari direktori sumber
+            files_synced = False
             for file_path in source_path.glob('*'):
                 if file_path.is_file():
                     target_file = target_path / file_path.name
@@ -121,6 +165,10 @@ def sync_to_drive(source_dir: str, target_dir: str, files_info: dict = None, sho
                     if not target_file.exists() or os.path.getsize(file_path) != os.path.getsize(target_file):
                         print(f"📤 Menyalin {file_path.name} ke Drive...")
                         shutil.copy2(file_path, target_file)
+                        files_synced = True
+            
+            if not files_synced:
+                print("ℹ️ Semua file sudah sinkron, tidak ada yang perlu disalin")
             
         print("✅ Sinkronisasi ke Drive selesai")
         
@@ -152,6 +200,37 @@ def sync_models_with_drive(models_dir: str = '/content/models', drive_dir: str =
     Returns:
         bool: True jika berhasil, False jika gagal
     """
+    # Cek apakah berjalan di Google Colab
+    if not IN_COLAB:
+        print("⚠️ Bukan di lingkungan Google Colab, melewati sinkronisasi Drive")
+        return False
+    
+    # Cek apakah Drive sudah di-mount
+    if not os.path.exists('/content/drive'):
+        try:
+            from google.colab import drive
+            print("🔄 Mounting Google Drive...")
+            drive.mount('/content/drive')
+        except Exception as e:
+            print(f"❌ Gagal mounting Google Drive: {str(e)}")
+            return False
+    
+    # Cek apakah direktori Drive ada
+    drive_path = Path(drive_dir)
+    if not drive_path.parent.exists():
+        print(f"⚠️ Direktori parent {drive_path.parent} tidak ditemukan di Drive")
+        return False
+    
+    # Cek apakah direktori lokal ada
+    local_path = Path(models_dir)
+    if not local_path.parent.exists():
+        print(f"⚠️ Direktori parent {local_path.parent} tidak ditemukan di lokal")
+        return False
+    
+    # Buat direktori jika belum ada
+    drive_path.mkdir(parents=True, exist_ok=True)
+    local_path.mkdir(parents=True, exist_ok=True)
+    
     # Sinkronisasi dari Drive ke lokal terlebih dahulu
     sync_from_drive(drive_dir, models_dir)
     

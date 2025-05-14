@@ -72,12 +72,21 @@ def get_source_dir(split: str, config: Dict) -> str:
         config: Konfigurasi aplikasi
         
     Returns:
-        Path direktori sumber
+        Path direktori sumber sebagai string
     """
-    data_dir = config.get('data', {}).get('dir', 'data')
+    # Dapatkan direktori data dari config atau gunakan default
+    data_dir = config.get('dataset_dir', config.get('data', {}).get('dir', 'data'))
+    
+    # Pastikan data_dir adalah string
+    if isinstance(data_dir, Path):
+        data_dir = str(data_dir)
+    
     # Jika punya local.split, gunakan itu
     if 'local' in config.get('data', {}) and split in config.get('data', {}).get('local', {}):
-        return config['data']['local'][split]
+        path = config['data']['local'][split]
+        # Pastikan path adalah string
+        return str(path) if isinstance(path, Path) else path
+    
     # Fallback ke direktori default
     return os.path.join(data_dir, split)
 
@@ -92,11 +101,27 @@ def calculate_total_images(splits: List[str], config: Dict) -> Dict[str, int]:
     Returns:
         Dictionary jumlah gambar per split
     """
-    total_by_split = {split: sum(len(list(Path(get_source_dir(split, config)) / 'images').glob(f'*{ext}'))) 
-                     for split in splits 
-                     for ext in IMG_EXTENSIONS 
-                     if (Path(get_source_dir(split, config)) / 'images').exists()}
+    total_by_split = {}
     
+    for split in splits:
+        # Konversi path ke string untuk menghindari masalah dengan PosixPath
+        source_dir = str(get_source_dir(split, config))
+        images_dir = os.path.join(source_dir, 'images')
+        
+        # Periksa apakah direktori ada
+        if os.path.exists(images_dir) and os.path.isdir(images_dir):
+            # Hitung jumlah gambar dengan ekstensi yang didukung
+            count = 0
+            for ext in IMG_EXTENSIONS:
+                pattern = os.path.join(images_dir, f'*{ext}')
+                count += len(glob.glob(pattern))
+            
+            total_by_split[split] = count
+        else:
+            # Jika direktori tidak ada, set count ke 0
+            total_by_split[split] = 0
+    
+    # Hitung total semua split
     total_by_split['all'] = sum(total_by_split.values())
     return total_by_split
 

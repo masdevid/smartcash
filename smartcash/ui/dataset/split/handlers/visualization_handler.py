@@ -369,32 +369,38 @@ def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[s
                 </div>
             """
         
-        # Import dengan timeout untuk menghindari hanging
-        import threading
-        import time
-        
-        # Variabel untuk menyimpan hasil dan status
-        result = {'stats': None, 'done': False, 'error': None}
-        
-        # Fungsi untuk mendapatkan statistik dengan timeout
-        def get_stats_with_timeout():
-            try:
-                result['stats'] = get_dataset_stats(config, env, logger)
-                result['done'] = True
-            except Exception as e:
-                result['error'] = str(e)
-                result['done'] = True
-        
-        # Jalankan di thread terpisah
-        stats_thread = threading.Thread(target=get_stats_with_timeout)
-        stats_thread.daemon = True
-        stats_thread.start()
-        
-        # Tunggu maksimal 10 detik
-        timeout = 10
-        start_time = time.time()
-        while not result['done'] and time.time() - start_time < timeout:
-            time.sleep(0.5)
+        # Coba dapatkan statistik langsung tanpa threading untuk menghindari masalah
+        try:
+            # Dapatkan statistik dataset secara langsung
+            stats = get_dataset_stats(config, env, logger)
+            
+            # Update UI dengan statistik
+            if 'stats_container' in ui_components:
+                if stats:
+                    # Tampilkan statistik yang berhasil dimuat
+                    update_stats_cards(ui_components['stats_container'], stats, COLORS, ICONS)
+                    if logger: logger.info("✅ Statistik dataset berhasil dimuat")
+                else:
+                    # Tampilkan pesan jika tidak ada statistik
+                    empty_stats = create_empty_stats()
+                    update_stats_cards(ui_components['stats_container'], empty_stats, COLORS, ICONS)
+                    if logger: logger.info("ℹ️ Menampilkan statistik dataset kosong dengan nilai 0")
+            
+            return
+            
+        except Exception as e:
+            # Jika gagal mendapatkan statistik secara langsung, tampilkan statistik kosong
+            if logger: logger.warning(f"⚠️ Error saat memuat statistik secara langsung: {str(e)}. Menampilkan statistik kosong.")
+            
+            # Buat statistik kosong
+            empty_stats = create_empty_stats()
+            
+            # Update UI dengan statistik kosong
+            if 'stats_container' in ui_components:
+                update_stats_cards(ui_components['stats_container'], empty_stats, COLORS, ICONS)
+                if logger: logger.info("ℹ️ Menampilkan statistik dataset kosong dengan nilai 0")
+            
+            return
         
         # Cek hasil
         if not result['done']:
@@ -446,6 +452,27 @@ def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[s
             except (ImportError, AttributeError):
                 ui_components['stats_container'].value = f'<div style="padding:10px; background-color:{COLORS["alert_danger_bg"]}; color:{COLORS["alert_danger_text"]}; border-radius:4px;"><p>{ICONS["error"]} Error menampilkan statistik: {str(e)}</p></div>'
 
+def create_empty_stats() -> Dict[str, Any]:
+    """
+    Buat statistik kosong untuk ditampilkan saat tidak ada data atau terjadi error.
+    
+    Returns:
+        Dictionary berisi statistik kosong
+    """
+    from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
+    
+    # Buat statistik kosong dengan nilai 0 untuk ditampilkan
+    return {
+        'raw': {
+            'exists': True,
+            'stats': {split: {'images': 0, 'labels': 0, 'valid': True} for split in DEFAULT_SPLITS}
+        },
+        'preprocessed': {
+            'exists': True,
+            'stats': {split: {'images': 0, 'labels': 0, 'valid': True} for split in DEFAULT_SPLITS}
+        }
+    }
+
 def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Any]:
     """
     Dapatkan statistik dataset untuk raw dan preprocessed data.
@@ -488,40 +515,90 @@ def get_dataset_stats(config: Dict[str, Any], env=None, logger=None) -> Dict[str
 
 def count_files(dataset_dir: str) -> Dict[str, Dict[str, int]]:
     """
-    Hitung file dalam struktur dataset YOLO.
+    Hitung file dalam struktur dataset YOLO dengan penanganan error yang lebih baik
+    dan batasan waktu untuk menghindari hanging.
     
     Args:
         dataset_dir: Path ke direktori dataset
         
     Returns:
+{{ ... }}
         Dictionary berisi statistik file per split
     """
     from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
+    import os
+    from pathlib import Path
+    import time
     
-    stats = {}
+    # Inisialisasi statistik kosong untuk semua split
+    stats = {split: {'images': 0, 'labels': 0, 'valid': False} for split in DEFAULT_SPLITS}
     
-    # Check if directory exists
-    if not os.path.exists(dataset_dir): return stats
+    # Batasi waktu eksekusi untuk menghindari hanging
+    start_time = time.time()
+    max_execution_time = 5  # maksimal 5 detik
+    
+    try:
+        # Check if directory exists
+        if not os.path.exists(dataset_dir):
+            return stats
         
-    for split in DEFAULT_SPLITS:
-        split_dir = Path(dataset_dir) / split
+        # Buat Path object
+        dataset_path = Path(dataset_dir)
         
-        # Initialize counters
-        stats[split] = {'images': 0, 'labels': 0, 'valid': False}
-        
-        # Count files if directories exist
-        images_dir = split_dir / 'images'
-        labels_dir = split_dir / 'labels'
-        
-        if images_dir.exists(): stats[split]['images'] = len(list(images_dir.glob('*.*')))
-        if labels_dir.exists(): stats[split]['labels'] = len(list(labels_dir.glob('*.txt')))
-        stats[split]['valid'] = stats[split]['images'] > 0 and stats[split]['labels'] > 0
+        # Cek struktur YOLO (train/val/test dengan subdirektori images dan labels)
+        for split in DEFAULT_SPLITS:
+            # Cek apakah sudah melebihi batas waktu
+            if time.time() - start_time > max_execution_time:
+                # Jika melebihi batas waktu, kembalikan statistik yang sudah terkumpul
+                return stats
+                
+            split_path = dataset_path / split
+            images_path = split_path / 'images'
+            labels_path = split_path / 'labels'
+            
+            # Hitung gambar jika direktori ada (dengan batas waktu)
+            if images_path.exists() and images_path.is_dir():
+                try:
+                    # Gunakan list comprehension dengan batasan waktu untuk menghindari hanging
+                    image_files = []
+                    for ext in ['.jpg', '.jpeg', '.png']:
+                        # Cek waktu setiap iterasi
+                        if time.time() - start_time > max_execution_time:
+                            break
+                        # Batasi jumlah file yang dihitung jika terlalu banyak
+                        image_files.extend(list(images_path.glob(f'*{ext}'))[:1000])
+                    
+                    stats[split]['images'] = len(image_files)
+                except Exception:
+                    # Jika terjadi error, gunakan nilai default
+                    stats[split]['images'] = 0
+            
+            # Hitung label jika direktori ada (dengan batas waktu)
+            if labels_path.exists() and labels_path.is_dir():
+                try:
+                    # Cek waktu sebelum menghitung label
+                    if time.time() - start_time > max_execution_time:
+                        break
+                    # Batasi jumlah file yang dihitung jika terlalu banyak
+                    label_files = list(labels_path.glob('*.txt'))[:1000]
+                    stats[split]['labels'] = len(label_files)
+                except Exception:
+                    # Jika terjadi error, gunakan nilai default
+                    stats[split]['labels'] = 0
+            
+            # Tentukan validitas split (harus memiliki gambar dan label)
+            stats[split]['valid'] = stats[split]['images'] > 0 and stats[split]['labels'] > 0
+    
+    except Exception:
+        # Jika terjadi error, kembalikan statistik kosong
+        pass
         
     return stats
 
 def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, str], ICONS: Dict[str, str]) -> None:
     """
     Update komponen HTML dengan kartu statistik dataset menggunakan komponen yang sudah ada.
+    Fungsi ini memastikan kartu statistik selalu ditampilkan meskipun data kosong.
     
     Args:
         html_component: Komponen HTML untuk diupdate
@@ -529,76 +606,122 @@ def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, 
         COLORS: Dictionary warna UI
         ICONS: Dictionary ikon UI
     """
-    from smartcash.ui.utils.card_utils import create_card_html
+    try:
+        # Pastikan stats memiliki struktur yang benar
+        if not isinstance(stats, dict):
+            stats = create_empty_stats()
+        
+        # Pastikan kunci yang diperlukan ada
+        if 'raw' not in stats or 'preprocessed' not in stats:
+            stats = create_empty_stats()
+            
+        # Header untuk informasi dataset dengan styling yang lebih baik
+        cards_html = f'''
+        <div style="text-align:center; padding:15px;">
+            <h3 style="color:{COLORS['dark']}; margin-bottom:15px; font-weight:bold;">
+                {ICONS['dataset']} Informasi Dataset
+            </h3>
+        '''
+        
+        # Flag untuk melacak apakah ada dataset yang ditampilkan
+        dataset_displayed = False
+        
+        # Tampilkan kartu untuk dataset raw jika ada
+        if stats.get('raw', {}).get('exists', False) and stats.get('raw', {}).get('stats', {}):
+            try:
+                # Gunakan fungsi helper untuk membuat kartu statistik
+                cards_html += _generate_stats_card(
+                    "Dataset Raw", 
+                    ICONS.get('folder', '📁'), 
+                    COLORS.get('card', '#f8f9fa'),
+                    stats['raw']['stats']
+                )
+                dataset_displayed = True
+            except Exception:
+                # Jika terjadi error, tampilkan kartu kosong
+                cards_html += _generate_empty_card("Dataset Raw", ICONS.get('folder', '📁'), COLORS.get('card', '#f8f9fa'))
+        
+        # Tampilkan kartu untuk dataset preprocessed jika ada
+        if stats.get('preprocessed', {}).get('exists', False) and stats.get('preprocessed', {}).get('stats', {}):
+            try:
+                # Gunakan fungsi helper untuk membuat kartu statistik
+                cards_html += _generate_stats_card(
+                    "Dataset Preprocessed", 
+                    ICONS.get('processing', '⚙️'), 
+                    COLORS.get('card', '#f8f9fa'),
+                    stats['preprocessed']['stats']
+                )
+                dataset_displayed = True
+            except Exception:
+                # Jika terjadi error, tampilkan kartu kosong
+                cards_html += _generate_empty_card("Dataset Preprocessed", ICONS.get('processing', '⚙️'), COLORS.get('card', '#f8f9fa'))
+        
+        # Jika tidak ada dataset yang ditampilkan, tampilkan pesan informasi
+        if not dataset_displayed:
+            cards_html += f'''
+            <div style="padding:15px; background-color:{COLORS.get('alert_info_bg', '#d1ecf1')}; 
+                color:{COLORS.get('alert_info_text', '#0c5460')}; border-radius:8px; margin:10px 0;">
+                <p>{ICONS.get('info', 'ℹ️')} Tidak ada dataset yang terdeteksi. Silakan upload dataset terlebih dahulu atau gunakan tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat contoh visualisasi.</p>
+            </div>'''
+        
+        # Tutup div utama
+        cards_html += '</div>'
+        
+        # Update HTML component
+        html_component.value = cards_html
+        
+    except Exception as e:
+        # Jika terjadi error, tampilkan pesan error
+        error_html = f'''
+        <div style="padding:10px; background-color:{COLORS.get('alert_warning_bg', '#fff3cd')}; 
+            color:{COLORS.get('alert_warning_text', '#856404')}; border-radius:4px; margin:10px 0;">
+            <p>{ICONS.get('warning', '⚠️')} Gagal menampilkan statistik dataset: {str(e)}</p>
+            <p>Silakan klik tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat visualisasi dataset.</p>
+        </div>'''
+        html_component.value = error_html
+
+# Fungsi helper untuk membuat kartu statistik
+def _generate_stats_card(title: str, icon: str, color: str, stats: Dict[str, Dict[str, int]]) -> str:
+    """
+    Buat kartu HTML untuk statistik dataset.
     
-    # Header untuk informasi dataset
-    cards_html = f'<div style="text-align:center; padding:15px;">'
-    cards_html += f'<h3 style="color:{COLORS["dark"]}; margin-bottom:10px;">{ICONS["dataset"]} Informasi Dataset</h3>'
+    Args:
+        title: Judul kartu
+        icon: Ikon untuk kartu
+        color: Warna latar belakang kartu
+        stats: Statistik dataset per split
+        
+    Returns:
+        String HTML untuk kartu statistik
+    """
+    # Buat tabel statistik
+    table_html = _generate_stats_table(stats)
     
-    # Tampilkan kartu untuk dataset raw jika ada
-    if stats['raw']['exists'] and stats['raw']['stats']:
-        try:
-            # Gunakan create_card_html jika tersedia
-            cards_html += create_card_html(title="Dataset Raw", icon=ICONS['folder'], 
-                                          value=_generate_stats_table(stats['raw']['stats']),
-                                          color=COLORS['card'])
-        except (ImportError, AttributeError):
-            # Fallback ke implementasi lokal
-            cards_html += _generate_card("Dataset Raw", ICONS['folder'], COLORS['card'], stats['raw']['stats'])
+    # Buat kartu dengan styling yang lebih baik
+    return f'''
+    <div style="margin:10px 0; padding:15px; background-color:{color}; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <h4 style="margin-top:0; margin-bottom:10px; color:#333;">{icon} {title}</h4>
+        {table_html}
+    </div>'''
+
+# Fungsi helper untuk membuat kartu kosong
+def _generate_empty_card(title: str, icon: str, color: str) -> str:
+    """
+    Buat kartu HTML kosong untuk dataset yang tidak memiliki statistik.
     
-    # Tampilkan kartu untuk dataset preprocessed jika ada
-    if stats['preprocessed']['exists'] and stats['preprocessed']['stats']:
-        try:
-            cards_html += create_card_html(title="Dataset Preprocessed", icon=ICONS['processing'], 
-                                          value=_generate_stats_table(stats['preprocessed']['stats']),
-                                          color=COLORS['card'])
-        except (ImportError, AttributeError):
-            cards_html += _generate_card("Dataset Preprocessed", ICONS['processing'], COLORS['card'], 
-                                       stats['preprocessed']['stats'])
-    
-    # Tampilkan pesan jika tidak ada dataset atau semua dataset kosong
-    all_empty = True
-    
-    # Periksa apakah semua dataset kosong (0 gambar)
-    if stats['raw']['exists'] and stats['raw']['stats']:
-        for split_stats in stats['raw']['stats'].values():
-            if split_stats.get('images', 0) > 0:
-                all_empty = False
-                break
-                
-    if stats['preprocessed']['exists'] and stats['preprocessed']['stats']:
-        for split_stats in stats['preprocessed']['stats'].values():
-            if split_stats.get('images', 0) > 0:
-                all_empty = False
-                break
-    
-    # Tampilkan pesan informatif jika tidak ada dataset atau semua dataset kosong
-    if not (stats['raw']['exists'] or stats['preprocessed']['exists']) or all_empty:
-        from smartcash.ui.utils.alert_utils import create_alert_html
-        try:
-            if all_empty:
-                cards_html += create_alert_html(
-                    message="Dataset kosong (0 gambar). Silakan lakukan preprocessing terlebih dahulu atau tambahkan gambar ke dataset.",
-                    alert_type="info")
-            else:
-                cards_html += create_alert_html(
-                    message="Dataset tidak ditemukan. Klik tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat contoh visualisasi.",
-                    alert_type="warning")
-        except (ImportError, AttributeError):
-            if all_empty:
-                cards_html += f'<div style="padding:10px; background-color:{COLORS["alert_info_bg"]}; '\
-                             f'color:{COLORS["alert_info_text"]}; border-radius:4px;">'\
-                             f'<p>{ICONS["info"]} Dataset kosong (0 gambar). Silakan lakukan preprocessing terlebih dahulu atau tambahkan gambar ke dataset.</p></div>'
-            else:
-                cards_html += f'<div style="padding:10px; background-color:{COLORS["alert_warning_bg"]}; '\
-                             f'color:{COLORS["alert_warning_text"]}; border-radius:4px;">'\
-                             f'<p>{ICONS["warning"]} Dataset tidak ditemukan. Klik tombol <strong>Visualisasi '\
-                             f'Distribusi Kelas</strong> untuk melihat contoh visualisasi.</p></div>'
-    
-    cards_html += '</div>'
-    
-    # Update HTML component
-    html_component.value = cards_html
+    Args:
+        title: Judul kartu
+        icon: Ikon untuk kartu
+        color: Warna latar belakang kartu
+        
+    Returns:
+        String HTML untuk kartu kosong
+    """
+    return f'''
+    <div style="margin:10px 0; padding:15px; background-color:{color}; border-radius:8px; box-shadow:0 2px 4px rgba(0,0,0,0.1);">
+        <h4 style="margin-top:0; margin-bottom:10px; color:#333;">{icon} {title}</h4>
+        <p style="color:#666;">Tidak ada data tersedia</p>
+    </div>'''
 
 def _generate_stats_table(data: Dict[str, Any]) -> str:
     """Generate table HTML for dataset stats dengan format yang lebih ringkas."""

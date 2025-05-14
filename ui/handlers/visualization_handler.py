@@ -61,12 +61,29 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             
             # Jika modul adalah preprocessing, prioritaskan mencari gambar di preprocessed_dir
             if module_name == 'preprocessing':
-                # Cari gambar di preprocessed_dir tanpa memperhatikan prefix
-                if train_images_dir.exists() and any(train_images_dir.glob('*.jpg')):
-                    target_dir = train_images_dir
-                    if logger: logger.info(f"✅ Menggunakan gambar dari {train_images_dir}")
-                # Jika tidak ada di preprocessed, cari di data_dir
-                else:
+                # Cari gambar di preprocessed_dir dengan berbagai ekstensi
+                has_images_in_preprocessed = False
+                if train_images_dir.exists():
+                    for ext in ['.jpg', '.jpeg', '.png']:
+                        if list(train_images_dir.glob(f'*{ext}')):
+                            has_images_in_preprocessed = True
+                            target_dir = train_images_dir
+                            if logger: logger.info(f"✅ Menggunakan gambar dari {train_images_dir}")
+                            break
+                
+                # Jika tidak ada di train/images, coba cari di preprocessed_dir langsung
+                if not has_images_in_preprocessed:
+                    preprocessed_path = Path(preprocessed_dir)
+                    if preprocessed_path.exists():
+                        # Cari di semua subdirektori preprocessed
+                        for root, _, files in os.walk(preprocessed_path):
+                            if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
+                                target_dir = Path(root)
+                                if logger: logger.info(f"✅ Menggunakan gambar dari {root}")
+                                break
+                
+                # Jika masih tidak ada, cari di data_dir
+                if not target_dir:
                     for root, _, files in os.walk(data_dir):
                         if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
                             target_dir = Path(root)
@@ -514,39 +531,51 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
     """
     try:
         # Cari direktori label
-        labels_dir = Path(dataset_dir) / 'train' / 'labels'
-        if not labels_dir.exists():
+        labels_dir = None
+        train_labels_dir = Path(dataset_dir) / 'train' / 'labels'
+        
+        # Cek beberapa lokasi potensial untuk label
+        if train_labels_dir.exists() and any(train_labels_dir.glob('*.txt')):
+            labels_dir = train_labels_dir
+        else:
+            # Cari di direktori dataset dan subdirektorinya
             for root, dirs, files in os.walk(dataset_dir):
                 if any(f.endswith('.txt') for f in files):
                     labels_dir = Path(root)
                     break
         
-        if not labels_dir.exists():
+        if not labels_dir:
             with output_widget:
-                display(create_status_indicator('warning', f"{ICONS['warning']} Tidak dapat menemukan direktori label"))
+                display(create_status_indicator('warning', f"{ICONS['warning']} Tidak dapat menemukan direktori label di {dataset_dir}"))
             return
         
-        # Hitung distribusi kelas
+        # Hitung distribusi kelas dengan cara yang lebih efisien dan aman
         class_counts = {}
         label_files = list(labels_dir.glob('*.txt'))
         
-        # Proses file label secara langsung tanpa ThreadPoolExecutor untuk menghindari rekursi
+        # Batasi jumlah file yang diproses jika terlalu banyak
+        max_files_to_process = 1000
+        if len(label_files) > max_files_to_process:
+            if logger: logger.info(f"⚠️ Membatasi pemrosesan ke {max_files_to_process} dari {len(label_files)} file label")
+            label_files = random.sample(label_files, max_files_to_process)
+        
+        # Proses file label secara langsung dan sederhana (tanpa rekursi atau threading)
         for file_path in label_files:
             try:
+                # Baca hanya baris pertama untuk efisiensi
                 with open(file_path, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
+                    first_line = f.readline().strip()
+                    if first_line:
+                        parts = first_line.split()
                         if parts and len(parts) > 0:
                             try:
                                 class_id = int(parts[0])
                                 class_counts[class_id] = class_counts.get(class_id, 0) + 1
-                                # Hanya proses baris pertama dari setiap file
-                                break
                             except (ValueError, IndexError):
-                                continue
+                                pass  # Abaikan baris yang tidak valid
             except Exception as e:
-                # Lewati file yang bermasalah
-                continue
+                # Abaikan file yang bermasalah
+                pass
         
         if not class_counts:
             with output_widget:

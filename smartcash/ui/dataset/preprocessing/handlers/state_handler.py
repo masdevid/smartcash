@@ -125,50 +125,76 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 stats = get_preprocessing_stats(ui_components, preprocessed_dir)
                 ui_components['preprocessing_stats'] = stats
             
-            # Tampilkan summary dengan format lebih baik
+            # Tampilkan summary dengan format lebih baik dan responsif
             display(HTML(f"""
-            <h3 style="color:{COLORS['dark']}">📊 Preprocessing Summary</h3>
-            <div style="padding:10px; background:{COLORS['light']}; border-radius:5px; margin-bottom:10px;">
-                <p><strong>📂 Direktori:</strong> {preprocessed_dir}</p>
-                <p><strong>🖼️ Total Gambar:</strong> {stats['total']['images']}</p>
-                <p><strong>🏷️ Total Label:</strong> {stats['total']['labels']}</p>
-                <p><strong>✅ Status:</strong> {
-                    "Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</p>
+            <h3 style="color:{COLORS['dark']}; font-weight:bold;">📊 Preprocessing Summary</h3>
+            <div style="padding:15px; background:{COLORS['light']}; border-radius:8px; margin-bottom:15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">📂 Direktori:</strong> <span style="font-family:monospace;">{preprocessed_dir}</span></p>
+                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🖼️ Total Gambar:</strong> <span style="font-weight:bold;">{stats['total']['images']}</span></p>
+                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🏷️ Total Label:</strong> <span style="font-weight:bold;">{stats['total']['labels']}</span></p>
+                {class_info}
+                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status:</strong> <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
+                    {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span></p>
             </div>
             
             <h4 style="color:{COLORS['dark']}">📊 Detail Split</h4>
-            <table style="width:100%; border-collapse:collapse; margin-bottom:20px;">
-                <tr style="background:{COLORS['header_bg']};">
-                    <th style="padding:8px; text-align:left; border:1px solid #ddd;">Split</th>
-                    <th style="padding:8px; text-align:left; border:1px solid #ddd;">Status</th>
-                    <th style="padding:8px; text-align:left; border:1px solid #ddd;">Gambar</th>
-                    <th style="padding:8px; text-align:left; border:1px solid #ddd;">Label</th>
-                </tr>
+            <div style="overflow-x:auto;"> <!-- Tambahkan scrolling horizontal jika tabel terlalu lebar -->
+                <table style="width:100%; border-collapse:collapse; margin-bottom:20px; box-shadow: 0 2px 3px rgba(0,0,0,0.1);">
+                    <thead>
+                        <tr style="background:{COLORS['header_bg']};">
+                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Split</th>
+                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Status</th>
+                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Gambar</th>
+                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Label</th>
+                        </tr>
+                    </thead>
+                    <tbody>
             """))
             
-            # Tampilkan setiap split
-            for split, info in stats['splits'].items():
-                status = "✅ Lengkap" if info.get('complete', False) else "❌ Tidak Lengkap"
-                if not info.get('exists', False):
-                    status = "⚠️ Tidak Ada"
+            # Tampilkan setiap split dengan warna baris bergantian untuk keterbacaan
+            rows = []
+            for i, (split, info) in enumerate(stats['splits'].items()):
+                # Tentukan status dengan warna dan ikon
+                if info.get('complete', False):
+                    status_html = f'<span style="color:#28a745; font-weight:bold;">✅ Lengkap</span>'
+                elif not info.get('exists', False):
+                    status_html = f'<span style="color:#ffc107; font-weight:bold;">⚠️ Tidak Ada</span>'
+                else:
+                    status_html = f'<span style="color:#dc3545; font-weight:bold;">❌ Tidak Lengkap</span>'
                 
-                display(HTML(f"""
-                <tr>
-                    <td style="padding:8px; text-align:left; border:1px solid #ddd;">{split}</td>
-                    <td style="padding:8px; text-align:left; border:1px solid #ddd;">{status}</td>
-                    <td style="padding:8px; text-align:left; border:1px solid #ddd;">{info.get('images', 0)}</td>
-                    <td style="padding:8px; text-align:left; border:1px solid #ddd;">{info.get('labels', 0)}</td>
-                </tr>
-                """))
+                # Tentukan warna baris bergantian
+                row_bg = f'background-color: {COLORS["light"]}' if i % 2 == 0 else ''
+                
+                # Buat baris tabel
+                rows.append(f"""
+                <tr style="{row_bg}">
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">{split}</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{status_html}</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{info.get('images', 0)}</td>
+                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{info.get('labels', 0)}</td>
+                </tr>""")
             
-            display(HTML("</table>"))
+            # Tampilkan semua baris sekaligus untuk menghindari masalah rendering
+            display(HTML('\n'.join(rows)))
             
-            # Tambahkan informasi tentang langkah selanjutnya
+            # Tutup tabel dan div
+            display(HTML("""
+                    </tbody>
+                </table>
+            </div>"""))
+            
+            # Tambahkan informasi tentang langkah selanjutnya dengan tampilan yang lebih baik
             # Periksa apakah kunci 'valid' ada di stats, jika tidak, cek apakah ada split yang lengkap
             is_valid = stats.get('valid', False)
             if 'valid' not in stats and 'splits' in stats:
                 # Hitung apakah valid berdasarkan split yang lengkap
                 is_valid = any(split_info.get('complete', False) for split_info in stats['splits'].values()) if stats['splits'] else False
+                
+            # Tambahkan informasi tentang jumlah kelas jika tersedia
+            class_info = ""
+            if 'classes' in stats and stats['classes']:
+                class_count = len(stats['classes'])
+                class_info = f"<p><strong>🏷️ Jumlah Kelas:</strong> {class_count}</p>"
                 
             if is_valid:
                 display(HTML(f"""

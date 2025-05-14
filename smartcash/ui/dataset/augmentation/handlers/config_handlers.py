@@ -24,6 +24,15 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Validasi ui_components untuk mencegah error NoneType is not iterable
+    if ui_components is None:
+        # Inisialisasi ui_components kosong jika None
+        ui_components = {}
+        # Tambahkan logger dummy jika diperlukan
+        import logging
+        ui_components['logger'] = logging.getLogger('augmentation')
+        ui_components['logger'].warning("⚠️ ui_components adalah None, membuat dictionary kosong")
+    
     logger = ui_components.get('logger')
     from smartcash.ui.utils.constants import ICONS
     
@@ -31,8 +40,14 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     if config is None:
         config = load_augmentation_config(ui_components=ui_components)
     
-    # Update UI dari konfigurasi
-    ui_components = update_ui_from_config(ui_components, config)
+    # Pastikan config tidak None
+    if config is None:
+        config = {}
+        if logger: logger.warning("⚠️ config adalah None, membuat dictionary kosong")
+    
+    # Update UI dari konfigurasi jika ada komponen UI
+    if ui_components:
+        ui_components = update_ui_from_config(ui_components, config)
     
     # Handler untuk tombol save config
     def on_save_config(b):
@@ -49,25 +64,29 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
         status_type = 'success' if success else 'error'
         message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
         
-        # Update status
-        with ui_components['status']: 
-            display(create_status_indicator(status_type, message))
-            
-        # Update status panel
-        from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
-        update_status_panel(ui_components, status_type, message)
+        # Update status jika ada
+        if 'status' in ui_components:
+            with ui_components['status']: 
+                display(create_status_indicator(status_type, message))
+                
+            # Update status panel
+            try:
+                from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+                update_status_panel(ui_components, status_type, message)
+            except Exception as e:
+                if logger: logger.warning(f"⚠️ Error saat update status panel: {str(e)}")
         
         # Log
         if logger: 
             log_method = logger.success if success else logger.error
             log_method(message)
     
-    # Register handler untuk tombol save
-    if 'save_button' in ui_components:
+    # Register handler untuk tombol save jika ada
+    if ui_components and 'save_button' in ui_components:
         ui_components['save_button'].on_click(on_save_config)
         
     # Register handler untuk tombol augment (jika ada)
-    if 'augment_button' in ui_components:
+    if ui_components and 'augment_button' in ui_components:
         ui_components['augment_button'].on_click(lambda b: None)
     
     # Tambahkan referensi fungsi ke UI components
@@ -93,6 +112,13 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     Returns:
         Dictionary konfigurasi yang diupdate
     """
+    # Validasi parameter untuk mencegah error NoneType is not iterable
+    if ui_components is None:
+        import logging
+        logger = logging.getLogger('augmentation')
+        logger.warning("⚠️ ui_components adalah None saat update_config_from_ui")
+        return {}
+    
     # Inisialisasi config dengan deep copy untuk mencegah modifikasi tidak sengaja
     config = copy.deepcopy(config or {})
     logger = ui_components.get('logger')
@@ -283,6 +309,18 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
         Dictionary konfigurasi
     """
     logger = None
+    
+    # Validasi ui_components untuk mencegah error NoneType is not iterable
+    if ui_components is None:
+        ui_components = {}
+        # Setup logger jika ui_components None
+        try:
+            import logging
+            logger = logging.getLogger('augmentation_config')
+            logger.warning("⚠️ ui_components adalah None saat load_augmentation_config")
+        except Exception:
+            pass
+    
     try:
         # Ambil logger dari lingkungan atau ui_components
         if ui_components and 'logger' in ui_components:
@@ -387,21 +425,36 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
     
     return default_config
 
-def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Update komponen UI dari konfigurasi dengan pendekatan yang lebih robust.
     
     Args:
         ui_components: Dictionary komponen UI
         config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
     """
+    # Validasi parameter untuk mencegah error NoneType is not iterable
+    if ui_components is None:
+        import logging
+        logger = logging.getLogger('augmentation')
+        logger.warning("⚠️ ui_components adalah None saat update_ui_from_config")
+        return {}
+    
+    if config is None:
+        config = {}
+        if 'logger' in ui_components:
+            ui_components['logger'].warning("⚠️ config adalah None saat update_ui_from_config")
+    
     logger = ui_components.get('logger')
     if logger: logger.debug(f"{ICONS['info']} Updating UI from config...")
     
     # Pastikan ada komponen aug_options
     if 'aug_options' not in ui_components or not ui_components['aug_options']:
         if logger: logger.warning(f"{ICONS['warning']} Tidak dapat menemukan komponen aug_options")
-        return
+        return ui_components
     
     try:
         # Ambil bagian augmentation dari config
@@ -410,36 +463,39 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Log konfigurasi yang ditemukan
         if logger: logger.debug(f"{ICONS['info']} Konfigurasi augmentasi ditemukan: {aug_config}")
         
-        # Dapatkan komponen UI
-        aug_options = ui_components['aug_options'].children
-        
-        # Update UI components sesuai config
-        if len(aug_options) >= 6:  # Pastikan jumlah komponen sesuai (sekarang 6 children)
-            # Jenis augmentasi dan target split sekarang tetap, tidak perlu diupdate dari config
+        # Dapatkan komponen UI dengan validasi
+        try:
+            aug_options = ui_components['aug_options'].children
             
-            # Update prefix (sekarang di posisi 1)
-            if 'prefix' in aug_config and hasattr(aug_options[1], 'value'):
-                aug_options[1].value = aug_config['prefix']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set prefix: {aug_config['prefix']}")
-            
-            # Update factor (sekarang di posisi 2)
-            if 'factor' in aug_config and hasattr(aug_options[2], 'value'):
-                aug_options[2].value = aug_config['factor']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {aug_config['factor']}")
-            
-            # Update balance_classes (sekarang di posisi 4)
-            if 'balance_classes' in aug_config and hasattr(aug_options[4], 'value'):
-                aug_options[4].value = aug_config['balance_classes']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set balance_classes: {aug_config['balance_classes']}")
-            
-            # Update num_workers (sekarang di posisi 5)
-            if 'num_workers' in aug_config and hasattr(aug_options[5], 'value'):
-                aug_options[5].value = aug_config['num_workers']
-                if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {aug_config['num_workers']}")
+            # Update UI components sesuai config
+            if len(aug_options) >= 6:  # Pastikan jumlah komponen sesuai (sekarang 6 children)
+                # Jenis augmentasi dan target split sekarang tetap, tidak perlu diupdate dari config
                 
-            # Pastikan nilai tetap selalu tersimpan di config
-            aug_config['types'] = ['Combined (Recommended)']
-            aug_config['split'] = 'train'
+                # Update prefix (sekarang di posisi 1)
+                if 'prefix' in aug_config and hasattr(aug_options[1], 'value'):
+                    aug_options[1].value = aug_config['prefix']
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set prefix: {aug_config['prefix']}")
+                
+                # Update factor (sekarang di posisi 2)
+                if 'factor' in aug_config and hasattr(aug_options[2], 'value'):
+                    aug_options[2].value = aug_config['factor']
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {aug_config['factor']}")
+                
+                # Update balance_classes (sekarang di posisi 4)
+                if 'balance_classes' in aug_config and hasattr(aug_options[4], 'value'):
+                    aug_options[4].value = aug_config['balance_classes']
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set balance_classes: {aug_config['balance_classes']}")
+                
+                # Update num_workers (sekarang di posisi 5)
+                if 'num_workers' in aug_config and hasattr(aug_options[5], 'value'):
+                    aug_options[5].value = aug_config['num_workers']
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {aug_config['num_workers']}")
+                    
+                # Pastikan nilai tetap selalu tersimpan di config
+                aug_config['types'] = ['Combined (Recommended)']
+                aug_config['split'] = 'train'
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Error saat akses aug_options: {str(e)}")
         
         # Simpan referensi config ke ui_components untuk memastikan persistensi
         ui_components['config'] = config
@@ -448,3 +504,5 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
         if logger: logger.warning(f"{ICONS['warning']} Error saat update UI dari config: {str(e)}")
     
     if logger: logger.debug(f"{ICONS['success']} UI berhasil diupdate dari konfigurasi")
+    
+    return ui_components

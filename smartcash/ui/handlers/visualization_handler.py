@@ -52,7 +52,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             else:
                 aug_prefix = 'aug'
             
-            # Cek lokasi sampel (prioritas ke preprocessed)
+            # Cek lokasi sampel dengan pendekatan yang lebih efisien
             train_images_dir = Path(preprocessed_dir) / 'train' / 'images'
             augmented_images_dir = Path(augmented_dir) / 'images'
             
@@ -61,67 +61,74 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             
             # Jika modul adalah preprocessing, prioritaskan mencari gambar di preprocessed_dir
             if module_name == 'preprocessing':
-                # Cari gambar di preprocessed_dir dengan berbagai ekstensi
-                has_images_in_preprocessed = False
-                if train_images_dir.exists():
-                    for ext in ['.jpg', '.jpeg', '.png']:
-                        if list(train_images_dir.glob(f'*{ext}')):
-                            has_images_in_preprocessed = True
-                            target_dir = train_images_dir
-                            if logger: logger.info(f"✅ Menggunakan gambar dari {train_images_dir}")
-                            break
+                # Cari gambar di lokasi yang paling mungkin terlebih dahulu
+                potential_dirs = [
+                    train_images_dir,  # Prioritas tertinggi
+                    Path(preprocessed_dir) / 'val' / 'images',
+                    Path(preprocessed_dir) / 'test' / 'images',
+                    Path(preprocessed_dir) / 'images',
+                    Path(data_dir) / 'images',
+                    Path(data_dir)  # Fallback
+                ]
                 
-                # Jika tidak ada di train/images, coba cari di preprocessed_dir langsung
-                if not has_images_in_preprocessed:
-                    preprocessed_path = Path(preprocessed_dir)
-                    if preprocessed_path.exists():
-                        # Cari di semua subdirektori preprocessed
-                        for root, _, files in os.walk(preprocessed_path):
-                            if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
-                                target_dir = Path(root)
-                                if logger: logger.info(f"✅ Menggunakan gambar dari {root}")
+                # Cek setiap direktori potensial secara efisien
+                for dir_path in potential_dirs:
+                    if dir_path.exists():
+                        # Cek apakah ada file gambar (hanya cek beberapa file pertama)
+                        try:
+                            # Gunakan os.listdir yang lebih efisien daripada Path.glob
+                            import os
+                            files = os.listdir(str(dir_path))[:20]  # Batasi pencarian
+                            if any(f.lower().endswith(('.jpg', '.jpeg', '.png')) for f in files):
+                                target_dir = dir_path
+                                if logger: logger.info(f"✅ Menggunakan gambar dari {dir_path}")
                                 break
-                
-                # Jika masih tidak ada, cari di data_dir
-                if not target_dir:
-                    for root, _, files in os.walk(data_dir):
-                        if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
-                            target_dir = Path(root)
-                            if logger: logger.info(f"✅ Menggunakan gambar dari {root}")
-                            break
-            # Untuk modul augmentasi, cari gambar dengan prefix augmentasi
+                        except Exception as e:
+                            if logger: logger.debug(f"⚠️ Error saat memeriksa {dir_path}: {str(e)}")
+                            continue
+            # Untuk modul augmentasi, cari gambar dengan prefix augmentasi dengan pendekatan yang lebih efisien
             elif module_name == 'augmentation':
                 # Cari gambar dengan prefix augmentasi di berbagai lokasi
-                aug_files_train = []
-                aug_files_augmented = []
+                potential_dirs = [
+                    train_images_dir,  # Prioritas tertinggi
+                    augmented_images_dir,
+                    Path(preprocessed_dir) / 'images',
+                    Path(augmented_dir)
+                ]
                 
-                # Cek di direktori train/images
-                if train_images_dir.exists():
-                    aug_files_train = list(train_images_dir.glob(f"{aug_prefix}_*.jpg")) + \
-                                    list(train_images_dir.glob(f"{aug_prefix}_*.jpeg")) + \
-                                    list(train_images_dir.glob(f"{aug_prefix}_*.png"))
+                # Cek setiap direktori potensial untuk file augmentasi
+                for dir_path in potential_dirs:
+                    if not dir_path.exists():
+                        continue
+                        
+                    try:
+                        # Gunakan os.listdir yang lebih efisien
+                        import os
+                        files = os.listdir(str(dir_path))
+                        
+                        # Cek apakah ada file augmentasi
+                        aug_files = [f for f in files if f.startswith(f"{aug_prefix}_") and 
+                                   f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                        
+                        if aug_files:
+                            target_dir = dir_path
+                            if logger: logger.info(f"✅ Menggunakan {len(aug_files)} gambar augmentasi dari {dir_path}")
+                            break
+                            
+                        # Jika tidak ada file augmentasi tetapi ada file gambar biasa
+                        normal_files = [f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                        if normal_files and not target_dir:  # Simpan sebagai fallback
+                            target_dir = dir_path
+                            # Jangan log dulu, kita masih mencari file augmentasi di direktori lain
+                    except Exception as e:
+                        if logger: logger.debug(f"⚠️ Error saat memeriksa {dir_path}: {str(e)}")
+                        continue
                 
-                # Cek di direktori augmented/images
-                if augmented_images_dir.exists():
-                    aug_files_augmented = list(augmented_images_dir.glob(f"{aug_prefix}_*.jpg")) + \
-                                        list(augmented_images_dir.glob(f"{aug_prefix}_*.jpeg")) + \
-                                        list(augmented_images_dir.glob(f"{aug_prefix}_*.png"))
-                
-                # Pilih lokasi yang memiliki sampel augmentasi
-                if aug_files_train:
-                    target_dir = train_images_dir
-                    if logger: logger.info(f"✅ Menggunakan {len(aug_files_train)} gambar augmentasi dari {train_images_dir}")
-                elif aug_files_augmented:
-                    target_dir = augmented_images_dir
-                    if logger: logger.info(f"✅ Menggunakan {len(aug_files_augmented)} gambar augmentasi dari {augmented_images_dir}")
-                else:
-                    # Jika tidak ada gambar augmentasi, gunakan gambar biasa
-                    if train_images_dir.exists() and any(train_images_dir.glob('*.jpg')):
-                        target_dir = train_images_dir
-                        if logger: logger.info(f"⚠️ Tidak ada gambar augmentasi, menggunakan gambar biasa dari {train_images_dir}")
-                    elif augmented_images_dir.exists() and any(augmented_images_dir.glob('*.jpg')):
-                        target_dir = augmented_images_dir
-                        if logger: logger.info(f"⚠️ Tidak ada gambar augmentasi, menggunakan gambar biasa dari {augmented_images_dir}")
+                # Jika tidak menemukan file augmentasi tetapi menemukan file gambar biasa
+                if target_dir and not any(f.startswith(f"{aug_prefix}_") for f in os.listdir(str(target_dir)) 
+                                         if f.lower().endswith(('.jpg', '.jpeg', '.png'))):
+                    # Hanya tampilkan pesan ini jika kita menggunakan gambar biasa
+                    if logger: logger.info(f"⚠️ Tidak ada gambar augmentasi dengan prefix '{aug_prefix}', menggunakan gambar biasa dari {target_dir}")
             # Untuk modul lain, cari di data_dir
             else:
                 for root, _, files in os.walk(data_dir):
@@ -289,7 +296,7 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
 # Fungsi helper untuk visualisasi sampel
 def visualize_samples(target_dir, output_widget: widgets.Output, num_samples: int = 4, aug_prefix: str = None):
     """
-    Visualisasi sampel gambar dari direktori.
+    Visualisasi sampel gambar dari direktori dengan pendekatan yang lebih efisien.
     
     Args:
         target_dir: Direktori target (Path atau str)
@@ -298,23 +305,37 @@ def visualize_samples(target_dir, output_widget: widgets.Output, num_samples: in
         aug_prefix: Prefix untuk gambar augmentasi (jika ada)
     """
     try:
-        # Cari file gambar
+        # Gunakan pendekatan yang lebih efisien untuk mencari file gambar
+        target_dir_path = Path(target_dir)
+        if not target_dir_path.exists():
+            with output_widget:
+                display(create_status_indicator('warning', f"{ICONS['warning']} Direktori {target_dir} tidak ditemukan"))
+            return
+        
+        # Gunakan os.listdir yang lebih efisien daripada Path.glob
+        import os
+        try:
+            all_files = os.listdir(str(target_dir_path))
+        except Exception as e:
+            with output_widget:
+                display(create_status_indicator('warning', f"{ICONS['warning']} Error saat membaca direktori {target_dir}: {str(e)}"))
+            return
+        
+        # Filter hanya file gambar
         image_files = []
         augmented_files = []
         original_files = []
         
-        # Cari semua file gambar
-        for ext in ['.jpg', '.jpeg', '.png']:
-            all_files = list(Path(target_dir).glob(f"*{ext}"))
-            image_files.extend(all_files)
-            
-            # Pisahkan file augmentasi dan original jika ada aug_prefix
-            if aug_prefix:
-                for f in all_files:
-                    if f.name.startswith(f"{aug_prefix}_"):
-                        augmented_files.append(f)
-                    else:
-                        original_files.append(f)
+        for filename in all_files:
+            if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                full_path = target_dir_path / filename
+                image_files.append(full_path)
+                
+                # Pisahkan file augmentasi dan original jika ada aug_prefix
+                if aug_prefix and filename.startswith(f"{aug_prefix}_"):
+                    augmented_files.append(full_path)
+                else:
+                    original_files.append(full_path)
         
         if not image_files:
             with output_widget:
@@ -523,7 +544,7 @@ def compare_original_vs_processed_fallback(data_dir: str, processed_dir: str, ou
 # Fungsi helper untuk distribusi kelas
 def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widgets.Output):
     """
-    Visualisasi distribusi kelas dataset.
+    Visualisasi distribusi kelas dataset dengan pendekatan yang aman tanpa rekursi.
     
     Args:
         dataset_dir: Direktori dataset
@@ -534,11 +555,11 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
             clear_output(wait=True)
             display(create_status_indicator('info', f"{ICONS['processing']} Mencari direktori label..."))
         
-        # Cari direktori label
+        # Cari direktori label dengan pendekatan yang aman
         labels_dir = None
         dataset_path = Path(dataset_dir)
         
-        # Cek lokasi potensial untuk label secara langsung tanpa rekursi
+        # Daftar lokasi potensial untuk label tanpa rekursi
         potential_label_dirs = [
             dataset_path / 'train' / 'labels',
             dataset_path / 'labels',
@@ -546,25 +567,48 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
             dataset_path / 'test' / 'labels'
         ]
         
-        # Cek setiap direktori potensial
+        # Cek setiap direktori potensial dengan pendekatan yang aman
         for dir_path in potential_label_dirs:
-            if dir_path.exists() and any(dir_path.glob('*.txt')):
-                labels_dir = dir_path
-                break
+            try:
+                if dir_path.exists():
+                    # Cek apakah ada file .txt dengan cara yang aman
+                    txt_files = list(dir_path.glob('*.txt'))
+                    if txt_files and len(txt_files) > 0:
+                        labels_dir = dir_path
+                        break
+            except Exception as e:
+                if logger: logger.warning(f"{ICONS['warning']} Error saat memeriksa direktori {dir_path}: {str(e)}")
+                continue
         
         if not labels_dir:
             with output_widget:
                 display(create_status_indicator('warning', f"{ICONS['warning']} Tidak dapat menemukan direktori label di {dataset_dir}"))
             return
         
-        # Hitung distribusi kelas dengan cara yang lebih efisien dan aman
-        class_counts = {}
-        label_files = list(labels_dir.glob('*.txt'))
+        # Hitung distribusi kelas dengan pendekatan yang aman
+        with output_widget:
+            clear_output(wait=True)
+            display(create_status_indicator('info', f"{ICONS['processing']} Mengumpulkan file label..."))
+        
+        # Gunakan pendekatan yang aman untuk mendapatkan daftar file
+        try:
+            label_files = []
+            # Gunakan os.listdir yang lebih aman daripada Path.glob
+            import os
+            for file_name in os.listdir(str(labels_dir)):
+                if file_name.endswith('.txt'):
+                    label_files.append(os.path.join(str(labels_dir), file_name))
+        except Exception as e:
+            with output_widget:
+                display(create_status_indicator('error', f"{ICONS['error']} Error saat mengumpulkan file label: {str(e)}"))
+            return
         
         # Batasi jumlah file yang diproses jika terlalu banyak
         max_files_to_process = 1000
         if len(label_files) > max_files_to_process:
-            if logger: logger.info(f"⚠️ Membatasi pemrosesan ke {max_files_to_process} dari {len(label_files)} file label")
+            if logger: logger.info(f"{ICONS['warning']} Membatasi pemrosesan ke {max_files_to_process} dari {len(label_files)} file label")
+            import random
+            random.seed(42)  # Untuk hasil yang konsisten
             label_files = random.sample(label_files, max_files_to_process)
         
         # Update status
@@ -572,23 +616,33 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
             clear_output(wait=True)
             display(create_status_indicator('info', f"{ICONS['processing']} Menghitung distribusi kelas dari {len(label_files)} file..."))
         
-        # Proses file label secara langsung dan sederhana (tanpa rekursi atau threading)
-        # Batasi jumlah file yang diproses untuk menghindari masalah performa
+        # Proses file label dengan pendekatan yang aman
+        class_counts = {}
         processed_count = 0
+        
         for file_path in label_files:
             try:
-                # Baca file secara efisien
+                # Baca file dengan pendekatan yang aman
                 with open(file_path, 'r') as f:
-                    for line in f:
+                    # Batasi jumlah baris yang dibaca per file
+                    for i, line in enumerate(f):
+                        if i >= 1000:  # Batasi maksimal 1000 baris per file
+                            break
+                        
                         line = line.strip()
-                        if line:
-                            parts = line.split()
-                            if parts and len(parts) > 0:
-                                try:
-                                    class_id = int(parts[0])
-                                    class_counts[class_id] = class_counts.get(class_id, 0) + 1
-                                except (ValueError, IndexError):
-                                    continue  # Abaikan baris yang tidak valid
+                        if not line:
+                            continue
+                            
+                        parts = line.split()
+                        if not parts or len(parts) == 0:
+                            continue
+                            
+                        try:
+                            class_id = int(parts[0])
+                            class_counts[class_id] = class_counts.get(class_id, 0) + 1
+                        except (ValueError, IndexError):
+                            continue  # Abaikan baris yang tidak valid
+                
                 processed_count += 1
                 # Update progress setiap 100 file
                 if processed_count % 100 == 0:
@@ -596,7 +650,8 @@ def visualize_class_distribution_fallback(dataset_dir: str, output_widget: widge
                         clear_output(wait=True)
                         display(create_status_indicator('info', f"{ICONS['processing']} Menghitung distribusi kelas... ({processed_count}/{len(label_files)} file)"))
             except Exception as e:
-                # Abaikan file yang bermasalah
+                # Log error dan lanjutkan
+                if logger: logger.debug(f"{ICONS['warning']} Error saat memproses file {file_path}: {str(e)}")
                 continue
         
         if not class_counts:

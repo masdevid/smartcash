@@ -112,20 +112,18 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     )
     
     # Dropdown untuk memilih model yang dioptimalkan
-    model_options = [(f"{key}: {value['description']}", key) for key, value in optimized_models.items()]
-    
     ui_components['model_type'] = widgets.Dropdown(
-        options=model_options,
-        value='efficient_optimized',
-        description='Model:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='500px')
+        options=list(optimized_models.keys()),
+        value='yolov5s',  # Jadikan YOLOv5s sebagai opsi default
+        description='Model Type:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%')
     )
     
     # Dropdown backbone akan otomatis diupdate berdasarkan model yang dipilih
     ui_components['backbone_type'] = widgets.Dropdown(
         options=backbone_options,
-        value=optimized_models['efficient_optimized']['backbone'],
+        value=optimized_models['yolov5s']['backbone'],  # Gunakan backbone dari model yolov5s
         description='Backbone:',
         style={'description_width': '120px'},
         layout=widgets.Layout(width='400px'),
@@ -251,43 +249,65 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     ], layout=widgets.Layout(
         border='1px solid #ddd',
         border_radius='5px',
-        padding='15px',
+        padding='10px',
         margin='0 0 15px 0',
         background_color='#f8f9fa'
     ))
     
-    # Kolom kiri: Model selection dan backbone config
-    left_column = widgets.VBox([
-        model_selection_card,
-        backbone_config_card
-    ])
+    # Buat info_box untuk informasi backbone
+    ui_components['info_box'] = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['info']} Informasi Model</h4>"),
+        ui_components['backbone_info']
+    ], layout=widgets.Layout(
+        padding='10px', 
+        border='1px solid #ddd', 
+        border_radius='5px',
+        margin='0 0 15px 0',
+        background_color='#f8f9fa'
+    ))
     
-    # Buat info_box terlebih dahulu
-    ui_components['info_box'] = widgets.VBox(
-        [widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['info']} Informasi Model</h4>"),
-         ui_components['backbone_info']],
-        layout=widgets.Layout(
-            padding='15px', 
-            border='1px solid #ddd', 
-            border_radius='5px',
-            margin='0 0 15px 0',
-            background_color='#f8f9fa'
-        )
-    )
+    # Buat layout yang lebih compact
+    # Baris pertama: Model dan backbone selection
+    model_row = widgets.HBox([
+        widgets.VBox([
+            ui_components['model_type']
+        ], layout=widgets.Layout(width='50%', padding='5px')),
+        widgets.VBox([
+            ui_components['backbone_type']
+        ], layout=widgets.Layout(width='50%', padding='5px'))
+    ], layout=widgets.Layout(margin='0 0 10px 0'))
     
-    # Kolom kanan: Fitur optimasi dan info backbone
-    right_column = widgets.VBox([
-        optimization_card,
+    # Baris kedua: Pretrained dan freeze backbone
+    config_row = widgets.HBox([
+        widgets.VBox([
+            ui_components['pretrained']
+        ], layout=widgets.Layout(width='50%', padding='5px')),
+        widgets.VBox([
+            ui_components['freeze_backbone']
+        ], layout=widgets.Layout(width='50%', padding='5px'))
+    ], layout=widgets.Layout(margin='0 0 10px 0'))
+    
+    # Baris ketiga: Freeze layers dan fitur optimasi
+    feature_row = widgets.HBox([
+        widgets.VBox([
+            ui_components['freeze_layers']
+        ], layout=widgets.Layout(width='50%', padding='5px')),
+        widgets.VBox([
+            widgets.HBox([
+                ui_components['use_attention'],
+                ui_components['use_residual'],
+                ui_components['use_ciou']
+            ])
+        ], layout=widgets.Layout(width='50%', padding='5px'))
+    ], layout=widgets.Layout(margin='0 0 10px 0'))
+    
+    # Gabungkan semua dalam layout compact
+    ui_components['form'] = widgets.VBox([
+        model_row,
+        config_row,
+        feature_row,
         ui_components['info_box']
-    ])
-    
-    # Gabungkan dalam layout grid
-    ui_components['form'] = widgets.HBox([
-        left_column,
-        right_column
-    ], layout=widgets.Layout(padding='10px'))
-    
-    # Info box sudah dibuat sebelumnya
+    ], layout=widgets.Layout(padding='5px'))
     
     # Placeholder untuk tombol konfigurasi yang akan ditambahkan dari initializer
     ui_components['buttons_placeholder'] = widgets.HBox(

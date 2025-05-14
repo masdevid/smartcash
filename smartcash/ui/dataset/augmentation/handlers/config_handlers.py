@@ -10,6 +10,7 @@ import copy
 from pathlib import Path
 from IPython.display import display
 import ipywidgets as widgets
+from smartcash.ui.utils.constants import ICONS, COLORS
 
 def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """

@@ -132,75 +132,60 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
                 class_info = f"<p style=\"margin:8px 0;\"><strong style=\"color:{COLORS['dark']}\">🏷️ Jumlah Kelas:</strong> <span style=\"font-weight:bold;\">{class_count}</span></p>"
             
             # Buat informasi split yang lengkap
-            if any(info.get('complete', False) for s, info in stats['splits'].items()):
-                complete_splits = [s for s, info in stats['splits'].items() if info.get('complete', False)]
-                split_info_html = f'<span style="margin-left:10px; font-size:0.9em; color:#666;">({", ".join(complete_splits)} lengkap)</span>'
-            else:
+            complete_splits = [s for s, info in stats['splits'].items() if info.get('complete', False)]
+            split_info_html = f'<span style="margin-left:10px; font-size:0.9em; color:#666;">({", ".join(complete_splits)} lengkap)</span>'
+            if not complete_splits:
                 split_info_html = '<span style="margin-left:10px; font-size:0.9em; color:#666;">(Tidak ada split yang lengkap)</span>'
             
-            # Tampilkan summary dengan format lebih baik dan responsif
-            display(HTML(f"""
-            <h3 style="color:{COLORS['dark']}; font-weight:bold;">📊 Preprocessing Summary</h3>
-            <div style="padding:15px; background:{COLORS['light']}; border-radius:8px; margin-bottom:15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
-                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">📂 Direktori:</strong> <span style="font-family:monospace;">{preprocessed_dir}</span></p>
-                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🖼️ Total Gambar:</strong> <span style="font-weight:bold;">{stats['total']['images']}</span></p>
-                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🏷️ Total Label:</strong> <span style="font-weight:bold;">{stats['total']['labels']}</span></p>
-                {class_info}
-                <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status Dataset:</strong> 
-                    <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
-                    {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span>
-                    {split_info_html}
-                </p>
-                <p style="margin:8px 0; font-size:0.9em; color:#666;">
-                    <strong>Catatan:</strong> Dataset dianggap siap digunakan jika minimal split train dan val sudah lengkap.
-                </p>
-            </div>
-            
-            <h4 style="color:{COLORS['dark']}">📊 Detail Split</h4>
-            <div style="overflow-x:auto;"> <!-- Tambahkan scrolling horizontal jika tabel terlalu lebar -->
-                <table style="width:100%; border-collapse:collapse; margin-bottom:20px; box-shadow: 0 2px 3px rgba(0,0,0,0.1);">
-                    <thead>
-                        <tr style="background:{COLORS['header_bg']};">
-                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Split</th>
-                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Status</th>
-                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Gambar</th>
-                            <th style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">Label</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            """))
-            
-            # Tampilkan setiap split dengan warna baris bergantian untuk keterbacaan
-            rows = []
-            for i, (split, info) in enumerate(stats['splits'].items()):
-                # Tentukan status dengan warna dan ikon
+            # Tampilkan summary dengan format lebih baik dan responsif tanpa tabel
+            # Buat ringkasan status split
+            split_status = []
+            for split, info in stats['splits'].items():
                 if info.get('complete', False):
-                    status_html = f'<span style="color:#28a745; font-weight:bold;">✅ Lengkap</span>'
+                    status_icon = "✅"
+                    status_color = "#28a745"
                 elif not info.get('exists', False):
-                    status_html = f'<span style="color:#ffc107; font-weight:bold;">⚠️ Tidak Ada</span>'
+                    status_icon = "⚠️"
+                    status_color = "#ffc107"
                 else:
-                    status_html = f'<span style="color:#dc3545; font-weight:bold;">❌ Tidak Lengkap</span>'
+                    status_icon = "❌"
+                    status_color = "#dc3545"
                 
-                # Tentukan warna baris bergantian
-                row_bg = f'background-color: {COLORS["light"]}' if i % 2 == 0 else ''
+                split_status.append(f'<span style="margin-right:15px;"><strong>{split}</strong>: <span style="color:{status_color}">{status_icon}</span> {info.get("images", 0)} gambar, {info.get("labels", 0)} label</span>')
+            
+            # Gabungkan semua status split
+            split_details = ''.join([f'<div style="margin:5px 0;">{status}</div>' for status in split_status])
+            
+            display(HTML(f"""
+            <div style="padding:15px; background:{COLORS['light']}; border-radius:8px; margin-bottom:15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                <h3 style="color:{COLORS['dark']}; font-weight:bold; margin-top:0;">📊 Preprocessing Summary</h3>
                 
-                # Buat baris tabel
-                rows.append(f"""
-                <tr style="{row_bg}">
-                    <td style="padding:10px; text-align:center; border:1px solid #ddd; font-weight:bold;">{split}</td>
-                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{status_html}</td>
-                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{info.get('images', 0)}</td>
-                    <td style="padding:10px; text-align:center; border:1px solid #ddd;">{info.get('labels', 0)}</td>
-                </tr>""")
-            
-            # Tampilkan semua baris sekaligus untuk menghindari masalah rendering
-            display(HTML('\n'.join(rows)))
-            
-            # Tutup tabel dan div
-            display(HTML("""
-                    </tbody>
-                </table>
-            </div>"""))
+                <div style="display:flex; flex-wrap:wrap; margin-bottom:10px;">
+                    <div style="flex:1; min-width:250px; margin-right:15px;">
+                        <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">📂 Direktori:</strong> <span style="font-family:monospace;">{preprocessed_dir}</span></p>
+                        <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🖼️ Total Gambar:</strong> <span style="font-weight:bold;">{stats['total']['images']}</span></p>
+                        <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">🏷️ Total Label:</strong> <span style="font-weight:bold;">{stats['total']['labels']}</span></p>
+                        {class_info}
+                    </div>
+                    
+                    <div style="flex:1; min-width:250px;">
+                        <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">📊 Detail Split:</strong></p>
+                        {split_details}
+                    </div>
+                </div>
+                
+                <div style="margin-top:15px; padding-top:10px; border-top:1px solid #eee;">
+                    <p style="margin:8px 0;"><strong style="color:{COLORS['dark']}">✅ Status Dataset:</strong> 
+                        <span style="font-weight:bold; color:{'green' if stats.get('valid', False) else 'red'};">
+                        {"Siap digunakan" if stats.get('valid', False) else "Belum lengkap"}</span>
+                        {split_info_html}
+                    </p>
+                    <p style="margin:8px 0; font-size:0.9em; color:#666;">
+                        <strong>Catatan:</strong> Dataset dianggap siap digunakan jika minimal split train dan val sudah lengkap.
+                    </p>
+                </div>
+            </div>
+            """))
             
             # Tambahkan informasi tentang langkah selanjutnya dengan tampilan yang lebih baik
             # Periksa apakah kunci 'valid' ada di stats, jika tidak, cek apakah ada split yang lengkap

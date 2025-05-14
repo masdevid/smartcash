@@ -172,6 +172,9 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         
         # Coba tampilkan UI meskipun ada error
         try:
+            # Import display di awal blok try untuk menghindari error
+            from IPython.display import display, HTML
+            
             # Coba buat komponen UI dengan fallback
             from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
             ui_components.update(create_backbone_ui(config))
@@ -180,7 +183,6 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             if 'status' in ui_components:
                 from smartcash.ui.utils.alert_utils import create_alert_html
                 with ui_components['status']:
-                    from IPython.display import display, HTML
                     display(HTML(create_alert_html(
                         f"Error inisialisasi UI backbone: {str(e)}. Menggunakan konfigurasi fallback.",
                         "warning"
@@ -188,10 +190,8 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             
             # Tampilkan komponen yang tersedia
             if 'main_container' in ui_components:
-                from IPython.display import display
                 display(ui_components['main_container'])
             elif 'form' in ui_components:
-                from IPython.display import display
                 display(ui_components['form'])
                 if 'status' in ui_components:
                     display(ui_components['status'])

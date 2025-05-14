@@ -22,6 +22,18 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
     """
     ui_components = {'module_name': 'backbone'}
     
+    # Setup logging
+    import logging
+    logger = logging.getLogger('backbone_ui')
+    logger.setLevel(logging.INFO)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+        logger.addHandler(handler)
+    ui_components['logger'] = logger
+    
+    logger.info("🚀 Memulai inisialisasi UI backbone model")
+    
     try:
         # Import dependency
         from smartcash.common.environment import get_environment_manager
@@ -154,9 +166,41 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
                 display(ui_components['status'])
         
     except Exception as e:
-        # Gunakan utilitas fallback yang ada
-        from smartcash.ui.utils.fallback_utils import create_fallback_ui
-        ui_components = create_fallback_ui(ui_components, str(e), "error")
+        # Log error
+        if 'logger' in ui_components:
+            ui_components['logger'].error(f"❌ Error inisialisasi UI backbone: {str(e)}")
+        
+        # Coba tampilkan UI meskipun ada error
+        try:
+            # Coba buat komponen UI dengan fallback
+            from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
+            ui_components.update(create_backbone_ui(config))
+            
+            # Tambahkan pesan error ke status
+            if 'status' in ui_components:
+                from smartcash.ui.utils.alert_utils import create_alert_html
+                with ui_components['status']:
+                    from IPython.display import display, HTML
+                    display(HTML(create_alert_html(
+                        f"Error inisialisasi UI backbone: {str(e)}. Menggunakan konfigurasi fallback.",
+                        "warning"
+                    )))
+            
+            # Tampilkan komponen yang tersedia
+            if 'main_container' in ui_components:
+                from IPython.display import display
+                display(ui_components['main_container'])
+            elif 'form' in ui_components:
+                from IPython.display import display
+                display(ui_components['form'])
+                if 'status' in ui_components:
+                    display(ui_components['status'])
+        except Exception as inner_e:
+            # Jika masih gagal, gunakan utilitas fallback yang ada
+            if 'logger' in ui_components:
+                ui_components['logger'].error(f"❌ Error fallback UI backbone: {str(inner_e)}")
+            from smartcash.ui.utils.fallback_utils import create_fallback_ui
+            ui_components = create_fallback_ui(ui_components, f"{str(e)}\n\nError fallback: {str(inner_e)}", "error")
     
     return ui_components
 

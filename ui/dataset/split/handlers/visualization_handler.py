@@ -414,19 +414,25 @@ def load_and_display_dataset_stats(ui_components: Dict[str, Any], config: Dict[s
             raise Exception(result['error'])
         
         # Update UI dengan statistik
-        if 'stats_container' in ui_components and result['stats']:
-            update_stats_cards(ui_components['stats_container'], result['stats'], COLORS, ICONS)
-            if logger: logger.info("✅ Statistik dataset berhasil dimuat")
-        else:
-            # Fallback jika tidak ada statistik
-            if 'stats_container' in ui_components:
-                ui_components['stats_container'].value = f"""
-                    <div style="padding:10px; background-color:{COLORS['alert_warning_bg']}; 
-                         color:{COLORS['alert_warning_text']}; border-radius:4px;">
-                        <p>{ICONS['warning']} Tidak ada statistik dataset yang tersedia. Pastikan dataset Anda sudah benar.</p>
-                    </div>
-                """
-            if logger: logger.warning("⚠️ Tidak ada statistik dataset yang tersedia")
+        if 'stats_container' in ui_components:
+            # Selalu tampilkan kartu statistik, bahkan jika kosong
+            if result['stats']:
+                update_stats_cards(ui_components['stats_container'], result['stats'], COLORS, ICONS)
+                if logger: logger.info("✅ Statistik dataset berhasil dimuat")
+            else:
+                # Buat statistik kosong dengan nilai 0 untuk ditampilkan
+                empty_stats = {
+                    'raw': {
+                        'exists': True,
+                        'stats': {split: {'images': 0, 'labels': 0, 'valid': True} for split in DEFAULT_SPLITS}
+                    },
+                    'preprocessed': {
+                        'exists': True,
+                        'stats': {split: {'images': 0, 'labels': 0, 'valid': True} for split in DEFAULT_SPLITS}
+                    }
+                }
+                update_stats_cards(ui_components['stats_container'], empty_stats, COLORS, ICONS)
+                if logger: logger.info("ℹ️ Menampilkan statistik dataset kosong dengan nilai 0")
         
     except Exception as e:
         # Handle error
@@ -550,18 +556,44 @@ def update_stats_cards(html_component, stats: Dict[str, Any], COLORS: Dict[str, 
             cards_html += _generate_card("Dataset Preprocessed", ICONS['processing'], COLORS['card'], 
                                        stats['preprocessed']['stats'])
     
-    # Tampilkan pesan jika tidak ada dataset
-    if not (stats['raw']['exists'] or stats['preprocessed']['exists']):
+    # Tampilkan pesan jika tidak ada dataset atau semua dataset kosong
+    all_empty = True
+    
+    # Periksa apakah semua dataset kosong (0 gambar)
+    if stats['raw']['exists'] and stats['raw']['stats']:
+        for split_stats in stats['raw']['stats'].values():
+            if split_stats.get('images', 0) > 0:
+                all_empty = False
+                break
+                
+    if stats['preprocessed']['exists'] and stats['preprocessed']['stats']:
+        for split_stats in stats['preprocessed']['stats'].values():
+            if split_stats.get('images', 0) > 0:
+                all_empty = False
+                break
+    
+    # Tampilkan pesan informatif jika tidak ada dataset atau semua dataset kosong
+    if not (stats['raw']['exists'] or stats['preprocessed']['exists']) or all_empty:
         from smartcash.ui.utils.alert_utils import create_alert_html
         try:
-            cards_html += create_alert_html(
-                message="Dataset tidak ditemukan. Klik tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat contoh visualisasi.",
-                alert_type="warning")
+            if all_empty:
+                cards_html += create_alert_html(
+                    message="Dataset kosong (0 gambar). Silakan lakukan preprocessing terlebih dahulu atau tambahkan gambar ke dataset.",
+                    alert_type="info")
+            else:
+                cards_html += create_alert_html(
+                    message="Dataset tidak ditemukan. Klik tombol <strong>Visualisasi Distribusi Kelas</strong> untuk melihat contoh visualisasi.",
+                    alert_type="warning")
         except (ImportError, AttributeError):
-            cards_html += f'<div style="padding:10px; background-color:{COLORS["alert_warning_bg"]}; '\
-                         f'color:{COLORS["alert_warning_text"]}; border-radius:4px;">'\
-                         f'<p>{ICONS["warning"]} Dataset tidak ditemukan. Klik tombol <strong>Visualisasi '\
-                         f'Distribusi Kelas</strong> untuk melihat contoh visualisasi.</p></div>'
+            if all_empty:
+                cards_html += f'<div style="padding:10px; background-color:{COLORS["alert_info_bg"]}; '\
+                             f'color:{COLORS["alert_info_text"]}; border-radius:4px;">'\
+                             f'<p>{ICONS["info"]} Dataset kosong (0 gambar). Silakan lakukan preprocessing terlebih dahulu atau tambahkan gambar ke dataset.</p></div>'
+            else:
+                cards_html += f'<div style="padding:10px; background-color:{COLORS["alert_warning_bg"]}; '\
+                             f'color:{COLORS["alert_warning_text"]}; border-radius:4px;">'\
+                             f'<p>{ICONS["warning"]} Dataset tidak ditemukan. Klik tombol <strong>Visualisasi '\
+                             f'Distribusi Kelas</strong> untuk melihat contoh visualisasi.</p></div>'
     
     cards_html += '</div>'
     

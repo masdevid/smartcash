@@ -30,17 +30,51 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     
     # Import ModelManager untuk mendapatkan model yang dioptimalkan
     try:
-        from smartcash.model.manager import ModelManager
-        from smartcash.model.config.backbone_config import BackboneConfig
-        
-        # Daftar backbone yang didukung
-        backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
-        
-        # Daftar model yang dioptimalkan
-        optimized_models = ModelManager.OPTIMIZED_MODELS
+        # Coba impor dari lokasi yang benar
+        try:
+            from smartcash.model.manager import ModelManager
+            from smartcash.model.config.backbone_config import BackboneConfig
+            
+            # Daftar backbone yang didukung
+            backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+            
+            # Daftar model yang dioptimalkan
+            optimized_models = ModelManager.OPTIMIZED_MODELS
+            import_success = True
+        except ImportError:
+            # Coba impor alternatif jika struktur modul berubah
+            from smartcash.model.config.backbone_config import BackboneConfig
+            backbone_options = list(BackboneConfig.BACKBONE_CONFIGS.keys())
+            
+            # Definisi model yang dioptimalkan secara manual
+            optimized_models = {
+                'efficient_optimized': {
+                    'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                    'backbone': 'efficientnet_b4',
+                    'use_attention': True,
+                    'use_residual': False,
+                    'use_ciou': False
+                },
+                'yolov5s': {
+                    'description': 'YOLOv5s dengan CSPDarknet sebagai backbone',
+                    'backbone': 'cspdarknet_s',
+                    'use_attention': False,
+                    'use_residual': False,
+                    'use_ciou': False
+                },
+                'efficient_advanced': {
+                    'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
+                    'backbone': 'efficientnet_b4',
+                    'use_attention': True,
+                    'use_residual': True,
+                    'use_ciou': True
+                }
+            }
+            import_success = False
+            print(f"⚠️ Menggunakan definisi model alternatif karena ModelManager tidak dapat diimpor")
     except Exception as e:
-        # Fallback jika terjadi error saat mengakses ModelManager
-        print(f"⚠️ Error mengakses ModelManager: {str(e)}")
+        # Fallback jika terjadi error saat mengakses ModelManager dan BackboneConfig
+        print(f"⚠️ Error mengakses konfigurasi backbone: {str(e)}")
         backbone_options = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'cspdarknet_s', 'cspdarknet_m']
         
         # Buat optimized_models fallback
@@ -58,8 +92,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                 'use_attention': False,
                 'use_residual': False,
                 'use_ciou': False
+            },
+            'efficient_basic': {
+                'description': 'Model dasar tanpa optimasi khusus',
+                'backbone': 'efficientnet_b4',
+                'use_attention': False,
+                'use_residual': False,
+                'use_ciou': False
             }
         }
+        import_success = False
     
     # Import konstanta untuk styling yang konsisten
     from smartcash.ui.utils.constants import COLORS, ICONS

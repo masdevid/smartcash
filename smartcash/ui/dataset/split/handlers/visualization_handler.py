@@ -197,7 +197,7 @@ def show_distribution_visualization(output_widget, config: Dict[str, Any], env=N
 
 def get_dataset_paths(config: Dict[str, Any], env=None) -> Tuple[str, str]:
     """
-    Dapatkan path dataset dan preprocessed dataset.
+    Dapatkan path dataset dan preprocessed dataset dengan pengecekan path yang lebih baik.
     
     Args:
         config: Konfigurasi aplikasi
@@ -208,8 +208,14 @@ def get_dataset_paths(config: Dict[str, Any], env=None) -> Tuple[str, str]:
     """
     from smartcash.dataset.utils.dataset_constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH
     
+    # Cek status drive dari environment manager
     drive_mounted = env and getattr(env, 'is_drive_mounted', False)
-    base_path = '/content/drive/MyDrive/SmartCash/data' if drive_mounted else 'data'
+    
+    # Default paths berdasarkan status drive
+    if drive_mounted:
+        base_path = '/content/drive/MyDrive/SmartCash/data'
+    else:
+        base_path = 'data'
     
     # Default paths
     dataset_path = base_path
@@ -219,7 +225,31 @@ def get_dataset_paths(config: Dict[str, Any], env=None) -> Tuple[str, str]:
     if config and isinstance(config, dict) and 'data' in config and isinstance(config['data'], dict):
         dataset_path = config['data'].get('dataset_path', base_path)
         preprocessed_path = config['data'].get('preprocessed_path', f'{base_path}/preprocessed')
+    
+    # Periksa apakah path ada, jika tidak coba alternatif
+    if not os.path.exists(dataset_path) and drive_mounted:
+        # Coba path alternatif di drive
+        alt_paths = [
+            '/content/drive/MyDrive/SmartCash/data',
+            '/content/drive/MyDrive/data',
+            DRIVE_DATASET_PATH if DRIVE_DATASET_PATH else '/content/drive/MyDrive/SmartCash/data'
+        ]
         
+        for path in alt_paths:
+            if os.path.exists(path):
+                dataset_path = path
+                preprocessed_path = f'{path}/preprocessed'
+                break
+    
+    # Jika masih tidak ada, coba path lokal
+    if not os.path.exists(dataset_path):
+        local_paths = ['data', './data', '../data']
+        for path in local_paths:
+            if os.path.exists(path):
+                dataset_path = path
+                preprocessed_path = f'{path}/preprocessed'
+                break
+                
     return (dataset_path, preprocessed_path)
 
 def get_class_distribution(config: Dict[str, Any], env=None, logger=None) -> Dict[str, Dict[str, int]]:
@@ -282,8 +312,28 @@ def _map_class_names(split_classes: Dict[int, int], logger=None) -> Dict[str, in
         # Coba load dari file kelas jika ada
         class_names = {}
         
-        # Coba baca dari file data.yaml atau classes.txt
-        for file_path in ['data/data.yaml', 'data/classes.txt']:
+        # Coba baca dari file data.yaml atau classes.txt di berbagai lokasi
+        # Cek di dataset_path terlebih dahulu
+        dataset_path = None
+        try:
+            dataset_path, _ = get_dataset_paths({}, None)
+        except Exception:
+            pass
+            
+        # Daftar kemungkinan lokasi file kelas
+        possible_paths = [
+            'data/data.yaml', 'data/classes.txt',
+            os.path.join(dataset_path, 'data.yaml') if dataset_path else None,
+            os.path.join(dataset_path, 'classes.txt') if dataset_path else None,
+            '/content/drive/MyDrive/SmartCash/data/data.yaml',
+            '/content/drive/MyDrive/SmartCash/data/classes.txt'
+        ]
+        
+        # Filter path yang None
+        possible_paths = [p for p in possible_paths if p]
+        
+        # Coba setiap path
+        for file_path in possible_paths:
             if os.path.exists(file_path):
                 if file_path.endswith('.yaml'):
                     import yaml

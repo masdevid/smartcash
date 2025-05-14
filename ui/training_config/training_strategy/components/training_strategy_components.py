@@ -33,86 +33,102 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     # Tab untuk kategori strategi pelatihan
     ui_components['tabs'] = widgets.Tab()
     
-    # Tab 1: Parameter Dasar
-    ui_components['batch_size'] = widgets.IntSlider(
-        value=16,
-        min=1,
-        max=64,
-        step=1,
-        description='Batch size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+    # Tab 1: Parameter Utilitas Training
+    ui_components['experiment_name'] = widgets.Text(
+        value='efficientnet_b4_training',
+        description='Experiment name:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='500px')
     )
     
-    ui_components['epochs'] = widgets.IntSlider(
-        value=100,
-        min=1,
-        max=300,
-        step=1,
-        description='Epochs:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+    ui_components['checkpoint_dir'] = widgets.Text(
+        value='/content/runs/train/checkpoints',
+        description='Checkpoint dir:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='500px')
     )
     
-    ui_components['image_size'] = widgets.IntSlider(
-        value=640,
-        min=320,
-        max=1280,
-        step=32,
-        description='Image size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['workers'] = widgets.IntSlider(
-        value=4,
-        min=0,
-        max=16,
-        step=1,
-        description='Workers:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    # Tab 2: Validasi dan Evaluasi
-    
-    # Tambahkan val_split dengan nilai default 15% (0.15)
-    ui_components['val_split'] = widgets.FloatSlider(
-        value=0.15,
-        min=0.05,
-        max=0.3,
-        step=0.01,
-        description='Val split:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px'),
-        readout_format='.0%'
-    )
-    
-    ui_components['val_frequency'] = widgets.IntSlider(
-        value=1,
-        min=1,
-        max=10,
-        step=1,
-        description='Val frequency:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['early_stopping'] = widgets.Checkbox(
+    ui_components['tensorboard'] = widgets.Checkbox(
         value=True,
-        description='Early stopping',
+        description='Enable TensorBoard',
         style={'description_width': '200px'},
         layout=widgets.Layout(width='300px')
     )
     
-    ui_components['patience'] = widgets.IntSlider(
+    ui_components['log_metrics_every'] = widgets.IntSlider(
         value=10,
         min=1,
-        max=30,
+        max=50,
         step=1,
-        description='Patience:',
-        style={'description_width': '120px'},
+        description='Log metrics every:',
+        style={'description_width': '150px'},
         layout=widgets.Layout(width='400px')
+    )
+    
+    ui_components['visualize_batch_every'] = widgets.IntSlider(
+        value=100,
+        min=10,
+        max=500,
+        step=10,
+        description='Visualize batch every:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
+    ui_components['gradient_clipping'] = widgets.FloatSlider(
+        value=1.0,
+        min=0.1,
+        max=5.0,
+        step=0.1,
+        description='Gradient clipping:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
+    ui_components['mixed_precision'] = widgets.Checkbox(
+        value=True,
+        description='Enable mixed precision',
+        style={'description_width': '200px'},
+        layout=widgets.Layout(width='300px')
+    )
+    
+    # Tab 2: Validasi dan Evaluasi
+    ui_components['validation_frequency'] = widgets.IntSlider(
+        value=1,
+        min=1,
+        max=10,
+        step=1,
+        description='Validation frequency:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
+    ui_components['iou_threshold'] = widgets.FloatSlider(
+        value=0.6,
+        min=0.1,
+        max=0.9,
+        step=0.05,
+        description='IoU threshold:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
+    ui_components['conf_threshold'] = widgets.FloatSlider(
+        value=0.001,
+        min=0.0001,
+        max=0.01,
+        step=0.0001,
+        description='Conf threshold:',
+        style={'description_width': '150px'},
+        layout=widgets.Layout(width='400px')
+    )
+    
+    # Tab 3: Multi-scale Training
+    ui_components['multi_scale'] = widgets.Checkbox(
+        value=True,
+        description='Enable multi-scale training',
+        style={'description_width': '200px'},
+        layout=widgets.Layout(width='300px')
     )
     
     # Menghapus tab eksperimen dan multi-GPU sesuai permintaan
@@ -128,24 +144,31 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Susun layout
-    basic_box = widgets.VBox([
-        ui_components['batch_size'],
-        ui_components['epochs'],
-        ui_components['image_size'],
-        ui_components['workers']
+    utils_box = widgets.VBox([
+        ui_components['experiment_name'],
+        ui_components['checkpoint_dir'],
+        ui_components['tensorboard'],
+        ui_components['log_metrics_every'],
+        ui_components['visualize_batch_every'],
+        ui_components['gradient_clipping'],
+        ui_components['mixed_precision']
     ])
     
     validation_box = widgets.VBox([
-        ui_components['val_split'],
-        ui_components['val_frequency'],
-        ui_components['early_stopping'],
-        ui_components['patience']
+        ui_components['validation_frequency'],
+        ui_components['iou_threshold'],
+        ui_components['conf_threshold']
     ])
     
-    # Buat tabs (hanya parameter dasar dan validasi)
-    ui_components['tabs'].children = [basic_box, validation_box]
-    ui_components['tabs'].set_title(0, 'Parameter Dasar')
+    multiscale_box = widgets.VBox([
+        ui_components['multi_scale']
+    ])
+    
+    # Buat tabs
+    ui_components['tabs'].children = [utils_box, validation_box, multiscale_box]
+    ui_components['tabs'].set_title(0, 'Utilitas Training')
     ui_components['tabs'].set_title(1, 'Validasi')
+    ui_components['tabs'].set_title(2, 'Multi-scale')
     
     ui_components['info_box'] = widgets.VBox(
         [ui_components['training_strategy_info']],

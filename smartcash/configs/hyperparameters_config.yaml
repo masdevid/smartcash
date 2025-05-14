@@ -1,5 +1,9 @@
 # File: configs/hyperparameters_config.yaml
-# Konfigurasi hyperparameter untuk model YOLOv5 dengan EfficientNet-B4 backbone
+# Author: Alfrida Sabar (Direvisi)
+# Deskripsi: Konfigurasi hyperparameter untuk optimasi dan training model
+
+# Inherit dari base_config.yaml
+_base_: 'base_config.yaml'
 
 hyperparameters:
   # Parameter dasar
@@ -32,13 +36,6 @@ hyperparameters:
   anchor_t: 4.0
   fl_gamma: 0.0
   
-  # EfficientNet-B4 specific
-  efficientnet:
-    width_coefficient: 1.4
-    depth_coefficient: 1.8
-    resolution: 380
-    dropout_rate: 0.4
-    
   # Parameter early stopping
   early_stopping:
     enabled: true
@@ -50,19 +47,3 @@ hyperparameters:
     save_period: 10
     save_best: true
     metric: 'mAP'
-    
-  # Parameter validasi
-  validation:
-    frequency: 1
-    iou_thres: 0.6
-    conf_thres: 0.001
-    
-  # Parameter multi-scale training
-  multi_scale: true
-  
-  # Parameter transfer learning
-  transfer_learning:
-    enabled: true
-    freeze_backbone: false
-    freeze_batch_norm: false
-    unfreeze_after_epochs: 10

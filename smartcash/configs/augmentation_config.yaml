@@ -18,6 +18,7 @@ augmentation:
     - 'combined'
     - 'position'
     - 'lighting'
+    - 'extreme_rotation'
 
 # Pengaturan pengelolaan data augmentasi
 cleanup:

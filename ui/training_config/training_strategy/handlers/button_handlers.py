@@ -21,8 +21,8 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
     """
     try:
         # Import dengan penanganan error minimal
-        from smartcash.ui.training_config.config_handler import save_config, reset_config
-        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.common.config.manager import ConfigManager
+        from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
         # Dapatkan logger jika tersedia
         logger = ui_components.get('logger', None)
@@ -30,16 +30,27 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         # Validasi config
         if config is None: config = {}
         
-        # Default config (sudah dihapus komponen yang tidak digunakan)
+        # Default config sesuai dengan training_config.yaml terbaru
         default_config = {
-            'training': {
-                'batch_size': 16,
-                'epochs': 100,
-                'image_size': 640,
-                'workers': 4,
-                'val_frequency': 1,
-                'early_stopping': True,
-                'patience': 10
+            # Parameter validasi
+            'validation': {
+                'frequency': 1,
+                'iou_thres': 0.6,
+                'conf_thres': 0.001
+            },
+            
+            # Parameter multi-scale training
+            'multi_scale': True,
+            
+            # Konfigurasi tambahan untuk proses training
+            'training_utils': {
+                'experiment_name': 'efficientnet_b4_training',
+                'checkpoint_dir': '/content/runs/train/checkpoints',
+                'tensorboard': True,
+                'log_metrics_every': 10,
+                'visualize_batch_every': 100,
+                'gradient_clipping': 1.0,
+                'mixed_precision': True
             }
         }
         
@@ -47,17 +58,28 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         def update_config_from_ui(current_config=None):
             if current_config is None: current_config = config
             
-            # Update config dari nilai UI
-            if 'training' not in current_config:
-                current_config['training'] = {}
+            # Update parameter validasi
+            if 'validation' not in current_config:
+                current_config['validation'] = {}
                 
-            current_config['training']['batch_size'] = ui_components['batch_size'].value
-            current_config['training']['epochs'] = ui_components['epochs'].value
-            current_config['training']['image_size'] = ui_components['image_size'].value
-            current_config['training']['workers'] = ui_components['workers'].value
-            current_config['training']['val_frequency'] = ui_components['val_frequency'].value
-            current_config['training']['early_stopping'] = ui_components['early_stopping'].value
-            current_config['training']['patience'] = ui_components['patience'].value
+            current_config['validation']['frequency'] = ui_components['validation_frequency'].value
+            current_config['validation']['iou_thres'] = ui_components['iou_threshold'].value
+            current_config['validation']['conf_thres'] = ui_components['conf_threshold'].value
+            
+            # Update parameter multi-scale training
+            current_config['multi_scale'] = ui_components['multi_scale'].value
+            
+            # Update parameter training_utils
+            if 'training_utils' not in current_config:
+                current_config['training_utils'] = {}
+                
+            current_config['training_utils']['experiment_name'] = ui_components['experiment_name'].value
+            current_config['training_utils']['checkpoint_dir'] = ui_components['checkpoint_dir'].value
+            current_config['training_utils']['tensorboard'] = ui_components['tensorboard'].value
+            current_config['training_utils']['log_metrics_every'] = ui_components['log_metrics_every'].value
+            current_config['training_utils']['visualize_batch_every'] = ui_components['visualize_batch_every'].value
+            current_config['training_utils']['gradient_clipping'] = ui_components['gradient_clipping'].value
+            current_config['training_utils']['mixed_precision'] = ui_components['mixed_precision'].value
             
             # Update info strategi pelatihan
             update_training_strategy_info()
@@ -65,24 +87,39 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
             return current_config
         
         # Update UI dari config
-        def update_ui_from_config():
-            if not config or 'training' not in config: return
+        def update_ui_from_config(current_config=None):
+            if current_config is None: current_config = config
             
             try:
-                if 'batch_size' in config['training']:
-                    ui_components['batch_size'].value = config['training']['batch_size']
-                if 'epochs' in config['training']:
-                    ui_components['epochs'].value = config['training']['epochs']
-                if 'image_size' in config['training']:
-                    ui_components['image_size'].value = config['training']['image_size']
-                if 'workers' in config['training']:
-                    ui_components['workers'].value = config['training']['workers']
-                if 'val_frequency' in config['training']:
-                    ui_components['val_frequency'].value = config['training']['val_frequency']
-                if 'early_stopping' in config['training']:
-                    ui_components['early_stopping'].value = config['training']['early_stopping']
-                if 'patience' in config['training']:
-                    ui_components['patience'].value = config['training']['patience']
+                # Update parameter validasi
+                if 'validation' in current_config:
+                    if 'frequency' in current_config['validation']:
+                        ui_components['validation_frequency'].value = current_config['validation']['frequency']
+                    if 'iou_thres' in current_config['validation']:
+                        ui_components['iou_threshold'].value = current_config['validation']['iou_thres']
+                    if 'conf_thres' in current_config['validation']:
+                        ui_components['conf_threshold'].value = current_config['validation']['conf_thres']
+                
+                # Update parameter multi-scale training
+                if 'multi_scale' in current_config:
+                    ui_components['multi_scale'].value = current_config['multi_scale']
+                
+                # Update parameter training_utils
+                if 'training_utils' in current_config:
+                    if 'experiment_name' in current_config['training_utils']:
+                        ui_components['experiment_name'].value = current_config['training_utils']['experiment_name']
+                    if 'checkpoint_dir' in current_config['training_utils']:
+                        ui_components['checkpoint_dir'].value = current_config['training_utils']['checkpoint_dir']
+                    if 'tensorboard' in current_config['training_utils']:
+                        ui_components['tensorboard'].value = current_config['training_utils']['tensorboard']
+                    if 'log_metrics_every' in current_config['training_utils']:
+                        ui_components['log_metrics_every'].value = current_config['training_utils']['log_metrics_every']
+                    if 'visualize_batch_every' in current_config['training_utils']:
+                        ui_components['visualize_batch_every'].value = current_config['training_utils']['visualize_batch_every']
+                    if 'gradient_clipping' in current_config['training_utils']:
+                        ui_components['gradient_clipping'].value = current_config['training_utils']['gradient_clipping']
+                    if 'mixed_precision' in current_config['training_utils']:
+                        ui_components['mixed_precision'].value = current_config['training_utils']['mixed_precision']
                 
                 # Update info strategi pelatihan
                 update_training_strategy_info()
@@ -95,32 +132,27 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         def update_training_strategy_info():
             try:
                 # Dapatkan nilai dari UI
-                batch_size = ui_components['batch_size'].value
-                epochs = ui_components['epochs'].value
-                image_size = ui_components['image_size'].value
-                early_stopping = ui_components['early_stopping'].value
-                val_frequency = ui_components['val_frequency'].value
-                patience = ui_components['patience'].value
-                
-                # Estimasi jumlah iterasi
-                # Asumsikan dataset berisi 1000 gambar (ganti dengan jumlah sebenarnya jika diketahui)
-                dataset_size = 1000
-                val_split = 0.2  # Default value since we removed the slider
-                train_size = int(dataset_size * (1 - val_split))
-                iterations_per_epoch = train_size // batch_size
-                total_iterations = iterations_per_epoch * epochs
+                experiment_name = ui_components['experiment_name'].value
+                checkpoint_dir = ui_components['checkpoint_dir'].value
+                tensorboard = ui_components['tensorboard'].value
+                validation_frequency = ui_components['validation_frequency'].value
+                iou_threshold = ui_components['iou_threshold'].value
+                conf_threshold = ui_components['conf_threshold'].value
+                multi_scale = ui_components['multi_scale'].value
+                mixed_precision = ui_components['mixed_precision'].value
                 
                 # Buat informasi HTML
                 info_html = f"""
                 <h4>Ringkasan Strategi Pelatihan</h4>
                 <ul>
-                    <li><b>Batch Size:</b> {batch_size}</li>
-                    <li><b>Epochs:</b> {epochs}</li>
-                    <li><b>Resolusi Gambar:</b> {image_size}x{image_size}</li>
-                    <li><b>Early Stopping:</b> {'Aktif' if early_stopping else 'Nonaktif'}</li>
-                    <li><b>Validasi Setiap:</b> {val_frequency} epoch</li>
-                    <li><b>Patience:</b> {patience} epoch</li>
-                    <li><b>Estimasi Iterasi:</b> ~{total_iterations} (berdasarkan asumsi dataset)</li>
+                    <li><b>Experiment Name:</b> {experiment_name}</li>
+                    <li><b>Checkpoint Dir:</b> {checkpoint_dir}</li>
+                    <li><b>TensorBoard:</b> {'Aktif' if tensorboard else 'Nonaktif'}</li>
+                    <li><b>Validasi Setiap:</b> {validation_frequency} epoch</li>
+                    <li><b>IoU Threshold:</b> {iou_threshold}</li>
+                    <li><b>Confidence Threshold:</b> {conf_threshold}</li>
+                    <li><b>Multi-scale Training:</b> {'Aktif' if multi_scale else 'Nonaktif'}</li>
+                    <li><b>Mixed Precision:</b> {'Aktif' if mixed_precision else 'Nonaktif'}</li>
                 </ul>
                 <p><i>Catatan: Pastikan parameter pelatihan sesuai dengan kebutuhan dan kapasitas hardware.</i></p>
                 """
@@ -130,11 +162,50 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 ui_components['training_strategy_info'].value = f"<p style='color:red'>❌ Error: {str(e)}</p>"
         
         # Handler buttons
-        def on_save_click(b): 
-            save_config(ui_components, config, "configs/training_config.yaml", update_config_from_ui, "Strategi Pelatihan")
+        def on_save_click(b):
+            try:
+                # Dapatkan config manager
+                config_manager = ConfigManager.get_instance()
+                
+                # Update config dari UI
+                updated_config = update_config_from_ui()
+                
+                # Simpan ke config manager
+                config_manager.save_module_config('training_strategy', updated_config)
+                
+                # Register UI components untuk persistensi
+                config_manager.register_ui_components('training_strategy', ui_components)
+                
+                # Tampilkan pesan sukses
+                with ui_components['status']:
+                    display(create_info_alert("Konfigurasi strategi pelatihan berhasil disimpan", alert_type='success'))
+                
+                if logger: logger.info("✅ Konfigurasi strategi pelatihan berhasil disimpan")
+            except Exception as e:
+                with ui_components['status']:
+                    display(create_info_alert(f"Gagal menyimpan konfigurasi: {str(e)}", alert_type='error'))
+                if logger: logger.error(f"❌ Error menyimpan konfigurasi strategi pelatihan: {e}")
         
-        def on_reset_click(b): 
-            reset_config(ui_components, config, default_config, update_ui_from_config, "Strategi Pelatihan")
+        def on_reset_click(b):
+            try:
+                # Dapatkan config manager
+                config_manager = ConfigManager.get_instance()
+                
+                # Reset ke default config
+                config_manager.reset_module_config('training_strategy', default_config)
+                
+                # Update UI dari default config
+                update_ui_from_config(default_config)
+                
+                # Tampilkan pesan sukses
+                with ui_components['status']:
+                    display(create_info_alert("Konfigurasi strategi pelatihan berhasil direset ke default", alert_type='success'))
+                
+                if logger: logger.info("✅ Konfigurasi strategi pelatihan berhasil direset ke default")
+            except Exception as e:
+                with ui_components['status']:
+                    display(create_info_alert(f"Gagal mereset konfigurasi: {str(e)}", alert_type='error'))
+                if logger: logger.error(f"❌ Error mereset konfigurasi strategi pelatihan: {e}")
         
         # Register handlers
         ui_components['save_button'].on_click(on_save_click)
@@ -145,8 +216,29 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         ui_components['update_ui_from_config'] = update_ui_from_config
         ui_components['update_training_strategy_info'] = update_training_strategy_info
         
-        # Inisialisasi UI dari config
-        update_ui_from_config()
+        # Inisialisasi UI dari config yang disimpan
+        try:
+            # Dapatkan config manager
+            config_manager = ConfigManager.get_instance()
+            
+            # Coba dapatkan konfigurasi yang disimpan
+            saved_config = config_manager.get_module_config('training_strategy')
+            
+            if saved_config:
+                # Update UI dari konfigurasi yang disimpan
+                update_ui_from_config(saved_config)
+                if logger: logger.info("✅ UI strategi pelatihan diinisialisasi dari konfigurasi yang disimpan")
+            else:
+                # Jika tidak ada konfigurasi yang disimpan, gunakan default
+                update_ui_from_config(default_config)
+                if logger: logger.info("ℹ️ UI strategi pelatihan diinisialisasi dari konfigurasi default")
+                
+            # Register UI components untuk persistensi
+            config_manager.register_ui_components('training_strategy', ui_components)
+        except Exception as e:
+            # Fallback ke default jika terjadi error
+            update_ui_from_config(default_config)
+            if logger: logger.warning(f"⚠️ Error inisialisasi UI strategi pelatihan: {e}, menggunakan default")
         
     except Exception as e:
         # Fallback sederhana jika terjadi error

@@ -109,18 +109,56 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
                 config_manager = get_config_manager()
                 
                 # Ekstrak konfigurasi dari UI
-                current_config = config_manager.get_module_config('model')
-                updated_config = extract_config_from_ui(ui_components, current_config, 'model', logger)
+                current_config = config_manager.get_module_config('model') or {}
+                
+                # Ambil nilai dari UI components
+                model_config = {}
+                
+                # Ambil nilai model_type
+                if 'model_type' in ui_components and ui_components['model_type']:
+                    model_type = ui_components['model_type'].value
+                    model_config['type'] = model_type
+                    
+                # Ambil nilai backbone_type
+                if 'backbone_type' in ui_components and ui_components['backbone_type']:
+                    backbone = ui_components['backbone_type'].value
+                    model_config['backbone'] = backbone
+                    
+                # Ambil nilai pretrained
+                if 'pretrained_checkbox' in ui_components and ui_components['pretrained_checkbox']:
+                    pretrained = ui_components['pretrained_checkbox'].value
+                    model_config['backbone_pretrained'] = pretrained
+                    
+                # Ambil nilai freeze_backbone
+                if 'freeze_backbone_checkbox' in ui_components and ui_components['freeze_backbone_checkbox']:
+                    freeze = ui_components['freeze_backbone_checkbox'].value
+                    model_config['backbone_freeze'] = freeze
+                
+                # Tambahkan properti yang diperlukan
+                model_config['use_attention'] = False
+                model_config['use_residual'] = False
+                model_config['use_ciou'] = False
+                
+                # Jika model_type adalah efficient_advanced, sesuaikan properti
+                if model_config.get('type') == 'efficient_advanced':
+                    model_config['use_attention'] = True
+                    model_config['use_residual'] = True
+                    model_config['use_ciou'] = True
+                
+                # Update konfigurasi model
+                current_config.update(model_config)
                 
                 # Simpan konfigurasi menggunakan config manager
-                success = config_manager.save_module_config('model', updated_config)
+                success = config_manager.save_module_config('model', current_config)
                 
                 # Tampilkan pesan sukses atau error
                 with ui_components['status']:
                     if success:
-                        display(HTML(f"<div style='color:green'>✅ Konfigurasi backbone berhasil disimpan</div>"))
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        display(create_status_indicator("success", "Konfigurasi backbone berhasil disimpan"))
                     else:
-                        display(HTML(f"<div style='color:orange'>⚠️ Konfigurasi backbone mungkin tidak tersimpan dengan benar</div>"))
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        display(create_status_indicator("warning", "Konfigurasi backbone mungkin tidak tersimpan dengan benar"))
                     
                 if logger:
                     if success:
@@ -131,7 +169,8 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             except Exception as e:
                 # Tampilkan pesan error
                 with ui_components['status']:
-                    display(HTML(f"<div style='color:red'>❌ Error: {str(e)}</div>"))
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    display(create_status_indicator("error", f"Error: {str(e)}"))
                     
                 if logger:
                     logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
@@ -147,58 +186,102 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
             """Handler untuk tombol reset konfigurasi."""
             try:
                 # Reset ke konfigurasi default dengan efficient_basic
-                try:
-                    from smartcash.common.default_config import generate_default_config
-                    default_config = generate_default_config()
-                except Exception as config_error:
-                    logger.warning(f"⚠️ Error saat generate default config: {str(config_error)}")
-                    default_config = {}
+                # Definisikan nilai default secara langsung untuk menghindari dependensi
+                default_model = {
+                    'type': 'efficient_basic',
+                    'backbone': 'efficientnet_b4',
+                    'backbone_pretrained': True,
+                    'backbone_freeze': False,
+                    'use_attention': False,
+                    'use_residual': False,
+                    'use_ciou': False
+                }
                 
-                # Pastikan struktur konfigurasi ada
-                if 'model' not in default_config:
-                    default_config['model'] = {}
+                # Update UI dengan konfigurasi default dengan penanganan error yang lebih baik
+                # Pertama, periksa apakah model_type ada dalam opsi yang tersedia
+                if 'model_type' in ui_components:
+                    try:
+                        # Dapatkan opsi yang tersedia
+                        available_options = list(ui_components['model_type'].options)
+                        model_type = default_model['type']
+                        
+                        # Periksa apakah nilai default ada dalam opsi
+                        if model_type in available_options:
+                            ui_components['model_type'].value = model_type
+                        else:
+                            # Jika tidak ada, gunakan opsi pertama yang tersedia
+                            if available_options:
+                                ui_components['model_type'].value = available_options[0]
+                                logger.warning(f"⚠️ Model type '{model_type}' tidak tersedia, menggunakan '{available_options[0]}'")
+                    except Exception as e1:
+                        logger.warning(f"⚠️ Error saat update model_type: {str(e1)}")
                 
-                # Set nilai-nilai default yang penting
-                default_config['model']['type'] = 'efficient_basic'
-                default_config['model']['backbone'] = 'efficientnet_b4'
-                default_config['model']['pretrained'] = True
-                default_config['model']['freeze_backbone'] = False
+                # Kemudian, periksa backbone_type
+                if 'backbone_type' in ui_components:
+                    try:
+                        # Dapatkan opsi yang tersedia
+                        available_options = list(ui_components['backbone_type'].options)
+                        backbone = default_model['backbone']
+                        
+                        # Periksa apakah nilai default ada dalam opsi
+                        if backbone in available_options:
+                            ui_components['backbone_type'].value = backbone
+                        else:
+                            # Jika tidak ada, gunakan opsi pertama yang tersedia
+                            if available_options:
+                                ui_components['backbone_type'].value = available_options[0]
+                                logger.warning(f"⚠️ Backbone '{backbone}' tidak tersedia, menggunakan '{available_options[0]}'")
+                    except Exception as e2:
+                        logger.warning(f"⚠️ Error saat update backbone_type: {str(e2)}")
                 
-                # Tambahkan nilai default untuk properti yang sudah dihapus dari UI
-                # untuk menghindari error saat mengakses
-                default_config['model']['use_attention'] = False
-                default_config['model']['use_residual'] = False
-                default_config['model']['use_ciou'] = False
-                
-                # Update UI dengan konfigurasi default secara satu per satu dengan penanganan error
-                try:
-                    if 'model_type' in ui_components:
-                        ui_components['model_type'].value = default_config['model']['type']
-                except Exception as e1:
-                    logger.warning(f"⚠️ Error saat update model_type: {str(e1)}")
-                    
-                try:
-                    if 'backbone_type' in ui_components:
-                        ui_components['backbone_type'].value = default_config['model']['backbone']
-                except Exception as e2:
-                    logger.warning(f"⚠️ Error saat update backbone_type: {str(e2)}")
-                    
+                # Update checkbox dengan nilai default
                 try:
                     if 'pretrained_checkbox' in ui_components:
-                        ui_components['pretrained_checkbox'].value = default_config['model']['pretrained']
+                        ui_components['pretrained_checkbox'].value = default_model['backbone_pretrained']
                 except Exception as e3:
                     logger.warning(f"⚠️ Error saat update pretrained_checkbox: {str(e3)}")
-                    
+                
                 try:
                     if 'freeze_backbone_checkbox' in ui_components:
-                        ui_components['freeze_backbone_checkbox'].value = default_config['model']['freeze_backbone']
+                        ui_components['freeze_backbone_checkbox'].value = default_model['backbone_freeze']
                 except Exception as e4:
                     logger.warning(f"⚠️ Error saat update freeze_backbone_checkbox: {str(e4)}")
                 
-                # Tampilkan pesan sukses
-                logger.info("✅ Berhasil mereset konfigurasi ke efficient_basic")
+                # Simpan konfigurasi default ke file
+                try:
+                    from smartcash.common.config.manager import get_config_manager
+                    config_manager = get_config_manager()
+                    
+                    # Dapatkan konfigurasi saat ini dan update dengan nilai default
+                    current_config = config_manager.get_module_config('model') or {}
+                    current_config.update(default_model)
+                    
+                    # Simpan konfigurasi
+                    success = config_manager.save_module_config('model', current_config)
+                    
+                    if success:
+                        # Tampilkan pesan sukses
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            display(create_status_indicator("success", "Konfigurasi berhasil direset ke default"))
+                        logger.info("✅ Berhasil mereset dan menyimpan konfigurasi ke efficient_basic")
+                    else:
+                        # Tampilkan pesan warning
+                        with ui_components['status']:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            display(create_status_indicator("warning", "Konfigurasi direset di UI tetapi mungkin tidak tersimpan ke file"))
+                        logger.warning("⚠️ Konfigurasi direset di UI tetapi mungkin tidak tersimpan ke file")
+                        
+                except Exception as save_error:
+                    logger.warning(f"⚠️ Error saat menyimpan konfigurasi default: {str(save_error)}")
+                    with ui_components['status']:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        display(create_status_indicator("warning", f"Konfigurasi direset di UI tetapi tidak tersimpan: {str(save_error)}"))
             except Exception as e:
                 logger.error(f"❌ Error saat reset konfigurasi: {str(e)}")
+                with ui_components['status']:
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    display(create_status_indicator("error", f"Error saat reset konfigurasi: {str(e)}"))
         
         # Register handler untuk tombol
         ui_components['save_button'].on_click(on_save_config)

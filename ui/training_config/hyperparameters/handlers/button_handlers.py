@@ -21,8 +21,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
     """
     try:
         # Import dengan penanganan error minimal
-        from smartcash.ui.training_config.config_handler import save_config, reset_config
-        from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.common.config.manager import ConfigManager
+        from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
         # Dapatkan logger jika tersedia
         logger = ui_components.get('logger', None)
@@ -30,88 +30,103 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         # Validasi config
         if config is None: config = {}
         
-        # Default config
+        # Default config berdasarkan hyperparameter_config.yaml terbaru
         default_config = {
             'hyperparameters': {
-                'optimizer': {
-                    'type': 'AdamW',
-                    'lr': 0.001,
-                    'weight_decay': 0.0005,
-                    'momentum': 0.9
+                # Parameter dasar
+                'batch_size': 16,
+                'image_size': 640,
+                'epochs': 100,
+                
+                # Parameter optimasi
+                'optimizer': 'Adam',
+                'learning_rate': 0.001,
+                'weight_decay': 0.0005,
+                'momentum': 0.937,
+                
+                # Parameter penjadwalan
+                'lr_scheduler': 'cosine',
+                'warmup_epochs': 3,
+                'warmup_momentum': 0.8,
+                'warmup_bias_lr': 0.1,
+                
+                # Parameter regularisasi
+                'augment': True,
+                'dropout': 0.0,
+                
+                # Parameter loss
+                'box_loss_gain': 0.05,
+                'cls_loss_gain': 0.5,
+                'obj_loss_gain': 1.0,
+                
+                # Parameter anchor
+                'anchor_t': 4.0,
+                'fl_gamma': 0.0,
+                
+                # Parameter early stopping
+                'early_stopping': {
+                    'enabled': True,
+                    'patience': 15,
+                    'min_delta': 0.001
                 },
-                'scheduler': {
-                    'type': 'cosine',
-                    'warmup_epochs': 3,
-                    'step_size': 30,
-                    'gamma': 0.1
-                },
-                'augmentation': {
-                    'use_augmentation': True,
-                    'mosaic': True,
-                    'mixup': False,
-                    'flip': True,
-                    'hsv_h': 0.015,
-                    'hsv_s': 0.7,
-                    'hsv_v': 0.4
+                
+                # Parameter checkpoint
+                'checkpoint': {
+                    'save_period': 10,
+                    'save_best': True,
+                    'metric': 'mAP'
                 }
             }
         }
         
         # Update config dari UI
         def update_config_from_ui(current_config=None):
-            # Validasi input config
-            if current_config is None: 
-                current_config = config
+            if current_config is None: current_config = config
             
-            # Pastikan current_config adalah dictionary
-            if not isinstance(current_config, dict):
-                if logger: logger.warning(f"⚠️ Config bukan dictionary: {type(current_config).__name__}")
-                current_config = {}
+            # Pastikan struktur config ada
+            if 'hyperparameters' not in current_config:
+                current_config['hyperparameters'] = {}
             
-            # Buat deep copy untuk menghindari referensi yang tidak diinginkan
-            import copy
-            updated_config = copy.deepcopy(current_config)
+            # Update parameter dasar
+            current_config['hyperparameters']['batch_size'] = ui_components['batch_size'].value
+            current_config['hyperparameters']['image_size'] = ui_components['image_size'].value
+            current_config['hyperparameters']['epochs'] = ui_components['epochs'].value
             
-            # Update config dari nilai UI
-            if 'hyperparameters' not in updated_config:
-                updated_config['hyperparameters'] = {}
-                
-            # Optimizer
-            if 'optimizer' not in updated_config['hyperparameters']:
-                updated_config['hyperparameters']['optimizer'] = {}
-                
-            updated_config['hyperparameters']['optimizer']['type'] = ui_components['optimizer_type'].value
-            updated_config['hyperparameters']['optimizer']['lr'] = ui_components['learning_rate'].value
-            updated_config['hyperparameters']['optimizer']['weight_decay'] = ui_components['weight_decay'].value
-            updated_config['hyperparameters']['optimizer']['momentum'] = ui_components['momentum'].value
+            # Update parameter optimasi
+            current_config['hyperparameters']['optimizer'] = ui_components['optimizer_type'].value
+            current_config['hyperparameters']['learning_rate'] = ui_components['learning_rate'].value
+            current_config['hyperparameters']['weight_decay'] = ui_components['weight_decay'].value
+            current_config['hyperparameters']['momentum'] = ui_components['momentum'].value
             
-            # Scheduler
-            if 'scheduler' not in updated_config['hyperparameters']:
-                updated_config['hyperparameters']['scheduler'] = {}
-                
-            updated_config['hyperparameters']['scheduler']['type'] = ui_components['scheduler_type'].value
-            updated_config['hyperparameters']['scheduler']['warmup_epochs'] = ui_components['warmup_epochs'].value
-            updated_config['hyperparameters']['scheduler']['step_size'] = ui_components['step_size'].value
-            updated_config['hyperparameters']['scheduler']['gamma'] = ui_components['gamma'].value
+            # Update parameter penjadwalan
+            current_config['hyperparameters']['lr_scheduler'] = ui_components['lr_scheduler'].value
+            current_config['hyperparameters']['warmup_epochs'] = ui_components['warmup_epochs'].value
+            current_config['hyperparameters']['warmup_momentum'] = ui_components['warmup_momentum'].value
+            current_config['hyperparameters']['warmup_bias_lr'] = ui_components['warmup_bias_lr'].value
             
-            # Augmentation
-            if 'augmentation' not in updated_config['hyperparameters']:
-                updated_config['hyperparameters']['augmentation'] = {}
-                
-            updated_config['hyperparameters']['augmentation']['use_augmentation'] = ui_components['use_augmentation'].value
-            updated_config['hyperparameters']['augmentation']['mosaic'] = ui_components['mosaic'].value
-            updated_config['hyperparameters']['augmentation']['mixup'] = ui_components['mixup'].value
-            updated_config['hyperparameters']['augmentation']['flip'] = ui_components['flip'].value
-            updated_config['hyperparameters']['augmentation']['hsv_h'] = ui_components['hsv_h'].value
-            updated_config['hyperparameters']['augmentation']['hsv_s'] = ui_components['hsv_s'].value
-            updated_config['hyperparameters']['augmentation']['hsv_v'] = ui_components['hsv_v'].value
+            # Update parameter regularisasi
+            current_config['hyperparameters']['augment'] = ui_components['augment'].value
+            current_config['hyperparameters']['dropout'] = ui_components['dropout'].value
             
-            # Update info hyperparameter
-            update_hyperparameters_info()
+            # Update parameter loss
+            current_config['hyperparameters']['box_loss_gain'] = ui_components['box_loss_gain'].value
+            current_config['hyperparameters']['cls_loss_gain'] = ui_components['cls_loss_gain'].value
+            current_config['hyperparameters']['obj_loss_gain'] = ui_components['obj_loss_gain'].value
             
-            # Penting: Kembalikan config yang sudah diupdate
-            return updated_config
-            update_hyperparameters_info()
+            # Update parameter early stopping
+            if 'early_stopping' not in current_config['hyperparameters']:
+                current_config['hyperparameters']['early_stopping'] = {}
+            
+            current_config['hyperparameters']['early_stopping']['enabled'] = ui_components['early_stopping_enabled'].value
+            current_config['hyperparameters']['early_stopping']['patience'] = ui_components['early_stopping_patience'].value
+            current_config['hyperparameters']['early_stopping']['min_delta'] = ui_components['early_stopping_min_delta'].value
+            
+            # Update parameter checkpoint
+            if 'checkpoint' not in current_config['hyperparameters']:
+                current_config['hyperparameters']['checkpoint'] = {}
+            
+            current_config['hyperparameters']['checkpoint']['save_best'] = ui_components['checkpoint_save_best'].value
+            current_config['hyperparameters']['checkpoint']['save_period'] = ui_components['checkpoint_save_period'].value
             
             return current_config
         
@@ -170,19 +185,36 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         def update_hyperparameters_info():
             try:
                 # Dapatkan nilai dari UI
+                # Parameter dasar
+                batch_size = ui_components['batch_size'].value
+                image_size = ui_components['image_size'].value
+                epochs = ui_components['epochs'].value
+                
+                # Parameter optimasi
                 optimizer_type = ui_components['optimizer_type'].value
                 lr = ui_components['learning_rate'].value
                 weight_decay = ui_components['weight_decay'].value
-                scheduler_type = ui_components['scheduler_type'].value
-                use_augmentation = ui_components['use_augmentation'].value
+                momentum = ui_components['momentum'].value
+                
+                # Parameter penjadwalan
+                scheduler_type = ui_components['lr_scheduler'].value
+                
+                # Parameter regularisasi
+                use_augmentation = ui_components['augment'].value
+                dropout = ui_components['dropout'].value
+                
+                # Parameter early stopping
+                early_stopping = ui_components['early_stopping_enabled'].value
                 
                 # Buat informasi HTML
                 info_html = f"""
                 <h4>Ringkasan Hyperparameter</h4>
                 <ul>
-                    <li><b>Optimizer:</b> {optimizer_type} (LR: {lr:.6f}, Weight Decay: {weight_decay:.6f})</li>
+                    <li><b>Parameter Dasar:</b> Batch Size: {batch_size}, Image Size: {image_size}, Epochs: {epochs}</li>
+                    <li><b>Optimizer:</b> {optimizer_type} (LR: {lr:.6f}, Weight Decay: {weight_decay:.6f}, Momentum: {momentum:.3f})</li>
                     <li><b>Scheduler:</b> {scheduler_type.capitalize()}</li>
-                    <li><b>Augmentasi:</b> {'Aktif' if use_augmentation else 'Nonaktif'}</li>
+                    <li><b>Regularisasi:</b> Augmentasi: {'Aktif' if use_augmentation else 'Nonaktif'}, Dropout: {dropout:.2f}</li>
+                    <li><b>Early Stopping:</b> {'Aktif' if early_stopping else 'Nonaktif'}</li>
                 </ul>
                 <p><i>Catatan: Hyperparameter yang tepat sangat penting untuk performa model yang optimal.</i></p>
                 """
@@ -192,11 +224,50 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 ui_components['hyperparameters_info'].value = f"<p style='color:red'>❌ Error: {str(e)}</p>"
         
         # Handler buttons
-        def on_save_click(b): 
-            save_config(ui_components, config, "configs/hyperparameters_config.yaml", update_config_from_ui, "Hyperparameter")
+        def on_save_click(b):
+            try:
+                # Dapatkan config manager
+                config_manager = ConfigManager.get_instance()
+                
+                # Update config dari UI
+                updated_config = update_config_from_ui()
+                
+                # Simpan ke config manager
+                config_manager.save_module_config('hyperparameters', updated_config)
+                
+                # Register UI components untuk persistensi
+                config_manager.register_ui_components('hyperparameters', ui_components)
+                
+                # Tampilkan pesan sukses
+                with ui_components['status']:
+                    display(create_info_alert("Konfigurasi hyperparameter berhasil disimpan", alert_type='success'))
+                
+                if logger: logger.info("✅ Konfigurasi hyperparameter berhasil disimpan")
+            except Exception as e:
+                with ui_components['status']:
+                    display(create_info_alert(f"Gagal menyimpan konfigurasi: {str(e)}", alert_type='error'))
+                if logger: logger.error(f"❌ Error menyimpan konfigurasi hyperparameter: {e}")
         
-        def on_reset_click(b): 
-            reset_config(ui_components, config, default_config, update_ui_from_config, "Hyperparameter")
+        def on_reset_click(b):
+            try:
+                # Dapatkan config manager
+                config_manager = ConfigManager.get_instance()
+                
+                # Reset ke default config
+                config_manager.reset_module_config('hyperparameters', default_config)
+                
+                # Update UI dari default config
+                update_ui_from_config(default_config)
+                
+                # Tampilkan pesan sukses
+                with ui_components['status']:
+                    display(create_info_alert("Konfigurasi hyperparameter berhasil direset ke default", alert_type='success'))
+                
+                if logger: logger.info("✅ Konfigurasi hyperparameter berhasil direset ke default")
+            except Exception as e:
+                with ui_components['status']:
+                    display(create_info_alert(f"Gagal mereset konfigurasi: {str(e)}", alert_type='error'))
+                if logger: logger.error(f"❌ Error mereset konfigurasi hyperparameter: {e}")
         
         # Register handlers
         ui_components['save_button'].on_click(on_save_click)
@@ -207,8 +278,29 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         ui_components['update_ui_from_config'] = update_ui_from_config
         ui_components['update_hyperparameters_info'] = update_hyperparameters_info
         
-        # Inisialisasi UI dari config
-        update_ui_from_config()
+        # Inisialisasi UI dari config yang disimpan
+        try:
+            # Dapatkan config manager
+            config_manager = ConfigManager.get_instance()
+            
+            # Coba dapatkan konfigurasi yang disimpan
+            saved_config = config_manager.get_module_config('hyperparameters')
+            
+            if saved_config:
+                # Update UI dari konfigurasi yang disimpan
+                update_ui_from_config(saved_config)
+                if logger: logger.info("✅ UI hyperparameter diinisialisasi dari konfigurasi yang disimpan")
+            else:
+                # Jika tidak ada konfigurasi yang disimpan, gunakan default
+                update_ui_from_config(default_config)
+                if logger: logger.info("ℹ️ UI hyperparameter diinisialisasi dari konfigurasi default")
+                
+            # Register UI components untuk persistensi
+            config_manager.register_ui_components('hyperparameters', ui_components)
+        except Exception as e:
+            # Fallback ke default jika terjadi error
+            update_ui_from_config(default_config)
+            if logger: logger.warning(f"⚠️ Error inisialisasi UI hyperparameter: {e}, menggunakan default")
         
     except Exception as e:
         # Fallback sederhana jika terjadi error

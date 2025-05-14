@@ -30,15 +30,10 @@ def setup_hyperparameters_form_handlers(ui_components: Dict[str, Any], env=None,
                 if 'update_config_from_ui' in ui_components:
                     ui_components['update_config_from_ui']()
         
-        def on_use_augmentation_change(change):
+        def on_augment_change(change):
             if change['name'] == 'value':
-                # Aktifkan/nonaktifkan komponen augmentasi
-                ui_components['mosaic'].disabled = not change['new']
-                ui_components['mixup'].disabled = not change['new']
-                ui_components['flip'].disabled = not change['new']
-                ui_components['hsv_h'].disabled = not change['new']
-                ui_components['hsv_s'].disabled = not change['new']
-                ui_components['hsv_v'].disabled = not change['new']
+                # Aktifkan/nonaktifkan komponen regularisasi terkait
+                ui_components['dropout'].disabled = not change['new']
                 
                 # Update config
                 if 'update_config_from_ui' in ui_components:
@@ -47,12 +42,11 @@ def setup_hyperparameters_form_handlers(ui_components: Dict[str, Any], env=None,
         def on_scheduler_type_change(change):
             if change['name'] == 'value':
                 # Aktifkan/nonaktifkan komponen scheduler berdasarkan tipe
-                is_step = change['new'] == 'step'
                 is_none = change['new'] == 'none'
                 
-                ui_components['step_size'].disabled = not is_step
-                ui_components['gamma'].disabled = is_none
                 ui_components['warmup_epochs'].disabled = is_none
+                ui_components['warmup_momentum'].disabled = is_none
+                ui_components['warmup_bias_lr'].disabled = is_none
                 
                 # Update config
                 if 'update_config_from_ui' in ui_components:
@@ -62,52 +56,80 @@ def setup_hyperparameters_form_handlers(ui_components: Dict[str, Any], env=None,
             if change['name'] == 'value':
                 # Aktifkan/nonaktifkan momentum berdasarkan tipe optimizer
                 is_sgd = change['new'] == 'SGD'
+                is_adam = change['new'] in ['Adam', 'AdamW']
+                
                 ui_components['momentum'].disabled = not is_sgd
+                ui_components['weight_decay'].disabled = not is_adam
+                
+                # Update config
+                if 'update_config_from_ui' in ui_components:
+                    ui_components['update_config_from_ui']()
+        
+        def on_early_stopping_change(change):
+            if change['name'] == 'value':
+                # Aktifkan/nonaktifkan komponen early stopping
+                ui_components['early_stopping_patience'].disabled = not change['new']
+                ui_components['early_stopping_min_delta'].disabled = not change['new']
                 
                 # Update config
                 if 'update_config_from_ui' in ui_components:
                     ui_components['update_config_from_ui']()
         
         # Register observers untuk semua komponen
+        # Parameter dasar
+        ui_components['batch_size'].observe(on_component_change)
+        ui_components['image_size'].observe(on_component_change)
+        ui_components['epochs'].observe(on_component_change)
+        
+        # Parameter optimasi
         ui_components['optimizer_type'].observe(on_optimizer_type_change)
         ui_components['learning_rate'].observe(on_component_change)
         ui_components['weight_decay'].observe(on_component_change)
         ui_components['momentum'].observe(on_component_change)
         
-        ui_components['scheduler_type'].observe(on_scheduler_type_change)
+        # Parameter penjadwalan
+        ui_components['lr_scheduler'].observe(on_scheduler_type_change)
         ui_components['warmup_epochs'].observe(on_component_change)
-        ui_components['step_size'].observe(on_component_change)
-        ui_components['gamma'].observe(on_component_change)
+        ui_components['warmup_momentum'].observe(on_component_change)
+        ui_components['warmup_bias_lr'].observe(on_component_change)
         
-        ui_components['use_augmentation'].observe(on_use_augmentation_change)
-        ui_components['mosaic'].observe(on_component_change)
-        ui_components['mixup'].observe(on_component_change)
-        ui_components['flip'].observe(on_component_change)
-        ui_components['hsv_h'].observe(on_component_change)
-        ui_components['hsv_s'].observe(on_component_change)
-        ui_components['hsv_v'].observe(on_component_change)
+        # Parameter regularisasi
+        ui_components['augment'].observe(on_augment_change)
+        ui_components['dropout'].observe(on_component_change)
+        
+        # Parameter loss
+        ui_components['box_loss_gain'].observe(on_component_change)
+        ui_components['cls_loss_gain'].observe(on_component_change)
+        ui_components['obj_loss_gain'].observe(on_component_change)
+        
+        # Parameter early stopping & checkpoint
+        ui_components['early_stopping_enabled'].observe(on_early_stopping_change)
+        ui_components['early_stopping_patience'].observe(on_component_change)
+        ui_components['early_stopping_min_delta'].observe(on_component_change)
+        ui_components['checkpoint_save_best'].observe(on_component_change)
+        ui_components['checkpoint_save_period'].observe(on_component_change)
         
         # Inisialisasi state komponen
         # Aktifkan/nonaktifkan momentum berdasarkan tipe optimizer
         is_sgd = ui_components['optimizer_type'].value == 'SGD'
+        is_adam = ui_components['optimizer_type'].value in ['Adam', 'AdamW']
         ui_components['momentum'].disabled = not is_sgd
+        ui_components['weight_decay'].disabled = not is_adam
         
         # Aktifkan/nonaktifkan komponen scheduler berdasarkan tipe
-        is_step = ui_components['scheduler_type'].value == 'step'
-        is_none = ui_components['scheduler_type'].value == 'none'
-        
-        ui_components['step_size'].disabled = not is_step
-        ui_components['gamma'].disabled = is_none
+        is_none = ui_components['lr_scheduler'].value == 'none'
         ui_components['warmup_epochs'].disabled = is_none
+        ui_components['warmup_momentum'].disabled = is_none
+        ui_components['warmup_bias_lr'].disabled = is_none
         
-        # Aktifkan/nonaktifkan komponen augmentasi
-        is_aug_enabled = ui_components['use_augmentation'].value
-        ui_components['mosaic'].disabled = not is_aug_enabled
-        ui_components['mixup'].disabled = not is_aug_enabled
-        ui_components['flip'].disabled = not is_aug_enabled
-        ui_components['hsv_h'].disabled = not is_aug_enabled
-        ui_components['hsv_s'].disabled = not is_aug_enabled
-        ui_components['hsv_v'].disabled = not is_aug_enabled
+        # Aktifkan/nonaktifkan komponen regularisasi
+        is_aug_enabled = ui_components['augment'].value
+        ui_components['dropout'].disabled = not is_aug_enabled
+        
+        # Aktifkan/nonaktifkan komponen early stopping
+        is_es_enabled = ui_components['early_stopping_enabled'].value
+        ui_components['early_stopping_patience'].disabled = not is_es_enabled
+        ui_components['early_stopping_min_delta'].disabled = not is_es_enabled
         
         # Cleanup function
         def cleanup():

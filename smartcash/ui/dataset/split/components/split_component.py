@@ -40,12 +40,18 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     header = create_header(f"{ICONS['dataset']} Konfigurasi Split Dataset", 
                          "Konfigurasi dan visualisasi dataset untuk training, validation, dan testing")
     
-    # Status panel
-    status_panel = widgets.HTML(value=f"""
-        <div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                    color:{COLORS['alert_info_text']}; margin:10px 0; border-radius:4px; 
-                    border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} {'Terhubung ke Google Drive 🟢' if drive_mounted else 'Google Drive tidak terhubung ⚪'}</p>
+    # Card panel di awal
+    card_panel = widgets.HTML(value=f"""
+        <div style="padding:15px; background-color:{COLORS['bg_light']}; 
+                    color:{COLORS['text_dark']}; margin:10px 0; border-radius:8px; 
+                    box-shadow:0 2px 5px rgba(0,0,0,0.1);">
+            <h3 style="margin-top:0">{ICONS['dataset']} Konfigurasi Split Dataset</h3>
+            <p>Konfigurasi pembagian dataset untuk training, validation, dan testing.</p>
+            <ul style="padding-left:20px">
+                <li>Sesuaikan proporsi dataset dengan slider</li>
+                <li>Visualisasikan distribusi kelas untuk memastikan keseimbangan</li>
+                <li>Simpan konfigurasi untuk digunakan pada tahap training</li>
+            </ul>
         </div>
     """)
     

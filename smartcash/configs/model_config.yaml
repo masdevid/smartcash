@@ -53,33 +53,23 @@ model:
   use_residual: false  # Gunakan ResidualAdapter untuk koneksi residual tambahan
   use_ciou: false      # Gunakan CIoU Loss untuk bounding box regression
 
-# Training parameter spesifik
-training:
-  epochs: 100
-  batch_size: 16
-  early_stopping_patience: 15
-  optimizer: 'Adam'
-  lr: 0.001
-  weight_decay: 0.0005
-  momentum: 0.937
-  lr_scheduler: 'ReduceLROnPlateau'
-  lr_patience: 5
-  lr_factor: 0.1
-  save_best_only: true
-  save_every: 10  # Simpan checkpoint setiap 10 epoch
+# EfficientNet-B4 specific parameters
+efficientnet:
+  width_coefficient: 1.4
+  depth_coefficient: 1.8
+  resolution: 380
+  dropout_rate: 0.4
   
-  # Loss weights
-  cls_weight: 0.5  # Weight untuk loss klasifikasi
-  box_weight: 0.05  # Weight untuk loss bounding box
-  obj_weight: 1.0  # Weight untuk loss objectness
+# Transfer learning parameters
+transfer_learning:
+  enabled: true
+  freeze_backbone: false
+  freeze_batch_norm: false
+  unfreeze_after_epochs: 10
   
-  # Regularisasi
+# Regularisasi khusus model
+regularization:
   label_smoothing: 0.0  # Label smoothing untuk mengurangi overfitting
-  
-  # Fitur lanjutan
-  auto_augment: true  # Menggunakan augmentasi Auto-Augment
-  mixup: 0.0  # Menggunakan Mixup augmentation (alpha value)
-  cutmix: 0.0  # Menggunakan CutMix augmentation (alpha value)
 
 # Konfigurasi kompilasi model untuk deployment
 export:

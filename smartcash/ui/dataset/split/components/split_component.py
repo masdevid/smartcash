@@ -67,6 +67,14 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
+    # Status panel untuk menampilkan pesan status dan alert
+    status_panel = widgets.Output(
+        layout=widgets.Layout(
+            margin='10px 0',
+            min_height='50px'
+        )
+    )
+    
     # Current statistics panel
     current_stats_html = widgets.HTML(
         value=f"""<div style="text-align:center; padding:15px;">

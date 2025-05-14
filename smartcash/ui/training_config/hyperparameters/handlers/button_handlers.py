@@ -257,7 +257,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 config_manager.reset_module_config('hyperparameters', default_config)
                 
                 # Update UI dari default config
-                update_ui_from_config(default_config)
+                update_ui_from_config()
                 
                 # Tampilkan pesan sukses
                 with ui_components['status']:

@@ -192,13 +192,21 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                         
                 # Jika tidak ditemukan, tampilkan pesan informatif
                 if target_dir is None:
-                    if logger: logger.warning(f"⚠️ Tidak ada gambar ditemukan untuk visualisasi")
-                    display_no_data_message(
-                        output_widget,
-                        message="Tidak ada gambar yang ditemukan untuk divisualisasikan.",
-                        detail_message="Silakan lakukan preprocessing dataset terlebih dahulu."
-                    )
-                    return
+                    # Coba cari gambar di direktori lain dengan metode alternatif
+                    for root, _, files in os.walk(data_dir):
+                        if any(f.endswith(('.jpg', '.jpeg', '.png')) for f in files):
+                            target_dir = Path(root)
+                            if logger: logger.info(f"✅ Menemukan gambar di {target_dir} (pencarian alternatif)")
+                            break
+                            
+                    if target_dir is None:
+                        if logger: logger.warning(f"⚠️ Tidak ada gambar ditemukan untuk visualisasi")
+                        display_no_data_message(
+                            output_widget,
+                            message="Tidak ada gambar yang ditemukan untuk divisualisasikan.",
+                            detail_message="Silakan lakukan preprocessing dataset terlebih dahulu."
+                        )
+                        return
                 
                 # Gunakan implementasi yang ada di smartcash/ui/charts/visualize_preprocessed_samples
                 try:
@@ -396,8 +404,8 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                     "preprocessed_dir": preprocessed_dir
                 }
                 
-                # Visualisasi komparasi
-                compare_original_vs_preprocessed(vis_ui_components)
+                # Visualisasi komparasi dengan parameter yang benar
+                compare_original_vs_preprocessed(vis_ui_components, data_dir, preprocessed_dir)
             except ImportError as e:
                 if logger: logger.warning(f"⚠️ Tidak dapat menggunakan compare_original_vs_preprocessed: {str(e)}")
                 # Fallback: Visualisasi standar
@@ -455,7 +463,8 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             
             # Import helper untuk distribusi kelas
             try:
-                from smartcash.ui.charts.visualization_integrator import create_distribution_visualizations
+                # Gunakan class_distribution_analyzer yang sudah ada
+                from smartcash.dataset.utils.statistics.class_stats import class_distribution_analyzer
                 
                 # Buat wrapper untuk ui_components
                 vis_ui_components = {
@@ -467,14 +476,14 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                     "aug_options": ui_components.get('aug_options')
                 }
                 
-                # Visualisasi distribusi kelas
-                create_distribution_visualizations(
-                    ui_components=vis_ui_components,
+                # Visualisasi distribusi kelas dengan parameter yang benar
+                # Hindari recursion dengan membatasi kedalaman analisis
+                class_distribution_analyzer(
                     dataset_dir=preprocessed_dir,
+                    output_widget=output_widget,
                     split_name='train',
-                    aug_prefix=aug_prefix,
-                    orig_prefix='rp',
-                    target_count=1000
+                    max_depth=2,  # Batasi kedalaman rekursi
+                    show_dummy_warning=True
                 )
             except ImportError:
                 # Fallback: Visualisasi standar

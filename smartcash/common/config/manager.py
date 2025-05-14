@@ -6,7 +6,7 @@ Deskripsi: Manager konfigurasi dengan dukungan YAML, environment variables, dan 
 import os
 import copy
 from pathlib import Path
-from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple
+from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, List
 
 # Import dari IO module
 from smartcash.common.io import (
@@ -35,6 +35,11 @@ class ConfigManager:
         self.config = {}
         self._dependencies = {}
         self._factory_functions = {}
+        
+        # Tambahan untuk persistensi dan observer pattern
+        self.module_configs = {}  # Dictionary untuk menyimpan konfigurasi berbagai modul
+        self.observers = {}       # Dictionary untuk menyimpan observer
+        self.ui_components = {}   # Dictionary untuk menyimpan referensi UI components
         
         # Setup logger jika tersedia
         try:
@@ -361,6 +366,204 @@ class ConfigManager:
     def __setitem__(self, key, value):
         """Operator [] untuk mengatur konfigurasi."""
         self.set(key, value)
+        
+    # ========== Metode untuk validasi parameter ==========
+    
+    def validate_param(self, value: Any, default_value: Any, 
+                      valid_types: Optional[Union[type, List[type]]] = None, 
+                      valid_values: Optional[List[Any]] = None) -> Any:
+        """
+        Validasi parameter konfigurasi.
+        
+        Args:
+            value: Nilai yang akan divalidasi
+            default_value: Nilai default jika validasi gagal
+            valid_types: Tipe yang valid (single atau list)
+            valid_values: List nilai yang valid
+            
+        Returns:
+            Nilai yang valid atau default
+        """
+        # Validasi None
+        if value is None:
+            return default_value
+        
+        # Validasi tipe
+        if valid_types:
+            if not isinstance(valid_types, (list, tuple)):
+                valid_types = [valid_types]
+                
+            if not any(isinstance(value, t) for t in valid_types):
+                if self.logger:
+                    self.logger.debug(f"⚠️ Validasi tipe gagal: {value} bukan {valid_types}, menggunakan default: {default_value}")
+                return default_value
+        
+        # Validasi nilai
+        if valid_values and value not in valid_values:
+            if self.logger:
+                self.logger.debug(f"⚠️ Validasi nilai gagal: {value} tidak dalam {valid_values}, menggunakan default: {default_value}")
+            return default_value
+        
+        return value
+    
+    # ========== Metode untuk persistensi UI components ==========
+    
+    def get_module_config(self, module_name: str, default_config: Dict[str, Any] = None) -> Dict[str, Any]:
+        """
+        Dapatkan konfigurasi untuk modul tertentu.
+        
+        Args:
+            module_name: Nama modul
+            default_config: Konfigurasi default jika tidak ada yang tersimpan
+            
+        Returns:
+            Dictionary konfigurasi
+        """
+        # Cek apakah konfigurasi sudah dimuat
+        if module_name in self.module_configs:
+            return copy.deepcopy(self.module_configs[module_name])
+        
+        # Coba muat dari file
+        config_path = os.path.join(self.config_dir, f"{module_name}_config.yaml")
+        
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = load_yaml(f)
+                    if not config:
+                        config = {}
+                    
+                    if self.logger:
+                        self.logger.debug(f"✅ Konfigurasi {module_name} berhasil dimuat dari {config_path}")
+                    
+                    # Simpan di cache
+                    self.module_configs[module_name] = config
+                    return copy.deepcopy(config)
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"⚠️ Error saat memuat konfigurasi {module_name}: {str(e)}")
+        
+        # Gunakan default jika tidak ada file atau terjadi error
+        if default_config is None:
+            default_config = {}
+        
+        # Simpan default di cache
+        self.module_configs[module_name] = copy.deepcopy(default_config)
+        
+        if self.logger:
+            self.logger.debug(f"ℹ️ Menggunakan konfigurasi default untuk {module_name}")
+            
+        return copy.deepcopy(default_config)
+    
+    def save_module_config(self, module_name: str, config: Dict[str, Any]) -> bool:
+        """
+        Simpan konfigurasi untuk modul tertentu.
+        
+        Args:
+            module_name: Nama modul
+            config: Konfigurasi yang akan disimpan
+            
+        Returns:
+            Boolean status keberhasilan
+        """
+        try:
+            # Buat deep copy untuk mencegah modifikasi tidak sengaja
+            config_copy = copy.deepcopy(config)
+            
+            # Simpan di cache
+            self.module_configs[module_name] = config_copy
+            
+            # Simpan ke file
+            config_path = os.path.join(self.config_dir, f"{module_name}_config.yaml")
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            
+            with open(config_path, 'w') as f:
+                save_yaml(config_copy, f)
+            
+            if self.logger:
+                self.logger.info(f"✅ Konfigurasi {module_name} berhasil disimpan ke {config_path}")
+            
+            # Notifikasi observer
+            self.notify_observers(module_name, config_copy)
+            
+            return True
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error saat menyimpan konfigurasi {module_name}: {str(e)}")
+            return False
+    
+    def register_ui_components(self, module_name: str, ui_components: Dict[str, Any]) -> None:
+        """
+        Register UI components untuk persistensi.
+        
+        Args:
+            module_name: Nama modul
+            ui_components: Dictionary komponen UI
+        """
+        self.ui_components[module_name] = ui_components
+        
+        if self.logger:
+            self.logger.debug(f"🔗 UI components berhasil diregister untuk {module_name}")
+    
+    def get_ui_components(self, module_name: str) -> Dict[str, Any]:
+        """
+        Dapatkan UI components yang tersimpan.
+        
+        Args:
+            module_name: Nama modul
+            
+        Returns:
+            Dictionary komponen UI atau empty dict jika tidak ditemukan
+        """
+        return self.ui_components.get(module_name, {})
+    
+    # ========== Metode untuk observer pattern ==========
+    
+    def register_observer(self, module_name: str, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """
+        Register observer untuk notifikasi perubahan konfigurasi.
+        
+        Args:
+            module_name: Nama modul
+            callback: Fungsi callback yang akan dipanggil saat konfigurasi berubah
+        """
+        if module_name not in self.observers:
+            self.observers[module_name] = []
+        
+        self.observers[module_name].append(callback)
+        
+        if self.logger:
+            self.logger.debug(f"👁️ Observer berhasil diregister untuk {module_name}")
+    
+    def unregister_observer(self, module_name: str, callback: Callable[[Dict[str, Any]], None]) -> None:
+        """
+        Unregister observer.
+        
+        Args:
+            module_name: Nama modul
+            callback: Fungsi callback yang akan dihapus
+        """
+        if module_name in self.observers and callback in self.observers[module_name]:
+            self.observers[module_name].remove(callback)
+            
+            if self.logger:
+                self.logger.debug(f"👁️ Observer berhasil diunregister untuk {module_name}")
+    
+    def notify_observers(self, module_name: str, config: Dict[str, Any]) -> None:
+        """
+        Notifikasi semua observer tentang perubahan konfigurasi.
+        
+        Args:
+            module_name: Nama modul
+            config: Konfigurasi terbaru
+        """
+        if module_name in self.observers:
+            for callback in self.observers[module_name]:
+                try:
+                    callback(copy.deepcopy(config))
+                except Exception as e:
+                    if self.logger:
+                        self.logger.warning(f"⚠️ Error saat memanggil observer {module_name}: {str(e)}")
 
 # Singleton instance
 _config_manager = None

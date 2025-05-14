@@ -37,23 +37,21 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
     try:
         # Import dependency
         from smartcash.common.environment import get_environment_manager
-        from smartcash.common.config import get_config_manager
+        from smartcash.common.config.manager import get_config_manager
+        from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
         
-        # Dapatkan environment dan config jika belum tersedia
+        # Dapatkan environment jika belum tersedia
         env = env or get_environment_manager()
+        
+        # Dapatkan config manager
         config_manager = get_config_manager()
         
-        # Load konfigurasi dari file jika belum tersedia
-        config_path = "configs/model_config.yaml"
+        # Load konfigurasi dari config manager
         if config is None:
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, 'r') as f:
-                        config = yaml.safe_load(f)
-                except Exception as e:
-                    config = config_manager.config
-            else:
-                config = config_manager.config
+            # Dapatkan konfigurasi dari config manager
+            from smartcash.common.default_config import generate_default_config
+            default_config = generate_default_config()
+            config = config_manager.get_module_config('model', default_config)
         
         # Buat komponen UI dengan penanganan error yang lebih baik
         try:
@@ -100,27 +98,48 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         
         # Setup handlers untuk tombol save dan reset
         def on_save_config(b):
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            
-            # Update config dari UI
-            updated_config = update_config_from_ui(ui_components, copy.deepcopy(config))
-            
-            # Simpan konfigurasi ke file
-            os.makedirs(os.path.dirname(config_path), exist_ok=True)
             try:
-                with open(config_path, 'w') as f:
-                    yaml.dump(updated_config, f, default_flow_style=False)
-                success = True
-                message = "✅ Konfigurasi backbone berhasil disimpan"
-            except Exception as e:
-                success = False
-                message = f"❌ Gagal menyimpan konfigurasi: {str(e)}"
-            
-            # Update status
-            status_type = 'success' if success else 'error'
-            if 'status' in ui_components:
+                # Import ConfigManager
+                from smartcash.common.config.manager import get_config_manager
+                from smartcash.ui.utils.persistence_utils import extract_config_from_ui
+                
+                # Dapatkan config manager
+                config_manager = get_config_manager()
+                
+                # Ekstrak konfigurasi dari UI
+                current_config = config_manager.get_module_config('model')
+                updated_config = extract_config_from_ui(ui_components, current_config, 'model', logger)
+                
+                # Simpan konfigurasi menggunakan config manager
+                success = config_manager.save_module_config('model', updated_config)
+                
+                # Tampilkan pesan sukses atau error
                 with ui_components['status']:
-                    display(create_status_indicator(status_type, message))
+                    if success:
+                        display(HTML(f"<div style='color:green'>✅ Konfigurasi backbone berhasil disimpan</div>"))
+                    else:
+                        display(HTML(f"<div style='color:orange'>⚠️ Konfigurasi backbone mungkin tidak tersimpan dengan benar</div>"))
+                    
+                if logger:
+                    if success:
+                        logger.info(f"✅ Konfigurasi backbone berhasil disimpan")
+                    else:
+                        logger.warning(f"⚠️ Konfigurasi backbone mungkin tidak tersimpan dengan benar")
+                    
+            except Exception as e:
+                # Tampilkan pesan error
+                with ui_components['status']:
+                    display(HTML(f"<div style='color:red'>❌ Error: {str(e)}</div>"))
+                    
+                if logger:
+                    logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+                    
+                # Pastikan UI components tetap terdaftar untuk persistensi
+                try:
+                    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+                    ensure_ui_persistence(ui_components, 'backbone', logger)
+                except Exception:
+                    pass
         
         def on_reset_config(b):
             # Reset ke default config
@@ -242,25 +261,38 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Konfigurasi yang diupdate
     """
-    # Pastikan struktur config ada
-    if 'model' not in config:
-        config['model'] = {}
+    # Import utilitas persistensi
+    from smartcash.ui.utils.persistence_utils import extract_config_from_ui, validate_ui_param
     
-    # Ekstrak nilai dari form backbone
-    if 'backbone_dropdown' in ui_components:
-        config['model']['backbone'] = ui_components['backbone_dropdown'].value
+    # Dapatkan logger jika tersedia
+    logger = ui_components.get('logger')
     
-    # Ekstrak nilai lainnya dari form
-    if 'pretrained_checkbox' in ui_components:
-        config['model']['pretrained'] = ui_components['pretrained_checkbox'].value
+    # Gunakan utilitas extract_config_from_ui untuk mengekstrak nilai dari UI
+    updated_config = extract_config_from_ui(ui_components, config, 'model', logger)
     
-    if 'freeze_backbone_checkbox' in ui_components:
-        config['model']['freeze_backbone'] = ui_components['freeze_backbone_checkbox'].value
+    # Validasi nilai-nilai penting
+    if 'model' in updated_config:
+        # Validasi backbone
+        if 'backbone' in updated_config['model']:
+            backbone = updated_config['model']['backbone']
+            valid_backbones = ['cspdarknet_s', 'efficientnet_b4']
+            updated_config['model']['backbone'] = validate_ui_param(backbone, 'efficientnet_b4', str, valid_backbones, logger)
+        
+        # Validasi pretrained
+        if 'pretrained' in updated_config['model']:
+            pretrained = updated_config['model']['pretrained']
+            updated_config['model']['pretrained'] = validate_ui_param(pretrained, True, bool, None, logger)
+        
+        # Validasi freeze_backbone
+        if 'freeze_backbone' in updated_config['model']:
+            freeze_backbone = updated_config['model']['freeze_backbone']
+            updated_config['model']['freeze_backbone'] = validate_ui_param(freeze_backbone, True, bool, None, logger)
     
-    # Simpan konfigurasi di ui_components
-    ui_components['config'] = config
+    # Pastikan UI components terdaftar untuk persistensi
+    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+    ensure_ui_persistence(ui_components, 'backbone', logger)
     
-    return config
+    return updated_config
 
 # Fungsi untuk mengupdate UI dari konfigurasi
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -274,44 +306,76 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Dapatkan konfigurasi model
-    model_config = config.get('model', {})
+    # Import utilitas persistensi
+    from smartcash.ui.utils.persistence_utils import validate_ui_param, update_ui_from_config as update_ui_util
     
-    # Update dropdown backbone dengan pengecekan nilai yang lebih aman
+    # Dapatkan logger jika tersedia
+    logger = ui_components.get('logger')
+    
+    # Dapatkan konfigurasi model dengan validasi
+    if not isinstance(config, dict):
+        if logger: logger.warning(f"⚠️ Config bukan dictionary, menggunakan empty dict")
+        config = {}
+    
+    model_config = config.get('model', {})
+    if not isinstance(model_config, dict):
+        if logger: logger.warning(f"⚠️ Model config bukan dictionary, menggunakan empty dict")
+        model_config = {}
+    
+    # Update dropdown backbone dengan validasi yang lebih kuat
     if 'backbone_dropdown' in ui_components:
         try:
-            backbone = model_config.get('backbone', 'cspdarknet_s')  # Default ke cspdarknet_s (yolov5s)
+            # Validasi nilai backbone
+            backbone = validate_ui_param(
+                model_config.get('backbone'), 
+                'cspdarknet_s',  # Default ke cspdarknet_s (yolov5s)
+                str,
+                None,  # Validasi terhadap options akan dilakukan di bawah
+                logger
+            )
             
             # Pastikan backbone ada dalam opsi dropdown
-            if backbone in ui_components['backbone_dropdown'].options:
-                ui_components['backbone_dropdown'].value = backbone
+            if hasattr(ui_components['backbone_dropdown'], 'options'):
+                options = ui_components['backbone_dropdown'].options
+                if backbone in options:
+                    ui_components['backbone_dropdown'].value = backbone
+                else:
+                    # Jika tidak ada, gunakan opsi default yang aman
+                    if logger: 
+                        logger.warning(f"⚠️ Backbone '{backbone}' tidak ditemukan dalam opsi dropdown, menggunakan default")
+                    
+                    # Gunakan opsi default yang aman (cspdarknet_s untuk yolov5s)
+                    if 'cspdarknet_s' in options:
+                        ui_components['backbone_dropdown'].value = 'cspdarknet_s'
+                    elif options and len(options) > 0:
+                        # Fallback ke opsi pertama jika cspdarknet_s tidak tersedia
+                        ui_components['backbone_dropdown'].value = options[0]
+                        if logger: logger.info(f"ℹ️ Menggunakan backbone: {options[0]}")
             else:
-                # Jika tidak ada, gunakan opsi pertama yang tersedia
-                logger = ui_components.get('logger')
-                if logger: 
-                    logger.warning(f"⚠️ Backbone '{backbone}' tidak ditemukan dalam opsi dropdown, menggunakan default")
-                
-                # Gunakan opsi default yang aman (cspdarknet_s untuk yolov5s)
-                if 'cspdarknet_s' in ui_components['backbone_dropdown'].options:
-                    ui_components['backbone_dropdown'].value = 'cspdarknet_s'
-                elif len(ui_components['backbone_dropdown'].options) > 0:
-                    # Fallback ke opsi pertama jika cspdarknet_s tidak tersedia
-                    ui_components['backbone_dropdown'].value = ui_components['backbone_dropdown'].options[0]
+                if logger: logger.warning(f"⚠️ Dropdown backbone tidak memiliki opsi")
         except Exception as e:
-            logger = ui_components.get('logger')
-            if logger: 
-                logger.error(f"❌ Error saat update dropdown backbone: {str(e)}")
-            # Tidak perlu throw exception, biarkan proses berlanjut
+            if logger: logger.error(f"❌ Error saat update dropdown backbone: {str(e)}")
     
-    # Update checkbox pretrained
+    # Update checkbox pretrained dengan validasi
     if 'pretrained_checkbox' in ui_components:
-        ui_components['pretrained_checkbox'].value = model_config.get('pretrained', True)
+        try:
+            pretrained = validate_ui_param(model_config.get('pretrained'), True, bool, None, logger)
+            ui_components['pretrained_checkbox'].value = pretrained
+        except Exception as e:
+            if logger: logger.warning(f"⚠️ Error saat update checkbox pretrained: {str(e)}")
     
-    # Update checkbox freeze backbone
+    # Update checkbox freeze backbone dengan validasi
     if 'freeze_backbone_checkbox' in ui_components:
-        ui_components['freeze_backbone_checkbox'].value = model_config.get('freeze_backbone', True)
+        try:
+            freeze_backbone = validate_ui_param(model_config.get('freeze_backbone'), True, bool, None, logger)
+            ui_components['freeze_backbone_checkbox'].value = freeze_backbone
+        except Exception as e:
+            if logger: logger.warning(f"⚠️ Error saat update checkbox freeze_backbone: {str(e)}")
     
-    # Simpan referensi config di ui_components
-    ui_components['config'] = config
+    # Pastikan UI components terdaftar untuk persistensi
+    from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+    ensure_ui_persistence(ui_components, 'backbone', logger)
+    
+    if logger: logger.debug(f"✅ UI berhasil diupdate dari konfigurasi")
     
     return ui_components

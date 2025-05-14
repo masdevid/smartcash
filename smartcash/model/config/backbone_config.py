@@ -13,38 +13,6 @@ class BackboneConfig:
     
     # Konfigurasi default untuk berbagai backbone
     BACKBONE_CONFIGS = {
-        'efficientnet_b0': {
-            'stride': 32,
-            'width_coefficient': 1.0,
-            'depth_coefficient': 1.0,
-            'pretrained': True,
-            'features': 1280,
-            'stages': [40, 80, 192, 1280]
-        },
-        'efficientnet_b1': {
-            'stride': 32,
-            'width_coefficient': 1.0,
-            'depth_coefficient': 1.1,
-            'pretrained': True,
-            'features': 1280,
-            'stages': [40, 80, 192, 1280]
-        },
-        'efficientnet_b2': {
-            'stride': 32,
-            'width_coefficient': 1.1,
-            'depth_coefficient': 1.2,
-            'pretrained': True,
-            'features': 1408,
-            'stages': [48, 88, 208, 1408]
-        },
-        'efficientnet_b3': {
-            'stride': 32,
-            'width_coefficient': 1.2,
-            'depth_coefficient': 1.4,
-            'pretrained': True,
-            'features': 1536,
-            'stages': [48, 96, 232, 1536]
-        },
         'efficientnet_b4': {
             'stride': 32,
             'width_coefficient': 1.4,
@@ -53,29 +21,13 @@ class BackboneConfig:
             'features': 1792,
             'stages': [56, 112, 272, 1792]
         },
-        'efficientnet_b5': {
-            'stride': 32,
-            'width_coefficient': 1.6,
-            'depth_coefficient': 2.2,
-            'pretrained': True,
-            'features': 2048,
-            'stages': [64, 128, 304, 2048]
-        },
-        'cspdarknet33': {
+        'cspdarknet_s': {
             'stride': 32,
             'width_coefficient': 1.0,
             'depth_coefficient': 1.0,
             'pretrained': True,
             'features': 1024,
             'stages': [64, 128, 256, 1024]
-        },
-        'mobilenetv3_large': {
-            'stride': 32,
-            'width_coefficient': 1.0,
-            'depth_coefficient': 1.0,
-            'pretrained': True,
-            'features': 960,
-            'stages': [40, 112, 160, 960]
         }
     }
     

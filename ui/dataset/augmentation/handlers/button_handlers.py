@@ -149,26 +149,74 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Log awal augmentasi
             if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
             
-            # Pastikan semua parameter valid sebelum menjalankan augmentasi
-            if aug_types is None:
-                aug_types = ['Combined (Recommended)']
-                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_types adalah None, menggunakan default: {aug_types}")
+            # Import utilitas persistensi
+            from smartcash.common.config.manager import get_config_manager
+            from smartcash.ui.utils.persistence_utils import validate_ui_param
             
-            if split_option is None:
-                split_option = 'train'
-                if logger: logger.warning(f"{ICONS['warning']} Nilai split_option adalah None, menggunakan default: {split_option}")
+            # Dapatkan config manager
+            config_manager = get_config_manager()
             
-            if aug_prefix is None:
-                aug_prefix = 'aug'
-                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_prefix adalah None, menggunakan default: {aug_prefix}")
+            # Validasi semua parameter dengan utilitas validasi yang lebih kuat
+            aug_types = validate_ui_param(
+                aug_types, 
+                ['Combined (Recommended)'], 
+                (list, tuple, str),
+                None,
+                logger
+            )
             
-            if aug_factor is None:
-                aug_factor = 2
-                if logger: logger.warning(f"{ICONS['warning']} Nilai aug_factor adalah None, menggunakan default: {aug_factor}")
+            # Jika aug_types adalah string, konversi ke list
+            if isinstance(aug_types, str):
+                aug_types = [aug_types]
+                
+            split_option = validate_ui_param(
+                split_option, 
+                'train', 
+                str,
+                ['train', 'val', 'test', 'all'],
+                logger
+            )
             
-            if num_workers is None:
-                num_workers = 4
-                if logger: logger.warning(f"{ICONS['warning']} Nilai num_workers adalah None, menggunakan default: {num_workers}")
+            aug_prefix = validate_ui_param(
+                aug_prefix, 
+                'aug', 
+                str,
+                None,
+                logger
+            )
+            
+            aug_factor = validate_ui_param(
+                aug_factor, 
+                2, 
+                (int, float),
+                None,
+                logger
+            )
+            
+            num_workers = validate_ui_param(
+                num_workers, 
+                4, 
+                int,
+                None,
+                logger
+            )
+            
+            # Pastikan UI components terdaftar untuk persistensi
+            from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
+            ensure_ui_persistence(ui_components, 'augmentation', logger)
+            
+            # Simpan konfigurasi augmentasi terbaru
+            aug_config = {
+                'augmentation': {
+                    'types': aug_types,
+                    'split': split_option,
+                    'prefix': aug_prefix,
+                    'factor': aug_factor,
+                    'balance_classes': balance_classes,
+                    'num_workers': num_workers
+                }
+            }
+            config_manager.save_module_config('augmentation', aug_config)
             
             # Log parameter yang akan digunakan
             if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split={split_option}, types={aug_types}, prefix={aug_prefix}, factor={aug_factor}, balance={balance_classes}, workers={num_workers}")

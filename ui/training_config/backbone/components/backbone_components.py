@@ -75,7 +75,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     except Exception as e:
         # Fallback jika terjadi error saat mengakses ModelManager dan BackboneConfig
         print(f"⚠️ Error mengakses konfigurasi backbone: {str(e)}")
-        backbone_options = ['efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'cspdarknet_s', 'cspdarknet_m']
+        backbone_options = ['efficientnet_b4', 'cspdarknet_s']
         
         # Buat optimized_models fallback
         optimized_models = {

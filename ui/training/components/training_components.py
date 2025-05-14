@@ -148,7 +148,16 @@ def create_training_components() -> Dict[str, Any]:
         plt.xlabel('Epoch')
         plt.ylabel('Value')
         plt.grid(True, linestyle='--', alpha=0.7)
-        plt.legend()
+        
+        # Tambahkan contoh plot dummy dengan label untuk menghindari warning
+        epochs = [0]
+        # Hanya tambahkan plot dengan label jika chart kosong (inisialisasi awal)
+        plt.plot(epochs, [0], '-', alpha=0, label='Train Loss')
+        plt.plot(epochs, [0], '--', alpha=0, label='Val Loss')
+        plt.plot(epochs, [0], ':', alpha=0, label='mAP')
+        
+        # Tampilkan legend dengan lokasi yang optimal
+        plt.legend(loc='best')
         
         # Konversi plot ke gambar untuk ditampilkan di widget
         buf = io.BytesIO()

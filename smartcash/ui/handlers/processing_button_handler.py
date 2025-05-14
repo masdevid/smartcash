@@ -302,39 +302,86 @@ def setup_processing_button_handlers(
     
     def on_reset_click(b):
         """Reset UI dan konfigurasi ke default."""
-        # Reset UI
-        _reset_ui(ui_components)
+        # Validasi ui_components
+        if ui_components is None:
+            if logger: logger.error(f"{ICONS['error']} ui_components adalah None saat reset {module_type}")
+            return
+            
+        # Reset UI dengan validasi
+        try:
+            _reset_ui(ui_components)
+        except Exception as reset_error:
+            if logger: logger.warning(f"{ICONS['warning']} Error saat reset UI: {str(reset_error)}")
         
         # Load konfigurasi default dan update UI
         try:
-            # Dynamic resolve config functions
-            load_config_func = ui_components[f'load_{module_type}_config']
+            # Dynamic resolve config functions dengan validasi
+            load_config_key = f'load_{module_type}_config'
+            if load_config_key not in ui_components or not callable(ui_components.get(load_config_key)):
+                if logger: logger.warning(f"{ICONS['warning']} Fungsi {load_config_key} tidak tersedia")
+                return
+                
+            if 'update_ui_from_config' not in ui_components or not callable(ui_components.get('update_ui_from_config')):
+                if logger: logger.warning(f"{ICONS['warning']} Fungsi update_ui_from_config tidak tersedia")
+                return
+                
+            load_config_func = ui_components[load_config_key]
             update_ui_func = ui_components['update_ui_from_config']
             
-            default_config = load_config_func()
-            update_ui_func(ui_components, default_config)
+            # Load config dengan validasi
+            try:
+                default_config = load_config_func()
+                if default_config is None:
+                    default_config = {}
+                    if logger: logger.warning(f"{ICONS['warning']} Config default adalah None, menggunakan dict kosong")
+            except Exception as config_error:
+                if logger: logger.warning(f"{ICONS['warning']} Error saat load config: {str(config_error)}")
+                default_config = {}
             
-            # Deteksi state modul
-            detect_state_func = ui_components.get(f'detect_{module_type}_state')
-            if callable(detect_state_func):
-                detect_state_func(ui_components)
+            # Update UI dari config
+            try:
+                update_ui_func(ui_components, default_config)
+            except Exception as update_error:
+                if logger: logger.warning(f"{ICONS['warning']} Error saat update UI: {str(update_error)}")
             
-            # Tampilkan pesan sukses
-            with ui_components['status']: 
-                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
+            # Deteksi state modul dengan validasi
+            detect_state_key = f'detect_{module_type}_state'
+            if detect_state_key in ui_components and callable(ui_components.get(detect_state_key)):
+                try:
+                    ui_components[detect_state_key](ui_components)
+                except Exception as state_error:
+                    if logger: logger.warning(f"{ICONS['warning']} Error saat detect state: {str(state_error)}")
             
-            # Update status panel
-            _update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi direset ke nilai default")
+            # Tampilkan pesan sukses dengan validasi
+            if 'status' in ui_components and ui_components['status'] is not None:
+                try:
+                    with ui_components['status']: 
+                        display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
+                except Exception as status_error:
+                    if logger: logger.warning(f"{ICONS['warning']} Error saat update status: {str(status_error)}")
+            
+            # Update status panel dengan validasi
+            try:
+                _update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi direset ke nilai default")
+            except Exception as panel_error:
+                if logger: logger.warning(f"{ICONS['warning']} Error saat update status panel: {str(panel_error)}")
             
             # Log success
             if logger: logger.success(f"{ICONS['success']} Konfigurasi {process_name} berhasil direset ke nilai default")
         except Exception as e:
-            # Jika gagal reset konfigurasi, tampilkan pesan error
-            with ui_components['status']: 
-                display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
+            # Jika gagal reset konfigurasi, tampilkan pesan error dengan validasi
+            if 'status' in ui_components and ui_components['status'] is not None:
+                try:
+                    with ui_components['status']: 
+                        display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
+                except Exception:
+                    pass
             
-            # Update status panel
-            _update_status_panel(ui_components, "warning", f"{ICONS['warning']} Reset UI sebagian: {str(e)}")
+            # Update status panel dengan validasi
+            try:
+                _update_status_panel(ui_components, "warning", f"{ICONS['warning']} Reset UI sebagian: {str(e)}")
+            except Exception:
+                pass
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
     
@@ -342,18 +389,35 @@ def setup_processing_button_handlers(
     
     def _reset_ui(ui_components: Dict[str, Any]) -> None:
         """Reset UI ke kondisi awal."""
-        # Bersihkan UI
-        _cleanup_ui(ui_components, module_type)
+        # Validasi ui_components untuk mencegah KeyError
+        if ui_components is None:
+            logger.error(f"{ICONS['error']} ui_components adalah None saat reset UI")
+            return
+            
+        # Bersihkan UI dengan validasi
+        try:
+            _cleanup_ui(ui_components, module_type)
+        except Exception as e:
+            logger.warning(f"{ICONS['warning']} Error saat cleanup UI: {str(e)}")
         
-        # Sembunyikan visualisasi dan summary
+        # Sembunyikan visualisasi dan summary dengan validasi
         for component in ['visualization_container', 'summary_container', 'visualization_buttons']:
-            if component in ui_components:
-                ui_components[component].layout.display = 'none'
+            if component in ui_components and ui_components[component] is not None:
+                try:
+                    ui_components[component].layout.display = 'none'
+                except Exception as e:
+                    logger.debug(f"{ICONS['warning']} Error saat menyembunyikan {component}: {str(e)}")
         
-        # Reset status panel
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS['info']} Siap untuk memulai {module_type}"))
+        # Reset status panel dengan validasi
+        if 'status' in ui_components and ui_components['status'] is not None:
+            try:
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator("info", f"{ICONS['info']} Siap untuk memulai {module_type}"))
+            except Exception as e:
+                logger.warning(f"{ICONS['warning']} Error saat reset status panel: {str(e)}")
+        else:
+            logger.debug(f"{ICONS['info']} Status panel tidak tersedia saat reset UI")
     
     # Register handlers untuk tombol-tombol
     button_handlers = {

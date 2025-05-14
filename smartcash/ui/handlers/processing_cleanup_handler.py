@@ -469,17 +469,58 @@ def _cleanup_ui(ui_components: Dict[str, Any]) -> None:
 
 def _update_status_panel(ui_components: Dict[str, Any], status_type: str, message: str) -> None:
     """Update status panel dengan pesan."""
-    if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](ui_components, status_type, message)
-    elif 'status_panel' in ui_components and hasattr(ui_components['status_panel'], 'value'):
-        from smartcash.ui.utils.constants import ALERT_STYLES
-        style = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
-        ui_components['status_panel'].value = f"""
-        <div style="padding:10px; background-color:{style['bg_color']}; 
-                  color:{style['text_color']}; border-radius:4px; margin:5px 0;
-                  border-left:4px solid {style['text_color']};">
-            <p style="margin:5px 0">{style['icon']} {message}</p>
-        </div>"""
+    # Validasi ui_components
+    if ui_components is None:
+        return
+    
+    logger = ui_components.get('logger')
+    
+    try:
+        # Metode 1: Gunakan fungsi update_status_panel jika tersedia
+        if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+            try:
+                ui_components['update_status_panel'](ui_components, status_type, message)
+                return
+            except Exception as e:
+                if logger:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat update status panel (metode 1): {str(e)}")
+        
+        # Metode 2: Update status_panel widget jika tersedia
+        if 'status_panel' in ui_components and ui_components['status_panel'] is not None and hasattr(ui_components['status_panel'], 'value'):
+            try:
+                from smartcash.ui.utils.constants import ALERT_STYLES
+                style = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
+                ui_components['status_panel'].value = f"""
+                <div style="padding:10px; background-color:{style['bg_color']}; 
+                          color:{style['text_color']}; border-radius:4px; margin:5px 0;
+                          border-left:4px solid {style['text_color']};">
+                    <p style="margin:5px 0">{style['icon']} {message}</p>
+                </div>"""
+                return
+            except Exception as e:
+                if logger:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat update status panel (metode 2): {str(e)}")
+        
+        # Metode 3: Update status widget jika tersedia
+        if 'status' in ui_components and ui_components['status'] is not None:
+            try:
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator(status_type, message))
+                return
+            except Exception as e:
+                if logger:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat update status panel (metode 3): {str(e)}")
+        
+        # Jika semua metode gagal, log pesan
+        if logger:
+            logger.debug(f"{ICONS.get('info', 'ℹ️')} Tidak dapat menampilkan status: {message}")
+    
+    except Exception as e:
+        # Tangkap semua error yang mungkin terjadi
+        if logger:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Error tidak terduga saat update status panel: {str(e)}")
+        # Jangan raise exception agar tidak mengganggu alur program
 
 def _notify_cleanup_start(ui_components: Dict[str, Any], module_type: str) -> None:
     """Notifikasi observer tentang memulai pembersihan."""

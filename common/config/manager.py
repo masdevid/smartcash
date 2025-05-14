@@ -419,41 +419,60 @@ class ConfigManager:
         Returns:
             Dictionary konfigurasi
         """
-        # Cek apakah konfigurasi sudah dimuat
-        if module_name in self.module_configs:
-            return copy.deepcopy(self.module_configs[module_name])
-        
-        # Coba muat dari file
-        config_path = os.path.join(self.config_dir, f"{module_name}_config.yaml")
-        
         try:
+            # Cek apakah sudah ada di cache
+            if module_name in self.module_configs:
+                return copy.deepcopy(self.module_configs[module_name])
+            
+            # Coba load dari file
+            config_path = os.path.join(self.config_dir, f"{module_name}_config.yaml")
+            
             if os.path.exists(config_path):
-                with open(config_path, 'r') as f:
-                    config = load_yaml(f)
-                    if not config:
-                        config = {}
+                try:
+                    # Load konfigurasi dari file dengan penanganan error yang lebih baik
+                    with open(config_path, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f) or {}
+                    
+                    # Simpan ke cache
+                    self.module_configs[module_name] = copy.deepcopy(config)
                     
                     if self.logger:
-                        self.logger.debug(f"✅ Konfigurasi {module_name} berhasil dimuat dari {config_path}")
+                        self.logger.info(f"✅ Konfigurasi {module_name} berhasil dimuat dari {config_path}")
                     
-                    # Simpan di cache
-                    self.module_configs[module_name] = config
                     return copy.deepcopy(config)
+                except Exception as yaml_error:
+                    if self.logger:
+                        self.logger.error(f"❌ Error saat memuat YAML {module_name}: {str(yaml_error)}")
+                    # Jika gagal, gunakan default
+                    if default_config is not None:
+                        return copy.deepcopy(default_config)
+                    else:
+                        return {}
+            else:
+                # Jika file tidak ada, gunakan default
+                if default_config is not None:
+                    # Simpan default ke cache
+                    self.module_configs[module_name] = copy.deepcopy(default_config)
+                    
+                    if self.logger:
+                        self.logger.info(f"ℹ️ Menggunakan konfigurasi default untuk {module_name}")
+                    
+                    return copy.deepcopy(default_config)
+                else:
+                    # Return empty dict jika tidak ada default
+                    if self.logger:
+                        self.logger.warning(f"⚠️ Tidak ada konfigurasi untuk {module_name} dan tidak ada default")
+                    
+                    return {}
         except Exception as e:
             if self.logger:
-                self.logger.warning(f"⚠️ Error saat memuat konfigurasi {module_name}: {str(e)}")
-        
-        # Gunakan default jika tidak ada file atau terjadi error
-        if default_config is None:
-            default_config = {}
-        
-        # Simpan default di cache
-        self.module_configs[module_name] = copy.deepcopy(default_config)
-        
-        if self.logger:
-            self.logger.debug(f"ℹ️ Menggunakan konfigurasi default untuk {module_name}")
+                self.logger.error(f"❌ Error saat memuat konfigurasi {module_name}: {str(e)}")
             
-        return copy.deepcopy(default_config)
+            # Return default jika ada error
+            if default_config is not None:
+                return copy.deepcopy(default_config)
+            else:
+                return {}
     
     def save_module_config(self, module_name: str, config: Dict[str, Any]) -> bool:
         """
@@ -478,10 +497,23 @@ class ConfigManager:
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             
             # Perbaikan: gunakan path langsung untuk save_yaml, bukan file object
-            save_yaml(config_copy, config_path)
-            
-            if self.logger:
-                self.logger.info(f"✅ Konfigurasi {module_name} berhasil disimpan ke {config_path}")
+            try:
+                save_yaml(config_copy, config_path)
+                if self.logger:
+                    self.logger.info(f"✅ Konfigurasi {module_name} berhasil disimpan ke {config_path}")
+            except Exception as save_error:
+                if self.logger:
+                    self.logger.error(f"❌ Error saat menyimpan YAML: {str(save_error)}")
+                # Fallback: coba simpan dengan metode alternatif
+                try:
+                    with open(config_path, 'w', encoding='utf-8') as f:
+                        yaml.dump(config_copy, f, default_flow_style=False, allow_unicode=True)
+                    if self.logger:
+                        self.logger.info(f"✅ Konfigurasi {module_name} berhasil disimpan dengan metode alternatif")
+                except Exception as alt_error:
+                    if self.logger:
+                        self.logger.error(f"❌ Error saat menyimpan dengan metode alternatif: {str(alt_error)}")
+                    raise
             
             # Notifikasi observer
             self.notify_observers(module_name, config_copy)

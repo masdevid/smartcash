@@ -49,11 +49,16 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                 else:
                     print(f"⚠️ BackboneConfig.BACKBONE_CONFIGS kosong, menggunakan opsi default")
             
-            # Daftar model yang dioptimalkan
+            # Daftar model yang dioptimalkan - hanya menyimpan model yang diperlukan
             optimized_models = {}
             
-            # Salin model dari ModelManager.OPTIMIZED_MODELS dengan validasi backbone
+            # Salin model dari ModelManager.OPTIMIZED_MODELS dengan validasi backbone (hanya model yang dibutuhkan)
+            allowed_models = ['yolov5s', 'efficient_basic', 'efficient_optimized', 'efficient_advanced']
             for model_key, model_config in ModelManager.OPTIMIZED_MODELS.items():
+                # Hanya menyimpan model yang diizinkan (menghapus efficient_experiment)
+                if model_key not in allowed_models:
+                    continue
+                    
                 # Salin konfigurasi model
                 optimized_models[model_key] = model_config.copy()
                 
@@ -111,8 +116,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                         'use_ciou': False
                     }
                 }
-            
-            import_success = True
         except ImportError as ie:
             # Coba impor alternatif jika struktur modul berubah
             try:
@@ -359,31 +362,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(width='400px')
     )
     
-    # Fitur optimasi
-    ui_components['use_attention'] = widgets.Checkbox(
-        value=optimized_models['efficient_optimized']['use_attention'],
-        description='Gunakan FeatureAdapter (Attention)',
-        style={'description_width': '250px'},
-        layout=widgets.Layout(width='400px'),
-        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
-    )
-    
-    ui_components['use_residual'] = widgets.Checkbox(
-        value=optimized_models['efficient_optimized']['use_residual'],
-        description='Gunakan ResidualAdapter',
-        style={'description_width': '250px'},
-        layout=widgets.Layout(width='400px'),
-        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
-    )
-    
-    ui_components['use_ciou'] = widgets.Checkbox(
-        value=optimized_models['efficient_optimized']['use_ciou'],
-        description='Gunakan CIoU Loss',
-        style={'description_width': '250px'},
-        layout=widgets.Layout(width='400px'),
-        disabled=True  # Dinonaktifkan karena akan otomatis diupdate
-    )
-    
     # Informasi backbone
     ui_components['backbone_info'] = widgets.HTML(
         value="<p>Informasi backbone akan ditampilkan di sini</p>"
@@ -440,20 +418,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         background_color='#f8f9fa'
     ))
     
-    # Card untuk fitur optimasi
-    optimization_card = widgets.VBox([
-        widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS.get('optimization', '⚙️')} Fitur Optimasi</h4>"),
-        ui_components['use_attention'],
-        ui_components['use_residual'],
-        ui_components['use_ciou']
-    ], layout=widgets.Layout(
-        border='1px solid #ddd',
-        border_radius='5px',
-        padding='10px',
-        margin='0 0 15px 0',
-        background_color='#f8f9fa'
-    ))
-    
     # Buat info_box untuk informasi backbone
     ui_components['info_box'] = widgets.VBox([
         widgets.HTML(f"<h4 style='color:{COLORS['dark']}; margin-top:0;'>{ICONS['info']} Informasi Model</h4>"),
@@ -487,17 +451,10 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         ], layout=widgets.Layout(width='50%', padding='5px'))
     ], layout=widgets.Layout(margin='0 0 10px 0'))
     
-    # Baris ketiga: Freeze layers dan fitur optimasi
+    # Baris ketiga: Freeze layers
     feature_row = widgets.HBox([
         widgets.VBox([
             ui_components['freeze_layers']
-        ], layout=widgets.Layout(width='50%', padding='5px')),
-        widgets.VBox([
-            widgets.HBox([
-                ui_components['use_attention'],
-                ui_components['use_residual'],
-                ui_components['use_ciou']
-            ])
         ], layout=widgets.Layout(width='50%', padding='5px'))
     ], layout=widgets.Layout(margin='0 0 10px 0'))
     
@@ -591,7 +548,6 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                         with ui_components['status']:
                             from smartcash.ui.utils.alert_utils import create_status_indicator
                             from IPython.display import display
-                            display(create_status_indicator("success", f"Berhasil mengatur backbone ke: {backbone_value}"))
                     except Exception as set_error:
                         with ui_components['status']:
                             from smartcash.ui.utils.alert_utils import create_status_indicator
@@ -670,16 +626,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     from IPython.display import display
                     display(create_status_indicator("error", f"Error umum saat mengupdate backbone: {str(e)}"))
             
-            # Update fitur optimasi dengan penanganan error
-            try:
-                ui_components['use_attention'].value = model_config.get('use_attention', False)
-                ui_components['use_residual'].value = model_config.get('use_residual', False)
-                ui_components['use_ciou'].value = model_config.get('use_ciou', False)
-            except Exception as e:
-                with ui_components['status']:
-                    from smartcash.ui.utils.alert_utils import create_status_indicator
-                    from IPython.display import display
-                    display(create_status_indicator("error", f"Error saat mengupdate fitur optimasi: {str(e)}"))
+            # Fitur optimasi tidak lagi diupdate melalui UI karena checkbox dihapus
                     
             # Update informasi backbone
             try:

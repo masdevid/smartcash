@@ -627,6 +627,10 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     display(create_status_indicator("error", f"Error umum saat mengupdate backbone: {str(e)}"))
             
             # Fitur optimasi tidak lagi diupdate melalui UI karena checkbox dihapus
+            # Namun kita tetap perlu mendapatkan nilai-nilai ini dari model_config untuk ditampilkan di informasi backbone
+            use_attention = model_config.get('use_attention', False)
+            use_residual = model_config.get('use_residual', False)
+            use_ciou = model_config.get('use_ciou', False)
                     
             # Update informasi backbone
             try:
@@ -637,9 +641,9 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                     <p><strong>Backbone:</strong> {model_config['backbone']}</p>
                     <p><strong>Fitur Optimasi:</strong></p>
                     <ul>
-                        <li>FeatureAdapter (Attention): {'✅ Aktif' if model_config.get('use_attention', False) else '❌ Tidak aktif'}</li>
-                        <li>ResidualAdapter: {'✅ Aktif' if model_config.get('use_residual', False) else '❌ Tidak aktif'}</li>
-                        <li>CIoU Loss: {'✅ Aktif' if model_config.get('use_ciou', False) else '❌ Tidak aktif'}</li>
+                        <li>FeatureAdapter (Attention): {'✅ Aktif' if use_attention else '❌ Tidak aktif'}</li>
+                        <li>ResidualAdapter: {'✅ Aktif' if use_residual else '❌ Tidak aktif'}</li>
+                        <li>CIoU Loss: {'✅ Aktif' if use_ciou else '❌ Tidak aktif'}</li>
                     </ul>
                 </div>
                 """

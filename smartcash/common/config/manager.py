@@ -5,6 +5,7 @@ Deskripsi: Manager konfigurasi dengan dukungan YAML, environment variables, dan 
 
 import os
 import copy
+import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, List
 

@@ -8,7 +8,7 @@ _base_: 'base_config.yaml'
 # Konfigurasi detail model
 model:
   # Backbone model
-  backbone: 'EfficientNet-B4'
+  backbone: 'efficientnet_b4'
   backbone_pretrained: true
   backbone_weights: ''  # Path ke file weights kustom (kosong untuk menggunakan default pretrained)
   backbone_freeze: false  # Freeze backbone selama training

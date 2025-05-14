@@ -265,6 +265,37 @@ def load_default_config() -> Dict[str, Any]:
         }
     }
 
+def load_split_config_config(config_path: str = 'configs/dataset_config.yaml') -> Dict[str, Any]:
+    """
+    Load konfigurasi split dataset dari file.
+    
+    Args:
+        config_path: Path ke file konfigurasi
+        
+    Returns:
+        Dictionary berisi konfigurasi split dataset
+    """
+    try:
+        # Coba load dari file konfigurasi
+        if Path(config_path).exists():
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f) or {}
+            
+            # Pastikan struktur konfigurasi benar
+            if not isinstance(config, dict):
+                config = {}
+            if 'data' not in config:
+                config['data'] = {}
+                
+            return config
+        else:
+            # Jika file tidak ada, gunakan konfigurasi default
+            return load_default_config()
+    except Exception as e:
+        print(f"⚠️ Error saat memuat konfigurasi split: {str(e)}")
+        # Fallback ke konfigurasi default
+        return load_default_config()
+
 def initialize_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
     Update komponen UI dari konfigurasi dengan validasi.

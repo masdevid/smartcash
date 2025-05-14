@@ -22,7 +22,7 @@ training:
 
 # Override konfigurasi model
 model:
-  backbone: 'EfficientNet-B4'
+  backbone: 'efficientnet_b4'
   input_size: [640, 640]
   confidence: 0.25
   iou_threshold: 0.45

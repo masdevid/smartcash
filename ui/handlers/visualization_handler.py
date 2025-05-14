@@ -199,31 +199,27 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                         detail_message="Silakan lakukan preprocessing dataset terlebih dahulu."
                     )
                     return
+                
+                # Gunakan implementasi yang ada di smartcash/ui/charts/visualize_preprocessed_samples
+                try:
+                    from smartcash.ui.charts.visualize_preprocessed_samples import visualize_preprocessed_samples
+                    
+                    # Buat wrapper untuk ui_components
+                    vis_ui_components = {
+                        "visualization_container": output_widget,
+                        "logger": logger, 
+                        "status": output_widget,
+                        "preprocess_options": ui_components.get('preprocess_options', None)
+                    }
+                    
+                    # Visualisasi sampel preprocessed
+                    visualize_preprocessed_samples(vis_ui_components, preprocessed_dir, data_dir, num_samples=5)
+                    return
+                except ImportError as e:
+                    if logger: logger.warning(f"⚠️ Tidak dapat menggunakan visualize_preprocessed_samples: {str(e)}")
+                    # Lanjutkan dengan fallback jika import gagal
             # Jika modul adalah augmentation, prioritaskan mencari gambar di augmented_dir
             elif module_name == 'augmentation':
-                # Jika label_dir tidak ada, coba cari di lokasi standar
-                if show_labels and not label_dir:
-                    potential_label_dirs = [
-                        image_dir.parent / 'labels',
-                        image_dir.parent.parent / 'labels',
-                        image_dir.parent / 'train' / 'labels',
-                        image_dir.parent / 'val' / 'labels',
-                        image_dir.parent / 'test' / 'labels'
-                    ]
-                    
-                    # Gunakan fungsi helper untuk mencari direktori label yang valid
-                    label_dir = find_valid_label_directory(potential_label_dirs)
-                    if label_dir and logger:
-                        logger.info(f"✅ Menggunakan label dari {label_dir}")
-                        # Jika tidak ditemukan, tampilkan pesan informatif
-                        if target_dir is None:
-                            if logger: logger.warning(f"⚠️ Tidak ada gambar ditemukan untuk visualisasi")
-                            display_no_data_message(
-                                output_widget,
-                                message="Tidak ada gambar yang ditemukan untuk divisualisasikan.",
-                                detail_message="Silakan lakukan augmentasi dataset terlebih dahulu."
-                            )
-                            return
                 # Cari gambar di lokasi yang paling mungkin terlebih dahulu
                 potential_dirs = [
                     augmented_images_dir,  # Prioritas tertinggi
@@ -247,7 +243,49 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                         detail_message="Silakan lakukan augmentasi dataset terlebih dahulu."
                     )
                     return
-            # Jika modul adalah split, prioritaskan mencari gambar di data_dir
+                
+                # Gunakan implementasi yang ada di smartcash/ui/charts/visualize_augmented_samples
+                try:
+                    from smartcash.ui.charts.visualize_augmented_samples import visualize_augmented_samples
+                    
+                    # Buat wrapper untuk ui_components
+                    vis_ui_components = {
+                        "visualization_container": output_widget,
+                        "logger": logger, 
+                        "status": output_widget,
+                        "aug_options": ui_components.get('aug_options', None)
+                    }
+                    
+                    # Visualisasi sampel augmented
+                    visualize_augmented_samples(vis_ui_components, augmented_dir, data_dir, num_samples=5, aug_prefix=aug_prefix)
+                    return
+                except ImportError as e:
+                    if logger: logger.warning(f"⚠️ Tidak dapat menggunakan visualize_augmented_samples: {str(e)}")
+                    # Lanjutkan dengan fallback jika import gagal
+                # Cari gambar di lokasi yang paling mungkin terlebih dahulu
+                potential_dirs = [
+                    augmented_images_dir,  # Prioritas tertinggi
+                    Path(augmented_dir) / 'train' / 'images',
+                    Path(preprocessed_dir) / 'train' / 'images',
+                    Path(data_dir) / 'images',
+                    Path(data_dir)  # Fallback
+                ]
+                
+                # Gunakan fungsi helper untuk mencari direktori gambar yang valid
+                target_dir = find_valid_image_directory(potential_dirs)
+                if target_dir and logger: 
+                    logger.info(f"✅ Menggunakan gambar dari {target_dir}")
+                    
+                # Jika tidak ditemukan, tampilkan pesan informatif
+                if target_dir is None:
+                    if logger: logger.warning(f"⚠️ Tidak ada gambar ditemukan untuk visualisasi")
+                    display_no_data_message(
+                        output_widget,
+                        message="Tidak ada gambar yang ditemukan untuk divisualisasikan.",
+                        detail_message="Silakan lakukan augmentasi dataset terlebih dahulu."
+                    )
+                    return
+            # Jika modul adalah split atau default, prioritaskan mencari gambar di data_dir
             else:  # split atau default
                 # Cari gambar di lokasi yang paling mungkin terlebih dahulu
                 potential_dirs = [
@@ -338,16 +376,16 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
             if not Path(preprocessed_dir).exists():
                 with output_widget:
                     display_visualization_status(
-                output_widget,
-                status_type="warning",
-                title="Direktori tidak ditemukan",
-                messages=[str(preprocessed_dir)]
-            )
-                return
+                        output_widget,
+                        status_type="warning",
+                        title="Direktori tidak ditemukan",
+                        messages=[str(preprocessed_dir)]
+                    )
+                    return
             
             # Import helper untuk komparasi
             try:
-                from smartcash.ui.charts.comparison_visualizer import compare_original_vs_processed
+                from smartcash.ui.charts.compare_original_vs_preprocessed import compare_original_vs_preprocessed
                 
                 # Buat wrapper untuk ui_components
                 vis_ui_components = {
@@ -359,8 +397,9 @@ def setup_visualization_handlers(ui_components: Dict[str, Any], module_name: str
                 }
                 
                 # Visualisasi komparasi
-                compare_original_vs_processed(vis_ui_components)
-            except ImportError:
+                compare_original_vs_preprocessed(vis_ui_components)
+            except ImportError as e:
+                if logger: logger.warning(f"⚠️ Tidak dapat menggunakan compare_original_vs_preprocessed: {str(e)}")
                 # Fallback: Visualisasi standar
                 compare_original_vs_processed_fallback(data_dir, preprocessed_dir, output_widget)
             

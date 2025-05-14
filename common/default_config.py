@@ -58,7 +58,7 @@ def generate_default_config() -> Dict[str, Any]:
             "security"
         ],
         "model": {
-            "backbone": "EfficientNet-B4",
+            "backbone": "efficientnet_b4",
             "input_size": DEFAULT_IMG_SIZE,
             "confidence": 0.25,
             "iou_threshold": 0.45,

@@ -46,7 +46,7 @@ layers:
 
 # Konfigurasi model
 model:
-  backbone: 'EfficientNet-B4'     # Backbone yang digunakan
+  backbone: 'efficientnet_b4'     # Backbone yang digunakan
   input_size: [640, 640]          # Ukuran input model
   confidence: 0.25                # Threshold untuk deteksi
   iou_threshold: 0.45             # Threshold untuk NMS

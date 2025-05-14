@@ -3,13 +3,45 @@ File: smartcash/ui/dataset/augmentation/handlers/button_handlers.py
 Deskripsi: Handler tombol untuk augmentasi dataset
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from IPython.display import display, clear_output
 import os
+import traceback
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+
+# Fungsi notifikasi untuk observer pattern
+def _notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
+    """Notifikasi observer bahwa proses telah dimulai."""
+    logger = ui_components.get('logger')
+    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
+        ui_components['on_process_start']("augmentation", {
+            'split': split,
+            'display_info': display_info
+        })
+
+def _notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any], display_info: str) -> None:
+    """Notifikasi observer bahwa proses telah selesai dengan sukses."""
+    logger = ui_components.get('logger')
+    if logger: logger.info(f"{ICONS['success']} Augmentasi {display_info} selesai")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
+        ui_components['on_process_complete']("augmentation", result)
+
+def _notify_process_error(ui_components: Dict[str, Any], error_message: str) -> None:
+    """Notifikasi observer bahwa proses mengalami error."""
+    logger = ui_components.get('logger')
+    if logger: logger.error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
+        ui_components['on_process_error']("augmentation", error_message)
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -81,18 +113,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
         
         # Notifikasi observer tentang mulai augmentasi
-        try:
-            from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
-            notify(
-                event_type=EventTopics.AUGMENTATION_START, 
-                sender="augmentation_handler", 
-                message=f"Memulai augmentasi dataset {split_info}", 
-                split=split_option,
-                aug_types=aug_types
-            )
-        except ImportError: 
-            pass
+        _notify_process_start(ui_components, "augmentasi", split_info, split_option)
         
         # Setup augmentation service
         try:
@@ -154,19 +175,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             generate_augmentation_summary(ui_components, preprocessed_dir, augmented_dir)
             
             # Notifikasi observer tentang selesai
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=EventTopics.AUGMENTATION_END,
-                    sender="augmentation_handler",
-                    message=f"Augmentasi dataset {split_info} selesai",
-                    result=augment_result,
-                    duration=augment_result.get('duration', 0),
-                    generated_files=augment_result.get('generated_files', 0)
-                )
-            except ImportError:
-                pass
+            _notify_process_complete(ui_components, augment_result, split_info)
             
         except Exception as e:
             # Handle error dengan notifikasi
@@ -177,17 +186,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             update_status_panel(ui_components, "error", f"{ICONS['error']} Augmentasi gagal: {str(e)}")
             
             # Notifikasi observer tentang error
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=EventTopics.AUGMENTATION_ERROR,
-                    sender="augmentation_handler",
-                    message=f"Error saat augmentasi: {str(e)}",
-                    error=str(e)
-                )
-            except ImportError:
-                pass
+            _notify_process_error(ui_components, str(e))
             
             # Log error
             if logger: logger.error(f"{ICONS['error']} Error saat augmentasi dataset: {str(e)}")
@@ -357,3 +356,39 @@ def reset_ui(ui_components: Dict[str, Any]) -> None:
     # Reset accordion
     if 'log_accordion' in ui_components:
         ui_components['log_accordion'].selected_index = None
+
+def get_dataset_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None, logger=None):
+    """
+    Dapatkan dataset manager dengan fallback yang terstandarisasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi
+        logger: Logger untuk logging
+        
+    Returns:
+        Dataset manager instance
+    """
+    # Cek apakah sudah ada di ui_components
+    if 'augmentation_manager' in ui_components and ui_components['augmentation_manager']:
+        return ui_components['augmentation_manager']
+    
+    # Gunakan fallback_utils untuk konsistensi
+    try:
+        from smartcash.ui.utils.fallback_utils import get_augmentation_manager
+        augmentation_manager = get_augmentation_manager(config, logger)
+        
+        # Register progress callback jika tersedia
+        try:
+            if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
+                ui_components['register_progress_callback'](augmentation_manager)
+        except Exception:
+            pass
+        
+        # Simpan ke ui_components
+        ui_components['augmentation_manager'] = augmentation_manager
+        
+        return augmentation_manager
+    except Exception as e:
+        if logger: logger.error(f"{ICONS['error']} Gagal membuat augmentation manager: {str(e)}")
+        return None

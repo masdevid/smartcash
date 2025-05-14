@@ -3,9 +3,10 @@ File: smartcash/ui/handlers/processing_button_handler.py
 Deskripsi: Handler tombol bersama untuk modul preprocessing dan augmentasi
 """
 
-from typing import Dict, Any, Optional, Callable, Union
+from typing import Dict, Any, Optional, Callable, Union, List
 from IPython.display import display, clear_output
 import os
+import traceback
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
@@ -47,6 +48,118 @@ def _notify_process_error(ui_components: Dict[str, Any], module_type: str, error
     # Panggil callback jika tersedia
     if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
         ui_components['on_process_error'](module_type, error_message)
+
+def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True, module_type: str = 'preprocessing') -> None:
+    """Menonaktifkan atau mengaktifkan komponen UI selama proses berjalan."""
+    # Daftar komponen yang perlu dinonaktifkan
+    primary_button_key = f"{module_type}_button"
+    disable_components = [
+        'split_selector', 'config_accordion', 'options_accordion',
+        'reset_button', primary_button_key, 'save_button'
+    ]
+    
+    # Tambahan komponen untuk augmentation
+    if module_type == 'augmentation':
+        disable_components.extend(['aug_options', 'aug_factor_slider'])
+    
+    # Disable/enable komponen
+    for component in disable_components:
+        if component in ui_components and hasattr(ui_components[component], 'disabled'):
+            ui_components[component].disabled = disable
+
+def _cleanup_ui(ui_components: Dict[str, Any], module_type: str = 'preprocessing') -> None:
+    """Membersihkan UI setelah proses selesai."""
+    # Aktifkan kembali UI
+    _disable_ui_during_processing(ui_components, False, module_type)
+    
+    # Tampilkan tombol utama, sembunyikan tombol stop
+    primary_button_key = f"{module_type}_button"
+    # Periksa keberadaan tombol primary sebelum mengakses
+    if primary_button_key in ui_components:
+        ui_components[primary_button_key].layout.display = 'block'
+    elif 'augment_button' in ui_components and module_type == 'augmentation':
+        # Fallback untuk augmentation module
+        ui_components['augment_button'].layout.display = 'block'
+    
+    # Sembunyikan tombol stop jika ada
+    if 'stop_button' in ui_components:
+        ui_components['stop_button'].layout.display = 'none'
+    
+    # Reset progress bar
+    if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
+        ui_components['reset_progress_bar']()
+
+def _get_dataset_manager(ui_components: Dict[str, Any], module_type: str) -> Any:
+    """Mendapatkan atau membuat dataset manager dari ui_components.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        module_type: Tipe modul ('preprocessing' atau 'augmentation')
+        
+    Returns:
+        Dataset manager instance atau None jika gagal
+    """
+    logger = ui_components.get('logger')
+    
+    # Cek apakah manager sudah ada di ui_components
+    manager_key = f"{module_type}_manager"
+    if manager_key in ui_components and ui_components[manager_key] is not None:
+        return ui_components[manager_key]
+    
+    # Jika belum ada, coba buat baru
+    try:
+        if module_type == 'preprocessing':
+            # Import dan buat preprocessing manager
+            from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
+            
+            # Dapatkan parameter dari ui_components
+            data_dir = ui_components.get('data_dir', 'data')
+            config = ui_components.get('config', {})
+            num_workers = ui_components.get('num_workers', 4)
+            
+            # Buat instance service
+            manager = PreprocessingService(
+                config=config,
+                data_dir=data_dir,
+                logger=logger,
+                num_workers=num_workers
+            )
+            
+        elif module_type == 'augmentation':
+            # Import dan buat augmentation manager
+            from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
+            
+            # Dapatkan parameter dari ui_components
+            data_dir = ui_components.get('data_dir', 'data')
+            config = ui_components.get('config', {})
+            num_workers = ui_components.get('num_workers', 4)
+            
+            # Buat instance service
+            manager = AugmentationService(
+                config=config,
+                data_dir=data_dir,
+                logger=logger,
+                num_workers=num_workers
+            )
+            
+        else:
+            # Tipe modul tidak didukung
+            if logger: logger.warning(f"{ICONS['warning']} Tipe modul tidak didukung: {module_type}")
+            return None
+        
+        # Simpan manager ke ui_components
+        ui_components[manager_key] = manager
+        
+        # Register progress callback jika tersedia
+        if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
+            ui_components['register_progress_callback'](manager)
+        
+        return manager
+        
+    except Exception as e:
+        # Log error
+        if logger: logger.error(f"{ICONS['error']} Error saat membuat {module_type} manager: {str(e)}")
+        return None
 
 def setup_processing_button_handlers(
     ui_components: Dict[str, Any], 
@@ -104,7 +217,7 @@ def setup_processing_button_handlers(
                 ui_components[element].layout.visibility = 'visible'
         
         # Disable semua UI input
-        _disable_ui_during_processing(ui_components, True)
+        _disable_ui_during_processing(ui_components, True, module_type)
         
         # Update tombol untuk mode processing
         ui_components[primary_button_key].layout.display = 'none'
@@ -221,49 +334,12 @@ def setup_processing_button_handlers(
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
     
-    # Definisi fungsi helper untuk UI
-    def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True) -> None:
-        """Menonaktifkan atau mengaktifkan komponen UI selama proses berjalan."""
-        # Daftar komponen yang perlu dinonaktifkan
-        disable_components = [
-            'split_selector', 'config_accordion', 'options_accordion',
-            'reset_button', primary_button_key, 'save_button'
-        ]
-        
-        # Tambahan komponen untuk augmentation
-        if module_type == 'augmentation':
-            disable_components.extend(['aug_options', 'aug_factor_slider'])
-        
-        # Disable/enable komponen
-        for component in disable_components:
-            if component in ui_components and hasattr(ui_components[component], 'disabled'):
-                ui_components[component].disabled = disable
-    
-    def _cleanup_ui(ui_components: Dict[str, Any]) -> None:
-        """Membersihkan UI setelah proses selesai."""
-        # Aktifkan kembali UI
-        _disable_ui_during_processing(ui_components, False)
-        
-        # Tampilkan tombol utama, sembunyikan tombol stop
-        # Periksa keberadaan tombol primary sebelum mengakses
-        if primary_button_key in ui_components:
-            ui_components[primary_button_key].layout.display = 'block'
-        elif 'augment_button' in ui_components:
-            # Fallback untuk augmentation module
-            ui_components['augment_button'].layout.display = 'block'
-        
-        # Sembunyikan tombol stop jika ada
-        if 'stop_button' in ui_components:
-            ui_components['stop_button'].layout.display = 'none'
-        
-        # Reset progress bar
-        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-            ui_components['reset_progress_bar']()
+    # Gunakan fungsi helper global
     
     def _reset_ui(ui_components: Dict[str, Any]) -> None:
         """Reset UI ke kondisi awal."""
         # Bersihkan UI
-        _cleanup_ui(ui_components)
+        _cleanup_ui(ui_components, module_type)
         
         # Sembunyikan visualisasi dan summary
         for component in ['visualization_container', 'summary_container', 'visualization_buttons']:
@@ -290,8 +366,6 @@ def setup_processing_button_handlers(
         'on_stop_click': on_stop_click,
         'on_reset_click': on_reset_click,
         running_flag_key: False,
-        'disable_ui_during_processing': _disable_ui_during_processing,
-        'cleanup_ui': _cleanup_ui,
         'reset_ui': _reset_ui
     })
     
@@ -308,7 +382,7 @@ def _execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str
     if not dataset_manager:
         with ui_components['status']: 
             display(create_status_indicator("error", f"{ICONS['error']} Dataset Manager tidak tersedia"))
-        _cleanup_ui(ui_components)
+        _cleanup_ui(ui_components, "preprocessing")
         return
     
     # Dapatkan opsi preprocessing dari UI
@@ -396,7 +470,7 @@ def _execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str
         ui_components['preprocessing_running'] = False
         
         # Restore UI
-        _cleanup_ui(ui_components)
+        _cleanup_ui(ui_components, "preprocessing")
 def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: str) -> None:
     """Eksekusi augmentasi dengan parameter dari UI."""
     logger = ui_components.get('logger')
@@ -492,4 +566,4 @@ def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info:
         ui_components['augmentation_running'] = False
         
         # Restore UI
-        _cleanup_ui(ui_components)
+        _cleanup_ui(ui_components, "augmentation")

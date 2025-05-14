@@ -7,8 +7,11 @@ _base_: 'base_config.yaml'
 
 # Konfigurasi detail model
 model:
+  # Type model
+  type: 'efficient_basic'  # Tipe model: 'efficient_basic' atau 'yolov5s'
+  
   # Backbone model
-  backbone: 'efficientnet_b4'
+  backbone: 'efficientnet_b4'  # Backbone yang didukung: 'efficientnet_b4' atau 'cspdarknet_s'
   backbone_pretrained: true
   backbone_weights: ''  # Path ke file weights kustom (kosong untuk menggunakan default pretrained)
   backbone_freeze: false  # Freeze backbone selama training
@@ -44,6 +47,11 @@ model:
   quantization: false
   quantization_aware_training: false  # Gunakan QAT untuk model lebih ringan
   fp16_training: true  # Gunakan mixed precision untuk training
+  
+  # Fitur optimasi tambahan
+  use_attention: false  # Gunakan FeatureAdapter (Attention) untuk adaptasi feature maps
+  use_residual: false  # Gunakan ResidualAdapter untuk koneksi residual tambahan
+  use_ciou: false      # Gunakan CIoU Loss untuk bounding box regression
 
 # Training parameter spesifik
 training:
@@ -97,29 +105,23 @@ experiments:
         backbone: 'efficientnet_b4'
         pretrained: true
   
-  # Skenario uji coba (sesuai OPTIMIZED_MODELS)
+  # Skenario uji coba (sesuai model yang didukung)
   scenarios:
     - name: 'yolov5s'
       description: 'YOLOv5s dengan CSPDarknet sebagai backbone (model pembanding)'
       config:
+        type: 'yolov5s'
         backbone: 'cspdarknet_s'
         use_attention: false
         use_residual: false
         use_ciou: false
     
     - name: 'efficient_basic'
-      description: 'Model dasar tanpa optimasi khusus'
+      description: 'Model dasar dengan EfficientNet-B4 tanpa optimasi khusus'
       config:
+        type: 'efficient_basic'
         backbone: 'efficientnet_b4'
         use_attention: false
-        use_residual: false
-        use_ciou: false
-    
-    - name: 'efficient_optimized'
-      description: 'Model dengan EfficientNet-B4 dan FeatureAdapter'
-      config:
-        backbone: 'efficientnet_b4'
-        use_attention: true
         use_residual: false
         use_ciou: false
     
@@ -130,12 +132,3 @@ experiments:
         use_attention: true
         use_residual: true
         use_ciou: true
-    
-    - name: 'efficient_experiment'
-      description: 'Model penelitian dengan konfigurasi khusus'
-      config:
-        backbone: 'efficientnet_b4'
-        use_attention: true
-        use_residual: true
-        use_ciou: true
-        num_repeats: 3

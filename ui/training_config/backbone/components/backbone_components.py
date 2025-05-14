@@ -53,7 +53,7 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             optimized_models = {}
             
             # Salin model dari ModelManager.OPTIMIZED_MODELS dengan validasi backbone (hanya model yang dibutuhkan)
-            allowed_models = ['yolov5s', 'efficient_basic', 'efficient_optimized', 'efficient_advanced']
+            allowed_models = ['yolov5s', 'efficient_basic', 'efficient_advanced']
             for model_key, model_config in ModelManager.OPTIMIZED_MODELS.items():
                 # Hanya menyimpan model yang diizinkan (menghapus efficient_experiment)
                 if model_key not in allowed_models:
@@ -232,14 +232,14 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             'use_ciou': False
         }
     
-    # Pastikan efficient_optimized juga tersedia
-    if 'efficient_optimized' not in optimized_models:
-        optimized_models['efficient_optimized'] = {
-            'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+    # Pastikan efficient_advanced juga tersedia
+    if 'efficient_advanced' not in optimized_models:
+        optimized_models['efficient_advanced'] = {
+            'description': 'Model dengan semua optimasi: FeatureAdapter, ResidualAdapter, dan CIoU',
             'backbone': 'efficientnet_b4',
             'use_attention': True,
-            'use_residual': False,
-            'use_ciou': False
+            'use_residual': True,
+            'use_ciou': True
         }
         
     # Tambahkan model efficient_basic sebagai model default
@@ -264,10 +264,10 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         # Jika optimized_models kosong, tambahkan model default
         if not optimized_models:
             optimized_models = {
-                'efficient_optimized': {
-                    'description': 'Model dengan EfficientNet-B4 dan FeatureAdapter',
+                'efficient_basic': {
+                    'description': 'Model dasar dengan EfficientNet-B4 tanpa optimasi tambahan',
                     'backbone': 'efficientnet_b4',
-                    'use_attention': True,
+                    'use_attention': False,
                     'use_residual': False,
                     'use_ciou': False
                 },
@@ -281,9 +281,10 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
             }
     
     # Pastikan nilai default selalu ada dalam opsi
-    default_model = config.get('model_type', 'efficient_basic')
+    # Tetapkan efficient_basic sebagai default pilihan
+    default_model = 'efficient_basic'
     if default_model not in model_options:
-        default_model = 'efficient_basic' if 'efficient_basic' in model_options else ('efficient_optimized' if 'efficient_optimized' in model_options else model_options[0])
+        default_model = model_options[0]
         with ui_components['status']:
             print(f"⚠️ Model default tidak ditemukan dalam opsi, menggunakan: {default_model}")
     

@@ -17,6 +17,37 @@ except ImportError:
     # Fallback jika tidak ditemukan
     from smartcash.ui.handlers.processing_cleanup_handler import _update_status_panel
 
+# Fungsi notifikasi untuk observer pattern
+def _notify_process_start(ui_components: Dict[str, Any], module_type: str, process_name: str, display_info: str, split: Optional[str] = None) -> None:
+    """Notifikasi observer bahwa proses telah dimulai."""
+    logger = ui_components.get('logger')
+    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
+        ui_components['on_process_start'](module_type, {
+            'split': split,
+            'display_info': display_info
+        })
+
+def _notify_process_complete(ui_components: Dict[str, Any], module_type: str, result: Dict[str, Any], display_info: str) -> None:
+    """Notifikasi observer bahwa proses telah selesai dengan sukses."""
+    logger = ui_components.get('logger')
+    if logger: logger.info(f"{ICONS['success']} {module_type.capitalize()} {display_info} selesai")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
+        ui_components['on_process_complete'](module_type, result)
+
+def _notify_process_error(ui_components: Dict[str, Any], module_type: str, error_message: str) -> None:
+    """Notifikasi observer bahwa proses mengalami error."""
+    logger = ui_components.get('logger')
+    if logger: logger.error(f"{ICONS['error']} Error pada {module_type}: {error_message}")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
+        ui_components['on_process_error'](module_type, error_message)
+
 def setup_processing_button_handlers(
     ui_components: Dict[str, Any], 
     module_type: str = 'preprocessing',

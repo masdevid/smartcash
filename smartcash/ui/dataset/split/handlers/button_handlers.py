@@ -9,15 +9,54 @@ from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.ui_logger import create_direct_ui_logger
 from smartcash.common.logger import get_logger
+import yaml
+from pathlib import Path
 
-# Import dari file SRP lainnya
+# Import fungsi yang selalu dibutuhkan
 from smartcash.ui.dataset.split.handlers.config_handlers import (
     update_config_from_ui, save_config_with_manager, 
-    load_default_config, load_split_config_config, get_config_manager_instance
+    load_default_config, get_config_manager_instance
 )
 from smartcash.ui.dataset.split.handlers.ui_initializer import (
     initialize_ui_from_config, ensure_ui_persistence, update_ui_from_config
 )
+
+# Definisi fungsi load_split_config_config langsung di file ini untuk menghindari masalah import
+def load_split_config_config() -> Dict[str, Any]:
+    """
+    Load konfigurasi split dataset dari file YAML.
+    
+    Returns:
+        Dictionary berisi konfigurasi split dataset
+    """
+    try:
+        # Path ke file konfigurasi dataset
+        config_path = Path("config/dataset_config.yaml")
+        if not config_path.exists():
+            # Coba cari di lokasi alternatif
+            alt_path = Path("../config/dataset_config.yaml")
+            if alt_path.exists():
+                config_path = alt_path
+            else:
+                return load_default_config()
+        
+        # Load konfigurasi dari file
+        with open(config_path, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        # Pastikan struktur konfigurasi benar
+        if not config:
+            config = {}
+        if 'data' not in config:
+            config['data'] = {}
+        if 'split' not in config['data']:
+            config['data']['split'] = {'train': 0.7, 'val': 0.15, 'test': 0.15, 'stratified': True}
+        
+        return config
+    except Exception as e:
+        print(f"{ICONS['error']} Error saat memuat konfigurasi split dataset: {str(e)}")
+        # Kembalikan konfigurasi default
+        return load_default_config()
 
 def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
@@ -40,11 +79,6 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     # Pastikan konfigurasi data ada
     if not config:
-        # Import fungsi yang diperlukan untuk memastikan tersedia dalam scope
-        from smartcash.ui.dataset.split.handlers.config_handlers import (
-            load_split_config_config
-        )
-        
         # Coba dapatkan konfigurasi dari ConfigManager
         config_manager = get_config_manager_instance()
         if config_manager:
@@ -53,21 +87,11 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
                 if logger: logger.debug(f"{ICONS['info']} Konfigurasi berhasil dimuat dari ConfigManager")
             except Exception as e:
                 if logger: logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari ConfigManager: {str(e)}")
-                # Fallback ke load dari file dengan penanganan error
-                try:
-                    config = load_split_config_config()
-                except Exception as load_error:
-                    if logger: logger.error(f"{ICONS['error']} Gagal memuat konfigurasi dari file: {str(load_error)}")
-                    # Fallback ke konfigurasi default
-                    config = load_default_config()
-        else:
-            # Fallback ke load dari file dengan penanganan error
-            try:
+                # Fallback ke load dari file
                 config = load_split_config_config()
-            except Exception as load_error:
-                if logger: logger.error(f"{ICONS['error']} Gagal memuat konfigurasi dari file: {str(load_error)}")
-                # Fallback ke konfigurasi default
-                config = load_default_config()
+        else:
+            # Fallback ke load dari file
+            config = load_split_config_config()
     
     # Pastikan struktur konfigurasi benar
     if not isinstance(config, dict):
@@ -163,7 +187,7 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
     """
     # Import fungsi yang diperlukan untuk memastikan tersedia dalam scope
     from smartcash.ui.dataset.split.handlers.config_handlers import (
-        load_default_config, save_config_with_manager
+        save_config_with_manager
     )
     from smartcash.ui.dataset.split.handlers.ui_initializer import (
         update_ui_from_config

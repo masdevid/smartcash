@@ -93,7 +93,8 @@ class TestTrainingStrategyConfig(unittest.TestCase):
         self.assertEqual(updated_config['training_utils']['layer_mode'], 'multilayer')
     
     @patch('smartcash.ui.training_config.training_strategy.handlers.config_handlers.get_config_manager')
-    def test_update_ui_from_config(self, mock_get_config_manager):
+    @patch('smartcash.ui.training_config.training_strategy.handlers.config_handlers.update_training_strategy_info')
+    def test_update_ui_from_config(self, mock_update_info, mock_get_config_manager):
         """Test update UI dari konfigurasi."""
         # Setup mock
         mock_get_config_manager.return_value = self.mock_config_manager
@@ -136,7 +137,8 @@ class TestTrainingStrategyConfig(unittest.TestCase):
         self.assertEqual(self.ui_components['layer_mode'].value, 'multilayer')
         
         # Verifikasi update info dipanggil
-        self.ui_components['update_training_strategy_info'].assert_called_once()
+        # Dalam implementasi baru, update_training_strategy_info dipanggil langsung dari dalam update_ui_from_config
+        mock_update_info.assert_called_once()
     
     def test_save_config_to_file(self):
         """Test menyimpan konfigurasi ke file."""

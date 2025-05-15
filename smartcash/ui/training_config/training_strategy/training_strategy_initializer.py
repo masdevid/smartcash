@@ -13,7 +13,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
-from smartcash.ui.training_config.training_strategy.components.training_strategy_components import create_training_strategy_ui_components
+from smartcash.ui.training_config.training_strategy.components import create_training_strategy_ui_components
 from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_ui_from_config, update_config_from_ui, get_default_config
 from smartcash.ui.training_config.training_strategy.handlers.button_handlers import setup_training_strategy_button_handlers
 from smartcash.ui.training_config.training_strategy.handlers.form_handlers import setup_training_strategy_form_handlers

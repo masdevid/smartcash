@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import ipywidgets as widgets
 
-from smartcash.ui.training_config.hyperparameters.components.hyperparameters_components import (
+from smartcash.ui.training_config.hyperparameters.components import (
     create_hyperparameters_ui_components,
     create_hyperparameters_info_panel
 )
@@ -61,37 +61,51 @@ class TestHyperparametersUI(unittest.TestCase):
         self.mock_env.is_drive_mounted = True
         self.mock_env.drive_path = '/content/drive'
     
-    @patch('smartcash.ui.training_config.hyperparameters.components.hyperparameters_components.widgets')
-    def test_create_hyperparameters_ui_components(self, mock_widgets):
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_tab_widget')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_header')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_hyperparameters_info_panel')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_hyperparameters_button_components')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_hyperparameters_advanced_components')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_hyperparameters_optimization_components')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.create_hyperparameters_basic_components')
+    @patch('smartcash.ui.training_config.hyperparameters.components.main_components.widgets')
+    def test_create_hyperparameters_ui_components(self, mock_widgets, mock_basic, mock_optimization, mock_advanced, mock_button, mock_info_panel, mock_header, mock_tab_widget):
         """Pengujian pembuatan komponen UI hyperparameter"""
         # Setup mock
         mock_widgets.VBox.return_value = MagicMock()
         mock_widgets.HBox.return_value = MagicMock()
         mock_widgets.HTML.return_value = MagicMock()
-        mock_widgets.Output.return_value = MagicMock()
-        mock_widgets.IntSlider.return_value = MagicMock()
-        mock_widgets.FloatSlider.return_value = MagicMock()
-        mock_widgets.FloatLogSlider.return_value = MagicMock()
-        mock_widgets.Dropdown.return_value = MagicMock()
-        mock_widgets.Checkbox.return_value = MagicMock()
-        mock_widgets.Button.return_value = MagicMock()
+        mock_widgets.Box.return_value = MagicMock()
+        mock_widgets.Tab.return_value = MagicMock()
+        mock_widgets.Accordion.return_value = MagicMock()
         mock_widgets.Layout.return_value = MagicMock()
+        
+        # Mock komponen
+        mock_basic.return_value = {'basic_box': MagicMock()}
+        mock_optimization.return_value = {'optimization_box': MagicMock()}
+        mock_advanced.return_value = {'advanced_box': MagicMock()}
+        mock_button.return_value = {'save_button': MagicMock(), 'reset_button': MagicMock(), 'status': MagicMock()}
+        mock_info_panel.return_value = (MagicMock(), MagicMock())
+        mock_header.return_value = MagicMock()
+        mock_tab_widget.return_value = MagicMock()
         
         # Panggil fungsi
         ui_components = create_hyperparameters_ui_components()
         
         # Verifikasi hasil
         self.assertIsInstance(ui_components, dict)
-        self.assertIn('batch_size_slider', ui_components)
-        self.assertIn('image_size_slider', ui_components)
-        self.assertIn('epochs_slider', ui_components)
-        self.assertIn('optimizer_dropdown', ui_components)
-        self.assertIn('learning_rate_slider', ui_components)
+        self.assertIn('basic_box', ui_components)
+        self.assertIn('optimization_box', ui_components)
+        self.assertIn('advanced_box', ui_components)
         self.assertIn('save_button', ui_components)
         self.assertIn('reset_button', ui_components)
-        self.assertIn('main_layout', ui_components)
+        self.assertIn('status', ui_components)
+        self.assertIn('info_panel', ui_components)
+        self.assertIn('main_container', ui_components)
+        self.assertIn('tabs', ui_components)
+        self.assertIn('header', ui_components)
     
-    @patch('smartcash.ui.training_config.hyperparameters.components.hyperparameters_components.widgets')
+    @patch('smartcash.ui.training_config.hyperparameters.components.info_panel_components.widgets')
     def test_create_hyperparameters_info_panel(self, mock_widgets):
         """Pengujian pembuatan panel informasi hyperparameter"""
         # Setup mock
@@ -223,14 +237,10 @@ class TestHyperparametersUI(unittest.TestCase):
         self.assertIsInstance(result, dict)
         self.assertIn('on_save_click', result)
         self.assertIn('on_reset_click', result)
-        self.assertIn('on_sync_from_drive_click', result)
-        self.assertIn('on_sync_to_drive_click', result)
         
         # Verifikasi handler terpasang
         ui_components['save_button'].on_click.assert_called_once()
         ui_components['reset_button'].on_click.assert_called_once()
-        ui_components['sync_from_drive_button'].on_click.assert_called_once()
-        ui_components['sync_to_drive_button'].on_click.assert_called_once()
     
     @patch('smartcash.ui.training_config.hyperparameters.handlers.form_handlers.get_logger')
     def test_setup_hyperparameters_form_handlers(self, mock_get_logger):

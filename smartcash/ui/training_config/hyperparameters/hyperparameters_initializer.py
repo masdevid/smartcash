@@ -14,7 +14,7 @@ from smartcash.common.logger import get_logger
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
-from smartcash.ui.training_config.hyperparameters.components.hyperparameters_components import create_hyperparameters_ui_components
+from smartcash.ui.training_config.hyperparameters.components import create_hyperparameters_ui_components
 from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import update_ui_from_config, update_config_from_ui
 from smartcash.ui.training_config.hyperparameters.handlers.button_handlers import setup_hyperparameters_button_handlers
 from smartcash.ui.training_config.hyperparameters.handlers.form_handlers import setup_hyperparameters_form_handlers

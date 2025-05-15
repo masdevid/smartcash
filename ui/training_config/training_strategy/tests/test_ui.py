@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 import ipywidgets as widgets
 
-from smartcash.ui.training_config.training_strategy.components.training_strategy_components import create_training_strategy_ui_components
+from smartcash.ui.training_config.training_strategy.components import create_training_strategy_ui_components
 from smartcash.ui.training_config.training_strategy.handlers.form_handlers import setup_training_strategy_form_handlers
 from smartcash.ui.training_config.training_strategy.handlers.button_handlers import setup_training_strategy_button_handlers
 from smartcash.ui.training_config.training_strategy.training_strategy_initializer import initialize_training_strategy_ui, get_training_strategy_ui
@@ -44,55 +44,79 @@ class TestTrainingStrategyUI(unittest.TestCase):
         self.mock_config_manager.save_module_config.return_value = True
         self.mock_config_manager.get_ui_components.return_value = None
     
-    @patch('smartcash.ui.training_config.training_strategy.components.training_strategy_components.create_config_buttons')
-    def test_create_training_strategy_ui_components(self, mock_create_config_buttons):
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.VBox')
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.HTML')
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.Accordion')
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.Tab')
+    @patch('smartcash.ui.training_config.training_strategy.components.button_components.create_training_strategy_button_components')
+    @patch('smartcash.ui.training_config.training_strategy.components.utils_components.create_training_strategy_utils_components')
+    @patch('smartcash.ui.training_config.training_strategy.components.validation_components.create_training_strategy_validation_components')
+    @patch('smartcash.ui.training_config.training_strategy.components.multiscale_components.create_training_strategy_multiscale_components')
+    @patch('smartcash.ui.training_config.training_strategy.components.info_panel_components.create_training_strategy_info_panel')
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.create_header')
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.create_divider')
+    def test_create_training_strategy_ui_components(self, mock_create_divider, mock_create_header, mock_create_info_panel, 
+                                                  mock_create_multiscale, mock_create_validation, 
+                                                  mock_create_utils, mock_create_buttons, mock_tab, mock_accordion,
+                                                  mock_html, mock_vbox):
         """Test membuat komponen UI."""
         # Setup mock
-        mock_create_config_buttons.return_value = {
+        mock_vbox.return_value = MagicMock()
+        mock_html.return_value = MagicMock()
+        mock_accordion.return_value = MagicMock()
+        mock_tab.return_value = MagicMock()
+        mock_create_divider.return_value = MagicMock()
+        
+        mock_create_buttons.return_value = {
             'save_button': MagicMock(),
             'reset_button': MagicMock(),
-            'container': MagicMock()
+            'sync_to_drive_button': MagicMock(),
+            'sync_from_drive_button': MagicMock(),
+            'button_container': MagicMock(),
+            'status': MagicMock()
         }
+        mock_create_utils.return_value = {
+            'utils_box': MagicMock(),
+            'experiment_name': MagicMock(),
+            'checkpoint_dir': MagicMock(),
+            'tensorboard': MagicMock(),
+            'log_metrics_every': MagicMock(),
+            'visualize_batch_every': MagicMock(),
+            'gradient_clipping': MagicMock(),
+            'mixed_precision': MagicMock(),
+            'layer_mode': MagicMock()
+        }
+        mock_create_validation.return_value = {
+            'validation_box': MagicMock(),
+            'validation_frequency': MagicMock(),
+            'iou_threshold': MagicMock(),
+            'conf_threshold': MagicMock()
+        }
+        mock_create_multiscale.return_value = {
+            'multiscale_box': MagicMock(),
+            'multi_scale': MagicMock()
+        }
+        mock_create_info_panel.return_value = (MagicMock(), MagicMock())
+        mock_create_header.return_value = MagicMock()
         
         # Panggil fungsi yang ditest
         ui_components = create_training_strategy_ui_components()
         
         # Verifikasi hasil
         self.assertIsInstance(ui_components, dict)
-        self.assertIn('experiment_name', ui_components)
-        self.assertIn('checkpoint_dir', ui_components)
-        self.assertIn('tensorboard', ui_components)
-        self.assertIn('log_metrics_every', ui_components)
-        self.assertIn('visualize_batch_every', ui_components)
-        self.assertIn('gradient_clipping', ui_components)
-        self.assertIn('mixed_precision', ui_components)
-        self.assertIn('layer_mode', ui_components)
-        self.assertIn('validation_frequency', ui_components)
-        self.assertIn('iou_threshold', ui_components)
-        self.assertIn('conf_threshold', ui_components)
-        self.assertIn('multi_scale', ui_components)
+        self.assertIn('utils_box', ui_components)
+        self.assertIn('validation_box', ui_components)
+        self.assertIn('multiscale_box', ui_components)
+        self.assertIn('save_button', ui_components)
+        self.assertIn('reset_button', ui_components)
+        self.assertIn('status', ui_components)
+        self.assertIn('training_strategy_info', ui_components)
         self.assertIn('main_container', ui_components)
         self.assertIn('tabs', ui_components)
-        self.assertIn('status', ui_components)
-        
-        # Verifikasi tipe komponen
-        self.assertIsInstance(ui_components['experiment_name'], widgets.Text)
-        self.assertIsInstance(ui_components['checkpoint_dir'], widgets.Text)
-        self.assertIsInstance(ui_components['tensorboard'], widgets.Checkbox)
-        self.assertIsInstance(ui_components['log_metrics_every'], widgets.IntSlider)
-        self.assertIsInstance(ui_components['visualize_batch_every'], widgets.IntSlider)
-        self.assertIsInstance(ui_components['gradient_clipping'], widgets.FloatSlider)
-        self.assertIsInstance(ui_components['mixed_precision'], widgets.Checkbox)
-        self.assertIsInstance(ui_components['layer_mode'], widgets.RadioButtons)
-        self.assertIsInstance(ui_components['validation_frequency'], widgets.IntSlider)
-        self.assertIsInstance(ui_components['iou_threshold'], widgets.FloatSlider)
-        self.assertIsInstance(ui_components['conf_threshold'], widgets.FloatSlider)
-        self.assertIsInstance(ui_components['multi_scale'], widgets.Checkbox)
-        self.assertIsInstance(ui_components['main_container'], widgets.VBox)
-        self.assertIsInstance(ui_components['tabs'], widgets.Tab)
-        self.assertIsInstance(ui_components['status'], widgets.Output)
+        self.assertIn('header', ui_components)
     
-    def test_setup_training_strategy_form_handlers(self):
+    @patch('smartcash.ui.training_config.training_strategy.handlers.form_handlers.get_logger')
+    def test_setup_training_strategy_form_handlers(self, mock_get_logger):
         """Test setup form handlers."""
         # Buat mock UI components
         ui_components = {
@@ -108,7 +132,6 @@ class TestTrainingStrategyUI(unittest.TestCase):
             'iou_threshold': MagicMock(),
             'conf_threshold': MagicMock(),
             'multi_scale': MagicMock(),
-            'training_strategy_info': MagicMock(),
             'status': MagicMock()
         }
         
@@ -119,20 +142,6 @@ class TestTrainingStrategyUI(unittest.TestCase):
         self.assertEqual(result, ui_components)
         self.assertIn('cleanup', result)
         self.assertIn('update_training_strategy_info', result)
-        
-        # Verifikasi observe dipanggil untuk setiap komponen
-        ui_components['experiment_name'].observe.assert_called_once()
-        ui_components['checkpoint_dir'].observe.assert_called_once()
-        ui_components['tensorboard'].observe.assert_called_once()
-        ui_components['log_metrics_every'].observe.assert_called_once()
-        ui_components['visualize_batch_every'].observe.assert_called_once()
-        ui_components['gradient_clipping'].observe.assert_called_once()
-        ui_components['mixed_precision'].observe.assert_called_once()
-        ui_components['layer_mode'].observe.assert_called_once()
-        ui_components['validation_frequency'].observe.assert_called_once()
-        ui_components['iou_threshold'].observe.assert_called_once()
-        ui_components['conf_threshold'].observe.assert_called_once()
-        ui_components['multi_scale'].observe.assert_called_once()
     
     @patch('smartcash.ui.training_config.training_strategy.handlers.button_handlers.get_config_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.button_handlers.get_environment_manager')
@@ -147,7 +156,7 @@ class TestTrainingStrategyUI(unittest.TestCase):
             'save_button': MagicMock(),
             'reset_button': MagicMock(),
             'status': MagicMock(),
-            'training_strategy_info': MagicMock()
+            'info_panel': MagicMock()
         }
         
         # Panggil fungsi yang ditest

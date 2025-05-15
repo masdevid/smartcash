@@ -4,8 +4,9 @@ Deskripsi: Initializer untuk modul konfigurasi split dataset
 """
 
 from typing import Dict, Any
+import ipywidgets as widgets
 from smartcash.ui.utils.base_initializer import initialize_module_ui
-from smartcash.ui.utils.ui_logger import get_ui_logger
+from smartcash.ui.utils.ui_logger import create_direct_ui_logger
 from smartcash.ui.dataset.split.components.split_component import create_split_ui
 from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
 
@@ -40,8 +41,11 @@ def setup_split_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -
 def initialize_split_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul konfigurasi split dataset tanpa visualisasi."""
     
+    # Buat dictionary ui_components minimal untuk logger
+    temp_ui_components = {'status': widgets.Output()}
+    
     # Dapatkan ui_logger untuk logging yang lebih baik
-    ui_logger = get_ui_logger('split_config')
+    ui_logger = create_direct_ui_logger(temp_ui_components, 'split_config')
     
     # Tombol yang perlu diattach dengan ui_components
     button_keys = ['save_button', 'reset_button']

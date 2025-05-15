@@ -7,7 +7,7 @@ from typing import Dict, Any
 from IPython.display import display, clear_output
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.ui_logger import get_ui_logger
+from smartcash.ui.utils.ui_logger import create_direct_ui_logger
 from smartcash.common.logger import get_logger
 
 # Import dari file SRP lainnya
@@ -36,7 +36,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
         ui_components = {}
     
     # Dapatkan ui_logger untuk logging yang lebih baik di UI
-    logger = ui_components.get('logger', get_ui_logger('split_config'))
+    logger = ui_components.get('logger', create_direct_ui_logger(ui_components, 'split_config'))
     
     # Pastikan konfigurasi data ada
     if not config:

@@ -191,7 +191,7 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
                 display(create_status_indicator("info", 
                     f"{ICONS.get('loading', '⏳')} Sinkronisasi dari Google Drive..."))
             
-            sync_models_with_drive(models_dir, drive_models_dir, log_callback=log_message)
+            sync_models_with_drive(models_dir, drive_models_dir, logger_func=log_message)
         
         # Download model pretrained dengan callback untuk logging
         log_message(f"{ICONS.get('download', '📥')} Memulai download model pre-trained...")
@@ -200,7 +200,7 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
             display(create_status_indicator("info", 
                 f"{ICONS.get('loading', '⏳')} Downloading model pre-trained..."))
         
-        model_info = setup_pretrained_models(models_dir=models_dir, log_callback=log_message)
+        model_info = setup_pretrained_models(models_dir=models_dir, logger_func=log_message)
         
         # Sinkronisasi ke Drive setelah download jika di Colab
         if model_info and in_colab and is_drive_available:
@@ -210,7 +210,7 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
                 display(create_status_indicator("info", 
                     f"{ICONS.get('loading', '⏳')} Sinkronisasi ke Google Drive..."))
             
-            sync_models_with_drive(models_dir, drive_models_dir, model_info, log_callback=log_message)
+            sync_models_with_drive(models_dir, drive_models_dir, model_info, logger_func=log_message)
         
         # Update status setelah selesai
         log_message(f"{ICONS.get('success', '✅')} Proses persiapan model pre-trained selesai!")

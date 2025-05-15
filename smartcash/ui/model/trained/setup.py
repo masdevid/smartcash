@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/model/trained/setup_fixed.py
+File: smartcash/ui/model/trained/setup_new.py
 Deskripsi: Fungsi setup untuk model pre-trained dengan pendekatan DRY (versi yang diperbaiki)
 """
 
@@ -15,21 +15,21 @@ from smartcash.common.logger import get_logger
 logger = get_logger(__name__)
 
 def setup_pretrained_models(models_dir: str = '/content/models', 
-                           log_callback: Optional[Callable] = None) -> Dict[str, Any]:
+                           logger_func = None) -> Dict[str, Any]:
     """
     Download dan setup model pre-trained YOLOv5 dan EfficientNet-B4 dengan UI feedback.
     
     Args:
         models_dir: Direktori untuk menyimpan model
-        log_callback: Fungsi callback untuk logging (opsional)
+        logger_func: Fungsi callback untuk logging (opsional)
         
     Returns:
         Dict berisi informasi model
     """
     # Fungsi helper untuk logging
     def log_message(message: str):
-        if log_callback and callable(log_callback):
-            log_callback(message)
+        if logger_func is not None and callable(logger_func):
+            logger_func(message)
         else:
             logger.info(message)
     
@@ -70,7 +70,7 @@ def setup_pretrained_models(models_dir: str = '/content/models',
 def sync_models_with_drive(models_dir: str, 
                           drive_models_dir: str, 
                           model_info: Optional[Dict[str, Any]] = None,
-                          log_callback: Optional[Callable] = None) -> None:
+                          logger_func = None) -> None:
     """
     Sinkronisasi model dengan Google Drive.
     
@@ -78,12 +78,12 @@ def sync_models_with_drive(models_dir: str,
         models_dir: Direktori lokal untuk model
         drive_models_dir: Direktori Google Drive untuk model
         model_info: Informasi model (opsional)
-        log_callback: Fungsi callback untuk logging (opsional)
+        logger_func: Fungsi callback untuk logging (opsional)
     """
     # Fungsi helper untuk logging
     def log_message(message: str):
-        if log_callback and callable(log_callback):
-            log_callback(message)
+        if logger_func is not None and callable(logger_func):
+            logger_func(message)
         else:
             logger.info(message)
     

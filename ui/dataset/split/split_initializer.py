@@ -5,6 +5,7 @@ Deskripsi: Initializer untuk modul konfigurasi split dataset
 
 from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
+from smartcash.ui.utils.ui_logger import get_ui_logger
 from smartcash.ui.dataset.split.components.split_component import create_split_ui
 from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
 
@@ -39,14 +40,25 @@ def setup_split_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -
 def initialize_split_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul konfigurasi split dataset tanpa visualisasi."""
     
+    # Dapatkan ui_logger untuk logging yang lebih baik
+    ui_logger = get_ui_logger('split_config')
+    
     # Tombol yang perlu diattach dengan ui_components
     button_keys = ['save_button', 'reset_button']
     
     # Gunakan base initializer dengan konfigurasi minimal
-    return initialize_module_ui(
+    ui_components = initialize_module_ui(
         module_name='split_config',
         create_ui_func=create_split_ui,
         setup_specific_handlers_func=setup_split_handlers,
         button_keys=button_keys,
         multi_progress_config=None  # Tidak perlu multi-progress karena tidak ada visualisasi
     )
+    
+    # Tambahkan ui_logger ke ui_components
+    ui_components['logger'] = ui_logger
+    
+    # Log inisialisasi berhasil dengan level debug
+    ui_logger.debug(f"🚀 Split_config UI berhasil diinisialisasi")
+    
+    return ui_components

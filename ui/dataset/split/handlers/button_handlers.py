@@ -7,6 +7,7 @@ from typing import Dict, Any
 from IPython.display import display, clear_output
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.ui_logger import get_ui_logger
 from smartcash.common.logger import get_logger
 
 # Import dari file SRP lainnya
@@ -34,8 +35,8 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     if ui_components is None:
         ui_components = {}
     
-    # Dapatkan logger jika tersedia
-    logger = ui_components.get('logger', get_logger('split_config'))
+    # Dapatkan ui_logger untuk logging yang lebih baik di UI
+    logger = ui_components.get('logger', get_ui_logger('split_config'))
     
     # Pastikan konfigurasi data ada
     if not config:
@@ -68,14 +69,14 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
         ui_components['save_button'].on_click(
             lambda b: handle_save_button(b, ui_components, config, env, logger)
         )
-        if logger: logger.info(f"{ICONS['link']} Handler untuk save button terdaftar")
+        if logger: logger.debug(f"{ICONS['link']} Handler untuk save button terdaftar")
     
     # Register handler untuk reset button
     if 'reset_button' in ui_components and ui_components['reset_button']:
         ui_components['reset_button'].on_click(
             lambda b: handle_reset_button(b, ui_components, config, env, logger)
         )
-        if logger: logger.info(f"{ICONS['link']} Handler untuk reset button terdaftar")
+        if logger: logger.debug(f"{ICONS['link']} Handler untuk reset button terdaftar")
     
     return ui_components
 
@@ -90,11 +91,19 @@ def handle_save_button(b, ui_components: Dict[str, Any], config: Dict[str, Any],
         env: Environment manager
         logger: Logger untuk logging
     """
+    # Import fungsi yang diperlukan untuk memastikan tersedia dalam scope
+    from smartcash.ui.dataset.split.handlers.config_handlers import (
+        update_config_from_ui, save_config_with_manager
+    )
+    
     # Pastikan output_box tersedia
     output_box = ui_components.get('output_box')
     if not output_box:
         print(f"{ICONS['warning']} Output box tidak tersedia")
         return
+    
+    # Gunakan status_panel jika tersedia
+    status_panel = ui_components.get('status_panel')
     
     # Clear output dan tampilkan status
     with output_box:
@@ -113,7 +122,7 @@ def handle_save_button(b, ui_components: Dict[str, Any], config: Dict[str, Any],
             clear_output()
             if success:
                 display(create_status_indicator("Konfigurasi berhasil disimpan", "success"))
-                if logger: logger.info(f"{ICONS['success']} Konfigurasi split dataset berhasil disimpan")
+                if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil disimpan")
             else:
                 display(create_status_indicator("Gagal menyimpan konfigurasi", "error"))
                 if logger: logger.error(f"{ICONS['error']} Gagal menyimpan konfigurasi split dataset")
@@ -135,6 +144,11 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         env: Environment manager
         logger: Logger untuk logging
     """
+    # Import fungsi yang diperlukan untuk memastikan tersedia dalam scope
+    from smartcash.ui.dataset.split.handlers.config_handlers import (
+        load_default_config, save_config_with_manager
+    )
+    
     # Pastikan output_box tersedia
     output_box = ui_components.get('output_box')
     if not output_box:
@@ -161,7 +175,7 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
             clear_output()
             if success:
                 display(create_status_indicator("Konfigurasi berhasil direset ke default", "success"))
-                if logger: logger.info(f"{ICONS['success']} Konfigurasi split dataset berhasil direset ke default")
+                if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil direset ke default")
             else:
                 display(create_status_indicator("Gagal mereset konfigurasi", "error"))
                 if logger: logger.error(f"{ICONS['error']} Gagal mereset konfigurasi split dataset")

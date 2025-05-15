@@ -160,14 +160,6 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 
                 logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
         
-        # Handler untuk tombol sync dari drive
-        def on_sync_from_drive_click(b):
-            sync_from_drive(b, ui_components)
-        
-        # Handler untuk tombol sync ke drive
-        def on_sync_to_drive_click(b):
-            sync_to_drive(b, ui_components)
-        
         # Pasang handler ke tombol
         if 'save_button' in ui_components:
             ui_components['save_button'].on_click(on_save_click)
@@ -175,18 +167,10 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         if 'reset_button' in ui_components:
             ui_components['reset_button'].on_click(on_reset_click)
         
-        if 'sync_from_drive_button' in ui_components:
-            ui_components['sync_from_drive_button'].on_click(on_sync_from_drive_click)
-        
-        if 'sync_to_drive_button' in ui_components:
-            ui_components['sync_to_drive_button'].on_click(on_sync_to_drive_click)
-        
         # Tambahkan handler ke ui_components
         ui_components.update({
             'on_save_click': on_save_click,
-            'on_reset_click': on_reset_click,
-            'on_sync_from_drive_click': on_sync_from_drive_click,
-            'on_sync_to_drive_click': on_sync_to_drive_click
+            'on_reset_click': on_reset_click
         })
         
         return ui_components

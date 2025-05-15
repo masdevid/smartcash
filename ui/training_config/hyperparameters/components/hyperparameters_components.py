@@ -493,7 +493,7 @@ def create_hyperparameters_button_components() -> Dict[str, Any]:
     """
     # Save button
     save_button = widgets.Button(
-        description=f"{ICONS.get('save', '💾')} Simpan",
+        description="💾 Simpan",
         disabled=False,
         button_style='success',
         tooltip='Simpan konfigurasi hyperparameter',
@@ -503,31 +503,11 @@ def create_hyperparameters_button_components() -> Dict[str, Any]:
     
     # Reset button
     reset_button = widgets.Button(
-        description=f"{ICONS.get('reset', '🔄')} Reset",
+        description="🔄 Reset",
         disabled=False,
         button_style='warning',
         tooltip='Reset konfigurasi hyperparameter ke default',
         icon='refresh',
-        layout=widgets.Layout(width='auto')
-    )
-    
-    # Sync from drive button
-    sync_from_drive_button = widgets.Button(
-        description=f"{ICONS.get('download', '⬇️')} Dari Drive",
-        disabled=False,
-        button_style='info',
-        tooltip='Sinkronisasi konfigurasi dari Google Drive',
-        icon='download',
-        layout=widgets.Layout(width='auto')
-    )
-    
-    # Sync to drive button
-    sync_to_drive_button = widgets.Button(
-        description=f"{ICONS.get('upload', '⬆️')} Ke Drive",
-        disabled=False,
-        button_style='info',
-        tooltip='Sinkronisasi konfigurasi ke Google Drive',
-        icon='upload',
         layout=widgets.Layout(width='auto')
     )
     
@@ -546,17 +526,13 @@ def create_hyperparameters_button_components() -> Dict[str, Any]:
     button_components = {
         'save_button': save_button,
         'reset_button': reset_button,
-        'sync_from_drive_button': sync_from_drive_button,
-        'sync_to_drive_button': sync_to_drive_button,
         'status': status_panel
     }
     
-    # Button box
+    # Button box (tidak digunakan lagi karena tombol ditampilkan di form_container)
     button_box = widgets.HBox([
         save_button,
-        reset_button,
-        sync_from_drive_button,
-        sync_to_drive_button
+        reset_button
     ], layout=widgets.Layout(
         width='100%',
         display='flex',
@@ -577,6 +553,10 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     Returns:
         Dict berisi semua komponen UI
     """
+    # Import tab factory
+    from smartcash.ui.components.tab_factory import create_tab_widget
+    from smartcash.ui.utils.header_utils import create_header
+    
     # Buat komponen UI
     basic_components = create_hyperparameters_basic_components()
     optimization_components = create_hyperparameters_optimization_components()
@@ -596,9 +576,15 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         'update_hyperparameters_info': update_hyperparameters_info
     }
     
-    # Buat layout utama
-    main_layout = widgets.VBox([
-        info_panel,
+    # Buat header
+    header = create_header(
+        title="Konfigurasi Hyperparameter",
+        description="Pengaturan parameter untuk proses training model",
+        icon=ICONS.get('settings', '⚙️')
+    )
+    
+    # Buat form container untuk tab konfigurasi
+    form_container = widgets.VBox([
         widgets.HBox([
             basic_components['basic_box'],
             widgets.VBox([
@@ -612,13 +598,44 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
             align_items='flex-start',
             justify_content='space-between'
         )),
-        button_components['button_box'],
-        button_components['status']
-    ], layout=widgets.Layout(
-        width='100%',
-        padding='10px'
-    ))
+        widgets.HBox([
+            button_components['save_button'], 
+            button_components['reset_button']
+        ], layout=widgets.Layout(
+            justify_content='space-between', 
+            margin='20px 0px 10px 0px'
+        )),
+        widgets.HTML(
+            value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} "
+                  f"Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
+        )
+    ])
     
-    ui_components['main_layout'] = main_layout
+    # Buat info container untuk tab informasi
+    info_container = widgets.VBox([
+        widgets.HTML("<h4>Informasi Hyperparameter</h4>"),
+        info_panel
+    ])
+    
+    # Buat tab untuk form dan info
+    tab_items = [
+        ('Konfigurasi', form_container),
+        ('Informasi', info_container)
+    ]
+    tabs = create_tab_widget(tab_items)
+    
+    # Set tab yang aktif
+    tabs.selected_index = 0
+    
+    # Buat container utama
+    main_container = widgets.VBox([
+        header,
+        tabs,
+        button_components['status']
+    ], layout=widgets.Layout(width='100%', padding='10px'))
+    
+    ui_components['main_container'] = main_container
+    ui_components['main_layout'] = main_container  # Untuk kompatibilitas
+    ui_components['tabs'] = tabs
     
     return ui_components

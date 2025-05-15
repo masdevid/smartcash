@@ -69,7 +69,11 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
             logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
         
         # Tampilkan UI secara otomatis
-        display_hyperparameters_ui(ui_components)
+        clear_output(wait=True)
+        if 'main_container' in ui_components:
+            display(ui_components['main_container'])
+        else:
+            display_hyperparameters_ui(ui_components)
         
         return ui_components
     except Exception as e:

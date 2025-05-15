@@ -477,32 +477,53 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                             # Update prefix (posisi 1)
                             if hasattr(children[1], 'value'):
                                 children[1].value = default_config['augmentation']['prefix']
-                            # Update factor (posisi 2)
+                            # Update factor (posisi 2) - PASTIKAN SELALU STRING
                             if hasattr(children[2], 'value'):
-                                children[2].value = default_config['augmentation']['factor']
+                                # Konversi ke string untuk mencegah error 'value' trait
+                                factor_value = str(default_config['augmentation']['factor'])
+                                children[2].value = factor_value
                             # Update balance_classes (posisi 4)
                             if hasattr(children[4], 'value'):
                                 children[4].value = default_config['augmentation']['balance_classes']
-                            # Update num_workers (posisi 5)
+                            # Update num_workers (posisi 5) - PASTIKAN TIPE YANG BENAR
                             if hasattr(children[5], 'value'):
-                                children[5].value = default_config['augmentation']['num_workers']
+                                # Deteksi tipe yang diharapkan
+                                if hasattr(children[5], '_trait_values'):
+                                    try:
+                                        # Coba konversi ke string dulu untuk aman
+                                        children[5].value = str(default_config['augmentation']['num_workers'])
+                                    except Exception:
+                                        # Jika gagal, coba sebagai integer
+                                        try:
+                                            children[5].value = int(default_config['augmentation']['num_workers'])
+                                        except Exception:
+                                            # Fallback ke default
+                                            pass
+                                else:
+                                    # Default fallback
+                                    try:
+                                        children[5].value = int(default_config['augmentation']['num_workers'])
+                                    except Exception:
+                                        pass
                     if logger: logger.info(f"{ICONS['success']} UI berhasil diupdate secara manual")
                 except Exception as manual_error:
                     if logger: logger.error(f"{ICONS['error']} Error saat update manual UI: {str(manual_error)}")
-            
-            # Simpan default config ke ConfigManager dengan penanganan error yang lebih baik
-            try:
-                success = save_augmentation_config(default_config)
-                if success:
-                    if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan ke ConfigManager")
-                else:
-                    if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan ke ConfigManager, mencoba fallback")
-                    # Fallback ke metode lama jika ConfigManager gagal
-                    try:
-                        ui_components['save_augmentation_config'](default_config)
-                        if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan dengan metode fallback")
-                    except Exception as fallback_error:
-                        if logger: logger.error(f"{ICONS['error']} Error saat menyimpan dengan metode fallback: {str(fallback_error)}")
+                    
+                # Simpan konfigurasi default
+                try:
+                    success = save_augmentation_config(default_config)
+                    if success:
+                        if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan ke ConfigManager")
+                    else:
+                        if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan ke ConfigManager, mencoba fallback")
+                        # Fallback ke metode lama jika ConfigManager gagal
+                        try:
+                            ui_components['save_augmentation_config'](default_config)
+                            if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan dengan metode fallback")
+                        except Exception as fallback_error:
+                            if logger: logger.error(f"{ICONS['error']} Error saat menyimpan dengan metode fallback: {str(fallback_error)}")
+                except Exception as config_error:
+                    if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi: {str(config_error)}")
             except Exception as e:
                 if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi default: {str(e)}")
                 # Tidak perlu raise exception di sini, biarkan proses reset tetap berlanjut

@@ -482,8 +482,10 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
                 
                 # Update factor (sekarang di posisi 2)
                 if 'factor' in aug_config and hasattr(aug_options[2], 'value'):
-                    aug_options[2].value = aug_config['factor']
-                    if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {aug_config['factor']}")
+                    # Pastikan nilai factor selalu string untuk Text widget
+                    factor_value = str(aug_config['factor']) if aug_config['factor'] is not None else '2'
+                    aug_options[2].value = factor_value
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set factor: {factor_value}")
                 
                 # Update balance_classes (sekarang di posisi 4)
                 if 'balance_classes' in aug_config and hasattr(aug_options[4], 'value'):
@@ -492,8 +494,20 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
                 
                 # Update num_workers (sekarang di posisi 5)
                 if 'num_workers' in aug_config and hasattr(aug_options[5], 'value'):
-                    aug_options[5].value = aug_config['num_workers']
-                    if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {aug_config['num_workers']}")
+                    # Pastikan nilai num_workers sesuai dengan tipe widget
+                    if hasattr(aug_options[5], '_trait_values') and hasattr(aug_options[5]._trait_values.get('value', None), '__class__'):
+                        expected_type = aug_options[5]._trait_values.get('value', 4).__class__
+                        # Konversi ke tipe yang diharapkan (int atau str)
+                        if expected_type == str:
+                            num_workers_value = str(aug_config['num_workers'])
+                        else:
+                            num_workers_value = int(aug_config['num_workers']) if isinstance(aug_config['num_workers'], (int, str)) else 4
+                    else:
+                        # Default ke int jika tidak dapat menentukan tipe
+                        num_workers_value = int(aug_config['num_workers']) if isinstance(aug_config['num_workers'], (int, str)) else 4
+                    
+                    aug_options[5].value = num_workers_value
+                    if logger: logger.debug(f"{ICONS['success']} Berhasil set num_workers: {num_workers_value}")
                     
                 # Pastikan nilai tetap selalu tersimpan di config
                 aug_config['types'] = ['Combined (Recommended)']

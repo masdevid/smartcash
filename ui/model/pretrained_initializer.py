@@ -12,6 +12,7 @@ from typing import Dict, Any, Tuple, List, Optional
 from smartcash.ui.model.trained.setup import setup_pretrained_models, sync_models_with_drive
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.header_utils import create_header
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import EnvironmentManager
 
@@ -55,24 +56,26 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
     """
     try:
         # Buat komponen UI
-        main_container = widgets.VBox([])
+        main_container = widgets.VBox()
         status_output = widgets.Output()
-        log_output = widgets.Output()
+        log_output = widgets.Output(layout=widgets.Layout(max_height='300px', overflow='auto'))
         
         # Definisikan direktori untuk model
         models_dir = '/content/models'
         drive_models_dir = '/content/drive/MyDrive/SmartCash/models'
         
+        # Buat header dengan create_header
+        header = create_header(
+            title="Persiapan Model Pre-trained",
+            description="Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4",
+            icon=ICONS.get('brain', '🧠')
+        )
+        
+        # Tambahkan elemen ke main_container
+        main_container.children = [header, status_output, log_output]
+        
         # Tampilkan UI
         clear_output(wait=True)
-        # Tambahkan elemen ke main_container
-        main_container.children = [
-            widgets.HTML("<h2>🧠 Persiapan Model Pre-trained</h2>"),
-            widgets.HTML("<p>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4</p>"),
-            status_output,
-            log_output
-        ]
-        # Tampilkan main_container
         display(main_container)
         
         # Kumpulkan komponen UI
@@ -175,4 +178,5 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
             clear_output(wait=True)
             display(create_status_indicator("error", 
                 f"{ICONS.get('error', '❌')} Error saat setup pretrained model"))
-        log_callback(f"{ICONS.get('error', '❌')} Error: {str(e)}")
+        with ui_components['log']:
+            print(f"{ICONS.get('error', '❌')} Error: {str(e)}")

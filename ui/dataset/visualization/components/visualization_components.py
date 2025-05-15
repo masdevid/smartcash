@@ -7,6 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any
 
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.components.tab_factory import create_tab_widget
 from smartcash.ui.components.accordion_factory import create_accordion
 
@@ -73,10 +74,16 @@ def create_visualization_components() -> Dict[str, Any]:
     # Buat tab widget
     tab = create_tab_widget(tab_items)
     
+    # Buat header dengan create_header
+    header = create_header(
+        title="Visualisasi Dataset",
+        description="Visualisasi dan analisis dataset untuk deteksi mata uang",
+        icon=ICONS.get('magnifier', '🔍')
+    )
+    
     # Tambahkan komponen ke container utama
     main_container.children = [
-        widgets.HTML("<h2>🔍 Visualisasi Dataset</h2>"),
-        widgets.HTML("<p>Visualisasi dan analisis dataset untuk deteksi mata uang</p>"),
+        header,
         status,
         progress_bar,
         tab

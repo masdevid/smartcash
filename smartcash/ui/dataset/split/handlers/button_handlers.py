@@ -89,20 +89,20 @@ def handle_save_button(b, ui_components: Dict[str, Any], config: Dict[str, Any],
     """
     # Import fungsi yang diperlukan
     from smartcash.ui.dataset.split.handlers.config_handlers import update_config_from_ui, save_config_with_manager
+    from smartcash.ui.utils.constants import COLORS
     
-    # Pastikan output_box tersedia
-    output_box = ui_components.get('output_box')
-    if not output_box:
-        print(f"{ICONS['warning']} Output box tidak tersedia")
+    # Pastikan status_panel tersedia
+    status_panel = ui_components.get('status_panel')
+    if not status_panel:
+        print(f"{ICONS['warning']} Status panel tidak tersedia")
         return
     
-    # Gunakan status_panel jika tersedia
-    status_panel = ui_components.get('status_panel')
-    
-    # Clear output dan tampilkan status
-    with output_box:
-        clear_output()
-        display(create_status_indicator("Menyimpan konfigurasi...", "processing"))
+    # Tampilkan status processing
+    status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']}">
+            <p style="margin:5px 0">{ICONS['processing']} Menyimpan konfigurasi...</p>
+        </div>"""
     
     try:
         # Update konfigurasi dari UI
@@ -112,19 +112,27 @@ def handle_save_button(b, ui_components: Dict[str, Any], config: Dict[str, Any],
         success = save_config_with_manager(config, ui_components, logger)
         
         # Tampilkan hasil
-        with output_box:
-            clear_output()
-            if success:
-                display(create_status_indicator("Konfigurasi berhasil disimpan", "success"))
-                if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil disimpan")
-            else:
-                display(create_status_indicator("Gagal menyimpan konfigurasi", "error"))
-                if logger: logger.error(f"{ICONS['error']} Gagal menyimpan konfigurasi split dataset")
+        if success:
+            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
+                     color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
+                     border-left:4px solid {COLORS['alert_success_text']}">
+                <p style="margin:5px 0">{ICONS['success']} Konfigurasi berhasil disimpan</p>
+            </div>"""
+            if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil disimpan")
+        else:
+            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                     color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
+                     border-left:4px solid {COLORS['alert_danger_text']}">
+                <p style="margin:5px 0">{ICONS['error']} Gagal menyimpan konfigurasi</p>
+            </div>"""
+            if logger: logger.error(f"{ICONS['error']} Gagal menyimpan konfigurasi split dataset")
     except Exception as e:
         # Tampilkan error
-        with output_box:
-            clear_output()
-            display(create_status_indicator(f"Error: {str(e)}", "error"))
+        status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                 color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_danger_text']}">
+            <p style="margin:5px 0">{ICONS['error']} Error: {str(e)}</p>
+        </div>"""
         if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi split dataset: {str(e)}")
 
 def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
@@ -141,17 +149,20 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
     # Import fungsi yang diperlukan
     from smartcash.ui.dataset.split.handlers.config_handlers import load_default_config, save_config_with_manager
     from smartcash.ui.dataset.split.handlers.ui_handlers import update_ui_from_config
+    from smartcash.ui.utils.constants import COLORS
     
-    # Pastikan output_box tersedia
-    output_box = ui_components.get('output_box')
-    if not output_box:
-        print(f"{ICONS['warning']} Output box tidak tersedia")
+    # Pastikan status_panel tersedia
+    status_panel = ui_components.get('status_panel')
+    if not status_panel:
+        print(f"{ICONS['warning']} Status panel tidak tersedia")
         return
     
-    # Clear output dan tampilkan status
-    with output_box:
-        clear_output()
-        display(create_status_indicator("Mereset konfigurasi...", "processing"))
+    # Tampilkan status processing
+    status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']}">
+            <p style="margin:5px 0">{ICONS['processing']} Mereset konfigurasi...</p>
+        </div>"""
     
     try:
         # Load konfigurasi default
@@ -164,17 +175,25 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         success = save_config_with_manager(default_config, ui_components, logger)
         
         # Tampilkan hasil
-        with output_box:
-            clear_output()
-            if success:
-                display(create_status_indicator("Konfigurasi berhasil direset ke default", "success"))
-                if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil direset ke default")
-            else:
-                display(create_status_indicator("Gagal mereset konfigurasi", "error"))
-                if logger: logger.error(f"{ICONS['error']} Gagal mereset konfigurasi split dataset")
+        if success:
+            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
+                     color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
+                     border-left:4px solid {COLORS['alert_success_text']}">
+                <p style="margin:5px 0">{ICONS['success']} Konfigurasi berhasil direset ke default</p>
+            </div>"""
+            if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil direset ke default")
+        else:
+            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                     color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
+                     border-left:4px solid {COLORS['alert_danger_text']}">
+                <p style="margin:5px 0">{ICONS['error']} Gagal mereset konfigurasi</p>
+            </div>"""
+            if logger: logger.error(f"{ICONS['error']} Gagal mereset konfigurasi split dataset")
     except Exception as e:
         # Tampilkan error
-        with output_box:
-            clear_output()
-            display(create_status_indicator(f"Error: {str(e)}", "error"))
+        status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
+                 color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_danger_text']}">
+            <p style="margin:5px 0">{ICONS['error']} Error: {str(e)}</p>
+        </div>"""
         if logger: logger.error(f"{ICONS['error']} Error saat mereset konfigurasi split dataset: {str(e)}")

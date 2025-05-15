@@ -26,9 +26,15 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Inisialisasi komponen
     ui_components = {}
     
-    # Tambahkan komponen status dan output
-    ui_components['status_panel'] = widgets.Output(layout=OUTPUT_WIDGET)
-    ui_components['output_box'] = widgets.Output(layout=OUTPUT_WIDGET)
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']}">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi split dataset</p>
+        </div>"""
+    )
+    ui_components['status_panel'] = status_panel
     
     # Buat header
     header = create_header(
@@ -201,6 +207,7 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Buat layout UI
     split_config_box = widgets.VBox([
         header,
+        ui_components['status_panel'],
         widgets.HBox([
             widgets.VBox([
                 widgets.HTML(value="<h3>Ratio Split Dataset</h3>"),
@@ -222,9 +229,7 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         widgets.HBox([
             ui_components['save_button'],
             ui_components['reset_button']
-        ]),
-        ui_components['status_panel'],
-        ui_components['output_box']
+        ])
     ])
     
     # Tambahkan UI ke komponen

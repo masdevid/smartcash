@@ -4,6 +4,7 @@ Deskripsi: Handler untuk interaksi UI backbone model
 """
 
 from typing import Dict, Any, Optional
+from smartcash.ui.utils.ui_logger import create_direct_ui_logger
 from smartcash.ui.utils.constants import ICONS
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:

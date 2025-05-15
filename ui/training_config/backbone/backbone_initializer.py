@@ -18,8 +18,15 @@ def initialize_backbone_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         Dict berisi komponen UI
     """
     # Setup UI logger
-    from smartcash.ui.utils.ui_logger import create_ui_logger
-    logger = create_ui_logger('backbone_ui')
+    from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+    
+    # Buat komponen status untuk logger
+    import ipywidgets as widgets
+    status_output = widgets.Output()
+    ui_components_temp = {'status': status_output}
+    
+    # Buat logger
+    logger = create_direct_ui_logger(ui_components_temp, 'backbone_ui')
     
     logger.info("🚀 Memulai inisialisasi UI backbone model")
     

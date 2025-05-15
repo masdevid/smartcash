@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 import threading
+import os
 from datetime import datetime
 
 from smartcash.ui.utils.constants import ICONS
@@ -14,10 +15,9 @@ from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 from smartcash.common.config.manager import ConfigManager
 from smartcash.dataset.services.service_factory import get_dataset_service
-from smartcash.ui.dataset.visualization.components.dashboard_cards import (
-    create_preprocessing_cards, create_augmentation_cards
+from smartcash.ui.dataset.visualization.components.dataset_stats_cards import (
+    create_dataset_stats_cards, create_preprocessing_stats_cards, create_augmentation_stats_cards
 )
-from smartcash.ui.dataset.visualization.components.split_stats_cards import create_split_stats_cards
 from smartcash.ui.utils.loading_indicator import create_loading_indicator, LoadingIndicator
 
 logger = get_logger(__name__)
@@ -46,18 +46,18 @@ def initialize_visualization_ui(loading_indicator: Optional[LoadingIndicator] = 
         # Buat dashboard cards container
         dashboard_cards_container = widgets.VBox([], layout=widgets.Layout(width='100%', margin='10px 0'))
         
-        # Buat container untuk kartu preprocessing dan augmentasi
-        preprocessing_cards = widgets.Output(layout=widgets.Layout(width='100%'))
-        augmentation_cards = widgets.Output(layout=widgets.Layout(width='100%'))
-        split_stats_cards = widgets.Output(layout=widgets.Layout(width='100%'))
+        # Buat container untuk kartu dataset stats
+        dataset_stats_cards = widgets.Output(layout=widgets.Layout(width='100%', margin='10px 0'))
+        preprocessing_stats_cards = widgets.Output(layout=widgets.Layout(width='100%', margin='10px 0'))
+        augmentation_stats_cards = widgets.Output(layout=widgets.Layout(width='100%', margin='10px 0'))
         
         # Tambahkan kartu ke dashboard container
         dashboard_cards_container.children = [
             widgets.HTML("<h3 style='margin: 10px 0; color: #0d47a1;'>📊 Dashboard Dataset</h3>"),
             status_panel,
-            split_stats_cards,
-            preprocessing_cards,
-            augmentation_cards
+            dataset_stats_cards,
+            preprocessing_stats_cards,
+            augmentation_stats_cards
         ]
         
         # Buat refresh button untuk dashboard
@@ -84,9 +84,9 @@ def initialize_visualization_ui(loading_indicator: Optional[LoadingIndicator] = 
             'main_container': main_container,
             'status_panel': status_panel,
             'dashboard_cards_container': dashboard_cards_container,
-            'preprocessing_cards': preprocessing_cards,
-            'augmentation_cards': augmentation_cards,
-            'split_stats_cards': split_stats_cards,
+            'dataset_stats_cards': dataset_stats_cards,
+            'preprocessing_stats_cards': preprocessing_stats_cards,
+            'augmentation_stats_cards': augmentation_stats_cards,
             'visualization_tabs': visualization_tabs,
             'refresh_button': refresh_button
         }
@@ -143,9 +143,9 @@ def update_dashboard_cards(ui_components: Dict[str, Any], loading_indicator: Opt
     try:
         # Ambil komponen UI
         status_panel = ui_components.get('status_panel')
-        preprocessing_cards = ui_components.get('preprocessing_cards')
-        augmentation_cards = ui_components.get('augmentation_cards')
-        split_stats_cards = ui_components.get('split_stats_cards')
+        dataset_stats_cards = ui_components.get('dataset_stats_cards')
+        preprocessing_stats_cards = ui_components.get('preprocessing_stats_cards')
+        augmentation_stats_cards = ui_components.get('augmentation_stats_cards')
         
         # Tampilkan loading indicator jika ada
         if loading_indicator:
@@ -166,11 +166,15 @@ def update_dashboard_cards(ui_components: Dict[str, Any], loading_indicator: Opt
             dataset_service = get_dataset_service(service_name='visualization')
             
             config_manager = ConfigManager()
-            dataset_config = config_manager.get_config('dataset_config')
+            dataset_config = config_manager.get_module_config('dataset_config')
             dataset_path = dataset_config.get('dataset_path', None)
             
-            if not dataset_path:
-                error_message = "Dataset path tidak ditemukan dalam konfigurasi"
+            if not dataset_path or not os.path.exists(dataset_path):
+                if not dataset_path:
+                    error_message = "Dataset path tidak ditemukan dalam konfigurasi"
+                else:
+                    error_message = f"Dataset path '{dataset_path}' tidak ditemukan"
+                    
                 logger.warning(f"{ICONS.get('warning', '⚠️')} {error_message}")
                 using_dummy_data = True
             else:
@@ -199,14 +203,16 @@ def update_dashboard_cards(ui_components: Dict[str, Any], loading_indicator: Opt
                     'test': {'images': 300, 'labels': 300}
                 },
                 'preprocessing': {
-                    'processed_images': 2000,
-                    'filtered_images': 2000,
-                    'normalized_images': 2000
+                    'train_processed': 1000,
+                    'val_processed': 200,
+                    'test_processed': 200,
+                    'total_processed': 1400
                 },
                 'augmentation': {
-                    'augmented_images': 2000,
-                    'augmentations_created': 2000,
-                    'augmentation_types': 5
+                    'train_augmented': 700,
+                    'val_augmented': 150,
+                    'test_augmented': 150,
+                    'total_augmented': 1000
                 }
             }
             
@@ -222,29 +228,33 @@ def update_dashboard_cards(ui_components: Dict[str, Any], loading_indicator: Opt
         
         # Perbarui loading indicator jika ada
         if loading_indicator:
-            loading_indicator.update(60, "Memperbarui statistik split...")
+            loading_indicator.update(60, "Memperbarui statistik dataset...")
         
-        # Update split stats cards
-        if split_stats_cards:
-            with split_stats_cards:
+        # Update dataset stats cards
+        if dataset_stats_cards:
+            with dataset_stats_cards:
                 clear_output(wait=True)
-                display(create_split_stats_cards(stats))
+                display(create_dataset_stats_cards(stats))
         
         # Perbarui loading indicator jika ada
         if loading_indicator:
-            loading_indicator.update(75, "Memperbarui kartu preprocessing dan augmentasi...")
+            loading_indicator.update(75, "Memperbarui statistik preprocessing...")
         
-        # Update preprocessing cards
-        if preprocessing_cards:
-            with preprocessing_cards:
+        # Update preprocessing stats cards
+        if preprocessing_stats_cards:
+            with preprocessing_stats_cards:
                 clear_output(wait=True)
-                display(create_preprocessing_cards(stats.get('preprocessing', {})))
+                display(create_preprocessing_stats_cards(stats))
         
-        # Update augmentation cards
-        if augmentation_cards:
-            with augmentation_cards:
+        # Perbarui loading indicator jika ada
+        if loading_indicator:
+            loading_indicator.update(90, "Memperbarui statistik augmentasi...")
+        
+        # Update augmentation stats cards
+        if augmentation_stats_cards:
+            with augmentation_stats_cards:
                 clear_output(wait=True)
-                display(create_augmentation_cards(stats.get('augmentation', {})))
+                display(create_augmentation_stats_cards(stats))
         
         # Tampilkan pesan sukses
         success_message = "Dashboard berhasil diperbarui" + (" dengan data dummy" if using_dummy_data else "")

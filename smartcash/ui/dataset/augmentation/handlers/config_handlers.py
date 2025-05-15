@@ -256,8 +256,8 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
     Returns:
         Boolean status keberhasilan
     """
-    # ConfigManager untuk persistensi sudah diimport di level modul
-    save_config_to_manager = save_augmentation_config  # Alias untuk kompatibilitas
+    # Import ConfigManager untuk persistensi
+    from smartcash.common.config.manager import get_config_manager
     logger = None
     try:
         # Ambil logger dari lingkungan jika tersedia
@@ -277,7 +277,8 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
             config['augmentation'] = {}
     
         # Simpan ke ConfigManager (metode utama)
-        success = save_config_to_manager(config)
+        config_manager = get_config_manager()
+        success = config_manager.save_module_config('augmentation', config)
         if success:
             if logger: logger.info("✅ Konfigurasi augmentasi berhasil disimpan ke ConfigManager")
             return True
@@ -310,7 +311,7 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
                     # Meskipun path identik, kita tetap perlu memastikan konten diperbarui
                     # karena mungkin ada perubahan yang belum tersimpan
                     with open(drive_config_path, 'w') as f:
-                        yaml.dump(save_config, f, default_flow_style=False)
+                        yaml.dump(config, f, default_flow_style=False)
                     if logger: logger.info(f"🔄 File lokal dan drive identik, memperbarui konten: {config_path}")
                 else:
                     # Buat direktori jika belum ada

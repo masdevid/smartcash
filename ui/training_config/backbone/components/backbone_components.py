@@ -10,7 +10,7 @@ from IPython.display import display
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.header_utils import create_header
-from smartcash.ui.components.tab_factory import create_tabs
+from smartcash.ui.components.tab_factory import create_tab_widget
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -128,11 +128,14 @@ def create_backbone_ui() -> Dict[str, Any]:
     ])
     
     # Buat tab untuk form dan info
-    tabs = create_tabs(
-        [form_container, info_container],
-        ['Konfigurasi', 'Informasi'],
-        selected_index=0
-    )
+    tab_items = [
+        ('Konfigurasi', form_container),
+        ('Informasi', info_container)
+    ]
+    tabs = create_tab_widget(tab_items)
+    
+    # Set tab yang aktif
+    tabs.selected_index = 0
     
     # Buat container utama
     main_container = widgets.VBox([

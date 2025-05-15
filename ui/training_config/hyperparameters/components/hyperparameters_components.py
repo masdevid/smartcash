@@ -595,21 +595,23 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     # Buat form container untuk tab konfigurasi
     form_container = widgets.VBox([
         widgets.HBox([
-            basic_components['basic_box'],
-            widgets.HBox([
-                optimization_components['optimization_box'],
-                advanced_components['advanced_box']
-            ], layout=widgets.Layout(
-                width='70%',  # Lebar total untuk container kanan
-                display='flex',
-                flex_flow='row nowrap',  # Memastikan tidak ada wrap
-                align_items='flex-start',
-                justify_content='space-between'
-            ))
+            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='30%')),
+            widgets.Box([
+                widgets.HBox([
+                    optimization_components['optimization_box'],
+                    advanced_components['advanced_box']
+                ], layout=widgets.Layout(
+                    width='100%',
+                    display='flex',
+                    flex_flow='row nowrap',
+                    align_items='flex-start',
+                    justify_content='space-between'
+                ))
+            ], layout=widgets.Layout(width='70%'))
         ], layout=widgets.Layout(
             width='100%',
             display='flex',
-            flex_flow='row wrap',
+            flex_flow='row nowrap',
             align_items='flex-start',
             justify_content='space-between'
         )),

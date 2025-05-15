@@ -71,11 +71,8 @@ def initialize_backbone_ui() -> Dict[str, Any]:
             on_reset_click
         )
         
-        # Setup handler untuk sinkronisasi dengan Drive
-        from smartcash.ui.training_config.backbone.handlers.drive_handlers import (
-            sync_to_drive,
-            sync_from_drive
-        )
+        # Import environment manager untuk cek status drive
+        from smartcash.common.environment import EnvironmentManager
         
         # Register handler untuk tombol
         ui_components['save_button'].on_click(
@@ -86,14 +83,14 @@ def initialize_backbone_ui() -> Dict[str, Any]:
             lambda b: on_reset_click(b, ui_components)
         )
         
-        # Register handler untuk tombol sinkronisasi dengan Drive
-        ui_components['sync_to_drive_button'].on_click(
-            lambda b: sync_to_drive(b, ui_components)
-        )
-        
-        ui_components['sync_from_drive_button'].on_click(
-            lambda b: sync_from_drive(b, ui_components)
-        )
+        # Perbarui informasi sinkronisasi berdasarkan status drive
+        try:
+            env_manager = EnvironmentManager.get_instance()
+            if not env_manager.is_drive_enabled():
+                # Jika drive tidak diaktifkan, perbarui pesan
+                ui_components['sync_info'].value = f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('warning', '⚠️')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi otomatis.</div>"
+        except Exception as e:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal memeriksa status drive: {str(e)}")
         
         # Inisialisasi UI dari konfigurasi
         from smartcash.ui.training_config.backbone.handlers.config_handlers import (

@@ -6,10 +6,10 @@ Deskripsi: Handler untuk sinkronisasi konfigurasi backbone dengan Google Drive
 from typing import Dict, Any, Optional
 import os
 import ipywidgets as widgets
-from IPython.display import clear_output
+from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import show_success, show_error, show_info
+from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.config.manager import ConfigManager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import EnvironmentManager
@@ -17,7 +17,7 @@ from smartcash.ui.training_config.backbone.handlers.config_handlers import updat
 
 logger = get_logger(__name__)
 
-def sync_to_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
+def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> None:
     """
     Sinkronisasi konfigurasi backbone ke Google Drive.
     
@@ -38,10 +38,12 @@ def sync_to_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None
             
             # Cek apakah drive diaktifkan
             if not env_manager.is_drive_enabled():
-                show_error(
-                    f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
+                        alert_type='error'
+                    ))
                 return
             
             # Dapatkan ConfigManager
@@ -65,26 +67,32 @@ def sync_to_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None
             
             if success:
                 # Tampilkan pesan sukses
-                show_success(
-                    f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
+                        alert_type='success'
+                    ))
                 
                 logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive")
             else:
                 # Tampilkan pesan error
-                show_error(
-                    f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive",
+                        alert_type='error'
+                    ))
                 
                 logger.error(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive")
         except Exception as e:
             # Tampilkan pesan error
-            show_error(
-                f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}",
-                status_panel
-            )
+            with status_panel:
+                clear_output(wait=True)
+                display(create_info_alert(
+                    f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}",
+                    alert_type='error'
+                ))
             
             logger.error(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
 
@@ -109,10 +117,12 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
             
             # Cek apakah drive diaktifkan
             if not env_manager.is_drive_enabled():
-                show_error(
-                    f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
+                        alert_type='error'
+                    ))
                 return
             
             # Dapatkan ConfigManager
@@ -127,10 +137,12 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
             
             # Cek apakah file konfigurasi ada di drive
             if not os.path.exists(drive_config_path):
-                show_error(
-                    f"{ICONS.get('error', '❌')} File konfigurasi tidak ditemukan di Google Drive",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} File konfigurasi tidak ditemukan di Google Drive",
+                        alert_type='error'
+                    ))
                 return
             
             # Load konfigurasi dari drive
@@ -145,33 +157,41 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                     update_ui_from_config(ui_components, drive_config)
                     
                     # Tampilkan pesan sukses
-                    show_success(
-                        f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive",
-                        status_panel
-                    )
+                    with status_panel:
+                        clear_output(wait=True)
+                        display(create_info_alert(
+                            f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive",
+                            alert_type='success'
+                        ))
                     
                     logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive")
                 else:
                     # Tampilkan pesan error
-                    show_error(
-                        f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive",
-                        status_panel
-                    )
+                    with status_panel:
+                        clear_output(wait=True)
+                        display(create_info_alert(
+                            f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive",
+                            alert_type='error'
+                        ))
                     
                     logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive")
             else:
                 # Tampilkan pesan error
-                show_error(
-                    f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive",
-                    status_panel
-                )
+                with status_panel:
+                    clear_output(wait=True)
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive",
+                        alert_type='error'
+                    ))
                 
                 logger.error(f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive")
         except Exception as e:
             # Tampilkan pesan error
-            show_error(
-                f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}",
-                status_panel
-            )
+            with status_panel:
+                clear_output(wait=True)
+                display(create_info_alert(
+                    f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}",
+                    alert_type='error'
+                ))
             
             logger.error(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}")

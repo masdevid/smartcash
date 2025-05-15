@@ -90,19 +90,9 @@ def create_backbone_ui() -> Dict[str, Any]:
         layout=widgets.Layout(width='auto')
     )
     
-    # Buat tombol sinkronisasi dengan Drive
-    sync_to_drive_button = widgets.Button(
-        description='Simpan ke Drive',
-        button_style='info',
-        icon=ICONS.get('upload', '⬆️'),
-        layout=widgets.Layout(width='auto')
-    )
-    
-    sync_from_drive_button = widgets.Button(
-        description='Muat dari Drive',
-        button_style='info',
-        icon=ICONS.get('download', '⬇️'),
-        layout=widgets.Layout(width='auto')
+    # Tambahkan keterangan sinkronisasi otomatis
+    sync_info = widgets.HTML(
+        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
     )
     
     # Buat panel untuk status
@@ -128,8 +118,7 @@ def create_backbone_ui() -> Dict[str, Any]:
         ], layout=widgets.Layout(margin='10px 0px')),
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
         widgets.HBox([save_button, reset_button], layout=widgets.Layout(justify_content='space-between', margin='20px 0px 10px 0px')),
-        widgets.HTML("<h4>Sinkronisasi dengan Drive</h4>"),
-        widgets.HBox([sync_to_drive_button, sync_from_drive_button], layout=widgets.Layout(justify_content='space-between', margin='10px 0px'))
+        sync_info
     ])
     
     # Buat container untuk info
@@ -162,8 +151,7 @@ def create_backbone_ui() -> Dict[str, Any]:
         'use_ciou_checkbox': use_ciou_checkbox,
         'save_button': save_button,
         'reset_button': reset_button,
-        'sync_to_drive_button': sync_to_drive_button,
-        'sync_from_drive_button': sync_from_drive_button,
+        'sync_info': sync_info,
         'status_panel': status_panel,
         'info_panel': info_panel,
         'tabs': tabs

@@ -1,68 +1,98 @@
 """
 File: smartcash/ui/dataset/split/split_initializer.py
-Deskripsi: Initializer untuk modul konfigurasi split dataset
+Deskripsi: Initializer untuk UI konfigurasi split dataset
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from smartcash.ui.utils.base_initializer import initialize_module_ui
-from smartcash.ui.utils.ui_logger import create_direct_ui_logger
-from smartcash.ui.dataset.split.components.split_component import create_split_ui
-from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
+from IPython.display import display
 
-def setup_split_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
-    """Setup handler spesifik untuk modul split dataset"""
-    # Setup handlers (non-singleton)
-    setup_button_handlers(ui_components, config, env)
+def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Inisialisasi UI untuk konfigurasi split dataset.
     
-    # Register cleanup handler untuk slider
-    from IPython import get_ipython
-    if get_ipython():
-        def cleanup():
-            try:
-                # Unobserve all sliders
-                for s in ui_components.get('split_sliders', []):
-                    if hasattr(s, 'unobserve_all'):
-                        s.unobserve_all()
-                # Log cleanup
-                if 'logger' in ui_components: 
-                    ui_components['logger'].debug(f"🧹 UI split config event handlers cleaned up")
-                return True
-            except Exception as e:
-                if 'logger' in ui_components:
-                    ui_components['logger'].error(f"❌ Error during cleanup: {str(e)}")
-                return False
+    Args:
+        env: Environment manager
+        config: Konfigurasi untuk dataset
         
-        ui_components['cleanup'] = cleanup
-        get_ipython().events.register('pre_run_cell', cleanup)
+    Returns:
+        Dict berisi komponen UI
+    """
+    ui_components = {'module_name': 'dataset_split'}
     
-    return ui_components
+    # Setup UI logger
+    from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+    output_widget = widgets.Output()
+    ui_components['output_log'] = output_widget
+    logger = create_direct_ui_logger(ui_components, 'split_config')
+    ui_components['logger'] = logger
+    
+    logger.debug(f"🚀 Memulai inisialisasi UI split dataset")
+    
+    try:
+        # Import dependency
+        from smartcash.common.environment import get_environment_manager
+        from smartcash.common.config.manager import get_config_manager
+        
+        # Dapatkan environment jika belum tersedia
+        env = env or get_environment_manager()
+        
+        # Dapatkan config manager
+        config_manager = get_config_manager()
+        
+        # Load konfigurasi dari config manager
+        if config is None:
+            # Dapatkan konfigurasi dari config manager atau file
+            try:
+                from smartcash.ui.dataset.split.handlers.config_handlers import load_config
+                config = config_manager.get_module_config('dataset') if config_manager else load_config()
+                logger.debug(f"✅ Konfigurasi berhasil dimuat")
+            except Exception as e:
+                logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
+                from smartcash.ui.dataset.split.handlers.config_handlers import load_default_config
+                config = load_default_config()
+                logger.debug(f"ℹ️ Menggunakan konfigurasi default")
+        
+        # Buat komponen UI
+        try:
+            from smartcash.ui.dataset.split.components.split_components import create_split_ui
+            ui_components.update(create_split_ui(config))
+            logger.debug(f"✅ Komponen UI berhasil dibuat")
+        except Exception as ui_error:
+            logger.error(f"❌ Error saat membuat komponen UI: {str(ui_error)}")
+            raise
+        
+        # Setup button handlers
+        try:
+            from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
+            ui_components = setup_button_handlers(ui_components, config, env)
+            logger.debug(f"✅ Button handlers berhasil disetup")
+        except Exception as handler_error:
+            logger.error(f"❌ Error saat setup button handlers: {str(handler_error)}")
+            raise
+        
+        # Tampilkan UI
+        display(ui_components['ui'])
+        logger.debug(f"✅ UI berhasil ditampilkan")
+        
+        return ui_components
+    
+    except Exception as e:
+        logger.error(f"❌ Error saat inisialisasi UI: {str(e)}")
+        # Tampilkan pesan error
+        error_widget = widgets.HTML(
+            value=f"<div style='color: red; padding: 10px; border: 1px solid red;'><b>Error:</b> {str(e)}</div>"
+        )
+        display(error_widget)
+        
+        # Kembalikan komponen minimal
+        return ui_components
 
-def initialize_split_ui() -> Dict[str, Any]:
-    """Inisialisasi UI modul konfigurasi split dataset tanpa visualisasi."""
+def create_split_config_cell():
+    """
+    Buat cell untuk konfigurasi split dataset.
     
-    # Buat dictionary ui_components minimal untuk logger
-    temp_ui_components = {'status': widgets.Output()}
-    
-    # Dapatkan ui_logger untuk logging yang lebih baik
-    ui_logger = create_direct_ui_logger(temp_ui_components, 'split_config')
-    
-    # Tombol yang perlu diattach dengan ui_components
-    button_keys = ['save_button', 'reset_button']
-    
-    # Gunakan base initializer dengan konfigurasi minimal
-    ui_components = initialize_module_ui(
-        module_name='split_config',
-        create_ui_func=create_split_ui,
-        setup_specific_handlers_func=setup_split_handlers,
-        button_keys=button_keys,
-        multi_progress_config=None  # Tidak perlu multi-progress karena tidak ada visualisasi
-    )
-    
-    # Tambahkan ui_logger ke ui_components
-    ui_components['logger'] = ui_logger
-    
-    # Log inisialisasi berhasil dengan level debug
-    ui_logger.debug(f"🚀 Split_config UI berhasil diinisialisasi")
-    
-    return ui_components
+    Fungsi ini digunakan untuk membuat cell yang dapat dijalankan di notebook.
+    """
+    # Inisialisasi UI
+    initialize_split_ui()

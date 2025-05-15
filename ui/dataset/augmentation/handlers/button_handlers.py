@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/button_handlers.py
-Deskripsi: Handler tombol untuk augmentasi dataset
+Deskripsi: Handler tombol untuk augmentasi dataset dengan pendekatan SRP
 """
 
 from typing import Dict, Any, Optional
@@ -12,42 +12,17 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
 
-# Import persistensi di level modul untuk memastikan tersedia di semua fungsi
+# Import handler terpisah untuk SRP
 from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
-    ensure_ui_persistence, ensure_valid_aug_types, save_augmentation_config, get_augmentation_config,
-    safe_convert_type, validate_ui_component_value
+    ensure_ui_persistence, save_augmentation_config, get_augmentation_config
 )
-
-# Fungsi notifikasi untuk observer pattern
-def _notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
-    """Notifikasi observer bahwa proses telah dimulai."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
-        ui_components['on_process_start']("augmentation", {
-            'split': split,
-            'display_info': display_info
-        })
-
-def _notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any], display_info: str) -> None:
-    """Notifikasi observer bahwa proses telah selesai dengan sukses."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['success']} Augmentasi {display_info} selesai")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
-        ui_components['on_process_complete']("augmentation", result)
-
-def _notify_process_error(ui_components: Dict[str, Any], error_message: str) -> None:
-    """Notifikasi observer bahwa proses mengalami error."""
-    logger = ui_components.get('logger')
-    if logger: logger.error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
-        ui_components['on_process_error']("augmentation", error_message)
+from smartcash.ui.dataset.augmentation.handlers.config_validator import validate_augmentation_config
+from smartcash.ui.dataset.augmentation.handlers.config_mapper import (
+    map_ui_to_config, map_config_to_ui, extract_augmentation_params
+)
+from smartcash.ui.dataset.augmentation.handlers.observer_handler import (
+    notify_process_start, notify_process_complete, notify_process_error
+)
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -64,6 +39,14 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     # Pastikan persistensi UI components
     ensure_ui_persistence(ui_components)
     logger = ui_components.get('logger')
+    
+    # Import handler terpisah untuk SRP
+    from smartcash.ui.dataset.augmentation.handlers.progress_handler import (
+        register_progress_callback, reset_progress_tracking
+    )
+    from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import (
+        get_augmentation_service, execute_augmentation, stop_augmentation
+    )
     
     # Penanganan error dengan decorator standar
     from smartcash.ui.handlers.error_handler import try_except_decorator
@@ -95,12 +78,13 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         
         # Update konfigurasi dari UI dan simpan dengan ConfigManager
         try:
-            updated_config = ui_components['update_config_from_ui'](ui_components, config)
+            # Gunakan config mapper untuk update konfigurasi dari UI
+            updated_config = map_ui_to_config(ui_components, config)
             success = save_augmentation_config(updated_config)
-            if not success and logger:
-                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi ke ConfigManager, mencoba fallback")
-                ui_components['save_augmentation_config'](updated_config)
-            if logger: logger.info(f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan")
+            if success and logger:
+                logger.info(f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan")
+            else:
+                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi augmentasi")
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
         
@@ -111,235 +95,74 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         split_info = f"Split {split_option}"
         update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai augmentasi {split_info}...")
         
-        # Dapatkan opsi augmentasi dari UI dengan validasi yang lebih kuat
-        # Inisialisasi dengan nilai default yang aman
-        aug_types = ['Combined (Recommended)']  # Nilai tetap
-        aug_prefix = 'aug'
-        aug_factor = 2
-        balance_classes = True
-        num_workers = 4
-        
-        try:
-            # Ekstrak parameter dari UI dengan validasi
-            # Prefix (sekarang di posisi 1)
-            extracted_prefix = validate_ui_component_value(ui_components['aug_options'].children[1], str, aug_prefix)
-            if extracted_prefix and extracted_prefix.strip():
-                aug_prefix = extracted_prefix
-                if logger: logger.debug(f"{ICONS['info']} Prefix: {aug_prefix}")
-            
-            # Jenis augmentasi (di posisi 0)
-            aug_value = ui_components['aug_options'].children[0].value
-            aug_types = ensure_valid_aug_types(aug_value)
-            if logger: logger.debug(f"{ICONS['info']} Jenis augmentasi: {aug_types}")
-            
-            # Faktor (sekarang di posisi 2)
-            extracted_factor = validate_ui_component_value(ui_components['aug_options'].children[2], str, str(aug_factor))
-            if extracted_factor:
-                # Konversi ke int dengan aman
-                try:
-                    factor_value = int(extracted_factor)
-                    if factor_value > 0:
-                        aug_factor = factor_value
-                        if logger: logger.debug(f"{ICONS['info']} Faktor: {aug_factor}")
-                except ValueError:
-                    if logger: logger.warning(f"{ICONS['warning']} Nilai faktor tidak valid: {extracted_factor}, menggunakan default: {aug_factor}")
-            
-            # Balance classes (sekarang di posisi 4)
-            extracted_balance = validate_ui_component_value(ui_components['aug_options'].children[4], bool, balance_classes)
-            balance_classes = bool(extracted_balance)
-            if logger: logger.debug(f"{ICONS['info']} Balance classes: {balance_classes}")
-            
-            # Num workers (sekarang di posisi 5)
-            extracted_workers = validate_ui_component_value(ui_components['aug_options'].children[5], int, num_workers)
-            if extracted_workers and extracted_workers > 0:
-                num_workers = int(extracted_workers)
-                if logger: logger.debug(f"{ICONS['info']} Num workers: {num_workers}")
-        except Exception as e:
-            if logger: logger.warning(f"{ICONS['warning']} Error saat mengambil nilai komponen UI: {str(e)}, menggunakan nilai default")
-            # Nilai default sudah diinisialisasi di awal
+        # Notifikasi observer tentang mulai augmentasi
+        notify_process_start(ui_components, "augmentasi", split_info, split_option)
         
         # Verifikasi direktori dataset
         data_dir = ui_components.get('data_dir', 'data')
         preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
         augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
         
-        # Notifikasi observer tentang mulai augmentasi
-        _notify_process_start(ui_components, "augmentasi", split_info, split_option)
+        # Ekstrak parameter augmentasi dari UI menggunakan config mapper
+        augmentation_params = extract_augmentation_params(ui_components)
         
-        # Setup augmentation service
+        # Log parameter yang akan digunakan
+        if logger:
+            logger.info(f"{ICONS['info']} Parameter augmentasi: ")
+            logger.info(f"  - Split: {augmentation_params['split']}")
+            logger.info(f"  - Jenis: {augmentation_params['augmentation_types']}")
+            logger.info(f"  - Jumlah variasi: {augmentation_params['num_variations']}")
+            logger.info(f"  - Prefix: {augmentation_params['output_prefix']}")
+            logger.info(f"  - Balance kelas: {augmentation_params['target_balance']}")
+            logger.info(f"  - Target count: {augmentation_params['target_count']}")
+            logger.info(f"  - Workers: {augmentation_params['num_workers']}")
+            logger.info(f"  - Pindahkan ke preprocessed: {augmentation_params['move_to_preprocessed']}")
+        
+        # Pastikan direktori input dan output ada
+        import os
+        from pathlib import Path
+        
+        # Validasi direktori input
+        input_dir = Path(preprocessed_dir) / 'train' / 'images'
+        if not input_dir.exists():
+            input_dir = Path(preprocessed_dir) / 'images'
+            if not input_dir.exists():
+                input_dir = Path(preprocessed_dir)
+                if not input_dir.exists():
+                    os.makedirs(str(input_dir), exist_ok=True)
+                    if logger: logger.warning(f"{ICONS['warning']} Membuat direktori input: {input_dir}")
+        
+        # Validasi direktori output
+        output_dir = Path(augmented_dir)
+        if not output_dir.exists():
+            os.makedirs(str(output_dir), exist_ok=True)
+            if logger: logger.info(f"{ICONS['info']} Membuat direktori output: {output_dir}")
+        
+        # Update status dengan informasi direktori
+        with ui_components['status']:
+            display(create_status_indicator("info", f"{ICONS['processing']} Augmentasi dari {input_dir} ke {output_dir}..."))
+        
+        # Setup augmentation service menggunakan handler terpisah
         try:
-            from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
+            # Dapatkan augmentation service dari handler
+            augmentation_service = get_augmentation_service(ui_components, config)
             
-            # Buat instance AugmentationService
-            augmentation_service = AugmentationService(
-                config, 
-                data_dir=data_dir,
-                logger=logger,
-                num_workers=num_workers
-            )
-            
-            # Simpan ke ui_components
-            ui_components['augmentation_manager'] = augmentation_service
-            
-            # Register progress callback jika tersedia
-            if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
-                ui_components['register_progress_callback'](augmentation_service)
+            # Register progress callback dari handler terpisah
+            register_progress_callback(augmentation_service, ui_components)
             
             # Log awal augmentasi
             if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
             
-            # Import utilitas persistensi
-            from smartcash.common.config.manager import get_config_manager
-            from smartcash.ui.utils.persistence_utils import validate_ui_param
+            # Eksekusi augmentasi dengan parameter dari config mapper
+            result = execute_augmentation(augmentation_service, augmentation_params)
             
-            # Dapatkan config manager
-            config_manager = get_config_manager()
-            
-            # Pastikan nilai tetap selalu valid
-            aug_types = ensure_valid_aug_types(aug_types)
-            
-            # Validasi parameter lain dengan utilitas validasi
-            try:
-                split_option = validate_ui_param(
-                    split_option, 
-                    'train', 
-                    str,
-                    ['train', 'val', 'test', 'all'],
-                    logger
-                )
-            except Exception as e:
-                split_option = 'train'  # Nilai default
-                if logger: logger.warning(f"{ICONS['warning']} Error saat validasi split_option: {str(e)}, menggunakan default: {split_option}")
-            
-            try:
-                aug_prefix = validate_ui_param(
-                    aug_prefix, 
-                    'aug', 
-                    str,
-                    None,
-                    logger
-                )
-            except Exception as e:
-                aug_prefix = 'aug'  # Nilai default
-                if logger: logger.warning(f"{ICONS['warning']} Error saat validasi aug_prefix: {str(e)}, menggunakan default: {aug_prefix}")
-            
-            try:
-                aug_factor = validate_ui_param(
-                    aug_factor, 
-                    2, 
-                    (int, float),
-                    None,
-                    logger
-                )
-            except Exception as e:
-                aug_factor = 2  # Nilai default
-                if logger: logger.warning(f"{ICONS['warning']} Error saat validasi aug_factor: {str(e)}, menggunakan default: {aug_factor}")
-            
-            try:
-                num_workers = validate_ui_param(
-                    num_workers, 
-                    4, 
-                    int,
-                    None,
-                    logger
-                )
-            except Exception as e:
-                num_workers = 4  # Nilai default
-                if logger: logger.warning(f"{ICONS['warning']} Error saat validasi num_workers: {str(e)}, menggunakan default: {num_workers}")
-            
-            # Pastikan UI components terdaftar untuk persistensi
-            try:
-                from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
-                ensure_ui_persistence(ui_components, 'augmentation', logger)
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat memastikan persistensi UI: {str(e)}")
-            
-            # Simpan konfigurasi augmentasi terbaru
-            try:
-                aug_config = {
-                    'augmentation': {
-                        'types': aug_types,
-                        'split': split_option,
-                        'prefix': aug_prefix,
-                        'factor': aug_factor,
-                        'balance_classes': balance_classes,
-                        'num_workers': num_workers
-                    }
-                }
-                config_manager.save_module_config('augmentation', aug_config)
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat menyimpan konfigurasi: {str(e)}")
-            
-            # Log parameter final yang akan digunakan
-            if logger: logger.info(f"{ICONS['info']} Parameter augmentasi final: aug_types={aug_types}, split=train, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}")
-            
-            # Lakukan augmentasi dengan parameter yang sudah divalidasi dan error handling yang lebih baik
-            try:
-                # Log parameter yang akan digunakan untuk augmentasi
-                if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split=train, types={aug_types}, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}, workers={num_workers}")
-                
-                # Pastikan input dan output direktori ada
-                import os
-                from pathlib import Path
-                
-                # Validasi direktori input
-                input_dir = Path(preprocessed_dir) / 'train' / 'images'
-                if not input_dir.exists():
-                    input_dir = Path(preprocessed_dir) / 'images'
-                    if not input_dir.exists():
-                        input_dir = Path(preprocessed_dir)
-                        if not input_dir.exists():
-                            os.makedirs(str(input_dir), exist_ok=True)
-                            if logger: logger.warning(f"{ICONS['warning']} Membuat direktori input: {input_dir}")
-                
-                # Validasi direktori output
-                output_dir = Path(augmented_dir)
-                if not output_dir.exists():
-                    os.makedirs(str(output_dir), exist_ok=True)
-                    if logger: logger.info(f"{ICONS['info']} Membuat direktori output: {output_dir}")
-                
-                # Update status dengan informasi direktori
-                with ui_components['status']:
-                    display(create_status_indicator("info", f"{ICONS['processing']} Augmentasi dari {input_dir} ke {output_dir}..."))
-                
-                # Jalankan augmentasi dengan try-except yang lebih detail
-                try:
-                    result = augmentation_service.augment_dataset(
-                        split='train',  # Nilai tetap
-                        augmentation_types=aug_types,
-                        num_variations=aug_factor,
-                        output_prefix=aug_prefix,
-                        target_balance=balance_classes,
-                        num_workers=num_workers
-                    )
-                    
-                    if logger: logger.success(f"{ICONS['success']} Augmentasi berhasil dijalankan")
-                except AttributeError as attr_error:
-                    if logger: logger.error(f"{ICONS['error']} AttributeError saat augmentasi: {str(attr_error)}")
-                    # Coba jalankan dengan cara alternatif
-                    if logger: logger.info(f"{ICONS['refresh']} Mencoba metode alternatif untuk augmentasi...")
-                    
-                    # Import langsung dari modul
-                    from smartcash.dataset.services.augmentor.augmentor import augment_dataset as direct_augment
-                    
-                    result = direct_augment(
-                        input_dir=str(input_dir),
-                        output_dir=str(output_dir),
-                        augmentation_types=aug_types,
-                        num_variations=aug_factor,
-                        output_prefix=aug_prefix,
-                        target_balance=balance_classes,
-                        num_workers=num_workers,
-                        logger=logger
-                    )
-                    
-                    if logger: logger.success(f"{ICONS['success']} Augmentasi berhasil dengan metode alternatif")
-            except Exception as e:
-                if logger: logger.error(f"{ICONS['error']} Error saat melakukan augmentasi: {str(e)}")
-                # Tampilkan detail error untuk debugging
-                import traceback
-                if logger: logger.debug(f"Traceback: {traceback.format_exc()}")
-                raise  # Re-raise exception untuk ditangkap oleh blok except di luar
+            # Cek hasil augmentasi
+            if result['status'] == 'success':
+                if logger: logger.success(f"{ICONS['success']} Augmentasi berhasil dijalankan")
+            elif result['status'] == 'error':
+                error_message = result.get('message', 'Terjadi kesalahan saat augmentasi')
+                if logger: logger.error(f"{ICONS['error']} {error_message}")
+                raise Exception(error_message)
             
             # Tambahkan path output jika tidak ada
             try:
@@ -375,7 +198,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             
             # Notifikasi observer tentang selesai
             try:
-                _notify_process_complete(ui_components, result, split_info)
+                notify_process_complete(ui_components, result, split_info)
             except Exception as e:
                 if logger: logger.warning(f"{ICONS['warning']} Error saat notifikasi proses selesai: {str(e)}")
             
@@ -388,7 +211,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             update_status_panel(ui_components, "error", f"{ICONS['error']} Augmentasi gagal: {str(e)}")
             
             # Notifikasi observer tentang error
-            _notify_process_error(ui_components, str(e))
+            notify_process_error(ui_components, str(e))
             
             # Log error
             if logger: logger.error(f"{ICONS['error']} Error saat augmentasi dataset: {str(e)}")
@@ -413,136 +236,103 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         # Update status panel
         update_status_panel(ui_components, "warning", f"{ICONS['warning']} Augmentasi dihentikan oleh pengguna")
         
-        # Notifikasi observer
+        # Hentikan augmentasi menggunakan handler terpisah
         try:
-            from smartcash.components.observer import notify
-            from smartcash.components.observer.event_topics_observer import EventTopics
-            notify(
-                event_type=EventTopics.AUGMENTATION_END,
-                sender="augmentation_handler",
-                message=f"Augmentasi dihentikan oleh pengguna",
-                status="cancelled"
-            )
-        except ImportError:
-            pass
+            # Dapatkan augmentation service dari ui_components
+            augmentation_service = ui_components.get('augmentation_service')
+            if augmentation_service:
+                # Gunakan handler untuk menghentikan augmentasi
+                stop_augmentation(augmentation_service)
+                if logger: logger.info(f"{ICONS['stop']} Augmentasi dihentikan oleh pengguna")
+        except Exception as e:
+            if logger: logger.warning(f"{ICONS['warning']} Error saat menghentikan augmentasi: {str(e)}")
+        
+        # Notifikasi observer tentang pembatalan
+        notify_process_error(ui_components, "Augmentasi dihentikan oleh pengguna")
         
         # Reset UI
         cleanup_ui(ui_components)
     
     # Reset handler untuk reset button
+    @try_except_decorator(ui_components.get('status'))
     def on_reset_click(b):
         """Reset UI dan konfigurasi ke default."""
+        # Tampilkan status
         with ui_components['status']: 
             clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS['processing']} Mereset konfigurasi augmentasi..."))
-            
-        # Reset UI ke default
-        reset_ui(ui_components)
+            display(create_status_indicator("info", f"{ICONS['processing']} Mereset konfigurasi ke default..."))
         
         try:
-            # Load default config dengan ConfigManager - import sudah tersedia di level modul
-            
-            # Default config untuk augmentasi dengan tipe data yang sesuai dengan widget UI
+            # Definisikan default config
             default_config = {
-                "augmentation": {
-                    "input_dir": "data/preprocessed",
-                    "output_dir": "data/augmented",
-                    "types": ["Combined (Recommended)"],
-                    "prefix": "aug",
-                    "factor": "2",  # Menggunakan string untuk kompatibilitas dengan Text widget
-                    "target_split": "train",
-                    "balance_classes": True,
-                    "num_workers": 4,
-                    "enabled": True
-                },
-                "data": {
-                    "dir": "data"
+                'augmentation': {
+                    'prefix': 'aug',
+                    'factor': 2,
+                    'balance_classes': True,
+                    'num_workers': 4,
+                    'techniques': {
+                        'flip': True,
+                        'rotate': True,
+                        'blur': False,
+                        'noise': False,
+                        'contrast': False,
+                        'brightness': False,
+                        'saturation': False,
+                        'hue': False,
+                        'cutout': False
+                    },
+                    'advanced': {
+                        'rotate_range': 15,
+                        'blur_limit': 7,
+                        'noise_var': 25,
+                        'contrast_limit': 0.2,
+                        'brightness_limit': 0.2,
+                        'saturation_limit': 0.2,
+                        'hue_shift_limit': 20,
+                        'cutout_size': 0.1,
+                        'cutout_count': 4
+                    }
                 }
             }
             
             # Log informasi konfigurasi default
             if logger: logger.info(f"{ICONS['info']} Menggunakan konfigurasi default: {default_config['augmentation']}")
             
-            # Update UI dari default config dengan penanganan error
+            # Simpan default config ke ConfigManager menggunakan handler terpisah
             try:
-                ui_components['update_ui_from_config'](ui_components, default_config)
-                if logger: logger.info(f"{ICONS['success']} UI berhasil diupdate dari konfigurasi default")
-            except Exception as e:
-                if logger: logger.error(f"{ICONS['error']} Error saat update UI dari konfigurasi: {str(e)}")
-                # Fallback: update manual komponen UI yang penting
-                try:
-                    if 'aug_options' in ui_components and hasattr(ui_components['aug_options'], 'children'):
-                        children = ui_components['aug_options'].children
-                        if len(children) >= 6:
-                            # Update prefix (posisi 1)
-                            if hasattr(children[1], 'value'):
-                                children[1].value = default_config['augmentation']['prefix']
-                            # Update factor (posisi 2) - PASTIKAN SELALU STRING
-                            if hasattr(children[2], 'value'):
-                                # Konversi ke string untuk mencegah error 'value' trait
-                                factor_value = str(default_config['augmentation']['factor'])
-                                children[2].value = factor_value
-                            # Update balance_classes (posisi 4)
-                            if hasattr(children[4], 'value'):
-                                children[4].value = default_config['augmentation']['balance_classes']
-                            # Update num_workers (posisi 5) - PASTIKAN TIPE YANG BENAR
-                            if hasattr(children[5], 'value'):
-                                # Deteksi tipe yang diharapkan
-                                if hasattr(children[5], '_trait_values'):
-                                    try:
-                                        # Coba konversi ke string dulu untuk aman
-                                        children[5].value = str(default_config['augmentation']['num_workers'])
-                                    except Exception:
-                                        # Jika gagal, coba sebagai integer
-                                        try:
-                                            children[5].value = int(default_config['augmentation']['num_workers'])
-                                        except Exception:
-                                            # Fallback ke default
-                                            pass
-                                else:
-                                    # Default fallback
-                                    try:
-                                        children[5].value = int(default_config['augmentation']['num_workers'])
-                                    except Exception:
-                                        pass
-                    if logger: logger.info(f"{ICONS['success']} UI berhasil diupdate secara manual")
-                except Exception as manual_error:
-                    if logger: logger.error(f"{ICONS['error']} Error saat update manual UI: {str(manual_error)}")
-                    
-                # Simpan konfigurasi default
-                try:
-                    success = save_augmentation_config(default_config)
-                    if success:
-                        if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan ke ConfigManager")
-                    else:
-                        if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan ke ConfigManager, mencoba fallback")
-                        # Fallback ke metode lama jika ConfigManager gagal
-                        try:
-                            ui_components['save_augmentation_config'](default_config)
-                            if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan dengan metode fallback")
-                        except Exception as fallback_error:
-                            if logger: logger.error(f"{ICONS['error']} Error saat menyimpan dengan metode fallback: {str(fallback_error)}")
-                except Exception as config_error:
-                    if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi: {str(config_error)}")
+                # Validasi konfigurasi default
+                validated_config = validate_augmentation_config(default_config)
+                
+                # Simpan konfigurasi yang sudah divalidasi
+                success = save_augmentation_config(validated_config)
+                
+                if success:
+                    if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan")
+                else:
+                    if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi default")
             except Exception as e:
                 if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi default: {str(e)}")
-                # Tidak perlu raise exception di sini, biarkan proses reset tetap berlanjut
-                
-            # Pastikan persistensi UI components
-            ensure_ui_persistence(ui_components)
+
+            # Update UI dari konfigurasi default menggunakan handler terpisah
+            try:
+                map_config_to_ui(ui_components, default_config)
+                if logger: logger.info(f"{ICONS['success']} UI berhasil diupdate dari konfigurasi default")
+            except Exception as e:
+                if logger: logger.warning(f"{ICONS['warning']} Error saat update UI dari konfigurasi default: {str(e)}")
             
-            # Update status
-            with ui_components['status']: 
+            # Update status panel
+            with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi berhasil direset ke default"))
-                
-            if logger: logger.info(f"{ICONS['success']} Konfigurasi berhasil direset ke default")
+            
+            update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke default")
+            
         except Exception as e:
             # Update status
             with ui_components['status']: 
                 clear_output(wait=True)
                 display(create_status_indicator("error", f"{ICONS['error']} Error saat mereset konfigurasi: {str(e)}"))
-                
+            
             if logger: logger.error(f"{ICONS['error']} Error saat mereset konfigurasi: {str(e)}")
             
             # Update status panel dengan validasi
@@ -552,7 +342,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                 pass
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
-    
+
     # Register handlers untuk tombol-tombol dengan one-liner
     button_handlers = {
         'augment_button': on_augment_click,
@@ -583,9 +373,15 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
     # Disable komponen utama
     aug_options = ui_components.get('aug_options')
     if aug_options is not None and hasattr(aug_options, 'children'):
-        for child in aug_options.children:
-            if hasattr(child, 'disabled'):
-                child.disabled = disable
+        # Disable tab container (children[1])
+        if len(aug_options.children) >= 2 and hasattr(aug_options.children[1], 'children'):
+            tab = aug_options.children[1]
+            # Disable semua tab
+            for tab_child in tab.children:
+                if hasattr(tab_child, 'children'):
+                    for child in tab_child.children:
+                        if hasattr(child, 'disabled'):
+                            child.disabled = disable
     
     # Disable tombol-tombol
     for btn in ['save_button', 'reset_button', 'cleanup_button']:
@@ -606,11 +402,12 @@ def cleanup_ui(ui_components: Dict[str, Any]) -> None:
     ui_components['augment_button'].layout.display = 'block'
     ui_components['stop_button'].layout.display = 'none'
     
-    # Reset progress bar
-    if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-        ui_components['reset_progress_bar']()
-    else:
-        # Fallback jika fungsi reset tidak tersedia
+    # Reset progress bar menggunakan handler terpisah
+    try:
+        from smartcash.ui.dataset.augmentation.handlers.progress_handler import reset_progress_tracking
+        reset_progress_tracking(ui_components)
+    except Exception as e:
+        # Fallback jika import gagal
         for element in ['progress_bar', 'current_progress', 'overall_label', 'step_label']:
             if element in ui_components:
                 if hasattr(ui_components[element], 'layout') and hasattr(ui_components[element].layout, 'visibility'):
@@ -648,39 +445,5 @@ def reset_ui(ui_components: Dict[str, Any]) -> None:
     # Reset accordion
     if 'log_accordion' in ui_components:
         ui_components['log_accordion'].selected_index = None
-
-def get_dataset_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None, logger=None):
-    """
-    Dapatkan dataset manager dengan fallback yang terstandarisasi.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi aplikasi
-        logger: Logger untuk logging
-        
-    Returns:
-        Dataset manager instance
-    """
-    # Cek apakah sudah ada di ui_components
-    if 'augmentation_manager' in ui_components and ui_components['augmentation_manager']:
-        return ui_components['augmentation_manager']
-    
-    # Gunakan fallback_utils untuk konsistensi
-    try:
-        from smartcash.ui.utils.fallback_utils import get_augmentation_manager
-        augmentation_manager = get_augmentation_manager(config, logger)
-        
-        # Register progress callback jika tersedia
-        try:
-            if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
-                ui_components['register_progress_callback'](augmentation_manager)
-        except Exception:
-            pass
-        
-        # Simpan ke ui_components
-        ui_components['augmentation_manager'] = augmentation_manager
-        
-        return augmentation_manager
-    except Exception as e:
-        if logger: logger.error(f"{ICONS['error']} Gagal membuat augmentation manager: {str(e)}")
-        return None
+# Fungsi get_dataset_manager telah dipindahkan ke augmentation_service_handler.py
+# Gunakan get_augmentation_service dari augmentation_service_handler.py sebagai gantinya

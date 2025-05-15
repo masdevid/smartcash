@@ -50,33 +50,11 @@ preprocessing:
     min_samples_per_class: 100
     max_samples_per_class: 1000
 
-# Konfigurasi augmentasi diselaraskan, dengan variasi spesifik untuk preprocessing
-augmentation:
-  enabled: true
-  num_variations: 3  # Lebih banyak variasi untuk preprocessing
-  output_prefix: 'aug'
-  types:
-    - 'position'
-    - 'lighting'
-    - 'combined'
-  position:
-    fliplr: 0.5
-    degrees: 15
-    translate: 0.15
-    scale: 0.15
-    rotate_max: 15    # Alias untuk degrees
-    shear_max: 10     # Derajat maksimum untuk shear
-    translate_max: 0.15  # Alias untuk translate
-    scale_max: 0.15   # Alias untuk scale
-  lighting:
-    hsv_h: 0.025
-    hsv_s: 0.7
-    hsv_v: 0.4
-    contrast: [0.7, 1.3]  # Menggunakan list bukan tuple
-    brightness: [0.7, 1.3]  # Menggunakan list bukan tuple
-    blur: 0.2
-    noise: 0.1
-    compress: 0.2
+# Referensi ke konfigurasi augmentasi terpisah
+augmentation_reference:
+  config_file: 'augmentation_config.yaml'  # Referensi ke file konfigurasi terpisah
+  use_for_preprocessing: true  # Gunakan augmentasi dalam preprocessing jika diperlukan
+  preprocessing_variations: 3  # Override jumlah variasi khusus untuk preprocessing
 
 # Konfigurasi cleanup dengan path relatif standar
 cleanup:

@@ -5,6 +5,7 @@ Deskripsi: Initializer untuk UI konfigurasi hyperparameter model
 
 from typing import Dict, Any, Optional
 from IPython.display import display, clear_output
+import ipywidgets as widgets
 import os
 import yaml
 import copy

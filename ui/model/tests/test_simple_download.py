@@ -4,6 +4,7 @@ Deskripsi: Test case untuk fungsi download dan sync model pretrained yang disede
 """
 
 import os
+import sys
 import unittest
 import tempfile
 import shutil
@@ -140,17 +141,130 @@ def run_test_case(test_case):
     runner = unittest.TextTestRunner()
     return runner.run(suite)
 
+class TestPretrainedInitializer(unittest.TestCase):
+    """Test case untuk fungsi di pretrained_initializer.py"""
+    
+    def test_is_drive_mounted(self):
+        """Test fungsi is_drive_mounted"""
+        from smartcash.ui.model.pretrained_initializer import is_drive_mounted
+        
+        # Patch os.path.exists untuk mengembalikan True
+        with patch('os.path.exists', return_value=True):
+            self.assertTrue(is_drive_mounted())
+        
+        # Patch os.path.exists untuk mengembalikan False
+        with patch('os.path.exists', return_value=False):
+            self.assertFalse(is_drive_mounted())
+    
+    def test_mount_drive_success(self):
+        """Test fungsi mount_drive saat berhasil"""
+        from smartcash.ui.model.pretrained_initializer import mount_drive
+        
+        # Mock the import of google.colab
+        with patch('builtins.__import__') as mock_import:
+            # Setup mock to return our mocked module
+            mock_drive = MagicMock()
+            mock_import.return_value = MagicMock(drive=mock_drive)
+            
+            # Call the function
+            success, message = mount_drive()
+            
+            # Verify the results
+            self.assertTrue(success)
+            self.assertIn("berhasil", message)
+            mock_drive.mount.assert_called_once_with('/content/drive')
+    
+    def test_mount_drive_failure(self):
+        """Test fungsi mount_drive saat gagal"""
+        from smartcash.ui.model.pretrained_initializer import mount_drive
+        
+        # Mock the import of google.colab
+        with patch('builtins.__import__') as mock_import:
+            # Setup mock to raise exception when importing
+            mock_import.side_effect = Exception("Test error")
+            
+            # Call the function
+            success, message = mount_drive()
+            
+            # Verify the results
+            self.assertFalse(success)
+            self.assertIn("Gagal", message)
+            self.assertIn("Test error", message)
+
+class TestDownloadWithDrive(unittest.TestCase):
+    """Test case untuk skenario download dengan Google Drive"""
+    
+    def setUp(self):
+        """Setup untuk test case"""
+        # Buat direktori sementara untuk test
+        self.temp_dir = tempfile.mkdtemp()
+        self.local_dir = os.path.join(self.temp_dir, 'local')
+        self.drive_dir = os.path.join(self.temp_dir, 'drive')
+        
+        # Buat direktori lokal dan drive
+        os.makedirs(self.local_dir, exist_ok=True)
+        os.makedirs(self.drive_dir, exist_ok=True)
+        
+        # Buat file dummy di drive untuk test
+        with open(os.path.join(self.drive_dir, 'yolov5s.pt'), 'w') as f:
+            f.write('dummy yolov5s model from drive')
+        
+        with open(os.path.join(self.drive_dir, 'efficientnet-b4_notop.h5'), 'w') as f:
+            f.write('dummy efficientnet model from drive')
+        
+        # Mock untuk log function
+        self.log_messages = []
+        self.log_func = lambda msg: self.log_messages.append(msg)
+    
+    def tearDown(self):
+        """Cleanup setelah test case"""
+        # Hapus direktori sementara
+        shutil.rmtree(self.temp_dir)
+    
+    @patch('smartcash.ui.model.handlers.simple_download.is_drive_mounted')
+    def test_process_download_sync_with_drive(self, mock_is_drive_mounted):
+        """Test proses download dan sync dengan Google Drive"""
+        # Mock is_drive_mounted untuk mengembalikan True
+        mock_is_drive_mounted.return_value = True
+        
+        # Buat UI components mock
+        ui_components = {
+            'status': MagicMock(),
+            'log': MagicMock(),
+            'models_dir': self.local_dir,
+            'drive_models_dir': self.drive_dir
+        }
+        
+        # Import fungsi yang akan diuji
+        from smartcash.ui.model.handlers.simple_download import process_download_sync
+        
+        # Jalankan fungsi process_download_sync
+        process_download_sync(ui_components)
+        
+        # Verifikasi bahwa file berhasil disinkronkan dari drive ke lokal
+        self.assertTrue(os.path.exists(os.path.join(self.local_dir, 'yolov5s.pt')))
+        self.assertTrue(os.path.exists(os.path.join(self.local_dir, 'efficientnet-b4_notop.h5')))
+
 def run_all_tests():
     """Menjalankan semua test case"""
     print("🧪 Menjalankan test case untuk fungsi download dan sync model pretrained...")
-    result = run_test_case(TestSimpleDownload)
     
-    if result.wasSuccessful():
-        print(f"{ICONS.get('success', '✅')} Semua test berhasil!")
+    # Jalankan semua test case
+    test_classes = [TestSimpleDownload, TestPretrainedInitializer, TestDownloadWithDrive]
+    success = True
+    
+    for test_class in test_classes:
+        print(f"\n🧪 Menjalankan {test_class.__name__}...")
+        result = run_test_case(test_class)
+        if not result.wasSuccessful():
+            success = False
+    
+    if success:
+        print(f"\n{ICONS.get('success', '✅')} Semua test berhasil!")
     else:
-        print(f"{ICONS.get('error', '❌')} Ada test yang gagal!")
+        print(f"\n{ICONS.get('error', '❌')} Ada test yang gagal!")
     
-    return result.wasSuccessful()
+    return success
 
 if __name__ == '__main__':
     run_all_tests()

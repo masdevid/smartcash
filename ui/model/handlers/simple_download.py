@@ -43,37 +43,15 @@ def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
     b.disabled = True
     b.description = "Sedang Memproses..."
     
-    # Jalankan proses download dan sync secara asinkron menggunakan threading
-    thread = threading.Thread(
-        target=lambda: process_download_sync_async(ui_components, lambda: enable_button(b))
-    )
-    thread.daemon = True
-    thread.start()
-
-def enable_button(button):
-    """
-    Mengaktifkan kembali tombol setelah proses selesai.
-    
-    Args:
-        button: Button widget yang akan diaktifkan
-    """
-    button.disabled = False
-    button.description = "Download & Sync Model"
-
-def process_download_sync_async(ui_components: Dict[str, Any], callback: Callable = None) -> None:
-    """
-    Memproses download dan sinkronisasi model pretrained secara asinkron.
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        callback: Fungsi callback yang akan dipanggil setelah proses selesai
-    """
+    # Jalankan proses download dan sync secara langsung
     try:
         process_download_sync(ui_components)
     finally:
-        # Panggil callback jika ada
-        if callback and callable(callback):
-            callback()
+        # Aktifkan kembali tombol setelah proses selesai
+        b.disabled = False
+        b.description = "Download & Sync Model"
+
+# Fungsi enable_button dan process_download_sync_async tidak diperlukan lagi karena tidak menggunakan threading
 
 def process_download_sync(ui_components: Dict[str, Any]) -> None:
     """

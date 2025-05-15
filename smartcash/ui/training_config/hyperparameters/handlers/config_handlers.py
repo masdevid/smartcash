@@ -44,67 +44,67 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
         
         # Update slider batch size
         if 'batch_size_slider' in ui_components:
-            ui_components['batch_size_slider'].value = hp_config.get('batch_size', 16)
+            ui_components['batch_size_slider'].value = current_config.get('batch_size', 16)
         
         # Update slider image size
         if 'image_size_slider' in ui_components:
-            ui_components['image_size_slider'].value = hp_config.get('image_size', 640)
+            ui_components['image_size_slider'].value = current_config.get('image_size', 640)
         
         # Update slider epochs
         if 'epochs_slider' in ui_components:
-            ui_components['epochs_slider'].value = hp_config.get('epochs', 50)
+            ui_components['epochs_slider'].value = current_config.get('epochs', 100)
         
         # Update slider learning rate
         if 'learning_rate_slider' in ui_components:
-            ui_components['learning_rate_slider'].value = hp_config.get('learning_rate', 0.001)
+            ui_components['learning_rate_slider'].value = current_config.get('learning_rate', 0.01)
         
         # Update dropdown optimizer
         if 'optimizer_dropdown' in ui_components:
-            optimizer = hp_config.get('optimizer', 'Adam')
+            optimizer = current_config.get('optimizer', 'SGD')
             if optimizer in ui_components['optimizer_dropdown'].options:
                 ui_components['optimizer_dropdown'].value = optimizer
         
         # Update slider weight decay
         if 'weight_decay_slider' in ui_components:
-            ui_components['weight_decay_slider'].value = hp_config.get('weight_decay', 0.0005)
+            ui_components['weight_decay_slider'].value = current_config.get('weight_decay', 0.0005)
         
         # Update slider momentum
         if 'momentum_slider' in ui_components:
-            ui_components['momentum_slider'].value = hp_config.get('momentum', 0.937)
+            ui_components['momentum_slider'].value = current_config.get('momentum', 0.937)
         
         # Update dropdown scheduler
         if 'scheduler_dropdown' in ui_components:
-            scheduler = hp_config.get('lr_scheduler', 'cosine')
+            scheduler = current_config.get('scheduler', 'cosine')
             if scheduler in ui_components['scheduler_dropdown'].options:
                 ui_components['scheduler_dropdown'].value = scheduler
         
         # Update slider warmup epochs
         if 'warmup_epochs_slider' in ui_components:
-            ui_components['warmup_epochs_slider'].value = hp_config.get('warmup_epochs', 3)
+            ui_components['warmup_epochs_slider'].value = current_config.get('warmup_epochs', 3)
         
         # Update slider warmup momentum
         if 'warmup_momentum_slider' in ui_components:
-            ui_components['warmup_momentum_slider'].value = hp_config.get('warmup_momentum', 0.8)
+            ui_components['warmup_momentum_slider'].value = current_config.get('warmup_momentum', 0.8)
         
         # Update slider warmup bias lr
         if 'warmup_bias_lr_slider' in ui_components:
-            ui_components['warmup_bias_lr_slider'].value = hp_config.get('warmup_bias_lr', 0.1)
+            ui_components['warmup_bias_lr_slider'].value = current_config.get('warmup_bias_lr', 0.1)
         
         # Update checkbox augment
         if 'augment_checkbox' in ui_components:
-            ui_components['augment_checkbox'].value = hp_config.get('augment', True)
+            ui_components['augment_checkbox'].value = current_config.get('augment', True)
         
         # Update slider dropout
         if 'dropout_slider' in ui_components:
-            ui_components['dropout_slider'].value = hp_config.get('dropout', 0.0)
+            ui_components['dropout_slider'].value = current_config.get('dropout', 0.0)
         
         # Update slider box loss gain
         if 'box_loss_gain_slider' in ui_components:
-            ui_components['box_loss_gain_slider'].value = hp_config.get('box_loss_gain', 0.05)
+            ui_components['box_loss_gain_slider'].value = current_config.get('box_loss_gain', 0.05)
         
         # Update slider cls loss gain
         if 'cls_loss_gain_slider' in ui_components:
-            ui_components['cls_loss_gain_slider'].value = hp_config.get('cls_loss_gain', 0.5)
+            ui_components['cls_loss_gain_slider'].value = current_config.get('cls_loss_gain', 0.5)
         
         # Update slider obj loss gain
         if 'obj_loss_gain_slider' in ui_components:
@@ -156,9 +156,6 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
         Konfigurasi yang diupdate
     """
     try:
-        # Pastikan struktur config ada
-        if 'hyperparameters' not in config:
-            config['hyperparameters'] = {}
         
         # Update batch size
         if 'batch_size_slider' in ui_components:
@@ -209,16 +206,16 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
             config['augment'] = ui_components['augment_checkbox'].value
         
         if 'dropout_slider' in ui_components:
-            config['hyperparameters']['dropout'] = ui_components['dropout_slider'].value
+            config['dropout'] = ui_components['dropout_slider'].value
         
         if 'box_loss_gain_slider' in ui_components:
-            config['hyperparameters']['box_loss_gain'] = ui_components['box_loss_gain_slider'].value
+            config['box_loss_gain'] = ui_components['box_loss_gain_slider'].value
         
         if 'cls_loss_gain_slider' in ui_components:
-            config['hyperparameters']['cls_loss_gain'] = ui_components['cls_loss_gain_slider'].value
+            config['cls_loss_gain'] = ui_components['cls_loss_gain_slider'].value
         
         if 'obj_loss_gain_slider' in ui_components:
-            config['hyperparameters']['obj_loss_gain'] = ui_components['obj_loss_gain_slider'].value
+            config['obj_loss_gain'] = ui_components['obj_loss_gain_slider'].value
         
         # Update early stopping
         if 'early_stopping_enabled_checkbox' in ui_components or 'early_stopping_patience_slider' in ui_components or 'early_stopping_min_delta_slider' in ui_components:

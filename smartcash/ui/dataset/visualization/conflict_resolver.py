@@ -32,15 +32,28 @@ def detect_ui_conflicts():
     """
     conflict_widgets = []
     
-    # Cari semua widget yang mungkin dari modul lain
-    for obj in gc.get_objects():
-        if isinstance(obj, widgets.Widget):
-            # Periksa apakah widget berasal dari modul yang berpotensi konflik
-            widget_module = getattr(obj, '__module__', '')
-            for conflict_module in POTENTIAL_CONFLICT_MODULES:
-                if conflict_module in widget_module:
-                    conflict_widgets.append(obj)
-                    break
+    try:
+        # Pendekatan yang lebih aman untuk mendapatkan widget yang aktif
+        import IPython
+        shell = IPython.get_ipython()
+        
+        if shell is not None:
+            # Cari widget di namespace pengguna
+            for var_name, obj in shell.user_ns.items():
+                try:
+                    if isinstance(obj, widgets.Widget):
+                        # Periksa apakah widget berasal dari modul yang berpotensi konflik
+                        widget_module = getattr(obj, '__module__', '')
+                        for conflict_module in POTENTIAL_CONFLICT_MODULES:
+                            if conflict_module in widget_module:
+                                conflict_widgets.append(obj)
+                                logger.info(f"🔍 Terdeteksi widget konflik: {var_name} dari modul {widget_module}")
+                                break
+                except (ReferenceError, AttributeError):
+                    # Abaikan objek yang sudah tidak ada atau tidak dapat diakses
+                    continue
+    except Exception as e:
+        logger.warning(f"⚠️ Error saat mendeteksi konflik UI: {str(e)}")
     
     return len(conflict_widgets) > 0, conflict_widgets
 
@@ -52,38 +65,50 @@ def resolve_ui_conflicts():
         Boolean yang menunjukkan apakah konflik berhasil diselesaikan
     """
     with _resolver_lock:
-        has_conflict, conflict_widgets = detect_ui_conflicts()
-        
-        if not has_conflict:
-            return False
-        
-        # Log informasi konflik
-        logger.warning(f"🔄 Terdeteksi {len(conflict_widgets)} widget yang berpotensi konflik")
-        
-        # Tutup semua widget yang konflik
-        for widget in conflict_widgets:
+        try:
+            has_conflict, conflict_widgets = detect_ui_conflicts()
+            
+            if not has_conflict:
+                return False
+            
+            # Log informasi konflik
+            logger.warning(f"🔄 Terdeteksi {len(conflict_widgets)} widget yang berpotensi konflik")
+            
+            # Tutup semua widget yang konflik
+            closed_count = 0
+            for widget in conflict_widgets:
+                try:
+                    widget.close()
+                    closed_count += 1
+                except Exception as e:
+                    logger.error(f"❌ Gagal menutup widget: {str(e)}")
+            
+            logger.info(f"🚩 Berhasil menutup {closed_count} dari {len(conflict_widgets)} widget konflik")
+            
+            # Paksa garbage collection
+            gc.collect()
+            
+            # Tunggu sebentar untuk memastikan widget benar-benar dihapus
+            time.sleep(0.5)
+            
+            # Bersihkan output
+            clear_output(wait=True)
+            
+            # Periksa lagi apakah masih ada konflik
             try:
-                widget.close()
+                has_conflict, remaining_widgets = detect_ui_conflicts()
+                if has_conflict:
+                    logger.warning(f"⚠️ Masih tersisa {len(remaining_widgets)} widget konflik")
+                    return closed_count > 0  # Berhasil jika setidaknya beberapa widget ditutup
             except Exception as e:
-                logger.error(f"❌ Gagal menutup widget: {str(e)}")
-        
-        # Paksa garbage collection
-        gc.collect()
-        
-        # Tunggu sebentar untuk memastikan widget benar-benar dihapus
-        time.sleep(0.5)
-        
-        # Bersihkan output
-        clear_output(wait=True)
-        
-        # Periksa lagi apakah masih ada konflik
-        has_conflict, remaining_widgets = detect_ui_conflicts()
-        if has_conflict:
-            logger.warning(f"⚠️ Masih tersisa {len(remaining_widgets)} widget konflik")
+                logger.warning(f"⚠️ Error saat memeriksa konflik yang tersisa: {str(e)}")
+                return closed_count > 0  # Berhasil jika setidaknya beberapa widget ditutup
+            
+            logger.info("✅ Konflik UI berhasil diselesaikan")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Error saat menyelesaikan konflik UI: {str(e)}")
             return False
-        
-        logger.info("✅ Konflik UI berhasil diselesaikan")
-        return True
 
 def check_and_resolve_conflicts():
     """

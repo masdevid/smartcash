@@ -9,16 +9,16 @@ import os
 from pathlib import Path
 from smartcash.dataset.utils.dataset_constants import DRIVE_DATASET_PATH, DRIVE_PREPROCESSED_PATH, DEFAULT_PREPROCESSED_DIR
 
-def create_split_ui(env=None, config=None) -> Dict[str, Any]:
+def create_split_component(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi split dataset tanpa visualisasi.
+    Membuat komponen UI untuk konfigurasi split dataset.
     
     Args:
-        env: Environment manager
-        config: Konfigurasi aplikasi
+        env: Environment dari notebook
+        config: Konfigurasi dataset
         
     Returns:
-        Dictionary berisi widget UI
+        Dictionary berisi komponen UI
     """
     # Import komponen UI standar
     from smartcash.ui.utils.header_utils import create_header
@@ -36,24 +36,15 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         drive_mounted = True
         drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else '/content/drive/MyDrive'
     
-    # Header
+    # Header dengan layout compact
     header = create_header(f"{ICONS['dataset']} Konfigurasi Split Dataset", 
-                         "Konfigurasi pembagian dataset untuk training, validation, dan testing")
+                         "Konfigurasi pembagian dataset untuk training, validation, dan testing",
+                         compact=True)
     
-    # Card panel di awal
-    card_panel = widgets.HTML(value=f"""
-        <div style="padding:15px; background-color:{COLORS['card']}; 
-                    color:{COLORS['dark']}; margin:10px 0; border-radius:8px; 
-                    box-shadow:0 2px 5px rgba(0,0,0,0.1);">
-            <h3 style="margin-top:0">{ICONS['dataset']} Konfigurasi Split Dataset</h3>
-            <p>Konfigurasi pembagian dataset untuk training, validation, dan testing.</p>
-            <ul style="padding-left:20px">
-                <li>Sesuaikan proporsi dataset dengan slider</li>
-                <li>Simpan konfigurasi untuk digunakan pada tahap training</li>
-                <li>Konfigurasi ini hanya memperbarui dataset_config.yaml</li>
-            </ul>
-        </div>
-    """)
+    # Status panel untuk pesan status
+    status_panel = widgets.Output(
+        layout=widgets.Layout(margin='5px 0', padding='0')
+    )
     
     # Output box untuk status dan log
     output_box = widgets.Output(
@@ -83,29 +74,50 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(margin='10px 0')
     )
     
-    # Split percentages panel with sliders
+    # Split percentages panel
+    # Slider untuk train split - dengan style compact
     train_slider = widgets.FloatSlider(
-        value=70.0, min=50.0, max=90.0, step=1.0,
+        value=0.7,
+        min=0.5,
+        max=0.9,
+        step=0.05,
         description='Train:',
-        style={'description_width': '60px'},
-        layout=widgets.Layout(width='70%'),
-        readout_format='.0f'
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.2f',
+        layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
-    valid_slider = widgets.FloatSlider(
-        value=15.0, min=5.0, max=30.0, step=1.0,
-        description='Valid:',
-        style={'description_width': '60px'},
-        layout=widgets.Layout(width='70%'),
-        readout_format='.0f'
+    # Slider untuk validation split - dengan style compact
+    val_slider = widgets.FloatSlider(
+        value=0.15,
+        min=0.05,
+        max=0.3,
+        step=0.05,
+        description='Val:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.2f',
+        layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
+    # Slider untuk test split - dengan style compact
     test_slider = widgets.FloatSlider(
-        value=15.0, min=5.0, max=30.0, step=1.0,
+        value=0.15,
+        min=0.05,
+        max=0.3,
+        step=0.05,
         description='Test:',
-        style={'description_width': '60px'},
-        layout=widgets.Layout(width='70%'),
-        readout_format='.0f'
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.2f',
+        layout=widgets.Layout(width='100%', margin='2px 0')
     )
     
     stratified_checkbox = widgets.Checkbox(
@@ -114,10 +126,15 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         style={'description_width': 'initial'}
     )
     
-    split_panel = widgets.VBox([
-        widgets.HTML(f"<h3 style='color:{COLORS['dark']}; margin-top:10px; margin-bottom:10px;'>{ICONS['folder']} Persentase Split</h3>"),
-        train_slider, valid_slider, test_slider, stratified_checkbox
-    ])
+    # Slider container dengan style compact
+    slider_container = widgets.VBox([
+        widgets.HTML(value=f"<h4 style='margin:5px 0;'>{ICONS['split']} Proporsi Split Dataset</h4>"),
+        train_slider,
+        val_slider,
+        test_slider,
+        widgets.HBox([stratified_checkbox], layout=widgets.Layout(margin='5px 0'))
+    ], layout=widgets.Layout(margin='5px 0', padding='8px', 
+                            border='1px solid #ddd', border_radius='5px'))
     
     # Advanced options panel
     advanced_options = widgets.VBox([
@@ -168,92 +185,89 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         "info"
     )
     
-    # Button container
-    try:
-        from smartcash.ui.components.config_buttons import create_config_buttons
-        buttons_container = create_config_buttons("Split Dataset")
-    except ImportError:
-        # Fallback jika config_buttons tidak tersedia
-        save_button = widgets.Button(
-            description='Simpan Konfigurasi',
-            button_style='primary',
-            icon='save',
-            layout=widgets.Layout(margin='0 5px')
-        )
-        
-        reset_button = widgets.Button(
-            description='Reset ke Default',
-            button_style='warning',
-            icon='refresh',
-            layout=widgets.Layout(margin='0 0 0 5px')
-        )
-        
-        buttons_container = widgets.HBox([save_button, reset_button], 
-            layout=widgets.Layout(display='flex', justify_content='flex-end'))
+    # Buttons dengan style compact
+    save_button = widgets.Button(
+        description='Simpan',
+        icon='save',
+        button_style='primary',
+        tooltip='Simpan konfigurasi split',
+        layout=widgets.Layout(width='auto', margin='0 5px 0 0')
+    )
     
-    # Pastikan buttons_container adalah widget, bukan dictionary
-    if isinstance(buttons_container, dict) and 'container' in buttons_container:
-        all_buttons = buttons_container['container']
-    else:
-        all_buttons = buttons_container
+    reset_button = widgets.Button(
+        description='Reset',
+        icon='refresh',
+        button_style='warning',
+        tooltip='Reset ke default',
+        layout=widgets.Layout(width='auto', margin='0 5px')
+    )
     
-    # Atur layout hanya jika all_buttons adalah widget
-    if hasattr(all_buttons, 'layout'):
-        all_buttons.layout = widgets.Layout(
-            display='flex', 
-            justify_content='flex-end',
-            margin='10px 0',
-            align_items='center'
-        )
+    # Buttons container dengan style compact
+    buttons_container = widgets.HBox([save_button, reset_button], 
+                                  layout=widgets.Layout(margin='5px 0', justify_content='flex-start', padding='0'))
     
-    # Info box
-    info_box = get_split_info()
-    
-    # Rakit komponen UI
-    ui = widgets.VBox([
+    # Main container dengan style compact
+    main_container = widgets.VBox([
         header,
+        slider_container,
+        buttons_container,
         status_panel,
-        split_notice,
-        config_info_html,
-        split_panel,
-        advanced_accordion,
-        widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
-        all_buttons,
-        output_box,
-        info_box
-    ])
+        output_box
+    ], layout=widgets.Layout(width='100%', padding='5px'))
     
-    # Dictionary untuk akses komponen
+    # Simpan komponen UI untuk digunakan di handlers
     ui_components = {
-        'ui': ui,
-        'header': header,
-        'status_panel': status_panel,
+        'train_slider': train_slider,
+        'val_slider': val_slider,
+        'test_slider': test_slider,
+        'stratified_checkbox': stratified_checkbox,
+        'save_button': save_button,
+        'reset_button': reset_button,
         'output_box': output_box,
-        'config_info_html': config_info_html,
-        'split_panel': split_panel,
-        'split_sliders': [train_slider, valid_slider, test_slider],
-        'stratified': stratified_checkbox,
-        'advanced_options': advanced_options,
-        'data_paths': data_paths,
-        'buttons_container': buttons_container,
-        'module_name': 'split_config'
+        'status_panel': status_panel,
+        'main_container': main_container
     }
     
-    # Pastikan buttons dapat diakses
-    if isinstance(buttons_container, widgets.HBox):
-        ui_components['save_button'] = buttons_container.children[0]
-        ui_components['reset_button'] = buttons_container.children[1]
-    elif isinstance(buttons_container, dict) and 'save_button' in buttons_container and 'reset_button' in buttons_container:
-        # Jika buttons_container adalah dictionary dengan tombol-tombol
-        ui_components['save_button'] = buttons_container['save_button']
-        ui_components['reset_button'] = buttons_container['reset_button']
-    elif hasattr(buttons_container, 'children'):
-        # Extract buttons jika menggunakan create_config_buttons
-        for child in buttons_container.children:
-            if isinstance(child, widgets.Button):
-                if child.description == 'Simpan Konfigurasi':
-                    ui_components['save_button'] = child
-                elif child.description == 'Reset ke Default':
-                    ui_components['reset_button'] = child
+    # Callback untuk memperbarui nilai slider saat salah satu slider berubah
+    def update_sliders(change):
+        # Pastikan total tetap 1.0
+        total = train_slider.value + val_slider.value + test_slider.value
+        if abs(total - 1.0) > 0.01:  # Toleransi untuk floating point
+            # Sesuaikan nilai lain
+            if change['owner'] == train_slider:
+                # Distribusikan sisanya secara proporsional
+                remaining = 1.0 - train_slider.value
+                ratio = val_slider.value / (val_slider.value + test_slider.value) if (val_slider.value + test_slider.value) > 0 else 0.5
+                val_slider.value = remaining * ratio
+                test_slider.value = remaining * (1 - ratio)
+            elif change['owner'] == val_slider:
+                # Sesuaikan test slider
+                test_slider.value = 1.0 - train_slider.value - val_slider.value
+            elif change['owner'] == test_slider:
+                # Sesuaikan valid slider
+                val_slider.value = 1.0 - train_slider.value - test_slider.value
+    
+    # Tambahkan observers untuk slider
+    train_slider.observe(update_sliders, names='value')
+    val_slider.observe(update_sliders, names='value')
+    test_slider.observe(update_sliders, names='value')
+    
+    # Simpan referensi ke split_sliders untuk cleanup
+    ui_components['split_sliders'] = [train_slider, val_slider, test_slider]
+    ui_components['ui'] = main_container
     
     return ui_components
+
+
+def create_split_ui(env=None, config=None) -> Dict[str, Any]:
+    """
+    Fungsi wrapper untuk kompatibilitas dengan kode lama.
+    
+    Args:
+        env: Environment dari notebook
+        config: Konfigurasi dataset
+        
+    Returns:
+        Dictionary berisi komponen UI
+    """
+    return create_split_component(env, config)

@@ -11,10 +11,10 @@ from smartcash.common.logger import get_logger
 
 # Import ConfigManager untuk persistensi
 try:
-    from smartcash.common.config.manager import ConfigManager
+    from smartcash.common.config.manager import get_config_manager
 except ImportError:
     # Fallback jika ConfigManager tidak tersedia
-    ConfigManager = None
+    get_config_manager = None
     print(f"{ICONS['warning']} ConfigManager tidak tersedia, persistensi konfigurasi mungkin tidak berfungsi dengan baik")
 
 def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -37,29 +37,31 @@ def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any])
         config['data']['split'] = {}
     
     # Validasi komponen yang diperlukan
-    if 'split_sliders' not in ui_components or not ui_components['split_sliders'] or len(ui_components['split_sliders']) < 3:
-        print(f"{ICONS['warning']} Komponen split_sliders tidak tersedia atau tidak valid")
+    if 'train_slider' not in ui_components or 'val_slider' not in ui_components or 'test_slider' not in ui_components:
+        print(f"{ICONS['warning']} Komponen slider tidak tersedia atau tidak valid")
         return config
     
-    # Dapatkan nilai dari UI
-    train_slider, valid_slider, test_slider = ui_components['split_sliders']
+    # Dapatkan nilai dari UI dengan akses langsung ke slider
+    train_slider = ui_components['train_slider']
+    val_slider = ui_components['val_slider']
+    test_slider = ui_components['test_slider']
     
     # Normalisasi nilai slider untuk memastikan total 1.0
-    total = train_slider.value + valid_slider.value + test_slider.value
+    total = train_slider.value + val_slider.value + test_slider.value
     if total > 0:  # Hindari division by zero
         train_ratio = train_slider.value / total
-        valid_ratio = valid_slider.value / total
+        val_ratio = val_slider.value / total
         test_ratio = test_slider.value / total
     else:
         # Default jika total 0
-        train_ratio, valid_ratio, test_ratio = 0.8, 0.1, 0.1
+        train_ratio, val_ratio, test_ratio = 0.7, 0.15, 0.15
     
     # Update konfigurasi
     config['data']['split'] = {
         'train': train_ratio,
-        'val': valid_ratio,  # Menggunakan 'val' bukan 'valid' untuk konsistensi dengan dataset_config.yaml
+        'val': val_ratio,  # Menggunakan 'val' bukan 'valid' untuk konsistensi dengan dataset_config.yaml
         'test': test_ratio,
-        'stratified': ui_components['stratified'].value if 'stratified' in ui_components else True
+        'stratified': ui_components['stratified_checkbox'].value if 'stratified_checkbox' in ui_components else True
     }
     
     # Advanced options
@@ -118,9 +120,9 @@ def load_default_config() -> Dict[str, Any]:
     return {
         'data': {
             'split': {
-                'train': 0.8,
-                'val': 0.1,
-                'test': 0.1,
+                'train': 0.7,
+                'val': 0.15,
+                'test': 0.15,
                 'stratified': True
             },
             'random_seed': 42,
@@ -159,7 +161,7 @@ def load_split_config_config() -> Dict[str, Any]:
         if 'data' not in config:
             config['data'] = {}
         if 'split' not in config['data']:
-            config['data']['split'] = {'train': 0.8, 'val': 0.1, 'test': 0.1, 'stratified': True}
+            config['data']['split'] = {'train': 0.7, 'val': 0.15, 'test': 0.15, 'stratified': True}
         
         return config
     except Exception as e:
@@ -167,18 +169,18 @@ def load_split_config_config() -> Dict[str, Any]:
         # Kembalikan konfigurasi default
         return load_default_config()
 
-def get_config_manager():
+def get_config_manager_instance():
     """
     Dapatkan instance ConfigManager dengan penanganan error.
     
     Returns:
         Instance ConfigManager atau None jika tidak tersedia
     """
-    if ConfigManager is None:
+    if get_config_manager is None:
         return None
     
     try:
-        return ConfigManager.get_instance()
+        return get_config_manager()
     except Exception as e:
         print(f"{ICONS['warning']} Gagal mendapatkan instance ConfigManager: {str(e)}")
         return None
@@ -198,7 +200,7 @@ def save_config_with_manager(config: Dict[str, Any], ui_components: Dict[str, An
     success = False
     
     # Coba simpan dengan ConfigManager terlebih dahulu
-    config_manager = get_config_manager()
+    config_manager = get_config_manager_instance()
     if config_manager:
         try:
             # Pastikan UI components terdaftar untuk persistensi

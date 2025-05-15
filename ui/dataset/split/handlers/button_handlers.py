@@ -12,10 +12,10 @@ from smartcash.common.logger import get_logger
 # Import dari file SRP lainnya
 from smartcash.ui.dataset.split.handlers.config_handlers import (
     update_config_from_ui, save_config_with_manager, 
-    load_default_config, load_split_config_config, get_config_manager
+    load_default_config, load_split_config_config, get_config_manager_instance
 )
 from smartcash.ui.dataset.split.handlers.ui_initializer import (
-    initialize_ui_from_config, ensure_ui_persistence
+    initialize_ui_from_config, ensure_ui_persistence, update_ui_from_config
 )
 
 def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
@@ -40,7 +40,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     # Pastikan konfigurasi data ada
     if not config:
         # Coba dapatkan konfigurasi dari ConfigManager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager_instance()
         if config_manager:
             try:
                 config = config_manager.get_module_config('dataset')

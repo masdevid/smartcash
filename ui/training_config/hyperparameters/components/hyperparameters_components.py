@@ -215,7 +215,8 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
         width='100%',
         border='1px solid #ddd',
         padding='10px',
-        margin='10px 0'
+        margin='10px 0',
+        height='100%'  # Memastikan tinggi yang konsisten
     ))
     
     basic_components['basic_box'] = basic_box
@@ -371,7 +372,8 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         border='1px solid #ddd',
         padding='10px',
         margin='10px 0',
-        width='49%'  # Lebar 49% untuk memberikan sedikit jarak
+        width='100%',  # Full width dalam container 32%
+        height='100%'  # Memastikan tinggi yang konsisten
     ))
     
     optimization_components['optimization_box'] = optimization_box
@@ -481,10 +483,11 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         early_stopping_box,
         checkpoint_box
     ], layout=widgets.Layout(
-        width='49%',  # Lebar 49% untuk memberikan space between yang lebih baik
+        width='100%',  # Full width dalam container 32%
         border='1px solid #ddd',
         padding='10px',
-        margin='10px 0'
+        margin='10px 0',
+        height='100%'  # Memastikan tinggi yang konsisten
     ))
     
     advanced_components['early_stopping_box'] = early_stopping_box
@@ -595,19 +598,9 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     # Buat form container untuk tab konfigurasi
     form_container = widgets.VBox([
         widgets.HBox([
-            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='30%')),
-            widgets.Box([
-                widgets.HBox([
-                    optimization_components['optimization_box'],
-                    advanced_components['advanced_box']
-                ], layout=widgets.Layout(
-                    width='100%',
-                    display='flex',
-                    flex_flow='row nowrap',
-                    align_items='flex-start',
-                    justify_content='space-between'
-                ))
-            ], layout=widgets.Layout(width='70%'))
+            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='32%')),
+            widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='32%')),
+            widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='32%'))
         ], layout=widgets.Layout(
             width='100%',
             display='flex',

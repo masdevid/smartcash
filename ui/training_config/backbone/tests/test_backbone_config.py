@@ -68,7 +68,7 @@ class TestBackboneConfig(unittest.TestCase):
         # Hapus temporary file
         os.unlink(self.temp_config_file.name)
     
-    @patch('smartcash.common.config.manager.ConfigManager.get_instance')
+    @patch('smartcash.common.config.manager.get_config_manager')
     def test_update_config_from_ui(self, mock_get_instance):
         """Tes untuk update_config_from_ui"""
         # Setup mock
@@ -99,7 +99,7 @@ class TestBackboneConfig(unittest.TestCase):
         
         self.assertTrue(scenario_exists, "Scenario tidak ditambahkan ke konfigurasi")
     
-    @patch('smartcash.common.config.manager.ConfigManager.get_instance')
+    @patch('smartcash.common.config.manager.get_config_manager')
     def test_update_ui_from_config(self, mock_get_instance):
         """Tes untuk update_ui_from_config"""
         # Setup mock
@@ -130,7 +130,7 @@ class TestBackboneConfig(unittest.TestCase):
         self.ui_components['use_residual_checkbox'].disabled = True
         self.ui_components['use_ciou_checkbox'].disabled = True
     
-    @patch('smartcash.common.config.manager.ConfigManager.get_instance')
+    @patch('smartcash.common.config.manager.get_config_manager')
     def test_invalid_values(self, mock_get_instance):
         """Tes untuk nilai yang tidak valid"""
         # Setup mock

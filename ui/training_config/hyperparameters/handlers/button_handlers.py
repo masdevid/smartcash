@@ -329,7 +329,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         # Inisialisasi UI dari config yang disimpan
         try:
             # Dapatkan config manager
-            config_manager = ConfigManager.get_instance()
+            config_manager = get_config_manager()
             
             # Coba dapatkan konfigurasi yang disimpan
             saved_config = config_manager.get_module_config('hyperparameters')

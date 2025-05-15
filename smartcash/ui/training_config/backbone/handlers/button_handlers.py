@@ -113,7 +113,7 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
             config_manager = get_config_manager()
             
             # Dapatkan default config
-            default_config = config_manager.get_module_config('model')
+            default_config = config_manager.get_module_config('model', {})
             
             # Update UI dari default config
             update_ui_from_config(ui_components, default_config)

@@ -63,7 +63,13 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
             os.makedirs(os.path.dirname(drive_config_path), exist_ok=True)
             
             # Simpan konfigurasi ke drive
-            success = config_manager.save_config(drive_config_path)
+            try:
+                # Gunakan save_config dengan parameter yang benar
+                config_manager.save_config(drive_config_path, create_dirs=True)
+                success = True
+            except Exception as e:
+                logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi ke drive: {str(e)}")
+                success = False
             
             if success:
                 # Tampilkan pesan sukses
@@ -146,7 +152,12 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                 return
             
             # Load konfigurasi dari drive
-            drive_config = config_manager.load_config(drive_config_path)
+            try:
+                from smartcash.common.io import load_yaml
+                drive_config = load_yaml(drive_config_path, {})
+            except Exception as e:
+                logger.error(f"{ICONS.get('error', '❌')} Error saat memuat konfigurasi dari drive: {str(e)}")
+                drive_config = None
             
             if drive_config:
                 # Simpan konfigurasi ke lokal

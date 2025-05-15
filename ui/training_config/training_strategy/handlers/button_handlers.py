@@ -270,7 +270,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
         # Inisialisasi UI dari config yang disimpan
         try:
             # Dapatkan config manager
-            config_manager = ConfigManager.get_instance()
+            config_manager = get_config_manager()
             
             # Coba dapatkan konfigurasi yang disimpan
             saved_config = config_manager.get_module_config('training_strategy')

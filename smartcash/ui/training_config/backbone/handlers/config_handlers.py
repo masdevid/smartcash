@@ -5,10 +5,10 @@ Deskripsi: Handler untuk konfigurasi pada UI pemilihan backbone model SmartCash
 
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from IPython.display import clear_output
+from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import get_config_manager
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -24,7 +24,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary berisi konfigurasi yang diperbarui
     """
     # Dapatkan ConfigManager
-    config_manager = ConfigManager.get_instance()
+    config_manager = get_config_manager()
     
     # Dapatkan konfigurasi saat ini
     current_config = config_manager.get_module_config('model')
@@ -124,7 +124,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
         config_to_use: Dictionary berisi konfigurasi yang akan digunakan (opsional)
     """
     # Dapatkan ConfigManager
-    config_manager = ConfigManager.get_instance()
+    config_manager = get_config_manager()
     
     # Dapatkan konfigurasi
     current_config = config_to_use if config_to_use else config_manager.get_module_config('model')

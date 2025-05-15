@@ -158,8 +158,8 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     # Validasi config manager jika tersedia
     try:
-        from smartcash.common.config.manager import ConfigManager
-        config_manager = ConfigManager.get_instance()
+        from smartcash.common.config.manager import get_config_manager
+        config_manager = get_config_manager()
         if config_manager and hasattr(config_manager, 'validate_param'):
             # Pastikan section augmentation ada dan valid
             config['augmentation'] = config_manager.validate_param(

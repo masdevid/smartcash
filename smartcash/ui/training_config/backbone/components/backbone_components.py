@@ -17,11 +17,53 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
-    # Import komponen UI standar 
-    from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.constants import COLORS, ICONS 
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
-    from smartcash.ui.components.config_buttons import create_config_buttons
+    # Import komponen UI standar dengan error handling
+    try:
+        from smartcash.ui.utils.header_utils import create_header
+    except ImportError:
+        # Fallback sederhana jika header_utils tidak tersedia
+        def create_header(title, description=None, icon=None):
+            return widgets.HTML(f"<h2>{title}</h2>" + (f"<p>{description}</p>" if description else ""))
+    
+    try:
+        from smartcash.ui.utils.constants import COLORS, ICONS
+    except ImportError:
+        # Fallback untuk constants
+        COLORS = {
+            'alert_info_bg': '#d1ecf1',
+            'alert_info_text': '#0c5460',
+            'alert_success_bg': '#d4edda',
+            'alert_success_text': '#155724',
+            'alert_warning_bg': '#fff3cd',
+            'alert_warning_text': '#856404',
+            'alert_danger_bg': '#f8d7da',
+            'alert_danger_text': '#721c24'
+        }
+        ICONS = {
+            'info': 'ℹ️',
+            'success': '✅',
+            'warning': '⚠️',
+            'error': '❌',
+            'processing': '⏳',
+            'link': '🔗'
+        }
+    
+    try:
+        from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    except ImportError:
+        # Fallback untuk layout_utils
+        OUTPUT_WIDGET = widgets.Layout(width='100%', border='1px solid #ddd', padding='10px')
+        def create_divider():
+            return widgets.HTML("<hr style='margin: 10px 0; border: 0; border-top: 1px solid #eee;'>")
+    
+    try:
+        from smartcash.ui.components.config_buttons import create_config_buttons
+    except ImportError:
+        # Fallback untuk config_buttons
+        def create_config_buttons():
+            save_button = widgets.Button(description='Simpan', button_style='primary', icon='check')
+            reset_button = widgets.Button(description='Reset', button_style='danger', icon='refresh')
+            return {'save_button': save_button, 'reset_button': reset_button}
     
     # Inisialisasi komponen
     ui_components = {}

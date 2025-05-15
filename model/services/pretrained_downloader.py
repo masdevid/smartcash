@@ -78,7 +78,7 @@ class PretrainedModelDownloader:
             }
         
         # Download model
-        model = torch.hub.load(yolo_source, 'yolov5s', pretrained=True, force_reload=True)
+        model = torch.hub.load(yolo_source, 'yolov5s', pretrained=True, force_reload=True, verbose=False, trust_repo=True)
         torch.save(model.state_dict(), yolo_path)
         
         # Update metadata

@@ -4,12 +4,13 @@ Deskripsi: Inisialisasi UI dan logika bisnis untuk pretrained model dengan pende
 """
 
 import os
+import time
+import threading
 from pathlib import Path
 import ipywidgets as widgets
 from IPython.display import display, clear_output
-from typing import Dict, Any, Tuple, List, Optional
+from typing import Dict, Any, Tuple, List, Optional, Callable
 
-from smartcash.ui.model.trained.setup import setup_pretrained_models, sync_models_with_drive
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.header_utils import create_header
@@ -17,6 +18,10 @@ from smartcash.common.logger import get_logger
 from smartcash.common.environment import EnvironmentManager
 
 logger = get_logger(__name__)
+
+# Import model services di sini untuk menghindari circular import
+# Ini akan diimpor saat diperlukan di dalam fungsi
+# from smartcash.ui.model.trained.setup import setup_pretrained_models, sync_models_with_drive
 
 def check_colab_environment() -> Tuple[bool, bool]:
     """
@@ -89,7 +94,6 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
         
         # Kembalikan komponen UI terlebih dahulu
         # Proses download akan dijalankan secara asinkron setelah UI terender
-        import threading
         thread = threading.Thread(target=lambda: setup_pretrained_models_ui(ui_components))
         thread.daemon = True
         thread.start()
@@ -119,10 +123,12 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
     """
     try:
         # Tunggu sebentar untuk memastikan UI sudah terender sempurna
-        import time
-        time.sleep(0.5)
+        time.sleep(1)
         
-        # Gunakan EnvironmentManager untuk manajemen environment
+        # Impor di sini untuk menghindari circular import
+        from smartcash.model.services.pretrained_downloader import PretrainedModelDownloader
+        
+        # Setup environment
         env_manager = EnvironmentManager()
         models_dir = ui_components['models_dir']
         drive_models_dir = ui_components['drive_models_dir']
@@ -134,22 +140,11 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
             with ui_components['log']:
                 print(f"[{timestamp}] {message}")
         
-        # Update status - Inisialisasi
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("info", 
-                f"{ICONS.get('loading', '⏳')} Memeriksa environment dan direktori..."))
-        
+        # Inisialisasi downloader
         log_message(f"{ICONS.get('info', 'ℹ️')} Memulai proses persiapan model pre-trained")
         
-        # Cek apakah direktori parent ada
-        models_parent = Path(models_dir).parent
-        if not models_parent.exists():
-            with ui_components['status']:
-                clear_output(wait=True)
-                display(create_status_indicator("warning", 
-                    f"{ICONS.get('warning', '⚠️')} Direktori parent {models_parent} tidak ditemukan"))
-            log_message(f"{ICONS.get('warning', '⚠️')} Direktori parent {models_parent} tidak ditemukan")
+        # Jika tidak di Colab, lewati proses download dan sinkronisasi
+        if not env_manager.is_colab():
             log_message(f"{ICONS.get('warning', '⚠️')} Download dan sinkronisasi model dilewati")
             return
         
@@ -191,7 +186,11 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
                 display(create_status_indicator("info", 
                     f"{ICONS.get('loading', '⏳')} Sinkronisasi dari Google Drive..."))
             
-            sync_models_with_drive(models_dir, drive_models_dir, logger_func=log_message)
+            # Sinkronisasi dari Drive ke lokal
+            try:
+                sync_drive_to_local(models_dir, drive_models_dir, log_message)
+            except Exception as e:
+                log_message(f"{ICONS.get('error', '❌')} Error saat sinkronisasi dari Drive: {str(e)}")
         
         # Download model pretrained dengan callback untuk logging
         log_message(f"{ICONS.get('download', '📥')} Memulai download model pre-trained...")
@@ -200,17 +199,45 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
             display(create_status_indicator("info", 
                 f"{ICONS.get('loading', '⏳')} Downloading model pre-trained..."))
         
-        model_info = setup_pretrained_models(models_dir=models_dir, logger_func=log_message)
+        # Download model menggunakan downloader langsung
+        try:
+            downloader = PretrainedModelDownloader(models_dir=models_dir)
+            
+            # Download YOLOv5
+            log_message(f"\n{ICONS.get('download', '📥')} Memeriksa YOLOv5s...")
+            yolo_info = downloader.download_yolov5()
+            log_message(f"{ICONS.get('success', '✅')} Model YOLOv5s tersedia di {yolo_info['path']}")
+            
+            # Download EfficientNet-B4
+            log_message(f"\n{ICONS.get('download', '📥')} Memeriksa EfficientNet-B4...")
+            efficientnet_info = downloader.download_efficientnet()
+            log_message(f"{ICONS.get('success', '✅')} Model EfficientNet-B4 tersedia di {efficientnet_info['path']}")
+            
+            # Dapatkan informasi model
+            model_info = downloader.get_model_info()
+            
+            # Tampilkan ringkasan informasi model
+            if 'models' in model_info and 'yolov5s' in model_info['models'] and 'efficientnet_b4' in model_info['models']:
+                log_message("\nRingkasan model yang tersedia:")
+                log_message(f"- YOLOv5s: {model_info['models']['yolov5s']['size_mb']} MB")
+                log_message(f"- EfficientNet-B4: {model_info['models']['efficientnet_b4']['size_mb']} MB")
+        except Exception as e:
+            log_message(f"{ICONS.get('error', '❌')} Error saat download model: {str(e)}")
+            raise
         
         # Sinkronisasi ke Drive setelah download jika di Colab
-        if model_info and in_colab and is_drive_available:
+        if in_colab and is_drive_available:
             log_message(f"{ICONS.get('sync', '🔄')} Menyinkronkan model ke Google Drive...")
             with ui_components['status']:
                 clear_output(wait=True)
                 display(create_status_indicator("info", 
                     f"{ICONS.get('loading', '⏳')} Sinkronisasi ke Google Drive..."))
             
-            sync_models_with_drive(models_dir, drive_models_dir, model_info, logger_func=log_message)
+            # Sinkronisasi dari lokal ke Drive
+            try:
+                sync_local_to_drive(models_dir, drive_models_dir, model_info, log_message)
+            except Exception as e:
+                log_message(f"{ICONS.get('error', '❌')} Error saat sinkronisasi ke Drive: {str(e)}")
         
         # Update status setelah selesai
         log_message(f"{ICONS.get('success', '✅')} Proses persiapan model pre-trained selesai!")
@@ -227,3 +254,113 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
                 f"{ICONS.get('error', '❌')} Error saat setup pretrained model"))
         with ui_components['log']:
             print(f"{ICONS.get('error', '❌')} Error: {str(e)}")
+
+def sync_drive_to_local(models_dir: str, drive_models_dir: str, log_func: Callable) -> None:
+    """
+    Sinkronisasi model dari Google Drive ke lokal.
+    
+    Args:
+        models_dir: Direktori lokal untuk model
+        drive_models_dir: Direktori Google Drive untuk model
+        log_func: Fungsi untuk logging
+    """
+    try:
+        # Cek apakah direktori Drive ada
+        drive_path = Path(drive_models_dir)
+        if not drive_path.exists():
+            log_func(f"{ICONS.get('warning', '⚠️')} Direktori Drive {drive_models_dir} tidak ditemukan")
+            return
+        
+        # Cek apakah ada file model di Drive
+        model_files = []
+        for file_path in drive_path.glob('**/*'):
+            if file_path.is_file():
+                model_files.append(file_path)
+        
+        if not model_files:
+            log_func(f"{ICONS.get('warning', '⚠️')} Tidak ada file model di Drive")
+            return
+        
+        # Salin file dari Drive ke lokal
+        log_func(f"{ICONS.get('sync', '🔄')} Menyalin {len(model_files)} file dari Drive ke lokal...")
+        
+        for file_path in model_files:
+            # Hitung path relatif terhadap direktori Drive
+            rel_path = file_path.relative_to(drive_path)
+            local_file_path = Path(models_dir) / rel_path
+            
+            # Buat direktori parent jika belum ada
+            local_file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Salin file jika belum ada atau ukurannya berbeda
+            if not local_file_path.exists() or local_file_path.stat().st_size != file_path.stat().st_size:
+                import shutil
+                shutil.copy2(file_path, local_file_path)
+                log_func(f"{ICONS.get('file', '📄')} Disalin dari Drive: {rel_path}")
+        
+        log_func(f"{ICONS.get('success', '✅')} Sinkronisasi dari Drive selesai!")
+    
+    except Exception as e:
+        log_func(f"{ICONS.get('error', '❌')} Error saat sinkronisasi dari Drive: {str(e)}")
+        raise
+
+def sync_local_to_drive(models_dir: str, drive_models_dir: str, model_info: Dict[str, Any], log_func: Callable) -> None:
+    """
+    Sinkronisasi model dari lokal ke Google Drive.
+    
+    Args:
+        models_dir: Direktori lokal untuk model
+        drive_models_dir: Direktori Google Drive untuk model
+        model_info: Informasi model
+        log_func: Fungsi untuk logging
+    """
+    try:
+        # Cek apakah direktori Drive ada
+        drive_path = Path(drive_models_dir)
+        if not drive_path.exists():
+            log_func(f"{ICONS.get('folder', '📁')} Membuat direktori {drive_models_dir}...")
+            drive_path.mkdir(parents=True, exist_ok=True)
+        
+        # Daftar file model yang perlu disinkronkan
+        model_files = []
+        local_path = Path(models_dir)
+        
+        # Jika model_info tersedia, gunakan informasi tersebut
+        if model_info and 'models' in model_info:
+            for model_name, model_data in model_info['models'].items():
+                if 'path' in model_data:
+                    model_path = Path(model_data['path'])
+                    if model_path.exists():
+                        model_files.append(model_path)
+        
+        # Jika tidak ada model_info, cari semua file di direktori model
+        if not model_files:
+            for file_path in local_path.glob('**/*'):
+                if file_path.is_file():
+                    model_files.append(file_path)
+        
+        # Sinkronisasi file model ke Drive
+        if model_files:
+            log_func(f"{ICONS.get('sync', '🔄')} Sinkronisasi {len(model_files)} file model ke Google Drive...")
+            
+            for file_path in model_files:
+                # Hitung path relatif terhadap direktori model
+                rel_path = file_path.relative_to(local_path)
+                drive_file_path = drive_path / rel_path
+                
+                # Buat direktori parent jika belum ada
+                drive_file_path.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Salin file jika belum ada atau ukurannya berbeda
+                if not drive_file_path.exists() or drive_file_path.stat().st_size != file_path.stat().st_size:
+                    import shutil
+                    shutil.copy2(file_path, drive_file_path)
+                    log_func(f"{ICONS.get('file', '📄')} Disinkronkan ke Drive: {rel_path}")
+            
+            log_func(f"{ICONS.get('success', '✅')} Sinkronisasi ke Drive selesai!")
+        else:
+            log_func(f"{ICONS.get('warning', '⚠️')} Tidak ada file model yang ditemukan untuk disinkronkan.")
+    
+    except Exception as e:
+        log_func(f"{ICONS.get('error', '❌')} Error saat sinkronisasi ke Drive: {str(e)}")
+        raise

@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/model/trained/setup_new.py
+File: smartcash/ui/model/trained/setup.py
 Deskripsi: Fungsi setup untuk model pre-trained dengan pendekatan DRY (versi yang diperbaiki)
 """
 

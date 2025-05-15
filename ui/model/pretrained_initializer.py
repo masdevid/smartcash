@@ -67,8 +67,8 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
         clear_output(wait=True)
         # Tambahkan elemen ke main_container
         main_container.children = [
-            widgets.HTML("<h2>🧠 Pretrained Model Setup</h2>"),
-            widgets.HTML("<p>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4</p>"),
+            widgets.HTML("<h2 style='color: #2c3e50; font-family: Arial, sans-serif;'>🧠 Persiapan Model Pre-trained</h2>"),
+            widgets.HTML("<p style='color: #34495e; font-family: Arial, sans-serif;'>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4 untuk deteksi mata uang</p>"),
             status_output,
             log_output
         ]

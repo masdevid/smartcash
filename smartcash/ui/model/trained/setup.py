@@ -1,9 +1,9 @@
 """
-File: smartcash/ui/model/trained/setup.py
-Deskripsi: Fungsi setup untuk model pre-trained dengan pendekatan DRY
+File: smartcash/ui/model/trained/setup_fixed.py
+Deskripsi: Fungsi setup untuk model pre-trained dengan pendekatan DRY (versi yang diperbaiki)
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from pathlib import Path
 import os
 from tqdm import tqdm
@@ -15,7 +15,7 @@ from smartcash.common.logger import get_logger
 logger = get_logger(__name__)
 
 def setup_pretrained_models(models_dir: str = '/content/models', 
-                           log_callback: Optional[callable] = None) -> Dict[str, Any]:
+                           log_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """
     Download dan setup model pre-trained YOLOv5 dan EfficientNet-B4 dengan UI feedback.
     
@@ -28,7 +28,7 @@ def setup_pretrained_models(models_dir: str = '/content/models',
     """
     # Fungsi helper untuk logging
     def log_message(message: str):
-        if log_callback:
+        if log_callback and callable(log_callback):
             log_callback(message)
         else:
             logger.info(message)
@@ -70,7 +70,7 @@ def setup_pretrained_models(models_dir: str = '/content/models',
 def sync_models_with_drive(models_dir: str, 
                           drive_models_dir: str, 
                           model_info: Optional[Dict[str, Any]] = None,
-                          log_callback: Optional[callable] = None) -> None:
+                          log_callback: Optional[Callable] = None) -> None:
     """
     Sinkronisasi model dengan Google Drive.
     
@@ -82,7 +82,7 @@ def sync_models_with_drive(models_dir: str,
     """
     # Fungsi helper untuk logging
     def log_message(message: str):
-        if log_callback:
+        if log_callback and callable(log_callback):
             log_callback(message)
         else:
             logger.info(message)

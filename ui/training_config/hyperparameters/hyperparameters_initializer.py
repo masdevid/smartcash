@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Inisialisasi komponen UI untuk konfigurasi hyperparameter.
+    Inisialisasi dan tampilkan komponen UI untuk konfigurasi hyperparameter.
     
     Args:
         env: Environment manager
@@ -68,6 +68,9 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         except Exception as persist_error:
             logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
         
+        # Tampilkan UI secara otomatis
+        display_hyperparameters_ui(ui_components)
+        
         return ui_components
     except Exception as e:
         logger.error(f"{ICONS.get('error', '❌')} Error saat inisialisasi UI hyperparameter: {str(e)}")
@@ -93,7 +96,7 @@ def display_hyperparameters_ui(ui_components: Dict[str, Any]) -> None:
         # Tampilkan header
         display(create_header(
             title="Konfigurasi Hyperparameter",
-            subtitle="Pengaturan parameter untuk proses training model",
+            description="Pengaturan parameter untuk proses training model",
             icon=ICONS.get('settings', '⚙️')
         ))
         

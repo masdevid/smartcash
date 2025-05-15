@@ -5,10 +5,7 @@ Deskripsi: Entry point untuk konfigurasi hyperparameter model SmartCash
 
 def setup_hyperparameters():
     """Setup dan tampilkan UI untuk konfigurasi hyperparameter model."""
-    # Import modul hyperparameters
     from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import initialize_hyperparameters_ui
-    
-    # Inisialisasi UI dan kembalikan komponen
     return initialize_hyperparameters_ui()
 
 # Eksekusi saat modul diimpor

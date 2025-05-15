@@ -5,6 +5,7 @@ Deskripsi: Komponen UI untuk pemilihan backbone model
 
 from typing import Dict, Any, List, Optional
 import ipywidgets as widgets
+from IPython.display import display
 
 def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
@@ -20,11 +21,22 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    from smartcash.ui.components.config_buttons import create_config_buttons
     
     # Inisialisasi komponen
     ui_components = {}
     
-    # Tambahkan komponen status
+    # Panel info status
+    status_panel = widgets.HTML(
+        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
+                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {COLORS['alert_info_text']}">
+            <p style="margin:5px 0">{ICONS['info']} Konfigurasi backbone model</p>
+        </div>"""
+    )
+    ui_components['status_panel'] = status_panel
+    
+    # Tambahkan komponen status untuk error handling
     ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
     
     # Import ModelManager untuk mendapatkan model yang dioptimalkan
@@ -669,10 +681,43 @@ def create_backbone_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         
         # Catatan: Bagian ini telah dipindahkan ke dalam blok try-except di atas
     
+    # Buat tombol konfigurasi
+    config_buttons = create_config_buttons()
+    ui_components['save_button'] = config_buttons['save_button']
+    ui_components['reset_button'] = config_buttons['reset_button']
+    
     # Daftarkan handler
     ui_components['model_type'].observe(on_model_change, names='value')
     
     # Trigger handler untuk inisialisasi awal
     on_model_change({'new': ui_components['model_type'].value})
+    
+    # Buat layout UI
+    backbone_config_box = widgets.VBox([
+        create_header(
+            title="Konfigurasi Backbone Model",
+            description="Pilih model dan backbone untuk deteksi mata uang"
+        ),
+        ui_components['status_panel'],
+        widgets.HBox([
+            widgets.VBox([
+                widgets.HTML(value="<h3>Model dan Backbone</h3>"),
+                ui_components['model_type'],
+                ui_components['backbone_type'],
+                ui_components['status']
+            ], layout=widgets.Layout(width='50%')),
+            widgets.VBox([
+                widgets.HTML(value="<h3>Informasi Model</h3>"),
+                ui_components['backbone_info']
+            ], layout=widgets.Layout(width='50%'))
+        ]),
+        widgets.HBox([
+            ui_components['save_button'],
+            ui_components['reset_button']
+        ])
+    ])
+    
+    # Tambahkan UI ke komponen
+    ui_components['ui'] = backbone_config_box
     
     return ui_components

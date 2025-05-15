@@ -309,6 +309,11 @@ def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         layout=widgets.Layout(padding='10px')
     )
     
+    # Tambahkan keterangan sinkronisasi otomatis
+    ui_components['sync_info'] = widgets.HTML(
+        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
+    )
+    
     # Header dengan komponen standar
     header = create_header(f"{ICONS['settings']} Hyperparameters Configuration", 
                           "Konfigurasi hyperparameter untuk training model deteksi mata uang")

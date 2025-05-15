@@ -5,7 +5,16 @@ Deskripsi: Handler untuk tombol UI pada komponen hyperparameter
 
 from typing import Dict, Any, Optional, Callable
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display, clear_output
+
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
+from smartcash.common.config.manager import get_config_manager
+from smartcash.common.logger import get_logger
+from smartcash.common.environment import get_environment_manager
+from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import sync_to_drive
+
+logger = get_logger(__name__)
 
 def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -20,12 +29,9 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         Dict berisi komponen UI dengan handler terpasang
     """
     try:
-        # Import dengan penanganan error minimal
-        from smartcash.common.config.manager import ConfigManager, get_config_manager
-        from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
         
-        # Dapatkan logger jika tersedia
-        logger = ui_components.get('logger', None)
+        # Dapatkan environment manager jika belum tersedia
+        env = env or get_environment_manager()
         
         # Validasi config
         if config is None: config = {}
@@ -247,18 +253,28 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 except Exception as persist_error:
                     if logger: logger.warning(f"⚠️ Error saat memastikan persistensi UI: {persist_error}")
                 
-                # Tampilkan pesan sukses
+                # Tampilkan pesan sukses atau warning
                 with ui_components['status']:
                     if success:
-                        display(create_info_alert("Konfigurasi hyperparameter berhasil disimpan", alert_type='success'))
+                        display(create_info_alert(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan", alert_type='success'))
                     else:
-                        display(create_info_alert("Konfigurasi hyperparameter mungkin tidak tersimpan dengan benar", alert_type='warning'))
+                        display(create_info_alert(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameter mungkin tidak tersimpan ke file", alert_type='warning'))
                 
-                if logger: 
-                    if success:
-                        logger.info("✅ Konfigurasi hyperparameter berhasil disimpan")
-                    else:
-                        logger.warning("⚠️ Konfigurasi hyperparameter mungkin tidak tersimpan dengan benar")
+                # Update info panel jika ada
+                if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+                    ui_components['update_hyperparameters_info']()
+                
+                # Sinkronisasi ke Google Drive jika diaktifkan
+                try:
+                    env_manager = get_environment_manager()
+                    if env_manager.is_drive_mounted:
+                        # Sinkronisasi ke Google Drive
+                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        sync_to_drive(None, ui_components)
+                except Exception as e:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                
+                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal menyimpan konfigurasi: {str(e)}", alert_type='error'))
@@ -296,15 +312,25 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 # Tampilkan pesan sukses atau warning
                 with ui_components['status']:
                     if success:
-                        display(create_info_alert("Konfigurasi hyperparameter berhasil direset ke default", alert_type='success'))
+                        display(create_info_alert(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default", alert_type='success'))
                     else:
-                        display(create_info_alert("Konfigurasi hyperparameter direset di UI tetapi mungkin tidak tersimpan ke file", alert_type='warning'))
+                        display(create_info_alert(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameter direset di UI tetapi mungkin tidak tersimpan ke file", alert_type='warning'))
                 
-                if logger: 
-                    if success:
-                        logger.info("✅ Konfigurasi hyperparameter berhasil direset ke default")
-                    else:
-                        logger.warning("⚠️ Konfigurasi direset di UI tetapi mungkin tidak tersimpan ke file")
+                # Update info panel jika ada
+                if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+                    ui_components['update_hyperparameters_info']()
+                
+                # Sinkronisasi ke Google Drive jika diaktifkan
+                try:
+                    env_manager = get_environment_manager()
+                    if env_manager.is_drive_mounted:
+                        # Sinkronisasi ke Google Drive
+                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        sync_to_drive(None, ui_components)
+                except Exception as e:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                
+                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default")
             except Exception as e:
                 with ui_components['status']:
                     display(create_info_alert(f"Gagal mereset konfigurasi: {str(e)}", alert_type='error'))

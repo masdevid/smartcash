@@ -49,59 +49,66 @@ def create_training_strategy_ui_components() -> Dict[str, Any]:
     ui_components['training_strategy_info'] = info_panel
     ui_components['update_training_strategy_info'] = update_info_func
     
-    # Buat tabs
+    # Buat form container untuk tab konfigurasi
     ui_components['tabs'] = widgets.Tab()
     ui_components['tabs'].children = [
         utils_components['utils_box'], 
         validation_components['validation_box'], 
         multiscale_components['multiscale_box']
     ]
-    ui_components['tabs'].set_title(0, f"{ICONS.get('settings', '⚙️')} Utilitas Training")
-    ui_components['tabs'].set_title(1, f"{ICONS.get('check', '✓')} Validasi")
-    ui_components['tabs'].set_title(2, f"{ICONS.get('scale', '📏')} Multi-scale")
     
-    # Buat info box
-    ui_components['info_box'] = widgets.VBox(
-        [info_panel],
-        layout=widgets.Layout(padding='10px', border='1px solid #ddd', margin='10px 0')
-    )
+    # Set judul tab
+    ui_components['tabs']._titles = {
+        0: f"{ICONS.get('settings', '⚙️')} Utilitas Training",
+        1: f"{ICONS.get('check', '✓')} Validasi",
+        2: f"{ICONS.get('scale', '📏')} Multi-scale"
+    }
     
-    # Header dengan komponen standar
+    form_container = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('settings', '⚙️')} Konfigurasi Strategi Pelatihan</h4>"),
+        ui_components['tabs'],
+        widgets.HBox([
+            button_components['button_container']
+        ], layout=widgets.Layout(width='auto', justify_content='flex-end')),
+        button_components['sync_info']
+    ], layout=widgets.Layout(width='auto', overflow='visible'))
+    
+    # Buat container untuk info
+    info_container = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Strategi Pelatihan</h4>"),
+        info_panel
+    ], layout=widgets.Layout(width='auto', overflow='visible'))
+    
+    # Buat tab untuk form dan info
+    tab_items = [
+        ('Konfigurasi', form_container),
+        ('Informasi', info_container)
+    ]
+    ui_components['main_tabs'] = widgets.Tab()
+    ui_components['main_tabs'].children = [item[1] for item in tab_items]
+    for i, (title, _) in enumerate(tab_items):
+        ui_components['main_tabs'].set_title(i, title)
+    
+    # Set tab yang aktif
+    ui_components['tabs'].selected_index = 0
+    
+    # Buat header dengan komponen standar
     header = create_header(
-        title=f"{ICONS.get('training', '🏋️')} Training Strategy Configuration",
-        description="Konfigurasi strategi pelatihan untuk model deteksi mata uang"
+        title="Konfigurasi Strategi Pelatihan",
+        description="Pengaturan strategi pelatihan untuk model deteksi mata uang",
+        icon=ICONS.get('training', '🏋️')
     )
-    
-    # Panel info status
-    status_panel = widgets.HTML(
-        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS.get('info', 'ℹ️')} Konfigurasi strategi pelatihan model</p>
-        </div>"""
-    )
-    
-    # Log accordion dengan styling standar
-    log_accordion = widgets.Accordion(children=[button_components['status']], selected_index=None)
-    log_accordion.set_title(0, f"{ICONS.get('file', '📄')} Training Strategy Logs")
     
     # Container utama
     ui_components['main_container'] = widgets.VBox([
         header,
-        status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Training Strategy</h4>"),
-        ui_components['tabs'],
-        ui_components['info_box'],
-        create_divider(),
-        button_components['button_container'],
-        log_accordion
-    ])
+        ui_components['main_tabs'],
+        button_components['status']
+    ], layout=widgets.Layout(width='auto', padding='10px', overflow='visible'))
     
     # Tambahkan referensi komponen tambahan ke ui_components
     ui_components.update({
         'header': header,
-        'status_panel': status_panel,
-        'log_accordion': log_accordion,
         'module_name': 'training_strategy'
     })
     

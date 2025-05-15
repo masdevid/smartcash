@@ -22,7 +22,7 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         value='efficientnet_b4_training',
         description='Experiment name:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='500px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter checkpoint directory
@@ -30,15 +30,15 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         value='/content/runs/train/checkpoints',
         description='Checkpoint dir:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='500px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter tensorboard
     ui_components['tensorboard'] = widgets.Checkbox(
         value=True,
         description='Enable TensorBoard',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter log metrics
@@ -49,7 +49,7 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         step=1,
         description='Log metrics every:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter visualize batch
@@ -60,7 +60,7 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         step=10,
         description='Visualize batch every:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter gradient clipping
@@ -71,15 +71,15 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         step=0.1,
         description='Gradient clipping:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter mixed precision
     ui_components['mixed_precision'] = widgets.Checkbox(
         value=True,
         description='Enable mixed precision',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter layer mode
@@ -88,19 +88,30 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         value='single',
         description='Layer mode:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Buat box untuk parameter utilitas
     ui_components['utils_box'] = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('settings', '⚙️')} Parameter Utilitas Training</h4>"),
         ui_components['experiment_name'],
         ui_components['checkpoint_dir'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        widgets.HTML("<b>Logging & Visualisasi</b>"),
         ui_components['tensorboard'],
         ui_components['log_metrics_every'],
         ui_components['visualize_batch_every'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        widgets.HTML("<b>Optimasi Training</b>"),
         ui_components['gradient_clipping'],
         ui_components['mixed_precision'],
         ui_components['layer_mode']
-    ])
+    ], layout=widgets.Layout(
+        width='auto',
+        padding='10px',
+        border='1px solid #ddd',
+        border_radius='5px',
+        overflow='visible'
+    ))
     
     return ui_components

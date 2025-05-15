@@ -21,13 +21,20 @@ def create_training_strategy_multiscale_components() -> Dict[str, Any]:
     ui_components['multi_scale'] = widgets.Checkbox(
         value=True,
         description='Enable multi-scale training',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='100%')
     )
     
     # Buat box untuk parameter multi-scale
     ui_components['multiscale_box'] = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('scale', '📏')} Parameter Multi-scale</h4>"),
         ui_components['multi_scale']
-    ])
+    ], layout=widgets.Layout(
+        width='auto',
+        padding='10px',
+        border='1px solid #ddd',
+        border_radius='5px',
+        overflow='visible'
+    ))
     
     return ui_components

@@ -122,11 +122,12 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         ui_components['warmup_momentum_slider'],
         ui_components['warmup_bias_lr_slider']
     ], layout=widgets.Layout(
-        width='100%',
+        width='auto',
         padding='10px',
         border='1px solid #ddd',
         border_radius='5px',
-        height='100%'
+        height='100%',
+        overflow='visible'
     ))
     
     return ui_components

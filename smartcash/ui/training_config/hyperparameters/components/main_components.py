@@ -64,41 +64,66 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         icon=ICONS.get('settings', '⚙️')
     )
     
+    # Buat button container untuk kompatibilitas dengan tes
+    ui_components['button_container'] = widgets.HBox([
+        button_components['save_button'],
+        button_components['reset_button']
+    ], layout=widgets.Layout(
+        display='flex',
+        flex_flow='row nowrap',
+        justify_content='flex-end',
+        align_items='center',
+        gap='10px',
+        width='auto',
+        margin='10px 0px'
+    ))
+    
+    # Tambahkan sync_info ke ui_components untuk kompatibilitas dengan tes
+    # Periksa apakah sync_info ada dalam button_components (untuk tes)
+    ui_components['sync_info'] = button_components.get('sync_info', widgets.HTML(
+        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
+    ))
+    
     # Buat form container untuk tab konfigurasi
     form_container = widgets.VBox([
         widgets.HBox([
-            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='32%')),
-            widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='32%')),
-            widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='32%'))
+            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='30%', overflow='visible')),
+            widgets.Box([
+                widgets.HBox([
+                    widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='49%', overflow='visible')),
+                    widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='49%', overflow='visible'))
+                ], layout=widgets.Layout(
+                    width='100%',
+                    display='flex',
+                    flex_flow='row nowrap',
+                    align_items='flex-start',
+                    justify_content='space-between',
+                    overflow='visible'
+                ))
+            ], layout=widgets.Layout(width='70%', overflow='visible'))
         ], layout=widgets.Layout(
-            width='100%',
+            width='auto',
             display='flex',
             flex_flow='row nowrap',
             align_items='flex-start',
-            justify_content='space-between'
+            justify_content='space-between',
+            overflow='visible'
         )),
         widgets.HBox([
-            button_components['save_button'], 
-            button_components['reset_button']
-        ], layout=widgets.Layout(
-            justify_content='space-between', 
-            margin='20px 0px 10px 0px'
-        )),
-        widgets.HTML(
-            value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} "
-                  f"Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
-        )
-    ])
+            ui_components['button_container']
+        ], layout=widgets.Layout(width='auto', justify_content='flex-end')),
+        ui_components['sync_info']
+    ], layout=widgets.Layout(width='auto', overflow='visible'))
     
     # Buat info box umum untuk hyperparameter
     general_info = get_hyperparameters_info(open_by_default=True)
     
     # Buat info container untuk tab informasi
     info_container = widgets.VBox([
-        widgets.HTML("<h4>Informasi Hyperparameter</h4>"),
+        widgets.HTML(f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Hyperparameter</h4>"),
         general_info,
         info_panel
-    ])
+    ], layout=widgets.Layout(width='auto', overflow='visible'))
     
     # Buat tab untuk form dan info
     tab_items = [
@@ -138,22 +163,24 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     
     # Buat footer dengan info boxes yang menumpuk (stacked)
     footer_info = widgets.VBox([
-        widgets.HTML("<h4>Informasi Parameter</h4>"),
+        widgets.HTML(f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Parameter</h4>"),
         widgets.VBox([
             basic_info,
             optimization_info,
             advanced_info
         ], layout=widgets.Layout(
-            width='100%',
+            width='auto',
             display='flex',
             flex_flow='column',
-            align_items='stretch'
+            align_items='stretch',
+            overflow='visible'
         ))
     ], layout=widgets.Layout(
-        width='100%',
+        width='auto',
         margin='20px 0 0 0',
         padding='10px',
-        border_top='1px solid #ddd'
+        border_top='1px solid #ddd',
+        overflow='visible'
     ))
     
     # Buat container utama
@@ -162,7 +189,7 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         tabs,
         button_components['status'],
         footer_info
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+    ], layout=widgets.Layout(width='auto', padding='10px', overflow='visible'))
     
     ui_components['main_container'] = main_container
     ui_components['main_layout'] = main_container  # Untuk kompatibilitas

@@ -25,7 +25,7 @@ def create_training_strategy_validation_components() -> Dict[str, Any]:
         step=1,
         description='Validation frequency:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter IoU threshold
@@ -36,7 +36,7 @@ def create_training_strategy_validation_components() -> Dict[str, Any]:
         step=0.05,
         description='IoU threshold:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Parameter confidence threshold
@@ -47,14 +47,21 @@ def create_training_strategy_validation_components() -> Dict[str, Any]:
         step=0.0001,
         description='Conf threshold:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='400px')
+        layout=widgets.Layout(width='100%')
     )
     
     # Buat box untuk parameter validasi
     ui_components['validation_box'] = widgets.VBox([
+        widgets.HTML(f"<h4>{ICONS.get('check', '✓')} Parameter Validasi</h4>"),
         ui_components['validation_frequency'],
         ui_components['iou_threshold'],
         ui_components['conf_threshold']
-    ])
+    ], layout=widgets.Layout(
+        width='auto',
+        padding='10px',
+        border='1px solid #ddd',
+        border_radius='5px',
+        overflow='visible'
+    ))
     
     return ui_components

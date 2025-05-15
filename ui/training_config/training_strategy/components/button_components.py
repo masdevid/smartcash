@@ -20,18 +20,25 @@ def create_training_strategy_button_components() -> Dict[str, Any]:
     
     # Tombol save
     ui_components['save_button'] = widgets.Button(
-        description=f"{ICONS.get('save', '💾')} Simpan",
+        description='Simpan',
         button_style='primary',
+        icon=ICONS.get('save', '💾'),
         tooltip='Simpan konfigurasi strategi pelatihan dan sinkronkan ke Google Drive',
-        layout=widgets.Layout(width='auto')
+        layout=widgets.Layout(width='100px')
     )
     
     # Tombol reset
     ui_components['reset_button'] = widgets.Button(
-        description=f"{ICONS.get('reset', '🔄')} Reset",
+        description='Reset',
         button_style='warning',
+        icon=ICONS.get('reset', '🔄'),
         tooltip='Reset konfigurasi strategi pelatihan ke default',
-        layout=widgets.Layout(width='auto')
+        layout=widgets.Layout(width='100px')
+    )
+    
+    # Tambahkan keterangan sinkronisasi otomatis
+    ui_components['sync_info'] = widgets.HTML(
+        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
     )
     
     # Status output
@@ -45,12 +52,12 @@ def create_training_strategy_button_components() -> Dict[str, Any]:
         ui_components['reset_button']
     ], layout=widgets.Layout(
         display='flex',
-        flex_flow='row wrap',
-        justify_content='flex-start',
+        flex_flow='row nowrap',
+        justify_content='flex-end',
         align_items='center',
-        width='100%',
-        margin='10px 0',
-        gap='10px'
+        gap='10px',
+        width='auto',
+        margin='10px 0px'
     ))
     
     return ui_components

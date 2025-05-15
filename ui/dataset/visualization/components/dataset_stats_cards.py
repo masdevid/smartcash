@@ -7,7 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any
 import math
 
-def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
+def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     """
     Buat kartu statistik dataset yang menampilkan jumlah gambar per split (train, val, test).
     
@@ -15,7 +15,7 @@ def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
         stats: Dictionary berisi statistik dataset
         
     Returns:
-        Box widget berisi kartu statistik dataset
+        HBox widget berisi kartu statistik dataset
     """
     # Ambil statistik split
     split_stats = stats.get('split', {})
@@ -32,7 +32,7 @@ def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
     total_images = sum(split['images'] for split in split_stats.values())
     
     # Buat container untuk kartu split
-    split_container = widgets.Box(layout=widgets.Layout(
+    split_container = widgets.HBox(layout=widgets.Layout(
         display='flex',
         flex_flow='row wrap',
         align_items='stretch',
@@ -103,7 +103,7 @@ def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
     return split_container
 
 
-def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
+def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     """
     Buat kartu statistik preprocessing yang menampilkan jumlah gambar preprocessing per split.
     
@@ -111,7 +111,7 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
         stats: Dictionary berisi statistik preprocessing
         
     Returns:
-        Box widget berisi kartu statistik preprocessing
+        HBox widget berisi kartu statistik preprocessing
     """
     # Ambil statistik preprocessing dan split
     preprocessing_stats = stats.get('preprocessing', {})
@@ -134,11 +134,11 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
             'test': {'images': 0}
         }
     
-    # Hitung total gambar
-    total_images = sum(split['images'] for split in split_stats.values())
+    # Hitung total gambar yang diproses
+    total_processed = preprocessing_stats.get('total_processed', 0)
     
     # Buat container untuk kartu preprocessing
-    preprocessing_container = widgets.Box(layout=widgets.Layout(
+    preprocessing_container = widgets.HBox(layout=widgets.Layout(
         display='flex',
         flex_flow='row wrap',
         align_items='stretch',
@@ -211,7 +211,7 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
     return preprocessing_container
 
 
-def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
+def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     """
     Buat kartu statistik augmentasi yang menampilkan jumlah gambar augmentasi per split.
     
@@ -219,7 +219,7 @@ def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
         stats: Dictionary berisi statistik augmentasi
         
     Returns:
-        Box widget berisi kartu statistik augmentasi
+        HBox widget berisi kartu statistik augmentasi
     """
     # Ambil statistik augmentasi dan split
     augmentation_stats = stats.get('augmentation', {})
@@ -246,7 +246,7 @@ def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
     total_images = sum(split['images'] for split in split_stats.values())
     
     # Buat container untuk kartu augmentasi
-    augmentation_container = widgets.Box(layout=widgets.Layout(
+    augmentation_container = widgets.HBox(layout=widgets.Layout(
         display='flex',
         flex_flow='row wrap',
         align_items='stretch',

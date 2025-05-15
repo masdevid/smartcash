@@ -118,8 +118,20 @@ def setup_dataset_visualization(force_new=False):
             # Inisialisasi UI components
             ui_components = visualization_manager.initialize()
             
+            # Tampilkan UI
+            display(ui_components['main_container'])
+            
             # Perbarui dashboard dengan data terbaru
-            visualization_manager.update_dashboard()
+            try:
+                visualization_manager.update_dashboard()
+            except Exception as e:
+                logger.error(f"{ICONS.get('error', '❌')} Error saat memperbarui dashboard: {str(e)}")
+                # Tampilkan pesan error di UI
+                with ui_components['status_panel']:
+                    error_html = f"<div style='padding: 10px; background-color: #ffebee; border-radius: 5px;'>"
+                    error_html += f"<p><b>{ICONS.get('error', '❌')} Error:</b> {str(e)}</p>"
+                    error_html += "</div>"
+                    display(widgets.HTML(error_html))
             
             # Setup auto refresh download dengan delay 100ms
             from smartcash.ui.dataset.visualization.auto_refresh import trigger_auto_refresh

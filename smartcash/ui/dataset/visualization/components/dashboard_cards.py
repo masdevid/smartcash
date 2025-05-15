@@ -171,7 +171,7 @@ def create_card(
     return card
 
 
-def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.Box:
+def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.HBox:
     """
     Membuat cards untuk statistik preprocessing.
     
@@ -179,10 +179,10 @@ def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.B
         preprocessing_stats: Dictionary berisi statistik preprocessing
         
     Returns:
-        Box berisi cards preprocessing
+        HBox berisi cards preprocessing
     """
     # Container untuk cards
-    cards_container = widgets.Box(layout=widgets.Layout(
+    cards_container = widgets.HBox(layout=widgets.Layout(
         display='flex',
         flex_flow='row wrap',
         align_items='stretch',
@@ -223,7 +223,7 @@ def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.B
     return cards_container
 
 
-def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.Box:
+def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.HBox:
     """
     Membuat cards untuk statistik augmentasi.
     
@@ -231,10 +231,10 @@ def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.Box
         augmentation_stats: Dictionary berisi statistik augmentasi
         
     Returns:
-        Box berisi cards augmentasi
+        HBox berisi cards augmentasi
     """
     # Container untuk cards
-    cards_container = widgets.Box(layout=widgets.Layout(
+    cards_container = widgets.HBox(layout=widgets.Layout(
         display='flex',
         flex_flow='row wrap',
         align_items='stretch',

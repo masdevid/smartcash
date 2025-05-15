@@ -52,8 +52,8 @@ class TestDashboardCards(unittest.TestCase):
         self.assertIsInstance(card.children[1], widgets.HTML)
         self.assertIsInstance(card.children[2], widgets.HTML)
         
-        # Verifikasi warna latar belakang
-        self.assertIn('background-color: #f5f5f5', card.style)
+        # Verifikasi kelas CSS
+        self.assertIn('bg-default', card._dom_classes)
     
     def test_create_split_cards(self):
         """Test untuk fungsi create_split_cards."""
@@ -83,14 +83,14 @@ class TestDashboardCards(unittest.TestCase):
         self.assertIsInstance(cards, widgets.HBox)
         self.assertEqual(len(cards.children), 3)  # 3 splits
         
-        # Verifikasi warna latar belakang untuk setiap card
+        # Verifikasi kelas CSS untuk setiap card
         train_card = cards.children[0]
         val_card = cards.children[1]
         test_card = cards.children[2]
         
-        self.assertIn('background-color: #e3f2fd', train_card.style)  # Preprocessing (biru)
-        self.assertIn('background-color: #f5f5f5', val_card.style)    # Default (abu-abu)
-        self.assertIn('background-color: #f5f5f5', test_card.style)   # Default (abu-abu)
+        self.assertIn('bg-preprocessing', train_card._dom_classes)  # Preprocessing (biru)
+        self.assertIn('bg-default', val_card._dom_classes)    # Default (abu-abu)
+        self.assertIn('bg-default', test_card._dom_classes)   # Default (abu-abu)
     
     def test_create_preprocessing_cards(self):
         """Test untuk fungsi create_preprocessing_cards."""
@@ -108,9 +108,9 @@ class TestDashboardCards(unittest.TestCase):
         self.assertIsInstance(cards, widgets.HBox)
         self.assertEqual(len(cards.children), 3)  # 3 cards
         
-        # Verifikasi warna latar belakang untuk setiap card
+        # Verifikasi kelas CSS untuk setiap card
         for card in cards.children:
-            self.assertIn('background-color: #e3f2fd', card.style)  # Preprocessing (biru)
+            self.assertIn('bg-preprocessing', card._dom_classes)  # Preprocessing (biru)
     
     def test_create_augmentation_cards(self):
         """Test untuk fungsi create_augmentation_cards."""
@@ -128,9 +128,9 @@ class TestDashboardCards(unittest.TestCase):
         self.assertIsInstance(cards, widgets.HBox)
         self.assertEqual(len(cards.children), 3)  # 3 cards
         
-        # Verifikasi warna latar belakang untuk setiap card
+        # Verifikasi kelas CSS untuk setiap card
         for card in cards.children:
-            self.assertIn('background-color: #e8f5e9', card.style)  # Augmentation (hijau)
+            self.assertIn('bg-augmentation', card._dom_classes)  # Augmentation (hijau)
 
 
 if __name__ == '__main__':

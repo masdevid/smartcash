@@ -256,6 +256,63 @@ class VisualizationManager:
                 'total_augmented': 1000
             }
         }
+        
+    def _update_dataset_stats_cards(self, stats):
+        """
+        Perbarui dataset stats cards dengan data terbaru
+        
+        Args:
+            stats: Dictionary berisi statistik dataset
+        """
+        try:
+            # Ambil komponen UI
+            dataset_stats_cards = self.ui_components.get('dataset_stats_cards')
+            
+            if dataset_stats_cards:
+                dataset_stats_cards.clear_output()
+                with dataset_stats_cards:
+                    from smartcash.ui.dataset.visualization.components.dataset_stats_cards import create_dataset_stats_cards
+                    display(create_dataset_stats_cards(stats))
+        except Exception as e:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat memperbarui dataset stats cards: {str(e)}")
+    
+    def _update_preprocessing_stats_cards(self, stats):
+        """
+        Perbarui preprocessing stats cards dengan data terbaru
+        
+        Args:
+            stats: Dictionary berisi statistik preprocessing
+        """
+        try:
+            # Ambil komponen UI
+            preprocessing_stats_cards = self.ui_components.get('preprocessing_stats_cards')
+            
+            if preprocessing_stats_cards:
+                preprocessing_stats_cards.clear_output()
+                with preprocessing_stats_cards:
+                    from smartcash.ui.dataset.visualization.components.dataset_stats_cards import create_preprocessing_stats_cards
+                    display(create_preprocessing_stats_cards(stats))
+        except Exception as e:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat memperbarui preprocessing stats cards: {str(e)}")
+    
+    def _update_augmentation_stats_cards(self, stats):
+        """
+        Perbarui augmentation stats cards dengan data terbaru
+        
+        Args:
+            stats: Dictionary berisi statistik augmentasi
+        """
+        try:
+            # Ambil komponen UI
+            augmentation_stats_cards = self.ui_components.get('augmentation_stats_cards')
+            
+            if augmentation_stats_cards:
+                augmentation_stats_cards.clear_output()
+                with augmentation_stats_cards:
+                    from smartcash.ui.dataset.visualization.components.dataset_stats_cards import create_augmentation_stats_cards
+                    display(create_augmentation_stats_cards(stats))
+        except Exception as e:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat memperbarui augmentation stats cards: {str(e)}")
     
     def update_dashboard(self):
         """

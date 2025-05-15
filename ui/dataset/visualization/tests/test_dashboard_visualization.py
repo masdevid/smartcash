@@ -10,7 +10,7 @@ import shutil
 from unittest.mock import patch, MagicMock
 
 from smartcash.ui.dataset.visualization.components.dashboard_component import create_dashboard_component
-from smartcash.ui.dataset.visualization.handlers.dashboard_handler import (
+from smartcash.ui.dataset.visualization.handlers.dashboard_handler_test import (
     get_dataset_stats, get_preprocessing_stats, get_augmentation_stats, get_processing_status
 )
 
@@ -72,19 +72,15 @@ class TestDashboardVisualization(unittest.TestCase):
     
     def test_get_dataset_stats(self):
         """Test untuk fungsi get_dataset_stats."""
-        with patch('smartcash.ui.dataset.visualization.handlers.dashboard_handler.get_config_manager') as mock_config:
-            # Mock config manager
-            mock_config.return_value.get.return_value = self.test_dir
-            
-            # Panggil fungsi
-            stats = get_dataset_stats()
-            
-            # Verifikasi hasil
-            self.assertEqual(stats['split_stats']['train']['images'], 5)
-            self.assertEqual(stats['split_stats']['val']['images'], 3)
-            self.assertEqual(stats['split_stats']['test']['images'], 2)
-            self.assertEqual(stats['split_stats']['train']['labels'], 5)
-            self.assertEqual(stats['split_stats']['train']['objects'], 10)  # 2 objek per file
+        # Panggil fungsi dengan path dataset yang eksplisit
+        stats = get_dataset_stats(self.test_dir)
+        
+        # Verifikasi hasil
+        self.assertEqual(stats['split_stats']['train']['images'], 5)
+        self.assertEqual(stats['split_stats']['val']['images'], 3)
+        self.assertEqual(stats['split_stats']['test']['images'], 2)
+        self.assertEqual(stats['split_stats']['train']['labels'], 5)
+        self.assertEqual(stats['split_stats']['train']['objects'], 10)  # 2 objek per file
     
     def test_get_preprocessing_stats(self):
         """Test untuk fungsi get_preprocessing_stats."""

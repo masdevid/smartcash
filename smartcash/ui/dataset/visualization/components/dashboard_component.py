@@ -135,6 +135,8 @@ def create_dashboard_component() -> Dict[str, Any]:
         'split_cards_container': split_cards_container,
         'preprocessing_output': preprocessing_cards,
         'augmentation_output': augmentation_cards,
+        'preprocessing_cards': preprocessing_cards,
+        'augmentation_cards': augmentation_cards,
         'visualization_components': visualization_components
     }
     

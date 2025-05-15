@@ -8,7 +8,8 @@ from IPython.display import display, clear_output
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import get_config_manager
+from smartcash.common.environment import get_environment_manager
 
 logger = get_logger(__name__)
 
@@ -71,8 +72,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
             on_reset_click
         )
         
-        # Import environment manager untuk cek status drive
-        from smartcash.common.environment import EnvironmentManager
+        # Environment manager sudah diimpor di bagian atas file
         
         # Register handler untuk tombol
         ui_components['save_button'].on_click(
@@ -85,8 +85,8 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
         # Perbarui informasi sinkronisasi berdasarkan status drive
         try:
-            env_manager = EnvironmentManager.get_instance()
-            if not env_manager.is_drive_enabled():
+            env_manager = get_environment_manager()
+            if not env_manager.is_drive_mounted:
                 # Jika drive tidak diaktifkan, perbarui pesan
                 ui_components['sync_info'].value = f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('warning', '⚠️')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi otomatis.</div>"
         except Exception as e:
@@ -99,7 +99,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         )
         
         # Dapatkan ConfigManager
-        config_manager = ConfigManager.get_instance()
+        config_manager = get_config_manager()
         
         # Dapatkan konfigurasi
         current_config = config_manager.get_module_config('model')

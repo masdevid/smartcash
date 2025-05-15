@@ -10,9 +10,9 @@ from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import get_config_manager
 from smartcash.common.logger import get_logger
-from smartcash.common.environment import EnvironmentManager
+from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.backbone.handlers.config_handlers import update_ui_from_config
 
 logger = get_logger(__name__)
@@ -34,10 +34,10 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
         clear_output(wait=True)
         try:
             # Dapatkan environment manager
-            env_manager = EnvironmentManager.get_instance()
+            env_manager = get_environment_manager()
             
             # Cek apakah drive diaktifkan
-            if not env_manager.is_drive_enabled():
+            if not env_manager.is_drive_mounted:
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
@@ -47,14 +47,14 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                 return
             
             # Dapatkan ConfigManager
-            config_manager = ConfigManager.get_instance()
+            config_manager = get_config_manager()
             
             # Dapatkan konfigurasi
             config = config_manager.get_module_config('model')
             
             # Dapatkan path file konfigurasi di drive
             drive_config_path = os.path.join(
-                env_manager.get_drive_path(),
+                env_manager.drive_path,
                 'configs',
                 'model_config.yaml'
             )
@@ -63,7 +63,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
             os.makedirs(os.path.dirname(drive_config_path), exist_ok=True)
             
             # Simpan konfigurasi ke drive
-            success = config_manager.save_config_to_file(config, drive_config_path)
+            success = config_manager.save_config(drive_config_path)
             
             if success:
                 # Tampilkan pesan sukses
@@ -113,10 +113,10 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
         clear_output(wait=True)
         try:
             # Dapatkan environment manager
-            env_manager = EnvironmentManager.get_instance()
+            env_manager = get_environment_manager()
             
             # Cek apakah drive diaktifkan
-            if not env_manager.is_drive_enabled():
+            if not env_manager.is_drive_mounted:
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
@@ -126,11 +126,11 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                 return
             
             # Dapatkan ConfigManager
-            config_manager = ConfigManager.get_instance()
+            config_manager = get_config_manager()
             
             # Dapatkan path file konfigurasi di drive
             drive_config_path = os.path.join(
-                env_manager.get_drive_path(),
+                env_manager.drive_path,
                 'configs',
                 'model_config.yaml'
             )
@@ -146,7 +146,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                 return
             
             # Load konfigurasi dari drive
-            drive_config = config_manager.load_config_from_file(drive_config_path)
+            drive_config = config_manager.load_config(drive_config_path)
             
             if drive_config:
                 # Simpan konfigurasi ke lokal

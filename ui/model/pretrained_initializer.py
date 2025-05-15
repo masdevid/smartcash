@@ -64,12 +64,16 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
         drive_models_dir = '/content/drive/MyDrive/SmartCash/models'
         
         # Tampilkan UI
-        with main_container:
-            clear_output(wait=True)
-            display(widgets.HTML("<h2>🧠 Pretrained Model Setup</h2>"))
-            display(widgets.HTML("<p>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4</p>"))
-            display(status_output)
-            display(log_output)
+        clear_output(wait=True)
+        # Tambahkan elemen ke main_container
+        main_container.children = [
+            widgets.HTML("<h2>🧠 Pretrained Model Setup</h2>"),
+            widgets.HTML("<p>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4</p>"),
+            status_output,
+            log_output
+        ]
+        # Tampilkan main_container
+        display(main_container)
         
         # Kumpulkan komponen UI
         ui_components = {

@@ -30,13 +30,12 @@ def initialize_visualization_ui() -> Dict[str, Any]:
         ui_components = setup_visualization_handlers(ui_components)
         
         # Tampilkan UI
-        with ui_components['main_container']:
-            clear_output(wait=True)
-            display(ui_components['tab'])
+        clear_output(wait=True)
+        display(ui_components['main_container'])
         
         # Tampilkan pesan sukses
+        ui_components['status'].clear_output(wait=True)
         with ui_components['status']:
-            clear_output(wait=True)
             display(create_status_indicator("success", f"{ICONS.get('success', '✅')} UI Visualisasi Dataset berhasil diinisialisasi"))
         
         return ui_components

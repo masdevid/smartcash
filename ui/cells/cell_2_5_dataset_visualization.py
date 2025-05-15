@@ -3,13 +3,37 @@ File: smartcash/ui/cells/cell_2_5_dataset_visualization.py
 Deskripsi: Entry point untuk visualisasi dataset dengan pendekatan DRY
 """
 
+from IPython.display import display, clear_output
+import ipywidgets as widgets
+from smartcash.ui.dataset.visualization.visualization_initializer import initialize_visualization_ui
+from smartcash.ui.utils.loading_indicator import create_loading_indicator
+from smartcash.common.logger import get_logger
+
 def setup_dataset_visualization():
-    """Setup dan tampilkan UI untuk visualisasi dataset."""
-    # Import modul visualisasi dataset
-    from smartcash.ui.dataset.visualization.visualization_initializer import initialize_visualization_ui
+    """Setup dan tampilkan UI visualisasi dataset dengan pendekatan minimalis."""
+    logger = get_logger(__name__)
     
-    # Inisialisasi UI dan kembalikan komponen
-    return initialize_visualization_ui()
+    # Buat dan tampilkan indikator loading animasi
+    loading_indicator = create_loading_indicator(
+        message="Mempersiapkan visualisasi dataset", 
+        is_indeterminate=True,
+        auto_hide=True
+    )
+    display(loading_indicator)
+    
+    try:
+        # Inisialisasi UI dengan loading indicator
+        ui_components = initialize_visualization_ui(loading_indicator=loading_indicator)
+        
+        # Tampilkan UI
+        clear_output(wait=True)
+        display(ui_components['main_container'])
+        
+        return ui_components
+    except Exception as e:
+        logger.error(f"❌ Error saat setup visualisasi dataset: {str(e)}")
+        loading_indicator.error(f"Error: {str(e)}")
+        return {'error': str(e)}
 
 # Eksekusi saat modul diimpor
 ui_components = setup_dataset_visualization()

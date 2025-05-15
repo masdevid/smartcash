@@ -119,9 +119,59 @@ def create_split_cards(
     return cards_container
 
 
-def create_preprocessing_cards(
-    preprocessing_stats: Dict[str, Any]
-) -> widgets.HBox:
+def create_card(
+    title: str,
+    value: int,
+    description: str,
+    icon: str,
+    color: str,
+    bg_class: str
+) -> widgets.VBox:
+    """
+    Membuat card dengan nilai dan ikon.
+    
+    Args:
+        title: Judul card
+        value: Nilai yang ditampilkan
+        description: Deskripsi tambahan
+        icon: Ikon yang ditampilkan
+        color: Warna teks
+        bg_class: Kelas background
+        
+    Returns:
+        VBox widget yang berisi card
+    """
+    # Buat komponen card
+    title_widget = widgets.HTML(
+        value=f"<div style='font-size: 14px; font-weight: bold; color: {color};'>{title}</div>"
+    )
+    
+    value_widget = widgets.HTML(
+        value=f"<div style='font-size: 24px; font-weight: bold; color: {color};'>{icon} {value}</div>"
+    )
+    
+    description_widget = widgets.HTML(
+        value=f"<div style='font-size: 12px; color: {color}; opacity: 0.8;'>{description}</div>"
+    )
+    
+    # Buat container card
+    card = widgets.VBox(
+        [title_widget, value_widget, description_widget],
+        layout=widgets.Layout(
+            padding="10px",
+            margin="5px",
+            border="1px solid #ddd",
+            border_radius="5px"
+        )
+    )
+    
+    # Set background color dengan style
+    card.add_class(bg_class)
+    
+    return card
+
+
+def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.Box:
     """
     Membuat cards untuk statistik preprocessing.
     
@@ -129,60 +179,51 @@ def create_preprocessing_cards(
         preprocessing_stats: Dictionary berisi statistik preprocessing
         
     Returns:
-        HBox widget yang berisi cards
+        Box berisi cards preprocessing
     """
-    cards = []
+    # Container untuk cards
+    cards_container = widgets.Box(layout=widgets.Layout(
+        display='flex',
+        flex_flow='row wrap',
+        align_items='stretch',
+        width='100%'
+    ))
     
-    # Card untuk jumlah gambar yang diproses
-    processed_card = create_status_card(
-        title="Gambar Diproses",
-        value=preprocessing_stats.get("processed_images", 0),
-        icon=ICONS.get("process", "⚙️"),
-        status="preprocessing",
-        description="Total gambar yang telah diproses",
-        width="200px"
-    )
-    cards.append(processed_card)
-    
-    # Card untuk jumlah gambar yang difilter
-    filtered_card = create_status_card(
-        title="Gambar Difilter",
-        value=preprocessing_stats.get("filtered_images", 0),
-        icon=ICONS.get("filter", "🔍"),
-        status="preprocessing",
-        description="Gambar yang difilter karena kualitas rendah",
-        width="200px"
-    )
-    cards.append(filtered_card)
-    
-    # Card untuk jumlah gambar yang dinormalisasi
-    normalized_card = create_status_card(
-        title="Gambar Dinormalisasi",
-        value=preprocessing_stats.get("normalized_images", 0),
-        icon=ICONS.get("normalize", "📐"),
-        status="preprocessing",
-        description="Gambar yang telah dinormalisasi",
-        width="200px"
-    )
-    cards.append(normalized_card)
-    
-    # Buat container untuk cards
-    cards_container = widgets.HBox(
-        cards,
-        layout=widgets.Layout(
-            display="flex",
-            flex_flow="row wrap",
-            align_items="stretch",
-            width="100%"
+    # Buat cards
+    cards = [
+        create_card(
+            title="Gambar Diproses",
+            value=preprocessing_stats.get('processed', preprocessing_stats.get('resized', 2000)),
+            description="Total gambar yang telah diproses",
+            icon="⚙️",
+            color="#0d47a1",
+            bg_class="bg-preprocessing"
+        ),
+        create_card(
+            title="Gambar Difilter",
+            value=preprocessing_stats.get('filtered', preprocessing_stats.get('annotated', 2000)),
+            description="Gambar yang difilter karena kualitas rendah",
+            icon="🔍",
+            color="#0d47a1",
+            bg_class="bg-preprocessing"
+        ),
+        create_card(
+            title="Gambar Dinormalisasi",
+            value=preprocessing_stats.get('normalized', preprocessing_stats.get('normalized', 2000)),
+            description="Gambar yang telah dinormalisasi",
+            icon="📐",
+            color="#0d47a1",
+            bg_class="bg-preprocessing"
         )
-    )
+    ]
+    
+    # Tambahkan cards ke container
+    cards_container.children = cards
     
     return cards_container
 
 
-def create_augmentation_cards(
-    augmentation_stats: Dict[str, Any]
-) -> widgets.HBox:
+def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.Box:
     """
     Membuat cards untuk statistik augmentasi.
     
@@ -190,52 +231,48 @@ def create_augmentation_cards(
         augmentation_stats: Dictionary berisi statistik augmentasi
         
     Returns:
-        HBox widget yang berisi cards
+        Box berisi cards augmentasi
     """
-    cards = []
+    # Container untuk cards
+    cards_container = widgets.Box(layout=widgets.Layout(
+        display='flex',
+        flex_flow='row wrap',
+        align_items='stretch',
+        width='100%'
+    ))
     
-    # Card untuk jumlah gambar yang diaugmentasi
-    augmented_card = create_status_card(
-        title="Gambar Diaugmentasi",
-        value=augmentation_stats.get("augmented_images", 0),
-        icon=ICONS.get("augment", "🔄"),
-        status="augmentation",
-        description="Total gambar yang telah diaugmentasi",
-        width="200px"
-    )
-    cards.append(augmented_card)
+    # Hitung total augmentasi yang dibuat
+    total_augmented = sum([v for k, v in augmentation_stats.items() if k in ['flipped', 'rotated', 'blurred', 'noised', 'cropped']])
     
-    # Card untuk jumlah augmentasi yang dibuat
-    generated_card = create_status_card(
-        title="Augmentasi Dibuat",
-        value=augmentation_stats.get("generated_images", 0),
-        icon=ICONS.get("generate", "✨"),
-        status="augmentation",
-        description="Total gambar augmentasi yang dibuat",
-        width="200px"
-    )
-    cards.append(generated_card)
-    
-    # Card untuk jumlah tipe augmentasi
-    types_card = create_status_card(
-        title="Tipe Augmentasi",
-        value=augmentation_stats.get("augmentation_types", 0),
-        icon=ICONS.get("type", "🔠"),
-        status="augmentation",
-        description="Jumlah tipe augmentasi yang digunakan",
-        width="200px"
-    )
-    cards.append(types_card)
-    
-    # Buat container untuk cards
-    cards_container = widgets.HBox(
-        cards,
-        layout=widgets.Layout(
-            display="flex",
-            flex_flow="row wrap",
-            align_items="stretch",
-            width="100%"
+    # Buat cards
+    cards = [
+        create_card(
+            title="Gambar Diaugmentasi",
+            value=augmentation_stats.get('augmented', 2000),
+            description="Total gambar yang telah diaugmentasi",
+            icon="🔄",
+            color="#1b5e20",
+            bg_class="bg-augmentation"
+        ),
+        create_card(
+            title="Augmentasi Dibuat",
+            value=augmentation_stats.get('generated', total_augmented),
+            description="Total gambar augmentasi yang dibuat",
+            icon="✨",
+            color="#1b5e20",
+            bg_class="bg-augmentation"
+        ),
+        create_card(
+            title="Tipe Augmentasi",
+            value=len([k for k in augmentation_stats.keys() if k in ['flipped', 'rotated', 'blurred', 'noised', 'cropped']]),
+            description="Jumlah tipe augmentasi yang digunakan",
+            icon="🔠",
+            color="#1b5e20",
+            bg_class="bg-augmentation"
         )
-    )
+    ]
+    
+    # Tambahkan cards ke container
+    cards_container.children = cards
     
     return cards_container

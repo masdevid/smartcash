@@ -54,6 +54,9 @@ def create_dashboard_component() -> Dict[str, Any]:
         value="<h3 style='margin-bottom: 10px;'>Dashboard Statistik Dataset</h3>"
     )
     
+    # Container untuk status dashboard
+    dashboard_status = widgets.Output()
+    
     # Container untuk split cards
     split_cards_container = widgets.Output()
     
@@ -97,7 +100,7 @@ def create_dashboard_component() -> Dict[str, Any]:
     processing_cards_row.children = [preprocessing_container, augmentation_container]
     
     # Tambahkan semua komponen ke cards_section
-    cards_section.children = [cards_title, split_cards_container, processing_cards_row]
+    cards_section.children = [cards_title, dashboard_status, processing_cards_row]
     
     # Buat komponen tab visualisasi
     visualization_components = create_visualization_tabs()
@@ -128,9 +131,10 @@ def create_dashboard_component() -> Dict[str, Any]:
         'progress_bar': progress_bar,
         'refresh_button': refresh_button,
         'cards_section': cards_section,
+        'dashboard_status': dashboard_status,
         'split_cards_container': split_cards_container,
-        'preprocessing_cards': preprocessing_cards,
-        'augmentation_cards': augmentation_cards,
+        'preprocessing_output': preprocessing_cards,
+        'augmentation_output': augmentation_cards,
         'visualization_components': visualization_components
     }
     

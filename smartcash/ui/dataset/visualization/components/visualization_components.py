@@ -75,8 +75,8 @@ def create_visualization_components() -> Dict[str, Any]:
     
     # Tambahkan komponen ke container utama
     main_container.children = [
-        widgets.HTML("<h2 style='color: #2c3e50; font-family: Arial, sans-serif;'>🔍 Visualisasi Dataset</h2>"),
-        widgets.HTML("<p style='color: #34495e; font-family: Arial, sans-serif;'>Visualisasi dan analisis dataset untuk deteksi mata uang dengan distribusi kelas, sampel gambar, dan statistik</p>"),
+        widgets.HTML("<h2>🔍 Visualisasi Dataset</h2>"),
+        widgets.HTML("<p>Visualisasi dan analisis dataset untuk deteksi mata uang</p>"),
         status,
         progress_bar,
         tab

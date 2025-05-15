@@ -67,8 +67,8 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
         clear_output(wait=True)
         # Tambahkan elemen ke main_container
         main_container.children = [
-            widgets.HTML("<h2 style='color: #2c3e50; font-family: Arial, sans-serif;'>🧠 Persiapan Model Pre-trained</h2>"),
-            widgets.HTML("<p style='color: #34495e; font-family: Arial, sans-serif;'>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4 untuk deteksi mata uang</p>"),
+            widgets.HTML("<h2>🧠 Persiapan Model Pre-trained</h2>"),
+            widgets.HTML("<p>Download dan sinkronisasi model pre-trained YOLOv5 dan EfficientNet-B4</p>"),
             status_output,
             log_output
         ]
@@ -116,7 +116,7 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
         drive_models_dir = ui_components['drive_models_dir']
         
         # Fungsi callback untuk logging
-        def log_callback(message: str):
+        def log_message(message: str):
             with ui_components['log']:
                 print(message)
         
@@ -127,8 +127,8 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
                 clear_output(wait=True)
                 display(create_status_indicator("warning", 
                     f"{ICONS.get('warning', '⚠️')} Direktori parent {models_parent} tidak ditemukan"))
-            log_callback(f"{ICONS.get('warning', '⚠️')} Direktori parent {models_parent} tidak ditemukan")
-            log_callback(f"{ICONS.get('warning', '⚠️')} Download dan sinkronisasi model dilewati")
+            log_message(f"{ICONS.get('warning', '⚠️')} Direktori parent {models_parent} tidak ditemukan")
+            log_message(f"{ICONS.get('warning', '⚠️')} Download dan sinkronisasi model dilewati")
             return
         
         # Cek environment Colab dan Drive menggunakan EnvironmentManager
@@ -138,7 +138,7 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
         # Jika di Colab tapi Drive belum ter-mount, coba mount
         if in_colab and not is_drive_available:
             success, message = env_manager.mount_drive()
-            log_callback(message)
+            log_message(message)
             is_drive_available = env_manager.is_drive_mounted()
         
         # Buat direktori model jika belum ada
@@ -152,16 +152,16 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
         
         # Lakukan sinkronisasi awal dari Drive jika di Colab
         if in_colab and is_drive_available:
-            log_callback(f"{ICONS.get('sync', '🔄')} Sinkronisasi model dari Google Drive...")
-            sync_models_with_drive(models_dir, drive_models_dir, log_callback=log_callback)
+            log_message(f"{ICONS.get('sync', '🔄')} Sinkronisasi model dari Google Drive...")
+            sync_models_with_drive(models_dir, drive_models_dir, log_callback=log_message)
         
         # Download model pretrained dengan callback untuk logging
-        model_info = setup_pretrained_models(models_dir=models_dir, log_callback=log_callback)
+        model_info = setup_pretrained_models(models_dir=models_dir, log_callback=log_message)
         
         # Sinkronisasi ke Drive setelah download jika di Colab
         if model_info and in_colab and is_drive_available:
-            log_callback(f"{ICONS.get('sync', '🔄')} Sinkronisasi model ke Google Drive...")
-            sync_models_with_drive(models_dir, drive_models_dir, model_info, log_callback=log_callback)
+            log_message(f"{ICONS.get('sync', '🔄')} Sinkronisasi model ke Google Drive...")
+            sync_models_with_drive(models_dir, drive_models_dir, model_info, log_callback=log_message)
         
         # Update status setelah selesai
         with ui_components['status']:

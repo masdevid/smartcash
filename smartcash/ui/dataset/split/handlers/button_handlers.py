@@ -40,6 +40,11 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     # Pastikan konfigurasi data ada
     if not config:
+        # Import fungsi yang diperlukan untuk memastikan tersedia dalam scope
+        from smartcash.ui.dataset.split.handlers.config_handlers import (
+            load_split_config_config
+        )
+        
         # Coba dapatkan konfigurasi dari ConfigManager
         config_manager = get_config_manager_instance()
         if config_manager:
@@ -48,9 +53,21 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
                 if logger: logger.debug(f"{ICONS['info']} Konfigurasi berhasil dimuat dari ConfigManager")
             except Exception as e:
                 if logger: logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari ConfigManager: {str(e)}")
-                config = load_split_config_config()  # Fallback ke load dari file
+                # Fallback ke load dari file dengan penanganan error
+                try:
+                    config = load_split_config_config()
+                except Exception as load_error:
+                    if logger: logger.error(f"{ICONS['error']} Gagal memuat konfigurasi dari file: {str(load_error)}")
+                    # Fallback ke konfigurasi default
+                    config = load_default_config()
         else:
-            config = load_split_config_config()  # Fallback ke load dari file
+            # Fallback ke load dari file dengan penanganan error
+            try:
+                config = load_split_config_config()
+            except Exception as load_error:
+                if logger: logger.error(f"{ICONS['error']} Gagal memuat konfigurasi dari file: {str(load_error)}")
+                # Fallback ke konfigurasi default
+                config = load_default_config()
     
     # Pastikan struktur konfigurasi benar
     if not isinstance(config, dict):

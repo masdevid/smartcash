@@ -7,7 +7,12 @@ import sys
 import os
 
 # Pastikan path modul dapat diakses
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+try:
+    # Untuk lingkungan normal (non-Colab)
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+except NameError:
+    # Untuk lingkungan Colab
+    sys.path.append('/content/smartcash')
 
 # Import fungsi setup yang telah dipisahkan
 from smartcash.ui.dataset.visualization.setup import setup_dataset_visualization, reset_visualization, is_restart_mode

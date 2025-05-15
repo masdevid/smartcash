@@ -28,13 +28,27 @@ def is_restart_mode():
     Returns:
         Boolean yang menunjukkan apakah sedang dalam mode restart
     """
-    import gc
-    for obj in gc.get_objects():
-        if isinstance(obj, dict) and '_oh' in obj and '_ih' in obj:
+    # Pendekatan yang lebih sederhana dan aman
+    try:
+        # Cek apakah kita berada di lingkungan Colab
+        import google.colab
+        
+        # Di Colab, gunakan pendekatan alternatif yang lebih aman
+        import IPython
+        shell = IPython.get_ipython()
+        if shell is not None:
+            # Cek history input dan output
+            history_in = shell.user_ns.get('_ih', [])
+            history_out = shell.user_ns.get('_oh', {})
+            
             # Jika history input lebih dari 10 dan history output kurang dari 5,
             # kemungkinan besar ini adalah restart
-            if len(obj['_ih']) > 10 and len(obj['_oh']) < 5:
+            if len(history_in) > 10 and len(history_out) < 5:
                 return True
+    except (ImportError, AttributeError, ReferenceError):
+        # Bukan di Colab atau error lainnya
+        pass
+    
     return False
 
 def setup_dataset_visualization(force_new=False):

@@ -1,6 +1,0 @@
-dataset_name: Dataset Belum Diinisialisasi
-dataset_path: ''
-split_ratio:
-  test: 0.15
-  train: 0.7
-  val: 0.15

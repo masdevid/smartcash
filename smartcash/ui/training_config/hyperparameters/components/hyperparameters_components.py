@@ -493,21 +493,21 @@ def create_hyperparameters_button_components() -> Dict[str, Any]:
     """
     # Save button
     save_button = widgets.Button(
-        description="💾 Simpan",
+        description='Simpan Konfigurasi',
         disabled=False,
-        button_style='success',
+        button_style='primary',
         tooltip='Simpan konfigurasi hyperparameter',
-        icon='save',
+        icon=ICONS.get('save', '💾'),
         layout=widgets.Layout(width='auto')
     )
     
     # Reset button
     reset_button = widgets.Button(
-        description="🔄 Reset",
+        description='Reset ke Default',
         disabled=False,
         button_style='warning',
         tooltip='Reset konfigurasi hyperparameter ke default',
-        icon='refresh',
+        icon=ICONS.get('reset', '🔄'),
         layout=widgets.Layout(width='auto')
     )
     
@@ -587,10 +587,16 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     form_container = widgets.VBox([
         widgets.HBox([
             basic_components['basic_box'],
-            widgets.VBox([
+            widgets.HBox([
                 optimization_components['optimization_box'],
                 advanced_components['advanced_box']
-            ])
+            ], layout=widgets.Layout(
+                width='100%',
+                display='flex',
+                flex_flow='row wrap',
+                align_items='flex-start',
+                justify_content='space-between'
+            ))
         ], layout=widgets.Layout(
             width='100%',
             display='flex',

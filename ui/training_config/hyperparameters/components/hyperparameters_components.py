@@ -136,6 +136,8 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
+    # Import info box
+    from smartcash.ui.info_boxes.hyperparameters_info import get_basic_hyperparameters_info
     # Batch size slider
     batch_size_slider = widgets.IntSlider(
         value=16,
@@ -198,9 +200,13 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
         'augment_checkbox': augment_checkbox
     }
     
+    # Buat info box untuk parameter dasar
+    basic_info = get_basic_hyperparameters_info(open_by_default=False)
+    
     # Basic box
     basic_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Dasar</h3>'),
+        basic_info,
         batch_size_slider,
         image_size_slider,
         epochs_slider,
@@ -223,6 +229,8 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
+    # Import info box
+    from smartcash.ui.info_boxes.hyperparameters_info import get_optimization_hyperparameters_info
     # Optimizer dropdown
     optimizer_dropdown = widgets.Dropdown(
         options=['SGD', 'Adam', 'AdamW', 'RMSprop'],
@@ -334,6 +342,9 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         layout=widgets.Layout(width='90%')
     )
     
+    # Buat info box untuk parameter optimasi
+    optimization_info = get_optimization_hyperparameters_info(open_by_default=False)
+    
     # Komponen optimasi
     optimization_components = {
         'optimizer_dropdown': optimizer_dropdown,
@@ -349,6 +360,7 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
     # Optimization box
     optimization_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Optimasi</h3>'),
+        optimization_info,
         optimizer_dropdown,
         learning_rate_slider,
         momentum_slider,
@@ -359,10 +371,10 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         warmup_momentum_slider,
         warmup_bias_lr_slider
     ], layout=widgets.Layout(
-        width='100%',
         border='1px solid #ddd',
         padding='10px',
-        margin='10px 0'
+        margin='10px 0',
+        width='48%'  # Lebar 48% untuk memberikan sedikit jarak
     ))
     
     optimization_components['optimization_box'] = optimization_box
@@ -376,6 +388,8 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
+    # Import info box
+    from smartcash.ui.info_boxes.hyperparameters_info import get_advanced_hyperparameters_info
     # Early stopping checkbox
     early_stopping_enabled_checkbox = widgets.Checkbox(
         value=True,
@@ -466,13 +480,17 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         margin='10px 0'
     ))
     
+    # Buat info box untuk parameter lanjutan
+    advanced_info = get_advanced_hyperparameters_info(open_by_default=False)
+    
     # Advanced box
     advanced_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Lanjutan</h3>'),
+        advanced_info,
         early_stopping_box,
         checkpoint_box
     ], layout=widgets.Layout(
-        width='100%',
+        width='48%',  # Lebar 48% untuk memberikan sedikit jarak
         border='1px solid #ddd',
         padding='10px',
         margin='10px 0'
@@ -553,9 +571,10 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     Returns:
         Dict berisi semua komponen UI
     """
-    # Import tab factory
+    # Import tab factory dan info box
     from smartcash.ui.components.tab_factory import create_tab_widget
     from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.info_boxes.hyperparameters_info import get_hyperparameters_info
     
     # Buat komponen UI
     basic_components = create_hyperparameters_basic_components()
@@ -591,9 +610,9 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
                 optimization_components['optimization_box'],
                 advanced_components['advanced_box']
             ], layout=widgets.Layout(
-                width='100%',
+                width='70%',  # Lebar total untuk container kanan
                 display='flex',
-                flex_flow='row wrap',
+                flex_flow='row nowrap',  # Memastikan tidak ada wrap
                 align_items='flex-start',
                 justify_content='space-between'
             ))
@@ -617,9 +636,13 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         )
     ])
     
+    # Buat info box umum untuk hyperparameter
+    general_info = get_hyperparameters_info(open_by_default=True)
+    
     # Buat info container untuk tab informasi
     info_container = widgets.VBox([
         widgets.HTML("<h4>Informasi Hyperparameter</h4>"),
+        general_info,
         info_panel
     ])
     

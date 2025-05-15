@@ -148,6 +148,9 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
     from smartcash.ui.dataset.split.handlers.config_handlers import (
         load_default_config, save_config_with_manager
     )
+    from smartcash.ui.dataset.split.handlers.ui_initializer import (
+        update_ui_from_config
+    )
     
     # Pastikan output_box tersedia
     output_box = ui_components.get('output_box')
@@ -164,8 +167,9 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         # Load konfigurasi default
         default_config = load_default_config()
         
-        # Update UI dari konfigurasi default
-        initialize_ui_from_config(ui_components, default_config)
+        # Update UI dari konfigurasi default - menggunakan update_ui_from_config alih-alih initialize_ui_from_config
+        # untuk memastikan nilai slider diperbarui dengan benar
+        update_ui_from_config(ui_components, default_config)
         
         # Simpan konfigurasi default dengan ConfigManager atau fallback
         success = save_config_with_manager(default_config, ui_components, logger)

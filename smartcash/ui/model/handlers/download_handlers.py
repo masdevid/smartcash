@@ -4,9 +4,9 @@ Deskripsi: Handler untuk tombol download dan sinkronisasi model pretrained
 """
 
 from typing import Dict, Any, Callable, Optional
-import threading
 from pathlib import Path
 import time
+from IPython.display import display, HTML
 
 from smartcash.ui.utils.constants import ICONS, COLORS
 from smartcash.common.environment import EnvironmentManager
@@ -31,7 +31,6 @@ def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
     # Tampilkan status processing
     status_panel.clear_output(wait=True)
     with status_panel:
-        from IPython.display import display, HTML
         display(HTML(f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
                  color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
                  border-left:4px solid {COLORS['alert_info_text']}">
@@ -42,24 +41,17 @@ def handle_download_sync_button(b, ui_components: Dict[str, Any]) -> None:
     b.disabled = True
     b.description = "Sedang Memproses..."
     
-    # Jalankan proses download dan sync di thread terpisah
-    thread = threading.Thread(
-        target=lambda: process_download_sync(ui_components, lambda: enable_button(b))
-    )
-    thread.daemon = True
-    thread.start()
+    # Jalankan proses download dan sync secara langsung
+    try:
+        process_download_sync(ui_components)
+    finally:
+        # Aktifkan kembali tombol setelah proses selesai
+        b.disabled = False
+        b.description = "Download & Sync Model"
 
-def enable_button(button) -> None:
-    """
-    Mengaktifkan kembali tombol setelah proses selesai.
-    
-    Args:
-        button: Button widget yang akan diaktifkan
-    """
-    button.disabled = False
-    button.description = "Download & Sync Model"
+# Fungsi enable_button tidak diperlukan lagi karena kita tidak menggunakan threading
 
-def process_download_sync(ui_components: Dict[str, Any], callback: Optional[Callable] = None) -> None:
+def process_download_sync(ui_components: Dict[str, Any]) -> None:
     """
     Memproses download dan sinkronisasi model pretrained.
     
@@ -169,6 +161,5 @@ def process_download_sync(ui_components: Dict[str, Any], callback: Optional[Call
                 </div>"""))
     
     finally:
-        # Panggil callback jika ada
-        if callback and callable(callback):
-            callback()
+        # Tidak perlu callback karena tidak menggunakan threading
+        pass

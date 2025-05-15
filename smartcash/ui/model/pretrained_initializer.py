@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/model/pretrained_initializer_new.py
+File: smartcash/ui/model/pretrained_initializer.py
 Deskripsi: Inisialisasi UI dan logika bisnis untuk pretrained model dengan pendekatan DRY
 """
 

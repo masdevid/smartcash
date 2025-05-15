@@ -87,8 +87,12 @@ def initialize_pretrained_model_ui() -> Dict[str, Any]:
             'drive_models_dir': drive_models_dir
         }
         
-        # Jalankan proses setup model
-        setup_pretrained_models_ui(ui_components)
+        # Kembalikan komponen UI terlebih dahulu
+        # Proses download akan dijalankan secara asinkron setelah UI terender
+        import threading
+        thread = threading.Thread(target=lambda: setup_pretrained_models_ui(ui_components))
+        thread.daemon = True
+        thread.start()
         
         return ui_components
         
@@ -108,20 +112,35 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
     """
     Setup pretrained models dengan UI feedback.
     Menggunakan EnvironmentManager untuk deteksi environment dan manajemen direktori.
+    Fungsi ini dijalankan secara asinkron setelah UI terender sempurna.
     
     Args:
         ui_components: Dictionary komponen UI
     """
     try:
+        # Tunggu sebentar untuk memastikan UI sudah terender sempurna
+        import time
+        time.sleep(0.5)
+        
         # Gunakan EnvironmentManager untuk manajemen environment
         env_manager = EnvironmentManager()
         models_dir = ui_components['models_dir']
         drive_models_dir = ui_components['drive_models_dir']
         
-        # Fungsi callback untuk logging
+        # Fungsi callback untuk logging dengan timestamp
         def log_message(message: str):
+            from datetime import datetime
+            timestamp = datetime.now().strftime("%H:%M:%S")
             with ui_components['log']:
-                print(message)
+                print(f"[{timestamp}] {message}")
+        
+        # Update status - Inisialisasi
+        with ui_components['status']:
+            clear_output(wait=True)
+            display(create_status_indicator("info", 
+                f"{ICONS.get('loading', '⏳')} Memeriksa environment dan direktori..."))
+        
+        log_message(f"{ICONS.get('info', 'ℹ️')} Memulai proses persiapan model pre-trained")
         
         # Cek apakah direktori parent ada
         models_parent = Path(models_dir).parent
@@ -134,20 +153,31 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
             log_message(f"{ICONS.get('warning', '⚠️')} Download dan sinkronisasi model dilewati")
             return
         
-        # Cek environment Colab dan Drive menggunakan EnvironmentManager
+        # Cek environment Colab dan Drive
+        log_message(f"{ICONS.get('search', '🔎')} Memeriksa environment...")
         in_colab = env_manager.is_colab()
-        is_drive_available = env_manager.is_drive_mounted()
+        log_message(f"{ICONS.get('info', 'ℹ️')} Running di Google Colab: {in_colab}")
+        
+        is_drive_available = env_manager.is_drive_mounted() if in_colab else False
         
         # Jika di Colab tapi Drive belum ter-mount, coba mount
         if in_colab and not is_drive_available:
+            log_message(f"{ICONS.get('sync', '🔄')} Mencoba mount Google Drive...")
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("info", 
+                    f"{ICONS.get('loading', '⏳')} Mounting Google Drive..."))
+            
             success, message = env_manager.mount_drive()
             log_message(message)
             is_drive_available = env_manager.is_drive_mounted()
+            log_message(f"{ICONS.get('info', 'ℹ️')} Google Drive tersedia: {is_drive_available}")
         
         # Buat direktori model jika belum ada
+        log_message(f"{ICONS.get('folder', '📁')} Menyiapkan direktori model: {models_dir}")
         Path(models_dir).mkdir(parents=True, exist_ok=True)
         
-        # Status update
+        # Status update - Download
         with ui_components['status']:
             clear_output(wait=True)
             display(create_status_indicator("info", 
@@ -155,18 +185,35 @@ def setup_pretrained_models_ui(ui_components: Dict[str, Any]) -> None:
         
         # Lakukan sinkronisasi awal dari Drive jika di Colab
         if in_colab and is_drive_available:
-            log_message(f"{ICONS.get('sync', '🔄')} Sinkronisasi model dari Google Drive...")
+            log_message(f"{ICONS.get('sync', '🔄')} Memeriksa model di Google Drive...")
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("info", 
+                    f"{ICONS.get('loading', '⏳')} Sinkronisasi dari Google Drive..."))
+            
             sync_models_with_drive(models_dir, drive_models_dir, log_callback=log_message)
         
         # Download model pretrained dengan callback untuk logging
+        log_message(f"{ICONS.get('download', '📥')} Memulai download model pre-trained...")
+        with ui_components['status']:
+            clear_output(wait=True)
+            display(create_status_indicator("info", 
+                f"{ICONS.get('loading', '⏳')} Downloading model pre-trained..."))
+        
         model_info = setup_pretrained_models(models_dir=models_dir, log_callback=log_message)
         
         # Sinkronisasi ke Drive setelah download jika di Colab
         if model_info and in_colab and is_drive_available:
-            log_message(f"{ICONS.get('sync', '🔄')} Sinkronisasi model ke Google Drive...")
+            log_message(f"{ICONS.get('sync', '🔄')} Menyinkronkan model ke Google Drive...")
+            with ui_components['status']:
+                clear_output(wait=True)
+                display(create_status_indicator("info", 
+                    f"{ICONS.get('loading', '⏳')} Sinkronisasi ke Google Drive..."))
+            
             sync_models_with_drive(models_dir, drive_models_dir, model_info, log_callback=log_message)
         
         # Update status setelah selesai
+        log_message(f"{ICONS.get('success', '✅')} Proses persiapan model pre-trained selesai!")
         with ui_components['status']:
             clear_output(wait=True)
             display(create_status_indicator("success", 

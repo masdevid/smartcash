@@ -104,7 +104,8 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
         
         # Simpan konfigurasi ke drive
         try:
-            config_manager.save_config(drive_config_path, config, create_dirs=True)
+            # Pastikan direktori ada sebelum menyimpan (tidak perlu memberikan create_dirs lagi)
+            config_manager.save_config(drive_config_path, config)
             success = True
         except Exception as e:
             logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi ke drive: {str(e)}")

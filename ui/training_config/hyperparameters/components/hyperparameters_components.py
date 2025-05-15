@@ -371,7 +371,7 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         border='1px solid #ddd',
         padding='10px',
         margin='10px 0',
-        width='48%'  # Lebar 48% untuk memberikan sedikit jarak
+        width='49%'  # Lebar 49% untuk memberikan sedikit jarak
     ))
     
     optimization_components['optimization_box'] = optimization_box
@@ -481,7 +481,7 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         early_stopping_box,
         checkpoint_box
     ], layout=widgets.Layout(
-        width='48%',  # Lebar 48% untuk memberikan sedikit jarak
+        width='49%',  # Lebar 49% untuk memberikan space between yang lebih baik
         border='1px solid #ddd',
         padding='10px',
         margin='10px 0'
@@ -651,19 +651,39 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     optimization_info = get_optimization_hyperparameters_info(open_by_default=False)
     advanced_info = get_advanced_hyperparameters_info(open_by_default=False)
     
-    # Buat footer dengan info boxes
+    # Buat footer dengan info boxes yang menumpuk (stacked)
+    # Set accordion behavior agar hanya satu yang terbuka
+    basic_info.selected_index = None
+    optimization_info.selected_index = None
+    advanced_info.selected_index = None
+    
+    # Fungsi untuk menutup accordion lain saat satu dibuka
+    def on_accordion_select(change, accordion_list):
+        if change['new'] is not None:  # Jika ada yang dibuka
+            # Tutup semua accordion lain
+            for acc in accordion_list:
+                if acc != change['owner']:
+                    acc.selected_index = None
+    
+    # Daftar semua accordion
+    accordion_list = [basic_info, optimization_info, advanced_info]
+    
+    # Tambahkan observer ke masing-masing accordion
+    for acc in accordion_list:
+        acc.observe(lambda change, acc_list=accordion_list: on_accordion_select(change, acc_list), names='selected_index')
+    
+    # Buat footer dengan info boxes yang menumpuk (stacked)
     footer_info = widgets.VBox([
         widgets.HTML("<h4>Informasi Parameter</h4>"),
-        widgets.HBox([
+        widgets.VBox([
             basic_info,
             optimization_info,
             advanced_info
         ], layout=widgets.Layout(
             width='100%',
             display='flex',
-            flex_flow='row wrap',
-            align_items='flex-start',
-            justify_content='space-between'
+            flex_flow='column',
+            align_items='stretch'
         ))
     ], layout=widgets.Layout(
         width='100%',

@@ -74,14 +74,14 @@ def setup_processing_cleanup_handler(
                     # Aktifkan kembali tombol setelah batal
                     disable_buttons(False)
                 
-                # Buat dialog konfirmasi
+                # Buat dialog konfirmasi dengan parameter yang benar
                 dialog = create_confirmation_dialog(
-                    "Konfirmasi Pembersihan Data",
-                    message + " Tindakan ini tidak dapat dibatalkan.",
-                    on_confirm_cleanup, 
-                    on_cancel_cleanup, 
-                    "Ya, Hapus Data", 
-                    "Batal"
+                    message=message + " Tindakan ini tidak dapat dibatalkan.",
+                    on_confirm=on_confirm_cleanup, 
+                    on_cancel=on_cancel_cleanup,
+                    title="Konfirmasi Pembersihan Data",
+                    confirm_label="Ya, Hapus Data", 
+                    cancel_label="Batal"
                 )
                 
                 with ui_components['status']:

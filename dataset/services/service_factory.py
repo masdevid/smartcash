@@ -4,6 +4,8 @@ Deskripsi: Factory untuk membuat service dataset dengan pendekatan lazy-loading
 """
 
 from typing import Dict, Any, Optional, Type, Union, Callable
+import os
+from smartcash.common.logger import get_logger
 
 class ServiceFactory:
     """Factory untuk membuat instance service dengan pendekatan lazy-loading."""
@@ -120,3 +122,39 @@ class ServiceFactory:
             if self.logger:
                 self.logger.error(f"❌ Gagal membuat instance service '{service_name}': {str(e)}")
             raise ValueError(f"Gagal membuat service '{service_name}': {str(e)}")
+
+
+def get_dataset_service(service_name: str, config: Optional[Dict[str, Any]] = None) -> Any:
+    """
+    Mendapatkan instance service dataset berdasarkan nama.
+    
+    Args:
+        service_name: Nama service yang akan dibuat
+        config: Konfigurasi dataset (opsional)
+        
+    Returns:
+        Instance service
+        
+    Raises:
+        ValueError: Jika service tidak terdaftar
+    """
+    # Jika config tidak disediakan, gunakan default
+    if config is None:
+        from smartcash.common.config.manager import get_config_manager
+        config_manager = get_config_manager()
+        dataset_path = config_manager.get('dataset_path', None)
+        
+        if not dataset_path:
+            raise ValueError("Dataset path tidak ditemukan dalam konfigurasi")
+            
+        config = {
+            'dataset_dir': dataset_path,
+            'img_size': config_manager.get('img_size', 640),
+            'multilayer': config_manager.get('multilayer', True)
+        }
+    
+    # Buat instance factory
+    factory = ServiceFactory(config, logger=get_logger("dataset_service"))
+    
+    # Buat dan kembalikan service
+    return factory.create_service(service_name)

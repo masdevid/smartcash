@@ -191,17 +191,20 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         buttons_container = widgets.HBox([save_button, reset_button], 
             layout=widgets.Layout(display='flex', justify_content='flex-end'))
     
-    # Gunakan buttons_container langsung
     # Pastikan buttons_container adalah widget, bukan dictionary
-    all_buttons = buttons_container
+    if isinstance(buttons_container, dict) and 'container' in buttons_container:
+        all_buttons = buttons_container['container']
+    else:
+        all_buttons = buttons_container
     
-    # Atur layout
-    all_buttons.layout = widgets.Layout(
-        display='flex', 
-        justify_content='flex-end',
-        margin='10px 0',
-        align_items='center'
-    )
+    # Atur layout hanya jika all_buttons adalah widget
+    if hasattr(all_buttons, 'layout'):
+        all_buttons.layout = widgets.Layout(
+            display='flex', 
+            justify_content='flex-end',
+            margin='10px 0',
+            align_items='center'
+        )
     
     # Info box
     info_box = get_split_info()

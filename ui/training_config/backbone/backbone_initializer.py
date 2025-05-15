@@ -113,8 +113,6 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         # Register UI components untuk persistensi
         config_manager.register_ui_components('backbone', ui_components)
         
-        logger.info(f"{ICONS.get('success', '✅')} UI backbone berhasil diinisialisasi")
-        
         return ui_components
         
     except Exception as e:

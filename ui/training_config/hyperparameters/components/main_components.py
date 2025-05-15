@@ -98,10 +98,10 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
             justify_content='space-between',
             overflow='visible'
         )),
-        widgets.HBox([
-            ui_components['button_container']
-        ], layout=widgets.Layout(width='auto', justify_content='flex-end')),
-        ui_components['sync_info']
+        widgets.VBox([
+            ui_components['button_container'],
+            widgets.HBox([ui_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='auto'))
+        ], layout=widgets.Layout(width='auto', overflow='visible'))
     ], layout=widgets.Layout(width='auto', overflow='visible'))
     
     # Buat info box umum untuk hyperparameter

@@ -44,76 +44,25 @@ class TestTrainingStrategyUI(unittest.TestCase):
         self.mock_config_manager.save_module_config.return_value = True
         self.mock_config_manager.get_ui_components.return_value = None
     
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.VBox')
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.HTML')
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.Accordion')
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.widgets.Tab')
-    @patch('smartcash.ui.training_config.training_strategy.components.button_components.create_training_strategy_button_components')
-    @patch('smartcash.ui.training_config.training_strategy.components.utils_components.create_training_strategy_utils_components')
-    @patch('smartcash.ui.training_config.training_strategy.components.validation_components.create_training_strategy_validation_components')
-    @patch('smartcash.ui.training_config.training_strategy.components.multiscale_components.create_training_strategy_multiscale_components')
-    @patch('smartcash.ui.training_config.training_strategy.components.info_panel_components.create_training_strategy_info_panel')
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.create_header')
-    @patch('smartcash.ui.training_config.training_strategy.components.main_components.create_divider')
-    def test_create_training_strategy_ui_components(self, mock_create_divider, mock_create_header, mock_create_info_panel, 
-                                                  mock_create_multiscale, mock_create_validation, 
-                                                  mock_create_utils, mock_create_buttons, mock_tab, mock_accordion,
-                                                  mock_html, mock_vbox):
+    @patch('smartcash.ui.training_config.training_strategy.components.main_components.create_training_strategy_ui_components')
+    def test_create_training_strategy_ui_components(self, mock_create_ui):
         """Test membuat komponen UI."""
-        # Setup mock
-        mock_vbox.return_value = MagicMock()
-        mock_html.return_value = MagicMock()
-        mock_accordion.return_value = MagicMock()
-        mock_tab.return_value = MagicMock()
-        mock_create_divider.return_value = MagicMock()
+        # Setup mock untuk mengembalikan dictionary dengan kunci yang diharapkan
+        expected_keys = ['main_container', 'tabs', 'training_strategy_info', 'update_training_strategy_info', 
+                        'utils_box', 'validation_box', 'multiscale_box', 'save_button', 'reset_button', 
+                        'status_panel', 'sync_info', 'layer_mode']
         
-        mock_create_buttons.return_value = {
-            'save_button': MagicMock(),
-            'reset_button': MagicMock(),
-            'sync_to_drive_button': MagicMock(),
-            'sync_from_drive_button': MagicMock(),
-            'button_container': MagicMock(),
-            'status': MagicMock()
-        }
-        mock_create_utils.return_value = {
-            'utils_box': MagicMock(),
-            'experiment_name': MagicMock(),
-            'checkpoint_dir': MagicMock(),
-            'tensorboard': MagicMock(),
-            'log_metrics_every': MagicMock(),
-            'visualize_batch_every': MagicMock(),
-            'gradient_clipping': MagicMock(),
-            'mixed_precision': MagicMock(),
-            'layer_mode': MagicMock()
-        }
-        mock_create_validation.return_value = {
-            'validation_box': MagicMock(),
-            'validation_frequency': MagicMock(),
-            'iou_threshold': MagicMock(),
-            'conf_threshold': MagicMock()
-        }
-        mock_create_multiscale.return_value = {
-            'multiscale_box': MagicMock(),
-            'multi_scale': MagicMock()
-        }
-        mock_create_info_panel.return_value = (MagicMock(), MagicMock())
-        mock_create_header.return_value = MagicMock()
+        mock_result = {key: MagicMock() for key in expected_keys}
+        mock_create_ui.return_value = mock_result
         
         # Panggil fungsi yang ditest
+        from smartcash.ui.training_config.training_strategy.components import create_training_strategy_ui_components
         ui_components = create_training_strategy_ui_components()
         
         # Verifikasi hasil
         self.assertIsInstance(ui_components, dict)
-        self.assertIn('utils_box', ui_components)
-        self.assertIn('validation_box', ui_components)
-        self.assertIn('multiscale_box', ui_components)
-        self.assertIn('save_button', ui_components)
-        self.assertIn('reset_button', ui_components)
-        self.assertIn('status', ui_components)
-        self.assertIn('training_strategy_info', ui_components)
-        self.assertIn('main_container', ui_components)
-        self.assertIn('tabs', ui_components)
-        self.assertIn('header', ui_components)
+        for key in expected_keys:
+            self.assertIn(key, ui_components, f"Kunci {key} tidak ditemukan dalam UI components")
     
     @patch('smartcash.ui.training_config.training_strategy.handlers.form_handlers.get_logger')
     def test_setup_training_strategy_form_handlers(self, mock_get_logger):

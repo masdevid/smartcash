@@ -33,11 +33,10 @@ def get_training_strategy_info(open_by_default: bool = False) -> widgets.Accordi
         <li><strong>Visualize Batch Every</strong>: Frekuensi visualisasi batch dalam batch. Membantu memahami bagaimana model memproses gambar selama training.</li>
         <li><strong>Gradient Clipping</strong>: Membatasi nilai gradien untuk mencegah exploding gradients. Nilai antara 0.5-1.0 biasanya efektif untuk model deteksi objek.</li>
         <li><strong>Mixed Precision</strong>: Menggunakan presisi campuran (FP16/FP32) untuk mempercepat training dan mengurangi penggunaan memori. Direkomendasikan untuk GPU yang mendukung.</li>
-        <li><strong>Layer Mode</strong>: Strategi untuk membekukan atau melatih layer model.
+        <li><strong>Layer Mode</strong>: Pilihan layer deteksi objek, apakah single atau multi-layer.
             <ul>
-                <li><em>Train All</em>: Melatih semua layer model, memberikan fleksibilitas maksimum tetapi membutuhkan lebih banyak data dan waktu.</li>
-                <li><em>Freeze Backbone</em>: Membekukan layer backbone, cocok untuk dataset kecil atau saat menggunakan pre-trained model.</li>
-                <li><em>Freeze Partial</em>: Membekukan sebagian layer, menyeimbangkan antara fleksibilitas dan efisiensi.</li>
+                <li><em>Single Layer</em>: Menggunakan satu layer deteksi, lebih sederhana dan cepat tetapi mungkin kurang akurat untuk objek dengan ukuran bervariasi.</li>
+                <li><em>Multi Layer</em>: Menggunakan beberapa layer deteksi pada skala berbeda, lebih akurat untuk mendeteksi objek dengan ukuran bervariasi tetapi membutuhkan lebih banyak komputasi.</li>
             </ul>
         </li>
     </ul>

@@ -124,9 +124,10 @@ def create_training_strategy_ui_components() -> Dict[str, Any]:
     form_container = widgets.VBox([
         widgets.HTML(f"<h4>{ICONS.get('settings', '⚙️')} Konfigurasi Strategi Pelatihan</h4>"),
         ui_components['tabs'],
-        widgets.HBox([
-            button_components['button_container']
-        ], layout=widgets.Layout(width='auto', justify_content='flex-end'))
+        widgets.VBox([
+            button_components['button_container'],
+            widgets.HBox([button_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='auto'))
+        ], layout=widgets.Layout(width='auto', overflow='visible'))
     ], layout=widgets.Layout(width='auto', overflow='visible'))
     
     # Buat container untuk info
@@ -156,8 +157,7 @@ def create_training_strategy_ui_components() -> Dict[str, Any]:
     ui_components['main_container'] = widgets.VBox([
         header,
         ui_components['main_tabs'],
-        button_components['status'],
-        button_components['sync_info'],
+        button_components['status_panel'],
         footer_info
     ], layout=widgets.Layout(width='auto', padding='10px', overflow='visible'))
     

@@ -41,9 +41,9 @@ def create_training_strategy_button_components() -> Dict[str, Any]:
         value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
     )
     
-    # Status output
-    ui_components['status'] = widgets.Output(
-        layout=OUTPUT_WIDGET
+    # Buat panel untuk status (seperti backbone)
+    ui_components['status_panel'] = widgets.Output(
+        layout=widgets.Layout(width='100%', min_height='50px')
     )
     
     # Container untuk tombol
@@ -59,5 +59,8 @@ def create_training_strategy_button_components() -> Dict[str, Any]:
         width='auto',
         margin='10px 0px'
     ))
+    
+    # Untuk kompatibilitas dengan kode lama
+    ui_components['status'] = ui_components['status_panel']
     
     return ui_components

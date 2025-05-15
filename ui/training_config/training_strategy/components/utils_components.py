@@ -82,13 +82,14 @@ def create_training_strategy_utils_components() -> Dict[str, Any]:
         layout=widgets.Layout(width='100%')
     )
     
-    # Parameter layer mode
+    # Parameter layer mode (deteksi objek)
     ui_components['layer_mode'] = widgets.RadioButtons(
         options=['single', 'multilayer'],
         value='single',
-        description='Layer mode:',
+        description='Layer deteksi:',
         style={'description_width': '150px'},
-        layout=widgets.Layout(width='100%')
+        layout=widgets.Layout(width='100%'),
+        tooltip='Pilihan layer deteksi objek, single layer atau multi-layer untuk deteksi pada skala berbeda'
     )
     
     # Buat box untuk parameter utilitas

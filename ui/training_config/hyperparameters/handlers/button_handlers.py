@@ -45,7 +45,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         # Handler untuk tombol save
         def on_save_click(b):
-            with ui_components['status']:
+            status_panel = ui_components.get('status_panel', ui_components.get('status'))
+            with status_panel:
                 clear_output(wait=True)
                 display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyimpan konfigurasi hyperparameter..."))
             
@@ -63,7 +64,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                     logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
                 
                 # Tampilkan pesan sukses atau warning
-                with ui_components['status']:
+                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                with status_panel:
                     clear_output(wait=True)
                     if success:
                         display(create_info_alert(
@@ -91,7 +93,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 
                 logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan")
             except Exception as e:
-                with ui_components['status']:
+                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
                         f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}",
@@ -102,7 +105,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         # Handler untuk tombol reset
         def on_reset_click(b):
-            with ui_components['status']:
+            status_panel = ui_components.get('status_panel', ui_components.get('status'))
+            with status_panel:
                 clear_output(wait=True)
                 display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi hyperparameter..."))
             
@@ -123,7 +127,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                     logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
                 
                 # Tampilkan pesan sukses atau warning
-                with ui_components['status']:
+                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                with status_panel:
                     clear_output(wait=True)
                     if success:
                         display(create_info_alert(
@@ -151,7 +156,8 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 
                 logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default")
             except Exception as e:
-                with ui_components['status']:
+                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
                         f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}",

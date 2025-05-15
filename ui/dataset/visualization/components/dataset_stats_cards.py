@@ -105,7 +105,7 @@ def create_dataset_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
 
 def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     """
-    Buat kartu statistik preprocessing yang menampilkan jumlah gambar preprocessing per split.
+    Buat kartu statistik preprocessing yang menampilkan jumlah gambar preprocessing.
     
     Args:
         stats: Dictionary berisi statistik preprocessing
@@ -113,29 +113,16 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     Returns:
         HBox widget berisi kartu statistik preprocessing
     """
-    # Ambil statistik preprocessing dan split
+    # Ambil statistik preprocessing
     preprocessing_stats = stats.get('preprocessing', {})
-    split_stats = stats.get('split', {})
     
     # Jika tidak ada statistik, gunakan data dummy
     if not preprocessing_stats:
         preprocessing_stats = {
-            'train_processed': 0,
-            'val_processed': 0,
-            'test_processed': 0,
-            'total_processed': 0
+            'total_processed': 2000,
+            'filtered_images': 1800,
+            'normalized_images': 2000
         }
-    
-    # Jika tidak ada statistik split, gunakan data dummy
-    if not split_stats:
-        split_stats = {
-            'train': {'images': 0},
-            'val': {'images': 0},
-            'test': {'images': 0}
-        }
-    
-    # Hitung total gambar yang diproses
-    total_processed = preprocessing_stats.get('total_processed', 0)
     
     # Buat container untuk kartu preprocessing
     preprocessing_container = widgets.HBox(layout=widgets.Layout(
@@ -145,55 +132,26 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
         width='100%'
     ))
     
-    # Warna untuk setiap split
-    split_colors = {
-        'train': '#4285F4',  # Biru
-        'val': '#FBBC05',    # Kuning
-        'test': '#34A853',   # Hijau
-        'total': '#673AB7'   # Ungu
-    }
+    # Warna untuk preprocessing
+    preprocessing_color = '#0d47a1'  # Biru
     
-    # Ikon untuk preprocessing
-    preprocessing_icon = '⚙️'
+    # Buat kartu preprocessing
+    processed_card = widgets.VBox([
+        widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {preprocessing_color};'>Gambar Diproses</div>"),
+        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {preprocessing_color};'>⚙️ {preprocessing_stats.get('total_processed', 0)}</div>"),
+        widgets.HTML(f"<div style='font-size: 12px; color: {preprocessing_color}; opacity: 0.8;'>Total gambar yang telah diproses</div>")
+    ], layout=widgets.Layout(
+        border='1px solid #ddd',
+        margin='5px',
+        padding='10px',
+        min_width='150px',
+        flex='1 1 auto'
+    ))
     
-    # Buat kartu untuk setiap split preprocessing
-    preprocessing_cards = []
-    
-    for split_name in ['train', 'val', 'test']:
-        # Ambil jumlah gambar yang diproses untuk split ini
-        processed_count = preprocessing_stats.get(f'{split_name}_processed', 0)
-        
-        # Hitung persentase dari total split
-        split_count = split_stats.get(split_name, {}).get('images', 0)
-        percentage = (processed_count / split_count * 100) if split_count > 0 else 0
-        
-        # Buat kartu untuk split preprocessing
-        card = widgets.VBox([
-            widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{split_name.capitalize()} Preprocessing</div>"),
-            widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{preprocessing_icon} {processed_count}</div>"),
-            widgets.HTML(f"<div style='font-size: 12px; color: {split_colors.get(split_name, '#0d47a1')}; opacity: 0.8;'>{percentage:.1f}% dari {split_name}</div>")
-        ], layout=widgets.Layout(
-            border='1px solid #ddd',
-            margin='5px',
-            padding='10px',
-            min_width='150px',
-            flex='1 1 auto'
-        ))
-        
-        # Tambahkan kelas CSS untuk styling
-        card._dom_classes = (f'bg-{split_name}-preprocessing',)
-        
-        # Tambahkan kartu ke list
-        preprocessing_cards.append(card)
-    
-    # Tambahkan kartu total preprocessing
-    total_processed = preprocessing_stats.get('total_processed', 0)
-    percentage = (total_processed / total_images * 100) if total_images > 0 else 0
-    
-    total_card = widgets.VBox([
-        widgets.HTML("<div style='font-size: 14px; font-weight: bold; color: #673AB7;'>Total Preprocessing</div>"),
-        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: #673AB7;'>{preprocessing_icon} {total_processed}</div>"),
-        widgets.HTML(f"<div style='font-size: 12px; color: #673AB7; opacity: 0.8;'>{percentage:.1f}% dari total gambar</div>")
+    filtered_card = widgets.VBox([
+        widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {preprocessing_color};'>Gambar Difilter</div>"),
+        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {preprocessing_color};'>🔍 {preprocessing_stats.get('filtered_images', 0)}</div>"),
+        widgets.HTML(f"<div style='font-size: 12px; color: {preprocessing_color}; opacity: 0.8;'>Gambar yang difilter karena kualitas rendah</div>")
     ], layout=widgets.Layout(
         border='1px solid #ddd',
         margin='5px',
@@ -203,17 +161,18 @@ def create_preprocessing_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     ))
     
     # Tambahkan kelas CSS untuk styling
-    total_card._dom_classes = ('bg-total-preprocessing',)
+    processed_card._dom_classes = ('bg-preprocessing',)
+    filtered_card._dom_classes = ('bg-preprocessing',)
     
-    # Tambahkan semua kartu ke container
-    preprocessing_container.children = preprocessing_cards + [total_card]
+    # Tambahkan kartu ke container
+    preprocessing_container.children = [processed_card, filtered_card]
     
     return preprocessing_container
 
 
 def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     """
-    Buat kartu statistik augmentasi yang menampilkan jumlah gambar augmentasi per split.
+    Buat kartu statistik augmentasi yang menampilkan jumlah gambar augmentasi.
     
     Args:
         stats: Dictionary berisi statistik augmentasi
@@ -221,29 +180,15 @@ def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     Returns:
         HBox widget berisi kartu statistik augmentasi
     """
-    # Ambil statistik augmentasi dan split
+    # Ambil statistik augmentasi
     augmentation_stats = stats.get('augmentation', {})
-    split_stats = stats.get('split', {})
     
     # Jika tidak ada statistik, gunakan data dummy
     if not augmentation_stats:
         augmentation_stats = {
-            'train_augmented': 0,
-            'val_augmented': 0,
-            'test_augmented': 0,
-            'total_augmented': 0
+            'total_augmented': 2000,
+            'augmentation_types': 5
         }
-    
-    # Jika tidak ada statistik split, gunakan data dummy
-    if not split_stats:
-        split_stats = {
-            'train': {'images': 0},
-            'val': {'images': 0},
-            'test': {'images': 0}
-        }
-    
-    # Hitung total gambar
-    total_images = sum(split['images'] for split in split_stats.values())
     
     # Buat container untuk kartu augmentasi
     augmentation_container = widgets.HBox(layout=widgets.Layout(
@@ -253,55 +198,26 @@ def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
         width='100%'
     ))
     
-    # Warna untuk setiap split
-    split_colors = {
-        'train': '#4285F4',  # Biru
-        'val': '#FBBC05',    # Kuning
-        'test': '#34A853',   # Hijau
-        'total': '#673AB7'   # Ungu
-    }
+    # Warna untuk augmentasi
+    augmentation_color = '#1b5e20'  # Hijau
     
-    # Ikon untuk augmentasi
-    augmentation_icon = '🔄'
+    # Buat kartu augmentasi
+    augmented_card = widgets.VBox([
+        widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {augmentation_color};'>Gambar Diaugmentasi</div>"),
+        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {augmentation_color};'>🔄 {augmentation_stats.get('total_augmented', 0)}</div>"),
+        widgets.HTML(f"<div style='font-size: 12px; color: {augmentation_color}; opacity: 0.8;'>Total gambar yang telah diaugmentasi</div>")
+    ], layout=widgets.Layout(
+        border='1px solid #ddd',
+        margin='5px',
+        padding='10px',
+        min_width='150px',
+        flex='1 1 auto'
+    ))
     
-    # Buat kartu untuk setiap split augmentasi
-    augmentation_cards = []
-    
-    for split_name in ['train', 'val', 'test']:
-        # Ambil jumlah gambar yang diaugmentasi untuk split ini
-        augmented_count = augmentation_stats.get(f'{split_name}_augmented', 0)
-        
-        # Hitung persentase dari total split
-        split_count = split_stats.get(split_name, {}).get('images', 0)
-        percentage = (augmented_count / split_count * 100) if split_count > 0 else 0
-        
-        # Buat kartu untuk split augmentasi
-        card = widgets.VBox([
-            widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{split_name.capitalize()} Augmentasi</div>"),
-            widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{augmentation_icon} {augmented_count}</div>"),
-            widgets.HTML(f"<div style='font-size: 12px; color: {split_colors.get(split_name, '#0d47a1')}; opacity: 0.8;'>{percentage:.1f}% dari {split_name}</div>")
-        ], layout=widgets.Layout(
-            border='1px solid #ddd',
-            margin='5px',
-            padding='10px',
-            min_width='150px',
-            flex='1 1 auto'
-        ))
-        
-        # Tambahkan kelas CSS untuk styling
-        card._dom_classes = (f'bg-{split_name}-augmentation',)
-        
-        # Tambahkan kartu ke list
-        augmentation_cards.append(card)
-    
-    # Tambahkan kartu total augmentasi
-    total_augmented = augmentation_stats.get('total_augmented', 0)
-    percentage = (total_augmented / total_images * 100) if total_images > 0 else 0
-    
-    total_card = widgets.VBox([
-        widgets.HTML("<div style='font-size: 14px; font-weight: bold; color: #673AB7;'>Total Augmentasi</div>"),
-        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: #673AB7;'>{augmentation_icon} {total_augmented}</div>"),
-        widgets.HTML(f"<div style='font-size: 12px; color: #673AB7; opacity: 0.8;'>{percentage:.1f}% dari total gambar</div>")
+    types_card = widgets.VBox([
+        widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {augmentation_color};'>Tipe Augmentasi</div>"),
+        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {augmentation_color};'>🔠 {augmentation_stats.get('augmentation_types', 0)}</div>"),
+        widgets.HTML(f"<div style='font-size: 12px; color: {augmentation_color}; opacity: 0.8;'>Jumlah tipe augmentasi yang digunakan</div>")
     ], layout=widgets.Layout(
         border='1px solid #ddd',
         margin='5px',
@@ -311,9 +227,10 @@ def create_augmentation_stats_cards(stats: Dict[str, Any]) -> widgets.HBox:
     ))
     
     # Tambahkan kelas CSS untuk styling
-    total_card._dom_classes = ('bg-total-augmentation',)
+    augmented_card._dom_classes = ('bg-augmentation',)
+    types_card._dom_classes = ('bg-augmentation',)
     
-    # Tambahkan semua kartu ke container
-    augmentation_container.children = augmentation_cards + [total_card]
+    # Tambahkan kartu ke container
+    augmentation_container.children = [augmented_card, types_card]
     
     return augmentation_container

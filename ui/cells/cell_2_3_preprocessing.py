@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/cells/cell_2_2_preprocessing.py
+File: smartcash/ui/cells/cell_2_3_preprocessing.py
 Deskripsi: Entry point untuk preprocessing dataset dengan pendekatan DRY
 """
 

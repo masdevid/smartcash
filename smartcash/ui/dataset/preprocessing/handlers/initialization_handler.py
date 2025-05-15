@@ -91,6 +91,30 @@ def initialize_preprocessing_directories(
         for ext in ['.jpg', '.jpeg', '.png']:
             image_files.extend(list(input_dir.glob(f"*{ext}")))
         
+        # Jika tidak ada gambar di direktori input, coba cari di subdirektori
+        if not image_files and input_dir.exists():
+            # Cek apakah ada subdirektori yang mungkin berisi gambar (seperti 'train', 'val', 'test')
+            for subdir in ['train', 'val', 'test']:
+                subdir_path = input_dir / subdir
+                if subdir_path.exists():
+                    for ext in ['.jpg', '.jpeg', '.png']:
+                        subdir_images = list(subdir_path.glob(f"*{ext}"))
+                        if subdir_images:
+                            logger.info(f"{ICONS['info']} Menemukan {len(subdir_images)} gambar di subdirektori: {subdir_path}")
+                            # Jika ada gambar di subdirektori, gunakan itu sebagai input
+                            image_files.extend(subdir_images)
+        
+        # Jika masih tidak ada gambar, coba cari di direktori parent
+        if not image_files and input_dir.parent.exists() and input_dir.parent != input_dir:
+            parent_dir = input_dir.parent
+            for ext in ['.jpg', '.jpeg', '.png']:
+                parent_images = list(parent_dir.glob(f"*{ext}"))
+                if parent_images:
+                    logger.info(f"{ICONS['info']} Menemukan {len(parent_images)} gambar di direktori parent: {parent_dir}")
+                    # Jika ada gambar di direktori parent, gunakan itu sebagai input
+                    image_files.extend(parent_images)
+                    input_dir = parent_dir  # Update input_dir ke direktori yang berisi gambar
+        
         if not image_files:
             return {
                 'success': False,
@@ -154,9 +178,14 @@ def validate_preprocessing_prerequisites(ui_components: Dict[str, Any]) -> Dict[
     
     # Validasi parameter preprocessing
     try:
-        # Import handler untuk konfigurasi preprocessing
-        from smartcash.ui.dataset.preprocessing.handlers.config_handler import get_preprocessing_config
-        preprocess_config = get_preprocessing_config(ui_components)
+        # Dapatkan konfigurasi preprocessing dari ui_components
+        preprocess_config = ui_components.get('config', {}).get('preprocessing', {})
+        
+        # Jika tidak ada konfigurasi di ui_components, gunakan update_config_from_ui
+        if not preprocess_config:
+            from smartcash.ui.dataset.preprocessing.handlers.config_handler import update_config_from_ui
+            config = update_config_from_ui(ui_components)
+            preprocess_config = config.get('preprocessing', {})
         
         # Validasi parameter dasar
         if not preprocess_config.get('enabled', True):

@@ -3,10 +3,14 @@ File: smartcash/ui/training_config/hyperparameters/components/hyperparameters_co
 Deskripsi: Komponen UI untuk konfigurasi hyperparameter model
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional, List, Tuple
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
+from smartcash.ui.utils.constants import ICONS, COLORS 
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+    
 def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Membuat komponen UI untuk pengaturan hyperparameter berdasarkan hyperparameter_config.yaml.
@@ -25,8 +29,13 @@ def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     # Inisialisasi komponen
     ui_components = {}
     
-    # Tambahkan komponen status
+    # Status panel untuk menampilkan pesan status
     ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
+    
+    # Info panel untuk menampilkan informasi konfigurasi
+    ui_components['info_panel'] = widgets.Output(
+        layout=widgets.Layout(padding='10px', max_height='300px', overflow='auto')
+    )
     
     # Buat komponen UI
     ui_components['title'] = widgets.HTML(
@@ -339,6 +348,7 @@ def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         ui_components['tabs'],
         create_divider(),
         ui_components['buttons_placeholder'],
+        ui_components['info_panel'],
         log_accordion
     ])
     

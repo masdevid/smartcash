@@ -155,6 +155,7 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         ui_components.update({
             'update_config_from_ui': update_config_from_ui,
             'update_ui_from_config': update_ui_from_config,
+            'update_hyperparameters_info': update_hyperparameters_info,
             'config': config
         })
         
@@ -245,74 +246,5 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
     
     return ui_components
 
-# Fungsi untuk mengupdate konfigurasi dari UI
-def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Update konfigurasi dari nilai UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi hyperparameter
-        
-    Returns:
-        Konfigurasi yang diupdate
-    """
-    # Pastikan struktur config ada
-    if 'hyperparameters' not in config:
-        config['hyperparameters'] = {}
-    
-    # Ekstrak nilai dari form hyperparameters
-    if 'batch_size_slider' in ui_components:
-        config['hyperparameters']['batch_size'] = ui_components['batch_size_slider'].value
-    
-    if 'epochs_slider' in ui_components:
-        config['hyperparameters']['epochs'] = ui_components['epochs_slider'].value
-    
-    if 'learning_rate_slider' in ui_components:
-        config['hyperparameters']['learning_rate'] = ui_components['learning_rate_slider'].value
-    
-    if 'optimizer_dropdown' in ui_components:
-        config['hyperparameters']['optimizer'] = ui_components['optimizer_dropdown'].value
-    
-    # Simpan konfigurasi di ui_components
-    ui_components['config'] = config
-    
-    return config
-
-# Fungsi untuk mengupdate UI dari konfigurasi
-def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Update UI dari konfigurasi.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi hyperparameter
-        
-    Returns:
-        Dictionary UI components yang telah diupdate
-    """
-    # Dapatkan konfigurasi hyperparameters
-    hp_config = config.get('hyperparameters', {})
-    
-    # Update slider batch size
-    if 'batch_size_slider' in ui_components:
-        ui_components['batch_size_slider'].value = hp_config.get('batch_size', 16)
-    
-    # Update slider epochs
-    if 'epochs_slider' in ui_components:
-        ui_components['epochs_slider'].value = hp_config.get('epochs', 50)
-    
-    # Update slider learning rate
-    if 'learning_rate_slider' in ui_components:
-        ui_components['learning_rate_slider'].value = hp_config.get('learning_rate', 0.001)
-    
-    # Update dropdown optimizer
-    if 'optimizer_dropdown' in ui_components:
-        optimizer = hp_config.get('optimizer', 'Adam')
-        if optimizer in ui_components['optimizer_dropdown'].options:
-            ui_components['optimizer_dropdown'].value = optimizer
-    
-    # Simpan referensi config di ui_components
-    ui_components['config'] = config
-    
-    return ui_components
+# Import fungsi dari config_handlers
+from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import update_config_from_ui, update_ui_from_config, update_hyperparameters_info

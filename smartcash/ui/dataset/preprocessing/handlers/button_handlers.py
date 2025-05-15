@@ -10,8 +10,8 @@ import traceback
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
+from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
 # get_logger diimpor tapi tidak digunakan langsung (logger diambil dari ui_components)
-# update_status_panel diimpor tapi tidak digunakan langsung (digunakan dalam execution_handler)
 
 # Import handler terpisah untuk SRP
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import save_preprocessing_config

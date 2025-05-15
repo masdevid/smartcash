@@ -66,14 +66,14 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 # Buat pesan konfirmasi
                 message = "Apakah Anda yakin ingin menghapus semua data hasil augmentasi?"
                 
-                # Buat dialog konfirmasi
+                # Buat dialog konfirmasi dengan parameter yang benar
                 dialog = create_confirmation_dialog(
-                    message + " Tindakan ini tidak dapat dibatalkan.",
-                    on_confirm_cleanup, 
-                    on_cancel_cleanup,
-                    "Konfirmasi Penghapusan Data",
-                    "Ya, Hapus Data", 
-                    "Batal"
+                    message=message + " Tindakan ini tidak dapat dibatalkan.",
+                    on_confirm=on_confirm_cleanup, 
+                    on_cancel=on_cancel_cleanup,
+                    title="Konfirmasi Penghapusan Data",
+                    confirm_label="Ya, Hapus Data", 
+                    cancel_label="Batal"
                 )
                 
                 with ui_components['status']:

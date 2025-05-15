@@ -21,11 +21,11 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
         Dictionary UI components yang telah diupdate
     """
     try:
-        # Import fungsi get_config_manager
-        from smartcash.common.config.manager import get_config_manager
+        # Import ConfigManager
+        from smartcash.common.config.manager import ConfigManager
         
-        # Dapatkan instance ConfigManager menggunakan fungsi singleton
-        config_manager = get_config_manager()
+        # Dapatkan instance ConfigManager
+        config_manager = ConfigManager.get_instance()
         
         # Register UI components untuk persistensi
         config_manager.register_ui_components('preprocessing', ui_components)
@@ -83,11 +83,11 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
         Boolean status keberhasilan
     """
     try:
-        # Import fungsi get_config_manager
-        from smartcash.common.config.manager import get_config_manager
+        # Import ConfigManager
+        from smartcash.common.config.manager import ConfigManager
         
-        # Dapatkan instance ConfigManager menggunakan fungsi singleton
-        config_manager = get_config_manager()
+        # Dapatkan instance ConfigManager
+        config_manager = ConfigManager.get_instance()
         
         # Dapatkan konfigurasi dari UI
         from smartcash.ui.dataset.preprocessing.handlers.config_handler import update_config_from_ui

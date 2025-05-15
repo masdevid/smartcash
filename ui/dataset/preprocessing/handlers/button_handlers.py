@@ -1,15 +1,25 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/button_handlers.py
-Deskripsi: Handler tombol untuk preprocessing dataset dengan perbaikan PosixPath error
+Deskripsi: Handler tombol untuk preprocessing dataset dengan pendekatan SRP
 """
 
-from typing import Dict, Any
+from typing import Dict, Any  # Optional, List, Union tidak digunakan langsung
 from IPython.display import display, clear_output
 import os
-from pathlib import Path
+import traceback
+import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
-from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
+# get_logger diimpor tapi tidak digunakan langsung (logger diambil dari ui_components)
+# update_status_panel diimpor tapi tidak digunakan langsung (digunakan dalam execution_handler)
+
+# Import handler terpisah untuk SRP
+from smartcash.ui.dataset.preprocessing.handlers.config_handler import (
+    save_preprocessing_config  # ensure_ui_persistence, get_preprocessing_config tidak digunakan langsung
+)
+# observer_handler tidak digunakan langsung (menggunakan import langsung dari smartcash.components.observer)
+from smartcash.ui.dataset.preprocessing.handlers.execution_handler import run_preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.initialization_handler import initialize_preprocessing_directories
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -31,11 +41,6 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     @try_except_decorator(ui_components.get('status'))
     def on_preprocess_click(b):
         """Handler tombol preprocessing dengan dukungan progress tracking yang dioptimalkan."""
-        # Dapatkan split dari UI
-        split_option = ui_components['split_selector'].value
-        split_map = {'All Splits': None, 'Train Only': 'train', 'Validation Only': 'valid', 'Test Only': 'test'}
-        split = split_map.get(split_option)
-        
         # Update UI: menampilkan proses dimulai
         with ui_components['status']: 
             clear_output(wait=True)
@@ -55,151 +60,83 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         ui_components['preprocess_button'].layout.display = 'none'
         ui_components['stop_button'].layout.display = 'block'
         
-        # Update konfigurasi dari UI dan simpan
+        # Update konfigurasi dari UI dan simpan dengan ConfigManager
         try:
+            # Gunakan config handler untuk update konfigurasi dari UI
             updated_config = ui_components['update_config_from_ui'](ui_components, config)
-            ui_components['save_preprocessing_config'](updated_config)
-            if logger: logger.info(f"{ICONS['success']} Konfigurasi preprocessing berhasil disimpan")
+            success = save_preprocessing_config(updated_config)
+            if success and logger:
+                logger.info(f"{ICONS['success']} Konfigurasi preprocessing berhasil disimpan")
+            else:
+                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi preprocessing")
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
         
         # Tandai preprocessing sedang berjalan
         ui_components['preprocessing_running'] = True
         
-        # Update status panel dengan informasi awal
-        split_info = f"Split {split}" if split else "Semua split"
-        update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai preprocessing {split_info}...")
-        
-        # PERBAIKAN: Cek apakah path identik untuk menghindari masalah symlink
-        data_dir = ui_components.get('data_dir', 'data')
-        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
-        
-        if os.path.realpath(data_dir) == os.path.realpath(preprocessed_dir):
-            error_msg = f"Path data input dan output sama: {data_dir}, ini akan menyebabkan masalah"
-            with ui_components['status']: 
-                display(create_status_indicator("error", f"{ICONS['error']} {error_msg}"))
-            update_status_panel(ui_components, "error", f"{ICONS['error']} {error_msg}")
-            cleanup_ui(ui_components)
-            return
-        
         # Notifikasi observer tentang mulai preprocessing
         try:
             from smartcash.components.observer import notify
             from smartcash.components.observer.event_topics_observer import EventTopics
             notify(event_type=EventTopics.PREPROCESSING_START, sender="preprocessing_handler", 
-                  message=f"Memulai preprocessing dataset {split_info}", split=split, split_info=split_info)
+                  message=f"Memulai preprocessing dataset", split=None, split_info="Semua")
         except ImportError: 
             pass
         
-        # Dapatkan dataset manager
-        dataset_manager = get_dataset_manager(ui_components, config, logger)
-        if not dataset_manager:
-            with ui_components['status']: 
-                display(create_status_indicator("error", f"{ICONS['error']} Dataset Manager tidak tersedia"))
-            cleanup_ui(ui_components)
-            return
-        
-        # Dapatkan opsi preprocessing dari UI dengan one-liner
-        normalize, preserve_aspect_ratio = [ui_components['preprocess_options'].children[i].value for i in [1, 2]]
-        
-        # Jalankan preprocessing
+        # Jalankan preprocessing dengan handler terpisah
         try:
-            # Update konfigurasi dataset manager dengan path yang benar
-            if hasattr(dataset_manager, 'config'): 
-                dataset_manager.config['dataset_dir'] = data_dir
-                if 'preprocessing' in dataset_manager.config:
-                    dataset_manager.config['preprocessing']['output_dir'] = preprocessed_dir
+            # Gunakan initialization_handler untuk inisialisasi direktori terlebih dahulu
+            init_result = initialize_preprocessing_directories(ui_components)
+            if not init_result['success']:
+                # Jika inisialisasi gagal, tampilkan error dan hentikan proses
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator("error", f"{ICONS['error']} {init_result['message']}"))
+                cleanup_ui(ui_components)
+                ui_components['preprocessing_running'] = False
+                return
             
-            # Update konfigurasi preproc jika ada
-            if hasattr(dataset_manager, 'preprocess_config'):
-                dataset_manager.preprocess_config.preprocessed_dir = preprocessed_dir
-                dataset_manager.preprocess_config.raw_dataset_dir = data_dir
+            # Jalankan preprocessing dengan execution_handler
+            result = run_preprocessing(ui_components, config)
             
-            # Log awal preprocessing
-            if logger: logger.info(f"{ICONS['start']} Memulai preprocessing {split_info}")
-            
-            # PERBAIKAN: Pastikan data_dir dan preprocessed_dir adalah string, bukan PosixPath
-            data_dir_str = str(data_dir) if isinstance(data_dir, Path) else data_dir
-            preprocessed_dir_str = str(preprocessed_dir) if isinstance(preprocessed_dir, Path) else preprocessed_dir
-            
-            # Jalankan preprocessing dengan parameter yang ditingkatkan
-            preprocess_result = dataset_manager.preprocess_dataset(
-                split=split, 
-                force_reprocess=True,
-                normalize=normalize,
-                preserve_aspect_ratio=preserve_aspect_ratio,
-                # PERBAIKAN: Jika dataset_manager mendukung parameter berikut, tambahkan secara eksplisit
-                raw_dataset_dir=data_dir_str,
-                preprocessed_dir=preprocessed_dir_str
-            )
-            
-            # Tambahkan path output jika tidak ada
-            if 'output_dir' not in preprocess_result: 
-                preprocess_result['output_dir'] = preprocessed_dir
-            
-            # Setelah selesai, update UI dengan status sukses
+            # Tampilkan hasil jika berhasil
+            if result and isinstance(result, dict):
+                # Tampilkan summary
+                if 'summary_container' in ui_components:
+                    ui_components['summary_container'].layout.display = 'block'
+                    with ui_components['summary_container']:
+                        clear_output(wait=True)
+                        display(create_status_indicator("success", f"{ICONS['success']} Preprocessing selesai"))
+                        
+                        # Tampilkan summary dengan format yang lebih baik
+                        display(widgets.HTML(f"""<div style='padding:10px; background-color:#f8f9fa; border-radius:4px;'>
+                            <h4>Hasil Preprocessing:</h4>
+                            <ul>
+                                <li><b>Total gambar yang diproses:</b> {result.get('total_processed', 0)}</li>
+                                <li><b>Direktori output:</b> {result.get('output_dir', 'data/preprocessed')}</li>
+                                <li><b>Split:</b> {result.get('split', 'Semua')}</li>
+                                <li><b>Waktu eksekusi:</b> {result.get('execution_time', 0):.2f} detik</li>
+                            </ul>
+                        </div>"""))
+                
+                # Tampilkan tombol visualisasi
+                if 'visualization_buttons' in ui_components:
+                    ui_components['visualization_buttons'].layout.display = 'block'
+                
+                # Tampilkan tombol cleanup
+                if 'cleanup_button' in ui_components:
+                    ui_components['cleanup_button'].layout.display = 'block'
+        except Exception as e:
+            # Tangani error
+            if logger: logger.error(f"{ICONS['error']} Error saat preprocessing: {str(e)}")
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} Preprocessing {split_info} selesai"))
-            
-            # Update status panel
-            update_status_panel(ui_components, "success", 
-                               f"{ICONS['success']} Preprocessing dataset berhasil diselesaikan")
-            
-            # Update UI state - tampilkan summary dan visualisasi
-            for component in ['visualization_container', 'summary_container']:
-                if component in ui_components:
-                    ui_components[component].layout.display = 'block'
-            
-            # Tampilkan tombol visualisasi dan cleanup
-            ui_components['visualization_buttons'].layout.display = 'flex'
-            ui_components['cleanup_button'].layout.display = 'block'
-            
-            # Update summary dengan hasil preprocessing
-            from smartcash.ui.dataset.preprocessing.handlers.state_handler import generate_preprocessing_summary
-            generate_preprocessing_summary(ui_components, preprocessed_dir)
-            
-            # Notifikasi observer tentang selesai
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=EventTopics.PREPROCESSING_END,
-                    sender="preprocessing_handler",
-                    message=f"Preprocessing dataset {split_info} selesai",
-                    result=preprocess_result,
-                    duration=preprocess_result.get('processing_time', 0),
-                    total_images=preprocess_result.get('total_images', 0)
-                )
-            except ImportError:
-                pass
-            
-        except Exception as e:
-            # Handle error dengan notifikasi
-            with ui_components['status']: 
-                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-            
-            # Update status panel
-            update_status_panel(ui_components, "error", f"{ICONS['error']} Preprocessing gagal: {str(e)}")
-            
-            # Notifikasi observer tentang error
-            try:
-                from smartcash.components.observer import notify
-                from smartcash.components.observer.event_topics_observer import EventTopics
-                notify(
-                    event_type=EventTopics.PREPROCESSING_ERROR,
-                    sender="preprocessing_handler",
-                    message=f"Error saat preprocessing: {str(e)}",
-                    error=str(e)
-                )
-            except ImportError:
-                pass
-            
-            # Log error
-            if logger: logger.error(f"{ICONS['error']} Error saat preprocessing dataset: {str(e)}")
-        
+                display(create_status_indicator("error", f"{ICONS['error']} Error saat preprocessing: {str(e)}"))
+                display(widgets.HTML(f"<pre>{traceback.format_exc()}</pre>"))
         finally:
-            # Tandai preprocessing selesai
+            # Cleanup UI
+            cleanup_ui(ui_components)
             ui_components['preprocessing_running'] = False
             
             # Restore UI

@@ -1,51 +1,55 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_service_handler.py
-Deskripsi: Handler untuk interaksi dengan layanan augmentasi dataset
+Deskripsi: Handler untuk mengelola AugmentationService
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional
+from smartcash.dataset.services.augmentor import AugmentationService
+from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
+from smartcash.ui.dataset.augmentation.handlers.observer_handler import (
+    notify_process_start, notify_process_complete, notify_process_error
+)
 
 logger = get_logger("augmentation_service_handler")
 
-def get_augmentation_service(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Optional[AugmentationService]:
+def get_augmentation_service(ui_components: Dict[str, Any]) -> AugmentationService:
     """
-    Dapatkan instance AugmentationService dengan konfigurasi yang sesuai.
+    Dapatkan instance AugmentationService.
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi aplikasi
         
     Returns:
-        Instance AugmentationService atau None jika gagal
+        Instance AugmentationService
     """
     try:
-        # Cek apakah sudah ada di ui_components
-        if 'augmentation_service' in ui_components and ui_components['augmentation_service']:
-            return ui_components['augmentation_service']
+        # Dapatkan logger atau buat baru jika tidak tersedia
+        logger = ui_components.get('logger', get_logger('augmentation_service'))
         
-        # Dapatkan logger
-        logger = ui_components.get('logger')
-        
-        # Dapatkan data_dir dari ui_components atau default
+        # Dapatkan direktori dataset
         data_dir = ui_components.get('data_dir', 'data')
+        augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
         
-        # Buat instance baru
-        augmentation_service = AugmentationService(config=config, data_dir=data_dir, logger=logger)
+        # Dapatkan konfigurasi augmentasi dari UI
+        aug_config = get_augmentation_config(ui_components)
         
-        # Register progress callback jika tersedia
-        if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
-            ui_components['register_progress_callback'](augmentation_service)
+        # Buat instance AugmentationService
+        service = AugmentationService(
+            data_dir=data_dir,
+            augmented_dir=augmented_dir,
+            config=aug_config,
+            logger=logger
+        )
         
-        # Simpan ke ui_components
-        ui_components['augmentation_service'] = augmentation_service
+        # Notifikasi bahwa service telah dibuat
+        logger.debug(f"{ICONS['info']} AugmentationService berhasil dibuat dengan konfigurasi: {aug_config}")
         
-        return augmentation_service
+        return service
     except Exception as e:
         if logger:
-            logger.error(f"❌ Gagal membuat augmentation service: {str(e)}")
-        return None
+            logger.error(f"Error saat membuat AugmentationService: {str(e)}")
+        raise e
 
 def register_progress_callback(augmentation_service: AugmentationService, callback: Callable) -> None:
     """

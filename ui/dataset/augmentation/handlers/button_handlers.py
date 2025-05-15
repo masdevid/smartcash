@@ -3,26 +3,26 @@ File: smartcash/ui/dataset/augmentation/handlers/button_handlers.py
 Deskripsi: Handler tombol untuk augmentasi dataset dengan pendekatan SRP
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional  # List, Union tidak digunakan langsung
 from IPython.display import display, clear_output
-import os
 import traceback
-from pathlib import Path
+import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
-from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+# get_logger diimpor tapi tidak digunakan langsung (logger diambil dari ui_components)
+# update_status_panel diimpor tapi tidak digunakan langsung (digunakan dalam execution_handler)
 
 # Import handler terpisah untuk SRP
 from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
-    ensure_ui_persistence, save_augmentation_config, get_augmentation_config
+    ensure_ui_persistence, save_augmentation_config  # get_augmentation_config tidak digunakan langsung
 )
-from smartcash.ui.dataset.augmentation.handlers.config_validator import validate_augmentation_config
+# validate_augmentation_config tidak digunakan langsung
 from smartcash.ui.dataset.augmentation.handlers.config_mapper import (
-    map_ui_to_config, map_config_to_ui, extract_augmentation_params
+    map_ui_to_config  # map_config_to_ui, extract_augmentation_params tidak digunakan langsung
 )
-from smartcash.ui.dataset.augmentation.handlers.observer_handler import (
-    notify_process_start, notify_process_complete, notify_process_error
-)
+# observer_handler tidak digunakan langsung (menggunakan import langsung dari smartcash.components.observer)
+from smartcash.ui.dataset.augmentation.handlers.execution_handler import run_augmentation
+from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import stop_augmentation
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -54,9 +54,6 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     @try_except_decorator(ui_components.get('status'))
     def on_augment_click(b):
         """Handler tombol augmentasi dengan dukungan progress tracking yang dioptimalkan."""
-        # Target split selalu 'train'
-        split_option = 'train'
-        
         # Update UI: menampilkan proses dimulai
         with ui_components['status']: 
             clear_output(wait=True)
@@ -91,133 +88,62 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         # Tandai augmentasi sedang berjalan
         ui_components['augmentation_running'] = True
         
-        # Update status panel dengan informasi awal
-        split_info = f"Split {split_option}"
-        update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai augmentasi {split_info}...")
-        
-        # Notifikasi observer tentang mulai augmentasi
-        notify_process_start(ui_components, "augmentasi", split_info, split_option)
-        
-        # Verifikasi direktori dataset
-        data_dir = ui_components.get('data_dir', 'data')
-        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
-        augmented_dir = ui_components.get('augmented_dir', 'data/augmented')
-        
-        # Ekstrak parameter augmentasi dari UI menggunakan config mapper
-        augmentation_params = extract_augmentation_params(ui_components)
-        
-        # Log parameter yang akan digunakan
-        if logger:
-            logger.info(f"{ICONS['info']} Parameter augmentasi: ")
-            logger.info(f"  - Split: {augmentation_params['split']}")
-            logger.info(f"  - Jenis: {augmentation_params['augmentation_types']}")
-            logger.info(f"  - Jumlah variasi: {augmentation_params['num_variations']}")
-            logger.info(f"  - Prefix: {augmentation_params['output_prefix']}")
-            logger.info(f"  - Balance kelas: {augmentation_params['target_balance']}")
-            logger.info(f"  - Target count: {augmentation_params['target_count']}")
-            logger.info(f"  - Workers: {augmentation_params['num_workers']}")
-            logger.info(f"  - Pindahkan ke preprocessed: {augmentation_params['move_to_preprocessed']}")
-        
-        # Pastikan direktori input dan output ada
-        import os
-        from pathlib import Path
-        
-        # Validasi direktori input
-        input_dir = Path(preprocessed_dir) / 'train' / 'images'
-        if not input_dir.exists():
-            input_dir = Path(preprocessed_dir) / 'images'
-            if not input_dir.exists():
-                input_dir = Path(preprocessed_dir)
-                if not input_dir.exists():
-                    os.makedirs(str(input_dir), exist_ok=True)
-                    if logger: logger.warning(f"{ICONS['warning']} Membuat direktori input: {input_dir}")
-        
-        # Validasi direktori output
-        output_dir = Path(augmented_dir)
-        if not output_dir.exists():
-            os.makedirs(str(output_dir), exist_ok=True)
-            if logger: logger.info(f"{ICONS['info']} Membuat direktori output: {output_dir}")
-        
-        # Update status dengan informasi direktori
-        with ui_components['status']:
-            display(create_status_indicator("info", f"{ICONS['processing']} Augmentasi dari {input_dir} ke {output_dir}..."))
-        
-        # Setup augmentation service menggunakan handler terpisah
+        # Jalankan augmentasi dengan handler terpisah
         try:
-            # Dapatkan augmentation service dari handler
-            augmentation_service = get_augmentation_service(ui_components, config)
+            # Gunakan execution_handler untuk menjalankan augmentasi
+            from smartcash.ui.dataset.augmentation.handlers.initialization_handler import initialize_augmentation_directories
             
-            # Register progress callback dari handler terpisah
-            register_progress_callback(augmentation_service, ui_components)
+            # Inisialisasi direktori terlebih dahulu
+            init_result = initialize_augmentation_directories(ui_components)
+            if not init_result['success']:
+                # Jika inisialisasi gagal, tampilkan error dan hentikan proses
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator("error", f"{ICONS['error']} {init_result['message']}"))
+                cleanup_ui(ui_components)
+                ui_components['augmentation_running'] = False
+                return
             
-            # Log awal augmentasi
-            if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
+            # Jalankan augmentasi dengan execution_handler
+            result = run_augmentation(ui_components, config)
             
-            # Eksekusi augmentasi dengan parameter dari config mapper
-            result = execute_augmentation(augmentation_service, augmentation_params)
-            
-            # Cek hasil augmentasi
-            if result['status'] == 'success':
-                if logger: logger.success(f"{ICONS['success']} Augmentasi berhasil dijalankan")
-            elif result['status'] == 'error':
-                error_message = result.get('message', 'Terjadi kesalahan saat augmentasi')
-                if logger: logger.error(f"{ICONS['error']} {error_message}")
-                raise Exception(error_message)
-            
-            # Tambahkan path output jika tidak ada
-            try:
-                if 'output_dir' not in result:
-                    result['output_dir'] = augmented_dir
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat menambahkan path output: {str(e)}")
-            
-            # Setelah selesai, update UI dengan status sukses
+            # Tampilkan hasil jika berhasil
+            if result and isinstance(result, dict):
+                # Tampilkan summary
+                if 'summary_container' in ui_components:
+                    ui_components['summary_container'].layout.display = 'block'
+                    with ui_components['summary_container']:
+                        clear_output(wait=True)
+                        display(create_status_indicator("success", f"{ICONS['success']} Augmentasi selesai"))
+                        
+                        # Tampilkan summary dengan format yang lebih baik
+                        display(widgets.HTML(f"""<div style='padding:10px; background-color:#f8f9fa; border-radius:4px;'>
+                            <h4>Hasil Augmentasi:</h4>
+                            <ul>
+                                <li><b>Total gambar yang diproses:</b> {result.get('total_processed', 0)}</li>
+                                <li><b>Total gambar yang dihasilkan:</b> {result.get('total_generated', 0)}</li>
+                                <li><b>Direktori output:</b> {result.get('output_dir', 'data/augmented')}</li>
+                                <li><b>Waktu eksekusi:</b> {result.get('execution_time', 0):.2f} detik</li>
+                            </ul>
+                        </div>"""))
+                
+                # Tampilkan tombol visualisasi
+                if 'visualization_buttons' in ui_components:
+                    ui_components['visualization_buttons'].layout.display = 'block'
+                
+                # Tampilkan tombol cleanup
+                if 'cleanup_button' in ui_components:
+                    ui_components['cleanup_button'].layout.display = 'block'
+        except Exception as e:
+            # Tangani error
+            if logger: logger.error(f"{ICONS['error']} Error saat augmentasi: {str(e)}")
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} Augmentasi {split_info} selesai"))
-            
-            # Update status panel
-            update_status_panel(ui_components, "success", 
-                               f"{ICONS['success']} Augmentasi dataset berhasil diselesaikan")
-            
-            # Update UI state - tampilkan summary dan visualisasi
-            for component in ['visualization_container', 'summary_container']:
-                if component in ui_components:
-                    ui_components[component].layout.display = 'block'
-            
-            # Tampilkan tombol visualisasi dan cleanup
-            ui_components['visualization_buttons'].layout.display = 'flex'
-            ui_components['cleanup_button'].layout.display = 'block'
-            
-            # Generate dan tampilkan ringkasan augmentasi
-            try:
-                from smartcash.ui.dataset.augmentation.handlers.state_handler import generate_augmentation_summary
-                generate_augmentation_summary(ui_components, preprocessed_dir, augmented_dir)
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat generate ringkasan augmentasi: {str(e)}")
-            
-            # Notifikasi observer tentang selesai
-            try:
-                notify_process_complete(ui_components, result, split_info)
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat notifikasi proses selesai: {str(e)}")
-            
-        except Exception as e:
-            # Handle error dengan notifikasi
-            with ui_components['status']: 
-                display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
-            
-            # Update status panel
-            update_status_panel(ui_components, "error", f"{ICONS['error']} Augmentasi gagal: {str(e)}")
-            
-            # Notifikasi observer tentang error
-            notify_process_error(ui_components, str(e))
-            
-            # Log error
-            if logger: logger.error(f"{ICONS['error']} Error saat augmentasi dataset: {str(e)}")
-        
+                display(create_status_indicator("error", f"{ICONS['error']} Error saat augmentasi: {str(e)}"))
+                display(widgets.HTML(f"<pre>{traceback.format_exc()}</pre>"))
         finally:
-            # Tandai augmentasi selesai
+            # Cleanup UI
+            cleanup_ui(ui_components)
             ui_components['augmentation_running'] = False
             
             # Restore UI

@@ -36,10 +36,9 @@ def create_split_component(env=None, config=None) -> Dict[str, Any]:
         drive_mounted = True
         drive_path = str(env.drive_path) if hasattr(env, 'drive_path') else '/content/drive/MyDrive'
     
-    # Header dengan layout compact
+    # Header dengan style minimalis
     header = create_header(f"{ICONS['dataset']} Konfigurasi Split Dataset", 
-                         "Konfigurasi pembagian dataset untuk training, validation, dan testing",
-                         compact=True)
+                         "Konfigurasi pembagian dataset untuk training, validation, dan testing")
     
     # Status panel untuk pesan status
     status_panel = widgets.Output(

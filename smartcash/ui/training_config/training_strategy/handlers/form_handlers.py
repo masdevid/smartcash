@@ -5,7 +5,13 @@ Deskripsi: Handler untuk form UI pada komponen strategi pelatihan
 
 from typing import Dict, Any, Optional, Callable
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display
+
+from smartcash.ui.utils.constants import ICONS
+from smartcash.common.logger import get_logger
+from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_training_strategy_info
+
+logger = get_logger(__name__)
 
 def setup_training_strategy_form_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -20,151 +26,68 @@ def setup_training_strategy_form_handlers(ui_components: Dict[str, Any], env=Non
         Dict berisi komponen UI dengan handler terpasang
     """
     try:
-        # Dapatkan logger jika tersedia
-        logger = ui_components.get('logger', None)
-        
         # Handler untuk perubahan komponen
         def on_component_change(change):
             if change['name'] == 'value':
-                # Update config
-                if 'update_config_from_ui' in ui_components:
-                    ui_components['update_config_from_ui']()
-        
-        def on_early_stopping_change(change):
-            if change['name'] == 'value':
-                # Aktifkan/nonaktifkan patience berdasarkan early stopping
-                ui_components['patience'].disabled = not change['new']
+                # Update config dari UI
+                if 'update_config_from_ui' in ui_components and callable(ui_components['update_config_from_ui']):
+                    ui_components['update_config_from_ui'](ui_components)
                 
-                # Update config
-                if 'update_config_from_ui' in ui_components:
-                    ui_components['update_config_from_ui']()
+                # Update info strategi pelatihan
+                update_training_strategy_info(ui_components)
         
-        def on_resume_change(change):
-            if change['name'] == 'value':
-                # Aktifkan/nonaktifkan checkpoint path berdasarkan resume
-                ui_components['checkpoint_path'].disabled = not change['new']
-                
-                # Update config
-                if 'update_config_from_ui' in ui_components:
-                    ui_components['update_config_from_ui']()
+        # Register observers untuk semua komponen
+        # Tab 1: Parameter Utilitas Training
+        ui_components['experiment_name'].observe(on_component_change)
+        ui_components['checkpoint_dir'].observe(on_component_change)
+        ui_components['tensorboard'].observe(on_component_change)
+        ui_components['log_metrics_every'].observe(on_component_change)
+        ui_components['visualize_batch_every'].observe(on_component_change)
+        ui_components['gradient_clipping'].observe(on_component_change)
+        ui_components['mixed_precision'].observe(on_component_change)
+        ui_components['layer_mode'].observe(on_component_change)
         
-        def on_use_multi_gpu_change(change):
-            if change['name'] == 'value':
-                # Aktifkan/nonaktifkan opsi multi-GPU
-                ui_components['sync_bn'].disabled = not change['new']
-                ui_components['distributed'].disabled = not change['new']
-                
-                # Update config
-                if 'update_config_from_ui' in ui_components:
-                    ui_components['update_config_from_ui']()
+        # Tab 2: Validasi dan Evaluasi
+        ui_components['validation_frequency'].observe(on_component_change)
+        ui_components['iou_threshold'].observe(on_component_change)
+        ui_components['conf_threshold'].observe(on_component_change)
         
-        # Register observers untuk semua komponen dengan pengecekan keberadaan
-        # Parameter dasar
-        if 'batch_size' in ui_components:
-            ui_components['batch_size'].observe(on_component_change)
-        if 'epochs' in ui_components:
-            ui_components['epochs'].observe(on_component_change)
-        if 'image_size' in ui_components:
-            ui_components['image_size'].observe(on_component_change)
-        if 'workers' in ui_components:
-            ui_components['workers'].observe(on_component_change)
-        
-        # Parameter validasi
-        if 'val_split' in ui_components:
-            ui_components['val_split'].observe(on_component_change)
-        if 'val_frequency' in ui_components:
-            ui_components['val_frequency'].observe(on_component_change)
-        if 'early_stopping' in ui_components:
-            ui_components['early_stopping'].observe(on_early_stopping_change)
-        if 'patience' in ui_components:
-            ui_components['patience'].observe(on_component_change)
-        
-        # Parameter eksperimen (mungkin tidak ada karena tab dihapus)
-        if 'experiment_name' in ui_components:
-            ui_components['experiment_name'].observe(on_component_change)
-        if 'save_period' in ui_components:
-            ui_components['save_period'].observe(on_component_change)
-        if 'resume' in ui_components:
-            ui_components['resume'].observe(on_resume_change)
-        if 'checkpoint_path' in ui_components:
-            ui_components['checkpoint_path'].observe(on_component_change)
-        
-        # Parameter multi-GPU (mungkin tidak ada karena tab dihapus)
-        if 'use_multi_gpu' in ui_components:
-            ui_components['use_multi_gpu'].observe(on_use_multi_gpu_change)
-        if 'sync_bn' in ui_components:
-            ui_components['sync_bn'].observe(on_component_change)
-        if 'distributed' in ui_components:
-            ui_components['distributed'].observe(on_component_change)
-        
-        # Inisialisasi state komponen dengan pengecekan keberadaan
-        # Patience dinonaktifkan jika early stopping tidak aktif
-        if 'patience' in ui_components and 'early_stopping' in ui_components:
-            ui_components['patience'].disabled = not ui_components['early_stopping'].value
-        
-        # Checkpoint path dinonaktifkan jika resume tidak aktif
-        if 'checkpoint_path' in ui_components and 'resume' in ui_components:
-            ui_components['checkpoint_path'].disabled = not ui_components['resume'].value
-        
-        # Opsi multi-GPU dinonaktifkan jika use_multi_gpu tidak aktif
-        if 'sync_bn' in ui_components and 'use_multi_gpu' in ui_components:
-            ui_components['sync_bn'].disabled = not ui_components['use_multi_gpu'].value
-        if 'distributed' in ui_components and 'use_multi_gpu' in ui_components:
-            ui_components['distributed'].disabled = not ui_components['use_multi_gpu'].value
+        # Tab 3: Multi-scale Training
+        ui_components['multi_scale'].observe(on_component_change)
         
         # Cleanup function
         def cleanup():
             try:
-                # Hapus semua observer dengan pengecekan keberadaan
-                # Parameter dasar
-                if 'batch_size' in ui_components:
-                    ui_components['batch_size'].unobserve(on_component_change)
-                if 'epochs' in ui_components:
-                    ui_components['epochs'].unobserve(on_component_change)
-                if 'image_size' in ui_components:
-                    ui_components['image_size'].unobserve(on_component_change)
-                if 'workers' in ui_components:
-                    ui_components['workers'].unobserve(on_component_change)
+                # Hapus semua observer
+                # Tab 1: Parameter Utilitas Training
+                ui_components['experiment_name'].unobserve(on_component_change)
+                ui_components['checkpoint_dir'].unobserve(on_component_change)
+                ui_components['tensorboard'].unobserve(on_component_change)
+                ui_components['log_metrics_every'].unobserve(on_component_change)
+                ui_components['visualize_batch_every'].unobserve(on_component_change)
+                ui_components['gradient_clipping'].unobserve(on_component_change)
+                ui_components['mixed_precision'].unobserve(on_component_change)
+                ui_components['layer_mode'].unobserve(on_component_change)
                 
-                # Parameter validasi
-                if 'val_split' in ui_components:
-                    ui_components['val_split'].unobserve(on_component_change)
-                if 'val_frequency' in ui_components:
-                    ui_components['val_frequency'].unobserve(on_component_change)
-                if 'early_stopping' in ui_components:
-                    ui_components['early_stopping'].unobserve(on_early_stopping_change)
-                if 'patience' in ui_components:
-                    ui_components['patience'].unobserve(on_component_change)
+                # Tab 2: Validasi dan Evaluasi
+                ui_components['validation_frequency'].unobserve(on_component_change)
+                ui_components['iou_threshold'].unobserve(on_component_change)
+                ui_components['conf_threshold'].unobserve(on_component_change)
                 
-                # Parameter eksperimen (mungkin tidak ada karena tab dihapus)
-                if 'experiment_name' in ui_components:
-                    ui_components['experiment_name'].unobserve(on_component_change)
-                if 'save_period' in ui_components:
-                    ui_components['save_period'].unobserve(on_component_change)
-                if 'resume' in ui_components:
-                    ui_components['resume'].unobserve(on_resume_change)
-                if 'checkpoint_path' in ui_components:
-                    ui_components['checkpoint_path'].unobserve(on_component_change)
+                # Tab 3: Multi-scale Training
+                ui_components['multi_scale'].unobserve(on_component_change)
                 
-                # Parameter multi-GPU (mungkin tidak ada karena tab dihapus)
-                if 'use_multi_gpu' in ui_components:
-                    ui_components['use_multi_gpu'].unobserve(on_use_multi_gpu_change)
-                if 'sync_bn' in ui_components:
-                    ui_components['sync_bn'].unobserve(on_component_change)
-                if 'distributed' in ui_components:
-                    ui_components['distributed'].unobserve(on_component_change)
-                
-                if logger: logger.info("✅ Training strategy form handlers cleaned up")
+                logger.info(f"{ICONS.get('success', '✅')} Training strategy form handlers cleaned up")
             except Exception as e:
-                if logger: logger.warning(f"⚠️ Error cleanup: {e}")
+                logger.warning(f"{ICONS.get('warning', '⚠️')} Error cleanup: {e}")
         
         # Tambahkan cleanup function
         ui_components['cleanup'] = cleanup
         
+        # Tambahkan update_training_strategy_info ke ui_components
+        ui_components['update_training_strategy_info'] = lambda: update_training_strategy_info(ui_components)
+        
+        return ui_components
     except Exception as e:
-        # Fallback sederhana jika terjadi error
-        if 'status' in ui_components:
-            with ui_components['status']: display(HTML(f"<p style='color:red'>❌ Error setup training strategy form handler: {str(e)}</p>"))
-        else: print(f"❌ Error setup training strategy form handler: {str(e)}")
-    
-    return ui_components
+        logger.error(f"{ICONS.get('error', '❌')} Error saat setup form handlers: {str(e)}")
+        return ui_components

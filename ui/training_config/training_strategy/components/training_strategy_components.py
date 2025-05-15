@@ -7,27 +7,23 @@ from typing import Dict, Any, List, Optional
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
-def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
+from smartcash.ui.utils.constants import COLORS, ICONS
+from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
+from smartcash.ui.utils.header_utils import create_header
+
+def create_training_strategy_ui_components() -> Dict[str, Any]:
     """
     Membuat komponen UI untuk konfigurasi strategi pelatihan model.
     
-    Args:
-        config: Konfigurasi model
-        
     Returns:
         Dict berisi komponen UI
     """
-    # Import komponen UI standar 
-    from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.constants import COLORS, ICONS 
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
-    
     # Inisialisasi komponen
     ui_components = {}
     
     # Buat komponen UI
     ui_components['title'] = widgets.HTML(
-        value="<h3>🏋️ Konfigurasi Strategi Pelatihan</h3>"
+        value=f"<h3>{ICONS.get('training', '🏋️')} Konfigurasi Strategi Pelatihan</h3>"
     )
     
     # Tab untuk kategori strategi pelatihan
@@ -139,14 +135,10 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
         layout=widgets.Layout(width='300px')
     )
     
-    # Menghapus tab eksperimen dan multi-GPU sesuai permintaan
-    
     # Informasi strategi pelatihan
     ui_components['training_strategy_info'] = widgets.HTML(
         value="<p style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'><b>ℹ️ Info:</b> Konfigurasi strategi pelatihan dasar untuk model YOLOv5 dengan EfficientNet backbone.</p>"
     )
-    
-    # Tombol aksi akan ditambahkan dari initializer
     
     # Status indicator
     ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
@@ -175,46 +167,52 @@ def create_training_strategy_ui(config: Dict[str, Any] = None) -> Dict[str, Any]
     
     # Buat tabs
     ui_components['tabs'].children = [utils_box, validation_box, multiscale_box]
-    ui_components['tabs'].set_title(0, 'Utilitas Training')
-    ui_components['tabs'].set_title(1, 'Validasi')
-    ui_components['tabs'].set_title(2, 'Multi-scale')
+    ui_components['tabs'].set_title(0, f"{ICONS.get('settings', '⚙️')} Utilitas Training")
+    ui_components['tabs'].set_title(1, f"{ICONS.get('check', '✓')} Validasi")
+    ui_components['tabs'].set_title(2, f"{ICONS.get('scale', '📏')} Multi-scale")
     
     ui_components['info_box'] = widgets.VBox(
         [ui_components['training_strategy_info']],
         layout=widgets.Layout(padding='10px', border='1px solid #ddd', margin='10px 0')
     )
     
-    # Placeholder untuk tombol konfigurasi yang akan ditambahkan dari initializer
-    ui_components['buttons_placeholder'] = widgets.HBox(
-        [],
-        layout=widgets.Layout(padding='10px')
-    )
+    # Tambahkan tombol konfigurasi
+    from smartcash.ui.components.config_buttons import create_config_buttons
+    config_buttons = create_config_buttons()
+    ui_components.update({
+        'save_button': config_buttons['save_button'],
+        'reset_button': config_buttons['reset_button'],
+        'config_buttons': config_buttons['container']
+    })
     
     # Header dengan komponen standar
-    header = create_header(f"{ICONS['training']} Training Strategy Configuration", 
-                          "Konfigurasi strategi pelatihan untuk model deteksi mata uang")
+    header = create_header(
+        title=f"{ICONS.get('training', '🏋️')} Training Strategy Configuration",
+        description="Konfigurasi strategi pelatihan untuk model deteksi mata uang"
+    )
     
     # Panel info status
     status_panel = widgets.HTML(
         value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
                  color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
                  border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} Konfigurasi strategi pelatihan model</p>
+            <p style="margin:5px 0">{ICONS.get('info', 'ℹ️')} Konfigurasi strategi pelatihan model</p>
         </div>"""
     )
     
     # Log accordion dengan styling standar
-    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=0)
-    log_accordion.set_title(0, f"{ICONS['file']} Training Strategy Logs")
+    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=None)
+    log_accordion.set_title(0, f"{ICONS.get('file', '📄')} Training Strategy Logs")
     
     # Container utama
     ui_components['main_container'] = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Training Strategy</h4>"),
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Training Strategy</h4>"),
         ui_components['tabs'],
+        ui_components['info_box'],
         create_divider(),
-        ui_components['buttons_placeholder'],
+        config_buttons['container'],
         log_accordion
     ])
     

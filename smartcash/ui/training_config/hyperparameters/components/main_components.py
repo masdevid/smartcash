@@ -84,23 +84,12 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
     ))
     
-    # Buat form container untuk tab konfigurasi
+    # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar
     form_container = widgets.VBox([
         widgets.HBox([
-            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='30%', overflow='visible')),
-            widgets.Box([
-                widgets.HBox([
-                    widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='49%', overflow='visible')),
-                    widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='49%', overflow='visible'))
-                ], layout=widgets.Layout(
-                    width='100%',
-                    display='flex',
-                    flex_flow='row nowrap',
-                    align_items='flex-start',
-                    justify_content='space-between',
-                    overflow='visible'
-                ))
-            ], layout=widgets.Layout(width='70%', overflow='visible'))
+            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible')),
+            widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible')),
+            widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible'))
         ], layout=widgets.Layout(
             width='auto',
             display='flex',

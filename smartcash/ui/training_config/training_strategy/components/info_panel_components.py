@@ -12,16 +12,19 @@ from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-def create_training_strategy_info_panel() -> Tuple[widgets.HTML, Any]:
+def create_training_strategy_info_panel() -> Tuple[widgets.Output, Any]:
     """
     Membuat panel informasi untuk strategi pelatihan.
     
     Returns:
-        Tuple berisi HTML widget dan fungsi update
+        Tuple berisi output widget dan fungsi update
     """
-    info_panel = widgets.HTML(
-        value="<p style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'><b>ℹ️ Info:</b> Konfigurasi strategi pelatihan dasar untuk model YOLOv5 dengan EfficientNet backbone.</p>"
-    )
+    info_panel = widgets.Output(layout=widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
     
     def update_training_strategy_info(ui_components: Optional[Dict[str, Any]] = None):
         """
@@ -30,36 +33,41 @@ def create_training_strategy_info_panel() -> Tuple[widgets.HTML, Any]:
         Args:
             ui_components: Komponen UI
         """
-        if not ui_components:
-            info_panel.value = f"<p style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'><b>{ICONS.get('info', 'ℹ️')} Info:</b> Tidak ada informasi yang tersedia.</p>"
-            return
-        
-        try:
-            # Dapatkan nilai dari komponen UI
-            experiment_name = ui_components.get('experiment_name', widgets.Text()).value
-            checkpoint_dir = ui_components.get('checkpoint_dir', widgets.Text()).value
-            tensorboard = ui_components.get('tensorboard', widgets.Checkbox()).value
-            log_metrics_every = ui_components.get('log_metrics_every', widgets.IntSlider()).value
-            visualize_batch_every = ui_components.get('visualize_batch_every', widgets.IntSlider()).value
-            gradient_clipping = ui_components.get('gradient_clipping', widgets.FloatSlider()).value
-            mixed_precision = ui_components.get('mixed_precision', widgets.Checkbox()).value
-            layer_mode = ui_components.get('layer_mode', widgets.RadioButtons()).value
+        with info_panel:
+            clear_output(wait=True)
             
-            # Validasi
-            validation_frequency = ui_components.get('validation_frequency', widgets.IntSlider()).value
-            iou_threshold = ui_components.get('iou_threshold', widgets.FloatSlider()).value
-            conf_threshold = ui_components.get('conf_threshold', widgets.FloatSlider()).value
+            if not ui_components:
+                display(widgets.HTML(
+                    f"<h3>{ICONS.get('info', 'ℹ️')} Informasi Strategi Pelatihan</h3>"
+                    f"<p>Tidak ada informasi yang tersedia.</p>"
+                ))
+                return
             
-            # Multi-scale
-            multi_scale = ui_components.get('multi_scale', widgets.Checkbox()).value
-            
-            # Buat konten HTML
-            html_content = f"""
-            <div style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'>
-                <h4 style='margin-top: 0;'>{ICONS.get('info', 'ℹ️')} Informasi Strategi Pelatihan</h4>
-                <div style='display: grid; grid-template-columns: 1fr 1fr; grid-gap: 10px;'>
+            try:
+                # Dapatkan nilai dari komponen UI
+                experiment_name = ui_components.get('experiment_name', widgets.Text()).value
+                checkpoint_dir = ui_components.get('checkpoint_dir', widgets.Text()).value
+                tensorboard = ui_components.get('tensorboard', widgets.Checkbox()).value
+                log_metrics_every = ui_components.get('log_metrics_every', widgets.IntSlider()).value
+                visualize_batch_every = ui_components.get('visualize_batch_every', widgets.IntSlider()).value
+                gradient_clipping = ui_components.get('gradient_clipping', widgets.FloatSlider()).value
+                mixed_precision = ui_components.get('mixed_precision', widgets.Checkbox()).value
+                layer_mode = ui_components.get('layer_mode', widgets.RadioButtons()).value
+                
+                # Validasi
+                validation_frequency = ui_components.get('validation_frequency', widgets.IntSlider()).value
+                iou_threshold = ui_components.get('iou_threshold', widgets.FloatSlider()).value
+                conf_threshold = ui_components.get('conf_threshold', widgets.FloatSlider()).value
+                
+                # Multi-scale
+                multi_scale = ui_components.get('multi_scale', widgets.Checkbox()).value
+                
+                # Buat konten HTML
+                html_content = f"""
+                <h3>{ICONS.get('info', 'ℹ️')} Informasi Strategi Pelatihan</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; grid-gap: 10px;">
                     <div>
-                        <h5>Parameter Utilitas</h5>
+                        <h4>Parameter Utilitas</h4>
                         <ul>
                             <li><b>Experiment Name:</b> {experiment_name}</li>
                             <li><b>Checkpoint Dir:</b> {checkpoint_dir}</li>
@@ -72,7 +80,7 @@ def create_training_strategy_info_panel() -> Tuple[widgets.HTML, Any]:
                         </ul>
                     </div>
                     <div>
-                        <h5>Validasi & Multi-scale</h5>
+                        <h4>Validasi & Multi-scale</h4>
                         <ul>
                             <li><b>Validation Frequency:</b> {validation_frequency} epoch</li>
                             <li><b>IoU Threshold:</b> {iou_threshold}</li>
@@ -81,13 +89,18 @@ def create_training_strategy_info_panel() -> Tuple[widgets.HTML, Any]:
                         </ul>
                     </div>
                 </div>
-                <p style='margin-top: 10px;'><b>Catatan:</b> Konfigurasi strategi pelatihan ini akan digunakan untuk melatih model YOLOv5 dengan EfficientNet backbone.</p>
-            </div>
-            """
-            
-            info_panel.value = html_content
-        except Exception as e:
-            logger.error(f"{ICONS.get('error', '❌')} Error update info panel: {str(e)}")
-            info_panel.value = f"<p style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #dc3545;'><b>{ICONS.get('error', '❌')} Error:</b> Terjadi error saat memperbarui informasi: {str(e)}</p>"
+                
+                <div style="margin-top: 20px; padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;">
+                    <p><b>{ICONS.get('info', 'ℹ️')} Catatan:</b> Konfigurasi strategi pelatihan ini akan digunakan untuk melatih model YOLOv5 dengan EfficientNet backbone.</p>
+                </div>
+                """
+                
+                display(widgets.HTML(html_content))
+            except Exception as e:
+                logger.error(f"{ICONS.get('error', '❌')} Error update info panel: {str(e)}")
+                display(widgets.HTML(
+                    f"<h3>{ICONS.get('error', '❌')} Error</h3>"
+                    f"<p>Terjadi error saat memperbarui informasi: {str(e)}</p>"
+                ))
     
     return info_panel, update_training_strategy_info

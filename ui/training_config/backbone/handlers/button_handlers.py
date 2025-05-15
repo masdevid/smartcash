@@ -36,62 +36,62 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
     
     with status_panel:
         clear_output(wait=True)
+        display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyimpan konfigurasi backbone..."))
+    
+    try:
+        # Dapatkan ConfigManager
+        config_manager = get_config_manager()
+        
+        # Update config dari UI
+        config_to_save = update_config_from_ui(ui_components)
+        
+        # Simpan config ke file
+        success = config_manager.save_module_config('model', config_to_save)
+        
+        # Pastikan UI components teregistrasi untuk persistensi
         try:
-            # Dapatkan ConfigManager
-            config_manager = get_config_manager()
-            
-            # Update config dari UI
-            config_to_save = update_config_from_ui(ui_components)
-            
-            # Simpan config ke file
-            success = config_manager.save_module_config('model', config_to_save)
-            
+            config_manager.register_ui_components('backbone', ui_components)
+        except Exception as persist_error:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+        
+        # Tampilkan pesan sukses atau warning
+        with status_panel:
+            clear_output(wait=True)
             if success:
-                # Pastikan UI components teregistrasi untuk persistensi
-                config_manager.register_ui_components('backbone', ui_components)
-                
-                # Tampilkan pesan sukses
-                with status_panel:
-                    clear_output(wait=True)
-                    display(create_info_alert(
-                        f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan",
-                        alert_type='success'
-                    ))
-                
-                # Update info panel
-                update_backbone_info(ui_components)
-                
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    env_manager = get_environment_manager()
-                    if env_manager.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi backbone ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan")
-            else:
-                # Tampilkan pesan error
-                with status_panel:
-                    clear_output(wait=True)
-                    display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone",
-                        alert_type='error'
-                    ))
-                
-                logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone")
-        except Exception as e:
-            # Tampilkan pesan error
-            with status_panel:
-                clear_output(wait=True)
                 display(create_info_alert(
-                    f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi backbone: {str(e)}",
-                    alert_type='error'
+                    f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan",
+                    alert_type='success'
                 ))
-            
-            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi backbone: {str(e)}")
+            else:
+                display(create_info_alert(
+                    f"{ICONS.get('warning', '⚠️')} Konfigurasi backbone mungkin tidak tersimpan ke file",
+                    alert_type='warning'
+                ))
+        
+        # Update info panel
+        update_backbone_info(ui_components)
+        
+        # Sinkronisasi ke Google Drive jika diaktifkan
+        try:
+            env_manager = get_environment_manager()
+            if env_manager.is_drive_mounted:
+                # Sinkronisasi ke Google Drive
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi backbone ke Google Drive...")
+                sync_to_drive(None, ui_components)
+        except Exception as e:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+        
+        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan")
+    except Exception as e:
+        # Tampilkan pesan error
+        with status_panel:
+            clear_output(wait=True)
+            display(create_info_alert(
+                f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}",
+                alert_type='error'
+            ))
+        
+        logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
 
 def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -108,62 +108,62 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
     
     with status_panel:
         clear_output(wait=True)
+        display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi backbone..."))
+    
+    try:
+        # Dapatkan ConfigManager
+        config_manager = get_config_manager()
+        
+        # Dapatkan default config
+        default_config = config_manager.get_module_config('model', {})
+        
+        # Update UI dari default config
+        update_ui_from_config(ui_components, default_config)
+        
+        # Simpan default config ke file
+        success = config_manager.save_module_config('model', default_config)
+        
+        # Pastikan UI components teregistrasi untuk persistensi
         try:
-            # Dapatkan ConfigManager
-            config_manager = get_config_manager()
-            
-            # Dapatkan default config
-            default_config = config_manager.get_module_config('model', {})
-            
-            # Update UI dari default config
-            update_ui_from_config(ui_components, default_config)
-            
-            # Simpan default config ke file
-            success = config_manager.save_module_config('model', default_config)
-            
+            config_manager.register_ui_components('backbone', ui_components)
+        except Exception as persist_error:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+        
+        # Tampilkan pesan sukses atau warning
+        with status_panel:
+            clear_output(wait=True)
             if success:
-                # Pastikan UI components teregistrasi untuk persistensi
-                config_manager.register_ui_components('backbone', ui_components)
-                
-                # Tampilkan pesan sukses
-                with status_panel:
-                    clear_output(wait=True)
-                    display(create_info_alert(
-                        f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default",
-                        alert_type='success'
-                    ))
-                
-                # Update info panel
-                update_backbone_info(ui_components)
-                
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    env_manager = get_environment_manager()
-                    if env_manager.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi backbone ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default")
-            else:
-                # Tampilkan pesan error
-                with status_panel:
-                    clear_output(wait=True)
-                    display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi backbone",
-                        alert_type='error'
-                    ))
-                
-                logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi backbone")
-        except Exception as e:
-            # Tampilkan pesan error
-            with status_panel:
-                clear_output(wait=True)
                 display(create_info_alert(
-                    f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi backbone: {str(e)}",
-                    alert_type='error'
+                    f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default",
+                    alert_type='success'
                 ))
-            
-            logger.error(f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi backbone: {str(e)}")
+            else:
+                display(create_info_alert(
+                    f"{ICONS.get('warning', '⚠️')} Konfigurasi backbone direset di UI tetapi mungkin tidak tersimpan ke file",
+                    alert_type='warning'
+                ))
+        
+        # Update info panel
+        update_backbone_info(ui_components)
+        
+        # Sinkronisasi ke Google Drive jika diaktifkan
+        try:
+            env_manager = get_environment_manager()
+            if env_manager.is_drive_mounted:
+                # Sinkronisasi ke Google Drive
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi backbone ke Google Drive...")
+                sync_to_drive(None, ui_components)
+        except Exception as e:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+        
+        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default")
+    except Exception as e:
+        # Tampilkan pesan error
+        with status_panel:
+            clear_output(wait=True)
+            display(create_info_alert(
+                f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}",
+                alert_type='error'
+            ))
+        
+        logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")

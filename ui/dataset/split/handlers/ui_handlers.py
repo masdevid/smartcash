@@ -153,3 +153,42 @@ def initialize_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, A
     ensure_ui_persistence(ui_components, config, logger)
     
     return ui_components
+
+def on_slider_change(train_slider, val_slider, test_slider, total_label) -> None:
+    """
+    Handler untuk perubahan nilai slider.
+    
+    Args:
+        train_slider: Slider untuk proporsi data training
+        val_slider: Slider untuk proporsi data validasi
+        test_slider: Slider untuk proporsi data testing
+        total_label: Label untuk menampilkan total proporsi
+    """
+    from smartcash.ui.utils.constants import COLORS
+    
+    # Hitung total proporsi
+    total = round(train_slider.value + val_slider.value + test_slider.value, 2)
+    
+    # Tentukan warna berdasarkan total
+    color = COLORS['success'] if total == 1.0 else COLORS['danger']
+    
+    # Update label total
+    total_label.value = f"<div style='padding: 10px; color: {color}; font-weight: bold;'>Total: {total:.2f}</div>"
+
+def validate_sliders(train_slider, val_slider, test_slider) -> bool:
+    """
+    Validasi nilai slider untuk memastikan total = 1.
+    
+    Args:
+        train_slider: Slider untuk proporsi data training
+        val_slider: Slider untuk proporsi data validasi
+        test_slider: Slider untuk proporsi data testing
+        
+    Returns:
+        Boolean yang menunjukkan validitas nilai slider
+    """
+    # Hitung total proporsi
+    total = round(train_slider.value + val_slider.value + test_slider.value, 2)
+    
+    # Kembalikan hasil validasi
+    return total == 1.0

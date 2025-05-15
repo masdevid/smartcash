@@ -77,23 +77,39 @@ def create_backbone_ui() -> Dict[str, Any]:
     
     # Buat tombol Save dan Reset
     save_button = widgets.Button(
-        description='Simpan Konfigurasi',
+        description='Simpan',
         button_style='primary',
         icon=ICONS.get('save', '💾'),
-        layout=widgets.Layout(width='auto')
+        tooltip='Simpan konfigurasi backbone dan sinkronkan ke Google Drive',
+        layout=widgets.Layout(width='100px')
     )
     
     reset_button = widgets.Button(
-        description='Reset ke Default',
+        description='Reset',
         button_style='warning',
         icon=ICONS.get('reset', '🔄'),
-        layout=widgets.Layout(width='auto')
+        tooltip='Reset konfigurasi backbone ke default',
+        layout=widgets.Layout(width='100px')
     )
     
     # Tambahkan keterangan sinkronisasi otomatis
     sync_info = widgets.HTML(
         value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
     )
+    
+    # Buat container untuk tombol
+    button_container = widgets.HBox([
+        save_button,
+        reset_button
+    ], layout=widgets.Layout(
+        display='flex',
+        flex_flow='row nowrap',
+        justify_content='flex-end',
+        align_items='center',
+        gap='10px',
+        width='auto',
+        margin='10px 0px'
+    ))
     
     # Buat panel untuk status
     status_panel = widgets.Output(
@@ -117,7 +133,7 @@ def create_backbone_ui() -> Dict[str, Any]:
             use_ciou_checkbox
         ], layout=widgets.Layout(margin='10px 0px')),
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
-        widgets.HBox([save_button, reset_button], layout=widgets.Layout(justify_content='space-between', margin='20px 0px 10px 0px')),
+        button_container,
         sync_info
     ])
     
@@ -154,6 +170,7 @@ def create_backbone_ui() -> Dict[str, Any]:
         'use_ciou_checkbox': use_ciou_checkbox,
         'save_button': save_button,
         'reset_button': reset_button,
+        'button_container': button_container,
         'sync_info': sync_info,
         'status_panel': status_panel,
         'info_panel': info_panel,

@@ -106,11 +106,31 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
     
     # Fungsi untuk membatalkan cleanup
     def cancel_cleanup():
-        with ui_components['status']: 
-            clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
-        # Aktifkan kembali tombol setelah batal
-        disable_buttons(False)
+        try:
+            with ui_components['status']: 
+                clear_output(wait=True)
+                display(create_status_indicator("info", f"{ICONS.get('info', 'ℹ️')} Cleanup dibatalkan"))
+            
+            # Notifikasi observer tentang pembatalan cleanup
+            try:
+                from smartcash.components.observer import notify
+                from smartcash.components.observer.event_topics_observer import EventTopics
+                notify(
+                    event_type=EventTopics.PREPROCESSING_CLEANUP_ERROR,  # Gunakan event yang sudah ada
+                    sender="preprocessing_handler",
+                    message="Pembersihan data preprocessing dibatalkan oleh pengguna"
+                )
+            except (ImportError, AttributeError):
+                # Tangani error jika modul tidak tersedia atau atribut tidak ada
+                pass
+                
+            # Aktifkan kembali tombol setelah batal
+            disable_buttons(False)
+        except Exception as e:
+            logger = ui_components.get('logger')
+            if logger:
+                logger.error(f"{ICONS.get('error', '❌')} Error saat membatalkan cleanup: {str(e)}")
+            disable_buttons(False)  # Pastikan tombol tetap diaktifkan kembali
     
     # Fungsi untuk melakukan cleanup dengan progress tracking
     def perform_cleanup():
@@ -207,16 +227,19 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env=None, config=None) 
                 if 'visualization_buttons' in ui_components:
                     ui_components['visualization_buttons'].layout.display = 'none'
                 
-                # Notifikasi observer
+                # Notifikasi observer tentang progress
                 try:
                     from smartcash.components.observer import notify
                     from smartcash.components.observer.event_topics_observer import EventTopics
+                    # Gunakan PREPROCESSING_PROGRESS yang tersedia di EventTopics
                     notify(
-                        event_type=EventTopics.PREPROCESSING_CLEANUP_END,
+                        event_type=EventTopics.PREPROCESSING_PROGRESS,
                         sender="preprocessing_handler",
-                        message="Pembersihan data preprocessing selesai"
+                        message=f"Progress pembersihan data: {file_name}",
+                        progress=progress
                     )
-                except ImportError:
+                except (ImportError, AttributeError):
+                    # Tangani error jika modul tidak tersedia atau atribut tidak ada
                     pass
                 
             # Aktifkan kembali tombol process setelah cleanup selesai

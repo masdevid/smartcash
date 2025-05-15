@@ -14,6 +14,7 @@ from smartcash.ui.dataset.visualization.conflict_resolver import check_and_resol
 from smartcash.ui.utils.loading_indicator import create_loading_indicator
 from smartcash.ui.dataset.visualization.visualization_manager import get_visualization_manager
 from smartcash.common.logger import get_logger
+from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
 
@@ -104,17 +105,53 @@ def setup_dataset_visualization(force_new=False):
             # Tunggu sebentar untuk memastikan widget lama benar-benar dihapus
             time.sleep(0.5)
         
-        # Dapatkan visualization manager
-        visualization_manager = get_visualization_manager(loading_indicator)
+        # Cek dan resolve konflik UI jika ada
+        has_conflict = check_and_resolve_conflicts()
         
-        # Inisialisasi UI dan tampilkan
-        ui_components = visualization_manager.initialize()
-        display(ui_components['main_container'])
+        # Buat loading indicator
+        loading_indicator = create_loading_indicator("Mempersiapkan visualisasi dataset...")
         
-        # Simpan referensi ke instance aktif
-        _active_ui_components = ui_components
-        
-        return ui_components
+        try:
+            # Dapatkan instance visualization manager
+            visualization_manager = get_visualization_manager(loading_indicator)
+            
+            # Inisialisasi UI components
+            ui_components = visualization_manager.initialize()
+            
+            # Perbarui dashboard dengan data terbaru
+            visualization_manager.update_dashboard()
+            
+            # Setup auto refresh download dengan delay 100ms
+            from smartcash.ui.dataset.visualization.auto_refresh import trigger_auto_refresh
+            
+            def download_dataset_callback():
+                try:
+                    # Coba dapatkan dataset service
+                    from smartcash.dataset.services.service_factory import get_dataset_service
+                    dataset_service = get_dataset_service(service_name='downloader')
+                    
+                    # Jika dataset service tersedia, trigger download
+                    if dataset_service and hasattr(dataset_service, 'download_dataset'):
+                        logger.info("🔎 Memulai download dataset otomatis...")
+                        dataset_service.download_dataset()
+                    else:
+                        logger.warning("⚠️ Dataset service tidak tersedia untuk download otomatis")
+                except Exception as e:
+                    logger.error(f"❌ Error saat download dataset otomatis: {str(e)}")
+            
+            # Trigger auto refresh dengan delay 100ms
+            trigger_auto_refresh(download_dataset_callback, delay_ms=100)
+            
+            # Simpan referensi ke instance aktif
+            _active_ui_components = ui_components
+            
+            return ui_components
+        except Exception as e:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat setup visualisasi dataset: {str(e)}")
+            error_container = widgets.VBox([
+                widgets.HTML(f"<div style='color: red; padding: 10px;'><b>Error:</b> {str(e)}</div>")
+            ])
+            return {'main_container': error_container, 'error': str(e)}
 
 def reset_visualization():
     """

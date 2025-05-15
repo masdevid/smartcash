@@ -7,15 +7,11 @@ from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.dataset.split.components.split_component import create_split_ui
 from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
-from smartcash.ui.dataset.split.handlers.visualization_handler import setup_visualization_handler
 
 def setup_split_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
     """Setup handler spesifik untuk modul split dataset"""
     # Setup handlers (non-singleton)
     setup_button_handlers(ui_components, config, env)
-    
-    # Setup visualisasi handlers
-    setup_visualization_handler(ui_components, config, env)
     
     # Register cleanup handler untuk slider
     from IPython import get_ipython

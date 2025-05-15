@@ -14,6 +14,7 @@ from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indi
 from smartcash.common.config.manager import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.io import save_yaml
 from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_ui_from_config, update_config_from_ui
 
 logger = get_logger(__name__)
@@ -64,7 +65,16 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         
         # Simpan konfigurasi ke file di Google Drive
         drive_config_file = os.path.join(drive_config_dir, 'training_config.yaml')
-        success = config_manager.save_config(config, drive_config_file)
+        # Gunakan save_config dengan parameter yang benar
+        success = config_manager.save_config(drive_config_file, create_dirs=True)
+        
+        # Simpan konfigurasi ke file di Google Drive menggunakan save_yaml
+        try:
+            save_yaml(config, drive_config_file)
+            success = True
+        except Exception as e:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan ke file: {str(e)}")
+            success = False
         
         # Tampilkan status
         with ui_components['status']:

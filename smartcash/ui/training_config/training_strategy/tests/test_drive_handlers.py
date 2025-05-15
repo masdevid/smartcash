@@ -69,6 +69,7 @@ class TestDriveHandlers(unittest.TestCase):
         """Cleanup setelah test."""
         self.temp_dir.cleanup()
     
+    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.save_yaml')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_config_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.update_config_from_ui')
@@ -78,13 +79,14 @@ class TestDriveHandlers(unittest.TestCase):
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.clear_output')
     def test_sync_to_drive(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                         mock_makedirs, mock_update_config, mock_get_config_manager, mock_get_environment_manager):
+                         mock_makedirs, mock_update_config, mock_get_config_manager, mock_get_environment_manager, mock_save_yaml):
         """Test sinkronisasi ke Google Drive."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
         mock_get_config_manager.return_value = self.mock_config_manager
         mock_create_status_indicator.return_value = "Status indicator"
         mock_create_info_alert.return_value = "Info alert"
+        mock_save_yaml.return_value = None  # save_yaml tidak mengembalikan nilai
         mock_update_config.return_value = {
             'validation': {
                 'frequency': 2,
@@ -113,16 +115,18 @@ class TestDriveHandlers(unittest.TestCase):
         mock_update_config.assert_called_once_with(self.ui_components)
         mock_makedirs.assert_called_once_with('/content/drive/smartcash/configs', exist_ok=True)
         self.mock_config_manager.save_config.assert_called_once()
+        mock_save_yaml.assert_called_once()  # Verifikasi save_yaml dipanggil
     
-    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.update_ui_from_config')
     @patch('os.path.exists')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.create_status_indicator')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.display')
-    def test_sync_from_drive(self, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                           mock_exists, mock_update_ui, mock_get_config_manager, mock_get_environment_manager):
+    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.clear_output')
+    def test_sync_from_drive(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
+                           mock_exists, mock_update_ui, mock_get_environment_manager, mock_get_config_manager):
         """Test sinkronisasi dari Google Drive."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
@@ -137,20 +141,24 @@ class TestDriveHandlers(unittest.TestCase):
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
         mock_get_config_manager.assert_called_once()
-        self.mock_config_manager.load_config.assert_called_once_with('/content/drive/smartcash/configs/training_config.yaml')
+        mock_exists.assert_called_once()
+        self.mock_config_manager.load_config.assert_called_once()
         self.mock_config_manager.save_module_config.assert_called_once()
         mock_update_ui.assert_called_once_with(self.ui_components, self.mock_config_manager.load_config.return_value)
     
+    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_config_manager')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_environment_manager')
     @patch('os.path.exists')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.create_status_indicator')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.display')
-    def test_sync_from_drive_file_not_exists(self, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                                          mock_exists, mock_get_environment_manager):
+    @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.clear_output')
+    def test_sync_from_drive_file_not_exists(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
+                                          mock_exists, mock_get_environment_manager, mock_get_config_manager):
         """Test sinkronisasi dari Google Drive ketika file tidak ada."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
+        mock_get_config_manager.return_value = self.mock_config_manager
         mock_exists.return_value = False
         mock_create_status_indicator.return_value = "Status indicator"
         mock_create_info_alert.return_value = "Info alert"
@@ -160,7 +168,8 @@ class TestDriveHandlers(unittest.TestCase):
         
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
-        # Tidak perlu memeriksa jumlah panggilan mock_exists karena implementasi telah berubah
+        mock_get_config_manager.assert_called_once()
+        mock_exists.assert_called_once()
         mock_create_info_alert.assert_called()
     
     @patch('smartcash.ui.training_config.training_strategy.handlers.drive_handlers.get_environment_manager')

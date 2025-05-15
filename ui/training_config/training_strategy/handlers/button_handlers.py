@@ -4,6 +4,7 @@ Deskripsi: Handler untuk tombol pada komponen UI strategi pelatihan
 """
 
 from typing import Dict, Any, Optional, Callable
+import os
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 
@@ -170,6 +171,19 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
             'on_save_click': on_save_click,
             'on_reset_click': on_reset_click
         })
+        
+        # Sinkronisasi otomatis dari Google Drive saat inisialisasi jika tersedia
+        try:
+            if env.is_drive_mounted:
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Memeriksa konfigurasi dari Google Drive...")
+                # Cek file konfigurasi di Google Drive
+                drive_config_file = os.path.join(env.drive_path, 'smartcash', 'configs', 'training_config.yaml')
+                if os.path.exists(drive_config_file):
+                    # Load konfigurasi dari Google Drive
+                    sync_from_drive(None, ui_components)
+        except Exception as e:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal memeriksa konfigurasi dari Google Drive: {str(e)}")
+            # Tidak perlu menampilkan pesan error ke pengguna karena ini hanya pemeriksaan awal
         
         return ui_components
     except Exception as e:

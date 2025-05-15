@@ -62,3 +62,45 @@ def ensure_valid_aug_types(aug_types: Any) -> List[str]:
     
     # Fallback ke default jika tipe tidak dikenali
     return default_aug_types
+
+def safe_convert_type(value: Any, target_type: type, default_value: Any = None) -> Any:
+    """Konversi nilai ke tipe target dengan aman.
+    
+    Args:
+        value: Nilai yang akan dikonversi
+        target_type: Tipe target (str, int, float, bool)
+        default_value: Nilai default jika konversi gagal
+        
+    Returns:
+        Nilai yang sudah dikonversi atau default_value jika konversi gagal
+    """
+    if value is None:
+        return default_value
+        
+    try:
+        if target_type == bool and isinstance(value, str):
+            # Konversi string ke boolean dengan lebih aman
+            return value.lower() in ('true', 'yes', 'y', '1', 'on')
+        return target_type(value)
+    except (ValueError, TypeError):
+        return default_value
+
+def validate_ui_component_value(component: Any, expected_type: type, default_value: Any = None) -> Any:
+    """Validasi nilai komponen UI dengan tipe yang diharapkan.
+    
+    Args:
+        component: Komponen UI
+        expected_type: Tipe yang diharapkan
+        default_value: Nilai default jika validasi gagal
+        
+    Returns:
+        Nilai yang sudah divalidasi
+    """
+    if component is None or not hasattr(component, 'value'):
+        return default_value
+        
+    try:
+        value = component.value
+        return safe_convert_type(value, expected_type, default_value)
+    except Exception:
+        return default_value

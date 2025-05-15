@@ -12,6 +12,11 @@ from IPython.display import display
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS, COLORS
 
+# Import persistensi di level modul untuk memastikan tersedia di semua fungsi
+from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
+    ensure_ui_persistence, get_augmentation_config, save_augmentation_config
+)
+
 def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
     Setup handler untuk konfigurasi augmentasi dengan persistensi yang ditingkatkan.
@@ -24,10 +29,7 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Gunakan ConfigManager untuk persistensi
-    from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
-        ensure_ui_persistence, get_augmentation_config
-    )
+    # ConfigManager untuk persistensi sudah diimport di level modul
     # Pastikan ui_components tidak None
     if ui_components is None:
         ui_components = {}
@@ -254,8 +256,8 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
     Returns:
         Boolean status keberhasilan
     """
-    # Gunakan ConfigManager untuk persistensi
-    from smartcash.ui.dataset.augmentation.handlers.config_persistence import save_augmentation_config as save_config_to_manager
+    # ConfigManager untuk persistensi sudah diimport di level modul
+    save_config_to_manager = save_augmentation_config  # Alias untuk kompatibilitas
     logger = None
     try:
         # Ambil logger dari lingkungan jika tersedia
@@ -340,8 +342,7 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
     Returns:
         Dictionary konfigurasi
     """
-    # Gunakan ConfigManager untuk persistensi
-    from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_augmentation_config
+    # ConfigManager untuk persistensi sudah diimport di level modul
     logger = None
     
     # Validasi ui_components untuk mencegah error NoneType is not iterable
@@ -437,8 +438,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Pastikan persistensi UI components
-    from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_ui_persistence
+    # ConfigManager untuk persistensi sudah diimport di level modul
     # Validasi parameter untuk mencegah error NoneType is not iterable
     if ui_components is None:
         import logging

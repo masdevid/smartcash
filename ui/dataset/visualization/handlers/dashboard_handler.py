@@ -18,75 +18,14 @@ from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.ui.dataset.visualization.components.dashboard_cards import (
     create_preprocessing_cards, create_augmentation_cards
 )
+from smartcash.ui.dataset.visualization.components.split_stats_cards import create_split_stats_cards
 from smartcash.ui.utils.loading_indicator import create_loading_indicator, LoadingIndicator
 
 logger = get_logger(__name__)
 
 
-def create_dashboard_handler() -> Dict[str, Any]:
-    """
-    Buat handler untuk dashboard visualisasi dataset.
-    
-    Returns:
-        Dictionary berisi komponen UI dan handler
-    """
-    # Buat container untuk dashboard
-    container = widgets.VBox([], layout=widgets.Layout(width='100%'))
-    
-    # Buat panel status
-    status_panel = widgets.Output(layout=widgets.Layout(width='100%', margin='5px 0'))
-    
-    # Buat loading indicator
-    loading_indicator = create_loading_indicator(
-        message="Mempersiapkan dashboard", 
-        is_indeterminate=False,
-        auto_hide=True
-    )
-    
-    # Buat container untuk kartu preprocessing dan augmentasi
-    preprocessing_cards = widgets.Output(layout=widgets.Layout(width='100%'))
-    augmentation_cards = widgets.Output(layout=widgets.Layout(width='100%'))
-    
-    # Buat tombol refresh
-    refresh_button = widgets.Button(
-        description='Refresh Dashboard',
-        icon='sync',
-        button_style='info',
-        layout=widgets.Layout(width='auto', margin='10px 0')
-    )
-    
-    # Tambahkan komponen ke container
-    container.children = [
-        status_panel,
-        preprocessing_cards,
-        augmentation_cards,
-        refresh_button
-    ]
-    
-    # Setup handler untuk tombol refresh
-    refresh_button.on_click(
-        lambda b: update_dashboard_cards({
-            'dashboard_handler': {
-                'status': status_panel,
-                'preprocessing_cards': preprocessing_cards,
-                'augmentation_cards': augmentation_cards,
-                'loading_indicator': loading_indicator,
-                'refresh_button': refresh_button
-            }
-        })
-    )
-    
-    # Buat dictionary untuk handler
-    handler = {
-        'container': container,
-        'status': status_panel,
-        'preprocessing_cards': preprocessing_cards,
-        'augmentation_cards': augmentation_cards,
-        'loading_indicator': loading_indicator,
-        'refresh_button': refresh_button
-    }
-    
-    return handler
+# Fungsi create_dashboard_handler telah dihapus karena tidak lagi digunakan
+# Komponen dashboard sekarang dibuat langsung di visualization_initializer.py
 
 
 def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
@@ -98,11 +37,11 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
     """
     try:
         # Ambil komponen UI
-        dashboard_handler = ui_components.get('dashboard_handler', {})
-        status_panel = dashboard_handler.get('status')
-        preprocessing_cards = dashboard_handler.get('preprocessing_cards')
-        augmentation_cards = dashboard_handler.get('augmentation_cards')
-        loading_indicator = dashboard_handler.get('loading_indicator')
+        status_panel = ui_components.get('status_panel')
+        preprocessing_cards = ui_components.get('preprocessing_cards')
+        augmentation_cards = ui_components.get('augmentation_cards')
+        split_stats_cards = ui_components.get('split_stats_cards')
+        loading_indicator = ui_components.get('loading_indicator')
         
         # Tampilkan loading indicator jika ada
         if loading_indicator:
@@ -133,7 +72,7 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
             else:
                 # Perbarui loading indicator jika ada
                 if loading_indicator:
-                    loading_indicator.update(50, "Mengambil statistik dataset...")
+                    loading_indicator.update(40, "Mengambil statistik dataset...")
                     
                 # Dapatkan statistik dataset
                 stats = dataset_service.get_dataset_statistics(dataset_path)
@@ -146,10 +85,15 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         if using_dummy_data:
             # Perbarui loading indicator jika ada
             if loading_indicator:
-                loading_indicator.update(50, "Menyiapkan data dummy...")
+                loading_indicator.update(40, "Menyiapkan data dummy...")
             
             # Gunakan data dummy
             stats = {
+                'split': {
+                    'train': {'images': 1400, 'labels': 1400},
+                    'val': {'images': 300, 'labels': 300},
+                    'test': {'images': 300, 'labels': 300}
+                },
                 'preprocessing': {
                     'processed_images': 2000,
                     'filtered_images': 2000,
@@ -174,7 +118,17 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         
         # Perbarui loading indicator jika ada
         if loading_indicator:
-            loading_indicator.update(75, "Memperbarui kartu dashboard...")
+            loading_indicator.update(60, "Memperbarui statistik split...")
+        
+        # Update split stats cards
+        if split_stats_cards:
+            with split_stats_cards:
+                clear_output(wait=True)
+                display(create_split_stats_cards(stats))
+        
+        # Perbarui loading indicator jika ada
+        if loading_indicator:
+            loading_indicator.update(75, "Memperbarui kartu preprocessing dan augmentasi...")
         
         # Update preprocessing cards
         if preprocessing_cards:

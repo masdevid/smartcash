@@ -1,13 +1,19 @@
 """
 File: smartcash/ui/cells/cell_2_5_dataset_visualization.py
-Deskripsi: Entry point untuk visualisasi dataset dengan pendekatan DRY
+Deskripsi: Entry point untuk visualisasi dataset dengan pendekatan minimalis
 """
 
 from IPython.display import display, clear_output
 import ipywidgets as widgets
-from smartcash.ui.dataset.visualization.visualization_initializer import initialize_visualization_ui
+import sys
+import os
+
+# Pastikan path modul dapat diakses
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
 from smartcash.ui.utils.loading_indicator import create_loading_indicator
 from smartcash.common.logger import get_logger
+from smartcash.ui.dataset.visualization.visualization_initializer_new import initialize_visualization_ui
 
 def setup_dataset_visualization():
     """Setup dan tampilkan UI visualisasi dataset dengan pendekatan minimalis."""
@@ -36,4 +42,7 @@ def setup_dataset_visualization():
         return {'error': str(e)}
 
 # Eksekusi saat modul diimpor
-ui_components = setup_dataset_visualization()
+if __name__ == "__main__":
+    ui_components = setup_dataset_visualization()
+else:
+    ui_components = setup_dataset_visualization()

@@ -10,6 +10,12 @@ from IPython.display import display, clear_output
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.logger import get_logger
+from smartcash.ui.info_boxes.hyperparameters_info import (
+    get_hyperparameters_info,
+    get_basic_hyperparameters_info,
+    get_optimization_hyperparameters_info,
+    get_advanced_hyperparameters_info
+)
 
 logger = get_logger(__name__)
 
@@ -136,8 +142,6 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
-    # Import info box
-    from smartcash.ui.info_boxes.hyperparameters_info import get_basic_hyperparameters_info
     # Batch size slider
     batch_size_slider = widgets.IntSlider(
         value=16,
@@ -200,13 +204,9 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
         'augment_checkbox': augment_checkbox
     }
     
-    # Buat info box untuk parameter dasar
-    basic_info = get_basic_hyperparameters_info(open_by_default=False)
-    
     # Basic box
     basic_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Dasar</h3>'),
-        basic_info,
         batch_size_slider,
         image_size_slider,
         epochs_slider,
@@ -229,8 +229,6 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
-    # Import info box
-    from smartcash.ui.info_boxes.hyperparameters_info import get_optimization_hyperparameters_info
     # Optimizer dropdown
     optimizer_dropdown = widgets.Dropdown(
         options=['SGD', 'Adam', 'AdamW', 'RMSprop'],
@@ -360,7 +358,6 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
     # Optimization box
     optimization_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Optimasi</h3>'),
-        optimization_info,
         optimizer_dropdown,
         learning_rate_slider,
         momentum_slider,
@@ -388,8 +385,6 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
     Returns:
         Dict berisi komponen UI
     """
-    # Import info box
-    from smartcash.ui.info_boxes.hyperparameters_info import get_advanced_hyperparameters_info
     # Early stopping checkbox
     early_stopping_enabled_checkbox = widgets.Checkbox(
         value=True,
@@ -480,13 +475,9 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         margin='10px 0'
     ))
     
-    # Buat info box untuk parameter lanjutan
-    advanced_info = get_advanced_hyperparameters_info(open_by_default=False)
-    
     # Advanced box
     advanced_box = widgets.VBox([
         widgets.HTML('<h3>Parameter Lanjutan</h3>'),
-        advanced_info,
         early_stopping_box,
         checkpoint_box
     ], layout=widgets.Layout(
@@ -571,10 +562,9 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     Returns:
         Dict berisi semua komponen UI
     """
-    # Import tab factory dan info box
+    # Import tab factory
     from smartcash.ui.components.tab_factory import create_tab_widget
     from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.info_boxes.hyperparameters_info import get_hyperparameters_info
     
     # Buat komponen UI
     basic_components = create_hyperparameters_basic_components()
@@ -656,11 +646,38 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     # Set tab yang aktif
     tabs.selected_index = 0
     
+    # Buat info boxes untuk footer
+    basic_info = get_basic_hyperparameters_info(open_by_default=False)
+    optimization_info = get_optimization_hyperparameters_info(open_by_default=False)
+    advanced_info = get_advanced_hyperparameters_info(open_by_default=False)
+    
+    # Buat footer dengan info boxes
+    footer_info = widgets.VBox([
+        widgets.HTML("<h4>Informasi Parameter</h4>"),
+        widgets.HBox([
+            basic_info,
+            optimization_info,
+            advanced_info
+        ], layout=widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='row wrap',
+            align_items='flex-start',
+            justify_content='space-between'
+        ))
+    ], layout=widgets.Layout(
+        width='100%',
+        margin='20px 0 0 0',
+        padding='10px',
+        border_top='1px solid #ddd'
+    ))
+    
     # Buat container utama
     main_container = widgets.VBox([
         header,
         tabs,
-        button_components['status']
+        button_components['status'],
+        footer_info
     ], layout=widgets.Layout(width='100%', padding='10px'))
     
     ui_components['main_container'] = main_container

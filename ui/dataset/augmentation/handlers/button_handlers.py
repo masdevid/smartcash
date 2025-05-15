@@ -55,6 +55,9 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Pastikan persistensi UI components
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_ui_persistence
+    ensure_ui_persistence(ui_components)
     logger = ui_components.get('logger')
     
     # Penanganan error dengan decorator standar
@@ -85,10 +88,14 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         ui_components['augment_button'].layout.display = 'none'
         ui_components['stop_button'].layout.display = 'block'
         
-        # Update konfigurasi dari UI dan simpan
+        # Update konfigurasi dari UI dan simpan dengan ConfigManager
         try:
+            from smartcash.ui.dataset.augmentation.handlers.config_persistence import save_augmentation_config
             updated_config = ui_components['update_config_from_ui'](ui_components, config)
-            ui_components['save_augmentation_config'](updated_config)
+            success = save_augmentation_config(updated_config)
+            if not success and logger:
+                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi ke ConfigManager, mencoba fallback")
+                ui_components['save_augmentation_config'](updated_config)
             if logger: logger.info(f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan")
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
@@ -116,7 +123,12 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                 if extracted_prefix is not None and isinstance(extracted_prefix, str) and extracted_prefix.strip():
                     aug_prefix = extracted_prefix
             
-            # Factor (sekarang di posisi 2)
+            # Dapatkan jenis augmentasi dengan validasi yang lebih kuat
+            from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_valid_aug_types
+            aug_value = ui_components['aug_options'].children[0].value
+            aug_types = ensure_valid_aug_types(aug_value)
+            
+            # Faktor (sekarang di posisi 2)
             if hasattr(ui_components['aug_options'].children[2], 'value'):
                 extracted_factor = ui_components['aug_options'].children[2].value
                 if extracted_factor is not None and isinstance(extracted_factor, (int, float)) and extracted_factor > 0:
@@ -175,7 +187,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             config_manager = get_config_manager()
             
             # Pastikan nilai tetap selalu valid
-            aug_types = ['Combined (Recommended)']  # Nilai tetap
+            aug_types = ensure_valid_aug_types(aug_types)
             
             # Validasi parameter lain dengan utilitas validasi
             try:
@@ -250,12 +262,12 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                 if logger: logger.warning(f"{ICONS['warning']} Error saat menyimpan konfigurasi: {str(e)}")
             
             # Log parameter final yang akan digunakan
-            if logger: logger.info(f"{ICONS['info']} Parameter augmentasi final: aug_types=Combined (Recommended), split=train, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}")
+            if logger: logger.info(f"{ICONS['info']} Parameter augmentasi final: aug_types={aug_types}, split=train, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}")
             
             # Lakukan augmentasi dengan parameter yang sudah divalidasi dan error handling yang lebih baik
             try:
                 # Log parameter yang akan digunakan untuk augmentasi
-                if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split=train, types=Combined, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}, workers={num_workers}")
+                if logger: logger.info(f"{ICONS['info']} Menjalankan augmentasi dengan parameter: split=train, types={aug_types}, factor={aug_factor}, prefix={aug_prefix}, balance={balance_classes}, workers={num_workers}")
                 
                 # Pastikan input dan output direktori ada
                 import os
@@ -285,7 +297,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                 try:
                     result = augmentation_service.augment_dataset(
                         split='train',  # Nilai tetap
-                        augmentation_types=['Combined (Recommended)'],  # Nilai tetap
+                        augmentation_types=aug_types,
                         num_variations=aug_factor,
                         output_prefix=aug_prefix,
                         target_balance=balance_classes,
@@ -304,7 +316,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                     result = direct_augment(
                         input_dir=str(input_dir),
                         output_dir=str(output_dir),
-                        augmentation_types=['Combined (Recommended)'],
+                        augmentation_types=aug_types,
                         num_variations=aug_factor,
                         output_prefix=aug_prefix,
                         target_balance=balance_classes,
@@ -411,61 +423,61 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     # Reset handler untuk reset button
     def on_reset_click(b):
         """Reset UI dan konfigurasi ke default."""
-        # Validasi ui_components
-        if ui_components is None:
-            if logger: logger.error(f"{ICONS['error']} ui_components adalah None saat reset augmentation")
-            return
+        with ui_components['status']: 
+            clear_output(wait=True)
+            display(create_status_indicator("info", f"{ICONS['processing']} Mereset konfigurasi augmentasi..."))
             
-        # Reset UI
+        # Reset UI ke default
         reset_ui(ui_components)
         
-        # Load konfigurasi default dan update UI
         try:
-            # Pastikan fungsi load_augmentation_config tersedia
-            if 'load_augmentation_config' not in ui_components or not callable(ui_components.get('load_augmentation_config')):
-                # Jika tidak tersedia, import langsung
-                from smartcash.ui.dataset.augmentation.handlers.config_handlers import load_augmentation_config
-                default_config = load_augmentation_config(ui_components=ui_components)
-            else:
-                # Pastikan parameter ui_components diteruskan ke load_augmentation_config
-                default_config = ui_components['load_augmentation_config'](ui_components=ui_components)
+            # Load default config dengan ConfigManager
+            from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_augmentation_config, save_augmentation_config
             
-            # Pastikan fungsi update_ui_from_config tersedia
-            if 'update_ui_from_config' not in ui_components or not callable(ui_components.get('update_ui_from_config')):
-                # Jika tidak tersedia, import langsung
-                from smartcash.ui.dataset.augmentation.handlers.config_handlers import update_ui_from_config
-                update_ui_from_config(ui_components, default_config)
-            else:
-                ui_components['update_ui_from_config'](ui_components, default_config)
+            # Default config untuk augmentasi
+            default_config = {
+                "augmentation": {
+                    "input_dir": "data/preprocessed",
+                    "output_dir": "data/augmented",
+                    "types": ["Combined (Recommended)"],
+                    "prefix": "aug",
+                    "factor": 2,
+                    "target_split": "train",
+                    "balance_classes": True,
+                    "num_workers": 4,
+                    "enabled": True
+                },
+                "data": {
+                    "dir": "data"
+                }
+            }
             
-            # Deteksi state augmentation
-            from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
-            detect_augmentation_state(ui_components)
+            # Update UI dari default config
+            ui_components['update_ui_from_config'](ui_components, default_config)
             
-            # Tampilkan pesan sukses dengan validasi
-            if 'status' in ui_components and ui_components['status'] is not None:
-                try:
-                    with ui_components['status']: 
-                        display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
-                except Exception as status_error:
-                    if logger: logger.warning(f"{ICONS['warning']} Error saat update status: {str(status_error)}")
+            # Simpan default config ke ConfigManager
+            success = save_augmentation_config(default_config)
+            if not success:
+                # Fallback ke metode lama jika ConfigManager gagal
+                ui_components['save_augmentation_config'](default_config)
+                
+            # Pastikan persistensi UI components
+            from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_ui_persistence
+            ensure_ui_persistence(ui_components)
             
-            # Update status panel dengan validasi
-            try:
-                update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi direset ke nilai default")
-            except Exception as panel_error:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat update status panel: {str(panel_error)}")
-            
-            # Log success
-            if logger: logger.success(f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke nilai default")
+            # Update status
+            with ui_components['status']: 
+                clear_output(wait=True)
+                display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi berhasil direset ke default"))
+                
+            if logger: logger.info(f"{ICONS['success']} Konfigurasi berhasil direset ke default")
         except Exception as e:
-            # Jika gagal reset konfigurasi, tampilkan pesan error dengan validasi
-            if 'status' in ui_components and ui_components['status'] is not None:
-                try:
-                    with ui_components['status']: 
-                        display(create_status_indicator("warning", f"{ICONS['warning']} Reset sebagian: {str(e)}"))
-                except Exception:
-                    pass
+            # Update status
+            with ui_components['status']: 
+                clear_output(wait=True)
+                display(create_status_indicator("error", f"{ICONS['error']} Error saat mereset konfigurasi: {str(e)}"))
+                
+            if logger: logger.error(f"{ICONS['error']} Error saat mereset konfigurasi: {str(e)}")
             
             # Update status panel dengan validasi
             try:

@@ -24,6 +24,10 @@ def setup_augmentation_config_handler(ui_components: Dict[str, Any], config: Dic
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Gunakan ConfigManager untuk persistensi
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
+        ensure_ui_persistence, get_augmentation_config
+    )
     # Pastikan ui_components tidak None
     if ui_components is None:
         ui_components = {}
@@ -227,6 +231,9 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
     # Simpan referensi config di ui_components untuk memastikan persistensi
     ui_components['config'] = config
     
+    # Pastikan persistensi UI components dengan ConfigManager
+    ensure_ui_persistence(ui_components)
+    
     # Validasi final untuk memastikan aug_types tidak None
     if config['augmentation'].get('types') is None:
         config['augmentation']['types'] = ['Combined (Recommended)']
@@ -247,6 +254,8 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
     Returns:
         Boolean status keberhasilan
     """
+    # Gunakan ConfigManager untuk persistensi
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import save_augmentation_config as save_config_to_manager
     logger = None
     try:
         # Ambil logger dari lingkungan jika tersedia
@@ -254,40 +263,37 @@ def save_augmentation_config(config: Dict[str, Any], config_path: str = "configs
             from smartcash.common.logger import get_logger
             logger = get_logger("augmentation_config")
         except ImportError:
-            pass
-        
-        # Buat deep copy untuk mencegah modifikasi tidak sengaja
-        save_config = copy.deepcopy(config)
-        
-        # Pastikan direktori config ada
-        Path(config_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Cek jika file sudah ada, baca dulu untuk mempertahankan konfigurasi lain
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                existing_config = yaml.safe_load(f) or {}
-                
-            # Merge existing config dengan config baru, prioritaskan config baru
-            merged_config = copy.deepcopy(existing_config)
+            logger = None
             
-            # Update augmentation section dengan deep merge
-            if 'augmentation' in save_config:
-                if 'augmentation' not in merged_config:
-                    merged_config['augmentation'] = {}
-                merged_config['augmentation'].update(save_config['augmentation'])
+        # Validasi config
+        if config is None:
+            if logger: logger.warning("⚠️ config adalah None, membuat dictionary kosong")
+            config = {}
             
-            # Update data section jika ada
-            if 'data' in save_config:
-                if 'data' not in merged_config:
-                    merged_config['data'] = {}
-                merged_config['data'].update(save_config['data'])
-                    
-            # Gunakan config yang sudah di-merge
-            save_config = merged_config
-        
-        # Simpan ke file dengan YAML
-        with open(config_path, 'w') as f:
-            yaml.dump(save_config, f, default_flow_style=False)
+        # Pastikan struktur config benar
+        if 'augmentation' not in config:
+            config['augmentation'] = {}
+    
+        # Simpan ke ConfigManager (metode utama)
+        success = save_config_to_manager(config)
+        if success:
+            if logger: logger.info("✅ Konfigurasi augmentasi berhasil disimpan ke ConfigManager")
+            return True
+            
+        # Fallback ke metode lama jika ConfigManager gagal
+        try:
+            # Pastikan path ada
+            config_dir = os.path.dirname(config_path)
+            os.makedirs(config_dir, exist_ok=True)
+            
+            # Simpan konfigurasi
+            with open(config_path, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False, allow_unicode=True)
+            if logger: logger.info(f"✅ Konfigurasi augmentasi berhasil disimpan ke {config_path}")
+            return True
+        except Exception as e:
+            if logger: logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+            return False
         
         # Coba sync dengan drive jika tersedia
         try:
@@ -334,106 +340,19 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
     Returns:
         Dictionary konfigurasi
     """
+    # Gunakan ConfigManager untuk persistensi
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_augmentation_config
     logger = None
     
     # Validasi ui_components untuk mencegah error NoneType is not iterable
     if ui_components is None:
         ui_components = {}
-        # Setup logger jika ui_components None
-        try:
-            import logging
-            logger = logging.getLogger('augmentation_config')
-            logger.warning("⚠️ ui_components adalah None saat load_augmentation_config")
-            
-            # Coba dapatkan logger dari environment jika tersedia
-            try:
-                from smartcash.common.logger import get_logger
-                logger = get_logger("augmentation_config")
-            except ImportError:
-                pass
-        except Exception:
-            pass
     
-    try:
-        # Ambil logger dari lingkungan atau ui_components
-        if ui_components and 'logger' in ui_components:
-            logger = ui_components['logger']
-        else:
-            try:
-                from smartcash.common.logger import get_logger
-                logger = get_logger("augmentation_config")
-            except ImportError:
-                pass
-            
-        # Cek apakah ada config tersimpan di ui_components
-        if ui_components and 'config' in ui_components and ui_components['config']:
-            if logger: logger.info("ℹ️ Menggunakan konfigurasi dari UI components")
-            return ui_components['config']
-            
-        # Coba load dari Google Drive terlebih dahulu
-        try:
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            
-            if env_manager.is_drive_mounted:
-                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
-                
-                # Cek apakah path sama dengan realpath untuk mencegah error symlink
-                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
-                elif os.path.exists(drive_config_path):
-                    # Baca langsung dari file drive untuk mendapatkan versi terbaru
-                    with open(drive_config_path, 'r') as f:
-                        drive_config = yaml.safe_load(f)
-                        
-                    if drive_config:
-                        # Salin juga ke lokal untuk digunakan sebagai cache
-                        os.makedirs(Path(config_path).parent, exist_ok=True)
-                        with open(config_path, 'w') as f:
-                            yaml.dump(drive_config, f, default_flow_style=False)
-                            
-                        if logger: logger.info(f"📥 Konfigurasi dimuat dari drive: {drive_config_path}")
-                        
-                        # Simpan ke ui_components jika tersedia
-                        if ui_components: ui_components['config'] = drive_config
-                        return drive_config
-        except (ImportError, AttributeError) as e:
-            if logger: logger.debug(f"ℹ️ Tidak dapat memuat dari drive: {str(e)}")
-        
-        # Load dari ConfigManager jika tersedia untuk konsistensi
-        try:
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
-            
-            # Paksa reload untuk mendapatkan data terbaru
-            full_config = config_manager.load_config(config_path)
-            
-            if full_config and ('augmentation' in full_config or 'data' in full_config):
-                if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path} via ConfigManager")
-                
-                # Simpan ke ui_components jika tersedia
-                if ui_components: ui_components['config'] = full_config
-                return full_config
-        except (ImportError, AttributeError):
-            pass
-        
-        # Fallback: Load dari local file
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f) or {}
-                if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path}")
-                
-                # Verifikasi struktur dasar config ada
-                if 'augmentation' not in config: config['augmentation'] = {}
-                if 'data' not in config: config['data'] = {}
-                
-                # Simpan ke ui_components jika tersedia
-                if ui_components: ui_components['config'] = config
-                return config
-    except Exception as e:
-        if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
+    # Ambil logger dari ui_components jika tersedia
+    if 'logger' in ui_components:
+        logger = ui_components['logger']
     
-    # Default config jika tidak ada file
+    # Default config
     default_config = {
         "augmentation": {
             "input_dir": "data/preprocessed",
@@ -451,10 +370,59 @@ def load_augmentation_config(config_path: str = "configs/augmentation_config.yam
         }
     }
     
-    if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
+    # Flag untuk status loading
+    loaded = False
+    config = {}
     
-    # Simpan default config ke ui_components jika tersedia
-    if ui_components: ui_components['config'] = default_config
+    try:
+        # Coba load dari ConfigManager (metode utama)
+        try:
+            from smartcash.common.logger import get_logger
+            if logger is None:
+                logger = get_logger("augmentation_config")
+        except ImportError:
+            pass
+                
+        # Load dari ConfigManager
+        config = get_augmentation_config(default_config)
+        
+        if config and 'augmentation' in config:
+            if logger: logger.info("✅ Konfigurasi augmentasi dimuat dari ConfigManager")
+            loaded = True
+        else:
+            # Fallback ke metode lama jika ConfigManager gagal
+            try:
+                # Coba load dari path yang diberikan
+                if os.path.exists(config_path):
+                    with open(config_path, 'r') as f:
+                        config = yaml.safe_load(f) or {}
+                    if logger: logger.info(f"✅ Konfigurasi augmentasi dimuat dari {config_path}")
+                    loaded = True
+                else:
+                    # Coba load dari path alternatif
+                    alt_config_path = os.path.join('smartcash', 'configs', os.path.basename(config_path))
+                    if os.path.exists(alt_config_path):
+                        with open(alt_config_path, 'r') as f:
+                            config = yaml.safe_load(f) or {}
+                        if logger: logger.info(f"✅ Konfigurasi augmentasi dimuat dari {alt_config_path}")
+                        loaded = True
+            except Exception as e:
+                if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi dari file: {str(e)}")
+                loaded = False
+    except Exception as e:
+        if logger: logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
+        loaded = False
+    
+    # Jika tidak berhasil dimuat, gunakan default
+    if not loaded or not config:
+        if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
+        config = default_config
+    
+    # Pastikan struktur config lengkap
+    if 'augmentation' not in config:
+        config['augmentation'] = default_config['augmentation']
+    if 'data' not in config:
+        config['data'] = default_config['data']
     
     return default_config
 
@@ -469,6 +437,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Pastikan persistensi UI components
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_ui_persistence
     # Validasi parameter untuk mencegah error NoneType is not iterable
     if ui_components is None:
         import logging

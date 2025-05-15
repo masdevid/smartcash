@@ -22,6 +22,9 @@ def detect_augmentation_state(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Pastikan persistensi UI components
+    from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_ui_persistence
+    ensure_ui_persistence(ui_components)
     logger = ui_components.get('logger')
     
     try:
@@ -194,22 +197,14 @@ def generate_augmentation_summary(ui_components: Dict[str, Any], preprocessed_di
         # Hitung durasi (tidak diketahui dari loaded files)
         duration = 0
         
-        # Dapatkan jenis augmentasi dengan validasi yang lebih kuat
+        # Dapatkan jenis augmentasi dengan validasi yang lebih kuat menggunakan helper
+        from smartcash.ui.dataset.augmentation.handlers.config_persistence import ensure_valid_aug_types
+        
         aug_types = []
         if 'aug_options' in ui_components and hasattr(ui_components['aug_options'], 'children'):
             try:
                 aug_value = ui_components['aug_options'].children[0].value
-                if aug_value is not None:
-                    if isinstance(aug_value, (list, tuple)):
-                        aug_types = list(aug_value)
-                    elif isinstance(aug_value, str):
-                        aug_types = [aug_value]
-                    else:
-                        # Jika tipe tidak dikenali, gunakan default
-                        aug_types = ['Combined (Recommended)']
-                else:
-                    # Jika nilai None, gunakan default
-                    aug_types = ['Combined (Recommended)']
+                aug_types = ensure_valid_aug_types(aug_value)
             except Exception as e:
                 # Jika terjadi error, gunakan default
                 aug_types = ['Combined (Recommended)']

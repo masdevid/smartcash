@@ -54,7 +54,7 @@ def initialize_split_ui() -> Dict[str, Any]:
     }
     
     # Tombol yang perlu diattach dengan ui_components
-    button_keys = ['visualize_button', 'save_button', 'reset_button']
+    button_keys = ['save_button', 'reset_button']
     
     # Gunakan base initializer
     return initialize_module_ui(

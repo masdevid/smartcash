@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/split/components/split_component.py
-Deskripsi: Komponen UI untuk konfigurasi pembagian dataset dengan tombol visualisasi on-demand
+Deskripsi: Komponen UI untuk konfigurasi pembagian dataset tanpa visualisasi
 """
 
 import ipywidgets as widgets
@@ -11,7 +11,7 @@ from smartcash.dataset.utils.dataset_constants import DRIVE_DATASET_PATH, DRIVE_
 
 def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi split dataset dengan visualisasi on-demand.
+    Buat komponen UI untuk konfigurasi split dataset tanpa visualisasi.
     
     Args:
         env: Environment manager
@@ -38,7 +38,7 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Header
     header = create_header(f"{ICONS['dataset']} Konfigurasi Split Dataset", 
-                         "Konfigurasi dan visualisasi dataset untuk training, validation, dan testing")
+                         "Konfigurasi pembagian dataset untuk training, validation, dan testing")
     
     # Card panel di awal
     card_panel = widgets.HTML(value=f"""
@@ -49,13 +49,13 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
             <p>Konfigurasi pembagian dataset untuk training, validation, dan testing.</p>
             <ul style="padding-left:20px">
                 <li>Sesuaikan proporsi dataset dengan slider</li>
-                <li>Visualisasikan distribusi kelas untuk memastikan keseimbangan</li>
                 <li>Simpan konfigurasi untuk digunakan pada tahap training</li>
+                <li>Konfigurasi ini hanya memperbarui dataset_config.yaml</li>
             </ul>
         </div>
     """)
     
-    # Output box untuk visualisasi, status, dan log
+    # Output box untuk status dan log
     output_box = widgets.Output(
         layout=widgets.Layout(
             margin='10px 0',
@@ -75,10 +75,10 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Current statistics panel
-    current_stats_html = widgets.HTML(
+    # Informasi konfigurasi panel
+    config_info_html = widgets.HTML(
         value=f"""<div style="text-align:center; padding:15px;">
-                <p style="color:{COLORS['muted']};">{ICONS['processing']} Memuat statistik dataset...</p>
+                <p style="color:{COLORS['muted']};">{ICONS['info']} Konfigurasi split dataset akan disimpan di dataset_config.yaml</p>
                </div>""",
         layout=widgets.Layout(margin='10px 0')
     )
@@ -163,17 +163,9 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Info notice
     split_notice = create_info_alert(
-        f"Perlu diperhatikan bahwa split dataset sudah dilakukan melalui Roboflow. " +
-        f"Pengaturan ini hanya digunakan untuk konfigurasi dan visualisasi distribusi dataset.",
+        f"Perlu diperhatikan bahwa pengaturan ini hanya digunakan untuk memperbarui konfigurasi split di dataset_config.yaml " +
+        f"dan tidak melakukan visualisasi atau pemrosesan data apapun.",
         "info"
-    )
-    
-    # Visualisasi button
-    visualize_button = widgets.Button(
-        description='Visualisasi Distribusi Kelas',
-        button_style='info',
-        icon='chart-bar',
-        layout=widgets.Layout(margin='0 5px 0 0')
     )
     
     # Button container
@@ -199,22 +191,17 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         buttons_container = widgets.HBox([save_button, reset_button], 
             layout=widgets.Layout(display='flex', justify_content='flex-end'))
     
-    # Kombinasikan semua tombol dalam satu baris
+    # Gunakan buttons_container langsung
     # Pastikan buttons_container adalah widget, bukan dictionary
-    if isinstance(buttons_container, dict) and 'container' in buttons_container:
-        buttons_widget = buttons_container['container']
-    else:
-        buttons_widget = buttons_container
-        
-    all_buttons = widgets.HBox([
-        visualize_button,
-        buttons_widget
-    ], layout=widgets.Layout(
+    all_buttons = buttons_container
+    
+    # Atur layout
+    all_buttons.layout = widgets.Layout(
         display='flex', 
-        justify_content='space-between',
+        justify_content='flex-end',
         margin='10px 0',
         align_items='center'
-    ))
+    )
     
     # Info box
     info_box = get_split_info()
@@ -224,7 +211,7 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         header,
         status_panel,
         split_notice,
-        current_stats_html,
+        config_info_html,
         split_panel,
         advanced_accordion,
         widgets.HTML("<hr style='margin: 15px 0; border: 0; border-top: 1px solid #eee;'>"),
@@ -239,14 +226,13 @@ def create_split_ui(env=None, config=None) -> Dict[str, Any]:
         'header': header,
         'status_panel': status_panel,
         'output_box': output_box,
-        'current_stats_html': current_stats_html,
+        'config_info_html': config_info_html,
         'split_panel': split_panel,
         'split_sliders': [train_slider, valid_slider, test_slider],
         'stratified': stratified_checkbox,
         'advanced_options': advanced_options,
         'data_paths': data_paths,
         'buttons_container': buttons_container,
-        'visualize_button': visualize_button,
         'module_name': 'split_config'
     }
     

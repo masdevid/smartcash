@@ -1,229 +1,291 @@
 """
 File: smartcash/ui/training_config/backbone/handlers/config_handlers.py
-Deskripsi: Handler untuk operasi konfigurasi backbone model
+Deskripsi: Handler untuk konfigurasi pada UI pemilihan backbone model SmartCash
 """
 
 from typing import Dict, Any, Optional
-import yaml
-from pathlib import Path
-import os
+import ipywidgets as widgets
+from IPython.display import clear_output
+
 from smartcash.ui.utils.constants import ICONS
+from smartcash.common.config.manager import ConfigManager
+from smartcash.common.logger import get_logger
 
-def load_default_config() -> Dict[str, Any]:
+logger = get_logger(__name__)
+
+def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Load konfigurasi default untuk backbone model.
+    Update konfigurasi dari komponen UI.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
     
     Returns:
-        Dictionary berisi konfigurasi default
+        Dictionary berisi konfigurasi yang diperbarui
     """
-    # Import ModelManager untuk mendapatkan model yang dioptimalkan
-    try:
-        from smartcash.model.manager import ModelManager
-        
-        # Default config berdasarkan model yang dioptimalkan
-        default_model_type = 'efficient_basic'
-        
-        # Pastikan model type ada dalam OPTIMIZED_MODELS
-        if hasattr(ModelManager, 'OPTIMIZED_MODELS') and default_model_type in ModelManager.OPTIMIZED_MODELS:
-            default_model_config = ModelManager.OPTIMIZED_MODELS[default_model_type]
-        else:
-            # Fallback jika model tidak ditemukan
-            default_model_config = {
-                'backbone': 'efficientnet_b4',
-                'use_attention': False,
-                'use_residual': False,
-                'use_ciou': False
-            }
-        
-        return {
-            'model': {
-                'type': default_model_type,
-                'backbone': default_model_config['backbone'],
-                'backbone_pretrained': True,
-                'backbone_freeze': False,
-                'use_attention': default_model_config.get('use_attention', False),
-                'use_residual': default_model_config.get('use_residual', False),
-                'use_ciou': default_model_config.get('use_ciou', False)
-            }
+    # Dapatkan ConfigManager
+    config_manager = ConfigManager.get_instance()
+    
+    # Dapatkan konfigurasi saat ini
+    current_config = config_manager.get_module_config('model')
+    
+    # Dapatkan nilai dari komponen UI
+    model_type = ui_components.get('model_type_dropdown').value
+    backbone = ui_components.get('backbone_dropdown').value
+    use_attention = ui_components.get('use_attention_checkbox').value
+    use_residual = ui_components.get('use_residual_checkbox').value
+    use_ciou = ui_components.get('use_ciou_checkbox').value
+    
+    # Update konfigurasi model
+    if 'model' not in current_config:
+        current_config['model'] = {}
+    
+    current_config['model']['type'] = model_type
+    current_config['model']['backbone'] = backbone
+    current_config['model']['use_attention'] = use_attention
+    current_config['model']['use_residual'] = use_residual
+    current_config['model']['use_ciou'] = use_ciou
+    
+    # Pastikan konfigurasi eksperimen juga diperbarui
+    if 'experiments' not in current_config:
+        current_config['experiments'] = {
+            'backbones': [],
+            'scenarios': []
         }
-    except Exception as e:
-        print(f"{ICONS['error']} Error saat memuat konfigurasi default backbone: {str(e)}")
-        # Fallback ke konfigurasi minimal
-        return {
-            'model': {
-                'type': 'efficient_basic',
-                'backbone': 'efficientnet_b4',
-                'backbone_pretrained': True,
-                'backbone_freeze': False,
-                'use_attention': False,
-                'use_residual': False,
-                'use_ciou': False
+    
+    # Pastikan backbone yang dipilih ada dalam daftar backbones
+    backbone_exists = False
+    for backbone_config in current_config['experiments']['backbones']:
+        if backbone_config.get('config', {}).get('backbone') == backbone:
+            backbone_exists = True
+            break
+    
+    if not backbone_exists:
+        backbone_name = 'EfficientNet-B4' if backbone == 'efficientnet_b4' else 'CSPDarknet-S'
+        backbone_desc = 'EfficientNet-B4 backbone' if backbone == 'efficientnet_b4' else 'YOLOv5s default backbone'
+        
+        current_config['experiments']['backbones'].append({
+            'name': backbone,
+            'description': backbone_desc,
+            'config': {
+                'backbone': backbone,
+                'pretrained': True
             }
-        }
-
-def load_config() -> Dict[str, Any]:
-    """
-    Load konfigurasi backbone model dari file YAML.
+        })
     
-    Returns:
-        Dictionary berisi konfigurasi backbone model
-    """
-    try:
-        # Path ke file konfigurasi model
-        config_path = Path("config/model_config.yaml")
-        if not config_path.exists():
-            # Coba cari di lokasi alternatif
-            alt_path = Path("../config/model_config.yaml")
-            if alt_path.exists():
-                config_path = alt_path
-            else:
-                return load_default_config()
-        
-        # Load konfigurasi dari file
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        # Pastikan struktur konfigurasi benar
-        if not config:
-            config = {}
-        if 'model' not in config:
-            config['model'] = {}
-        
-        return config
-    except Exception as e:
-        print(f"{ICONS['error']} Error saat memuat konfigurasi backbone model: {str(e)}")
-        # Kembalikan konfigurasi default
-        return load_default_config()
-
-def save_config(config: Dict[str, Any]) -> bool:
-    """
-    Simpan konfigurasi backbone model ke file YAML.
+    # Pastikan skenario yang sesuai dengan konfigurasi saat ini ada dalam daftar scenarios
+    scenario_exists = False
+    for scenario_config in current_config['experiments']['scenarios']:
+        if (scenario_config.get('config', {}).get('type') == model_type and
+            scenario_config.get('config', {}).get('backbone') == backbone and
+            scenario_config.get('config', {}).get('use_attention') == use_attention and
+            scenario_config.get('config', {}).get('use_residual') == use_residual and
+            scenario_config.get('config', {}).get('use_ciou') == use_ciou):
+            scenario_exists = True
+            break
     
-    Args:
-        config: Konfigurasi yang akan disimpan
+    if not scenario_exists:
+        scenario_name = f"{model_type}_{backbone}"
+        if use_attention or use_residual or use_ciou:
+            scenario_name += "_optimized"
         
-    Returns:
-        Boolean yang menunjukkan keberhasilan penyimpanan
-    """
-    try:
-        # Path ke file konfigurasi model
-        config_path = Path("config/model_config.yaml")
-        
-        # Buat direktori jika belum ada
-        os.makedirs(config_path.parent, exist_ok=True)
-        
-        # Simpan konfigurasi ke file
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
-        
-        # Coba sinkronkan dengan drive jika tersedia
-        try:
-            from google.colab import drive
-            # Cek apakah drive sudah di-mount
-            if os.path.exists('/content/drive'):
-                # Copy file ke drive
-                drive_path = Path("/content/drive/MyDrive/smartcash/config/model_config.yaml")
-                os.makedirs(drive_path.parent, exist_ok=True)
-                with open(drive_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
-                print(f"{ICONS['success']} Konfigurasi berhasil disinkronkan dengan Google Drive")
-        except ImportError:
-            # Bukan di Google Colab, abaikan
-            pass
-        
-        return True
-    except Exception as e:
-        print(f"{ICONS['error']} Error saat menyimpan konfigurasi backbone model: {str(e)}")
-        return False
-
-def get_config_manager_instance():
-    """
-    Dapatkan instance ConfigManager jika tersedia.
-    
-    Returns:
-        Instance ConfigManager atau None jika tidak tersedia
-    """
-    try:
-        from smartcash.common.config.manager import get_config_manager
-        return get_config_manager()
-    except Exception as e:
-        print(f"{ICONS['warning']} Gagal mendapatkan instance ConfigManager: {str(e)}")
-        return None
-
-def save_config_with_manager(config: Dict[str, Any], ui_components: Dict[str, Any], logger=None) -> bool:
-    """
-    Simpan konfigurasi menggunakan ConfigManager dengan fallback.
-    
-    Args:
-        config: Konfigurasi aplikasi
-        ui_components: Dictionary komponen UI
-        logger: Logger untuk logging
-        
-    Returns:
-        Boolean yang menunjukkan keberhasilan penyimpanan
-    """
-    success = False
-    
-    # Coba simpan dengan ConfigManager terlebih dahulu
-    config_manager = get_config_manager_instance()
-    if config_manager:
-        try:
-            # Pastikan UI components terdaftar untuk persistensi
-            config_manager.register_ui_components('backbone_model', ui_components)
-            # Simpan konfigurasi
-            success = config_manager.save_module_config('model', config)
-            if logger: logger.debug(f"{ICONS['info']} Konfigurasi disimpan melalui ConfigManager: {success}")
-        except Exception as e:
-            if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan dengan ConfigManager: {str(e)}")
-            # Fallback ke metode save_config tradisional
-            success = save_config(config)
-    else:
-        # Fallback ke metode save_config tradisional
-        success = save_config(config)
-    
-    return success
-
-def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Update konfigurasi dari nilai UI.
-    
-    Args:
-        config: Konfigurasi aplikasi
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Konfigurasi yang diupdate
-    """
-    # Pastikan struktur konfigurasi benar
-    if not config:
-        config = {}
-    if 'model' not in config:
-        config['model'] = {}
-    
-    # Simpan model_type yang dipilih
-    if 'model_type' in ui_components:
-        config['model']['type'] = ui_components['model_type'].value
+        scenario_desc = f"Model dengan backbone {backbone}"
+        if use_attention or use_residual or use_ciou:
+            optimizations = []
+            if use_attention:
+                optimizations.append("FeatureAdapter")
+            if use_residual:
+                optimizations.append("ResidualAdapter")
+            if use_ciou:
+                optimizations.append("CIoU")
             
-    # Simpan backbone dan pengaturan dasar
-    if 'backbone_type' in ui_components:
-        config['model']['backbone'] = ui_components['backbone_type'].value
+            scenario_desc += f" dengan optimasi: {', '.join(optimizations)}"
+        
+        current_config['experiments']['scenarios'].append({
+            'name': scenario_name,
+            'description': scenario_desc,
+            'config': {
+                'type': model_type,
+                'backbone': backbone,
+                'use_attention': use_attention,
+                'use_residual': use_residual,
+                'use_ciou': use_ciou
+            }
+        })
     
-    # Sesuaikan fitur optimasi berdasarkan model yang dipilih
-    model_type = config['model'].get('type', 'efficient_basic')
+    return current_config
+
+def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional[Dict[str, Any]] = None) -> None:
+    """
+    Update komponen UI dari konfigurasi.
     
-    # Import ModelManager untuk mendapatkan model yang dioptimalkan
-    from smartcash.model.manager import ModelManager
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        config_to_use: Dictionary berisi konfigurasi yang akan digunakan (opsional)
+    """
+    # Dapatkan ConfigManager
+    config_manager = ConfigManager.get_instance()
     
-    # Default semua fitur optimasi ke False
-    config['model']['use_attention'] = False
-    config['model']['use_residual'] = False
-    config['model']['use_ciou'] = False
+    # Dapatkan konfigurasi
+    current_config = config_to_use if config_to_use else config_manager.get_module_config('model')
     
-    # Jika model_type ada dalam OPTIMIZED_MODELS, gunakan fitur optimasi dari model tersebut
-    if hasattr(ModelManager, 'OPTIMIZED_MODELS') and model_type in ModelManager.OPTIMIZED_MODELS:
-        model_config = ModelManager.OPTIMIZED_MODELS[model_type]
-        config['model']['use_attention'] = model_config.get('use_attention', False)
-        config['model']['use_residual'] = model_config.get('use_residual', False)
-        config['model']['use_ciou'] = model_config.get('use_ciou', False)
+    # Dapatkan nilai dari konfigurasi
+    model_config = current_config.get('model', {})
+    model_type = model_config.get('type', 'efficient_basic')
+    backbone = model_config.get('backbone', 'efficientnet_b4')
+    use_attention = model_config.get('use_attention', False)
+    use_residual = model_config.get('use_residual', False)
+    use_ciou = model_config.get('use_ciou', False)
     
-    return config
+    # Validasi nilai
+    valid_model_types = ['efficient_basic', 'yolov5s']
+    valid_backbones = ['efficientnet_b4', 'cspdarknet_s']
+    
+    if model_type not in valid_model_types:
+        logger.warning(f"{ICONS.get('warning', '⚠️')} Model type tidak valid: {model_type}, menggunakan default: efficient_basic")
+        model_type = 'efficient_basic'
+    
+    if backbone not in valid_backbones:
+        logger.warning(f"{ICONS.get('warning', '⚠️')} Backbone tidak valid: {backbone}, menggunakan default: efficientnet_b4")
+        backbone = 'efficientnet_b4'
+    
+    # Update komponen UI
+    model_type_dropdown = ui_components.get('model_type_dropdown')
+    backbone_dropdown = ui_components.get('backbone_dropdown')
+    use_attention_checkbox = ui_components.get('use_attention_checkbox')
+    use_residual_checkbox = ui_components.get('use_residual_checkbox')
+    use_ciou_checkbox = ui_components.get('use_ciou_checkbox')
+    
+    if model_type_dropdown:
+        model_type_dropdown.value = model_type
+    
+    if backbone_dropdown:
+        backbone_dropdown.value = backbone
+    
+    if use_attention_checkbox:
+        use_attention_checkbox.value = use_attention
+        use_attention_checkbox.disabled = (backbone == 'cspdarknet_s')
+    
+    if use_residual_checkbox:
+        use_residual_checkbox.value = use_residual
+        use_residual_checkbox.disabled = (backbone == 'cspdarknet_s')
+    
+    if use_ciou_checkbox:
+        use_ciou_checkbox.value = use_ciou
+        use_ciou_checkbox.disabled = (backbone == 'cspdarknet_s')
+    
+    # Update info panel
+    update_backbone_info(ui_components)
+
+def update_backbone_info(ui_components: Dict[str, Any]) -> None:
+    """
+    Update panel informasi backbone.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+    """
+    info_panel = ui_components.get('info_panel')
+    if not info_panel:
+        logger.error(f"{ICONS.get('error', '❌')} Info panel tidak ditemukan")
+        return
+    
+    # Dapatkan nilai dari komponen UI
+    model_type = ui_components.get('model_type_dropdown').value
+    backbone = ui_components.get('backbone_dropdown').value
+    use_attention = ui_components.get('use_attention_checkbox').value
+    use_residual = ui_components.get('use_residual_checkbox').value
+    use_ciou = ui_components.get('use_ciou_checkbox').value
+    
+    with info_panel:
+        clear_output(wait=True)
+        
+        # Tampilkan informasi backbone
+        if backbone == 'efficientnet_b4':
+            display(widgets.HTML("""
+            <div style="padding: 10px; border-left: 3px solid #4CAF50; background-color: #f8f9fa;">
+                <h4 style="margin-top: 0;">EfficientNet-B4</h4>
+                <p><strong>Deskripsi:</strong> Backbone yang dioptimalkan untuk deteksi mata uang dengan performa tinggi.</p>
+                <p><strong>Karakteristik:</strong></p>
+                <ul>
+                    <li>Width Coefficient: 1.4</li>
+                    <li>Depth Coefficient: 1.8</li>
+                    <li>Resolution: 380px</li>
+                    <li>Parameter: ~19M</li>
+                </ul>
+                <p><strong>Kelebihan:</strong> Akurasi tinggi, efisien untuk deteksi objek kecil seperti mata uang.</p>
+            </div>
+            """))
+        elif backbone == 'cspdarknet_s':
+            display(widgets.HTML("""
+            <div style="padding: 10px; border-left: 3px solid #2196F3; background-color: #f8f9fa;">
+                <h4 style="margin-top: 0;">CSPDarknet-S</h4>
+                <p><strong>Deskripsi:</strong> Backbone default YOLOv5s yang ringan dan cepat.</p>
+                <p><strong>Karakteristik:</strong></p>
+                <ul>
+                    <li>Depth Multiple: 0.33</li>
+                    <li>Width Multiple: 0.50</li>
+                    <li>Parameter: ~7M</li>
+                </ul>
+                <p><strong>Kelebihan:</strong> Kecepatan inferensi tinggi, cocok untuk perangkat dengan komputasi terbatas.</p>
+            </div>
+            """))
+        
+        # Tampilkan informasi optimasi
+        if backbone == 'efficientnet_b4':
+            optimizations = []
+            if use_attention:
+                optimizations.append("""
+                <div style="margin-top: 10px; padding: 10px; border-left: 3px solid #FF9800; background-color: #f8f9fa;">
+                    <h5 style="margin-top: 0;">FeatureAdapter (Attention)</h5>
+                    <p>Mekanisme attention untuk meningkatkan fokus pada fitur penting mata uang.</p>
+                    <p><strong>Efek:</strong> Meningkatkan akurasi deteksi +3-5%, terutama untuk mata uang yang rusak atau terlipat.</p>
+                </div>
+                """)
+            
+            if use_residual:
+                optimizations.append("""
+                <div style="margin-top: 10px; padding: 10px; border-left: 3px solid #9C27B0; background-color: #f8f9fa;">
+                    <h5 style="margin-top: 0;">ResidualAdapter</h5>
+                    <p>Koneksi residual tambahan untuk mempertahankan informasi resolusi tinggi.</p>
+                    <p><strong>Efek:</strong> Meningkatkan deteksi detail halus pada mata uang seperti hologram dan watermark.</p>
+                </div>
+                """)
+            
+            if use_ciou:
+                optimizations.append("""
+                <div style="margin-top: 10px; padding: 10px; border-left: 3px solid #E91E63; background-color: #f8f9fa;">
+                    <h5 style="margin-top: 0;">CIoU Loss</h5>
+                    <p>Complete-IoU Loss untuk regresi bounding box yang lebih akurat.</p>
+                    <p><strong>Efek:</strong> Meningkatkan presisi lokalisasi mata uang, terutama saat tumpang tindih.</p>
+                </div>
+                """)
+            
+            if optimizations:
+                display(widgets.HTML("<h4>Optimasi yang Diaktifkan</h4>"))
+                for opt in optimizations:
+                    display(widgets.HTML(opt))
+            else:
+                display(widgets.HTML("""
+                <div style="margin-top: 10px; padding: 10px; border-left: 3px solid #607D8B; background-color: #f8f9fa;">
+                    <p>Tidak ada optimasi khusus yang diaktifkan. Aktifkan optimasi untuk meningkatkan performa model.</p>
+                </div>
+                """))
+        
+        # Tampilkan informasi model type
+        display(widgets.HTML("<h4>Tipe Model</h4>"))
+        if model_type == 'efficient_basic':
+            display(widgets.HTML("""
+            <div style="padding: 10px; border-left: 3px solid #3F51B5; background-color: #f8f9fa;">
+                <h5 style="margin-top: 0;">EfficientNet Basic</h5>
+                <p>Model dasar dengan EfficientNet sebagai backbone dan YOLOv5 sebagai detektor.</p>
+                <p><strong>Karakteristik:</strong> Seimbang antara akurasi dan kecepatan, optimal untuk deteksi mata uang.</p>
+            </div>
+            """))
+        elif model_type == 'yolov5s':
+            display(widgets.HTML("""
+            <div style="padding: 10px; border-left: 3px solid #00BCD4; background-color: #f8f9fa;">
+                <h5 style="margin-top: 0;">YOLOv5s</h5>
+                <p>Model YOLOv5s standar dengan CSPDarknet sebagai backbone.</p>
+                <p><strong>Karakteristik:</strong> Kecepatan tinggi, ukuran model kecil, cocok untuk deployment di perangkat terbatas.</p>
+            </div>
+            """))

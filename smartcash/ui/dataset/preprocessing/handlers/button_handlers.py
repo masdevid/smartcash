@@ -14,11 +14,10 @@ from smartcash.ui.utils.alert_utils import create_status_indicator
 # update_status_panel diimpor tapi tidak digunakan langsung (digunakan dalam execution_handler)
 
 # Import handler terpisah untuk SRP
-from smartcash.ui.dataset.preprocessing.handlers.config_handler import (
-    save_preprocessing_config  # ensure_ui_persistence, get_preprocessing_config tidak digunakan langsung
-)
-# observer_handler tidak digunakan langsung (menggunakan import langsung dari smartcash.components.observer)
-from smartcash.ui.dataset.preprocessing.handlers.execution_handler import run_preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.config_handler import save_preprocessing_config
+from smartcash.ui.dataset.preprocessing.handlers.service_handler import run_preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.parameter_handler import validate_preprocessing_params
+from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import sync_config_with_drive, ensure_ui_persistence
 from smartcash.ui.dataset.preprocessing.handlers.initialization_handler import initialize_preprocessing_directories
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -65,10 +64,14 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             # Gunakan config handler untuk update konfigurasi dari UI
             updated_config = ui_components['update_config_from_ui'](ui_components, config)
             success = save_preprocessing_config(updated_config)
-            if success and logger:
-                logger.info(f"{ICONS['success']} Konfigurasi preprocessing berhasil disimpan")
+            
+            # Sinkronkan konfigurasi dengan drive
+            drive_sync_success = sync_config_with_drive(ui_components)
+            
+            if success and drive_sync_success and logger:
+                logger.info(f"{ICONS['success']} Konfigurasi preprocessing berhasil disimpan dan tersinkron dengan drive")
             else:
-                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi preprocessing")
+                logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi preprocessing atau menyinkronkan dengan drive")
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
         
@@ -304,9 +307,9 @@ def reset_ui(ui_components: Dict[str, Any]) -> None:
         with ui_components['status']: 
             clear_output()
     
-    # Reset accordion
+    # Buka log accordion secara default
     if 'log_accordion' in ui_components:
-        ui_components['log_accordion'].selected_index = None
+        ui_components['log_accordion'].selected_index = 0
 
 def get_dataset_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = None, logger=None):
     """
@@ -324,10 +327,10 @@ def get_dataset_manager(ui_components: Dict[str, Any], config: Dict[str, Any] = 
     if 'dataset_manager' in ui_components and ui_components['dataset_manager']:
         return ui_components['dataset_manager']
     
-    # Gunakan fallback_utils untuk konsistensi
+    # Gunakan service_handler untuk konsistensi
     try:
-        from smartcash.ui.utils.fallback_utils import get_dataset_manager
-        dataset_manager = get_dataset_manager(config, logger)
+        from smartcash.ui.dataset.preprocessing.handlers.service_handler import get_dataset_manager as get_manager
+        dataset_manager = get_manager(ui_components, config, logger)
         
         # Register progress callback jika tersedia
         try:

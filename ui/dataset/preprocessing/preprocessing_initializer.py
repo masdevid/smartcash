@@ -8,12 +8,18 @@ from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.dataset.preprocessing.components.preprocessing_component import create_preprocessing_ui
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import setup_preprocessing_config_handler
 from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
-from smartcash.ui.handlers.visualization_handler import setup_visualization_handlers
+from smartcash.ui.dataset.preprocessing.handlers.preprocessing_service_handler import initialize_preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
     """Setup handler spesifik untuk modul preprocessing"""
-    # Setup visualization handlers dengan shared handler
-    return setup_visualization_handlers(ui_components, module_name='preprocessing', env=env, config=config)
+    # Setup button handlers
+    ui_components = setup_button_handlers(ui_components, env, config)
+    
+    # Pastikan persistensi konfigurasi
+    ui_components = initialize_preprocessing(ui_components)
+    
+    return ui_components
 
 def initialize_preprocessing_ui() -> Dict[str, Any]:
     """Inisialisasi UI modul preprocessing dataset."""

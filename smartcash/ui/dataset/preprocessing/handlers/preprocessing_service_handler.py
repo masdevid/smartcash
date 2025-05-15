@@ -1,190 +1,116 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/preprocessing_service_handler.py
-Deskripsi: Handler untuk interaksi dengan service preprocessing dataset
+Deskripsi: Handler utama untuk preprocessing dataset (menggunakan SRP files)
 """
 
 from typing import Dict, Any, Optional
-import os
-from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 
-logger = get_logger("preprocessing_service")
+# Import handler SRP files
+from smartcash.ui.dataset.preprocessing.handlers.service_handler import get_dataset_manager, run_preprocessing
+from smartcash.ui.dataset.preprocessing.handlers.parameter_handler import extract_preprocess_params, validate_preprocessing_params
+from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import ensure_ui_persistence, get_preprocessing_config, sync_config_with_drive
 
-def get_dataset_manager(ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None, custom_logger=None) -> Any:
+logger = get_logger("preprocessing_handler")
+
+def setup_preprocessing_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dapatkan instance dataset manager untuk preprocessing.
+    Setup semua handler untuk preprocessing dataset.
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi tambahan (opsional)
-        custom_logger: Logger kustom (opsional)
-        
-    Returns:
-        Instance dataset manager atau None jika gagal
-    """
-    logger = custom_logger or ui_components.get('logger', get_logger("preprocessing_service"))
-    
-    try:
-        # Import dataset manager
-        from smartcash.dataset.services.dataset_manager import DatasetManager
-        
-        # Dapatkan path dari UI components
-        data_dir = ui_components.get('data_dir', 'data')
-        preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
-        
-        # Pastikan path dalam bentuk string
-        data_dir_str = str(data_dir) if isinstance(data_dir, Path) else data_dir
-        preprocessed_dir_str = str(preprocessed_dir) if isinstance(preprocessed_dir, Path) else preprocessed_dir
-        
-        # Buat instance dataset manager
-        dataset_manager = DatasetManager(
-            dataset_dir=data_dir_str,
-            preprocessed_dir=preprocessed_dir_str,
-            logger=logger
-        )
-        
-        # Update konfigurasi jika tersedia
-        if config and hasattr(dataset_manager, 'config'):
-            # Update konfigurasi dataset
-            if 'data' in config:
-                dataset_manager.config.update({
-                    'dataset_dir': data_dir_str,
-                    'preprocessed_dir': preprocessed_dir_str
-                })
-            
-            # Update konfigurasi preprocessing
-            if 'preprocessing' in config:
-                dataset_manager.config['preprocessing'] = config.get('preprocessing', {})
-        
-        # Log info
-        logger.info(f"{ICONS['info']} Dataset manager berhasil dibuat dengan direktori:")
-        logger.info(f"  - Data: {data_dir_str}")
-        logger.info(f"  - Preprocessed: {preprocessed_dir_str}")
-        
-        return dataset_manager
-    except Exception as e:
-        logger.error(f"{ICONS['error']} Error saat membuat dataset manager: {str(e)}")
-        return None
-
-def extract_preprocess_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Ekstrak parameter preprocessing dari UI components.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Dictionary parameter preprocessing
-    """
-    # Dapatkan opsi preprocessing dari UI
-    preprocess_options = ui_components.get('preprocess_options', {})
-    
-    # Inisialisasi parameter default
-    params = {
-        'force_reprocess': True,
-        'normalize': True,
-        'preserve_aspect_ratio': True,
-        'img_size': 640,
-        'cache_images': True,
-        'num_workers': 4
-    }
-    
-    # Jika preprocess_options tersedia, update params
-    if preprocess_options and hasattr(preprocess_options, 'children'):
-        if len(preprocess_options.children) >= 5:
-            # Ekstrak nilai dari UI components
-            params.update({
-                'img_size': preprocess_options.children[0].value,
-                'normalize': preprocess_options.children[1].value,
-                'preserve_aspect_ratio': preprocess_options.children[2].value,
-                'cache_images': preprocess_options.children[3].value,
-                'num_workers': preprocess_options.children[4].value
-            })
-    
-    # Dapatkan opsi validasi dari UI
-    validation_options = ui_components.get('validation_options', {})
-    
-    # Inisialisasi parameter validasi default
-    validation_params = {
-        'validate': True,
-        'fix_issues': True,
-        'move_invalid': True,
-        'invalid_dir': 'data/invalid'
-    }
-    
-    # Jika validation_options tersedia, update validation_params
-    if validation_options and hasattr(validation_options, 'children'):
-        if len(validation_options.children) >= 4:
-            # Ekstrak nilai dari UI components
-            validation_params.update({
-                'validate': validation_options.children[0].value,
-                'fix_issues': validation_options.children[1].value,
-                'move_invalid': validation_options.children[2].value,
-                'invalid_dir': validation_options.children[3].value
-            })
-    
-    # Gabungkan params dan validation_params
-    params.update(validation_params)
-    
-    return params
-
-def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Pastikan persistensi UI components dengan ConfigManager.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        config: Konfigurasi tambahan (opsional)
         
     Returns:
         Dictionary UI components yang telah diupdate
     """
     try:
-        # Import ConfigManager
-        from smartcash.common.config_manager import ConfigManager
+        # Pastikan persistensi UI components
+        ui_components = ensure_ui_persistence(ui_components)
         
-        # Dapatkan instance ConfigManager
-        config_manager = ConfigManager.get_instance()
+        # Setup button handlers
+        from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
+        ui_components = setup_button_handlers(ui_components)
         
-        # Register UI components untuk persistensi
-        config_manager.register_ui_components('preprocessing', ui_components)
+        # Setup visualization handlers
+        from smartcash.ui.handlers.visualization_handler import setup_visualization_handlers
+        ui_components = setup_visualization_handlers(ui_components, module_name='preprocessing')
         
-        # Dapatkan konfigurasi preprocessing
-        if not config:
-            config = config_manager.get_module_config('preprocessing')
-        
-        # Update UI dari konfigurasi
-        from smartcash.ui.dataset.preprocessing.handlers.config_handler import update_ui_from_config
-        ui_components = update_ui_from_config(ui_components, config)
-        
-        # Log info
-        logger.info(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
-        
+        logger.info(f"{ICONS['success']} Semua handler preprocessing berhasil disetup")
         return ui_components
     except Exception as e:
-        logger.error(f"{ICONS['error']} Error saat memastikan persistensi UI: {str(e)}")
+        logger.error(f"{ICONS['error']} Error saat setup preprocessing handlers: {str(e)}")
         return ui_components
 
-def get_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def run_preprocessing_with_ui(ui_components: Dict[str, Any]) -> bool:
     """
-    Dapatkan konfigurasi preprocessing dari UI components.
+    Jalankan preprocessing dataset dengan UI components.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Dictionary konfigurasi preprocessing
+        Boolean status keberhasilan
     """
-    # Ekstrak parameter preprocessing dari UI
-    preprocess_params = extract_preprocess_params(ui_components)
+    try:
+        # Dapatkan konfigurasi preprocessing dari UI
+        params = get_preprocessing_config(ui_components)
+        
+        # Jalankan preprocessing
+        success = run_preprocessing(ui_components, params)
+        
+        # Update status
+        status_type = 'success' if success else 'error'
+        message = f"{ICONS['success' if success else 'error']} Preprocessing {'berhasil' if success else 'gagal'} dijalankan"
+        
+        # Update status panel
+        from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
+        update_status_panel(ui_components, status_type, message)
+        
+        # Sinkronkan konfigurasi dengan drive
+        sync_config_with_drive(ui_components)
+        
+        return success
+    except Exception as e:
+        logger.error(f"{ICONS['error']} Error saat menjalankan preprocessing: {str(e)}")
+        return False
+
+def initialize_preprocessing(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Inisialisasi preprocessing dengan persistensi konfigurasi.
     
-    # Dapatkan split dari UI
-    split_option = ui_components.get('split_selector', {}).value if 'split_selector' in ui_components else 'All Splits'
-    split_map = {'All Splits': None, 'Train Only': 'train', 'Validation Only': 'valid', 'Test Only': 'test'}
-    split = split_map.get(split_option)
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    try:
+        # Pastikan persistensi UI components
+        ui_components = ensure_ui_persistence(ui_components)
+        
+        # Setup handlers
+        ui_components = setup_preprocessing_handlers(ui_components)
+        
+        # Deteksi state preprocessing
+        from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
+        ui_components = detect_preprocessing_state(ui_components)
+        
+        logger.info(f"{ICONS['success']} Preprocessing berhasil diinisialisasi")
+        return ui_components
+    except Exception as e:
+        logger.error(f"{ICONS['error']} Error saat inisialisasi preprocessing: {str(e)}")
+        return ui_components
+
+# Fungsi utilitas untuk membantu integrasi dengan modul lain
+def get_preprocessing_manager(ui_components: Dict[str, Any]) -> Any:
+    """
+    Dapatkan preprocessing manager untuk integrasi dengan modul lain.
     
-    # Tambahkan split ke parameter
-    preprocess_params['split'] = split
-    
-    return preprocess_params
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Instance preprocessing manager
+    """
+    return get_dataset_manager(ui_components)

@@ -125,7 +125,7 @@ def create_action_buttons(
     
     return buttons_dict
 
-def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dict[str, Any]:
+def create_visualization_buttons(layout: Optional[widgets.Layout] = None, include_distribution: bool = True) -> Dict[str, Any]:
     """
     Buat tombol visualisasi standar untuk tampilan hasil.
     
@@ -153,14 +153,16 @@ def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dic
         layout=widgets.Layout(margin='5px')
     )
     
-    # Tombol distribusi
-    distribution_button = widgets.Button(
-        description='Distribusi Kelas',
-        button_style='info',
-        icon='bar-chart',
-        tooltip="Tampilkan distribusi kelas dataset",
-        layout=widgets.Layout(margin='5px')
-    )
+    # Tombol distribusi (opsional)
+    distribution_button = None
+    if include_distribution:
+        distribution_button = widgets.Button(
+            description='Distribusi Kelas',
+            button_style='info',
+            icon='bar-chart',
+            tooltip="Tampilkan distribusi kelas dataset",
+            layout=widgets.Layout(margin='5px')
+        )
     
     # Default layout
     if not layout:
@@ -174,15 +176,24 @@ def create_visualization_buttons(layout: Optional[widgets.Layout] = None) -> Dic
         )
     
     # Container untuk tombol visualisasi
+    buttons = [visualize_button, compare_button]
+    if distribution_button:
+        buttons.append(distribution_button)
+        
     button_container = widgets.HBox(
-        [visualize_button, compare_button, distribution_button],
+        buttons,
         layout=layout
     )
     
     # Kembalikan dictionary berisi tombol dan container
-    return {
+    result = {
         'visualize_button': visualize_button,
         'compare_button': compare_button,
-        'distribution_button': distribution_button,
         'container': button_container
     }
+    
+    # Tambahkan distribution_button ke result jika ada
+    if distribution_button:
+        result['distribution_button'] = distribution_button
+        
+    return result

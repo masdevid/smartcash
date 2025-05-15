@@ -57,8 +57,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_enabled=True
     )
     
-    # Tombol-tombol visualisasi dengan komponen standar
-    visualization_buttons = create_visualization_buttons()
+    # Tombol-tombol visualisasi dengan komponen standar (tanpa tombol distribusi kelas)
+    visualization_buttons = create_visualization_buttons(include_distribution=False)
     
     # Progress tracking dengan styling standar
     progress_bar = widgets.IntProgress(
@@ -93,8 +93,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Status output dengan layout standar
     status = widgets.Output(layout=OUTPUT_WIDGET)
     
-    # Log accordion dengan styling standar
-    log_accordion = widgets.Accordion(children=[status], selected_index=None)
+    # Log accordion dengan styling standar - terbuka secara default (selected_index=0)
+    log_accordion = widgets.Accordion(children=[status], selected_index=0)
     log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")
     
     # Summary stats container dengan styling yang konsisten
@@ -167,7 +167,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'visualization_buttons': visualization_buttons['container'],
         'visualize_button': visualization_buttons['visualize_button'],
         'compare_button': visualization_buttons['compare_button'],
-        'distribution_button': visualization_buttons['distribution_button'],
+        # 'distribution_button' dihapus karena tidak diperlukan lagi
         'visualization_container': visualization_container,
         'module_name': 'preprocessing',
         # Default dataset paths

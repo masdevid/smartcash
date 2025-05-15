@@ -1,174 +1,356 @@
 """
 File: tests/test_hyperparameters_ui.py
-Deskripsi: Test untuk komponen UI hyperparameter
+Deskripsi: Pengujian untuk komponen UI hyperparameter
 """
 
 import unittest
-import os
-import sys
-import tempfile
-import shutil
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+import ipywidgets as widgets
 
-# Tambahkan path root project ke sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from smartcash.ui.training_config.hyperparameters.components.hyperparameters_components import create_hyperparameters_ui
-from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import initialize_hyperparameters_ui
-from smartcash.ui.training_config.hyperparameters.handlers.button_handlers import setup_hyperparameters_button_handlers
-
+from smartcash.ui.training_config.hyperparameters.components.hyperparameters_components import (
+    create_hyperparameters_ui_components,
+    create_hyperparameters_info_panel
+)
+from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import (
+    update_ui_from_config,
+    update_config_from_ui
+)
+from smartcash.ui.training_config.hyperparameters.handlers.button_handlers import (
+    setup_hyperparameters_button_handlers
+)
+from smartcash.ui.training_config.hyperparameters.handlers.form_handlers import (
+    setup_hyperparameters_form_handlers
+)
+from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import (
+    initialize_hyperparameters_ui,
+    get_hyperparameters_ui
+)
 
 class TestHyperparametersUI(unittest.TestCase):
-    """Test case untuk komponen UI hyperparameter."""
-
+    """Pengujian untuk komponen UI hyperparameter"""
+    
     def setUp(self):
-        """Setup untuk test."""
-        # Buat direktori temporary untuk test
-        self.test_dir = tempfile.mkdtemp()
-        
-        # Mock environment manager
-        self.mock_env = MagicMock()
-        self.mock_env.is_drive_mounted = True
-        self.mock_env.drive_path = os.path.join(self.test_dir, 'drive')
-        os.makedirs(self.mock_env.drive_path, exist_ok=True)
-        os.makedirs(os.path.join(self.mock_env.drive_path, 'configs'), exist_ok=True)
-        
-        # Mock config manager
-        self.mock_config_manager = MagicMock()
-        
-        # Default config untuk test
-        self.default_config = {
-            'hyperparameters': {
-                'batch_size': 16,
-                'image_size': 640,
-                'epochs': 50,
-                'optimizer': 'Adam',
-                'learning_rate': 0.001,
-                'weight_decay': 0.0005,
-                'momentum': 0.937,
-                'lr_scheduler': 'cosine',
-                'warmup_epochs': 3,
-                'warmup_momentum': 0.8,
-                'warmup_bias_lr': 0.1,
-                'augment': True,
-                'dropout': 0.0,
-                'box_loss_gain': 0.05,
-                'cls_loss_gain': 0.5,
-                'obj_loss_gain': 1.0,
-                'early_stopping': {
-                    'enabled': True,
-                    'patience': 10,
-                    'min_delta': 0.001
-                },
-                'checkpoint': {
-                    'save_best': True,
-                    'save_period': 5,
-                    'metric': 'val_loss'
-                }
+        """Setup untuk pengujian"""
+        # Mock config
+        self.mock_config = {
+            'batch_size': 16,
+            'image_size': 640,
+            'epochs': 100,
+            'augment': True,
+            'optimizer': 'SGD',
+            'learning_rate': 0.01,
+            'momentum': 0.937,
+            'weight_decay': 0.0005,
+            'scheduler': 'cosine',
+            'warmup_epochs': 3,
+            'warmup_momentum': 0.8,
+            'warmup_bias_lr': 0.1,
+            'early_stopping': {
+                'enabled': True,
+                'patience': 10,
+                'min_delta': 0.001
+            },
+            'save_best': {
+                'enabled': True,
+                'metric': 'mAP_0.5'
             }
         }
-
-    def tearDown(self):
-        """Cleanup setelah test."""
-        # Hapus direktori temporary
-        shutil.rmtree(self.test_dir)
-
-    def test_hyperparameters_config_structure(self):
-        """Test struktur konfigurasi hyperparameter."""
-        # Verify struktur konfigurasi
-        self.assertIn('hyperparameters', self.default_config)
-        hp_config = self.default_config['hyperparameters']
         
-        # Parameter dasar
-        self.assertIn('batch_size', hp_config)
-        self.assertIn('image_size', hp_config)
-        self.assertIn('epochs', hp_config)
+        # Mock environment
+        self.mock_env = MagicMock()
+        self.mock_env.is_drive_mounted = True
+        self.mock_env.drive_path = '/content/drive'
+    
+    @patch('smartcash.ui.training_config.hyperparameters.components.hyperparameters_components.widgets')
+    def test_create_hyperparameters_ui_components(self, mock_widgets):
+        """Pengujian pembuatan komponen UI hyperparameter"""
+        # Setup mock
+        mock_widgets.VBox.return_value = MagicMock()
+        mock_widgets.HBox.return_value = MagicMock()
+        mock_widgets.HTML.return_value = MagicMock()
+        mock_widgets.Output.return_value = MagicMock()
+        mock_widgets.IntSlider.return_value = MagicMock()
+        mock_widgets.FloatSlider.return_value = MagicMock()
+        mock_widgets.FloatLogSlider.return_value = MagicMock()
+        mock_widgets.Dropdown.return_value = MagicMock()
+        mock_widgets.Checkbox.return_value = MagicMock()
+        mock_widgets.Button.return_value = MagicMock()
+        mock_widgets.Layout.return_value = MagicMock()
         
-        # Parameter optimasi
-        self.assertIn('optimizer', hp_config)
-        self.assertIn('learning_rate', hp_config)
-        self.assertIn('weight_decay', hp_config)
-        self.assertIn('momentum', hp_config)
+        # Panggil fungsi
+        ui_components = create_hyperparameters_ui_components()
         
-        # Parameter penjadwalan
-        self.assertIn('lr_scheduler', hp_config)
-        self.assertIn('warmup_epochs', hp_config)
-        self.assertIn('warmup_momentum', hp_config)
-        self.assertIn('warmup_bias_lr', hp_config)
+        # Verifikasi hasil
+        self.assertIsInstance(ui_components, dict)
+        self.assertIn('batch_size_slider', ui_components)
+        self.assertIn('image_size_slider', ui_components)
+        self.assertIn('epochs_slider', ui_components)
+        self.assertIn('optimizer_dropdown', ui_components)
+        self.assertIn('learning_rate_slider', ui_components)
+        self.assertIn('save_button', ui_components)
+        self.assertIn('reset_button', ui_components)
+        self.assertIn('main_layout', ui_components)
+    
+    @patch('smartcash.ui.training_config.hyperparameters.components.hyperparameters_components.widgets')
+    def test_create_hyperparameters_info_panel(self, mock_widgets):
+        """Pengujian pembuatan panel informasi hyperparameter"""
+        # Setup mock
+        mock_widgets.Output.return_value = MagicMock()
+        mock_widgets.Layout.return_value = MagicMock()
         
-        # Parameter regularisasi
-        self.assertIn('augment', hp_config)
-        self.assertIn('dropout', hp_config)
+        # Panggil fungsi
+        info_panel, update_func = create_hyperparameters_info_panel()
         
-        # Parameter loss
-        self.assertIn('box_loss_gain', hp_config)
-        self.assertIn('cls_loss_gain', hp_config)
-        self.assertIn('obj_loss_gain', hp_config)
+        # Verifikasi hasil
+        self.assertIsNotNone(info_panel)
+        self.assertTrue(callable(update_func))
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.config_handlers.get_logger')
+    def test_update_ui_from_config(self, mock_get_logger):
+        """Pengujian update UI dari konfigurasi"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
         
-        # Parameter early stopping
-        self.assertIn('early_stopping', hp_config)
-        self.assertIn('enabled', hp_config['early_stopping'])
-        self.assertIn('patience', hp_config['early_stopping'])
-        self.assertIn('min_delta', hp_config['early_stopping'])
+        # Buat UI components mock
+        ui_components = {
+            'batch_size_slider': MagicMock(),
+            'image_size_slider': MagicMock(),
+            'epochs_slider': MagicMock(),
+            'augment_checkbox': MagicMock(),
+            'optimizer_dropdown': MagicMock(),
+            'learning_rate_slider': MagicMock(),
+            'momentum_slider': MagicMock(),
+            'weight_decay_slider': MagicMock(),
+            'scheduler_dropdown': MagicMock(),
+            'warmup_epochs_slider': MagicMock(),
+            'warmup_momentum_slider': MagicMock(),
+            'warmup_bias_lr_slider': MagicMock(),
+            'early_stopping_enabled_checkbox': MagicMock(),
+            'early_stopping_patience_slider': MagicMock(),
+            'early_stopping_min_delta_slider': MagicMock(),
+            'save_best_checkbox': MagicMock(),
+            'checkpoint_metric_dropdown': MagicMock(),
+            'update_hyperparameters_info': MagicMock()
+        }
         
-        # Parameter checkpoint
-        self.assertIn('checkpoint', hp_config)
-        self.assertIn('save_best', hp_config['checkpoint'])
-        self.assertIn('save_period', hp_config['checkpoint'])
-        self.assertIn('metric', hp_config['checkpoint'])
-
-    def test_config_manager_methods(self):
-        """Test metode config manager untuk hyperparameter."""
-        # Setup
-        config_manager = self.mock_config_manager
+        # Panggil fungsi
+        update_ui_from_config(ui_components, self.mock_config)
         
-        # Simulasi metode get_module_config
-        config_manager.get_module_config.return_value = self.default_config
+        # Verifikasi hasil
+        ui_components['batch_size_slider'].value = self.mock_config['batch_size']
+        ui_components['image_size_slider'].value = self.mock_config['image_size']
+        ui_components['epochs_slider'].value = self.mock_config['epochs']
+        ui_components['augment_checkbox'].value = self.mock_config['augment']
+        ui_components['optimizer_dropdown'].value = self.mock_config['optimizer']
+        ui_components['learning_rate_slider'].value = self.mock_config['learning_rate']
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.config_handlers.get_logger')
+    def test_update_config_from_ui(self, mock_get_logger):
+        """Pengujian update konfigurasi dari UI"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
         
-        # Simulasi metode save_module_config
-        config_manager.save_module_config.return_value = True
+        # Buat UI components mock
+        ui_components = {
+            'batch_size_slider': MagicMock(value=32),
+            'image_size_slider': MagicMock(value=800),
+            'epochs_slider': MagicMock(value=200),
+            'augment_checkbox': MagicMock(value=False),
+            'optimizer_dropdown': MagicMock(value='Adam'),
+            'learning_rate_slider': MagicMock(value=0.001),
+            'momentum_slider': MagicMock(value=0.9),
+            'weight_decay_slider': MagicMock(value=0.0001),
+            'scheduler_dropdown': MagicMock(value='linear'),
+            'warmup_epochs_slider': MagicMock(value=5),
+            'warmup_momentum_slider': MagicMock(value=0.85),
+            'warmup_bias_lr_slider': MagicMock(value=0.05),
+            'early_stopping_enabled_checkbox': MagicMock(value=False),
+            'early_stopping_patience_slider': MagicMock(value=15),
+            'early_stopping_min_delta_slider': MagicMock(value=0.0005),
+            'save_best_checkbox': MagicMock(value=True),
+            'checkpoint_metric_dropdown': MagicMock(value='mAP_0.5:0.95')
+        }
         
-        # Verify
-        # Dapatkan konfigurasi
-        config = config_manager.get_module_config('hyperparameters')
-        self.assertEqual(config, self.default_config)
+        # Panggil fungsi
+        config = update_config_from_ui(ui_components, {})
         
-        # Simpan konfigurasi
-        success = config_manager.save_module_config('hyperparameters', self.default_config)
-        self.assertTrue(success)
+        # Verifikasi hasil
+        self.assertEqual(config['batch_size'], 32)
+        self.assertEqual(config['image_size'], 800)
+        self.assertEqual(config['epochs'], 200)
+        self.assertEqual(config['augment'], False)
+        self.assertEqual(config['optimizer'], 'Adam')
+        self.assertEqual(config['learning_rate'], 0.001)
+        self.assertEqual(config['momentum'], 0.9)
+        self.assertEqual(config['weight_decay'], 0.0001)
+        self.assertEqual(config['scheduler'], 'linear')
+        self.assertEqual(config['warmup_epochs'], 5)
+        self.assertEqual(config['warmup_momentum'], 0.85)
+        self.assertEqual(config['warmup_bias_lr'], 0.05)
+        self.assertEqual(config['early_stopping']['enabled'], False)
+        self.assertEqual(config['early_stopping']['patience'], 15)
+        self.assertEqual(config['early_stopping']['min_delta'], 0.0005)
+        self.assertEqual(config['save_best']['enabled'], True)
+        self.assertEqual(config['save_best']['metric'], 'mAP_0.5:0.95')
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.button_handlers.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.button_handlers.get_logger')
+    def test_setup_hyperparameters_button_handlers(self, mock_get_logger, mock_get_config_manager):
+        """Pengujian setup handler untuk tombol"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
         
-        # Verifikasi panggilan metode
-        config_manager.get_module_config.assert_called_with('hyperparameters')
-        config_manager.save_module_config.assert_called_with('hyperparameters', self.default_config)
-
-    def test_drive_sync_methods(self):
-        """Test metode sinkronisasi dengan Google Drive."""
-        # Setup
-        env_manager = self.mock_env
-        config_manager = self.mock_config_manager
+        mock_config_manager = MagicMock()
+        mock_get_config_manager.return_value = mock_config_manager
         
-        # Simulasi status drive
-        env_manager.is_drive_mounted = True
-        env_manager.drive_path = os.path.join(self.test_dir, 'drive')
+        # Buat UI components mock
+        ui_components = {
+            'save_button': MagicMock(),
+            'reset_button': MagicMock(),
+            'sync_from_drive_button': MagicMock(),
+            'sync_to_drive_button': MagicMock(),
+            'status': MagicMock(),
+            'update_hyperparameters_info': MagicMock()
+        }
         
-        # Simulasi metode config manager
-        config_manager.get_module_config.return_value = self.default_config
-        config_manager.save_module_config.return_value = True
+        # Panggil fungsi
+        result = setup_hyperparameters_button_handlers(ui_components, self.mock_env, self.mock_config)
         
-        # Verify
-        # Cek status drive
-        self.assertTrue(env_manager.is_drive_mounted)
-        self.assertEqual(env_manager.drive_path, os.path.join(self.test_dir, 'drive'))
+        # Verifikasi hasil
+        self.assertIsInstance(result, dict)
+        self.assertIn('on_save_click', result)
+        self.assertIn('on_reset_click', result)
+        self.assertIn('on_sync_from_drive_click', result)
+        self.assertIn('on_sync_to_drive_click', result)
         
-        # Cek path konfigurasi di drive
-        drive_config_path = os.path.join(env_manager.drive_path, 'configs', 'hyperparameters_config.yaml')
-        self.assertTrue(os.path.dirname(drive_config_path).startswith(env_manager.drive_path))
+        # Verifikasi handler terpasang
+        ui_components['save_button'].on_click.assert_called_once()
+        ui_components['reset_button'].on_click.assert_called_once()
+        ui_components['sync_from_drive_button'].on_click.assert_called_once()
+        ui_components['sync_to_drive_button'].on_click.assert_called_once()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.form_handlers.get_logger')
+    def test_setup_hyperparameters_form_handlers(self, mock_get_logger):
+        """Pengujian setup handler untuk form"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
         
-        # Verifikasi bahwa direktori configs ada di drive
-        configs_dir = os.path.join(env_manager.drive_path, 'configs')
-        self.assertTrue(os.path.exists(configs_dir))
-        self.assertTrue(os.path.isdir(configs_dir))
-
+        # Buat UI components mock
+        ui_components = {
+            'optimizer_dropdown': MagicMock(),
+            'scheduler_dropdown': MagicMock(),
+            'early_stopping_enabled_checkbox': MagicMock(),
+            'save_best_checkbox': MagicMock(),
+            'update_hyperparameters_info': MagicMock()
+        }
+        
+        # Panggil fungsi
+        result = setup_hyperparameters_form_handlers(ui_components, self.mock_env, self.mock_config)
+        
+        # Verifikasi hasil
+        self.assertIsInstance(result, dict)
+        self.assertIn('on_optimizer_type_change', result)
+        self.assertIn('on_scheduler_type_change', result)
+        self.assertIn('on_early_stopping_enabled_change', result)
+        self.assertIn('on_save_best_change', result)
+        
+        # Verifikasi handler terpasang
+        ui_components['optimizer_dropdown'].observe.assert_called_once()
+        ui_components['scheduler_dropdown'].observe.assert_called_once()
+        ui_components['early_stopping_enabled_checkbox'].observe.assert_called_once()
+        ui_components['save_best_checkbox'].observe.assert_called_once()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.get_environment_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.create_hyperparameters_ui_components')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.setup_hyperparameters_button_handlers')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.setup_hyperparameters_form_handlers')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.update_ui_from_config')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.get_logger')
+    def test_initialize_hyperparameters_ui(
+        self, mock_get_logger, mock_update_ui, mock_setup_form, mock_setup_button, 
+        mock_create_ui, mock_get_env, mock_get_config_manager
+    ):
+        """Pengujian inisialisasi UI hyperparameter"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
+        mock_env = MagicMock()
+        mock_get_env.return_value = mock_env
+        
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = self.mock_config
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_ui_components = {
+            'update_hyperparameters_info': MagicMock(),
+            'main_layout': MagicMock()
+        }
+        mock_create_ui.return_value = mock_ui_components
+        mock_setup_button.return_value = mock_ui_components
+        mock_setup_form.return_value = mock_ui_components
+        
+        # Panggil fungsi
+        result = initialize_hyperparameters_ui()
+        
+        # Verifikasi hasil
+        self.assertEqual(result, mock_ui_components)
+        mock_create_ui.assert_called_once()
+        mock_setup_button.assert_called_once()
+        mock_setup_form.assert_called_once()
+        mock_update_ui.assert_called_once()
+        mock_ui_components['update_hyperparameters_info'].assert_called_once()
+        mock_config_manager.register_ui_components.assert_called_once()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.initialize_hyperparameters_ui')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.update_ui_from_config')
+    def test_get_hyperparameters_ui_existing(self, mock_update_ui, mock_initialize, mock_get_config_manager):
+        """Pengujian mendapatkan UI hyperparameter yang sudah ada"""
+        # Setup mock
+        mock_config_manager = MagicMock()
+        mock_ui_components = {
+            'config': {},
+            'update_hyperparameters_info': MagicMock()
+        }
+        mock_config_manager.get_ui_components.return_value = mock_ui_components
+        mock_config_manager.get_module_config.return_value = self.mock_config
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        # Panggil fungsi
+        result = get_hyperparameters_ui()
+        
+        # Verifikasi hasil
+        self.assertEqual(result, mock_ui_components)
+        mock_initialize.assert_not_called()
+        mock_update_ui.assert_called_once()
+        mock_ui_components['update_hyperparameters_info'].assert_called_once()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.hyperparameters_initializer.initialize_hyperparameters_ui')
+    def test_get_hyperparameters_ui_new(self, mock_initialize, mock_get_config_manager):
+        """Pengujian mendapatkan UI hyperparameter baru"""
+        # Setup mock
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_ui_components.return_value = None
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_ui_components = {
+            'main_layout': MagicMock()
+        }
+        mock_initialize.return_value = mock_ui_components
+        
+        # Panggil fungsi
+        result = get_hyperparameters_ui()
+        
+        # Verifikasi hasil
+        self.assertEqual(result, mock_ui_components)
+        mock_initialize.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

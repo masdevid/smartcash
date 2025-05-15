@@ -40,111 +40,107 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
     else:
         current_config = config_to_use
     
-    # Dapatkan konfigurasi hyperparameters
-    hp_config = current_config.get('hyperparameters', {})
-    
-    # Update slider batch size
-    if 'batch_size_slider' in ui_components:
-        ui_components['batch_size_slider'].value = hp_config.get('batch_size', 16)
-    
-    # Update slider image size
-    if 'image_size_slider' in ui_components:
-        ui_components['image_size_slider'].value = hp_config.get('image_size', 640)
-    
-    # Update slider epochs
-    if 'epochs_slider' in ui_components:
-        ui_components['epochs_slider'].value = hp_config.get('epochs', 50)
-    
-    # Update slider learning rate
-    if 'learning_rate_slider' in ui_components:
-        ui_components['learning_rate_slider'].value = hp_config.get('learning_rate', 0.001)
-    
-    # Update dropdown optimizer
-    if 'optimizer_dropdown' in ui_components:
-        optimizer = hp_config.get('optimizer', 'Adam')
-        if optimizer in ui_components['optimizer_dropdown'].options:
-            ui_components['optimizer_dropdown'].value = optimizer
-    
-    # Update slider weight decay
-    if 'weight_decay_slider' in ui_components:
-        ui_components['weight_decay_slider'].value = hp_config.get('weight_decay', 0.0005)
-    
-    # Update slider momentum
-    if 'momentum_slider' in ui_components:
-        ui_components['momentum_slider'].value = hp_config.get('momentum', 0.937)
-    
-    # Update dropdown scheduler
-    if 'scheduler_dropdown' in ui_components:
-        scheduler = hp_config.get('lr_scheduler', 'cosine')
-        if scheduler in ui_components['scheduler_dropdown'].options:
-            ui_components['scheduler_dropdown'].value = scheduler
-    
-    # Update slider warmup epochs
-    if 'warmup_epochs_slider' in ui_components:
-        ui_components['warmup_epochs_slider'].value = hp_config.get('warmup_epochs', 3)
-    
-    # Update slider warmup momentum
-    if 'warmup_momentum_slider' in ui_components:
-        ui_components['warmup_momentum_slider'].value = hp_config.get('warmup_momentum', 0.8)
-    
-    # Update slider warmup bias lr
-    if 'warmup_bias_lr_slider' in ui_components:
-        ui_components['warmup_bias_lr_slider'].value = hp_config.get('warmup_bias_lr', 0.1)
-    
-    # Update checkbox augment
-    if 'augment_checkbox' in ui_components:
-        ui_components['augment_checkbox'].value = hp_config.get('augment', True)
-    
-    # Update slider dropout
-    if 'dropout_slider' in ui_components:
-        ui_components['dropout_slider'].value = hp_config.get('dropout', 0.0)
-    
-    # Update slider box loss gain
-    if 'box_loss_gain_slider' in ui_components:
-        ui_components['box_loss_gain_slider'].value = hp_config.get('box_loss_gain', 0.05)
-    
-    # Update slider cls loss gain
-    if 'cls_loss_gain_slider' in ui_components:
-        ui_components['cls_loss_gain_slider'].value = hp_config.get('cls_loss_gain', 0.5)
-    
-    # Update slider obj loss gain
-    if 'obj_loss_gain_slider' in ui_components:
-        ui_components['obj_loss_gain_slider'].value = hp_config.get('obj_loss_gain', 1.0)
-    
-    # Update early stopping
-    if 'early_stopping_enabled_checkbox' in ui_components:
-        early_stopping = hp_config.get('early_stopping', {})
-        ui_components['early_stopping_enabled_checkbox'].value = early_stopping.get('enabled', True)
-    
-    if 'early_stopping_patience_slider' in ui_components:
-        early_stopping = hp_config.get('early_stopping', {})
-        ui_components['early_stopping_patience_slider'].value = early_stopping.get('patience', 10)
-    
-    if 'early_stopping_min_delta_slider' in ui_components:
-        early_stopping = hp_config.get('early_stopping', {})
-        ui_components['early_stopping_min_delta_slider'].value = early_stopping.get('min_delta', 0.001)
-    
-    # Update checkpoint
-    if 'save_best_checkbox' in ui_components:
-        checkpoint = hp_config.get('checkpoint', {})
-        ui_components['save_best_checkbox'].value = checkpoint.get('save_best', True)
-    
-    if 'save_period_slider' in ui_components:
-        checkpoint = hp_config.get('checkpoint', {})
-        ui_components['save_period_slider'].value = checkpoint.get('save_period', 5)
-    
-    if 'checkpoint_metric_dropdown' in ui_components:
-        checkpoint = hp_config.get('checkpoint', {})
-        metric = checkpoint.get('metric', 'val_loss')
-        if metric in ui_components['checkpoint_metric_dropdown'].options:
-            ui_components['checkpoint_metric_dropdown'].value = metric
-    
-    # Simpan referensi config di ui_components
-    ui_components['config'] = current_config
-    
-    # Update info panel jika ada
-    if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
-        ui_components['update_hyperparameters_info']()
+    try:
+        
+        # Update slider batch size
+        if 'batch_size_slider' in ui_components:
+            ui_components['batch_size_slider'].value = hp_config.get('batch_size', 16)
+        
+        # Update slider image size
+        if 'image_size_slider' in ui_components:
+            ui_components['image_size_slider'].value = hp_config.get('image_size', 640)
+        
+        # Update slider epochs
+        if 'epochs_slider' in ui_components:
+            ui_components['epochs_slider'].value = hp_config.get('epochs', 50)
+        
+        # Update slider learning rate
+        if 'learning_rate_slider' in ui_components:
+            ui_components['learning_rate_slider'].value = hp_config.get('learning_rate', 0.001)
+        
+        # Update dropdown optimizer
+        if 'optimizer_dropdown' in ui_components:
+            optimizer = hp_config.get('optimizer', 'Adam')
+            if optimizer in ui_components['optimizer_dropdown'].options:
+                ui_components['optimizer_dropdown'].value = optimizer
+        
+        # Update slider weight decay
+        if 'weight_decay_slider' in ui_components:
+            ui_components['weight_decay_slider'].value = hp_config.get('weight_decay', 0.0005)
+        
+        # Update slider momentum
+        if 'momentum_slider' in ui_components:
+            ui_components['momentum_slider'].value = hp_config.get('momentum', 0.937)
+        
+        # Update dropdown scheduler
+        if 'scheduler_dropdown' in ui_components:
+            scheduler = hp_config.get('lr_scheduler', 'cosine')
+            if scheduler in ui_components['scheduler_dropdown'].options:
+                ui_components['scheduler_dropdown'].value = scheduler
+        
+        # Update slider warmup epochs
+        if 'warmup_epochs_slider' in ui_components:
+            ui_components['warmup_epochs_slider'].value = hp_config.get('warmup_epochs', 3)
+        
+        # Update slider warmup momentum
+        if 'warmup_momentum_slider' in ui_components:
+            ui_components['warmup_momentum_slider'].value = hp_config.get('warmup_momentum', 0.8)
+        
+        # Update slider warmup bias lr
+        if 'warmup_bias_lr_slider' in ui_components:
+            ui_components['warmup_bias_lr_slider'].value = hp_config.get('warmup_bias_lr', 0.1)
+        
+        # Update checkbox augment
+        if 'augment_checkbox' in ui_components:
+            ui_components['augment_checkbox'].value = hp_config.get('augment', True)
+        
+        # Update slider dropout
+        if 'dropout_slider' in ui_components:
+            ui_components['dropout_slider'].value = hp_config.get('dropout', 0.0)
+        
+        # Update slider box loss gain
+        if 'box_loss_gain_slider' in ui_components:
+            ui_components['box_loss_gain_slider'].value = hp_config.get('box_loss_gain', 0.05)
+        
+        # Update slider cls loss gain
+        if 'cls_loss_gain_slider' in ui_components:
+            ui_components['cls_loss_gain_slider'].value = hp_config.get('cls_loss_gain', 0.5)
+        
+        # Update slider obj loss gain
+        if 'obj_loss_gain_slider' in ui_components:
+            ui_components['obj_loss_gain_slider'].value = current_config.get('obj_loss_gain', 1.0)
+        
+        # Update early stopping
+        if 'early_stopping_enabled_checkbox' in ui_components:
+            early_stopping = current_config.get('early_stopping', {})
+            ui_components['early_stopping_enabled_checkbox'].value = early_stopping.get('enabled', True)
+            
+            if 'early_stopping_patience_slider' in ui_components:
+                ui_components['early_stopping_patience_slider'].value = early_stopping.get('patience', 10)
+            
+            if 'early_stopping_min_delta_slider' in ui_components:
+                ui_components['early_stopping_min_delta_slider'].value = early_stopping.get('min_delta', 0.001)
+        
+        # Update checkpoint
+        if 'save_best_checkbox' in ui_components:
+            save_best = current_config.get('save_best', {})
+            ui_components['save_best_checkbox'].value = save_best.get('enabled', True)
+            
+            if 'checkpoint_metric_dropdown' in ui_components:
+                metric = save_best.get('metric', 'mAP_0.5')
+                if metric in ui_components['checkpoint_metric_dropdown'].options:
+                    ui_components['checkpoint_metric_dropdown'].value = metric
+        
+        # Simpan referensi config di ui_components
+        ui_components['config'] = current_config
+        
+        # Update info panel jika ada
+        if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+            ui_components['update_hyperparameters_info']()
+        
+        logger.info(f"{ICONS.get('success', '✅')} UI hyperparameter berhasil diupdate dari konfigurasi")
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error update UI: {str(e)}")
     
     return ui_components
 
@@ -159,89 +155,102 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Konfigurasi yang diupdate
     """
-    # Pastikan struktur config ada
-    if 'hyperparameters' not in config:
-        config['hyperparameters'] = {}
-    
-    # Ekstrak nilai dari form hyperparameters
-    if 'batch_size_slider' in ui_components:
-        config['hyperparameters']['batch_size'] = ui_components['batch_size_slider'].value
-    
-    if 'image_size_slider' in ui_components:
-        config['hyperparameters']['image_size'] = ui_components['image_size_slider'].value
-    
-    if 'epochs_slider' in ui_components:
-        config['hyperparameters']['epochs'] = ui_components['epochs_slider'].value
-    
-    if 'learning_rate_slider' in ui_components:
-        config['hyperparameters']['learning_rate'] = ui_components['learning_rate_slider'].value
-    
-    if 'optimizer_dropdown' in ui_components:
-        config['hyperparameters']['optimizer'] = ui_components['optimizer_dropdown'].value
-    
-    if 'weight_decay_slider' in ui_components:
-        config['hyperparameters']['weight_decay'] = ui_components['weight_decay_slider'].value
-    
-    if 'momentum_slider' in ui_components:
-        config['hyperparameters']['momentum'] = ui_components['momentum_slider'].value
-    
-    if 'scheduler_dropdown' in ui_components:
-        config['hyperparameters']['lr_scheduler'] = ui_components['scheduler_dropdown'].value
-    
-    if 'warmup_epochs_slider' in ui_components:
-        config['hyperparameters']['warmup_epochs'] = ui_components['warmup_epochs_slider'].value
-    
-    if 'warmup_momentum_slider' in ui_components:
-        config['hyperparameters']['warmup_momentum'] = ui_components['warmup_momentum_slider'].value
-    
-    if 'warmup_bias_lr_slider' in ui_components:
-        config['hyperparameters']['warmup_bias_lr'] = ui_components['warmup_bias_lr_slider'].value
-    
-    if 'augment_checkbox' in ui_components:
-        config['hyperparameters']['augment'] = ui_components['augment_checkbox'].value
-    
-    if 'dropout_slider' in ui_components:
-        config['hyperparameters']['dropout'] = ui_components['dropout_slider'].value
-    
-    if 'box_loss_gain_slider' in ui_components:
-        config['hyperparameters']['box_loss_gain'] = ui_components['box_loss_gain_slider'].value
-    
-    if 'cls_loss_gain_slider' in ui_components:
-        config['hyperparameters']['cls_loss_gain'] = ui_components['cls_loss_gain_slider'].value
-    
-    if 'obj_loss_gain_slider' in ui_components:
-        config['hyperparameters']['obj_loss_gain'] = ui_components['obj_loss_gain_slider'].value
-    
-    # Update early stopping
-    if 'early_stopping_enabled_checkbox' in ui_components or 'early_stopping_patience_slider' in ui_components or 'early_stopping_min_delta_slider' in ui_components:
-        if 'early_stopping' not in config['hyperparameters']:
-            config['hyperparameters']['early_stopping'] = {}
+    try:
+        # Pastikan struktur config ada
+        if 'hyperparameters' not in config:
+            config['hyperparameters'] = {}
         
-        if 'early_stopping_enabled_checkbox' in ui_components:
-            config['hyperparameters']['early_stopping']['enabled'] = ui_components['early_stopping_enabled_checkbox'].value
+        # Update batch size
+        if 'batch_size_slider' in ui_components:
+            config['batch_size'] = ui_components['batch_size_slider'].value
         
-        if 'early_stopping_patience_slider' in ui_components:
-            config['hyperparameters']['early_stopping']['patience'] = ui_components['early_stopping_patience_slider'].value
+        # Update image size
+        if 'image_size_slider' in ui_components:
+            config['image_size'] = ui_components['image_size_slider'].value
         
-        if 'early_stopping_min_delta_slider' in ui_components:
-            config['hyperparameters']['early_stopping']['min_delta'] = ui_components['early_stopping_min_delta_slider'].value
-    
-    # Update checkpoint
-    if 'save_best_checkbox' in ui_components or 'save_period_slider' in ui_components or 'checkpoint_metric_dropdown' in ui_components:
-        if 'checkpoint' not in config['hyperparameters']:
-            config['hyperparameters']['checkpoint'] = {}
+        # Update epochs
+        if 'epochs_slider' in ui_components:
+            config['epochs'] = ui_components['epochs_slider'].value
         
-        if 'save_best_checkbox' in ui_components:
-            config['hyperparameters']['checkpoint']['save_best'] = ui_components['save_best_checkbox'].value
+        # Update optimizer
+        if 'optimizer_dropdown' in ui_components:
+            config['optimizer'] = ui_components['optimizer_dropdown'].value
         
-        if 'save_period_slider' in ui_components:
-            config['hyperparameters']['checkpoint']['save_period'] = ui_components['save_period_slider'].value
+        # Update learning rate
+        if 'learning_rate_slider' in ui_components:
+            config['learning_rate'] = ui_components['learning_rate_slider'].value
         
-        if 'checkpoint_metric_dropdown' in ui_components:
-            config['hyperparameters']['checkpoint']['metric'] = ui_components['checkpoint_metric_dropdown'].value
-    
-    # Simpan konfigurasi di ui_components
-    ui_components['config'] = config
+        # Update weight decay
+        if 'weight_decay_slider' in ui_components:
+            config['weight_decay'] = ui_components['weight_decay_slider'].value
+        
+        # Update momentum
+        if 'momentum_slider' in ui_components:
+            config['momentum'] = ui_components['momentum_slider'].value
+        
+        # Update scheduler
+        if 'scheduler_dropdown' in ui_components:
+            config['scheduler'] = ui_components['scheduler_dropdown'].value
+        
+        # Update warmup epochs
+        if 'warmup_epochs_slider' in ui_components:
+            config['warmup_epochs'] = ui_components['warmup_epochs_slider'].value
+        
+        # Update warmup momentum
+        if 'warmup_momentum_slider' in ui_components:
+            config['warmup_momentum'] = ui_components['warmup_momentum_slider'].value
+        
+        # Update warmup bias lr
+        if 'warmup_bias_lr_slider' in ui_components:
+            config['warmup_bias_lr'] = ui_components['warmup_bias_lr_slider'].value
+        
+        # Update augment
+        if 'augment_checkbox' in ui_components:
+            config['augment'] = ui_components['augment_checkbox'].value
+        
+        if 'dropout_slider' in ui_components:
+            config['hyperparameters']['dropout'] = ui_components['dropout_slider'].value
+        
+        if 'box_loss_gain_slider' in ui_components:
+            config['hyperparameters']['box_loss_gain'] = ui_components['box_loss_gain_slider'].value
+        
+        if 'cls_loss_gain_slider' in ui_components:
+            config['hyperparameters']['cls_loss_gain'] = ui_components['cls_loss_gain_slider'].value
+        
+        if 'obj_loss_gain_slider' in ui_components:
+            config['hyperparameters']['obj_loss_gain'] = ui_components['obj_loss_gain_slider'].value
+        
+        # Update early stopping
+        if 'early_stopping_enabled_checkbox' in ui_components or 'early_stopping_patience_slider' in ui_components or 'early_stopping_min_delta_slider' in ui_components:
+            if 'early_stopping' not in config:
+                config['early_stopping'] = {}
+            
+            if 'early_stopping_enabled_checkbox' in ui_components:
+                config['early_stopping']['enabled'] = ui_components['early_stopping_enabled_checkbox'].value
+            
+            if 'early_stopping_patience_slider' in ui_components:
+                config['early_stopping']['patience'] = ui_components['early_stopping_patience_slider'].value
+            
+            if 'early_stopping_min_delta_slider' in ui_components:
+                config['early_stopping']['min_delta'] = ui_components['early_stopping_min_delta_slider'].value
+        
+        # Update save best
+        if 'save_best_checkbox' in ui_components or 'checkpoint_metric_dropdown' in ui_components:
+            if 'save_best' not in config:
+                config['save_best'] = {}
+            
+            if 'save_best_checkbox' in ui_components:
+                config['save_best']['enabled'] = ui_components['save_best_checkbox'].value
+            
+            if 'checkpoint_metric_dropdown' in ui_components:
+                config['save_best']['metric'] = ui_components['checkpoint_metric_dropdown'].value
+        
+        # Simpan konfigurasi di ui_components
+        ui_components['config'] = config
+        
+        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil diupdate dari UI")
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error update config: {str(e)}")
     
     return config
 
@@ -258,7 +267,6 @@ def update_hyperparameters_info(ui_components: Dict[str, Any]) -> None:
     try:
         # Dapatkan konfigurasi
         config = ui_components.get('config', {})
-        hp_config = config.get('hyperparameters', {})
         
         # Buat HTML untuk info panel
         info_html = f"""
@@ -266,20 +274,19 @@ def update_hyperparameters_info(ui_components: Dict[str, Any]) -> None:
             <h4 style='margin-top: 0;'>{ICONS.get('info', 'ℹ️')} Informasi Hyperparameter</h4>
             <div style='display: grid; grid-template-columns: 1fr 1fr; gap: 10px;'>
                 <div>
-                    <p><strong>Batch Size:</strong> {hp_config.get('batch_size', 16)}</p>
-                    <p><strong>Image Size:</strong> {hp_config.get('image_size', 640)}</p>
-                    <p><strong>Epochs:</strong> {hp_config.get('epochs', 50)}</p>
-                    <p><strong>Optimizer:</strong> {hp_config.get('optimizer', 'Adam')}</p>
-                    <p><strong>Learning Rate:</strong> {hp_config.get('learning_rate', 0.001)}</p>
-                    <p><strong>Weight Decay:</strong> {hp_config.get('weight_decay', 0.0005)}</p>
+                    <p><strong>Batch Size:</strong> {config.get('batch_size', 16)}</p>
+                    <p><strong>Image Size:</strong> {config.get('image_size', 640)}</p>
+                    <p><strong>Epochs:</strong> {config.get('epochs', 100)}</p>
+                    <p><strong>Optimizer:</strong> {config.get('optimizer', 'SGD')}</p>
+                    <p><strong>Learning Rate:</strong> {config.get('learning_rate', 0.01)}</p>
+                    <p><strong>Weight Decay:</strong> {config.get('weight_decay', 0.0005)}</p>
                 </div>
                 <div>
-                    <p><strong>LR Scheduler:</strong> {hp_config.get('lr_scheduler', 'cosine')}</p>
-                    <p><strong>Augmentation:</strong> {'Aktif' if hp_config.get('augment', True) else 'Nonaktif'}</p>
-                    <p><strong>Early Stopping:</strong> {'Aktif' if hp_config.get('early_stopping', {}).get('enabled', True) else 'Nonaktif'}</p>
-                    <p><strong>Save Best Model:</strong> {'Ya' if hp_config.get('checkpoint', {}).get('save_best', True) else 'Tidak'}</p>
-                    <p><strong>Save Period:</strong> Setiap {hp_config.get('checkpoint', {}).get('save_period', 5)} epoch</p>
-                    <p><strong>Checkpoint Metric:</strong> {hp_config.get('checkpoint', {}).get('metric', 'val_loss')}</p>
+                    <p><strong>Scheduler:</strong> {config.get('scheduler', 'cosine')}</p>
+                    <p><strong>Augmentation:</strong> {'Aktif' if config.get('augment', True) else 'Nonaktif'}</p>
+                    <p><strong>Early Stopping:</strong> {'Aktif' if config.get('early_stopping', {}).get('enabled', True) else 'Nonaktif'}</p>
+                    <p><strong>Save Best Model:</strong> {'Ya' if config.get('save_best', {}).get('enabled', True) else 'Tidak'}</p>
+                    <p><strong>Checkpoint Metric:</strong> {config.get('save_best', {}).get('metric', 'mAP_0.5')}</p>
                 </div>
             </div>
         </div>

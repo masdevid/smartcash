@@ -1,363 +1,624 @@
 """
 File: smartcash/ui/training_config/hyperparameters/components/hyperparameters_components.py
-Deskripsi: Komponen UI untuk konfigurasi hyperparameter model
+Deskripsi: Komponen UI untuk konfigurasi hyperparameter
 """
 
 from typing import Dict, Any, Optional, List, Tuple
 import ipywidgets as widgets
-from IPython.display import display, HTML
+from IPython.display import display, clear_output
 
-from smartcash.ui.utils.constants import ICONS, COLORS 
-from smartcash.ui.utils.header_utils import create_header
-from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
-    
-def create_hyperparameters_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
+from smartcash.common.logger import get_logger
+
+logger = get_logger(__name__)
+
+def create_hyperparameters_info_panel() -> Tuple[widgets.Output, Any]:
     """
-    Membuat komponen UI untuk pengaturan hyperparameter berdasarkan hyperparameter_config.yaml.
+    Membuat panel informasi untuk hyperparameter.
     
-    Args:
-        config: Konfigurasi training
+    Returns:
+        Tuple berisi output widget dan fungsi update
+    """
+    info_panel = widgets.Output(layout=widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    def update_hyperparameters_info(ui_components: Optional[Dict[str, Any]] = None):
+        """
+        Update informasi hyperparameter di panel info.
         
+        Args:
+            ui_components: Komponen UI
+        """
+        with info_panel:
+            clear_output(wait=True)
+            
+            if not ui_components:
+                display(widgets.HTML(
+                    f"<h3>{ICONS.get('info', 'ℹ️')} Informasi Hyperparameter</h3>"
+                    f"<p>Tidak ada informasi yang tersedia.</p>"
+                ))
+                return
+            
+            # Dapatkan nilai dari komponen UI
+            try:
+                batch_size = ui_components.get('batch_size_slider', widgets.IntSlider()).value
+                image_size = ui_components.get('image_size_slider', widgets.IntSlider()).value
+                epochs = ui_components.get('epochs_slider', widgets.IntSlider()).value
+                optimizer = ui_components.get('optimizer_dropdown', widgets.Dropdown()).value
+                learning_rate = ui_components.get('learning_rate_slider', widgets.FloatLogSlider()).value
+                scheduler = ui_components.get('scheduler_dropdown', widgets.Dropdown()).value
+                
+                # Tampilkan informasi
+                html_content = f"""
+                <h3>{ICONS.get('info', 'ℹ️')} Informasi Hyperparameter</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; grid-gap: 10px;">
+                    <div>
+                        <h4>Parameter Dasar</h4>
+                        <ul>
+                            <li><b>Batch Size:</b> {batch_size}</li>
+                            <li><b>Image Size:</b> {image_size}</li>
+                            <li><b>Epochs:</b> {epochs}</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4>Optimasi</h4>
+                        <ul>
+                            <li><b>Optimizer:</b> {optimizer}</li>
+                            <li><b>Learning Rate:</b> {learning_rate:.6f}</li>
+                            <li><b>Scheduler:</b> {scheduler}</li>
+                        </ul>
+                    </div>
+                </div>
+                """
+                
+                # Tampilkan informasi tambahan jika ada
+                if 'momentum_slider' in ui_components and not ui_components['momentum_slider'].disabled:
+                    momentum = ui_components['momentum_slider'].value
+                    html_content += f"""
+                    <div>
+                        <h4>Parameter Tambahan</h4>
+                        <ul>
+                            <li><b>Momentum:</b> {momentum:.4f}</li>
+                    """
+                    
+                    if 'weight_decay_slider' in ui_components and not ui_components['weight_decay_slider'].disabled:
+                        weight_decay = ui_components['weight_decay_slider'].value
+                        html_content += f"<li><b>Weight Decay:</b> {weight_decay:.6f}</li>"
+                    
+                    html_content += "</ul></div>"
+                
+                # Tampilkan informasi early stopping jika diaktifkan
+                if 'early_stopping_enabled_checkbox' in ui_components and ui_components['early_stopping_enabled_checkbox'].value:
+                    patience = ui_components.get('early_stopping_patience_slider', widgets.IntSlider()).value
+                    min_delta = ui_components.get('early_stopping_min_delta_slider', widgets.FloatSlider()).value
+                    
+                    html_content += f"""
+                    <div>
+                        <h4>Early Stopping</h4>
+                        <ul>
+                            <li><b>Patience:</b> {patience} epochs</li>
+                            <li><b>Min Delta:</b> {min_delta:.6f}</li>
+                        </ul>
+                    </div>
+                    """
+                
+                # Tampilkan informasi save best jika diaktifkan
+                if 'save_best_checkbox' in ui_components and ui_components['save_best_checkbox'].value:
+                    metric = ui_components.get('checkpoint_metric_dropdown', widgets.Dropdown()).value
+                    
+                    html_content += f"""
+                    <div>
+                        <h4>Save Best Model</h4>
+                        <ul>
+                            <li><b>Metric:</b> {metric}</li>
+                        </ul>
+                    </div>
+                    """
+                
+                display(widgets.HTML(html_content))
+            except Exception as e:
+                display(widgets.HTML(
+                    f"<h3>{ICONS.get('error', '❌')} Error</h3>"
+                    f"<p>Error saat menampilkan informasi hyperparameter: {str(e)}</p>"
+                ))
+    
+    return info_panel, update_hyperparameters_info
+
+def create_hyperparameters_basic_components() -> Dict[str, Any]:
+    """
+    Membuat komponen UI dasar untuk hyperparameter.
+    
     Returns:
         Dict berisi komponen UI
     """
-    # Import komponen UI standar 
-    from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.constants import COLORS, ICONS 
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
-    
-    # Inisialisasi komponen
-    ui_components = {}
-    
-    # Status panel untuk menampilkan pesan status
-    ui_components['status'] = widgets.Output(layout=OUTPUT_WIDGET)
-    
-    # Info panel untuk menampilkan informasi konfigurasi
-    ui_components['info_panel'] = widgets.Output(
-        layout=widgets.Layout(padding='10px', max_height='300px', overflow='auto')
-    )
-    
-    # Buat komponen UI
-    ui_components['title'] = widgets.HTML(
-        value="<h3>🔢 Konfigurasi Hyperparameter</h3>"
-    )
-    
-    # Tab untuk kategori hyperparameter
-    ui_components['tabs'] = widgets.Tab()
-    
-    # Tab 1: Parameter dasar
-    ui_components['batch_size'] = widgets.IntSlider(
+    # Batch size slider
+    batch_size_slider = widgets.IntSlider(
         value=16,
         min=1,
-        max=64,
+        max=128,
         step=1,
-        description='Batch size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Batch Size:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['image_size'] = widgets.IntSlider(
+    # Image size slider
+    image_size_slider = widgets.IntSlider(
         value=640,
         min=320,
         max=1280,
         step=32,
-        description='Image size:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Image Size:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['epochs'] = widgets.IntSlider(
+    # Epochs slider
+    epochs_slider = widgets.IntSlider(
         value=100,
-        min=10,
-        max=300,
-        step=10,
+        min=1,
+        max=500,
+        step=1,
         description='Epochs:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='90%')
     )
     
-    # Tab 2: Optimizer
-    ui_components['optimizer_type'] = widgets.Dropdown(
+    # Augment checkbox
+    augment_checkbox = widgets.Checkbox(
+        value=True,
+        description='Gunakan Augmentasi',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(width='90%')
+    )
+    
+    # Komponen dasar
+    basic_components = {
+        'batch_size_slider': batch_size_slider,
+        'image_size_slider': image_size_slider,
+        'epochs_slider': epochs_slider,
+        'augment_checkbox': augment_checkbox
+    }
+    
+    # Basic box
+    basic_box = widgets.VBox([
+        widgets.HTML('<h3>Parameter Dasar</h3>'),
+        batch_size_slider,
+        image_size_slider,
+        epochs_slider,
+        augment_checkbox
+    ], layout=widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    basic_components['basic_box'] = basic_box
+    
+    return basic_components
+
+def create_hyperparameters_optimization_components() -> Dict[str, Any]:
+    """
+    Membuat komponen UI optimasi untuk hyperparameter.
+    
+    Returns:
+        Dict berisi komponen UI
+    """
+    # Optimizer dropdown
+    optimizer_dropdown = widgets.Dropdown(
         options=['SGD', 'Adam', 'AdamW', 'RMSprop'],
-        value='Adam',  # Sesuai dengan hyperparameter_config.yaml
+        value='SGD',
         description='Optimizer:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        disabled=False,
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['learning_rate'] = widgets.FloatLogSlider(
-        value=0.001,  # Sesuai dengan hyperparameter_config.yaml
+    # Learning rate slider
+    learning_rate_slider = widgets.FloatLogSlider(
+        value=0.01,
         base=10,
-        min=-5,  # 10^-5 = 0.00001
-        max=-1,  # 10^-1 = 0.1
+        min=-6,  # 10^-6
+        max=-1,  # 10^-1
         step=0.1,
-        description='Learning rate:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Learning Rate:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.6f',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['weight_decay'] = widgets.FloatLogSlider(
-        value=0.0005,  # Sesuai dengan hyperparameter_config.yaml
-        base=10,
-        min=-6,  # 10^-6 = 0.000001
-        max=-2,  # 10^-2 = 0.01
-        step=0.1,
-        description='Weight decay:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['momentum'] = widgets.FloatSlider(
-        value=0.937,  # Sesuai dengan hyperparameter_config.yaml
+    # Momentum slider
+    momentum_slider = widgets.FloatSlider(
+        value=0.937,
         min=0.0,
-        max=0.99,
+        max=0.999,
         step=0.001,
         description='Momentum:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.4f',
+        layout=widgets.Layout(width='90%')
     )
     
-    # Tab 3: Scheduler
-    ui_components['lr_scheduler'] = widgets.Dropdown(
-        options=['step', 'cosine', 'plateau', 'none'],
-        value='cosine',  # Sesuai dengan hyperparameter_config.yaml
+    # Weight decay slider
+    weight_decay_slider = widgets.FloatLogSlider(
+        value=0.0005,
+        base=10,
+        min=-6,  # 10^-6
+        max=-2,  # 10^-2
+        step=0.1,
+        description='Weight Decay:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.6f',
+        layout=widgets.Layout(width='90%')
+    )
+    
+    # Scheduler dropdown
+    scheduler_dropdown = widgets.Dropdown(
+        options=['none', 'cosine', 'linear', 'step'],
+        value='cosine',
         description='Scheduler:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        disabled=False,
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['warmup_epochs'] = widgets.IntSlider(
-        value=3,  # Sesuai dengan hyperparameter_config.yaml
+    # Warmup epochs slider
+    warmup_epochs_slider = widgets.IntSlider(
+        value=3,
         min=0,
         max=10,
         step=1,
-        description='Warmup epochs:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Warmup Epochs:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['warmup_momentum'] = widgets.FloatSlider(
-        value=0.8,  # Sesuai dengan hyperparameter_config.yaml
+    # Warmup momentum slider
+    warmup_momentum_slider = widgets.FloatSlider(
+        value=0.8,
         min=0.0,
-        max=0.99,
-        step=0.01,
-        description='Warmup momentum:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        max=0.999,
+        step=0.001,
+        description='Warmup Momentum:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.4f',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['warmup_bias_lr'] = widgets.FloatSlider(
-        value=0.1,  # Sesuai dengan hyperparameter_config.yaml
-        min=0.01,
-        max=1.0,
-        step=0.01,
-        description='Warmup bias LR:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    # Tab 4: Regularisasi
-    ui_components['augment'] = widgets.Checkbox(
-        value=True,  # Sesuai dengan hyperparameter_config.yaml
-        description='Gunakan augmentasi data',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
-    )
-    
-    ui_components['dropout'] = widgets.FloatSlider(
-        value=0.0,  # Sesuai dengan hyperparameter_config.yaml
-        min=0.0,
-        max=0.5,
-        step=0.01,
-        description='Dropout rate:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    # Tab 5: Loss
-    ui_components['box_loss_gain'] = widgets.FloatSlider(
-        value=0.05,  # Sesuai dengan hyperparameter_config.yaml
-        min=0.01,
-        max=0.1,
-        step=0.01,
-        description='Box loss gain:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['cls_loss_gain'] = widgets.FloatSlider(
-        value=0.5,  # Sesuai dengan hyperparameter_config.yaml
-        min=0.1,
-        max=1.0,
-        step=0.1,
-        description='Class loss gain:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['obj_loss_gain'] = widgets.FloatSlider(
-        value=1.0,  # Sesuai dengan hyperparameter_config.yaml
-        min=0.1,
-        max=2.0,
-        step=0.1,
-        description='Object loss gain:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    # Tab 6: Early Stopping & Checkpoint
-    ui_components['early_stopping_enabled'] = widgets.Checkbox(
-        value=True,  # Sesuai dengan hyperparameter_config.yaml
-        description='Early stopping',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
-    )
-    
-    ui_components['early_stopping_patience'] = widgets.IntSlider(
-        value=15,  # Sesuai dengan hyperparameter_config.yaml
-        min=1,
-        max=30,
-        step=1,
-        description='Patience:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
-    )
-    
-    ui_components['early_stopping_min_delta'] = widgets.FloatLogSlider(
-        value=0.001,  # Sesuai dengan hyperparameter_config.yaml
+    # Warmup bias lr slider
+    warmup_bias_lr_slider = widgets.FloatLogSlider(
+        value=0.1,
         base=10,
-        min=-5,  # 10^-5 = 0.00001
-        max=-2,  # 10^-2 = 0.01
+        min=-3,  # 10^-3
+        max=0,  # 10^0
         step=0.1,
-        description='Min delta:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Warmup Bias LR:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.4f',
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['checkpoint_save_best'] = widgets.Checkbox(
-        value=True,  # Sesuai dengan hyperparameter_config.yaml
-        description='Save best model',
-        style={'description_width': '200px'},
-        layout=widgets.Layout(width='300px')
+    # Komponen optimasi
+    optimization_components = {
+        'optimizer_dropdown': optimizer_dropdown,
+        'learning_rate_slider': learning_rate_slider,
+        'momentum_slider': momentum_slider,
+        'weight_decay_slider': weight_decay_slider,
+        'scheduler_dropdown': scheduler_dropdown,
+        'warmup_epochs_slider': warmup_epochs_slider,
+        'warmup_momentum_slider': warmup_momentum_slider,
+        'warmup_bias_lr_slider': warmup_bias_lr_slider
+    }
+    
+    # Optimization box
+    optimization_box = widgets.VBox([
+        widgets.HTML('<h3>Parameter Optimasi</h3>'),
+        optimizer_dropdown,
+        learning_rate_slider,
+        momentum_slider,
+        weight_decay_slider,
+        widgets.HTML('<h4>Learning Rate Scheduler</h4>'),
+        scheduler_dropdown,
+        warmup_epochs_slider,
+        warmup_momentum_slider,
+        warmup_bias_lr_slider
+    ], layout=widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    optimization_components['optimization_box'] = optimization_box
+    
+    return optimization_components
+
+def create_hyperparameters_advanced_components() -> Dict[str, Any]:
+    """
+    Membuat komponen UI lanjutan untuk hyperparameter.
+    
+    Returns:
+        Dict berisi komponen UI
+    """
+    # Early stopping checkbox
+    early_stopping_enabled_checkbox = widgets.Checkbox(
+        value=True,
+        description='Aktifkan Early Stopping',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(width='90%')
     )
     
-    ui_components['checkpoint_save_period'] = widgets.IntSlider(
-        value=10,  # Sesuai dengan hyperparameter_config.yaml
+    # Early stopping patience slider
+    early_stopping_patience_slider = widgets.IntSlider(
+        value=10,
         min=1,
         max=50,
         step=1,
-        description='Save period:',
-        style={'description_width': '120px'},
-        layout=widgets.Layout(width='400px')
+        description='Patience:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='90%')
     )
     
-    # Informasi hyperparameter
-    ui_components['hyperparameters_info'] = widgets.HTML(
-        value="<p>Informasi hyperparameter akan ditampilkan di sini</p>"
+    # Early stopping min delta slider
+    early_stopping_min_delta_slider = widgets.FloatLogSlider(
+        value=0.001,
+        base=10,
+        min=-6,  # 10^-6
+        max=-1,  # 10^-1
+        step=0.1,
+        description='Min Delta:',
+        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='.6f',
+        layout=widgets.Layout(width='90%')
     )
     
-    # Tombol aksi akan ditambahkan dari initializer
-    
-    # Buat tab
-    basic_tab = widgets.VBox([
-        ui_components['batch_size'],
-        ui_components['image_size'],
-        ui_components['epochs']
-    ])
-    
-    optimizer_tab = widgets.VBox([
-        ui_components['optimizer_type'],
-        ui_components['learning_rate'],
-        ui_components['weight_decay'],
-        ui_components['momentum']
-    ])
-    
-    scheduler_tab = widgets.VBox([
-        ui_components['lr_scheduler'],
-        ui_components['warmup_epochs'],
-        ui_components['warmup_momentum'],
-        ui_components['warmup_bias_lr']
-    ])
-    
-    regularization_tab = widgets.VBox([
-        ui_components['augment'],
-        ui_components['dropout']
-    ])
-    
-    loss_tab = widgets.VBox([
-        ui_components['box_loss_gain'],
-        ui_components['cls_loss_gain'],
-        ui_components['obj_loss_gain']
-    ])
-    
-    early_stopping_tab = widgets.VBox([
-        ui_components['early_stopping_enabled'],
-        ui_components['early_stopping_patience'],
-        ui_components['early_stopping_min_delta'],
-        ui_components['checkpoint_save_best'],
-        ui_components['checkpoint_save_period']
-    ])
-    
-    # Buat tabs
-    ui_components['tabs'].children = [basic_tab, optimizer_tab, scheduler_tab, regularization_tab, loss_tab, early_stopping_tab]
-    ui_components['tabs'].set_title(0, 'Parameter Dasar')
-    ui_components['tabs'].set_title(1, 'Optimizer')
-    ui_components['tabs'].set_title(2, 'Scheduler')
-    ui_components['tabs'].set_title(3, 'Regularisasi')
-    ui_components['tabs'].set_title(4, 'Loss')
-    ui_components['tabs'].set_title(5, 'Early Stopping & Checkpoint')
-    
-    ui_components['info_box'] = widgets.VBox(
-        [ui_components['hyperparameters_info']],
-        layout=widgets.Layout(padding='10px', border='1px solid #ddd', margin='10px 0')
+    # Save best checkbox
+    save_best_checkbox = widgets.Checkbox(
+        value=True,
+        description='Simpan Model Terbaik',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(width='90%')
     )
     
-    # Placeholder untuk tombol konfigurasi yang akan ditambahkan dari initializer
-    ui_components['buttons_placeholder'] = widgets.HBox(
-        [],
-        layout=widgets.Layout(padding='10px')
+    # Checkpoint metric dropdown
+    checkpoint_metric_dropdown = widgets.Dropdown(
+        options=['mAP_0.5', 'mAP_0.5:0.95', 'precision', 'recall', 'f1', 'loss'],
+        value='mAP_0.5',
+        description='Metric:',
+        disabled=False,
+        layout=widgets.Layout(width='90%')
     )
     
-    # Tambahkan keterangan sinkronisasi otomatis
-    ui_components['sync_info'] = widgets.HTML(
-        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
+    # Komponen lanjutan
+    advanced_components = {
+        'early_stopping_enabled_checkbox': early_stopping_enabled_checkbox,
+        'early_stopping_patience_slider': early_stopping_patience_slider,
+        'early_stopping_min_delta_slider': early_stopping_min_delta_slider,
+        'save_best_checkbox': save_best_checkbox,
+        'checkpoint_metric_dropdown': checkpoint_metric_dropdown
+    }
+    
+    # Early stopping box
+    early_stopping_box = widgets.VBox([
+        widgets.HTML('<h4>Early Stopping</h4>'),
+        early_stopping_enabled_checkbox,
+        early_stopping_patience_slider,
+        early_stopping_min_delta_slider
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    # Checkpoint box
+    checkpoint_box = widgets.VBox([
+        widgets.HTML('<h4>Checkpoint</h4>'),
+        save_best_checkbox,
+        checkpoint_metric_dropdown
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    # Advanced box
+    advanced_box = widgets.VBox([
+        widgets.HTML('<h3>Parameter Lanjutan</h3>'),
+        early_stopping_box,
+        checkpoint_box
+    ], layout=widgets.Layout(
+        width='100%',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    advanced_components['early_stopping_box'] = early_stopping_box
+    advanced_components['checkpoint_box'] = checkpoint_box
+    advanced_components['advanced_box'] = advanced_box
+    
+    return advanced_components
+
+def create_hyperparameters_button_components() -> Dict[str, Any]:
+    """
+    Membuat komponen tombol untuk hyperparameter.
+    
+    Returns:
+        Dict berisi komponen UI
+    """
+    # Save button
+    save_button = widgets.Button(
+        description=f"{ICONS.get('save', '💾')} Simpan",
+        disabled=False,
+        button_style='success',
+        tooltip='Simpan konfigurasi hyperparameter',
+        icon='save',
+        layout=widgets.Layout(width='auto')
     )
     
-    # Header dengan komponen standar
-    header = create_header(f"{ICONS['settings']} Hyperparameters Configuration", 
-                          "Konfigurasi hyperparameter untuk training model deteksi mata uang")
-    
-    # Panel info status
-    status_panel = widgets.HTML(
-        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} Konfigurasi hyperparameter training</p>
-        </div>"""
+    # Reset button
+    reset_button = widgets.Button(
+        description=f"{ICONS.get('reset', '🔄')} Reset",
+        disabled=False,
+        button_style='warning',
+        tooltip='Reset konfigurasi hyperparameter ke default',
+        icon='refresh',
+        layout=widgets.Layout(width='auto')
     )
     
-    # Log accordion dengan styling standar
-    log_accordion = widgets.Accordion(children=[ui_components['status']], selected_index=0)
-    log_accordion.set_title(0, f"{ICONS['file']} Hyperparameters Logs")
+    # Sync from drive button
+    sync_from_drive_button = widgets.Button(
+        description=f"{ICONS.get('download', '⬇️')} Dari Drive",
+        disabled=False,
+        button_style='info',
+        tooltip='Sinkronisasi konfigurasi dari Google Drive',
+        icon='download',
+        layout=widgets.Layout(width='auto')
+    )
     
-    # Container utama
-    ui_components['main_container'] = widgets.VBox([
-        header,
-        status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Training Parameters</h4>"),
-        ui_components['tabs'],
-        create_divider(),
-        ui_components['buttons_placeholder'],
-        ui_components['info_panel'],
-        log_accordion
-    ])
+    # Sync to drive button
+    sync_to_drive_button = widgets.Button(
+        description=f"{ICONS.get('upload', '⬆️')} Ke Drive",
+        disabled=False,
+        button_style='info',
+        tooltip='Sinkronisasi konfigurasi ke Google Drive',
+        icon='upload',
+        layout=widgets.Layout(width='auto')
+    )
     
-    # Tambahkan referensi komponen tambahan ke ui_components
-    ui_components.update({
-        'header': header,
-        'status_panel': status_panel,
-        'log_accordion': log_accordion,
-        'module_name': 'hyperparameters'
-    })
+    # Status panel
+    status_panel = widgets.Output(layout=widgets.Layout(
+        width='100%',
+        min_height='50px',
+        max_height='100px',
+        overflow='auto',
+        border='1px solid #ddd',
+        padding='10px',
+        margin='10px 0'
+    ))
+    
+    # Komponen tombol
+    button_components = {
+        'save_button': save_button,
+        'reset_button': reset_button,
+        'sync_from_drive_button': sync_from_drive_button,
+        'sync_to_drive_button': sync_to_drive_button,
+        'status': status_panel
+    }
+    
+    # Button box
+    button_box = widgets.HBox([
+        save_button,
+        reset_button,
+        sync_from_drive_button,
+        sync_to_drive_button
+    ], layout=widgets.Layout(
+        width='100%',
+        display='flex',
+        flex_flow='row wrap',
+        align_items='center',
+        justify_content='space-between',
+        margin='10px 0'
+    ))
+    
+    button_components['button_box'] = button_box
+    
+    return button_components
+
+def create_hyperparameters_ui_components() -> Dict[str, Any]:
+    """
+    Membuat semua komponen UI untuk hyperparameter.
+    
+    Returns:
+        Dict berisi semua komponen UI
+    """
+    # Buat komponen UI
+    basic_components = create_hyperparameters_basic_components()
+    optimization_components = create_hyperparameters_optimization_components()
+    advanced_components = create_hyperparameters_advanced_components()
+    button_components = create_hyperparameters_button_components()
+    
+    # Buat panel info
+    info_panel, update_hyperparameters_info = create_hyperparameters_info_panel()
+    
+    # Gabungkan semua komponen
+    ui_components = {
+        **basic_components,
+        **optimization_components,
+        **advanced_components,
+        **button_components,
+        'info_panel': info_panel,
+        'update_hyperparameters_info': update_hyperparameters_info
+    }
+    
+    # Buat layout utama
+    main_layout = widgets.VBox([
+        info_panel,
+        widgets.HBox([
+            basic_components['basic_box'],
+            widgets.VBox([
+                optimization_components['optimization_box'],
+                advanced_components['advanced_box']
+            ])
+        ], layout=widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='row wrap',
+            align_items='flex-start',
+            justify_content='space-between'
+        )),
+        button_components['button_box'],
+        button_components['status']
+    ], layout=widgets.Layout(
+        width='100%',
+        padding='10px'
+    ))
+    
+    ui_components['main_layout'] = main_layout
     
     return ui_components

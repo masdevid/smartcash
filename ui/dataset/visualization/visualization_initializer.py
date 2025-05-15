@@ -8,7 +8,7 @@ from IPython.display import display, clear_output
 from typing import Dict, Any
 
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.status_indicator import create_status_indicator
+from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.visualization.components.visualization_components import create_visualization_components
 from smartcash.ui.dataset.visualization.handlers.visualization_handler import setup_visualization_handlers

@@ -16,7 +16,7 @@ import pandas as pd
 import seaborn as sns
 
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.components.status_indicator import create_status_indicator
+from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
 from smartcash.ui.utils.config_manager import get_config_manager

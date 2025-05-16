@@ -73,12 +73,17 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
         # Ambil konfigurasi terbaru dari UI
         if 'update_config_from_ui' in ui_components and callable(ui_components['update_config_from_ui']):
             current_config = ui_components['update_config_from_ui'](ui_components)
+            
+            # Log konfigurasi untuk debugging
+            logger.debug(f"🔍 Konfigurasi dari UI: {current_config}")
         else:
             # Jika tidak ada fungsi update, ambil dari config manager
             current_config = config_manager.get_module_config('augmentation')
+            logger.debug(f"🔍 Konfigurasi dari config manager: {current_config}")
         
-        # Simpan konfigurasi ke file - ini harus dipanggil untuk pengujian
-        save_success = config_manager.save_module_config('augmentation', current_config)
+        # Simpan konfigurasi ke cache ConfigManager dan file
+        config_manager.module_configs['augmentation'] = current_config  # Simpan ke cache
+        save_success = config_manager.save_module_config('augmentation', current_config)  # Simpan ke file
         
         if not save_success:
             logger.warning("⚠️ Gagal menyimpan konfigurasi augmentasi ke file")

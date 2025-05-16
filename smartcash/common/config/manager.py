@@ -320,6 +320,10 @@ class ConfigManager:
             else:
                 config = self.module_configs[module_name]
             
+            # Debug log untuk melihat konfigurasi yang akan diupload
+            if self.logger:
+                self.logger.debug(f"🔍 Konfigurasi yang akan diupload ke Drive: {config}")
+            
             # Tentukan nama file konfigurasi dengan pola xxx_config.yaml
             config_file = f"{module_name}_config.yaml"
             

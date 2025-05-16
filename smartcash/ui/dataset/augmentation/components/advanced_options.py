@@ -21,10 +21,21 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     
     # Dapatkan konfigurasi augmentasi
     config_manager = get_config_manager()
-    aug_config = config_manager.get_module_config('augmentation')
+    aug_config = config_manager.get_module_config('augmentation') or {}
+    
+    # Pastikan struktur konfigurasi yang benar
+    if not isinstance(aug_config, dict):
+        aug_config = {}
+    
+    # Dapatkan konfigurasi augmentasi, pastikan ada struktur yang benar
+    augmentation_config = aug_config.get('augmentation', {})
+    if not isinstance(augmentation_config, dict):
+        augmentation_config = {}
     
     # Parameter posisi
-    position_params = aug_config.get('augmentation', {}).get('position', {})
+    position_params = augmentation_config.get('position', {}) 
+    if not isinstance(position_params, dict):
+        position_params = {}
     
     fliplr = widgets.FloatSlider(
         value=position_params.get('fliplr', 0.5),
@@ -92,7 +103,9 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     )
     
     # Parameter pencahayaan
-    lighting_params = aug_config.get('augmentation', {}).get('lighting', {})
+    lighting_params = augmentation_config.get('lighting', {})
+    if not isinstance(lighting_params, dict):
+        lighting_params = {}
     
     hsv_h = widgets.FloatSlider(
         value=lighting_params.get('hsv_h', 0.025),
@@ -215,7 +228,7 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     
     # Proses bounding boxes
     process_bboxes = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('process_bboxes', True),
+        value=augmentation_config.get('process_bboxes', True),
         description='Proses Bounding Boxes',
         indent=False,
         layout=widgets.Layout(width='auto')

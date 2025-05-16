@@ -247,10 +247,13 @@ def setup_processing_button_handlers(
             clear_output(wait=True)
             display(create_status_indicator("info", f"{ICONS['processing']} Memulai {process_name} dataset..."))
         
-        # Tampilkan log panel dan progress bar
-        ui_components['log_accordion'].selected_index = 0  # Expand log
+        # Tampilkan log panel dan progress bar jika tersedia
+        if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
+            ui_components['log_accordion'].selected_index = 0  # Expand log
+        
+        # Tampilkan progress bar dan label jika tersedia
         for element in ['progress_bar', 'current_progress', 'overall_label', 'step_label']:
-            if element in ui_components:
+            if element in ui_components and hasattr(ui_components[element], 'layout'):
                 ui_components[element].layout.visibility = 'visible'
         
         # Disable semua UI input

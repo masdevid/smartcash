@@ -6,9 +6,17 @@ Deskripsi: Utility untuk mengarahkan output logger ke UI widget dengan integrasi
 import logging
 import sys
 import threading
+import time
 from typing import Dict, Any, Callable, Optional, List, Union
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
+
+# Buffer global untuk menyimpan log awal sebelum UI terender
+# Format: [(level, message, timestamp), ...]
+_EARLY_LOG_BUFFER = []
+_BUFFER_LOCK = threading.RLock()
+_UI_READY = False
+_LOGS_DISPLAYED = set()  # Set untuk melacak log yang sudah ditampilkan di UI
 
 def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger"):
     """
@@ -90,27 +98,103 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
         level: Level log (info, warning, error, debug, success)
         emoji: Emoji untuk ditampilkan (akan ditambahkan ke pesan)
     """
+    global _EARLY_LOG_BUFFER, _UI_READY, _LOGS_DISPLAYED
+    
     # Skip debug messages untuk UI
     if level == "debug":
         return
-        
+    
+    # Format pesan dengan emoji jika ada
+    formatted_message = f"{emoji} {message}" if emoji else message
+    
+    # Buat timestamp unik untuk log ini
+    timestamp = time.time()
+    log_id = hash(f"{formatted_message}_{timestamp}")
+    
+    # Selalu tampilkan di console terlebih dahulu
+    print(f"[{level.upper()}] {formatted_message}")
+    
+    # Cek apakah UI sudah siap
     if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
-        # Fallback sederhana: print pesan
-        print(f"{emoji} {message}")
+        # Simpan ke buffer jika UI belum siap
+        with _BUFFER_LOCK:
+            _EARLY_LOG_BUFFER.append((level, formatted_message, log_id))
         return
     
-    with ui_components['status']:
+    # Coba tampilkan ke UI
+    try:
+        # Tandai log ini sebagai sudah ditampilkan
+        _LOGS_DISPLAYED.add(log_id)
+        
+        with ui_components['status']:
+            try:
+                # Gunakan komponen alert_utils jika tersedia
+                from smartcash.ui.utils.alert_utils import create_status_indicator
+                display(create_status_indicator(level, formatted_message))
+                _UI_READY = True  # UI sudah siap
+            except ImportError:
+                # Fallback sederhana jika alert_utils tidak tersedia
+                style_map = {
+                    "info": "color: #0c5460; background-color: #d1ecf1; padding: 10px; border-radius: 4px;",
+                    "success": "color: #155724; background-color: #d4edda; padding: 10px; border-radius: 4px;",
+                    "warning": "color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 4px;",
+                    "error": "color: #721c24; background-color: #f8d7da; padding: 10px; border-radius: 4px;"
+                }
+                style = style_map.get(level, style_map["info"])
+                display(HTML(f"<div style=\"{style}\">{formatted_message}</div>"))
+    except Exception as e:
+        # Jika gagal menampilkan ke UI, simpan ke buffer
+        with _BUFFER_LOCK:
+            if log_id not in _LOGS_DISPLAYED:
+                _EARLY_LOG_BUFFER.append((level, formatted_message, log_id))
+        # Tambahkan info error
+        print(f"[ERROR] Gagal menampilkan log ke UI: {str(e)}")
+
+def flush_early_logs(ui_components: Dict[str, Any]) -> None:
+    """
+    Flush log awal yang tersimpan di buffer ke UI setelah UI terender.
+    Hanya menampilkan log yang belum ditampilkan di UI.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI dengan kunci 'status'
+    """
+    global _EARLY_LOG_BUFFER, _UI_READY, _LOGS_DISPLAYED
+    
+    if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
+        return
+    
+    with _BUFFER_LOCK:
+        if not _EARLY_LOG_BUFFER:
+            return
+            
+        # Set UI ready
+        _UI_READY = True
+        
+        # Filter log yang belum ditampilkan
+        logs_to_display = []
+        for level, message, log_id in _EARLY_LOG_BUFFER:
+            if log_id not in _LOGS_DISPLAYED:
+                logs_to_display.append((level, message, log_id))
+                _LOGS_DISPLAYED.add(log_id)
+        
+        # Kosongkan buffer
+        _EARLY_LOG_BUFFER = []
+        
+        # Jika tidak ada log yang perlu ditampilkan, return
+        if not logs_to_display:
+            return
+        
         try:
-            # Gunakan komponen alert_utils jika tersedia
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            # Tambahkan emoji ke pesan jika disediakan
-            full_message = f"{emoji} {message}" if emoji else message
-            display(create_status_indicator(level, full_message))
-        except ImportError:
-            # Fallback minimal tanpa alert_utils - reuse kode
-            emoji_map = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌", "debug": "🔍"}
-            icon = emoji or emoji_map.get(level, "ℹ️")
-            display(HTML(f"<div><span>{icon}</span> {message}</div>"))
+            with ui_components['status']:
+                try:
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    for level, message, _ in logs_to_display:
+                        display(create_status_indicator(level, message))
+                except ImportError:
+                    for _, message, _ in logs_to_display:
+                        display(HTML(f"<div>{message}</div>"))
+        except Exception as e:
+            print(f"[ERROR] Gagal flush early logs: {str(e)}")
 
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     """
@@ -120,6 +204,8 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary berisi komponen UI dengan kunci 'status'
     """
+    # Flush log awal yang tersimpan di buffer
+    flush_early_logs(ui_components)
     # Pastikan ada status output widget
     if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
         return
@@ -183,10 +269,16 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                 'UserWarning', 'RuntimeWarning',
                 # Filter tambahan untuk mengurangi log INFO dari config_sync
                 'INFO:config_sync', 'INFO:root', 'INFO:smartcash.ui.setup',
-                'Environment config handlers', 'berhasil diinisialisasi'
+                'Environment config handlers', 'berhasil diinisialisasi',
+                # Filter tambahan untuk meredam log sinkronisasi drive config
+                'Menyinkronkan konfigurasi', 'Konfigurasi berhasil disinkronkan',
+                'Memuat konfigurasi dari Drive', 'Sinkronisasi konfigurasi',
+                'config_sync:', 'drive_sync:'
             ]  # Prefiks untuk mengidentifikasi pesan yang tidak perlu ditampilkan di UI
             
         def write(self, message):
+            global _EARLY_LOG_BUFFER, _UI_READY, _LOGS_DISPLAYED
+            
             # Write ke terminal asli
             self.terminal.write(message)
             
@@ -217,16 +309,30 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     # Tampilkan setiap baris lengkap
                     for line in lines[:-1]:
                         if line.strip():  # Cek jika bukan baris kosong
+                            # Buat timestamp unik untuk log ini
+                            timestamp = time.time()
+                            log_id = hash(f"{line}_{timestamp}")
+                            
                             try:
-                                with self.ui_components['status']:
-                                    try:
-                                        from smartcash.ui.utils.alert_utils import create_status_indicator
-                                        display(create_status_indicator("info", line))
-                                    except ImportError:
-                                        display(HTML(f"<div>{line}</div>"))
-                            except Exception:
+                                # Cek apakah UI sudah siap
+                                if 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
+                                    # Tandai log ini sebagai sudah ditampilkan
+                                    _LOGS_DISPLAYED.add(log_id)
+                                    
+                                    with self.ui_components['status']:
+                                        try:
+                                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                                            display(create_status_indicator("info", line))
+                                            _UI_READY = True  # UI sudah siap
+                                        except ImportError:
+                                            display(HTML(f"<div>{line}</div>"))
+                                else:
+                                    # Simpan ke buffer jika UI belum siap
+                                    with _BUFFER_LOCK:
+                                        _EARLY_LOG_BUFFER.append(("info", line, log_id))
+                            except Exception as e:
                                 # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
-                                self.terminal.write(f"[UI STDOUT ERROR] {line}\n")
+                                self.terminal.write(f"[UI STDOUT ERROR] {line} ({str(e)})\n")
         
         def flush(self):
             self.terminal.flush()

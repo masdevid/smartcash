@@ -62,21 +62,7 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
     
     # Tombol cek environment dan simpan konfigurasi dihapus karena akan dilakukan otomatis
     
-    # Buat progress bar dengan style yang konsisten dengan dependency_installer
-    progress_bar = widgets.IntProgress(
-        value=0,
-        min=0,
-        max=10,
-        description="Progress:",
-        style={"description_width": "initial", "bar_color": COLORS['primary']},
-        layout=widgets.Layout(width="100%", margin="10px 0", visibility="hidden")
-    )
-    
-    # Buat label untuk progress dengan style yang konsisten dengan dependency_installer
-    progress_message = widgets.HTML(
-        value="",
-        layout=widgets.Layout(margin='5px 0', visibility="hidden")
-    )
+    # Progress bar dihilangkan sesuai permintaan
     
     # Buat output widget untuk status dengan style yang konsisten dengan dependency_installer
     status = widgets.Output(
@@ -103,16 +89,10 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
         )
     )
     
-    # Buat container untuk progress dengan layout yang konsisten dengan dependency_installer
-    progress_container = widgets.VBox([
-        progress_bar,
-        progress_message
-    ], layout=widgets.Layout(width="100%", margin="5px 0"))
+    # Progress container dihilangkan sesuai permintaan
     
     # Buat accordion untuk informasi environment (tertutup secara default)
-    env_info_accordion = create_accordion([
-        ("Informasi Environment", env_info)
-    ], selected_index=None)  # None berarti semua section tertutup
+    env_info_accordion = create_accordion(env_info, selected_index=None)  # None berarti semua section tertutup
     
     # Buat container utama dengan semua komponen
     main_container = widgets.VBox(
@@ -120,7 +100,6 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
             header,
             status_panel,
             button_container,
-            progress_container,
             status,
             create_spacing(10),
             env_info_accordion
@@ -131,20 +110,15 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
         )
     )
     
-    # Fungsi untuk reset progress
+    # Fungsi reset progress tidak diperlukan lagi karena progress bar dihilangkan
     def reset_progress():
-        progress_bar.value = 0
-        progress_bar.layout.visibility = "hidden"
-        progress_message.value = ""
-        progress_message.layout.visibility = "hidden"
+        pass  # Tetap disediakan untuk kompatibilitas
     
     # Buat dictionary untuk menyimpan komponen UI (tanpa check_button dan save_button)
     ui_components = {
         "ui": main_container,
         "drive_button": drive_button,
         "directory_button": directory_button,
-        "progress_bar": progress_bar,
-        "progress_message": progress_message,
         "status": status,
         "status_panel": status_panel,
         "reset_progress": reset_progress,

@@ -1,134 +1,114 @@
 """
 File: smartcash/ui/setup/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment dengan pemanfaatan implementasi DRY
+Deskripsi: Komponen UI untuk konfigurasi environment
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Callable, Optional
 
-def create_env_config_ui(env, config: Dict[str, Any]) -> Dict[str, Any]:
+from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.utils.alert_utils import create_info_alert
+from smartcash.ui.info_boxes import get_environment_info
+
+def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi environment dengan implementasi DRY.
+    Buat komponen UI untuk konfigurasi environment
     
     Args:
-        env: Environment manager
+        env_manager: Environment manager
         config: Konfigurasi aplikasi
-        
+    
     Returns:
-        Dictionary berisi widget UI
+        Dictionary berisi komponen UI
     """
-    # Import komponen UI standar
-    from smartcash.ui.utils.header_utils import create_header
-    from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.ui.utils.layout_utils import STANDARD_LAYOUTS, OUTPUT_WIDGET, BUTTON
-    from smartcash.ui.info_boxes import get_environment_info
+    # Buat header
+    header = create_header("Konfigurasi Environment", "🔧", "Konfigurasi environment untuk SmartCash")
     
-    # Header
-    header = create_header(
-        "⚙️ Konfigurasi Environment", 
-        "Setup environment sistem untuk SmartCash"
+    # Buat info alert
+    info_alert = create_info_alert(
+        "Konfigurasi ini diperlukan untuk menjalankan aplikasi SmartCash. "
+        "Pastikan semua persyaratan terpenuhi sebelum melanjutkan."
     )
     
-    # Panel Colab Info dengan style dari constants
-    info_style = 'info'
-    from smartcash.ui.utils.alert_utils import create_info_alert
-    colab_panel = create_info_alert(
-        "ℹ️ Mendeteksi environment...",
-        info_style
-    )
+    # Buat info environment
+    env_info = get_environment_info(env_manager)
     
-    # Tombol dengan layout standar
+    # Buat tombol untuk connect ke Google Drive
     drive_button = widgets.Button(
-        description='Hubungkan Google Drive',
-        button_style='info',
-        icon='link',
-        tooltip="Hubungkan Google Drive untuk penyimpanan dataset dan konfigurasi",
-        layout=widgets.Layout(margin='5px', display='none')  # Hidden by default
+        description="Connect Google Drive",
+        button_style="primary",
+        icon="cloud",
+        tooltip="Hubungkan ke Google Drive untuk menyimpan dataset dan model"
     )
     
+    # Buat tombol untuk setup direktori
     directory_button = widgets.Button(
-        description='Setup Direktori Lokal',
-        button_style='primary',
-        icon='folder-plus',
-        tooltip="Buat struktur direktori untuk SmartCash",
-        layout=BUTTON
+        description="Setup Direktori",
+        button_style="info",
+        icon="folder-plus",
+        tooltip="Buat struktur direktori yang diperlukan"
     )
     
-    # Container tombol menggunakan STANDARD_LAYOUTS
-    button_container = widgets.HBox(
-        [drive_button, directory_button],
-        layout=STANDARD_LAYOUTS['hbox']
-    )
+    # Tombol cek environment dan simpan konfigurasi dihapus karena akan dilakukan otomatis
     
-    # Progress tracking menggunakan style dari constants
+    # Buat progress bar
     progress_bar = widgets.IntProgress(
         value=0,
         min=0,
         max=10,
-        description='Proses:',
-        layout=widgets.Layout(
-            width='100%',
-            margin='10px 0',
-            visibility='hidden'  # Hidden by default
-        ),
-        style={'description_width': 'initial', 'bar_color': COLORS['primary']}
+        description="Progress:",
+        style={"description_width": "initial"},
+        layout=widgets.Layout(width="100%", visibility="hidden")
     )
     
+    # Buat label untuk progress
     progress_message = widgets.HTML(
         value="",
-        layout=widgets.Layout(
-            margin='5px 0',
-            visibility='hidden'  # Hidden by default
-        )
+        layout=widgets.Layout(width="100%", visibility="hidden")
     )
     
-    progress_container = widgets.VBox(
-        [progress_bar, progress_message],
-        layout=STANDARD_LAYOUTS['vbox']
-    )
+    # Buat output widget untuk status
+    status = widgets.Output()
     
-    # Status output area menggunakan layout standar
-    status = widgets.Output(
-        layout=OUTPUT_WIDGET
-    )
+    # Buat container untuk tombol (hanya drive dan direktori)
+    button_container = widgets.HBox([
+        drive_button, 
+        directory_button
+    ], layout=widgets.Layout(width="100%", justify_content="space-around"))
     
-    # Reset progress helper
+    # Buat container untuk progress
+    progress_container = widgets.VBox([
+        progress_bar,
+        progress_message
+    ], layout=widgets.Layout(width="100%"))
+    
+    # Buat container utama
+    main_container = widgets.VBox([
+        header,
+        info_alert,
+        env_info,
+        button_container,
+        progress_container,
+        status
+    ], layout=widgets.Layout(width="100%"))
+    
+    # Fungsi untuk reset progress
     def reset_progress():
-        """Reset progress bar."""
-        progress_bar.layout.visibility = 'hidden'
-        progress_message.layout.visibility = 'hidden'
         progress_bar.value = 0
+        progress_bar.layout.visibility = "hidden"
         progress_message.value = ""
+        progress_message.layout.visibility = "hidden"
     
-    # Info box menggunakan komponen yang ada
-    info_box = get_environment_info()
-    
-    # Container utama dengan semua komponen
-    main = widgets.VBox(
-        [
-            header,
-            colab_panel,
-            button_container,
-            progress_container,
-            status,
-            info_box
-        ],
-        layout=STANDARD_LAYOUTS['container']
-    )
-    
-    # Struktur final komponen UI
+    # Buat dictionary untuk menyimpan komponen UI (tanpa check_button dan save_button)
     ui_components = {
-        'ui': main,
-        'colab_panel': colab_panel,
-        'drive_button': drive_button,
-        'directory_button': directory_button,
-        'button_container': button_container,
-        'progress_bar': progress_bar,
-        'progress_message': progress_message,
-        'status': status,
-        'progress_container': progress_container,
-        'reset_progress': reset_progress,
-        'module_name': 'env_config'
+        "ui": main_container,
+        "drive_button": drive_button,
+        "directory_button": directory_button,
+        "progress_bar": progress_bar,
+        "progress_message": progress_message,
+        "status": status,
+        "reset_progress": reset_progress,
+        "module_name": "env_config"
     }
     
     return ui_components

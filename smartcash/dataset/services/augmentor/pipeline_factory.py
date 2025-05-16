@@ -170,15 +170,22 @@ class AugmentationPipelineFactory:
                 )
             )
             
-        # Buat pipeline dengan parameter bbox
-        pipeline = A.Compose(
-            transforms,
-            bbox_params=A.BboxParams(
-                format=bbox_format,
-                label_fields=['class_labels'],
-                min_visibility=0.3
+        # Buat pipeline dengan parameter bbox yang tepat
+        if bbox_format:
+            # Jika format bbox ditentukan, gunakan BboxParams
+            pipeline = A.Compose(
+                transforms,
+                bbox_params=A.BboxParams(
+                    format=bbox_format,
+                    label_fields=['class_labels'],
+                    min_visibility=0.3
+                )
             )
-        )
+            self.logger.info(f"🔍 Pipeline dibuat dengan dukungan bbox format: {bbox_format}")
+        else:
+            # Jika tidak ada format bbox, buat pipeline tanpa BboxParams
+            pipeline = A.Compose(transforms)
+            self.logger.info("🔍 Pipeline dibuat tanpa dukungan bbox")
         
         self.logger.info(
             f"🎨 Pipeline augmentasi dibuat: {len(augmentation_types)} jenis transformasi, "

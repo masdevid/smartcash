@@ -117,7 +117,8 @@ def process_single_file(
             try:
                 # Augmentasi gambar dengan error handling yang lebih baik
                 try:
-                    augmented = pipeline(image=image)
+                    # Tambahkan class_labels sebagai parameter kosong untuk memenuhi kebutuhan label_fields
+                    augmented = pipeline(image=image, class_labels=[])
                     augmented_image = augmented['image']
                 except Exception as aug_error:
                     print(f"Error saat augmentasi {os.path.basename(image_path)}: {str(aug_error)}")

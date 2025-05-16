@@ -49,6 +49,17 @@ def _notify_process_error(ui_components: Dict[str, Any], module_type: str, error
     if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
         ui_components['on_process_error'](module_type, error_message)
 
+def _notify_process_stop(ui_components: Dict[str, Any], module_type: str, display_info: str = "") -> None:
+    """Notifikasi observer bahwa proses telah dihentikan oleh pengguna."""
+    logger = ui_components.get('logger')
+    if logger: logger.warning(f"{ICONS['stop']} Proses {module_type} dihentikan oleh pengguna")
+    
+    # Panggil callback jika tersedia
+    if 'on_process_stop' in ui_components and callable(ui_components['on_process_stop']):
+        ui_components['on_process_stop'](module_type, {
+            'display_info': display_info
+        })
+
 def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True, module_type: str = 'preprocessing') -> None:
     """Menonaktifkan atau mengaktifkan komponen UI selama proses berjalan."""
     # Daftar komponen yang perlu dinonaktifkan
@@ -295,7 +306,7 @@ def setup_processing_button_handlers(
         _update_status_panel(ui_components, "warning", f"{ICONS['warning']} {process_name.capitalize()} dihentikan oleh pengguna")
         
         # Notifikasi observer
-        _notify_process_stop(ui_components, module_type)
+        _notify_process_stop(ui_components, module_type, display_info="")
         
         # Reset UI
         _cleanup_ui(ui_components)

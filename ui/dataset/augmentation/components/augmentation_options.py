@@ -211,10 +211,7 @@ def create_combined_options(config: Dict[str, Any] = None) -> widgets.VBox:
             widgets.VBox([
                 widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['augmentation']} Jenis Augmentasi & Split</h5>"),
                 aug_types,
-                widgets.HBox([
-                    target_split,
-                    split_info
-                ], layout=widgets.Layout(justify_content='space-between', align_items='center'))
+                target_split
             ], layout=widgets.Layout(width='50%'))
         ], layout=widgets.Layout(width='100%'))
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
@@ -436,11 +433,10 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
         widgets.HBox([resume], layout=widgets.Layout(justify_content='flex-start'))
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
-    # Section untuk target split dan informasi split
+    # Section untuk target split (tanpa informasi split)
     split_section = widgets.VBox([
         widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['split']} Target Split</h5>"),
-        target_split,
-        split_info
+        target_split
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%', margin='10px 0'))
     
     # Tab untuk opsi dasar, target split, dan jenis augmentasi

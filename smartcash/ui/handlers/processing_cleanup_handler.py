@@ -528,15 +528,22 @@ def _notify_cleanup_start(ui_components: Dict[str, Any], module_type: str) -> No
         from smartcash.components.observer import notify
         from smartcash.components.observer.event_topics_observer import EventTopics
         
-        # Menentukan event type berdasarkan module_type
-        event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+        # Gunakan PROGRESS_START sebagai fallback jika event khusus tidak tersedia
+        try:
+            # Coba dapatkan event type berdasarkan module_type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            event_type = getattr(EventTopics, f"{event_type_prefix}_CLEANUP_START")
+        except AttributeError:
+            # Fallback ke PROGRESS_START jika event khusus tidak tersedia
+            event_type = EventTopics.PROGRESS_START
         
         notify(
-            event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_START"),
-            sender=f"{module_type}_handler",
+            event_type=event_type,
+            sender=f"{module_type}_cleanup_handler",
             message=f"Memulai pembersihan data {module_type}"
         )
-    except ImportError:
+    except Exception as e:
+        # Tangkap semua error dan abaikan
         pass
 
 def _notify_cleanup_progress(ui_components: Dict[str, Any], current: int, total: int) -> None:
@@ -547,16 +554,26 @@ def _notify_cleanup_progress(ui_components: Dict[str, Any], current: int, total:
         
         # Deteksi module_type
         module_type = 'preprocessing' if 'preprocessing_running' in ui_components else 'augmentation'
-        event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+        
+        # Gunakan PROGRESS_UPDATE sebagai fallback jika event khusus tidak tersedia
+        # Ini mencegah error "EventTopics has no attribute PREPROCESSING_CLEANUP_PROGRESS"
+        try:
+            # Coba dapatkan event type berdasarkan module_type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            event_type = getattr(EventTopics, f"{event_type_prefix}_CLEANUP_PROGRESS")
+        except AttributeError:
+            # Fallback ke PROGRESS_UPDATE jika event khusus tidak tersedia
+            event_type = EventTopics.PROGRESS_UPDATE
         
         notify(
-            event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_PROGRESS"),
-            sender=f"{module_type}_handler",
+            event_type=event_type,
+            sender=f"{module_type}_cleanup_handler",
             message=f"Menghapus file {current}/{total}",
             progress=current,
             total=total
         )
-    except ImportError:
+    except Exception as e:
+        # Tangkap semua error dan abaikan
         pass
 
 def _notify_cleanup_end(ui_components: Dict[str, Any], module_type: str, files_deleted: int, duration: float) -> None:
@@ -565,17 +582,24 @@ def _notify_cleanup_end(ui_components: Dict[str, Any], module_type: str, files_d
         from smartcash.components.observer import notify
         from smartcash.components.observer.event_topics_observer import EventTopics
         
-        # Menentukan event type berdasarkan module_type
-        event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+        # Gunakan PROGRESS_COMPLETE sebagai fallback jika event khusus tidak tersedia
+        try:
+            # Coba dapatkan event type berdasarkan module_type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            event_type = getattr(EventTopics, f"{event_type_prefix}_CLEANUP_END")
+        except AttributeError:
+            # Fallback ke PROGRESS_COMPLETE jika event khusus tidak tersedia
+            event_type = EventTopics.PROGRESS_COMPLETE
         
         notify(
-            event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_END"),
-            sender=f"{module_type}_handler",
+            event_type=event_type,
+            sender=f"{module_type}_cleanup_handler",
             message=f"Pembersihan data {module_type} selesai",
             files_deleted=files_deleted,
             duration=duration
         )
-    except ImportError:
+    except Exception as e:
+        # Tangkap semua error dan abaikan
         pass
 
 def _notify_cleanup_error(ui_components: Dict[str, Any], module_type: str, error_message: str) -> None:
@@ -584,14 +608,25 @@ def _notify_cleanup_error(ui_components: Dict[str, Any], module_type: str, error
         from smartcash.components.observer import notify
         from smartcash.components.observer.event_topics_observer import EventTopics
         
-        # Menentukan event type berdasarkan module_type
-        event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+        # Gunakan fallback jika event khusus tidak tersedia
+        try:
+            # Coba dapatkan event type berdasarkan module_type
+            event_type_prefix = "PREPROCESSING" if module_type == 'preprocessing' else "AUGMENTATION"
+            event_type = getattr(EventTopics, f"{event_type_prefix}_CLEANUP_ERROR")
+        except AttributeError:
+            # Fallback ke event error yang tersedia
+            if hasattr(EventTopics, f"{event_type_prefix}_ERROR"):
+                event_type = getattr(EventTopics, f"{event_type_prefix}_ERROR")
+            else:
+                # Fallback terakhir jika tidak ada event error yang sesuai
+                event_type = "error.cleanup"
         
         notify(
-            event_type=getattr(EventTopics, f"{event_type_prefix}_CLEANUP_ERROR"),
-            sender=f"{module_type}_handler",
+            event_type=event_type,
+            sender=f"{module_type}_cleanup_handler",
             message=f"Error saat pembersihan data {module_type}: {error_message}",
             error=error_message
         )
-    except ImportError:
+    except Exception as e:
+        # Tangkap semua error dan abaikan
         pass

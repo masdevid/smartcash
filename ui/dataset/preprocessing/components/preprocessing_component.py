@@ -57,7 +57,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_enabled=True
     )
     
-    # Tidak menggunakan tombol visualisasi sample dan bandingkan data
+    # Buat tombol visualisasi meskipun tidak ditampilkan di UI utama
+    visualization_buttons = create_visualization_buttons()
     
     # Progress tracking dengan styling standar
     progress_bar = widgets.IntProgress(
@@ -162,6 +163,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'log_accordion': log_accordion,
         'summary_container': summary_container,
         'module_name': 'preprocessing',
+        # Tambahkan visualization_buttons untuk mencegah KeyError
+        'visualization_buttons': visualization_buttons,
         # Default dataset paths
         'data_dir': 'data',
         'preprocessed_dir': 'data/preprocessed'

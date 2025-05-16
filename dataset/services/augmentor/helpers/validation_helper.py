@@ -12,6 +12,7 @@ import logging
 def validate_input_files(images_dir: str, file_prefix: str, logger = None) -> Tuple[List[str], Dict[str, Any]]:
     """
     Validasi file input untuk augmentasi dengan file pattern detection.
+    Jika tidak ada file dengan prefix tertentu, akan mencari semua file gambar.
     
     Args:
         images_dir: Path direktori gambar input
@@ -24,21 +25,43 @@ def validate_input_files(images_dir: str, file_prefix: str, logger = None) -> Tu
     # Buat direktori output jika belum ada
     os.makedirs(images_dir, exist_ok=True)
     
-    # Dapatkan file dengan pattern
+    # Dapatkan file dengan pattern spesifik
     pattern = f"{file_prefix}_*.jpg"
     image_files = glob.glob(os.path.join(images_dir, pattern))
     
+    # Jika tidak ada file dengan pattern spesifik, coba cari semua file gambar
+    if not image_files:
+        if logger:
+            logger.info(f"⚠️ Tidak ada file dengan pola {pattern}, mencari semua file gambar...")
+        
+        # Cari semua file gambar umum
+        all_patterns = ["*.jpg", "*.jpeg", "*.png"]
+        for img_pattern in all_patterns:
+            pattern_files = glob.glob(os.path.join(images_dir, img_pattern))
+            image_files.extend(pattern_files)
+    
     # Validasi input file
+    if not image_files:
+        # Coba cari di subdirektori images jika ada
+        images_subdir = os.path.join(os.path.dirname(images_dir), "images")
+        if os.path.exists(images_subdir):
+            if logger:
+                logger.info(f"🔍 Mencoba mencari di subdirektori: {images_subdir}")
+            for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
+                pattern_files = glob.glob(os.path.join(images_subdir, img_pattern))
+                image_files.extend(pattern_files)
+    
+    # Jika masih tidak ada file
     if not image_files:
         result = {
             "success": False,
-            "message": f"Tidak ada file gambar ditemukan dengan pola {pattern} di direktori {images_dir}"
+            "message": f"❌ Tidak ada gambar di direktori input: {images_dir}"
         }
         return [], result
     
     # Log jumlah file yang ditemukan
     if logger:
-        logger.info(f"🔍 Ditemukan {len(image_files)} file dengan pattern {pattern} di {images_dir}")
+        logger.info(f"🔍 Ditemukan {len(image_files)} file gambar di {images_dir}")
     
     # Return hasil sukses
     result = {

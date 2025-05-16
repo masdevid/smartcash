@@ -206,7 +206,7 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
 
 def extract_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Ekstrak parameter augmentasi dari UI components.
+    Ekstrak parameter augmentasi langsung dari UI components, bukan dari konfigurasi yang disimpan.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -214,38 +214,90 @@ def extract_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]
     Returns:
         Dictionary parameter augmentasi
     """
-    # Dapatkan konfigurasi dari UI
-    from smartcash.ui.dataset.augmentation.handlers.config_handler import get_config_from_ui
-    config = get_config_from_ui(ui_components)
+    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger.info("🔍 Mengambil parameter augmentasi langsung dari UI")
     
-    # Ekstrak parameter dari config
-    aug_config = config.get('augmentation', {})
-    
-    # Dapatkan split dari UI
-    split_selector = ui_components.get('split_selector')
-    split = 'train'  # Default
-    if split_selector and hasattr(split_selector, 'children'):
-        for child in split_selector.children:
-            if hasattr(child, 'children'):
-                for grandchild in child.children:
-                    if hasattr(grandchild, 'value') and hasattr(grandchild, 'description') and grandchild.description == 'Split:':
-                        split = grandchild.value
-                        break
-    
-    # Dapatkan parameter dari config
+    # Inisialisasi parameter dengan nilai default
     params = {
-        'split': split,
-        'augmentation_types': aug_config.get('types', ['combined']),
-        'num_variations': aug_config.get('num_variations', 2),
-        'output_prefix': aug_config.get('output_prefix', 'aug'),
-        'validate_results': aug_config.get('validate_results', True),
-        'resume': aug_config.get('resume', False),
-        'process_bboxes': aug_config.get('process_bboxes', True),
-        'target_balance': aug_config.get('balance_classes', True),
-        'num_workers': aug_config.get('num_workers', 4),
-        'move_to_preprocessed': aug_config.get('move_to_preprocessed', True),
-        'target_count': aug_config.get('target_count', 1000)
+        'split': 'train',
+        'augmentation_types': ['combined'],
+        'num_variations': 2,
+        'output_prefix': 'aug',
+        'validate_results': True,
+        'resume': False,
+        'process_bboxes': True,
+        'target_balance': True,
+        'num_workers': 4,
+        'move_to_preprocessed': True,
+        'target_count': 1000
     }
+    
+    # Dapatkan komponen augmentation_options
+    aug_options = ui_components.get('augmentation_options', {})
+    
+    # Ekstrak parameter dari komponen UI
+    if aug_options:
+        # Cari komponen UI berdasarkan deskripsi atau atribut
+        for key, component in aug_options.items():
+            # Jenis augmentasi (SelectMultiple)
+            if hasattr(component, 'description') and component.description == 'Jenis:':
+                params['augmentation_types'] = list(component.value)
+            
+            # Jumlah variasi (IntSlider)
+            elif hasattr(component, 'description') and component.description == 'Jumlah Variasi:':
+                params['num_variations'] = component.value
+            
+            # Target split (Dropdown)
+            elif hasattr(component, 'description') and component.description == 'Target Split:':
+                params['split'] = component.value
+            
+            # Output prefix (Text)
+            elif hasattr(component, 'description') and component.description == 'Output Prefix:':
+                params['output_prefix'] = component.value
+            
+            # Target count (IntSlider)
+            elif hasattr(component, 'description') and component.description == 'Target per Kelas:':
+                params['target_count'] = component.value
+            
+            # Balance classes (Checkbox)
+            elif hasattr(component, 'description') and component.description == 'Balancing Kelas':
+                params['target_balance'] = component.value
+            
+            # Move to preprocessed (Checkbox)
+            elif hasattr(component, 'description') and component.description == 'Pindahkan ke Preprocessed':
+                params['move_to_preprocessed'] = component.value
+    
+    # Dapatkan komponen advanced_options
+    adv_options = ui_components.get('advanced_options', {})
+    
+    # Ekstrak parameter dari advanced options
+    if adv_options:
+        for key, component in adv_options.items():
+            # Process bboxes (Checkbox)
+            if hasattr(component, 'description') and component.description == 'Proses Bounding Box':
+                params['process_bboxes'] = component.value
+            
+            # Validate results (Checkbox)
+            elif hasattr(component, 'description') and component.description == 'Validasi Hasil':
+                params['validate_results'] = component.value
+            
+            # Num workers (IntSlider)
+            elif hasattr(component, 'description') and component.description == 'Jumlah Worker:':
+                params['num_workers'] = component.value
+    
+    # Fallback ke split selector jika split tidak ditemukan di augmentation_options
+    if params['split'] == 'train':
+        split_selector = ui_components.get('split_selector')
+        if split_selector and hasattr(split_selector, 'children'):
+            for child in split_selector.children:
+                if hasattr(child, 'children'):
+                    for grandchild in child.children:
+                        if hasattr(grandchild, 'value') and hasattr(grandchild, 'description') and grandchild.description == 'Split:':
+                            params['split'] = grandchild.value
+                            break
+    
+    # Log parameter yang diambil
+    logger.info(f"📊 Parameter augmentasi: {params}")
     
     return params
 

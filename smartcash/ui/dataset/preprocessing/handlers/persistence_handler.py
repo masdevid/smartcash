@@ -83,8 +83,6 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
             from smartcash.ui.dataset.preprocessing.handlers.config_handler import update_ui_from_config
             ui_components = update_ui_from_config(ui_components, config)
         
-        # Log info
-        logger.info(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
         
         return ui_components
     except Exception as e:

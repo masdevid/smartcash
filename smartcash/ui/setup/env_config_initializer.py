@@ -40,8 +40,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     # Tampilkan UI
     display(ui_components['ui'])
     
-    # Log informasi
-    logger.info("Environment config handlers berhasil diinisialisasi")
+    # Hapus log info inisialisasi
     
     # Otomatisasi pemeriksaan environment dan sinkronisasi konfigurasi
     import threading
@@ -77,6 +76,13 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                 "Pemeriksaan environment dan sinkronisasi konfigurasi berhasil dilakukan.",
                 style="success"
             ).value
+            
+            # Nonaktifkan tombol Drive jika sudah terhubung
+            if env_manager.is_drive_mounted():
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = "Drive Terhubung"
+                ui_components['drive_button'].tooltip = "Google Drive sudah terhubung"
+                ui_components['drive_button'].icon = "check"
             
             # Tunggu sebentar sebelum menampilkan pesan sukses
             time.sleep(1)

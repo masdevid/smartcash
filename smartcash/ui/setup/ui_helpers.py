@@ -31,9 +31,4 @@ def cleanup_ui(ui_components: Dict[str, Any]) -> None:
     # Aktifkan kembali tombol
     disable_ui_during_processing(ui_components, False)
     
-    # Sembunyikan progress bar dan message
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-    
-    if 'progress_message' in ui_components:
-        ui_components['progress_message'].layout.visibility = 'hidden'
+    # Progress bar dan message telah dihilangkan, tidak perlu disembunyikan

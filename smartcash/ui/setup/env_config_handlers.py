@@ -9,6 +9,7 @@ from IPython import get_ipython
 
 from smartcash.ui.setup.environment_detector import detect_environment
 from smartcash.ui.setup.ui_helpers import disable_ui_during_processing, cleanup_ui
+from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.utils.ui_logger import log_to_ui
 from smartcash.ui.utils.logging_utils import create_cleanup_function
@@ -36,9 +37,7 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env_manager: Any, c
     cleanup_func = create_cleanup_function(ui_components)
     _register_cleanup_event(cleanup_func)
     
-    # Log info
-    if 'logger' in ui_components:
-        ui_components['logger'].info("Environment config handlers berhasil diinisialisasi")
+    # Hapus log info inisialisasi
     
     return ui_components
 
@@ -53,11 +52,12 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
-        # Update progress
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = "Menghubungkan ke Google Drive..."
+        # Update status panel
+        ui_components['status_panel'].value = create_info_box(
+            "Menghubungkan Drive", 
+            "Sedang menghubungkan ke Google Drive...",
+            style="info"
+        ).value
         
         # Log info
         log_to_ui(ui_components, "Menghubungkan ke Google Drive...", "info", "🔄")
@@ -76,8 +76,18 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
                 # Log success
                 log_to_ui(ui_components, message, "success", "✅")
                 
-                # Sembunyikan tombol
-                ui_components['drive_button'].layout.display = 'none'
+                # Nonaktifkan tombol
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = "Drive Terhubung"
+                ui_components['drive_button'].tooltip = "Google Drive sudah terhubung"
+                ui_components['drive_button'].icon = "check"
+                
+                # Update status panel
+                ui_components['status_panel'].value = create_info_box(
+                    "Drive Terhubung", 
+                    "Google Drive berhasil terhubung.",
+                    style="success"
+                ).value
                 
                 # Detect environment lagi
                 detect_environment(ui_components, env_manager)
@@ -105,11 +115,12 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
-        # Update progress
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = "Membuat struktur direktori..."
+        # Update status panel
+        ui_components['status_panel'].value = create_info_box(
+            "Membuat Direktori", 
+            "Sedang membuat struktur direktori yang diperlukan...",
+            style="info"
+        ).value
         
         # Log info
         log_to_ui(ui_components, "Membuat struktur direktori...", "info", "🔄")
@@ -201,11 +212,12 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
-        # Update progress
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = "Menyimpan konfigurasi..."
+        # Update status panel
+        ui_components['status_panel'].value = create_info_box(
+            "Menyiapkan Direktori", 
+            "Sedang menyiapkan struktur direktori...",
+            style="info"
+        ).value
         
         # Log info
         log_to_ui(ui_components, "Menyimpan konfigurasi...", "info", "🔄")

@@ -10,7 +10,7 @@ from IPython.display import display
 from smartcash.ui.setup.env_config_component import create_env_config_ui
 from smartcash.ui.setup.env_config_handlers import setup_env_config_handlers
 from smartcash.common.environment import get_environment_manager
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import get_config_manager
 from smartcash.ui.utils.ui_logger import create_direct_ui_logger
 from smartcash.ui.setup.ui_helpers import disable_ui_during_processing, cleanup_ui
 
@@ -25,7 +25,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     env_manager = get_environment_manager()
     
     # Inisialisasi config manager
-    config_manager = ConfigManager.get_instance()
+    config_manager = get_config_manager()
     
     # Buat komponen UI
     ui_components = create_env_config_ui(env_manager, config_manager)

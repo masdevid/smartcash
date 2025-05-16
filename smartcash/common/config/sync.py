@@ -289,7 +289,7 @@ def sync_all_configs(
     
     # Sinkronisasi setiap file
     for file_name in all_config_files:
-        logger.info(STATUS_INFO.format(message=f"Sinkronisasi {file_name}..."))
+        # logger.info(STATUS_INFO.format(message=f"Sinkronisasi {file_name}..."))
         
         try:
             # Cek jika realpath sama

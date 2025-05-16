@@ -8,6 +8,7 @@ import shutil
 import glob
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from tqdm.notebook import tqdm
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 
 # Definisi ekstensi gambar yang didukung
@@ -57,23 +58,30 @@ def move_files_to_preprocessed(
                 pattern = os.path.join(images_output_dir, f"*{ext}")
                 all_files.extend(glob.glob(pattern))
         
-        # Pindahkan file yang ditemukan
+        # Pindahkan file yang ditemukan dengan progress bar
         moved_count = 0
-        for img_file in augmented_files:
-            img_name = os.path.basename(img_file)
-            label_name = f"{os.path.splitext(img_name)[0]}.txt"
-            
-            # Define target paths
-            img_target = os.path.join(final_output_dir, split, 'images', img_name)
-            label_target = os.path.join(final_output_dir, split, 'labels', label_name)
-            label_file = os.path.join(labels_output_dir, label_name)
-            
-            # Copy file dengan debug info
-            for src, dst in [(img_file, img_target), (label_file, label_target)]:
-                if os.path.exists(src):
-                    # Copy file tanpa menghapus aslinya (tanpa log per file)
-                    shutil.copy2(src, dst)
-                    moved_count += 1
+        total_files = len(augmented_files)
+        
+        # Buat progress bar dengan deskripsi yang jelas
+        with tqdm(total=total_files, desc=f"📦 Menyalin file ke {split}", unit="file", colour="green") as pbar:
+            for img_file in augmented_files:
+                img_name = os.path.basename(img_file)
+                label_name = f"{os.path.splitext(img_name)[0]}.txt"
+                
+                # Define target paths
+                img_target = os.path.join(final_output_dir, split, 'images', img_name)
+                label_target = os.path.join(final_output_dir, split, 'labels', label_name)
+                label_file = os.path.join(labels_output_dir, label_name)
+                
+                # Copy file dengan progress bar
+                for src, dst in [(img_file, img_target), (label_file, label_target)]:
+                    if os.path.exists(src):
+                        # Copy file tanpa menghapus aslinya
+                        shutil.copy2(src, dst)
+                        moved_count += 1
+                
+                # Update progress bar setiap gambar (bukan setiap file)
+                pbar.update(1)
         
         if logger:
             logger.info(f"✅ Berhasil memindahkan {moved_count} file ke {os.path.join(final_output_dir, split)}")

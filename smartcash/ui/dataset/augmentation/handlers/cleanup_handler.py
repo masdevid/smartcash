@@ -4,8 +4,13 @@ Deskripsi: Handler pembersihan untuk augmentasi dataset
 """
 
 import os
+import glob
 import shutil
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Tuple, Optional
+from datetime import datetime
+from IPython.display import display, clear_output
+from tqdm.notebook import tqdm
+from smartcash.ui.components.status_indicator import create_status_indicator
 from smartcash.common.logger import get_logger
 
 def cleanup_augmentation_results(ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -89,18 +94,28 @@ def cleanup_augmentation_results(ui_components: Dict[str, Any]) -> Dict[str, Any
             # Log backup dinonaktifkan untuk mengurangi output log
             pass
         
-        # Hapus file di direktori output
+        # Hapus file di direktori output dengan progress bar
+        total_files = 0
+        files_to_remove = []
+        
+        # Kumpulkan semua file yang akan dihapus
         if os.path.exists(images_output_dir):
-            for file in os.listdir(images_output_dir):
-                file_path = os.path.join(images_output_dir, file)
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
+            image_files = [f for f in glob.glob(os.path.join(images_output_dir, '*')) if os.path.isfile(f)]
+            files_to_remove.extend(image_files)
+            total_files += len(image_files)
         
         if os.path.exists(labels_output_dir):
-            for file in os.listdir(labels_output_dir):
-                file_path = os.path.join(labels_output_dir, file)
-                if os.path.isfile(file_path):
-                    os.unlink(file_path)
+            label_files = [f for f in glob.glob(os.path.join(labels_output_dir, '*')) if os.path.isfile(f)]
+            files_to_remove.extend(label_files)
+            total_files += len(label_files)
+        
+        # Hapus file dengan progress bar
+        if files_to_remove:
+            with tqdm(total=total_files, desc="🗑️ Menghapus file sementara", unit="file", colour="red") as pbar:
+                for f in files_to_remove:
+                    if os.path.isfile(f):
+                        os.remove(f)
+                        pbar.update(1)
         
         # Log info
         logger.info(f"✅ Berhasil menghapus {num_images} gambar dan {num_labels} label dari {output_dir}")
@@ -193,27 +208,36 @@ def remove_augmented_files_from_preprocessed(ui_components: Dict[str, Any], pref
         images_dir = os.path.join(final_output_dir, 'images')
         labels_dir = os.path.join(final_output_dir, 'labels')
         
-        # Hitung jumlah file yang akan dihapus
+        # Cari file dengan prefix dan hapus dengan progress bar
         num_images = 0
         num_labels = 0
+        files_to_remove = []
         
-        # Hapus gambar yang dimulai dengan prefix
+        # Cari gambar untuk dihapus
+        images_dir = os.path.join(final_output_dir, 'images')
         if os.path.exists(images_dir):
-            for file in os.listdir(images_dir):
-                if file.startswith(prefix):
-                    file_path = os.path.join(images_dir, file)
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                        num_images += 1
+            image_files = [img_file for img_file in glob.glob(os.path.join(images_dir, f"{prefix}*.*")) 
+                         if os.path.isfile(img_file) and any(img_file.lower().endswith(ext) 
+                                                              for ext in ['.jpg', '.jpeg', '.png', '.bmp'])]
+            files_to_remove.extend(image_files)
+            num_images = len(image_files)
         
-        # Hapus label yang dimulai dengan prefix
+        # Cari label untuk dihapus
+        labels_dir = os.path.join(final_output_dir, 'labels')
         if os.path.exists(labels_dir):
-            for file in os.listdir(labels_dir):
-                if file.startswith(prefix):
-                    file_path = os.path.join(labels_dir, file)
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                        num_labels += 1
+            label_files = [label_file for label_file in glob.glob(os.path.join(labels_dir, f"{prefix}*.txt")) 
+                          if os.path.isfile(label_file)]
+            files_to_remove.extend(label_files)
+            num_labels = len(label_files)
+        
+        # Hapus file dengan progress bar
+        if files_to_remove:
+            with tqdm(total=len(files_to_remove), desc=f"🗑️ Menghapus file dengan prefix '{prefix}'", 
+                     unit="file", colour="red") as pbar:
+                for f in files_to_remove:
+                    if os.path.isfile(f):
+                        os.remove(f)
+                        pbar.update(1)
         
         # Jika tidak ada file yang dihapus
         if num_images == 0 and num_labels == 0:

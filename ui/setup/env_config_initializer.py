@@ -52,28 +52,16 @@ def initialize_env_config_ui() -> Dict[str, Any]:
         time.sleep(2)
         
         try:
-            # Periksa environment
-            logger.info("Memeriksa environment secara otomatis...")
+            # Periksa environment tanpa log berlebihan
             env_info = env_manager.get_system_info()
-            logger.info("Environment berhasil diperiksa")
             
-            # Sinkronisasi konfigurasi
-            logger.info("Menyinkronkan konfigurasi secara otomatis...")
+            # Sinkronisasi konfigurasi tanpa log
             if hasattr(env_manager, 'sync_config'):
-                success, message = env_manager.sync_config()
-                if success:
-                    logger.info(message)
-                else:
-                    logger.warning(message)
+                env_manager.sync_config()
             
-            # Simpan konfigurasi
-            logger.info("Menyimpan konfigurasi secara otomatis...")
+            # Simpan konfigurasi tanpa log
             if hasattr(env_manager, 'save_environment_config'):
-                success, message = env_manager.save_environment_config()
-                if success:
-                    logger.info(message)
-                else:
-                    logger.warning(message)
+                env_manager.save_environment_config()
         except Exception as e:
             logger.error(f"Error saat otomatisasi: {str(e)}")
     

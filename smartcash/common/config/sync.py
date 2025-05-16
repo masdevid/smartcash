@@ -164,7 +164,7 @@ def sync_config_with_drive(
         success_drive = save_config(merged_config, drive_config_path)
         
         if success_local and success_drive:
-            logger.info(STATUS_SUCCESS.format(message="Sinkronisasi berhasil dengan strategi merge"))
+            # logger.info(STATUS_SUCCESS.format(message="Sinkronisasi berhasil dengan strategi merge"))
             return True, "Sinkronisasi berhasil dengan strategi merge", merged_config
         else:
             logger.error(CONFIG_ERROR.format(operation="menyimpan hasil merge", error="Gagal menyimpan ke kedua lokasi"))
@@ -174,12 +174,12 @@ def sync_config_with_drive(
         # Strategi drive priority: Drive → lokal
         if drive_config_path.exists():
             if local_config_path.exists() and are_configs_identical(local_config, drive_config):
-                logger.info(CONFIG_IDENTICAL.format(name=config_file))
+                # logger.info(CONFIG_IDENTICAL.format(name=config_file))
                 return True, "Konfigurasi sudah identik", drive_config
             
             success = save_config(drive_config, local_config_path)
             if success:
-                logger.info(CONFIG_SYNC_SUCCESS.format(direction="dari Drive"))
+                # logger.info(CONFIG_SYNC_SUCCESS.format(direction="dari Drive"))
                 return True, "Konfigurasi berhasil disinkronisasi dari Drive", drive_config
             else:
                 logger.error(CONFIG_ERROR.format(operation="menyimpan dari Drive", error="Gagal menulis ke file lokal"))
@@ -189,8 +189,8 @@ def sync_config_with_drive(
             if local_config_path.exists():
                 success = save_config(local_config, drive_config_path)
                 if success:
-                    logger.info(CONFIG_SYNC_SUCCESS.format(direction="ke Drive"))
-                    return True, "Konfigurasi berhasil disalin ke Drive", local_config
+                    # logger.info(CONFIG_SYNC_SUCCESS.format(direction="ke Drive"))
+                    return True, "Konfigurasi berhasil disinkronisasi ke Drive", local_config
                 else:
                     logger.error(CONFIG_ERROR.format(operation="menyalin ke Drive", error="Gagal menulis ke Drive"))
                     return False, "Error saat menyalin ke Drive", {}
@@ -202,12 +202,12 @@ def sync_config_with_drive(
         # Strategi local priority: lokal → Drive
         if local_config_path.exists():
             if drive_config_path.exists() and are_configs_identical(local_config, drive_config):
-                logger.info(CONFIG_IDENTICAL.format(name=config_file))
+                # logger.info(CONFIG_IDENTICAL.format(name=config_file))
                 return True, "Konfigurasi sudah identik", local_config
             
             success = save_config(local_config, drive_config_path)
             if success:
-                logger.info(CONFIG_SYNC_SUCCESS.format(direction="ke Drive"))
+                # logger.info(CONFIG_SYNC_SUCCESS.format(direction="ke Drive"))
                 return True, "Konfigurasi berhasil disinkronisasi ke Drive", local_config
             else:
                 logger.error(CONFIG_ERROR.format(operation="menyimpan ke Drive", error="Gagal menulis ke Drive"))
@@ -217,7 +217,7 @@ def sync_config_with_drive(
             if drive_config_path.exists():
                 success = save_config(drive_config, local_config_path)
                 if success:
-                    logger.info(CONFIG_SYNC_SUCCESS.format(direction="dari Drive"))
+                    # logger.info(CONFIG_SYNC_SUCCESS.format(direction="dari Drive"))
                     return True, "Konfigurasi berhasil disalin dari Drive", drive_config
                 else:
                     logger.error(CONFIG_ERROR.format(operation="menyalin dari Drive", error="Gagal menulis ke file lokal"))

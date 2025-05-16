@@ -33,7 +33,7 @@ def on_augment_click(b, ui_components=None):
     
     logger = ui_components.get('logger', get_logger('augmentation'))
     
-    # Update UI: menampilkan proses dimulai
+    # Clear output hanya saat pertama kali tombol diklik
     with ui_components['status']: 
         clear_output(wait=True)
         display(create_status_indicator("info", f"{ICONS['augmentation']} Memulai augmentasi dataset..."))
@@ -94,9 +94,9 @@ def on_augment_click(b, ui_components=None):
         thread.daemon = True
         thread.start()
     except Exception as e:
-        # Tampilkan error
+        # Tampilkan pesan error tanpa menghapus output sebelumnya
         with ui_components['status']: 
-            clear_output(wait=True)
+            # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
             display(create_status_indicator("error", f"{ICONS['error']} Gagal menjalankan augmentasi: {str(e)}"))
         
         # Enable kembali komponen UI
@@ -154,7 +154,7 @@ def on_reset_click(b, ui_components=None):
     
     logger = ui_components.get('logger', get_logger('augmentation'))
     
-    # Update UI
+    # Clear output hanya saat pertama kali tombol diklik
     with ui_components['status']: 
         clear_output(wait=True)
         display(create_status_indicator("info", f"{ICONS['reset']} Mereset konfigurasi augmentasi..."))
@@ -173,19 +173,19 @@ def on_reset_click(b, ui_components=None):
             # Update status panel
             update_status_panel(ui_components, "Konfigurasi augmentasi direset ke default", "info")
             
-            # Tampilkan pesan sukses
+            # Tampilkan pesan sukses tanpa menghapus output sebelumnya
             with ui_components['status']: 
-                clear_output(wait=True)
+                # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
                 display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke default"))
         else:
-            # Tampilkan pesan error
+            # Tampilkan pesan error tanpa menghapus output sebelumnya
             with ui_components['status']: 
-                clear_output(wait=True)
+                # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
                 display(create_status_indicator("error", f"{ICONS['error']} Gagal mereset konfigurasi augmentasi"))
     except Exception as e:
-        # Tampilkan error
+        # Tampilkan error tanpa menghapus output sebelumnya
         with ui_components['status']: 
-            clear_output(wait=True)
+            # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
             display(create_status_indicator("error", f"{ICONS['error']} Error saat mereset konfigurasi: {str(e)}"))
         if logger: logger.error(f"Error saat reset konfigurasi: {str(e)}\n{traceback.format_exc()}")
 
@@ -198,7 +198,7 @@ def on_save_click(b, ui_components=None):
     
     logger = ui_components.get('logger', get_logger('augmentation'))
     
-    # Update UI
+    # Clear output hanya saat pertama kali tombol diklik
     with ui_components['status']: 
         clear_output(wait=True)
         display(create_status_indicator("info", f"{ICONS['save']} Menyimpan konfigurasi augmentasi..."))
@@ -231,14 +231,14 @@ def on_save_click(b, ui_components=None):
             if logger: logger.info(f"✅ Konfigurasi augmentasi berhasil disimpan{' dan tersinkron dengan drive' if drive_sync_success else ''}")
 
         else:
-            # Tampilkan pesan error
+            # Tampilkan pesan error tanpa menghapus output sebelumnya
             with ui_components['status']: 
-                clear_output(wait=True)
+                # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
                 display(create_status_indicator("error", f"{ICONS['error']} Gagal menyimpan konfigurasi augmentasi"))
     except Exception as e:
-        # Tampilkan error
+        # Tampilkan error tanpa menghapus output sebelumnya
         with ui_components['status']: 
-            clear_output(wait=True)
+            # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
             display(create_status_indicator("error", f"{ICONS['error']} Error saat menyimpan konfigurasi: {str(e)}"))
         if logger: logger.error(f"Error saat menyimpan konfigurasi: {str(e)}\n{traceback.format_exc()}")
 
@@ -251,7 +251,7 @@ def on_cleanup_click(b, ui_components=None):
     
     logger = ui_components.get('logger', get_logger('augmentation'))
     
-    # Update UI: menampilkan proses dimulai
+    # Clear output hanya saat pertama kali tombol diklik
     with ui_components['status']: 
         clear_output(wait=True)
         display(create_status_indicator("info", f"{ICONS['cleanup']} Membersihkan hasil augmentasi..."))
@@ -268,9 +268,9 @@ def on_cleanup_click(b, ui_components=None):
         # Jalankan cleanup
         success, message = cleanup_augmentation_results(aug_params, ui_components.get('logger'))
         
-        # Update status
+        # Update status tanpa menghapus output sebelumnya
         with ui_components['status']: 
-            clear_output(wait=True)
+            # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
             if success:
                 display(create_status_indicator("success", f"{ICONS['success']} {message}"))
             else:
@@ -285,7 +285,7 @@ def on_cleanup_click(b, ui_components=None):
             
     except Exception as e:
         with ui_components['status']: 
-            clear_output(wait=True)
+            # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
             display(create_status_indicator("error", f"{ICONS['error']} Gagal membersihkan hasil augmentasi: {str(e)}"))
         if logger: logger.error(f"{ICONS['error']} Error saat cleanup: {str(e)}\n{traceback.format_exc()}")
     finally:

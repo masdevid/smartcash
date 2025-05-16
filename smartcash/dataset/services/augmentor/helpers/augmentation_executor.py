@@ -25,13 +25,106 @@ def execute_prioritized_class_augmentation(
     result_stats = {'total_files_augmented': 0, 'total_generated': 0, 'class_stats': {}, 'fulfilled_classes': set()}
     
     # Ekstrak data kelas untuk prioritisasi dan tracking
-    class_files, class_counts, class_needs = [class_data.get(k, {}) for k in ('files_by_class', 'class_counts', 'augmentation_needs')]
+    class_files = class_data.get('files_by_class', {})
+    class_counts = class_data.get('class_counts', {})
+    class_needs = class_data.get('augmentation_needs', {})
+    selected_files = class_data.get('selected_files', [])
     
-    # Prioritaskan kelas dengan one-liner sort berdasarkan kebutuhan dan jumlah instance
+    # Cek apakah ini mode non-balancing (balancer dinonaktifkan)
+    is_non_balancing_mode = not class_files and selected_files
+    
+    if is_non_balancing_mode:
+        service.logger.info(f"🔄 Menjalankan augmentasi tanpa balancing untuk {len(selected_files)} file")
+        
+        # Untuk mode non-balancing, proses semua file sekaligus
+        augmentation_results = process_files_with_executor(
+            selected_files,
+            augmentation_params,
+            n_workers,
+            "Augmentasi semua file",
+            service.report_progress
+        )
+        
+        # Hitung hasil
+        total_generated = sum(r.get('generated', 0) for r in augmentation_results)
+        success_count = sum(1 for r in augmentation_results if r.get('status') == 'success')
+        
+        # Update statistik
+        result_stats['total_files_augmented'] = len(selected_files)
+        result_stats['total_generated'] = total_generated
+        
+        # Tambahkan statistik umum
+        result_stats['class_stats']['all'] = {
+            'original': len(selected_files),
+            'files_augmented': len(selected_files),
+            'target': target_count,
+            'before_augmentation': len(selected_files),
+            'generated': total_generated,
+            'success_rate': success_count / max(1, len(selected_files))
+        }
+        
+        # Log hasil
+        service.logger.info(f"✅ Augmentasi selesai: {total_generated} variasi dibuat dari {len(selected_files)} file")
+        
+        # Report progres hasil
+        service.report_progress(
+            message=f"✅ Augmentasi selesai: {total_generated} variasi dibuat",
+            status="success", step=1,
+            progress=len(selected_files),
+            total=len(selected_files)
+        )
+        
+        return result_stats
+    
+    # Mode balancing - prioritaskan kelas dengan one-liner sort berdasarkan kebutuhan dan jumlah instance
     classes_to_augment = [cls for cls, need in sorted(class_needs.items(), 
-                                                    key=lambda x: (x[1], -class_counts.get(x[0], 0)), 
-                                                    reverse=True) 
+                                                     key=lambda x: (x[1], -class_counts.get(x[0], 0)), 
+                                                     reverse=True) 
                          if need > 0]
+    
+    # Jika tidak ada kelas yang perlu diaugmentasi tapi ada file yang dipilih (forced augmentation)
+    if not classes_to_augment and selected_files:
+        service.logger.info(f"🔄 Menjalankan augmentasi yang dipaksa untuk {len(selected_files)} file")
+        
+        # Untuk mode forced augmentation, proses semua file sekaligus
+        augmentation_results = process_files_with_executor(
+            selected_files,
+            augmentation_params,
+            n_workers,
+            "Augmentasi yang dipaksa",
+            service.report_progress
+        )
+        
+        # Hitung hasil
+        total_generated = sum(r.get('generated', 0) for r in augmentation_results)
+        success_count = sum(1 for r in augmentation_results if r.get('status') == 'success')
+        
+        # Update statistik
+        result_stats['total_files_augmented'] = len(selected_files)
+        result_stats['total_generated'] = total_generated
+        
+        # Tambahkan statistik umum
+        result_stats['class_stats']['forced'] = {
+            'original': len(selected_files),
+            'files_augmented': len(selected_files),
+            'target': target_count,
+            'before_augmentation': 0,
+            'generated': total_generated,
+            'success_rate': success_count / max(1, len(selected_files))
+        }
+        
+        # Log hasil
+        service.logger.info(f"✅ Augmentasi yang dipaksa selesai: {total_generated} variasi dibuat dari {len(selected_files)} file")
+        
+        # Report progres hasil
+        service.report_progress(
+            message=f"✅ Augmentasi yang dipaksa selesai: {total_generated} variasi dibuat",
+            status="success", step=1,
+            progress=len(selected_files),
+            total=len(selected_files)
+        )
+        
+        return result_stats
     
     # Tracking dinamis dan initialized state
     current_class_counts, processed_files = dict(class_counts), set()
@@ -40,8 +133,8 @@ def execute_prioritized_class_augmentation(
     
     # Hitung total file untuk semua kelas dengan list comprehension
     total_files_all_classes = sum(len(select_prioritized_files_for_class(cls, class_files, current_class_counts, 
-                                                           target_count, processed_files, class_data))
-                                for cls in classes_to_augment)
+                                                            target_count, processed_files, class_data))
+                                 for cls in classes_to_augment)
     
     # Tracking progress global
     processed_file_count = 0

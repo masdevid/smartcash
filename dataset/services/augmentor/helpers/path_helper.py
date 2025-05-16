@@ -24,14 +24,18 @@ def setup_paths(config: Dict[str, Any], split: str) -> Dict[str, str]:
         'augmented_dir': config.get('augmentation', {}).get('output_dir', 'data/augmented')
     }
     
+    # Pastikan direktori augmented tidak sama dengan preprocessed untuk menghindari konflik
+    if paths['augmented_dir'] == paths['preprocessed_dir']:
+        paths['augmented_dir'] = os.path.join(paths['preprocessed_dir'], 'augmented')
+    
     # Derived paths dengan one-liner
     return {**paths, **{
         'input_dir': os.path.join(paths['preprocessed_dir'], split),
         'images_input_dir': os.path.join(paths['preprocessed_dir'], split, 'images'),
         'labels_input_dir': os.path.join(paths['preprocessed_dir'], split, 'labels'),
         'output_dir': paths['augmented_dir'],
-        'images_output_dir': os.path.join(paths['augmented_dir'], 'images'),
-        'labels_output_dir': os.path.join(paths['augmented_dir'], 'labels'),
+        'images_output_dir': os.path.join(paths['augmented_dir'], split, 'images'),  # Tambahkan split ke path
+        'labels_output_dir': os.path.join(paths['augmented_dir'], split, 'labels'),  # Tambahkan split ke path
         'split': split,
         'final_output_dir': paths['preprocessed_dir']
     }}

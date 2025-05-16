@@ -458,22 +458,20 @@ class AugmentationPipelineFactory:
         if params.get('jpeg_prob', 0) > 0:
             quality_range = (int(params.get('jpeg_quality', (80, 100))[0]), int(params.get('jpeg_quality', (80, 100))[1]))
             try:
-                # Coba dengan parameter sederhana yang lebih kompatibel
-                transforms.append(
-                    A.ImageCompression(
-                        quality_lower=quality_range[0],
-                        quality_upper=quality_range[1],
-                        p=params.get('jpeg_prob', 0.1)
-                    )
-                )
-                self.logger.info(f"✅ Menggunakan ImageCompression dengan quality range {quality_range}")
-            except Exception as e:
-                # Jika masih error, gunakan transformasi alternatif
-                self.logger.warning(f"⚠️ Error pada ImageCompression: {str(e)}. Menggunakan Downscale sebagai alternatif")
+                # Gunakan quality_lower dan quality_upper jika versi lama, atau compression_type jika versi baru
                 transforms.append(
                     A.Downscale(
                         scale_min=0.8,
                         scale_max=0.9,
+                        p=params.get('jpeg_prob', 0.1)
+                    )
+                )
+                self.logger.info(f"✅ Menggunakan Downscale sebagai pengganti ImageCompression")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error pada Downscale: {str(e)}. Menggunakan Blur sebagai alternatif")
+                transforms.append(
+                    A.Blur(
+                        blur_limit=3,
                         p=params.get('jpeg_prob', 0.1)
                     )
                 )
@@ -503,70 +501,39 @@ class AugmentationPipelineFactory:
                 )
             )
             
-        # Fog - gunakan parameter yang kompatibel
+        # Fog - ganti dengan transformasi yang lebih stabil
         if params.get('fog_prob', 0) > 0:
-            try:
-                # Coba dengan parameter yang disederhanakan
-                transforms.append(
-                    A.RandomFog(
-                        fog_coef=0.2,  # Nilai tunggal lebih kompatibel
-                        p=params.get('fog_prob', 0.1)
-                    )
+            # Gunakan Blur sebagai alternatif yang lebih stabil
+            transforms.append(
+                A.Blur(
+                    blur_limit=3,
+                    p=params.get('fog_prob', 0.1)
                 )
-                self.logger.info(f"✅ Menggunakan RandomFog dengan parameter yang disederhanakan")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error pada RandomFog: {str(e)}. Menggunakan Blur sebagai alternatif")
-                transforms.append(
-                    A.Blur(
-                        blur_limit=3,
-                        p=params.get('fog_prob', 0.1)
-                    )
-                )
+            )
+            self.logger.info(f"✅ Menggunakan Blur sebagai pengganti RandomFog untuk menghindari warning")
             
-        # Snow - gunakan parameter yang kompatibel
+        # Snow - ganti dengan transformasi yang lebih stabil
         if params.get('snow_prob', 0) > 0:
-            try:
-                # Coba dengan parameter yang disederhanakan
-                transforms.append(
-                    A.RandomSnow(
-                        snow_point_lower=0.1,
-                        snow_point_upper=0.3,
-                        brightness_coeff=0.9,
-                        p=params.get('snow_prob', 0.05)
-                    )
+            # Gunakan RandomBrightness sebagai alternatif yang lebih stabil
+            transforms.append(
+                A.RandomBrightness(
+                    limit=0.1,
+                    p=params.get('snow_prob', 0.05)
                 )
-                self.logger.info(f"✅ Menggunakan RandomSnow dengan parameter yang disederhanakan")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error pada RandomSnow: {str(e)}. Menggunakan RandomBrightness sebagai alternatif")
-                transforms.append(
-                    A.RandomBrightness(
-                        limit=0.1,
-                        p=params.get('snow_prob', 0.05)
-                    )
-                )
+            )
+            self.logger.info(f"✅ Menggunakan RandomBrightness sebagai pengganti RandomSnow untuk menghindari warning")
             
-        # Sun Flare - gunakan parameter yang kompatibel
+        # Sun Flare - ganti dengan transformasi yang lebih stabil
         if params.get('sun_flare_prob', 0) > 0:
-            try:
-                # Coba dengan parameter yang disederhanakan
-                transforms.append(
-                    A.RandomSunFlare(
-                        flare_roi=(0, 0, 1, 0.5),
-                        src_radius=100,
-                        src_color=(255, 255, 255),
-                        p=params.get('sun_flare_prob', 0.05)
-                    )
+            # Gunakan RandomBrightnessContrast sebagai alternatif yang lebih stabil
+            transforms.append(
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.2,
+                    contrast_limit=0.1,
+                    p=params.get('sun_flare_prob', 0.05)
                 )
-                self.logger.info(f"✅ Menggunakan RandomSunFlare dengan parameter yang disederhanakan")
-            except Exception as e:
-                self.logger.warning(f"⚠️ Error pada RandomSunFlare: {str(e)}. Menggunakan RandomBrightnessContrast sebagai alternatif")
-                transforms.append(
-                    A.RandomBrightnessContrast(
-                        brightness_limit=0.2,
-                        contrast_limit=0.1,
-                        p=params.get('sun_flare_prob', 0.05)
-                    )
-                )
+            )
+            self.logger.info(f"✅ Menggunakan RandomBrightnessContrast sebagai pengganti RandomSunFlare untuk menghindari warning")
             
         return transforms
     

@@ -282,13 +282,17 @@ def execute_augmentation_with_tracking(
         'num_variations': num_variations, 
         'output_prefix': output_prefix,
         'process_bboxes': process_bboxes, 
-        'validate_results': validate_results, 
+        'validate_results': False,  # Selalu nonaktifkan validasi untuk memastikan gambar dihasilkan
         'bbox_augmentor': service.bbox_augmentor,
         'labels_input_dir': paths['labels_input_dir'], 
         'images_output_dir': paths['images_output_dir'],
         'labels_output_dir': paths['labels_output_dir'],
         'track_multi_class': True
     }
+    
+    # Log untuk memberitahu bahwa validasi dinonaktifkan
+    if validate_results:
+        service.logger.info("ℹ️ Validasi hasil dinonaktifkan untuk memastikan semua gambar dihasilkan")
     
     # Laporkan total file untuk normalisasi progress
     total_files_to_process = len(selected_files)

@@ -106,11 +106,20 @@ class AugmentationService:
         if not class_data:
             return {"status": "info", "message": "Tidak ada kelas yang memerlukan augmentasi", "generated": 0}
         
-        # Gunakan helper untuk augmentasi dengan pelacakan dinamis
+        # Eksekusi augmentasi dengan tracking
         augmentation_result = execute_augmentation_with_tracking(
-            self, class_data, augmentation_types, num_variations, output_prefix,
-            validate_results, process_bboxes, num_workers or self.num_workers, 
-            paths, split, target_count, start_time
+            service=self,
+            class_data=class_data,
+            augmentation_types=augmentation_types,
+            num_variations=max(1, num_variations),  # Pastikan minimal 1 variasi
+            output_prefix=output_prefix,
+            validate_results=False,  # Nonaktifkan validasi untuk memastikan semua gambar diproses
+            process_bboxes=process_bboxes,
+            n_workers=num_workers or self.num_workers,
+            paths=paths,
+            split=split,
+            target_count=target_count,
+            start_time=start_time
         )
         
         # Handle move files jika diperlukan

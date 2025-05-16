@@ -73,31 +73,47 @@ class AugmentationPipelineFactory:
     
     def create_pipeline(
         self, 
-        augmentation_types: List[str] = None,
+        augmentation_types: List[str] = None, 
         img_size: tuple = (640, 640),
-        include_normalize: bool = True,
-        intensity: float = 1.0,
         bbox_format: str = 'yolo',
+        include_normalize: bool = True,
+        intensity: float = 0.5,
         **kwargs
-    ) -> A.Compose:
+    ) -> Any:
         """
-        Buat pipeline augmentasi berdasarkan jenis yang dipilih.
+        Buat pipeline augmentasi dengan konfigurasi yang disesuaikan.
         
         Args:
-            augmentation_types: Jenis augmentasi yang akan diterapkan
-            img_size: Ukuran target gambar
-            include_normalize: Apakah menyertakan normalisasi di akhir
+            augmentation_types: List jenis augmentasi yang akan digunakan
+            img_size: Ukuran gambar output (width, height)
+            bbox_format: Format bounding box ('yolo', 'coco', dll)
+            include_normalize: Sertakan normalisasi
             intensity: Intensitas augmentasi (0.0-1.0)
-            bbox_format: Format bbox ('yolo', 'pascal_voc', 'albumentations')
-            **kwargs: Parameter kustom untuk override
+            **kwargs: Parameter tambahan
             
         Returns:
             Pipeline augmentasi Albumentations
         """
-        # Default augmentation jika tidak disediakan
+        # Default ke semua jenis augmentasi jika tidak ditentukan
         if not augmentation_types:
-            augmentation_types = ['flip', 'rotate', 'brightness', 'contrast']
+            augmentation_types = ['combined']
             
+        # Jika combined, gunakan semua jenis
+        if 'combined' in augmentation_types:
+            augmentation_types = ['flip', 'rotate', 'lighting', 'noise', 'hsv', 'weather']
+            
+        # Pastikan intensitas minimal 0.3 untuk memastikan perubahan terlihat
+        intensity = max(0.3, intensity)
+            
+        # Validasi jenis augmentasi
+        valid_types = {'flip', 'rotate', 'position', 'lighting', 'brightness', 'contrast', 
+                      'noise', 'quality', 'hsv', 'weather', 'crop'}
+        augmentation_types = [t for t in augmentation_types if t in valid_types]
+        
+        # Pastikan selalu ada minimal satu jenis augmentasi
+        if not augmentation_types:
+            augmentation_types = ['flip', 'rotate']  # Minimal dua jenis augmentasi
+        
         # Buat list transformasi
         transforms = []
         

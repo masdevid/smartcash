@@ -176,6 +176,7 @@ def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: in
         value: Nilai progress bar
         max_value: Nilai maksimum progress bar (default: 100)
         description: Deskripsi progress bar
+        silent: Flag untuk menonaktifkan log dan update deskripsi (default: False)
     """
     if 'progress_bar' not in ui_components:
         return
@@ -190,8 +191,8 @@ def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: in
     progress_bar.max = max_value
     progress_bar.value = value
     
-    # Update deskripsi jika ada
-    if description and 'overall_label' in ui_components:
+    # Update deskripsi jika ada dan tidak silent
+    if description and 'overall_label' in ui_components and not silent:
         ui_components['overall_label'].layout.visibility = 'visible'
         
         # Cek apakah deskripsi berbeda dari yang sebelumnya untuk mencegah duplikasi
@@ -201,9 +202,9 @@ def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: in
             # Simpan deskripsi terakhir untuk mencegah duplikasi
             ui_components['_last_progress_description'] = ui_components['overall_label']
     
-    # Log progress ke logger jika ada, tapi batasi log dengan teks yang sama
+    # Log progress ke logger jika ada, tapi batasi log dengan teks yang sama dan tidak silent
     logger = ui_components.get('logger')
-    if logger and description:
+    if logger and description and not silent:
         percent = int((value / max_value) * 100) if max_value > 0 else 0
         
         # Cek apakah pesan progress ini berbeda dari yang terakhir

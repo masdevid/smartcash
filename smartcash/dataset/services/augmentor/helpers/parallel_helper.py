@@ -98,16 +98,18 @@ def process_files_with_executor(
                 if progress_callback:
                     current_progress = i + 1
                     percent = int(current_progress / total_files * 100)
-                    # Kurangi batasan frekuensi untuk update lebih sering
-                    should_report = (i % max(1, total_files // 20) == 0 or i == 0 or i == total_files - 1 or percent % 5 == 0)
+                    # Batasi notifikasi hanya untuk perubahan signifikan (10% progress) atau awal/akhir
+                    should_report = (i == 0 or i == total_files - 1 or percent % 10 == 0)
                     
                     if should_report:
+                        # Update progress bar tanpa mengirim notifikasi
                         progress_callback(
                             message=f"Memproses file {current_progress}/{total_files} ({percent}%)",
                             progress=percent,  # Progress global (0-100)
                             total=100,  # Dari total 100%
                             current_progress=current_progress,
                             current_total=total_files,
+                            silent=True,  # Tambahkan flag untuk tidak menampilkan notifikasi
                             **callback_params
                         )
     

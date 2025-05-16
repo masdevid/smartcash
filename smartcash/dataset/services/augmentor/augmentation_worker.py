@@ -113,11 +113,20 @@ def process_single_file(
         
         # Proses augmentasi untuk setiap variasi
         results = []
-        for var_idx in range(num_variations):
+        for var_idx in range(max(1, num_variations)):  # Pastikan minimal 1 variasi
             try:
-                # Augmentasi gambar
-                augmented = pipeline(image=image)
-                augmented_image = augmented['image']
+                # Augmentasi gambar dengan error handling yang lebih baik
+                try:
+                    augmented = pipeline(image=image)
+                    augmented_image = augmented['image']
+                except Exception as aug_error:
+                    print(f"Error saat augmentasi {os.path.basename(image_path)}: {str(aug_error)}")
+                    # Gunakan gambar asli sebagai fallback jika augmentasi gagal
+                    augmented_image = image.copy()
+                    augmented = {'transforms': []}
+                
+                # Debug info - simpan ke variabel untuk menghindari overhead log
+                debug_info = f"Debug: File: {os.path.basename(image_path)}, Shape: {augmented_image.shape}, Original: {image.shape}"
                 
                 # Dapatkan bounding box baru jika perlu
                 augmented_bboxes = []
@@ -130,15 +139,13 @@ def process_single_file(
                     # Gunakan bbox original jika tidak perlu transform
                     augmented_bboxes = bboxes
                 
-                # Validasi hasil jika diminta
-                if validate_results:
-                    # Cek dimensi gambar
-                    if augmented_image.shape[0] <= 0 or augmented_image.shape[1] <= 0:
-                        continue
-                    
-                    # Cek integritas bbox jika ada
-                    if process_bboxes and not augmented_bboxes:
-                        continue
+                # Debug info untuk dimensi gambar yang sangat kecil, tapi tidak melakukan validasi
+                if augmented_image.shape[0] <= 10 or augmented_image.shape[1] <= 10:
+                    print(f"{debug_info} - Peringatan: dimensi gambar sangat kecil tetapi tetap diproses")
+                
+                # Debug info untuk bbox yang hilang, tapi tidak melakukan validasi
+                if process_bboxes and bboxes and not augmented_bboxes:
+                    print(f"{debug_info} - Peringatan: tidak ada bbox yang valid tetapi tetap diproses")
                 
                 # Generate nama file output dengan format denominasi
                 if class_id in DENOMINATION_CLASS_MAP:

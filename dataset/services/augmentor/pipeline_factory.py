@@ -188,27 +188,87 @@ class AugmentationPipelineFactory:
         # Parameter probabilitas
         params['p_factor'] = intensity
         
-        # Position params
-        params['fliplr'] = self.position_params.get('fliplr', 0.5) * intensity
-        params['flipud'] = self.position_params.get('flipud', 0.1) * intensity
-        params['translate'] = self.position_params.get('translate', 0.1) * intensity
-        params['scale'] = self.position_params.get('scale', 0.1) * intensity
-        params['degrees'] = self.position_params.get('degrees', 15) * intensity
-        params['shear'] = self.position_params.get('shear', 5.0) * intensity
+        # Position params - pastikan nilai adalah float tunggal, bukan sequence
+        fliplr_param = self.position_params.get('fliplr', 0.5)
+        flipud_param = self.position_params.get('flipud', 0.1)
+        translate_param = self.position_params.get('translate', 0.1)
+        scale_param = self.position_params.get('scale', 0.1)
+        degrees_param = self.position_params.get('degrees', 15)
+        shear_param = self.position_params.get('shear', 5.0)
         
-        # Lighting params
-        params['brightness'] = self.lighting_params.get('brightness', 0.2) * intensity
-        params['contrast'] = self.lighting_params.get('contrast', 0.2) * intensity
-        params['saturation'] = self.lighting_params.get('saturation', 0.2) * intensity
-        params['hue'] = self.lighting_params.get('hue', 0.015) * intensity
-        params['lightness'] = self.lighting_params.get('hsv_v', 0.4) * intensity
+        # Jika parameter adalah tuple/list, gunakan nilai pertama
+        if isinstance(fliplr_param, (list, tuple)):
+            fliplr_param = fliplr_param[0] if len(fliplr_param) > 0 else 0.5
+        if isinstance(flipud_param, (list, tuple)):
+            flipud_param = flipud_param[0] if len(flipud_param) > 0 else 0.1
+        if isinstance(translate_param, (list, tuple)):
+            translate_param = translate_param[0] if len(translate_param) > 0 else 0.1
+        if isinstance(scale_param, (list, tuple)):
+            scale_param = scale_param[0] if len(scale_param) > 0 else 0.1
+        if isinstance(degrees_param, (list, tuple)):
+            degrees_param = degrees_param[0] if len(degrees_param) > 0 else 15
+        if isinstance(shear_param, (list, tuple)):
+            shear_param = shear_param[0] if len(shear_param) > 0 else 5.0
+            
+        # Kalikan dengan intensity
+        params['fliplr'] = float(fliplr_param) * intensity
+        params['flipud'] = float(flipud_param) * intensity
+        params['translate'] = float(translate_param) * intensity
+        params['scale'] = float(scale_param) * intensity
+        params['degrees'] = float(degrees_param) * intensity
+        params['shear'] = float(shear_param) * intensity
         
-        # Noise params
-        params['gaussian_prob'] = self.noise_params.get('gaussian_prob', 0.1) * intensity
-        params['gaussian_limit'] = self.noise_params.get('gaussian_limit', 10.0) * intensity
-        params['blur_prob'] = self.noise_params.get('blur_prob', 0.1) * intensity
-        params['blur_limit'] = int(self.noise_params.get('blur_limit', 3) * intensity) + 1
-        params['jpeg_prob'] = self.noise_params.get('jpeg_prob', 0.1) * intensity
+        # Lighting params - pastikan nilai adalah float tunggal, bukan sequence
+        brightness_param = self.lighting_params.get('brightness', 0.2)
+        contrast_param = self.lighting_params.get('contrast', 0.2)
+        saturation_param = self.lighting_params.get('saturation', 0.2)
+        hue_param = self.lighting_params.get('hue', 0.015)
+        lightness_param = self.lighting_params.get('hsv_v', 0.4)
+        
+        # Jika parameter adalah tuple/list, gunakan nilai pertama
+        if isinstance(brightness_param, (list, tuple)):
+            brightness_param = brightness_param[0] if len(brightness_param) > 0 else 0.2
+        if isinstance(contrast_param, (list, tuple)):
+            contrast_param = contrast_param[0] if len(contrast_param) > 0 else 0.2
+        if isinstance(saturation_param, (list, tuple)):
+            saturation_param = saturation_param[0] if len(saturation_param) > 0 else 0.2
+        if isinstance(hue_param, (list, tuple)):
+            hue_param = hue_param[0] if len(hue_param) > 0 else 0.015
+        if isinstance(lightness_param, (list, tuple)):
+            lightness_param = lightness_param[0] if len(lightness_param) > 0 else 0.4
+            
+        # Kalikan dengan intensity
+        params['brightness'] = float(brightness_param) * intensity
+        params['contrast'] = float(contrast_param) * intensity
+        params['saturation'] = float(saturation_param) * intensity
+        params['hue'] = float(hue_param) * intensity
+        params['lightness'] = float(lightness_param) * intensity
+        
+        # Noise params - pastikan nilai adalah float tunggal, bukan sequence
+        gaussian_prob_param = self.noise_params.get('gaussian_prob', 0.1)
+        gaussian_limit_param = self.noise_params.get('gaussian_limit', 10.0)
+        blur_prob_param = self.noise_params.get('blur_prob', 0.1)
+        blur_limit_param = self.noise_params.get('blur_limit', 3)
+        jpeg_prob_param = self.noise_params.get('jpeg_prob', 0.1)
+        
+        # Jika parameter adalah tuple/list, gunakan nilai pertama
+        if isinstance(gaussian_prob_param, (list, tuple)):
+            gaussian_prob_param = gaussian_prob_param[0] if len(gaussian_prob_param) > 0 else 0.1
+        if isinstance(gaussian_limit_param, (list, tuple)):
+            gaussian_limit_param = gaussian_limit_param[0] if len(gaussian_limit_param) > 0 else 10.0
+        if isinstance(blur_prob_param, (list, tuple)):
+            blur_prob_param = blur_prob_param[0] if len(blur_prob_param) > 0 else 0.1
+        if isinstance(blur_limit_param, (list, tuple)):
+            blur_limit_param = blur_limit_param[0] if len(blur_limit_param) > 0 else 3
+        if isinstance(jpeg_prob_param, (list, tuple)):
+            jpeg_prob_param = jpeg_prob_param[0] if len(jpeg_prob_param) > 0 else 0.1
+            
+        # Kalikan dengan intensity
+        params['gaussian_prob'] = float(gaussian_prob_param) * intensity
+        params['gaussian_limit'] = float(gaussian_limit_param) * intensity
+        params['blur_prob'] = float(blur_prob_param) * intensity
+        params['blur_limit'] = int(float(blur_limit_param) * intensity) + 1
+        params['jpeg_prob'] = float(jpeg_prob_param) * intensity
         
         # Weather params
         params['rain_prob'] = 0.1 * intensity

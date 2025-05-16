@@ -85,7 +85,20 @@ def on_augment_click(b, ui_components=None):
         if logger: logger.debug(f"Gagal mengirim notifikasi augmentasi: {str(e)}")
     
     # Log info awal untuk memastikan log berfungsi
-    logger.info(f"🚀 Memulai proses augmentasi dataset dengan parameter: {updated_config.get('augmentation', {})}")
+    logger.info(f"🚀 Memulai proses augmentasi dataset dengan parameter: {updated_config.get('augmentation', {})}")    
+    
+    # Bersihkan file augmentasi lama terlebih dahulu
+    try:
+        from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import cleanup_augmentation_results
+        cleanup_result = cleanup_augmentation_results(ui_components)
+        if cleanup_result.get('status') == 'success':
+            logger.info(f"✅ Berhasil membersihkan file augmentasi lama: {cleanup_result.get('message', '')}")
+        elif cleanup_result.get('status') == 'warning':
+            logger.info(f"⚠️ {cleanup_result.get('message', 'Tidak ada file yang perlu dibersihkan')}")
+        else:
+            logger.warning(f"⚠️ Gagal membersihkan file augmentasi lama: {cleanup_result.get('message', '')}")
+    except Exception as e:
+        logger.warning(f"⚠️ Error saat membersihkan file augmentasi lama: {str(e)}")
     
     # Jalankan augmentasi langsung tanpa threading (lebih kompatibel dengan Colab)
     try:

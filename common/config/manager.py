@@ -485,7 +485,7 @@ class ConfigManager:
         """
         # Gunakan direktori home user untuk menyimpan konfigurasi
         config_dir = os.path.join(os.path.expanduser('~'), '.smartcash', 'config')
-        return os.path.join(config_dir, f"{module_name}.yaml")
+        return os.path.join(config_dir, f"{module_name}_config.yaml")
     
     def get_module_config(self, module_name: str, default_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """

@@ -414,14 +414,27 @@ class AugmentationPipelineFactory:
         """
         transforms = []
         
-        # GaussianNoise
+        # Gaussian Noise (menggunakan GaussNoise sebagai pengganti GaussianNoise)
         if params.get('gaussian_prob', 0) > 0:
-            transforms.append(
-                A.GaussianNoise(
-                    var_limit=(5.0, params.get('gaussian_limit', 10.0)),
-                    p=params.get('gaussian_prob', 0.1)
+            try:
+                # Coba gunakan GaussNoise yang tersedia di albumentations
+                transforms.append(
+                    A.GaussNoise(
+                        var_limit=(5.0, params.get('gaussian_limit', 10.0)),
+                        p=params.get('gaussian_prob', 0.1)
+                    )
                 )
-            )
+                self.logger.info("✅ Menggunakan GaussNoise untuk noise augmentation")
+            except AttributeError:
+                # Fallback ke transformasi lain jika GaussNoise tidak tersedia
+                self.logger.warning("⚠️ GaussNoise tidak tersedia, menggunakan RandomBrightnessContrast sebagai alternatif")
+                transforms.append(
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.1,
+                        contrast_limit=0.1,
+                        p=params.get('gaussian_prob', 0.1)
+                    )
+                )
             
         # Blur
         if params.get('blur_prob', 0) > 0:

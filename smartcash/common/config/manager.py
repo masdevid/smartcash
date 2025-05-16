@@ -319,8 +319,8 @@ class ConfigManager:
             else:
                 config = self.module_configs[module_name]
             
-            # Tentukan nama file konfigurasi
-            config_file = f"{module_name}.yaml"
+            # Tentukan nama file konfigurasi dengan pola xxx_config.yaml
+            config_file = f"{module_name}_config.yaml"
             
             # Import modul config_sync
             from smartcash.common.config.sync import upload_config_to_drive

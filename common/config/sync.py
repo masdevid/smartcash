@@ -277,6 +277,11 @@ def upload_config_to_drive(config_path: str, config: Dict[str, Any], logger = No
             config_path = Path(config_path)
             file_name = config_path.name
             
+            # Perbaikan nama file untuk mengikuti pola xxx_config.yaml
+            if file_name.endswith('.yaml'):
+                module_name = file_name.replace('.yaml', '')
+                file_name = f"{module_name}_config.yaml"
+            
         drive_config_dir = env_manager.drive_path / "configs"
         drive_config_dir.mkdir(parents=True, exist_ok=True)
         drive_config_path = drive_config_dir / file_name

@@ -18,15 +18,38 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.common.config.manager import get_config_manager
+    from smartcash.common.logger import get_logger
     
-    # Dapatkan konfigurasi augmentasi
-    config_manager = get_config_manager()
-    aug_config = config_manager.get_module_config('augmentation')
+    logger = get_logger('augmentation')
+    logger.info(f"🔧 Membuat komponen opsi augmentasi")
     
-    # Pastikan aug_config memiliki struktur yang benar
-    if not aug_config:
+    try:
+        # Dapatkan konfigurasi augmentasi
+        config_manager = get_config_manager()
+        if config_manager is None:
+            logger.warning(f"⚠️ ConfigManager tidak tersedia, menggunakan konfigurasi default")
+            aug_config = {}
+        else:
+            aug_config = config_manager.get_module_config('augmentation')
+            logger.info(f"📋 Konfigurasi augmentasi berhasil dimuat")
+        
+        # Gunakan config yang diberikan jika ada
+        if config is not None and isinstance(config, dict):
+            if 'augmentation' in config:
+                aug_config = config.get('augmentation', {})
+                logger.info(f"📋 Menggunakan konfigurasi yang diberikan")
+        
+        # Pastikan aug_config memiliki struktur yang benar
+        if not aug_config or not isinstance(aug_config, dict):
+            logger.warning(f"⚠️ Konfigurasi tidak valid, menggunakan konfigurasi default")
+            aug_config = {}
+        if 'augmentation' not in aug_config:
+            aug_config['augmentation'] = {}
+    except Exception as e:
+        logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
+        import traceback
+        logger.error(f"🔍 Traceback: {traceback.format_exc()}")
         aug_config = {}
-    if 'augmentation' not in aug_config:
         aug_config['augmentation'] = {}
     
     # Daftar jenis augmentasi yang tersedia
@@ -189,8 +212,21 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     tabs.set_title(1, f"{ICONS['augmentation']} Jenis Augmentasi")
     
     # Container utama
-    container = widgets.VBox([
-        tabs
-    ], layout=widgets.Layout(margin='10px 0'))
-    
-    return container
+    try:
+        container = widgets.VBox([
+            tabs
+        ], layout=widgets.Layout(margin='10px 0'))
+        
+        logger.info(f"✅ Komponen opsi augmentasi berhasil dibuat")
+        return container
+    except Exception as e:
+        logger.error(f"❌ Error saat membuat container UI: {str(e)}")
+        import traceback
+        logger.error(f"🔍 Traceback: {traceback.format_exc()}")
+        
+        # Buat container fallback sederhana
+        fallback_container = widgets.VBox([
+            widgets.HTML(f"<h3 style='color: red;'>⚠️ Error saat membuat komponen opsi augmentasi</h3>"),
+            widgets.HTML(f"<p>Detail error: {str(e)}</p>")
+        ])
+        return fallback_container

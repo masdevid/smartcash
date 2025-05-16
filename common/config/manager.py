@@ -64,9 +64,6 @@ class ConfigManager:
         # Override dengan environment variables
         self._override_with_env_vars()
         
-        if self.logger:
-            self.logger.info(f"✅ Konfigurasi dimuat dari: {config_path}")
-            
         return self.config
     
     def _resolve_config_path(self, config_file: str) -> Path:

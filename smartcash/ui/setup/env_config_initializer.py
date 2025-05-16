@@ -78,7 +78,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
             ).value
             
             # Nonaktifkan tombol Drive jika sudah terhubung
-            if env_manager.is_drive_mounted():
+            if env_manager.is_drive_mounted:
                 ui_components['drive_button'].disabled = True
                 ui_components['drive_button'].description = "Drive Terhubung"
                 ui_components['drive_button'].tooltip = "Google Drive sudah terhubung"

@@ -167,7 +167,7 @@ def update_status_text(ui_components: Dict[str, Any], message: str, status: str 
         # Jika status_text bukan widget Output, mungkin HTML widget
         status_text.value = f"<div style='padding: 10px; background-color: {color}; color: white; border-radius: 5px;'><span class='{status}' style='color: {color_name};'>{icon} {message}</span></div>"
 
-def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: int = 100, description: str = '') -> None:
+def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: int = 100, description: str = '', silent: bool = False, **kwargs) -> None:
     """
     Update progress bar dengan nilai dan deskripsi.
     

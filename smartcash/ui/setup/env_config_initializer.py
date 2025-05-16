@@ -54,7 +54,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
         try:
             # Periksa environment
             logger.info("Memeriksa environment secara otomatis...")
-            env_info = env_manager.check_environment()
+            env_info = env_manager.get_system_info()
             logger.info("Environment berhasil diperiksa")
             
             # Sinkronisasi konfigurasi

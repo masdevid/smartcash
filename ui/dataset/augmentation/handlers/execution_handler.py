@@ -232,58 +232,139 @@ def extract_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]
         'target_count': 1000
     }
     
-    # Dapatkan komponen augmentation_options
-    aug_options = ui_components.get('augmentation_options', {})
+    # Dapatkan komponen augmentation_options dan combined_options
+    combined_options = ui_components.get('combined_options', None)
     
     # Ekstrak parameter dari komponen UI
-    if aug_options:
-        # Cari komponen UI berdasarkan deskripsi atau atribut
-        for key, component in aug_options.items():
-            # Jenis augmentasi (SelectMultiple)
-            if hasattr(component, 'description') and component.description == 'Jenis:':
-                params['augmentation_types'] = list(component.value)
-            
-            # Jumlah variasi (IntSlider)
-            elif hasattr(component, 'description') and component.description == 'Jumlah Variasi:':
-                params['num_variations'] = component.value
-            
-            # Target split (Dropdown)
-            elif hasattr(component, 'description') and component.description == 'Target Split:':
-                params['split'] = component.value
-            
-            # Output prefix (Text)
-            elif hasattr(component, 'description') and component.description == 'Output Prefix:':
-                params['output_prefix'] = component.value
-            
-            # Target count (IntSlider)
-            elif hasattr(component, 'description') and component.description == 'Target per Kelas:':
-                params['target_count'] = component.value
-            
-            # Balance classes (Checkbox)
-            elif hasattr(component, 'description') and component.description == 'Balancing Kelas':
-                params['target_balance'] = component.value
-            
-            # Move to preprocessed (Checkbox)
-            elif hasattr(component, 'description') and component.description == 'Pindahkan ke Preprocessed':
-                params['move_to_preprocessed'] = component.value
+    if combined_options and hasattr(combined_options, 'children'):
+        logger.info("🔍 Mengambil parameter dari combined_options")
+        
+        # Akses elemen-elemen dalam combined_options
+        # combined_options adalah VBox yang berisi komponen-komponen UI
+        for child in combined_options.children:
+            # Periksa apakah ini adalah HBox yang berisi komponen-komponen UI
+            if hasattr(child, 'children'):
+                for subchild in child.children:
+                    # Periksa apakah ini adalah VBox yang berisi komponen-komponen UI
+                    if hasattr(subchild, 'children'):
+                        for component in subchild.children:
+                            # Periksa komponen berdasarkan deskripsi
+                            if hasattr(component, 'description'):
+                                # Jenis augmentasi (SelectMultiple)
+                                if component.description == 'Jenis:':
+                                    params['augmentation_types'] = list(component.value)
+                                    logger.info(f"📊 Jenis augmentasi: {params['augmentation_types']}")
+                                
+                                # Jumlah variasi (IntSlider)
+                                elif component.description == 'Jumlah Variasi:':
+                                    params['num_variations'] = component.value
+                                    logger.info(f"📊 Jumlah variasi: {params['num_variations']}")
+                                
+                                # Target split (Dropdown)
+                                elif component.description == 'Target Split:':
+                                    params['split'] = component.value
+                                    logger.info(f"📊 Target split: {params['split']}")
+                                
+                                # Output prefix (Text)
+                                elif component.description == 'Output Prefix:':
+                                    params['output_prefix'] = component.value
+                                    logger.info(f"📊 Output prefix: {params['output_prefix']}")
+                                
+                                # Target count (IntSlider)
+                                elif component.description == 'Target per Kelas:':
+                                    params['target_count'] = component.value
+                                    logger.info(f"📊 Target per kelas: {params['target_count']}")
+                                
+                                # Balance classes (Checkbox)
+                                elif component.description == 'Balancing Kelas':
+                                    params['target_balance'] = component.value
+                                    logger.info(f"📊 Balancing kelas: {params['target_balance']}")
+                                
+                                # Move to preprocessed (Checkbox)
+                                elif component.description == 'Pindahkan ke Preprocessed':
+                                    params['move_to_preprocessed'] = component.value
+                                    logger.info(f"📊 Pindahkan ke preprocessed: {params['move_to_preprocessed']}")
+                                    
+                                # Validate results (Checkbox)
+                                elif component.description == 'Validasi Hasil':
+                                    params['validate_results'] = component.value
+                                    logger.info(f"📊 Validasi hasil: {params['validate_results']}")
+                                    
+                                # Resume (Checkbox)
+                                elif component.description == 'Resume Augmentasi':
+                                    params['resume'] = component.value
+                                    logger.info(f"📊 Resume: {params['resume']}")
+                                    
+                                # Num workers (IntSlider)
+                                elif component.description == 'Jumlah Workers:':
+                                    params['num_workers'] = component.value
+                                    logger.info(f"📊 Jumlah workers: {params['num_workers']}")
+                            
+                            # Jika komponen adalah HBox, periksa anak-anaknya
+                            elif hasattr(component, 'children'):
+                                for grandchild in component.children:
+                                    if hasattr(grandchild, 'description'):
+                                        # Periksa checkbox dalam HBox
+                                        if grandchild.description == 'Balancing Kelas':
+                                            params['target_balance'] = grandchild.value
+                                            logger.info(f"📊 Balancing kelas: {params['target_balance']}")
+                                        elif grandchild.description == 'Pindahkan ke Preprocessed':
+                                            params['move_to_preprocessed'] = grandchild.value
+                                            logger.info(f"📊 Pindahkan ke preprocessed: {params['move_to_preprocessed']}")
+                                        elif grandchild.description == 'Validasi Hasil':
+                                            params['validate_results'] = grandchild.value
+                                            logger.info(f"📊 Validasi hasil: {params['validate_results']}")
+                                        elif grandchild.description == 'Resume Augmentasi':
+                                            params['resume'] = grandchild.value
+                                            logger.info(f"📊 Resume: {params['resume']}")
+                                        elif grandchild.description == 'Aktifkan Augmentasi':
+                                            # Ini hanya untuk logging, tidak mempengaruhi parameter
+                                            logger.info(f"📊 Augmentasi aktif: {grandchild.value}")
     
     # Dapatkan komponen advanced_options
-    adv_options = ui_components.get('advanced_options', {})
+    adv_options = ui_components.get('advanced_options', None)
     
     # Ekstrak parameter dari advanced options
-    if adv_options:
-        for key, component in adv_options.items():
-            # Process bboxes (Checkbox)
-            if hasattr(component, 'description') and component.description == 'Proses Bounding Box':
-                params['process_bboxes'] = component.value
+    if adv_options and hasattr(adv_options, 'children'):
+        logger.info("🔍 Mengambil parameter dari advanced_options")
+        
+        # Iterasi melalui komponen dalam advanced_options
+        for component in adv_options.children:
+            if hasattr(component, 'description'):
+                # Process bboxes (Checkbox)
+                if component.description == 'Proses Bounding Box':
+                    params['process_bboxes'] = component.value
+                    logger.info(f"📊 Proses bounding box: {params['process_bboxes']}")
+                
+                # Validate results (Checkbox) - mungkin sudah diambil dari combined_options
+                elif component.description == 'Validasi Hasil' and 'validate_results' not in params:
+                    params['validate_results'] = component.value
+                    logger.info(f"📊 Validasi hasil: {params['validate_results']}")
+                
+                # Num workers (IntSlider) - mungkin sudah diambil dari combined_options
+                elif component.description == 'Jumlah Worker:' and 'num_workers' not in params:
+                    params['num_workers'] = component.value
+                    logger.info(f"📊 Jumlah workers: {params['num_workers']}")
             
-            # Validate results (Checkbox)
-            elif hasattr(component, 'description') and component.description == 'Validasi Hasil':
-                params['validate_results'] = component.value
-            
-            # Num workers (IntSlider)
-            elif hasattr(component, 'description') and component.description == 'Jumlah Worker:':
-                params['num_workers'] = component.value
+            # Jika komponen adalah container, periksa anak-anaknya
+            elif hasattr(component, 'children'):
+                for child in component.children:
+                    if hasattr(child, 'description'):
+                        # Process bboxes (Checkbox)
+                        if child.description == 'Proses Bounding Box':
+                            params['process_bboxes'] = child.value
+                            logger.info(f"📊 Proses bounding box: {params['process_bboxes']}")
+                        
+                        # Validate results (Checkbox)
+                        elif child.description == 'Validasi Hasil' and 'validate_results' not in params:
+                            params['validate_results'] = child.value
+                            logger.info(f"📊 Validasi hasil: {params['validate_results']}")
+                        
+                        # Num workers (IntSlider)
+                        elif child.description == 'Jumlah Worker:' and 'num_workers' not in params:
+                            params['num_workers'] = child.value
+                            logger.info(f"📊 Jumlah workers: {params['num_workers']}")
+
     
     # Fallback ke split selector jika split tidak ditemukan di augmentation_options
     if params['split'] == 'train':

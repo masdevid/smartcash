@@ -265,15 +265,27 @@ def upload_config_to_drive(config_path: str, config: Dict[str, Any], logger = No
         return False, "Google Drive tidak terpasang"
     
     try:
-        # Setup path konfigurasi di Drive
-        config_path = Path(config_path)
-        file_name = config_path.name
+        # Pastikan config_path adalah string atau PathLike object
+        if isinstance(config_path, dict):
+            logger.warning(f"⚠️ config_path adalah dict, bukan path: {config_path}")
+            # Gunakan nama default jika config_path adalah dict
+            file_name = "config.yaml"
+        else:
+            # Setup path konfigurasi di Drive
+            config_path = Path(config_path)
+            file_name = config_path.name
+            
         drive_config_dir = env_manager.drive_path / "configs"
         drive_config_dir.mkdir(parents=True, exist_ok=True)
         drive_config_path = drive_config_dir / file_name
         
-        # Simpan konfigurasi ke Drive
-        save_config(drive_config_path, config)
+        # Simpan konfigurasi ke Drive menggunakan yaml.dump langsung
+        try:
+            with open(drive_config_path, 'w', encoding='utf-8') as f:
+                yaml.safe_dump(config, f, default_flow_style=False)
+        except Exception as e:
+            logger.error(f"❌ Error saat menyimpan konfigurasi ke Drive: {str(e)}")
+            raise e
         
         logger.info(f"✅ Konfigurasi berhasil diupload ke {drive_config_path}")
         return True, f"Konfigurasi berhasil diupload ke {drive_config_path}"

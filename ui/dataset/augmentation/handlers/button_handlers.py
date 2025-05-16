@@ -75,6 +75,7 @@ def on_augment_click(b, ui_components=None):
     ui_components['augmentation_running'] = True
     
     # Pastikan progress callback diregistrasi dengan benar
+    from smartcash.ui.dataset.augmentation.handlers.initialization_handler import register_progress_callback
     register_progress_callback(ui_components)
     
     # Notifikasi observer tentang mulai augmentasi

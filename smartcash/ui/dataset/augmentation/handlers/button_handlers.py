@@ -202,11 +202,15 @@ def on_save_click(b, ui_components=None):
             # Update status panel
             update_status_panel(ui_components, "Konfigurasi augmentasi berhasil disimpan", "success")
             
-            # Tampilkan pesan sukses
+            # Tampilkan pesan sukses tanpa menghapus output
             with ui_components['status']: 
-                clear_output(wait=True)
+                # Tidak menggunakan clear_output agar output sebelumnya tetap terlihat
                 display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan" + 
                                               (f" dan tersinkron dengan drive" if drive_sync_success else "")))
+            
+            # Log info untuk debugging
+            if logger: logger.info(f"✅ Konfigurasi augmentasi berhasil disimpan{' dan tersinkron dengan drive' if drive_sync_success else ''}")
+
         else:
             # Tampilkan pesan error
             with ui_components['status']: 

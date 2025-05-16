@@ -78,23 +78,34 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
             current_config = config_manager.get_module_config('augmentation')
         
         # Simpan konfigurasi ke file - ini harus dipanggil untuk pengujian
-        config_manager.save_module_config('augmentation', current_config)
+        save_success = config_manager.save_module_config('augmentation', current_config)
+        
+        if not save_success:
+            logger.warning("⚠️ Gagal menyimpan konfigurasi augmentasi ke file")
+            return False
         
         # Coba sinkronkan dengan drive jika tersedia
         try:
             # Cek apakah ada fungsi sync di ConfigManager
             if hasattr(config_manager, 'sync_to_drive') and callable(config_manager.sync_to_drive):
-                config_manager.sync_to_drive('augmentation')
-                logger.info("✅ Konfigurasi augmentasi berhasil disinkronkan dengan drive")
+                success, message = config_manager.sync_to_drive('augmentation')
+                if success:
+                    logger.info(f"✅ {message}")
+                else:
+                    logger.warning(f"⚠️ {message}")
+                return success
             else:
                 logger.info("✅ Tidak ada fungsi sync_to_drive, hanya menyimpan lokal")
-            return True
+                return True
         except Exception as drive_error:
             logger.warning(f"⚠️ Error saat menyinkronkan dengan drive: {str(drive_error)}")
-            return True  # Tetap anggap sukses karena konfigurasi berhasil disimpan
+            # Tetap anggap sukses karena konfigurasi berhasil disimpan lokal
+            return True  
     except Exception as e:
         logger.warning(f"⚠️ Error saat menyinkronkan konfigurasi: {str(e)}")
-        return True  # Selalu kembalikan True untuk pengujian
+        import traceback
+        logger.debug(f"🔍 Traceback: {traceback.format_exc()}")
+        return False
 
 def reset_config_to_default(ui_components: Dict[str, Any]) -> bool:
     """

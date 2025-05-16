@@ -44,6 +44,9 @@ def on_augment_click(b, ui_components=None):
     for element in ['progress_bar', 'current_progress', 'overall_label', 'step_label']:
         if element in ui_components:
             ui_components[element].layout.visibility = 'visible'
+            # Reset nilai progress bar untuk memastikan dimulai dari 0
+            if element == 'progress_bar' or element == 'current_progress':
+                ui_components[element].value = 0
     
     # Disable semua komponen UI selama proses
     disable_ui_during_processing(ui_components, True)
@@ -71,11 +74,17 @@ def on_augment_click(b, ui_components=None):
     # Tandai augmentasi sedang berjalan
     ui_components['augmentation_running'] = True
     
+    # Pastikan progress callback diregistrasi dengan benar
+    register_progress_callback(ui_components)
+    
     # Notifikasi observer tentang mulai augmentasi
     try:
         notify_process_start(ui_components)
     except Exception as e:
         if logger: logger.debug(f"Gagal mengirim notifikasi augmentasi: {str(e)}")
+    
+    # Log info awal untuk memastikan log berfungsi
+    logger.info(f"🚀 Memulai proses augmentasi dataset dengan parameter: {updated_config.get('augmentation', {})}")
     
     # Jalankan augmentasi di thread terpisah
     try:
@@ -88,10 +97,19 @@ def on_augment_click(b, ui_components=None):
         with ui_components['status']: 
             clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS['error']} Gagal menjalankan augmentasi: {str(e)}"))
-        if logger: logger.error(f"{ICONS['error']} Error saat menjalankan augmentasi: {str(e)}\n{traceback.format_exc()}")
         
-        # Kembalikan UI ke kondisi awal
-        cleanup_ui(ui_components)
+        # Enable kembali komponen UI
+        disable_ui_during_processing(ui_components, False)
+        
+        # Update UI tombol
+        ui_components['augment_button'].layout.display = 'block'
+        ui_components['stop_button'].layout.display = 'none'
+        
+        # Tandai augmentasi selesai
+        ui_components['augmentation_running'] = False
+        
+        if logger: logger.error(f"{ICONS['error']} Gagal menjalankan augmentasi: {str(e)}")
+        if logger: logger.debug(traceback.format_exc())
 
 @try_except_decorator(None)
 def on_stop_click(b, ui_components=None):

@@ -171,14 +171,20 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
         # Jalankan augmentasi
         logger.info(f"🚀 Memulai augmentasi dataset {split} dengan jenis: {', '.join(augmentation_types)}")
         
-        # Buat progress bar
+        # Pastikan progress callback diregistrasi dengan benar
+        from smartcash.ui.dataset.augmentation.handlers.initialization_handler import register_progress_callback
+        register_progress_callback(ui_components)
+        
+        # Pastikan semua komponen progress tracking terlihat dan diinisialisasi dengan benar
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].layout.visibility = 'visible'
             ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].max = 100
         
         if 'current_progress' in ui_components:
             ui_components['current_progress'].layout.visibility = 'visible'
             ui_components['current_progress'].value = 0
+            ui_components['current_progress'].max = 100
         
         if 'overall_label' in ui_components:
             ui_components['overall_label'].layout.visibility = 'visible'
@@ -194,6 +200,45 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
                 'status': 'warning',
                 'message': 'Augmentasi dibatalkan oleh pengguna'
             }
+        
+        # Tambahkan callback untuk update UI dari thread terpisah
+        def progress_update_callback(progress=None, total=None, message=None, status='info', **kwargs):
+            try:
+                # Update progress bar
+                if progress is not None and total is not None and 'progress_bar' in ui_components:
+                    ui_components['progress_bar'].max = total
+                    ui_components['progress_bar'].value = progress
+                
+                # Update current progress
+                if 'current_progress' in kwargs and 'current_total' in kwargs and 'current_progress' in ui_components:
+                    ui_components['current_progress'].max = kwargs['current_total']
+                    ui_components['current_progress'].value = kwargs['current_progress']
+                
+                # Update label
+                if message and 'overall_label' in ui_components:
+                    ui_components['overall_label'].value = message
+                
+                # Update step label
+                if 'step' in kwargs and 'step_message' in kwargs and 'step_label' in ui_components:
+                    ui_components['step_label'].value = kwargs['step_message']
+                
+                # Log message
+                if message and logger:
+                    if status == 'error':
+                        logger.error(message)
+                    elif status == 'warning':
+                        logger.warning(message)
+                    else:
+                        logger.info(message)
+            except Exception as e:
+                # Jangan biarkan error di callback menghentikan proses
+                logger.warning(f"⚠️ Error pada progress callback: {str(e)}")
+        
+        # Register callback tambahan untuk memastikan UI diupdate
+        service.register_progress_callback(progress_update_callback)
+        
+        # Log awal proses
+        logger.info(f"⏳ Memulai proses augmentasi dengan {num_workers} worker...")
         
         # Jalankan augmentasi
         result = service.augment_dataset(
@@ -213,6 +258,12 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
         # Tambahkan parameter ke hasil
         result['split'] = split
         result['augmentation_types'] = augmentation_types
+        
+        # Log hasil akhir
+        if result.get('status') == 'success':
+            logger.info(f"✅ Augmentasi selesai: {result.get('generated', 0)} gambar dihasilkan")
+        else:
+            logger.warning(f"⚠️ Augmentasi tidak selesai dengan sempurna: {result.get('message', '')}")
         
         return result
     except Exception as e:

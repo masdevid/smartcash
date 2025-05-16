@@ -183,11 +183,37 @@ def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: in
     # Dapatkan progress bar
     progress_bar = ui_components['progress_bar']
     
-    # Update nilai dan deskripsi
-    progress_bar.value = value
+    # Pastikan progress bar terlihat
+    progress_bar.layout.visibility = 'visible'
+    
+    # Update nilai dan max
     progress_bar.max = max_value
-    if description:
-        progress_bar.description = description
+    progress_bar.value = value
+    
+    # Update deskripsi jika ada
+    if description and 'overall_label' in ui_components:
+        ui_components['overall_label'].layout.visibility = 'visible'
+        ui_components['overall_label'].value = description
+        
+    # Log progress ke logger jika ada
+    logger = ui_components.get('logger')
+    if logger and description:
+        percent = int((value / max_value) * 100) if max_value > 0 else 0
+        logger.info(f" Progress: {percent}% - {description}")
+        
+    # Pastikan UI diupdate dengan flush output
+    try:
+        from IPython.display import display, clear_output
+        import time
+        
+        # Gunakan teknik minimal flush untuk memastikan UI diupdate
+        if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
+            with ui_components['status']:
+                # Flush output dengan clear minimal
+                pass
+    except Exception:
+        # Ignore error, ini hanya untuk memastikan UI diupdate
+        pass
 
 def reset_progress_bar(ui_components: Dict[str, Any], description: str = 'Progress:') -> None:
     """

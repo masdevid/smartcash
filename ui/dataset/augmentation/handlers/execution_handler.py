@@ -60,6 +60,10 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import execute_augmentation as execute_aug
         from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel, update_progress_bar, reset_progress_bar
         from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_start, notify_process_complete, notify_process_error
+        from smartcash.ui.dataset.augmentation.handlers.initialization_handler import register_progress_callback
+        
+        # Pastikan progress callback diregistrasi dengan benar
+        register_progress_callback(ui_components)
         
         # Dapatkan parameter dari UI - ini harus dipanggil untuk pengujian
         params = extract_augmentation_params(ui_components)
@@ -73,17 +77,17 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         aug_types = params.get('types', ['combined'])
         display_info = f"split {split} dengan jenis {', '.join(aug_types)}"
         
-        # Update status panel
+        # Update status panel dengan informasi yang lebih detail
         update_status_panel(ui_components, f"Menjalankan augmentasi dataset {display_info}...", "info")
+        logger.info(f"🚀 Memulai augmentasi dataset {display_info}")
         
-        # Reset progress bar
+        # Reset progress bar dan pastikan terlihat
         reset_progress_bar(ui_components, "Mempersiapkan augmentasi...")
         
-        # Tampilkan progress bar
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            if 'overall_label' in ui_components:
-                ui_components['overall_label'].layout.visibility = 'visible'
+        # Pastikan semua komponen progress tracking terlihat
+        for element in ['progress_bar', 'current_progress', 'overall_label', 'step_label']:
+            if element in ui_components:
+                ui_components[element].layout.visibility = 'visible'
         
         # Notifikasi observer tentang dimulainya augmentasi
         notify_process_start(ui_components, "augmentasi", display_info, split)
@@ -93,8 +97,9 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         
         # Update progress bar ke 10% untuk menunjukkan proses dimulai
         update_progress_bar(ui_components, 10, 100, "Memulai proses augmentasi...")
+        logger.info(f"⏳ Memulai proses augmentasi {display_info}...")
         
-        # Jalankan augmentasi
+        # Jalankan augmentasi dengan thread terpisah dan update progress secara berkala
         result = execute_aug(ui_components, params)
         
         # Cek hasil

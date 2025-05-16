@@ -343,7 +343,8 @@ class ConfigManager:
                 # Lanjutkan meskipun gagal menyimpan ke file lokal
             
             # Upload ke Google Drive
-            success, message = upload_config_to_drive(config_path, config, self.logger)
+            # Pastikan config_path adalah string atau PathLike object, bukan dict
+            success, message = upload_config_to_drive(str(config_path), config, self.logger)
             
             if success:
                 if self.logger:

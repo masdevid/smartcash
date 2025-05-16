@@ -235,8 +235,9 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     )
     
     # Layout parameter posisi
+    position_icon = ICONS.get('position', '📐')  # Menggunakan emoji ruler sebagai fallback
     position_box = widgets.VBox([
-        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['position']} Parameter Posisi</h5>"),
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{position_icon} Parameter Posisi</h5>"),
         fliplr,
         degrees,
         translate,
@@ -245,8 +246,9 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
     # Layout parameter pencahayaan
+    lighting_icon = ICONS.get('lighting', '💡')  # Menggunakan emoji lampu sebagai fallback
     lighting_box = widgets.VBox([
-        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['lighting']} Parameter Pencahayaan</h5>"),
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{lighting_icon} Parameter Pencahayaan</h5>"),
         hsv_h,
         hsv_s,
         hsv_v,
@@ -257,8 +259,9 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
     # Layout parameter tambahan
+    settings_icon = ICONS.get('settings', '🔧')  # Menggunakan emoji kunci pas sebagai fallback
     additional_box = widgets.VBox([
-        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['settings']} Parameter Tambahan</h5>"),
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{settings_icon} Parameter Tambahan</h5>"),
         process_bboxes
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     

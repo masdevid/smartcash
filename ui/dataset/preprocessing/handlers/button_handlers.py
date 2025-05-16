@@ -17,7 +17,7 @@ from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_st
 from smartcash.ui.dataset.preprocessing.handlers.config_handler import save_preprocessing_config
 from smartcash.ui.dataset.preprocessing.handlers.service_handler import run_preprocessing
 from smartcash.ui.dataset.preprocessing.handlers.parameter_handler import validate_preprocessing_params
-from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import sync_config_with_drive, ensure_ui_persistence
+from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import sync_config_with_drive, ensure_ui_persistence, reset_config_to_default
 from smartcash.ui.dataset.preprocessing.handlers.initialization_handler import initialize_preprocessing_directories
 
 def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -180,24 +180,41 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         # Reset UI
         reset_ui(ui_components)
         
-        # Load konfigurasi default dan update UI
+        # Reset konfigurasi ke default dan update UI
         try:
-            default_config = ui_components['load_preprocessing_config']()
-            ui_components['update_ui_from_config'](ui_components, default_config)
+            # Gunakan fungsi reset_config_to_default dari persistence_handler
+            success = reset_config_to_default(ui_components)
+            
+            # Pastikan UI components terdaftar untuk persistensi
+            ensure_ui_persistence(ui_components)
+            
+            # Sinkronkan dengan drive
+            try:
+                drive_sync = sync_config_with_drive(ui_components)
+                if drive_sync and logger:
+                    logger.info(f"{ICONS['success']} Konfigurasi default berhasil disinkronkan dengan drive")
+            except Exception as e:
+                if logger:
+                    logger.warning(f"{ICONS['warning']} Gagal menyinkronkan default dengan drive: {str(e)}")
             
             # Deteksi state preprocessing
             from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
             detect_preprocessing_state(ui_components)
             
             # Tampilkan pesan sukses
+            status_type = 'success' if success else 'warning'
+            message = f"{ICONS['success' if success else 'warning']} UI dan konfigurasi {'berhasil' if success else 'sebagian'} direset ke nilai default"
+            
             with ui_components['status']: 
-                display(create_status_indicator("success", f"{ICONS['success']} UI dan konfigurasi berhasil direset ke nilai default"))
+                display(create_status_indicator(status_type, message))
             
             # Update status panel
-            update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi direset ke nilai default")
+            update_status_panel(ui_components, status_type, message)
             
             # Log success
-            if logger: logger.success(f"{ICONS['success']} Konfigurasi preprocessor berhasil direset ke nilai default")
+            if logger:
+                log_method = logger.success if success else logger.warning
+                log_method(message)
         except Exception as e:
             # Jika gagal reset konfigurasi, tampilkan pesan error
             with ui_components['status']: 
@@ -207,6 +224,13 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             update_status_panel(ui_components, "warning", f"{ICONS['warning']} Reset UI sebagian: {str(e)}")
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
+            
+            # Fallback: coba load default config dengan cara lama
+            try:
+                default_config = ui_components['load_preprocessing_config']()
+                ui_components['update_ui_from_config'](ui_components, default_config)
+            except Exception:
+                pass
     
     # Register handlers untuk tombol-tombol dengan one-liner
     button_handlers = {

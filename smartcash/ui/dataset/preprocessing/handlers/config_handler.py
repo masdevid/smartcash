@@ -10,6 +10,8 @@ import copy
 from pathlib import Path
 from IPython.display import display
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR, DEFAULT_IMG_SIZE
+from smartcash.common.config.manager import get_config_manager
+from smartcash.ui.utils.constants import ICONS
 
 def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
@@ -24,11 +26,20 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
         Dictionary UI components yang telah diupdate
     """
     logger = ui_components.get('logger')
-    from smartcash.ui.utils.constants import ICONS
+    
+    # Dapatkan instance ConfigManager
+    config_manager = get_config_manager()
+    
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('preprocessing', ui_components)
     
     # Load konfigurasi jika belum tersedia
     if config is None:
-        config = load_preprocessing_config(ui_components=ui_components)
+        # Coba dapatkan dari ConfigManager terlebih dahulu
+        config = config_manager.get_module_config('preprocessing')
+        if not config:
+            # Fallback ke load dari file
+            config = load_preprocessing_config(ui_components=ui_components)
     
     # Update UI dari konfigurasi
     ui_components = update_ui_from_config(ui_components, config)
@@ -36,17 +47,41 @@ def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Di
     # Handler untuk tombol save config
     def on_save_config(b):
         from smartcash.ui.utils.alert_utils import create_status_indicator
+        from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import ensure_ui_persistence
         
-        # Update config dari UI dan simpan
-        updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
-        success = save_preprocessing_config(updated_config)
-        
-        # Simpan kembali config yang diupdate ke ui_components
-        ui_components['config'] = updated_config
-        
-        # Tampilkan status
-        status_type = 'success' if success else 'error'
-        message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
+        try:
+            # Update config dari UI
+            updated_config = update_config_from_ui(ui_components, ui_components.get('config', config))
+            
+            # Simpan ke ConfigManager
+            success = config_manager.save_module_config('preprocessing', updated_config)
+            
+            # Simpan juga ke file lokal untuk kompatibilitas
+            local_success = save_preprocessing_config(updated_config)
+            
+            # Pastikan UI components terdaftar untuk persistensi
+            ensure_ui_persistence(ui_components, updated_config)
+            
+            # Simpan kembali config yang diupdate ke ui_components
+            ui_components['config'] = updated_config
+            
+            # Tampilkan status
+            status_type = 'success' if success and local_success else 'error'
+            message = f"{ICONS['success' if success else 'error']} Konfigurasi {'berhasil' if success else 'gagal'} disimpan"
+            
+            # Sinkronkan dengan drive
+            try:
+                from smartcash.ui.dataset.preprocessing.handlers.persistence_handler import sync_config_with_drive
+                drive_sync = sync_config_with_drive(ui_components)
+                if drive_sync and logger:
+                    logger.info(f"{ICONS['success']} Konfigurasi berhasil disinkronkan dengan drive")
+            except Exception as e:
+                if logger:
+                    logger.warning(f"{ICONS['warning']} Gagal menyinkronkan dengan drive: {str(e)}")
+        except Exception as e:
+            status_type = 'error'
+            message = f"{ICONS['error']} Error saat menyimpan konfigurasi: {str(e)}"
+            if logger: logger.error(message)
         
         # Update status
         with ui_components['status']: 
@@ -168,77 +203,37 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
     Returns:
         Boolean status keberhasilan
     """
-    logger = None
+    # Pastikan config tidak None
+    if config is None:
+        return False
+    
+    # Deep copy untuk mencegah modifikasi tidak sengaja
+    config = copy.deepcopy(config)
+    
+    # Pastikan direktori config ada
+    config_dir = os.path.dirname(config_path)
+    if config_dir and not os.path.exists(config_dir):
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception:
+            return False
+    
+    # Simpan konfigurasi ke file
     try:
-        # Ambil logger dari lingkungan jika tersedia
-        try:
-            from smartcash.common.logger import get_logger
-            logger = get_logger("preprocessing_config")
-        except ImportError:
-            pass
-        
-        # Buat deep copy untuk mencegah modifikasi tidak sengaja
-        save_config = copy.deepcopy(config)
-        
-        # Pastikan direktori config ada
-        Path(config_path).parent.mkdir(parents=True, exist_ok=True)
-        
-        # Cek jika file sudah ada, baca dulu untuk mempertahankan konfigurasi lain
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                existing_config = yaml.safe_load(f) or {}
-                
-            # Merge existing config dengan config baru, prioritaskan config baru
-            merged_config = copy.deepcopy(existing_config)
-            
-            # Update preprocessing section dengan deep merge
-            if 'preprocessing' in save_config:
-                if 'preprocessing' not in merged_config:
-                    merged_config['preprocessing'] = {}
-                merged_config['preprocessing'].update(save_config['preprocessing'])
-            
-            # Update data section jika ada
-            if 'data' in save_config:
-                if 'data' not in merged_config:
-                    merged_config['data'] = {}
-                merged_config['data'].update(save_config['data'])
-                    
-            # Gunakan config yang sudah di-merge
-            save_config = merged_config
-        
-        # Simpan ke file dengan YAML
         with open(config_path, 'w') as f:
-            yaml.dump(save_config, f, default_flow_style=False)
+            yaml.dump(config, f, default_flow_style=False)
         
-        # Coba sync dengan drive jika tersedia
+        # Simpan juga ke ConfigManager untuk persistensi
         try:
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            
-            if env_manager.is_drive_mounted:
-                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
-                
-                # Cek apakah path sama dengan realpath untuk mencegah error pada symlink
-                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, melewati salinan")
-                else:
-                    # Buat direktori jika belum ada
-                    os.makedirs(Path(drive_config_path).parent, exist_ok=True)
-                    
-                    # Salin file ke Google Drive
-                    with open(drive_config_path, 'w') as f:
-                        yaml.dump(save_config, f, default_flow_style=False)
-                    if logger: logger.info(f"📤 Konfigurasi disimpan ke drive: {drive_config_path}")
-        except (ImportError, AttributeError) as e:
-            if logger: logger.debug(f"ℹ️ Tidak dapat menyalin ke drive: {str(e)}")
+            config_manager = get_config_manager()
+            config_manager.save_module_config('preprocessing', config)
+        except Exception:
+            # Jika gagal menyimpan ke ConfigManager, tetap lanjutkan
+            # karena sudah berhasil menyimpan ke file
+            pass
             
         return True
-    except Exception as e:
-        error_msg = f"Error menyimpan konfigurasi: {str(e)}"
-        if logger: 
-            logger.error(f"❌ {error_msg}")
-        else:
-            print(f"❌ {error_msg}")
+    except Exception:
         return False
 
 def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -252,97 +247,65 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     Returns:
         Dictionary konfigurasi
     """
-    logger = None
+    logger = ui_components.get('logger') if ui_components else None
+    
+    # Coba dapatkan dari ConfigManager terlebih dahulu
     try:
-        # Ambil logger dari lingkungan atau ui_components
-        if ui_components and 'logger' in ui_components:
-            logger = ui_components['logger']
-        else:
-            try:
-                from smartcash.common.logger import get_logger
-                logger = get_logger("preprocessing_config")
-            except ImportError:
-                pass
-            
-        # Cek apakah ada config tersimpan di ui_components
-        if ui_components and 'config' in ui_components and ui_components['config']:
-            if logger: logger.info("ℹ️ Menggunakan konfigurasi dari UI components")
-            return ui_components['config']
-            
-        # Coba load dari Google Drive terlebih dahulu
-        try:
-            from smartcash.common.environment import get_environment_manager
-            env_manager = get_environment_manager()
-            
-            if env_manager.is_drive_mounted:
-                drive_config_path = str(env_manager.drive_path / 'configs' / Path(config_path).name)
-                
-                # Cek apakah path sama dengan realpath untuk mencegah error symlink
-                if os.path.realpath(config_path) == os.path.realpath(drive_config_path):
-                    if logger: logger.info(f"🔄 File lokal dan drive identik: {config_path}, menggunakan lokal")
-                elif os.path.exists(drive_config_path):
-                    # Baca langsung dari file drive untuk mendapatkan versi terbaru
-                    with open(drive_config_path, 'r') as f:
-                        drive_config = yaml.safe_load(f)
-                        
-                    if drive_config:
-                        # Salin juga ke lokal untuk digunakan sebagai cache
-                        os.makedirs(Path(config_path).parent, exist_ok=True)
-                        with open(config_path, 'w') as f:
-                            yaml.dump(drive_config, f, default_flow_style=False)
-                            
-                        if logger: logger.info(f"📥 Konfigurasi dimuat dari drive: {drive_config_path}")
-                        
-                        # Simpan ke ui_components jika tersedia
-                        if ui_components: ui_components['config'] = drive_config
-                        return drive_config
-        except (ImportError, AttributeError) as e:
-            if logger: logger.debug(f"ℹ️ Tidak dapat memuat dari drive: {str(e)}")
+        config_manager = get_config_manager()
+        config = config_manager.get_module_config('preprocessing')
         
-        # Load dari ConfigManager jika tersedia untuk konsistensi
-        try:
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
+        if config and isinstance(config, dict) and 'preprocessing' in config:
+            if logger: logger.info(f"{ICONS['success']} Konfigurasi preprocessing dimuat dari ConfigManager")
             
-            # Paksa reload untuk mendapatkan data terbaru
-            full_config = config_manager.load_config(config_path)
+            # Simpan ke ui_components jika tersedia
+            if ui_components: ui_components['config'] = config
             
-            if full_config and ('preprocessing' in full_config or 'data' in full_config):
-                if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path} via ConfigManager")
-                
-                # Simpan ke ui_components jika tersedia
-                if ui_components: ui_components['config'] = full_config
-                return full_config
-        except (ImportError, AttributeError):
-            pass
-        
-        # Fallback: Load dari local file
+            return config
+    except Exception as e:
+        if logger: logger.debug(f"{ICONS['info']} Tidak dapat memuat dari ConfigManager: {str(e)}")
+    
+    # Coba load dari file jika tidak ada di ConfigManager
+    try:
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
-                config = yaml.safe_load(f) or {}
-                if logger: logger.info(f"✅ Konfigurasi dimuat dari {config_path}")
+                config = yaml.safe_load(f)
                 
-                # Verifikasi struktur dasar config ada
-                if 'preprocessing' not in config: config['preprocessing'] = {}
-                if 'data' not in config: config['data'] = {}
+            # Validasi konfigurasi
+            if config is None:
+                config = {}
+            
+            # Pastikan struktur konfigurasi benar
+            if 'preprocessing' not in config:
+                config['preprocessing'] = {}
+            if 'data' not in config:
+                config['data'] = {}
                 
-                # Simpan ke ui_components jika tersedia
-                if ui_components: ui_components['config'] = config
-                return config
+            # Log info
+            if logger: logger.info(f"{ICONS['success']} Konfigurasi preprocessing dimuat dari {config_path}")
+            
+            # Simpan ke ConfigManager untuk persistensi
+            try:
+                config_manager = get_config_manager()
+                config_manager.save_module_config('preprocessing', config)
+            except Exception as e:
+                if logger: logger.debug(f"{ICONS['info']} Tidak dapat menyimpan ke ConfigManager: {str(e)}")
+            
+            # Simpan ke ui_components jika tersedia
+            if ui_components: ui_components['config'] = config
+            
+            return config
     except Exception as e:
-        if logger: logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
+        if logger: logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari {config_path}: {str(e)}")
     
-    # Default config jika tidak ada file
+    # Jika gagal load dari file dan ConfigManager, gunakan default
     default_config = {
         "preprocessing": {
+            "enabled": True,
             "output_dir": DEFAULT_PREPROCESSED_DIR,
             "img_size": DEFAULT_IMG_SIZE,
-            "enabled": True,
-            "num_workers": 4,
             "normalization": {
                 "enabled": True,
-                "preserve_aspect_ratio": True,
-                "target_size": DEFAULT_IMG_SIZE
+                "preserve_aspect_ratio": True
             },
             "validate": {
                 "enabled": True,
@@ -350,14 +313,22 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
                 "move_invalid": True,
                 "invalid_dir": DEFAULT_INVALID_DIR
             },
-            "splits": DEFAULT_SPLITS
+            "splits": DEFAULT_SPLITS,
+            "num_workers": 4
         },
         "data": {
             "dir": "data"
         }
     }
     
-    if logger: logger.info("ℹ️ Menggunakan konfigurasi default")
+    if logger: logger.info(f"{ICONS['info']} Menggunakan konfigurasi default")
+    
+    # Simpan default config ke ConfigManager
+    try:
+        config_manager = get_config_manager()
+        config_manager.save_module_config('preprocessing', default_config)
+    except Exception as e:
+        if logger: logger.debug(f"{ICONS['info']} Tidak dapat menyimpan default ke ConfigManager: {str(e)}")
     
     # Simpan default config ke ui_components jika tersedia
     if ui_components: ui_components['config'] = default_config

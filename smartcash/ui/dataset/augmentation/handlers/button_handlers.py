@@ -14,7 +14,7 @@ from smartcash.ui.utils.alert_utils import create_status_indicator
 
 # Import handler terpisah untuk SRP
 from smartcash.ui.dataset.augmentation.handlers.config_persistence import (
-    ensure_ui_persistence, save_augmentation_config  # get_augmentation_config tidak digunakan langsung
+    ensure_ui_persistence, save_augmentation_config, reset_config_to_default, sync_config_with_drive
 )
 # validate_augmentation_config tidak digunakan langsung
 from smartcash.ui.dataset.augmentation.handlers.config_mapper import (
@@ -189,69 +189,42 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
             display(create_status_indicator("info", f"{ICONS['processing']} Mereset konfigurasi ke default..."))
         
         try:
-            # Definisikan default config
-            default_config = {
-                'augmentation': {
-                    'prefix': 'aug',
-                    'factor': 2,
-                    'balance_classes': True,
-                    'num_workers': 4,
-                    'techniques': {
-                        'flip': True,
-                        'rotate': True,
-                        'blur': False,
-                        'noise': False,
-                        'contrast': False,
-                        'brightness': False,
-                        'saturation': False,
-                        'hue': False,
-                        'cutout': False
-                    },
-                    'advanced': {
-                        'rotate_range': 15,
-                        'blur_limit': 7,
-                        'noise_var': 25,
-                        'contrast_limit': 0.2,
-                        'brightness_limit': 0.2,
-                        'saturation_limit': 0.2,
-                        'hue_shift_limit': 20,
-                        'cutout_size': 0.1,
-                        'cutout_count': 4
-                    }
-                }
-            }
+            # Reset UI terlebih dahulu
+            reset_ui(ui_components)
             
-            # Log informasi konfigurasi default
-            if logger: logger.info(f"{ICONS['info']} Menggunakan konfigurasi default: {default_config['augmentation']}")
+            # Gunakan fungsi reset_config_to_default dari config_persistence
+            success = reset_config_to_default(ui_components)
             
-            # Simpan default config ke ConfigManager menggunakan handler terpisah
+            # Pastikan UI components terdaftar untuk persistensi
+            ensure_ui_persistence(ui_components)
+            
+            # Sinkronkan dengan drive
             try:
-                # Validasi konfigurasi default
-                validated_config = validate_augmentation_config(default_config)
-                
-                # Simpan konfigurasi yang sudah divalidasi
-                success = save_augmentation_config(validated_config)
-                
-                if success:
-                    if logger: logger.info(f"{ICONS['success']} Konfigurasi default berhasil disimpan")
-                else:
-                    if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi default")
+                drive_sync = sync_config_with_drive(ui_components)
+                if drive_sync and logger:
+                    logger.info(f"{ICONS['success']} Konfigurasi default berhasil disinkronkan dengan drive")
             except Exception as e:
-                if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi default: {str(e)}")
-
-            # Update UI dari konfigurasi default menggunakan handler terpisah
-            try:
-                map_config_to_ui(ui_components, default_config)
-                if logger: logger.info(f"{ICONS['success']} UI berhasil diupdate dari konfigurasi default")
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Error saat update UI dari konfigurasi default: {str(e)}")
+                if logger:
+                    logger.warning(f"{ICONS['warning']} Gagal menyinkronkan default dengan drive: {str(e)}")
             
             # Update status panel
+            status_type = 'success' if success else 'warning'
+            message = f"{ICONS['success' if success else 'warning']} Konfigurasi {'berhasil' if success else 'sebagian'} direset ke default"
+            
             with ui_components['status']:
                 clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} Konfigurasi berhasil direset ke default"))
+                display(create_status_indicator(status_type, message))
             
-            update_status_panel(ui_components, "success", f"{ICONS['success']} Konfigurasi augmentasi berhasil direset ke default")
+            # Update status panel
+            try:
+                update_status_panel(ui_components, status_type, message)
+            except Exception as e:
+                if logger: logger.warning(f"{ICONS['warning']} Gagal update status panel: {str(e)}")
+            
+            # Log success
+            if logger:
+                log_method = logger.success if success else logger.warning
+                log_method(message)
             
         except Exception as e:
             # Update status
@@ -268,6 +241,17 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
                 pass
             
             if logger: logger.warning(f"{ICONS['warning']} Error saat reset konfigurasi: {str(e)}")
+            
+            # Fallback: coba reset dengan cara lama
+            try:
+                # Dapatkan konfigurasi default
+                from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_default_augmentation_config
+                default_config = get_default_augmentation_config()
+                
+                # Update UI dari konfigurasi default
+                map_config_to_ui(ui_components, default_config)
+            except Exception:
+                pass
 
     # Register handlers untuk tombol-tombol dengan one-liner
     button_handlers = {

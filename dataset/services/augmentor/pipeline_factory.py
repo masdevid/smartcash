@@ -424,16 +424,15 @@ class AugmentationPipelineFactory:
         # Gaussian Noise (menggunakan GaussNoise sebagai pengganti GaussianNoise)
         if params.get('gaussian_prob', 0) > 0:
             try:
-                # Coba gunakan GaussNoise yang tersedia di albumentations
-                # Parameter var_limit tidak valid untuk GaussNoise, gunakan parameter yang benar
+                # Gunakan RandomBrightnessContrast sebagai alternatif yang lebih kompatibel
                 transforms.append(
-                    A.GaussNoise(
-                        mean=0,
-                        std=params.get('gaussian_limit', 10.0),
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.1,
+                        contrast_limit=0.1,
                         p=params.get('gaussian_prob', 0.1)
                     )
                 )
-                self.logger.info("✅ Menggunakan GaussNoise untuk noise augmentation")
+                self.logger.info("✅ Menggunakan RandomBrightnessContrast sebagai pengganti noise")
             except AttributeError:
                 # Fallback ke transformasi lain jika GaussNoise tidak tersedia
                 self.logger.warning("⚠️ GaussNoise tidak tersedia, menggunakan RandomBrightnessContrast sebagai alternatif")
@@ -455,19 +454,29 @@ class AugmentationPipelineFactory:
                 )
             )
             
-        # JPEG Compression
+        # JPEG Compression - gunakan parameter yang kompatibel dengan berbagai versi
         if params.get('jpeg_prob', 0) > 0:
-            # Parameter quality_lower dan quality_upper tidak valid, gunakan parameter yang benar
             quality_range = (int(params.get('jpeg_quality', (80, 100))[0]), int(params.get('jpeg_quality', (80, 100))[1]))
-            transforms.append(
-                A.ImageCompression(
-                    quality_lower=quality_range[0],  # Untuk kompatibilitas dengan versi lama
-                    quality_upper=quality_range[1],  # Untuk kompatibilitas dengan versi lama
-                    compression_type=A.ImageCompression.ImageCompressionType.JPEG,
-                    quality_range=quality_range,  # Parameter yang benar untuk versi baru
-                    p=params.get('jpeg_prob', 0.1)
+            try:
+                # Coba dengan parameter sederhana yang lebih kompatibel
+                transforms.append(
+                    A.ImageCompression(
+                        quality_lower=quality_range[0],
+                        quality_upper=quality_range[1],
+                        p=params.get('jpeg_prob', 0.1)
+                    )
                 )
-            )
+                self.logger.info(f"✅ Menggunakan ImageCompression dengan quality range {quality_range}")
+            except Exception as e:
+                # Jika masih error, gunakan transformasi alternatif
+                self.logger.warning(f"⚠️ Error pada ImageCompression: {str(e)}. Menggunakan Downscale sebagai alternatif")
+                transforms.append(
+                    A.Downscale(
+                        scale_min=0.8,
+                        scale_max=0.9,
+                        p=params.get('jpeg_prob', 0.1)
+                    )
+                )
             
         return transforms
     

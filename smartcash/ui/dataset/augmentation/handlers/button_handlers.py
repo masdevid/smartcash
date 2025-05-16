@@ -87,12 +87,10 @@ def on_augment_click(b, ui_components=None):
     # Log info awal untuk memastikan log berfungsi
     logger.info(f"🚀 Memulai proses augmentasi dataset dengan parameter: {updated_config.get('augmentation', {})}")
     
-    # Jalankan augmentasi di thread terpisah
+    # Jalankan augmentasi langsung tanpa threading (lebih kompatibel dengan Colab)
     try:
-        import threading
-        thread = threading.Thread(target=run_augmentation, args=(ui_components,))
-        thread.daemon = True
-        thread.start()
+        # Panggil fungsi augmentasi langsung
+        run_augmentation(ui_components)
     except Exception as e:
         # Tampilkan pesan error tanpa menghapus output sebelumnya
         with ui_components['status']: 
@@ -262,11 +260,12 @@ def on_cleanup_click(b, ui_components=None):
     try:
         from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import cleanup_augmentation_results
         
-        # Dapatkan parameter dari UI
-        aug_params = validate_augmentation_params(ui_components)
+        # Jalankan cleanup langsung tanpa parameter tambahan
+        result = cleanup_augmentation_results(ui_components)
         
-        # Jalankan cleanup
-        success, message = cleanup_augmentation_results(aug_params, ui_components.get('logger'))
+        # Ekstrak hasil
+        success = result.get('status') == 'success'
+        message = result.get('message', 'Pembersihan selesai')
         
         # Update status tanpa menghapus output sebelumnya
         with ui_components['status']: 

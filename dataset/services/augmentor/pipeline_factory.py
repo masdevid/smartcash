@@ -425,9 +425,11 @@ class AugmentationPipelineFactory:
         if params.get('gaussian_prob', 0) > 0:
             try:
                 # Coba gunakan GaussNoise yang tersedia di albumentations
+                # Parameter var_limit tidak valid untuk GaussNoise, gunakan parameter yang benar
                 transforms.append(
                     A.GaussNoise(
-                        var_limit=(5.0, params.get('gaussian_limit', 10.0)),
+                        mean=0,
+                        std=params.get('gaussian_limit', 10.0),
                         p=params.get('gaussian_prob', 0.1)
                     )
                 )
@@ -455,12 +457,14 @@ class AugmentationPipelineFactory:
             
         # JPEG Compression
         if params.get('jpeg_prob', 0) > 0:
-            quality_lower = int(params.get('jpeg_quality', (80, 100))[0])
-            quality_upper = int(params.get('jpeg_quality', (80, 100))[1])
+            # Parameter quality_lower dan quality_upper tidak valid, gunakan parameter yang benar
+            quality_range = (int(params.get('jpeg_quality', (80, 100))[0]), int(params.get('jpeg_quality', (80, 100))[1]))
             transforms.append(
                 A.ImageCompression(
-                    quality_lower=quality_lower,
-                    quality_upper=quality_upper,
+                    quality_lower=quality_range[0],  # Untuk kompatibilitas dengan versi lama
+                    quality_upper=quality_range[1],  # Untuk kompatibilitas dengan versi lama
+                    compression_type=A.ImageCompression.ImageCompressionType.JPEG,
+                    quality_range=quality_range,  # Parameter yang benar untuk versi baru
                     p=params.get('jpeg_prob', 0.1)
                 )
             )
@@ -492,10 +496,10 @@ class AugmentationPipelineFactory:
             
         # Fog
         if params.get('fog_prob', 0) > 0:
+            # Parameter fog_coef_lower dan fog_coef_upper tidak valid, gunakan parameter yang benar
             transforms.append(
                 A.RandomFog(
-                    fog_coef_lower=0.1,
-                    fog_coef_upper=0.3,
+                    fog_coef=(0.1, 0.3),  # Parameter yang benar untuk versi baru
                     alpha_coef=0.1,
                     p=params.get('fog_prob', 0.1)
                 )
@@ -503,10 +507,10 @@ class AugmentationPipelineFactory:
             
         # Snow
         if params.get('snow_prob', 0) > 0:
+            # Parameter snow_point_lower dan snow_point_upper tidak valid, gunakan parameter yang benar
             transforms.append(
                 A.RandomSnow(
-                    snow_point_lower=0.1,
-                    snow_point_upper=0.3,
+                    snow_point=(0.1, 0.3),  # Parameter yang benar untuk versi baru
                     brightness_coeff=0.9,
                     p=params.get('snow_prob', 0.05)
                 )
@@ -517,10 +521,8 @@ class AugmentationPipelineFactory:
             transforms.append(
                 A.RandomSunFlare(
                     flare_roi=(0, 0, 1, 0.5),
-                    angle_lower=0,
-                    angle_upper=1,
-                    num_flare_circles_lower=1,
-                    num_flare_circles_upper=3,
+                    angle=(0, 1),  # Parameter yang benar untuk versi baru
+                    num_flare_circles=(3, 6),  # Parameter yang benar untuk versi baru
                     src_radius=100,
                     src_color=(255, 255, 255),
                     p=params.get('sun_flare_prob', 0.05)

@@ -51,11 +51,16 @@ def move_files_to_preprocessed(
                                      for subdir, file_name in [('images', img_name), ('labels', label_name)]]
             label_file = os.path.join(labels_output_dir, label_name)
             
-            # Copy file ke target dengan one-liner conditional
+            # Copy file ke target dengan debug info
             for src, dst in [(img_file, img_target), (label_file, label_target)]:
-                if os.path.exists(src): 
-                    shutil.copy2(src, dst) 
-                    os.remove(src)
+                if os.path.exists(src):
+                    # Debug info
+                    if logger:
+                        logger.info(f"📋 Menyalin {os.path.basename(src)} ke {dst}")
+                    # Copy file tanpa menghapus aslinya
+                    shutil.copy2(src, dst)
+                    # Jangan hapus file asli agar bisa diperiksa
+                    # os.remove(src)
         
         return True
     except Exception as e:

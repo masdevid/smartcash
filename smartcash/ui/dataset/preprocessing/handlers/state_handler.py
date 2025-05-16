@@ -81,7 +81,13 @@ def detect_preprocessing_state(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 ui_components['cleanup_button'].layout.display = 'block'
                 
             if 'visualization_buttons' in ui_components:
-                ui_components['visualization_buttons'].layout.display = 'flex'
+                # Periksa apakah visualization_buttons adalah widget atau dict
+                vis_buttons = ui_components['visualization_buttons']
+                if hasattr(vis_buttons, 'layout'):
+                    vis_buttons.layout.display = 'flex'
+                elif isinstance(vis_buttons, dict) and 'container' in vis_buttons and hasattr(vis_buttons['container'], 'layout'):
+                    # Jika visualization_buttons adalah dict dengan container widget
+                    vis_buttons['container'].layout.display = 'flex'
             
             if 'summary_container' in ui_components:
                 ui_components['summary_container'].layout.display = 'block'

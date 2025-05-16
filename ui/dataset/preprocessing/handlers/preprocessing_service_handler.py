@@ -32,10 +32,6 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any
         from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
         ui_components = setup_button_handlers(ui_components)
         
-        # Visualization handler telah dihapus
-        # Tidak lagi menggunakan visualization_handler untuk preprocessing
-        
-        logger.info(f"{ICONS['success']} Semua handler preprocessing berhasil disetup")
         return ui_components
     except Exception as e:
         logger.error(f"{ICONS['error']} Error saat setup preprocessing handlers: {str(e)}")
@@ -95,7 +91,6 @@ def initialize_preprocessing(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
         ui_components = detect_preprocessing_state(ui_components)
         
-        logger.info(f"{ICONS['success']} Preprocessing berhasil diinisialisasi")
         return ui_components
     except Exception as e:
         logger.error(f"{ICONS['error']} Error saat inisialisasi preprocessing: {str(e)}")

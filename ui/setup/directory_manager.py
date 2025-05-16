@@ -27,8 +27,14 @@ def setup_project_directories(ui_components: Dict[str, Any], custom_path: Option
         # Log informasi
         _log_to_ui(ui_components, f"Menyiapkan direktori di {base_dir}", "info", "📂")
         
-        # Update progress jika tersedia
-        _update_progress(ui_components, 1, f"Base dir: {base_dir}")
+        # Update status panel jika tersedia
+        if 'status_panel' in ui_components:
+            from smartcash.ui.utils.alert_utils import create_info_box
+            ui_components['status_panel'].value = create_info_box(
+                "Menyiapkan Direktori", 
+                f"Menyiapkan direktori di {base_dir}",
+                style="info"
+            ).value
         
         # Buat struktur direktori dengan list comprehension
         _create_directory_structure(base_dir)
@@ -102,11 +108,15 @@ def create_project_structure_async(ui_components: Dict[str, Any], custom_path: O
         except Exception as e:
             _log_to_ui(ui_components, f"Error saat membuat struktur direktori: {str(e)}", "error", "❌")
 
-def _update_progress(ui_components: Dict[str, Any], value: int, message: str) -> None:
-    """Update progress bar jika tersedia."""
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].value = value
-        ui_components['progress_message'].value = message
+def _update_status(ui_components: Dict[str, Any], title: str, message: str, style: str = "info") -> None:
+    """Update status panel jika tersedia."""
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import create_info_box
+        ui_components['status_panel'].value = create_info_box(
+            title, 
+            message,
+            style=style
+        ).value
 
 def _log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", emoji: str = "") -> None:
     """Log pesan ke UI dan logger."""

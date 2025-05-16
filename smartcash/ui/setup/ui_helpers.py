@@ -28,7 +28,20 @@ def cleanup_ui(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary berisi komponen UI
     """
+    # Aktifkan kembali tombol, kecuali tombol drive jika sudah terhubung
+    drive_button_was_disabled = False
+    
+    # Periksa apakah tombol drive sudah disabled secara permanen
+    if 'drive_button' in ui_components and ui_components['drive_button'].disabled:
+        # Periksa apakah tombol drive sudah terhubung (memiliki ikon check)
+        if ui_components['drive_button'].icon == 'check':
+            drive_button_was_disabled = True
+    
     # Aktifkan kembali tombol
     disable_ui_during_processing(ui_components, False)
+    
+    # Jika tombol drive sebelumnya disabled secara permanen, kembalikan ke disabled
+    if drive_button_was_disabled and 'drive_button' in ui_components:
+        ui_components['drive_button'].disabled = True
     
     # Progress bar dan message telah dihilangkan, tidak perlu disembunyikan

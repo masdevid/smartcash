@@ -129,7 +129,6 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Dict[str, Any],
     try:
         from smartcash.ui.utils.persistence_utils import ensure_ui_persistence
         ensure_ui_persistence(ui_components, 'dataset_split', logger)
-        if logger: logger.debug(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
     except Exception as e:
         if logger: logger.warning(f"{ICONS['warning']} Error saat mendaftarkan UI components untuk persistensi: {str(e)}")
 

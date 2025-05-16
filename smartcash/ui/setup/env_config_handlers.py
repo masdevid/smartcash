@@ -49,6 +49,12 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
         ui_components: Dictionary berisi komponen UI
     """
     def on_drive_button_click(b):
+        # Simpan status tombol Drive
+        drive_button_disabled = ui_components['drive_button'].disabled if 'drive_button' in ui_components else False
+        drive_button_description = ui_components['drive_button'].description if 'drive_button' in ui_components else "Hubungkan Drive"
+        drive_button_tooltip = ui_components['drive_button'].tooltip if 'drive_button' in ui_components else "Hubungkan ke Google Drive"
+        drive_button_icon = ui_components['drive_button'].icon if 'drive_button' in ui_components else "cloud"
+        
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
@@ -69,8 +75,7 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
             # Mount drive
             success, message = env_manager.mount_drive()
             
-            # Update progress
-            ui_components['progress_bar'].value = 10
+            # Update status
             
             if success:
                 # Log success
@@ -98,8 +103,15 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
             # Log error
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
-            # Cleanup UI
+            # Cleanup UI dengan mempertahankan status tombol Drive
             cleanup_ui(ui_components)
+            
+            # Kembalikan status tombol Drive jika sebelumnya disabled
+            if drive_button_disabled and 'drive_button' in ui_components:
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = drive_button_description
+                ui_components['drive_button'].tooltip = drive_button_tooltip
+                ui_components['drive_button'].icon = drive_button_icon
     
     # Register handler
     ui_components['drive_button'].on_click(on_drive_button_click)
@@ -112,6 +124,12 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
         ui_components: Dictionary berisi komponen UI
     """
     def on_directory_button_click(b):
+        # Simpan status tombol Drive
+        drive_button_disabled = ui_components['drive_button'].disabled if 'drive_button' in ui_components else False
+        drive_button_description = ui_components['drive_button'].description if 'drive_button' in ui_components else "Hubungkan Drive"
+        drive_button_tooltip = ui_components['drive_button'].tooltip if 'drive_button' in ui_components else "Hubungkan ke Google Drive"
+        drive_button_icon = ui_components['drive_button'].icon if 'drive_button' in ui_components else "cloud"
+        
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
@@ -130,10 +148,34 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             env_manager = get_environment_manager()
             
             # Setup project structure
-            result = env_manager.setup_project_structure()
+            use_drive = env_manager.is_drive_mounted
+            result = env_manager.setup_project_structure(use_drive=use_drive)
             
-            # Update progress
-            ui_components['progress_bar'].value = 10
+            # Jika Google Drive terhubung, buat symlink
+            if env_manager.is_drive_mounted:
+                from smartcash.ui.setup.environment_symlink_helper import create_drive_symlinks
+                drive_path = env_manager.drive_path
+                
+                # Update status panel
+                ui_components['status_panel'].value = create_info_box(
+                    "Membuat Symlinks", 
+                    "Sedang membuat symlinks ke Google Drive...",
+                    style="info"
+                ).value
+                
+                # Log info
+                log_to_ui(ui_components, "Membuat symlinks ke Google Drive...", "info", "🔄")
+                
+                # Buat symlinks
+                symlink_result = create_drive_symlinks(drive_path, ui_components)
+                
+                # Log hasil
+                created = symlink_result.get('created', 0)
+                existing = symlink_result.get('existing', 0)
+                errors = symlink_result.get('error', 0)
+                log_to_ui(ui_components, f"Symlinks: {created} dibuat, {existing} sudah ada, {errors} error", "info", "🔗")
+            
+            # Update status
             
             # Log success
             created = result.get('created', 0)
@@ -148,8 +190,15 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             # Log error
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
-            # Cleanup UI
+            # Cleanup UI dengan mempertahankan status tombol Drive
             cleanup_ui(ui_components)
+            
+            # Kembalikan status tombol Drive jika sebelumnya disabled
+            if drive_button_disabled and 'drive_button' in ui_components:
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = drive_button_description
+                ui_components['drive_button'].tooltip = drive_button_tooltip
+                ui_components['drive_button'].icon = drive_button_icon
     
     # Register handler
     ui_components['directory_button'].on_click(on_directory_button_click)
@@ -162,14 +211,21 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
         ui_components: Dictionary berisi komponen UI
     """
     def on_check_button_click(b):
+        # Simpan status tombol Drive
+        drive_button_disabled = ui_components['drive_button'].disabled if 'drive_button' in ui_components else False
+        drive_button_description = ui_components['drive_button'].description if 'drive_button' in ui_components else "Hubungkan Drive"
+        drive_button_tooltip = ui_components['drive_button'].tooltip if 'drive_button' in ui_components else "Hubungkan ke Google Drive"
+        drive_button_icon = ui_components['drive_button'].icon if 'drive_button' in ui_components else "cloud"
+        
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
-        # Update progress
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = "Memeriksa environment..."
+        # Update status panel
+        ui_components['status_panel'].value = create_info_box(
+            "Memeriksa Environment", 
+            "Sedang memeriksa environment...",
+            style="info"
+        ).value
         
         # Log info
         log_to_ui(ui_components, "Memeriksa environment...", "info", "🔄")
@@ -181,8 +237,7 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
             # Cek environment
             env_info = env_manager.check_environment()
             
-            # Update progress
-            ui_components['progress_bar'].value = 10
+            # Update status
             
             # Log success
             log_to_ui(ui_components, "Environment berhasil diperiksa", "success", "✅")
@@ -193,8 +248,15 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
             # Log error
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
-            # Cleanup UI
+            # Cleanup UI dengan mempertahankan status tombol Drive
             cleanup_ui(ui_components)
+            
+            # Kembalikan status tombol Drive jika sebelumnya disabled
+            if drive_button_disabled and 'drive_button' in ui_components:
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = drive_button_description
+                ui_components['drive_button'].tooltip = drive_button_tooltip
+                ui_components['drive_button'].icon = drive_button_icon
     
     # Register handler
     if 'check_button' in ui_components:
@@ -209,6 +271,12 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
         config: Konfigurasi aplikasi
     """
     def on_save_button_click(b):
+        # Simpan status tombol Drive
+        drive_button_disabled = ui_components['drive_button'].disabled if 'drive_button' in ui_components else False
+        drive_button_description = ui_components['drive_button'].description if 'drive_button' in ui_components else "Hubungkan Drive"
+        drive_button_tooltip = ui_components['drive_button'].tooltip if 'drive_button' in ui_components else "Hubungkan ke Google Drive"
+        drive_button_icon = ui_components['drive_button'].icon if 'drive_button' in ui_components else "cloud"
+        
         # Nonaktifkan UI selama proses
         disable_ui_during_processing(ui_components, True)
         
@@ -229,8 +297,7 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
             # Simpan konfigurasi
             success, message = env_manager.save_environment_config()
             
-            # Update progress
-            ui_components['progress_bar'].value = 10
+            # Update status
             
             if success:
                 # Log success
@@ -242,8 +309,15 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
             # Log error
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
-            # Cleanup UI
+            # Cleanup UI dengan mempertahankan status tombol Drive
             cleanup_ui(ui_components)
+            
+            # Kembalikan status tombol Drive jika sebelumnya disabled
+            if drive_button_disabled and 'drive_button' in ui_components:
+                ui_components['drive_button'].disabled = True
+                ui_components['drive_button'].description = drive_button_description
+                ui_components['drive_button'].tooltip = drive_button_tooltip
+                ui_components['drive_button'].icon = drive_button_icon
     
     # Register handler
     if 'save_button' in ui_components:

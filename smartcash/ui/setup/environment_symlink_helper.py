@@ -33,14 +33,15 @@ def create_drive_symlinks(drive_path: Path, ui_components: Dict[str, Any] = None
     stats = {'created': 0, 'existing': 0, 'error': 0}
     total_symlinks = len(symlinks)
     
-    # Progress tracking
-    def update_progress(idx: int, total: int, message: str):
-        if ui_components and 'progress_bar' in ui_components and 'progress_message' in ui_components:
-            ui_components['progress_bar'].value = idx
-            ui_components['progress_bar'].max = total
-            ui_components['progress_message'].value = message
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_message'].layout.visibility = 'visible'
+    # Update status panel
+    def update_status(message: str, style: str = "info"):
+        if ui_components and 'status_panel' in ui_components:
+            from smartcash.ui.utils.alert_utils import create_info_box
+            ui_components['status_panel'].value = create_info_box(
+                "Membuat Symlinks", 
+                message,
+                style=style
+            ).value
     
     # Log ke UI
     def log_to_ui(message: str, level: str = "info"):
@@ -50,7 +51,8 @@ def create_drive_symlinks(drive_path: Path, ui_components: Dict[str, Any] = None
             log_to_ui(ui_components, message, level, icon)
     
     for idx, (local_name, target_path) in enumerate(symlinks.items()):
-        update_progress(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
+        # Update status dengan informasi symlink saat ini
+        update_status(f"Membuat symlink: {local_name} -> {target_path}")
             
         try:
             # Pastikan direktori target ada

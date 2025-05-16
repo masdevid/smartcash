@@ -19,27 +19,30 @@ def detect_environment(ui_components: Dict[str, Any], env=None) -> Dict[str, Any
     Returns:
         Dictionary UI components yang telah diperbarui
     """
-    # Update progress jika tersedia
-    if _should_update_progress(ui_components):
-        _update_progress(ui_components, 0, "Mendeteksi environment...")
+    # Update status panel jika tersedia
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import create_info_box
+        ui_components['status_panel'].value = create_info_box(
+            "Mendeteksi Environment", 
+            "Sedang mendeteksi environment...",
+            style="info"
+        ).value
     
     # Deteksi environment menggunakan env atau fallback
     env_info = _detect_env_info(env)
     is_colab, is_drive_mounted, drive_path = env_info
     
-    # Update progress
-    if _should_update_progress(ui_components):
-        _update_progress(ui_components, 1, f"Environment: {'Google Colab' if is_colab else 'Local'}")
+    # Update status panel
+    if 'status_panel' in ui_components and 'logger' in ui_components:
+        ui_components['logger'].info(f"🔍 Environment: {'Google Colab' if is_colab else 'Local'}")
     
     # Update colab panel
     if 'colab_panel' in ui_components:
         _update_colab_panel(ui_components, is_colab, is_drive_mounted, drive_path)
     
-    # Update progress lagi
-    if _should_update_progress(ui_components):
-        _update_progress(ui_components, 2, f"Drive: {'terhubung' if is_drive_mounted else 'tidak terhubung'}")
-        # Reset progress setelah selesai
-        _hide_progress(ui_components)
+    # Update status panel lagi
+    if 'logger' in ui_components:
+        ui_components['logger'].info(f"💾 Drive: {'terhubung' if is_drive_mounted else 'tidak terhubung'}")
     
     return ui_components
 
@@ -107,22 +110,4 @@ def _update_colab_panel(ui_components: Dict[str, Any], is_colab: bool, is_drive_
         # Sembunyikan tombol drive di environment lokal
         ui_components['drive_button'].layout.display = 'none'
 
-def _should_update_progress(ui_components: Dict[str, Any]) -> bool:
-    """Cek apakah progress bar tersedia dan perlu diupdate."""
-    return 'progress_bar' in ui_components and 'progress_message' in ui_components
-
-def _update_progress(ui_components: Dict[str, Any], value: int, message: str) -> None:
-    """Update progress bar dengan nilai dan pesan."""
-    ui_components['progress_bar'].value = value
-    ui_components['progress_message'].value = message
-    ui_components['progress_bar'].layout.visibility = 'visible'
-    ui_components['progress_message'].layout.visibility = 'visible'
-
-def _hide_progress(ui_components: Dict[str, Any]) -> None:
-    """Sembunyikan progress bar."""
-    if hasattr(ui_components, 'reset_progress') and callable(ui_components['reset_progress']):
-        ui_components['reset_progress']()
-    else:
-        # Fallback: hidden manual
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-        ui_components['progress_message'].layout.visibility = 'hidden'
+# Fungsi-fungsi terkait progress bar dihapus karena tidak diperlukan lagi

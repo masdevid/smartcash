@@ -294,6 +294,78 @@ class ConfigManager:
             if self.logger:
                 self.logger.error(error_msg)
             return False, error_msg, {}
+            
+    def sync_to_drive(self, module_name: str) -> Tuple[bool, str]:
+        """
+        Sinkronisasi konfigurasi modul dengan Google Drive.
+        
+        Args:
+            module_name: Nama modul yang akan disinkronkan
+            
+        Returns:
+            Tuple (success, message)
+        """
+        if self.logger:
+            self.logger.info(f"🔄 Memulai sinkronisasi konfigurasi {module_name} dengan Google Drive")
+            
+        try:
+            # Pastikan konfigurasi modul ada
+            if module_name not in self.module_configs:
+                config = self.get_module_config(module_name)
+                if not config:
+                    if self.logger:
+                        self.logger.warning(f"⚠️ Konfigurasi {module_name} tidak ditemukan untuk disinkronkan")
+                    return False, f"Konfigurasi {module_name} tidak ditemukan"
+            else:
+                config = self.module_configs[module_name]
+            
+            # Tentukan nama file konfigurasi
+            config_file = f"{module_name}.yaml"
+            
+            # Import modul config_sync
+            from smartcash.common.config.sync import upload_config_to_drive
+            
+            # Simpan konfigurasi ke file lokal terlebih dahulu
+            config_path = self._get_module_config_path(module_name)
+            try:
+                # Pastikan direktori ada
+                os.makedirs(os.path.dirname(config_path), exist_ok=True)
+                
+                # Simpan konfigurasi ke file
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    yaml.safe_dump(config, f, default_flow_style=False)
+                    
+                if self.logger:
+                    self.logger.debug(f"✅ Konfigurasi {module_name} berhasil disimpan ke file lokal")
+            except Exception as e:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Gagal menyimpan konfigurasi ke file lokal: {str(e)}")
+                # Lanjutkan meskipun gagal menyimpan ke file lokal
+            
+            # Upload ke Google Drive
+            success, message = upload_config_to_drive(config_path, config, self.logger)
+            
+            if success:
+                if self.logger:
+                    self.logger.info(f"✅ Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
+            else:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Gagal menyinkronkan konfigurasi {module_name} dengan Google Drive: {message}")
+            
+            return success, message
+        except ImportError:
+            error_msg = f"❌ Module config_sync tidak tersedia untuk sinkronisasi dengan drive"
+            if self.logger:
+                self.logger.error(error_msg)
+            return False, error_msg
+        except Exception as e:
+            error_msg = f"❌ Error saat menyinkronkan konfigurasi {module_name} dengan drive: {str(e)}"
+            if self.logger:
+                self.logger.error(error_msg)
+            import traceback
+            if self.logger:
+                self.logger.error(f"🔍 Traceback: {traceback.format_exc()}")
+            return False, error_msg
 
     def use_drive_as_source_of_truth(self) -> bool:
         """Sinkronisasi semua konfigurasi dengan Drive sebagai sumber kebenaran."""
@@ -399,6 +471,20 @@ class ConfigManager:
         return value
     
     # ========== Metode untuk persistensi UI components ==========
+    
+    def _get_module_config_path(self, module_name: str) -> str:
+        """
+        Dapatkan path file konfigurasi untuk modul tertentu.
+        
+        Args:
+            module_name: Nama modul
+            
+        Returns:
+            Path file konfigurasi
+        """
+        # Gunakan direktori home user untuk menyimpan konfigurasi
+        config_dir = os.path.join(os.path.expanduser('~'), '.smartcash', 'config')
+        return os.path.join(config_dir, f"{module_name}.yaml")
     
     def get_module_config(self, module_name: str, default_config: Dict[str, Any] = None) -> Dict[str, Any]:
         """

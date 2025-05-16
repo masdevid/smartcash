@@ -230,6 +230,60 @@ def sync_config_with_drive(
         logger.warning(STATUS_WARNING.format(message=msg))
         return False, msg, {}
 
+def upload_config_to_drive(config_path: str, config: Dict[str, Any], logger = None) -> Tuple[bool, str]:
+    """
+    Upload konfigurasi ke Google Drive.
+    
+    Args:
+        config_path: Path file konfigurasi lokal
+        config: Konfigurasi yang akan diupload
+        logger: Logger untuk mencatat aktivitas
+        
+    Returns:
+        Tuple (success, message)
+    """
+    # Setup logger
+    if logger is None:
+        try:
+            from smartcash.common.logger import get_logger
+            logger = get_logger("config_sync")
+        except ImportError:
+            import logging
+            logger = logging.getLogger("config_sync")
+    
+    # Dapatkan environment manager
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+    except ImportError:
+        logger.error(CONFIG_ERROR.format(operation="akses environment", error="Environment manager tidak tersedia"))
+        return False, "Environment manager tidak tersedia"
+    
+    # Verifikasi Google Drive mounted
+    if not env_manager.is_drive_mounted: 
+        logger.warning(DRIVE_NOT_MOUNTED)
+        return False, "Google Drive tidak terpasang"
+    
+    try:
+        # Setup path konfigurasi di Drive
+        config_path = Path(config_path)
+        file_name = config_path.name
+        drive_config_dir = env_manager.drive_path / "configs"
+        drive_config_dir.mkdir(parents=True, exist_ok=True)
+        drive_config_path = drive_config_dir / file_name
+        
+        # Simpan konfigurasi ke Drive
+        save_config(drive_config_path, config)
+        
+        logger.info(f"✅ Konfigurasi berhasil diupload ke {drive_config_path}")
+        return True, f"Konfigurasi berhasil diupload ke {drive_config_path}"
+    except Exception as e:
+        error_msg = f"❌ Error saat mengupload konfigurasi ke Drive: {str(e)}"
+        logger.error(error_msg)
+        import traceback
+        logger.error(f"🔍 Traceback: {traceback.format_exc()}")
+        return False, error_msg
+
 def sync_all_configs(
     sync_strategy: str = 'merge',
     config_dir: str = 'configs',
@@ -332,7 +386,7 @@ def sync_all_configs(
     
     # Verifikasi Google Drive mounted
     if not env_manager.is_drive_mounted:
-        logger.warning("⚠️ Google Drive tidak terpasang")
+        logger.warning(DRIVE_NOT_MOUNTED)
         return {"success": [], "failure": [], "skipped": []}
     
     # Setup path dan pastikan direktori ada

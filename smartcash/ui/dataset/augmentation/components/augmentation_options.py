@@ -200,10 +200,28 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
         output_prefix
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
-    # Layout jenis augmentasi
+    # Informasi tentang split
+    split_info = widgets.HTML(
+        f"""
+        <div style="padding: 5px; color: {COLORS['dark']};">
+            <p><b>{ICONS['info']} Informasi Split:</b></p>
+            <ul>
+                <li><b>train</b>: Augmentasi pada data training (rekomendasi)</li>
+                <li><b>valid</b>: Augmentasi pada data validasi (jarang diperlukan)</li>
+                <li><b>test</b>: Augmentasi pada data testing (tidak direkomendasikan)</li>
+            </ul>
+        </div>
+        """
+    )
+    
+    # Layout jenis augmentasi dengan split info yang terintegrasi
     augmentation_types_box = widgets.VBox([
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['augmentation']} Jenis Augmentasi & Split</h5>"),
         aug_types,
-        target_split
+        widgets.HBox([
+            target_split,
+            split_info
+        ], layout=widgets.Layout(justify_content='space-between', align_items='center'))
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
     # Tab untuk opsi dasar dan jenis augmentasi

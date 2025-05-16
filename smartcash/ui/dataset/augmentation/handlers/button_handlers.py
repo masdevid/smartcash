@@ -146,7 +146,7 @@ def on_reset_click(b, ui_components=None):
         
         # Update UI dari konfigurasi default
         if reset_success and 'update_ui_from_config' in ui_components and callable(ui_components['update_ui_from_config']):
-            ui_components['update_ui_from_config']()
+            ui_components['update_ui_from_config'](ui_components)
             
             # Pastikan UI persisten
             ensure_ui_persistence(ui_components)

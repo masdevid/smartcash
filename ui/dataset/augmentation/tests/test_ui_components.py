@@ -149,12 +149,12 @@ class TestAugmentationUIComponents(unittest.TestCase):
     
     def test_create_and_display_augmentation_ui(self):
         """Test pembuatan dan tampilan UI augmentasi."""
-        # Import fungsi yang akan diuji
-        from smartcash.ui.dataset.augmentation.augmentation_initializer import create_and_display_augmentation_ui
+        # Fungsi create_and_display_augmentation_ui tidak ada lagi di implementasi terbaru
+        # Sebagai gantinya, kita akan test initialize_augmentation_ui dengan display
         
         # Buat mock untuk fungsi-fungsi yang dipanggil
-        with patch('smartcash.ui.dataset.augmentation.augmentation_initializer.initialize_augmentation_ui') as mock_initialize_augmentation_ui, \
-             patch('smartcash.ui.dataset.augmentation.augmentation_initializer.display') as mock_display:
+        with patch('smartcash.ui.dataset.augmentation.augmentation_initializer.initialize_module_ui') as mock_initialize_module_ui, \
+             patch('IPython.display.display') as mock_display:
             
             # Setup mock
             mock_ui_components = {
@@ -162,22 +162,22 @@ class TestAugmentationUIComponents(unittest.TestCase):
                 'augmentation_options': MagicMock(),
                 'advanced_options': MagicMock()
             }
-            mock_initialize_augmentation_ui.return_value = mock_ui_components
+            mock_initialize_module_ui.return_value = mock_ui_components
             
             try:
+                # Import fungsi yang akan diuji
+                from smartcash.ui.dataset.augmentation.augmentation_initializer import initialize_augmentation_ui
+                
                 # Panggil fungsi
-                result = create_and_display_augmentation_ui(None, self.mock_config)
+                result = initialize_augmentation_ui()
                 
-                # Verifikasi hasil
+                # Verifikasi bahwa initialize_module_ui dipanggil
+                mock_initialize_module_ui.assert_called_once()
+                
+                # Verifikasi bahwa fungsi mengembalikan ui_components
                 self.assertEqual(result, mock_ui_components)
-                
-                # Verifikasi bahwa initialize_augmentation_ui dipanggil
-                mock_initialize_augmentation_ui.assert_called_with(None, self.mock_config)
-                
-                # Verifikasi bahwa display dipanggil
-                mock_display.assert_called_with(mock_ui_components['ui'])
             except Exception as e:
-                self.fail(f"create_and_display_augmentation_ui gagal dengan error: {str(e)}")
+                self.fail(f"initialize_augmentation_ui gagal dengan error: {str(e)}")
     
     def test_initialize_augmentation_ui(self):
         """Test inisialisasi UI augmentasi."""
@@ -185,39 +185,35 @@ class TestAugmentationUIComponents(unittest.TestCase):
         from smartcash.ui.dataset.augmentation.augmentation_initializer import initialize_augmentation_ui
         
         # Buat mock untuk fungsi-fungsi yang dipanggil
-        with patch('smartcash.ui.dataset.augmentation.augmentation_initializer.get_logger') as mock_get_logger, \
-             patch('smartcash.ui.dataset.augmentation.components.augmentation_component.create_augmentation_ui') as mock_create_augmentation_ui, \
-             patch('smartcash.ui.dataset.augmentation.augmentation_initializer.setup_handlers') as mock_setup_handlers, \
-             patch('smartcash.ui.dataset.augmentation.handlers.persistence_handler.ensure_ui_persistence') as mock_ensure_ui_persistence, \
-             patch('smartcash.ui.dataset.augmentation.handlers.status_handler.update_augmentation_info') as mock_update_augmentation_info:
+        with patch('smartcash.ui.dataset.augmentation.augmentation_initializer.initialize_module_ui') as mock_initialize_module_ui, \
+             patch('smartcash.ui.utils.ui_logger.intercept_stdout_to_ui') as mock_intercept_stdout, \
+             patch('smartcash.ui.utils.ui_logger.create_direct_ui_logger') as mock_create_logger:
             
             # Setup mock
-            mock_logger = MagicMock()
-            mock_get_logger.return_value = mock_logger
-            
             mock_ui_components = {
                 'ui': MagicMock(),
                 'augmentation_options': MagicMock(),
                 'advanced_options': MagicMock(),
                 'update_ui_from_config': MagicMock()
             }
-            mock_create_augmentation_ui.return_value = mock_ui_components
-            mock_setup_handlers.return_value = mock_ui_components
+            mock_initialize_module_ui.return_value = mock_ui_components
+            mock_logger = MagicMock()
+            mock_create_logger.return_value = mock_logger
             
             # Panggil fungsi
             try:
-                result = initialize_augmentation_ui(None, self.mock_config)
+                result = initialize_augmentation_ui()
                 
                 # Verifikasi hasil
                 self.assertEqual(result, mock_ui_components)
                 
                 # Verifikasi bahwa semua fungsi dipanggil
-                mock_get_logger.assert_called_once()
-                mock_create_augmentation_ui.assert_called_once_with(None, self.mock_config)
-                mock_setup_handlers.assert_called_once_with(mock_ui_components, None, self.mock_config)
-                mock_update_augmentation_info.assert_called_once_with(mock_ui_components)
-                mock_ensure_ui_persistence.assert_called_once_with(mock_ui_components)
-                mock_ui_components['update_ui_from_config'].assert_called_once_with(mock_ui_components, self.mock_config)
+                mock_initialize_module_ui.assert_called_once()
+                mock_intercept_stdout.assert_called_once_with(mock_ui_components)
+                mock_create_logger.assert_called_once()
+                
+                # Verifikasi bahwa logger ditambahkan ke ui_components
+                self.assertEqual(result['ui_logger'], mock_logger)
             except Exception as e:
                 self.fail(f"initialize_augmentation_ui gagal dengan error: {str(e)}")
 

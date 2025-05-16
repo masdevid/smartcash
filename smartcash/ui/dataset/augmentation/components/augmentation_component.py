@@ -26,7 +26,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Import komponen submodules augmentasi
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
-    from smartcash.ui.dataset.augmentation.components.split_selector import create_split_selector
     from smartcash.ui.dataset.augmentation.components.advanced_options import create_advanced_options
     
     # Import komponen button khusus untuk augmentasi
@@ -40,9 +39,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Panel info status
     status_panel = create_status_panel("Konfigurasi augmentasi dataset", "info")
     
-    # Augmentation options (split dari komponen besar)
+    # Augmentation options
     augmentation_options = create_augmentation_options(config)
-    split_selector = create_split_selector()
     
     # Advanced options dalam accordion
     advanced_options = create_advanced_options(config)
@@ -120,14 +118,23 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Layout UI dengan divider standar
     from smartcash.ui.utils.layout_utils import create_divider
     
+    # Rakit komponen UI dengan layout yang lebih compact
+    # Gabungkan augmentation_options dan advanced_options dalam satu baris
+    settings_container = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
+        augmentation_options
+    ])
+    
     # Rakit komponen UI
     ui = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
-        augmentation_options,
-        split_selector,
-        advanced_accordion,
+        widgets.HBox([
+            settings_container,
+            widgets.VBox([
+                advanced_accordion
+            ], layout=widgets.Layout(width='50%'))
+        ], layout=widgets.Layout(width='100%', align_items='flex-start')),
         create_divider(),
         action_buttons['container'],
         progress_container,
@@ -145,7 +152,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'status_panel': status_panel,
         'augmentation_options': augmentation_options,
         'advanced_options': advanced_options,
-        'split_selector': split_selector,
         'advanced_accordion': advanced_accordion,
         'augment_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],

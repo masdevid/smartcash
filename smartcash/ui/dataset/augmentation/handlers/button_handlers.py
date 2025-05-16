@@ -19,6 +19,7 @@ from smartcash.ui.dataset.augmentation.handlers.parameter_handler import validat
 from smartcash.ui.dataset.augmentation.handlers.persistence_handler import sync_config_with_drive, ensure_ui_persistence, reset_config_to_default
 from smartcash.ui.dataset.augmentation.handlers.initialization_handler import initialize_augmentation_directories
 from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_start, notify_process_stop, notify_process_complete
 
 # Penanganan error dengan decorator standar
 from smartcash.ui.handlers.error_handler import try_except_decorator
@@ -72,8 +73,7 @@ def on_augment_click(b, ui_components=None):
     
     # Notifikasi observer tentang mulai augmentasi
     try:
-        from smartcash.components.observer import notify
-        notify('augmentation_started', {'ui_components': ui_components})
+        notify_process_start(ui_components)
     except Exception as e:
         if logger: logger.debug(f"Gagal mengirim notifikasi augmentasi: {str(e)}")
     
@@ -102,20 +102,19 @@ def on_stop_click(b, ui_components=None):
     
     logger = ui_components.get('logger', get_logger('augmentation'))
     
-    # Update UI
+    # Update UI: menampilkan proses dihentikan
     with ui_components['status']: 
         clear_output(wait=True)
-        display(create_status_indicator("warning", f"{ICONS['stop']} Menghentikan augmentasi..."))
+        display(create_status_indicator("warning", f"{ICONS['stop']} Menghentikan proses augmentasi..."))
     
-    # Set flag stop
-    ui_components['stop_requested'] = True
+    # Tandai augmentasi berhenti
+    ui_components['augmentation_running'] = False
     
-    # Notifikasi observer tentang stop augmentasi
+    # Notifikasi observer tentang berhenti augmentasi
     try:
-        from smartcash.components.observer import notify
-        notify('augmentation_stopped', {'ui_components': ui_components})
+        notify_process_stop(ui_components)
     except Exception as e:
-        if logger: logger.debug(f"Gagal mengirim notifikasi stop: {str(e)}")
+        if logger: logger.debug(f"Gagal mengirim notifikasi berhenti: {str(e)}")
     
     # Kembalikan UI ke kondisi awal
     cleanup_ui(ui_components)
@@ -123,7 +122,9 @@ def on_stop_click(b, ui_components=None):
     # Update status
     with ui_components['status']: 
         clear_output(wait=True)
-        display(create_status_indicator("warning", f"{ICONS['stop']} Augmentasi dihentikan oleh pengguna"))
+        display(create_status_indicator("warning", f"{ICONS['stop']} Proses augmentasi dihentikan oleh pengguna"))
+    
+    logger.warning(f"{ICONS['stop']} Proses augmentasi dihentikan oleh pengguna")
 
 @try_except_decorator(None)
 def on_reset_click(b, ui_components=None):

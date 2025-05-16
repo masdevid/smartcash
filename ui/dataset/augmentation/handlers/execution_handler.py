@@ -59,6 +59,7 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         # Import handler service
         from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import execute_augmentation as execute_aug
         from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+        from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_complete
         
         # Dapatkan parameter dari UI - ini harus dipanggil untuk pengujian
         params = extract_augmentation_params(ui_components)
@@ -102,6 +103,12 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
             # Tampilkan tombol visualisasi
             ui_components['visualization_buttons'].layout.display = 'flex'
             
+            # Notifikasi observer tentang selesainya augmentasi
+            try:
+                notify_process_complete(ui_components, result)
+            except Exception as e:
+                logger.debug(f"Gagal mengirim notifikasi augmentasi_completed: {str(e)}")
+            
             # Tampilkan summary
             display_augmentation_summary(ui_components, result)
             
@@ -139,9 +146,13 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
             clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS['error']} Error saat menjalankan augmentasi: {str(e)}"))
     finally:
-        # Cleanup UI
-        from smartcash.ui.dataset.augmentation.handlers.button_handlers import cleanup_ui
-        cleanup_ui(ui_components)
+        # Tandai augmentasi selesai
+        ui_components['augmentation_running'] = False
+        
+        # Cleanup UI jika tidak ada permintaan stop
+        if not ui_components.get('stop_requested', False):
+            from smartcash.ui.dataset.augmentation.handlers.button_handlers import cleanup_ui
+            cleanup_ui(ui_components)
 
 def extract_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

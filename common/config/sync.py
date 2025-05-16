@@ -278,7 +278,7 @@ def upload_config_to_drive(config_path: str, config: Dict[str, Any], logger = No
             file_name = config_path.name
             
             # Perbaikan nama file untuk mengikuti pola xxx_config.yaml
-            if file_name.endswith('.yaml'):
+            if file_name.endswith('.yaml') and not file_name.endswith('_config.yaml'):
                 module_name = file_name.replace('.yaml', '')
                 file_name = f"{module_name}_config.yaml"
             

@@ -406,9 +406,6 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     
     # Layout opsi dasar
     basic_options = widgets.VBox([
-        widgets.HBox([aug_enabled, balance_classes], layout=widgets.Layout(justify_content='space-between')),
-        widgets.HBox([move_to_preprocessed, validate_results], layout=widgets.Layout(justify_content='space-between')),
-        widgets.HBox([resume], layout=widgets.Layout(justify_content='flex-start')),
         num_variations,
         target_count,
         num_workers,
@@ -429,20 +426,28 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
         """
     )
     
-    # Layout jenis augmentasi dengan split info yang terintegrasi
+    # Layout jenis augmentasi
     augmentation_types_box = widgets.VBox([
-        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['augmentation']} Jenis Augmentasi & Split</h5>"),
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['augmentation']} Jenis Augmentasi</h5>"),
         aug_types,
-        widgets.HBox([
-            target_split,
-            split_info
-        ], layout=widgets.Layout(justify_content='space-between', align_items='center'))
+        widgets.HTML(f"<h6 style='color: {COLORS['dark']}; margin: 10px 0 5px 0;'>{ICONS['settings']} Opsi Tambahan:</h6>"),
+        widgets.HBox([aug_enabled, balance_classes], layout=widgets.Layout(justify_content='space-between')),
+        widgets.HBox([move_to_preprocessed, validate_results], layout=widgets.Layout(justify_content='space-between')),
+        widgets.HBox([resume], layout=widgets.Layout(justify_content='flex-start'))
     ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
-    # Tab untuk opsi dasar dan jenis augmentasi (dipertahankan untuk kompatibilitas)
-    tabs = widgets.Tab(children=[basic_options, augmentation_types_box])
+    # Section untuk target split dan informasi split
+    split_section = widgets.VBox([
+        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['split']} Target Split</h5>"),
+        target_split,
+        split_info
+    ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%', margin='10px 0'))
+    
+    # Tab untuk opsi dasar, target split, dan jenis augmentasi
+    tabs = widgets.Tab(children=[basic_options, split_section, augmentation_types_box])
     tabs.set_title(0, f"{ICONS['settings']} Opsi Dasar")
-    tabs.set_title(1, f"{ICONS['augmentation']} Jenis Augmentasi")
+    tabs.set_title(1, f"{ICONS['split']} Target Split")
+    tabs.set_title(2, f"{ICONS['augmentation']} Jenis Augmentasi")
     
     # Container utama
     try:

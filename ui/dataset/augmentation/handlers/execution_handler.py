@@ -58,8 +58,8 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
     try:
         # Import handler service
         from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import execute_augmentation as execute_aug
-        from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
-        from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_start, notify_process_complete
+        from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel, update_progress_bar, reset_progress_bar
+        from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_start, notify_process_complete, notify_process_error
         
         # Dapatkan parameter dari UI - ini harus dipanggil untuk pengujian
         params = extract_augmentation_params(ui_components)
@@ -68,17 +68,33 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         if not validate_prerequisites(params, ui_components, ui_components.get('logger', logger)):
             return
         
+        # Dapatkan informasi split dan display info
+        split = params.get('target_split', 'train')
+        aug_types = params.get('types', ['combined'])
+        display_info = f"split {split} dengan jenis {', '.join(aug_types)}"
+        
         # Update status panel
-        update_status_panel(ui_components, "Menjalankan augmentasi dataset...", "info")
+        update_status_panel(ui_components, f"Menjalankan augmentasi dataset {display_info}...", "info")
+        
+        # Reset progress bar
+        reset_progress_bar(ui_components, "Mempersiapkan augmentasi...")
+        
+        # Tampilkan progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            if 'overall_label' in ui_components:
+                ui_components['overall_label'].layout.visibility = 'visible'
         
         # Notifikasi observer tentang dimulainya augmentasi
-        try:
-            notify_process_start(ui_components)
-        except Exception as e:
-            logger.debug(f"Gagal mengirim notifikasi augmentasi_started: {str(e)}")
+        notify_process_start(ui_components, "augmentasi", display_info, split)
         
         # Jalankan augmentasi
         start_time = time.time()
+        
+        # Update progress bar ke 10% untuk menunjukkan proses dimulai
+        update_progress_bar(ui_components, 10, 100, "Memulai proses augmentasi...")
+        
+        # Jalankan augmentasi
         result = execute_aug(ui_components, params)
         
         # Cek hasil
@@ -109,11 +125,11 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
             # Tampilkan tombol visualisasi
             ui_components['visualization_buttons'].layout.display = 'flex'
             
+            # Update progress bar ke 100% untuk menunjukkan proses selesai
+            update_progress_bar(ui_components, 100, 100, "Augmentasi selesai")
+            
             # Notifikasi observer tentang selesainya augmentasi
-            try:
-                notify_process_complete(ui_components, result)
-            except Exception as e:
-                logger.debug(f"Gagal mengirim notifikasi augmentasi_completed: {str(e)}")
+            notify_process_complete(ui_components, result, display_info)
             
             # Tampilkan summary
             display_augmentation_summary(ui_components, result)
@@ -144,13 +160,27 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
                 clear_output(wait=True)
                 display(create_status_indicator("error", f"{ICONS['error']} {result.get('message', 'Augmentasi gagal')}"))
     except Exception as e:
-        # Log error
-        logger.error(f"Error saat menjalankan augmentasi: {str(e)}\n{traceback.format_exc()}")
+        # Tangkap error dan tampilkan
+        error_message = str(e)
+        logger.error(f"{ICONS['error']} Error saat augmentasi: {error_message}")
         
-        # Tampilkan pesan error
+        # Update status panel
+        update_status_panel(ui_components, f"Error saat augmentasi: {error_message}", "error")
+        
+        # Reset progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].layout.visibility = 'hidden'
+            if 'overall_label' in ui_components:
+                ui_components['overall_label'].layout.visibility = 'hidden'
+        
+        # Tampilkan error di output status
         with ui_components['status']:
             clear_output(wait=True)
             display(create_status_indicator("error", f"{ICONS['error']} Error saat menjalankan augmentasi: {str(e)}"))
+            display(traceback.format_exc())
+            
+        # Notifikasi observer tentang error
+        notify_process_error(ui_components, str(e))
     finally:
         # Tandai augmentasi selesai
         ui_components['augmentation_running'] = False

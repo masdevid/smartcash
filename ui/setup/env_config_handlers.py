@@ -8,7 +8,7 @@ from typing import Dict, Any, Callable, Optional
 from IPython import get_ipython
 
 from smartcash.ui.setup.environment_detector import detect_environment
-from smartcash.ui.setup.env_config_initializer import _disable_ui_during_processing, _cleanup_ui
+from smartcash.ui.setup.ui_helpers import disable_ui_during_processing, cleanup_ui
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.utils.ui_logger import log_to_ui
 from smartcash.ui.utils.logging_utils import create_cleanup_function
@@ -51,7 +51,7 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
     """
     def on_drive_button_click(b):
         # Nonaktifkan UI selama proses
-        _disable_ui_during_processing(ui_components, True)
+        disable_ui_during_processing(ui_components, True)
         
         # Update progress
         ui_components['progress_bar'].layout.visibility = 'visible'
@@ -89,7 +89,7 @@ def _setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
             # Cleanup UI
-            _cleanup_ui(ui_components)
+            cleanup_ui(ui_components)
     
     # Register handler
     ui_components['drive_button'].on_click(on_drive_button_click)
@@ -103,7 +103,7 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
     """
     def on_directory_button_click(b):
         # Nonaktifkan UI selama proses
-        _disable_ui_during_processing(ui_components, True)
+        disable_ui_during_processing(ui_components, True)
         
         # Update progress
         ui_components['progress_bar'].layout.visibility = 'visible'
@@ -138,7 +138,7 @@ def _setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
             # Cleanup UI
-            _cleanup_ui(ui_components)
+            cleanup_ui(ui_components)
     
     # Register handler
     ui_components['directory_button'].on_click(on_directory_button_click)
@@ -152,7 +152,7 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
     """
     def on_check_button_click(b):
         # Nonaktifkan UI selama proses
-        _disable_ui_during_processing(ui_components, True)
+        disable_ui_during_processing(ui_components, True)
         
         # Update progress
         ui_components['progress_bar'].layout.visibility = 'visible'
@@ -183,7 +183,7 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
             # Cleanup UI
-            _cleanup_ui(ui_components)
+            cleanup_ui(ui_components)
     
     # Register handler
     if 'check_button' in ui_components:
@@ -199,7 +199,7 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
     """
     def on_save_button_click(b):
         # Nonaktifkan UI selama proses
-        _disable_ui_during_processing(ui_components, True)
+        disable_ui_during_processing(ui_components, True)
         
         # Update progress
         ui_components['progress_bar'].layout.visibility = 'visible'
@@ -231,7 +231,7 @@ def _setup_save_button_handler(ui_components: Dict[str, Any], config: Dict[str, 
             log_to_ui(ui_components, f"Error: {str(e)}", "error", "❌")
         finally:
             # Cleanup UI
-            _cleanup_ui(ui_components)
+            cleanup_ui(ui_components)
     
     # Register handler
     if 'save_button' in ui_components:

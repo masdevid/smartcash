@@ -12,6 +12,7 @@ from smartcash.ui.setup.env_config_handlers import setup_env_config_handlers
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.config.manager import ConfigManager
 from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+from smartcash.ui.setup.ui_helpers import disable_ui_during_processing, cleanup_ui
 
 def initialize_env_config_ui() -> Dict[str, Any]:
     """
@@ -83,35 +84,4 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     
     return ui_components
 
-def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True) -> None:
-    """
-    Nonaktifkan UI selama proses berjalan
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        disable: True untuk nonaktifkan, False untuk aktifkan
-    """
-    # Daftar tombol yang akan dinonaktifkan
-    buttons = ['drive_button', 'directory_button', 'check_button', 'save_button']
-    
-    # Nonaktifkan atau aktifkan tombol
-    for button_name in buttons:
-        if button_name in ui_components:
-            ui_components[button_name].disabled = disable
-
-def _cleanup_ui(ui_components: Dict[str, Any]) -> None:
-    """
-    Bersihkan UI setelah proses selesai
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-    """
-    # Aktifkan kembali tombol
-    _disable_ui_during_processing(ui_components, False)
-    
-    # Sembunyikan progress bar dan message
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-    
-    if 'progress_message' in ui_components:
-        ui_components['progress_message'].layout.visibility = 'hidden'
+# Fungsi _disable_ui_during_processing dan _cleanup_ui dipindahkan ke ui_helpers.py

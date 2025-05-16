@@ -59,7 +59,7 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         # Import handler service
         from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import execute_augmentation as execute_aug
         from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
-        from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_complete
+        from smartcash.ui.dataset.augmentation.handlers.notification_handler import notify_process_start, notify_process_complete
         
         # Dapatkan parameter dari UI - ini harus dipanggil untuk pengujian
         params = extract_augmentation_params(ui_components)
@@ -70,6 +70,12 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         
         # Update status panel
         update_status_panel(ui_components, "Menjalankan augmentasi dataset...", "info")
+        
+        # Notifikasi observer tentang dimulainya augmentasi
+        try:
+            notify_process_start(ui_components)
+        except Exception as e:
+            logger.debug(f"Gagal mengirim notifikasi augmentasi_started: {str(e)}")
         
         # Jalankan augmentasi
         start_time = time.time()

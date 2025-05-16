@@ -28,8 +28,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
     from smartcash.ui.dataset.augmentation.components.advanced_options import create_advanced_options
     
-    # Import komponen button khusus untuk augmentasi
-    from smartcash.ui.dataset.augmentation.components.action_buttons import create_action_buttons
+    # Import komponen button standar
+    from smartcash.ui.components.action_buttons import create_action_buttons
     from smartcash.ui.components.visualization_buttons import create_visualization_buttons
     
     # Header dengan komponen standar
@@ -49,8 +49,16 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
     
-    # Buat tombol-tombol augmentasi dengan komponen khusus
-    action_buttons = create_action_buttons()
+    # Buat tombol-tombol augmentasi dengan komponen standar
+    action_buttons = create_action_buttons(
+        primary_label="Augment",
+        primary_icon="play",
+        secondary_buttons=[
+            ("Reset", "refresh", "warning"),
+            ("Cleanup", "trash", "danger"),
+            ("Save", "save", "success")
+        ]
+    )
     
     # Tombol-tombol visualisasi dengan komponen standar
     visualization_buttons = create_visualization_buttons(module_name="augmentation")
@@ -119,22 +127,22 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import create_divider
     
     # Rakit komponen UI dengan layout yang lebih compact
-    # Gabungkan augmentation_options dan advanced_options dalam satu baris
+    # Gabungkan tab opsi dasar dan jenis augmentasi dalam satu card full width
+    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
+    combined_options = create_combined_options(config)
+    
     settings_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
-        augmentation_options
-    ])
+        combined_options,
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Advanced Options</h4>"),
+        advanced_options
+    ], layout=widgets.Layout(width='100%'))
     
     # Rakit komponen UI
     ui = widgets.VBox([
         header,
         status_panel,
-        widgets.HBox([
-            settings_container,
-            widgets.VBox([
-                advanced_accordion
-            ], layout=widgets.Layout(width='50%'))
-        ], layout=widgets.Layout(width='100%', align_items='flex-start')),
+        settings_container,
         create_divider(),
         action_buttons['container'],
         progress_container,
@@ -155,9 +163,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_accordion': advanced_accordion,
         'augment_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
-        'reset_button': action_buttons['reset_button'],
-        'cleanup_button': action_buttons['cleanup_button'],
-        'save_button': action_buttons['save_button'],
+        'reset_button': action_buttons['secondary_buttons'][0],
+        'cleanup_button': action_buttons['secondary_buttons'][1],
+        'save_button': action_buttons['secondary_buttons'][2],
         'button_container': action_buttons['container'],
         'progress_bar': progress_bar,
         'current_progress': current_progress,

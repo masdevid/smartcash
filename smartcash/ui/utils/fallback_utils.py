@@ -311,8 +311,8 @@ def create_fallback_ui(ui_components: Dict[str, Any], message: str, status_type:
         if 'aug_options' not in ui_components:
             # Buat dummy aug_options dengan nilai default yang aman
             dummy_selector = widgets.SelectMultiple(
-                options=['Combined (Recommended)'],
-                value=['Combined (Recommended)'],
+                options=[('Combined', 'combined')],
+                value=['combined'],
                 description='Jenis:',
                 layout=widgets.Layout(width='70%', height='80px')
             )
@@ -344,7 +344,7 @@ def create_fallback_ui(ui_components: Dict[str, Any], message: str, status_type:
         ui_components = {
             'ui': HTML(f"<div style='color:red; padding:10px; border:1px solid red;'>⚠️ Error: {message}</div>"),
             'status': None,
-            'aug_options': {'children': [{'value': ['Combined (Recommended)']}]}
+            'aug_options': {'children': [{'value': ['combined']}]}
         }
     
     return ui_components

@@ -503,40 +503,70 @@ class AugmentationPipelineFactory:
                 )
             )
             
-        # Fog
+        # Fog - gunakan parameter yang kompatibel
         if params.get('fog_prob', 0) > 0:
-            # Parameter fog_coef_lower dan fog_coef_upper tidak valid, gunakan parameter yang benar
-            transforms.append(
-                A.RandomFog(
-                    fog_coef=(0.1, 0.3),  # Parameter yang benar untuk versi baru
-                    alpha_coef=0.1,
-                    p=params.get('fog_prob', 0.1)
+            try:
+                # Coba dengan parameter yang disederhanakan
+                transforms.append(
+                    A.RandomFog(
+                        fog_coef=0.2,  # Nilai tunggal lebih kompatibel
+                        p=params.get('fog_prob', 0.1)
+                    )
                 )
-            )
+                self.logger.info(f"✅ Menggunakan RandomFog dengan parameter yang disederhanakan")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error pada RandomFog: {str(e)}. Menggunakan Blur sebagai alternatif")
+                transforms.append(
+                    A.Blur(
+                        blur_limit=3,
+                        p=params.get('fog_prob', 0.1)
+                    )
+                )
             
-        # Snow
+        # Snow - gunakan parameter yang kompatibel
         if params.get('snow_prob', 0) > 0:
-            # Parameter snow_point_lower dan snow_point_upper tidak valid, gunakan parameter yang benar
-            transforms.append(
-                A.RandomSnow(
-                    snow_point=(0.1, 0.3),  # Parameter yang benar untuk versi baru
-                    brightness_coeff=0.9,
-                    p=params.get('snow_prob', 0.05)
+            try:
+                # Coba dengan parameter yang disederhanakan
+                transforms.append(
+                    A.RandomSnow(
+                        snow_point_lower=0.1,
+                        snow_point_upper=0.3,
+                        brightness_coeff=0.9,
+                        p=params.get('snow_prob', 0.05)
+                    )
                 )
-            )
+                self.logger.info(f"✅ Menggunakan RandomSnow dengan parameter yang disederhanakan")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error pada RandomSnow: {str(e)}. Menggunakan RandomBrightness sebagai alternatif")
+                transforms.append(
+                    A.RandomBrightness(
+                        limit=0.1,
+                        p=params.get('snow_prob', 0.05)
+                    )
+                )
             
-        # Sun Flare
+        # Sun Flare - gunakan parameter yang kompatibel
         if params.get('sun_flare_prob', 0) > 0:
-            transforms.append(
-                A.RandomSunFlare(
-                    flare_roi=(0, 0, 1, 0.5),
-                    angle=(0, 1),  # Parameter yang benar untuk versi baru
-                    num_flare_circles=(3, 6),  # Parameter yang benar untuk versi baru
-                    src_radius=100,
-                    src_color=(255, 255, 255),
-                    p=params.get('sun_flare_prob', 0.05)
+            try:
+                # Coba dengan parameter yang disederhanakan
+                transforms.append(
+                    A.RandomSunFlare(
+                        flare_roi=(0, 0, 1, 0.5),
+                        src_radius=100,
+                        src_color=(255, 255, 255),
+                        p=params.get('sun_flare_prob', 0.05)
+                    )
                 )
-            )
+                self.logger.info(f"✅ Menggunakan RandomSunFlare dengan parameter yang disederhanakan")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error pada RandomSunFlare: {str(e)}. Menggunakan RandomBrightnessContrast sebagai alternatif")
+                transforms.append(
+                    A.RandomBrightnessContrast(
+                        brightness_limit=0.2,
+                        contrast_limit=0.1,
+                        p=params.get('sun_flare_prob', 0.05)
+                    )
+                )
             
         return transforms
     

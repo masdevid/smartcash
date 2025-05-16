@@ -8,7 +8,10 @@ import shutil
 import glob
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, IMG_EXTENSIONS
+from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
+
+# Definisi ekstensi gambar yang didukung
+IMG_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff']
 
 def move_files_to_preprocessed(
     images_output_dir: str, 
@@ -36,22 +39,43 @@ def move_files_to_preprocessed(
         # Buat direktori target dan dapatkan file dengan one-liner
         [os.makedirs(os.path.join(final_output_dir, split, subdir), exist_ok=True) 
          for subdir in ['images', 'labels']]
-        augmented_files = glob.glob(os.path.join(images_output_dir, f"{output_prefix}_*.jpg"))
         
-        if logger: 
-            logger.info(f"📦 Memindahkan {len(augmented_files)} file augmentasi ke {final_output_dir}/{split}")
+        # Cari semua file augmentasi dengan pattern yang lebih fleksibel
+        augmented_files = []
+        for ext in IMG_EXTENSIONS:
+            pattern = os.path.join(images_output_dir, f"{output_prefix}_*{ext}")
+            augmented_files.extend(glob.glob(pattern))
         
-        # Pindahkan file dengan one-liner looping
+        # Debug info untuk membantu troubleshooting
+        if logger:
+            logger.info(f"🔍 Mencari file dengan pola: {os.path.join(images_output_dir, f'{output_prefix}_*')}")
+            logger.info(f"💾 Direktori output gambar: {images_output_dir}")
+            logger.info(f"💾 Direktori output label: {labels_output_dir}")
+            logger.info(f"💾 Direktori tujuan akhir: {os.path.join(final_output_dir, split)}")
+            logger.info(f"📦 Ditemukan {len(augmented_files)} file augmentasi")
+        
+        # Jika tidak ada file yang ditemukan, coba cari semua file di direktori
+        if not augmented_files and logger:
+            all_files = []
+            for ext in IMG_EXTENSIONS:
+                pattern = os.path.join(images_output_dir, f"*{ext}")
+                all_files.extend(glob.glob(pattern))
+            logger.info(f"📦 Total {len(all_files)} file ditemukan di direktori output")
+            if all_files:
+                logger.info(f"💾 Contoh file: {os.path.basename(all_files[0])}")
+        
+        # Pindahkan file yang ditemukan
+        moved_count = 0
         for img_file in augmented_files:
             img_name = os.path.basename(img_file)
             label_name = f"{os.path.splitext(img_name)[0]}.txt"
             
-            # Define target paths dengan one-liner
-            img_target, label_target = [os.path.join(final_output_dir, split, subdir, file_name) 
-                                     for subdir, file_name in [('images', img_name), ('labels', label_name)]]
+            # Define target paths
+            img_target = os.path.join(final_output_dir, split, 'images', img_name)
+            label_target = os.path.join(final_output_dir, split, 'labels', label_name)
             label_file = os.path.join(labels_output_dir, label_name)
             
-            # Copy file ke target dengan debug info
+            # Copy file dengan debug info
             for src, dst in [(img_file, img_target), (label_file, label_target)]:
                 if os.path.exists(src):
                     # Debug info
@@ -59,10 +83,12 @@ def move_files_to_preprocessed(
                         logger.info(f"📋 Menyalin {os.path.basename(src)} ke {dst}")
                     # Copy file tanpa menghapus aslinya
                     shutil.copy2(src, dst)
-                    # Jangan hapus file asli agar bisa diperiksa
-                    # os.remove(src)
+                    moved_count += 1
         
-        return True
+        if logger:
+            logger.info(f"✅ Berhasil memindahkan {moved_count} file ke {os.path.join(final_output_dir, split)}")
+        
+        return moved_count > 0
     except Exception as e:
         if logger: 
             logger.error(f"❌ Error saat memindahkan file: {str(e)}")

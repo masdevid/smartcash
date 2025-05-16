@@ -70,8 +70,15 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
         # Dapatkan ConfigManager
         config_manager = get_config_manager()
         
+        # Ambil konfigurasi terbaru dari UI
+        if 'update_config_from_ui' in ui_components and callable(ui_components['update_config_from_ui']):
+            current_config = ui_components['update_config_from_ui'](ui_components)
+        else:
+            # Jika tidak ada fungsi update, ambil dari config manager
+            current_config = config_manager.get_module_config('augmentation')
+        
         # Simpan konfigurasi ke file - ini harus dipanggil untuk pengujian
-        config_manager.save_module_config('augmentation')
+        config_manager.save_module_config('augmentation', current_config)
         
         # Coba sinkronkan dengan drive jika tersedia
         try:

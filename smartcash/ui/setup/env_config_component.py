@@ -10,7 +10,7 @@ from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.info_boxes import get_environment_info
-from smartcash.ui.components.accordion_factory import create_accordion
+from smartcash.ui.utils.info_utils import create_info_accordion
 from smartcash.ui.helpers.ui_helpers import create_spacing
 
 def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, Any]:
@@ -40,7 +40,8 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
     )
     
     # Buat info environment dengan tampilan yang lebih informatif
-    env_info = get_environment_info(env_manager)
+    # Gunakan fungsi get_environment_info dengan parameter yang benar
+    env_info_content = get_environment_info(open_by_default=False)
     
     # Buat tombol untuk connect ke Google Drive dengan style yang konsisten dengan dependency_installer
     drive_button = widgets.Button(
@@ -89,11 +90,6 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
         )
     )
     
-    # Progress container dihilangkan sesuai permintaan
-    
-    # Buat accordion untuk informasi environment (tertutup secara default)
-    env_info_accordion = create_accordion(env_info, selected_index=None)  # None berarti semua section tertutup
-    
     # Buat container utama dengan semua komponen
     main_container = widgets.VBox(
         [
@@ -102,7 +98,7 @@ def create_env_config_ui(env_manager: Any, config: Dict[str, Any]) -> Dict[str, 
             button_container,
             status,
             create_spacing(10),
-            env_info_accordion
+            env_info_content
         ],
         layout=widgets.Layout(
             width='100%',

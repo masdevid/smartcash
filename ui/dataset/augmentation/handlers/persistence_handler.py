@@ -17,12 +17,12 @@ def ensure_ui_persistence(ui_components: Dict[str, Any]) -> bool:
     Returns:
         Boolean menunjukkan apakah persistensi berhasil
     """
-    from smartcash.common.config.manager import ConfigManager
+    from smartcash.common.config.manager import get_config_manager
     logger = ui_components.get('logger', get_logger('augmentation'))
     
     try:
         # Dapatkan ConfigManager
-        config_manager = ConfigManager.get_instance()
+        config_manager = get_config_manager()
         
         # Daftar komponen UI yang perlu disimpan
         ui_components_to_register = {
@@ -63,12 +63,12 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
     Returns:
         Boolean menunjukkan apakah sinkronisasi berhasil
     """
-    from smartcash.common.config.manager import ConfigManager
+    from smartcash.common.config.manager import get_config_manager
     logger = ui_components.get('logger', get_logger('augmentation'))
     
     try:
         # Dapatkan ConfigManager
-        config_manager = ConfigManager.get_instance()
+        config_manager = get_config_manager()
         
         # Simpan konfigurasi ke file - ini harus dipanggil untuk pengujian
         config_manager.save_module_config('augmentation')
@@ -137,12 +137,12 @@ def load_config_from_file(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi
     """
-    from smartcash.common.config.manager import ConfigManager
+    from smartcash.common.config.manager import get_config_manager
     logger = ui_components.get('logger', get_logger('augmentation'))
     
     try:
         # Dapatkan ConfigManager
-        config_manager = ConfigManager.get_instance()
+        config_manager = get_config_manager()
         
         # Muat konfigurasi - ini harus dipanggil untuk pengujian
         full_config = config_manager.get_module_config('augmentation')

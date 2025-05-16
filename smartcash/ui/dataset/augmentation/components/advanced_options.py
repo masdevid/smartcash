@@ -17,10 +17,10 @@ def create_advanced_options(config: Dict[str, Any] = None) -> widgets.VBox:
         Widget VBox berisi opsi lanjutan
     """
     from smartcash.ui.utils.constants import COLORS, ICONS
-    from smartcash.common.config.manager import ConfigManager
+    from smartcash.common.config.manager import get_config_manager
     
     # Dapatkan konfigurasi augmentasi
-    config_manager = ConfigManager.get_instance()
+    config_manager = get_config_manager()
     aug_config = config_manager.get_module_config('augmentation')
     
     # Parameter posisi

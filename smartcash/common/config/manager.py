@@ -632,3 +632,6 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
     if _config_manager is None:
         _config_manager = ConfigManager(base_dir, config_file, env_prefix)
     return _config_manager
+
+# Tambahkan method get_instance sebagai staticmethod untuk kompatibilitas
+ConfigManager.get_instance = staticmethod(get_config_manager)

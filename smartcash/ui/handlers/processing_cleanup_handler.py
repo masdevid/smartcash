@@ -10,7 +10,7 @@ import traceback
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
-from smartcash.common.logging import get_logger
+from smartcash.common.logger import get_logger
 
 def _update_status_panel(ui_components: Dict[str, Any], status_type: str, message: str) -> None:
     """

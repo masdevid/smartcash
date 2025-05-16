@@ -77,8 +77,8 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         layout=widgets.Layout(width='70%')
     )
     
-    # Dropdown untuk memilih jenis augmentasi
-    aug_types_dropdown = widgets.Dropdown(
+    # Multiple select untuk memilih jenis augmentasi
+    aug_types_select = widgets.SelectMultiple(
         options=[
             ('Combined (Recommended)', 'combined'),
             ('Flip', 'flip'),
@@ -91,10 +91,16 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
             ('Hue', 'hue'),
             ('Cutout', 'cutout')
         ],
-        value=aug_type,
+        value=[aug_type],
         description='Jenis augmentasi:',
         style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+        layout=widgets.Layout(width='70%', height='120px')
+    )
+    
+    # Label bantuan untuk SelectMultiple
+    aug_types_help = widgets.HTML(
+        value="<div style='margin-top: -15px; margin-bottom: 10px; font-size: 12px; color: #666;'>"
+              "<i>Tahan Ctrl/Cmd untuk memilih beberapa jenis augmentasi</i></div>"
     )
     
     # Dropdown untuk memilih target split
@@ -153,7 +159,8 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     
     # Isi tab dasar
     basic_tab.children = [
-        aug_types_dropdown,
+        aug_types_select,
+        aug_types_help,
         prefix_text,
         factor_slider,
         split_dropdown
@@ -180,7 +187,8 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     ])
     
     # Simpan referensi ke komponen UI untuk diakses oleh handler
-    result.aug_types_dropdown = aug_types_dropdown
+    result.aug_types_select = aug_types_select
+    result.aug_types_help = aug_types_help
     result.split_dropdown = split_dropdown
     result.prefix_text = prefix_text
     result.factor_slider = factor_slider

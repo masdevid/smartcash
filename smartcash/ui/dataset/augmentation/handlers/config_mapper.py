@@ -62,6 +62,21 @@ def map_ui_to_config(ui_components: Dict[str, Any], config: Dict[str, Any] = Non
         
         # Ekstrak nilai dari tab dasar
         if len(basic_tab.children) >= 4:
+            # Dapatkan jenis augmentasi (children[0]) - sekarang menggunakan SelectMultiple
+            if hasattr(basic_tab.children[0], 'value'):
+                aug_types_value = list(basic_tab.children[0].value)  # Konversi tuple ke list
+                logger.debug(f"ℹ️ Nilai aug_types dari UI: {aug_types_value}")
+                
+                # Jika tidak ada yang dipilih, gunakan default 'combined'
+                if not aug_types_value:
+                    aug_types_value = ['combined']
+                    logger.debug(f"ℹ️ Tidak ada jenis augmentasi yang dipilih, menggunakan default: {aug_types_value}")
+                    
+                # Simpan sebagai list untuk kompatibilitas dengan service
+                aug_config['types'] = aug_types_value
+            else:
+                logger.warning("⚠️ Komponen aug_types tidak memiliki atribut value")
+                
             # Prefix (children[1])
             if hasattr(basic_tab.children[1], 'value'):
                 prefix_value = basic_tab.children[1].value
@@ -295,22 +310,30 @@ def map_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> D
         else:
             logger.warning(f"⚠️ Tab lanjutan tidak memiliki cukup children: {len(advanced_tab.children) if hasattr(advanced_tab, 'children') else 'tidak ada children'}")
         
-        # Update jenis augmentasi dropdown (jika tersedia)
-        aug_types_dropdown = ui_components.get('aug_types_dropdown')
-        if aug_types_dropdown and hasattr(aug_types_dropdown, 'value'):
+        # Update jenis augmentasi select multiple (jika tersedia)
+        aug_types_select = ui_components.get('aug_types_select')
+        if aug_types_select and hasattr(aug_types_select, 'value'):
             try:
                 aug_types = aug_config.get('types', ['combined'])
-                # Jika list, ambil nilai pertama untuk dropdown
-                if isinstance(aug_types, list) and aug_types:
-                    aug_type = aug_types[0]
-                else:
-                    aug_type = 'combined'
-                logger.debug(f"ℹ️ Memperbarui nilai aug_types UI ke: {aug_type}")
-                aug_types_dropdown.value = aug_type
+                # Pastikan aug_types adalah list
+                if not isinstance(aug_types, list):
+                    aug_types = ['combined']
+                    
+                # Pastikan semua nilai dalam aug_types valid (ada dalam opsi)
+                valid_options = [opt[1] for opt in aug_types_select.options]
+                valid_aug_types = [t for t in aug_types if t in valid_options]
+                
+                # Jika tidak ada jenis yang valid, gunakan default
+                if not valid_aug_types:
+                    valid_aug_types = ['combined']
+                    
+                logger.debug(f"ℹ️ Memperbarui nilai aug_types UI ke: {valid_aug_types}")
+                aug_types_select.value = tuple(valid_aug_types)  # SelectMultiple menggunakan tuple
             except Exception as e:
                 logger.warning(f"⚠️ Gagal memperbarui nilai aug_types: {e}")
+                logger.debug(f"Detail error: {e}", exc_info=True)
         else:
-            logger.debug("ℹ️ Komponen aug_types_dropdown tidak ditemukan")
+            logger.debug("ℹ️ Komponen aug_types_select tidak ditemukan")
             
         # Update target split dropdown (jika tersedia)
         split_dropdown = ui_components.get('split_dropdown')

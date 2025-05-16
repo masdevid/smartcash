@@ -8,44 +8,107 @@ from typing import Dict, Any
 
 def create_action_buttons() -> Dict[str, Any]:
     """
-    Buat komponen tombol aksi untuk augmentasi dataset.
+    Buat komponen tombol aksi khusus untuk augmentasi dataset.
     
     Returns:
         Dictionary berisi tombol dan containers
     """
-    # Gunakan komponen standar untuk tombol aksi
-    from smartcash.ui.components.action_buttons import create_action_buttons as create_std_buttons
-    from smartcash.ui.components.action_buttons import create_visualization_buttons as create_std_vis_buttons
-    
-    # Tombol standar untuk aksi utama
-    action_buttons = create_std_buttons(
-        primary_label="Run Augmentation",
-        primary_icon="random",
-        cleanup_enabled=True
+    # Buat tombol augmentasi
+    augment_button = widgets.Button(
+        description="Run Augmentation",
+        icon="random",
+        button_style="primary",
+        tooltip="Jalankan proses augmentasi dataset",
+        layout=widgets.Layout(width="auto")
     )
     
-    # Tombol untuk visualisasi
-    visualization_buttons = create_std_vis_buttons()
+    # Buat tombol stop
+    stop_button = widgets.Button(
+        description="Stop",
+        icon="stop",
+        button_style="danger",
+        tooltip="Hentikan proses augmentasi yang sedang berjalan",
+        layout=widgets.Layout(width="auto", display="none")
+    )
     
-    # Rename tombol sesuai konteks
-    action_buttons['augment_button'] = action_buttons.pop('primary_button')
+    # Buat tombol reset
+    reset_button = widgets.Button(
+        description="Reset",
+        icon="refresh",
+        button_style="warning",
+        tooltip="Reset konfigurasi augmentasi ke default",
+        layout=widgets.Layout(width="auto")
+    )
+    
+    # Buat tombol save
+    save_button = widgets.Button(
+        description="Save Config",
+        icon="save",
+        button_style="info",
+        tooltip="Simpan konfigurasi augmentasi saat ini",
+        layout=widgets.Layout(width="auto")
+    )
+    
+    # Buat tombol cleanup
+    cleanup_button = widgets.Button(
+        description="Cleanup",
+        icon="trash",
+        button_style="warning",
+        tooltip="Bersihkan hasil augmentasi",
+        layout=widgets.Layout(width="auto", display="none")
+    )
+    
+    # Buat container untuk tombol aksi
+    action_container = widgets.HBox(
+        [augment_button, stop_button, reset_button, save_button, cleanup_button],
+        layout=widgets.Layout(justify_content="flex-start", margin="10px 0")
+    )
+    
+    # Buat tombol visualisasi
+    visualize_button = widgets.Button(
+        description="Visualize",
+        icon="eye",
+        button_style="success",
+        tooltip="Visualisasikan hasil augmentasi",
+        layout=widgets.Layout(width="auto")
+    )
+    
+    # Buat tombol compare
+    compare_button = widgets.Button(
+        description="Compare",
+        icon="columns",
+        button_style="info",
+        tooltip="Bandingkan gambar asli dan hasil augmentasi",
+        layout=widgets.Layout(width="auto")
+    )
+    
+    # Buat tombol distribution
+    distribution_button = widgets.Button(
+        description="Distribution",
+        icon="chart-bar",
+        button_style="info",
+        tooltip="Tampilkan distribusi kelas setelah augmentasi",
+        layout=widgets.Layout(width="auto")
+    )
+    
+    # Buat container untuk tombol visualisasi
+    visualization_container = widgets.HBox(
+        [visualize_button, compare_button, distribution_button],
+        layout=widgets.Layout(justify_content="flex-start", margin="10px 0", display="none")
+    )
     
     # Kembalikan dictionary gabungan
     result = {
-        'augment_button': action_buttons['augment_button'],
-        'stop_button': action_buttons['stop_button'],
-        'reset_button': action_buttons['reset_button'],
-        'save_button': action_buttons['save_button'],
-        'cleanup_button': action_buttons['cleanup_button'],
-        'container': action_buttons['container'],
-        'visualization_buttons': visualization_buttons['container'],
-        'visualize_button': visualization_buttons['visualize_button'],
-        'compare_button': visualization_buttons['compare_button'],
-        'distribution_button': visualization_buttons['distribution_button']
+        'augment_button': augment_button,
+        'stop_button': stop_button,
+        'reset_button': reset_button,
+        'save_button': save_button,
+        'cleanup_button': cleanup_button,
+        'container': action_container,
+        'visualization_buttons': visualization_container,
+        'visualize_button': visualize_button,
+        'compare_button': compare_button,
+        'distribution_button': distribution_button
     }
-    
-    # Set ke hidden by default
-    visualization_buttons['container'].layout.display = 'none'
-    action_buttons['cleanup_button'].layout.display = 'none'
     
     return result

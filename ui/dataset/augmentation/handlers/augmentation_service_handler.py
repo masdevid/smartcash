@@ -143,7 +143,9 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
     Returns:
         Dictionary hasil augmentasi
     """
+    # Pastikan logger tersedia untuk debugging
     logger = ui_components.get('logger', get_logger('augmentation'))
+    logger.info("🔍 Memulai augmentasi dengan tracking detail")
     
     try:
         # Dapatkan service
@@ -203,13 +205,17 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
         
         # Tambahkan callback untuk update UI dari thread terpisah
         def progress_update_callback(progress=None, total=None, message=None, status='info', **kwargs):
+            # Log pemanggilan callback untuk debugging
+            logger.debug(f"🔍 Progress callback dipanggil: progress={progress}, total={total}, message={message}")
+            
             try:
                 # Update progress bar
                 if progress is not None and total is not None and 'progress_bar' in ui_components:
                     ui_components['progress_bar'].max = total
                     ui_components['progress_bar'].value = progress
+                    logger.debug(f"📊 Progress bar diupdate langsung: {progress}/{total}")
                 
-                # Update current progress
+                # Update current progress jika ada
                 if 'current_progress' in kwargs and 'current_total' in kwargs and 'current_progress' in ui_components:
                     ui_components['current_progress'].max = kwargs['current_total']
                     ui_components['current_progress'].value = kwargs['current_progress']
@@ -217,22 +223,24 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
                 # Update label
                 if message and 'overall_label' in ui_components:
                     ui_components['overall_label'].value = message
-                
-                # Update step label
-                if 'step' in kwargs and 'step_message' in kwargs and 'step_label' in ui_components:
-                    ui_components['step_label'].value = kwargs['step_message']
-                
-                # Log message
-                if message and logger:
-                    if status == 'error':
-                        logger.error(message)
-                    elif status == 'warning':
-                        logger.warning(message)
-                    else:
-                        logger.info(message)
             except Exception as e:
-                # Jangan biarkan error di callback menghentikan proses
-                logger.warning(f"⚠️ Error pada progress callback: {str(e)}")
+                logger.warning(f"⚠️ Error saat mengupdate UI: {str(e)}")
+            
+            # Log progress
+            if message:
+                if status == 'error':
+                    logger.error(message)
+                elif status == 'warning':
+                    logger.warning(message)
+                else:
+                    logger.info(message)
+            
+            # Cek apakah stop diminta
+            if ui_components.get('stop_requested', False):
+                return False
+            
+            # Lanjutkan proses
+            return True
         
         # Register callback tambahan untuk memastikan UI diupdate
         service.register_progress_callback(progress_update_callback)

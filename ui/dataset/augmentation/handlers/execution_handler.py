@@ -99,6 +99,15 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         update_progress_bar(ui_components, 10, 100, "Memulai proses augmentasi...")
         logger.info(f"⏳ Memulai proses augmentasi {display_info}...")
         
+        # Pastikan service augmentasi memiliki callback progress yang terdaftar
+        from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import get_augmentation_service
+        service = get_augmentation_service(ui_components)
+        if service and 'progress_callback' in ui_components and callable(ui_components['progress_callback']):
+            service.register_progress_callback(ui_components['progress_callback'])
+            logger.info("✅ Progress callback berhasil didaftarkan ke service augmentasi")
+        else:
+            logger.warning("⚠️ Gagal mendaftarkan progress callback ke service augmentasi")
+            
         # Jalankan augmentasi dengan thread terpisah dan update progress secara berkala
         result = execute_aug(ui_components, params)
         

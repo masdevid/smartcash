@@ -41,9 +41,12 @@ def process_files_with_executor(
     
     # Notifikasi awal dengan callback
     if progress_callback and total_files > 0:
+        # Panggil callback untuk progress global
         progress_callback(
             message=f"🔄 Memproses {total_files} file dengan {num_workers} workers",
             status="info",
+            progress=0,  # Progress global 0%
+            total=100,  # Dari total 100%
             current_progress=0, 
             current_total=total_files,
             **callback_params
@@ -60,8 +63,12 @@ def process_files_with_executor(
                 
                 # Report progress dengan parameter yang optimnal
                 if progress_callback:
+                    # Hitung progress global (0-100)
+                    global_progress = int((i + 1) / total_files * 100)
                     progress_callback(
                         message=f"Memproses file {i+1}/{total_files}",
+                        progress=global_progress,  # Progress global (0-100)
+                        total=100,  # Dari total 100%
                         current_progress=i + 1,
                         current_total=total_files,
                         **callback_params
@@ -91,11 +98,14 @@ def process_files_with_executor(
                 if progress_callback:
                     current_progress = i + 1
                     percent = int(current_progress / total_files * 100)
-                    should_report = (i % max(1, total_files // 10) == 0 or i == 0 or i == total_files - 1)
+                    # Kurangi batasan frekuensi untuk update lebih sering
+                    should_report = (i % max(1, total_files // 20) == 0 or i == 0 or i == total_files - 1 or percent % 5 == 0)
                     
                     if should_report:
                         progress_callback(
                             message=f"Memproses file {current_progress}/{total_files} ({percent}%)",
+                            progress=percent,  # Progress global (0-100)
+                            total=100,  # Dari total 100%
                             current_progress=current_progress,
                             current_total=total_files,
                             **callback_params
@@ -106,6 +116,8 @@ def process_files_with_executor(
         progress_callback(
             message=f"✅ Selesai memproses {total_files} file",
             status="success",
+            progress=100,  # Progress global 100%
+            total=100,    # Dari total 100%
             current_progress=total_files,
             current_total=total_files,
             **callback_params

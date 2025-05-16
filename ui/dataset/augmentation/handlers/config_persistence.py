@@ -7,8 +7,13 @@ from typing import Dict, Any, Optional, List, Union
 import os
 import yaml
 from pathlib import Path
+from IPython.display import display, HTML
 from smartcash.common.config.manager import get_config_manager
+from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
+
+# Dapatkan logger untuk modul ini
+logger = get_logger('augmentation.config_persistence')
 
 def get_config_manager_instance():
     """Dapatkan instance ConfigManager dengan pendekatan singleton."""
@@ -34,7 +39,7 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
     """
     try:
         # Dapatkan logger jika tersedia
-        logger = ui_components.get('logger')
+        local_logger = ui_components.get('logger', logger)
         
         # Dapatkan instance ConfigManager
         config_manager = get_config_manager_instance()
@@ -51,8 +56,7 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
                 try:
                     config = get_augmentation_config()
                 except Exception as e:
-                    if logger:
-                        logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi: {str(e)}")
+                    local_logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi: {str(e)}")
         
         # Update UI dari konfigurasi jika ada
         if config:
@@ -62,17 +66,15 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
                 # Simpan referensi config di ui_components
                 ui_components['config'] = config
             except Exception as e:
-                if logger:
-                    logger.warning(f"{ICONS['warning']} Gagal update UI dari konfigurasi: {str(e)}")
+                local_logger.warning(f"{ICONS['warning']} Gagal update UI dari konfigurasi: {str(e)}")
         
-        # Log info jika tersedia logger
-        if logger:
-            logger.info(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
+        # Log info
+        local_logger.info(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
         
         return ui_components
     except Exception as e:
-        if logger:
-            logger.error(f"{ICONS['error']} Error saat memastikan persistensi UI: {str(e)}")
+        local_logger = ui_components.get('logger', logger)
+        local_logger.error(f"{ICONS['error']} Error saat memastikan persistensi UI: {str(e)}")
         return ui_components
 
 def get_persisted_ui_components(module_name: str = 'augmentation') -> Dict[str, Any]:
@@ -94,42 +96,46 @@ def get_augmentation_config(default_config: Dict[str, Any] = None) -> Dict[str, 
         config_manager = get_config_manager_instance()
         config = config_manager.get_module_config('augmentation')
         if config and isinstance(config, dict) and 'augmentation' in config:
+            logger.info(f"{ICONS['success']} Konfigurasi augmentation berhasil dimuat dari ConfigManager")
             return config
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari ConfigManager: {str(e)}")
     
-    # Coba load dari file jika tidak ada di ConfigManager
+    # Coba load dari file lokal
     try:
         config_path = "configs/augmentation_config.yaml"
         if os.path.exists(config_path):
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
-                
-            # Validasi konfigurasi
-            if config is None:
-                config = {}
-            
-            # Pastikan struktur konfigurasi benar
-            if 'augmentation' not in config:
-                config['augmentation'] = {}
-            
-            # Simpan ke ConfigManager untuk persistensi
-            try:
-                config_manager = get_config_manager_instance()
-                config_manager.save_module_config('augmentation', config)
-            except Exception:
-                pass
-            
-            return config
-    except Exception:
-        pass
+                if config and isinstance(config, dict) and 'augmentation' in config:
+                    logger.info(f"{ICONS['success']} Konfigurasi augmentation berhasil dimuat dari {config_path}")
+                    return config
+    except Exception as e:
+        logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari file: {str(e)}")
     
-    # Jika tidak ada konfigurasi yang ditemukan, gunakan default
-    if default_config:
-        return default_config
+    # Coba load dari Google Drive jika terpasang
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        
+        if env_manager.is_drive_mounted:
+            drive_config_path = str(env_manager.drive_path / 'configs' / 'augmentation_config.yaml')
+            
+            if os.path.exists(drive_config_path):
+                with open(drive_config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                    if config and isinstance(config, dict) and 'augmentation' in config:
+                        logger.info(f"{ICONS['success']} Konfigurasi augmentation berhasil dimuat dari drive: {drive_config_path}")
+                        return config
+    except Exception as e:
+        logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari drive: {str(e)}")
     
-    # Jika tidak ada default yang disediakan, gunakan default bawaan
-    return get_default_augmentation_config()
+    # Fallback ke default jika semua gagal
+    if default_config is None:
+        default_config = get_default_augmentation_config()
+        logger.info(f"{ICONS['info']} Menggunakan konfigurasi default untuk augmentation")
+    
+    return default_config
 
 def save_augmentation_config(config: Dict[str, Any]) -> bool:
     """Simpan konfigurasi augmentasi ke ConfigManager dan file lokal.
@@ -141,32 +147,27 @@ def save_augmentation_config(config: Dict[str, Any]) -> bool:
         Boolean status keberhasilan
     """
     try:
-        # Validasi konfigurasi sebelum disimpan
-        if not config or not isinstance(config, dict):
+        # Validasi konfigurasi
+        if not config or not isinstance(config, dict) or 'augmentation' not in config:
+            logger.warning(f"{ICONS['warning']} Konfigurasi tidak valid untuk disimpan")
             return False
-            
-        # Pastikan struktur konfigurasi benar
-        if 'augmentation' not in config:
-            config['augmentation'] = {}
         
         # Simpan ke ConfigManager
         config_manager = get_config_manager_instance()
         success = config_manager.save_module_config('augmentation', config)
         
-        # Simpan juga ke file lokal untuk kompatibilitas
+        if not success:
+            logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi ke ConfigManager")
+            return False
+        
+        # Simpan juga ke file lokal
         try:
             config_path = "configs/augmentation_config.yaml"
-            # Pastikan direktori ada
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
-            # Simpan ke file
             with open(config_path, 'w') as f:
                 yaml.dump(config, f, default_flow_style=False)
-        except Exception:
-            # Jika gagal menyimpan ke file lokal, tetap lanjutkan
-            pass
-        
-        # Coba sinkronkan dengan Google Drive jika tersedia
-        try:
+                
+            # Jika drive terpasang, simpan juga ke drive
             from smartcash.common.environment import get_environment_manager
             env_manager = get_environment_manager()
             
@@ -179,28 +180,32 @@ def save_augmentation_config(config: Dict[str, Any]) -> bool:
                 # Salin file ke Google Drive
                 with open(drive_config_path, 'w') as f:
                     yaml.dump(config, f, default_flow_style=False)
-        except Exception:
-            # Jika gagal menyinkronkan dengan drive, tetap lanjutkan
-            pass
+                    
+                logger.info(f"{ICONS['success']} Konfigurasi disimpan ke drive: {drive_config_path}")
+        except Exception as e:
+            logger.warning(f"{ICONS['warning']} Gagal menyimpan ke file: {str(e)}")
         
-        return success
-    except Exception:
+        logger.info(f"{ICONS['success']} Konfigurasi augmentation berhasil disimpan")
+        return True
+    except Exception as e:
+        logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi: {str(e)}")
         return False
 
-def register_config_observer(callback: callable) -> None:
+def register_config_observer(callback: callable) -> bool:
     """Register observer untuk notifikasi perubahan konfigurasi augmentasi."""
     config_manager = get_config_manager_instance()
-    config_manager.register_observer('augmentation', callback)
+    return config_manager.register_observer('augmentation', callback)
 
 def ensure_valid_aug_types(aug_types: Any) -> List[str]:
     """Pastikan aug_types selalu valid dengan validasi yang kuat."""
-    default_aug_types = ['Combined (Recommended)']
+    # Default jika tidak valid
+    default_aug_types = ['combined']
     
-    # Validasi tipe data
+    # Validasi None
     if aug_types is None:
         return default_aug_types
     
-    # Konversi ke list jika string
+    # Validasi string
     if isinstance(aug_types, str):
         return [aug_types]
     
@@ -256,19 +261,33 @@ def validate_ui_component_value(component: Any, expected_type: type, default_val
         return default_value
 
 def get_default_augmentation_config() -> Dict[str, Any]:
-    """Dapatkan konfigurasi default untuk augmentasi.
+    """
+    Mendapatkan konfigurasi default untuk augmentasi.
     
     Returns:
         Dictionary konfigurasi default
     """
     return {
         'augmentation': {
-            'prefix': 'aug',
-            'factor': 2,
-            'types': ['Combined (Recommended)'],
+            # Parameter utama untuk service
+            'types': ['combined'],
+            'output_prefix': 'aug_',
+            'num_variations': 2,
             'split': 'train',
-            'balance_classes': True,
+            'validate_results': True,
+            'process_bboxes': True,
+            'target_balance': True,
+            'balance_classes': True,  # Untuk backward compatibility
             'num_workers': 4,
+            'move_to_preprocessed': True,
+            'target_count': 1000,
+            'resume': False,
+            
+            # Parameter untuk UI dan backward compatibility
+            'prefix': 'aug_',  # Untuk backward compatibility
+            'factor': 2,  # Untuk backward compatibility
+            
+            # Parameter teknik augmentasi
             'techniques': {
                 'flip': True,
                 'rotate': True,
@@ -291,107 +310,171 @@ def get_default_augmentation_config() -> Dict[str, Any]:
                 'cutout_size': 0.1,
                 'cutout_count': 4
             }
+        },
+        # Data path untuk service
+        'data': {
+            'dataset_path': 'data/preprocessed'
         }
     }
 
 def reset_config_to_default(ui_components: Dict[str, Any]) -> bool:
-    """Reset konfigurasi ke default dan perbarui UI.
+    """
+    Mengatur ulang konfigurasi augmentasi ke nilai default.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Boolean status keberhasilan
+        True jika berhasil, False jika gagal
     """
     try:
         # Dapatkan logger jika tersedia
-        logger = ui_components.get('logger')
+        local_logger = ui_components.get('logger', logger)
+        
+        # Dapatkan config manager
+        config_manager = get_config_manager_instance()
         
         # Dapatkan konfigurasi default
         default_config = get_default_augmentation_config()
         
-        # Validasi konfigurasi default
+        # Validasi konfigurasi
         try:
             from smartcash.ui.dataset.augmentation.handlers.config_validator import validate_augmentation_config
-            validated_config = validate_augmentation_config(default_config)
-            default_config = validated_config
+            default_config = validate_augmentation_config(default_config)
         except Exception as e:
-            if logger:
-                logger.warning(f"{ICONS['warning']} Gagal validasi konfigurasi default: {str(e)}")
+            local_logger.warning(f"{ICONS['warning']} Gagal validasi konfigurasi default: {str(e)}")
         
-        # Simpan ke ConfigManager
-        config_manager = get_config_manager_instance()
-        success = config_manager.save_module_config('augmentation', default_config)
+        # Log konfigurasi default
+        local_logger.debug(f"{ICONS['info']} Konfigurasi default yang akan digunakan: {default_config}")
+        
+        # Perbarui UI components
+        from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_config_to_ui
+        ui_components = map_config_to_ui(ui_components, default_config)
+        
+        # Daftarkan UI components untuk persistensi
+        config_manager.register_ui_components('augmentation', ui_components)
+        
+        # Simpan konfigurasi default
+        config_manager.save_module_config('augmentation', default_config)
         
         # Simpan juga ke file lokal
         try:
-            config_path = "configs/augmentation_config.yaml"
+            config_path = os.path.join('configs', 'augmentation_config.yaml')
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             with open(config_path, 'w') as f:
                 yaml.dump(default_config, f, default_flow_style=False)
         except Exception as e:
-            if logger:
-                logger.warning(f"{ICONS['warning']} Gagal menyimpan default ke file: {str(e)}")
+            local_logger.warning(f"{ICONS['warning']} Gagal menyimpan default ke file: {str(e)}")
         
-        # Update UI dari konfigurasi default
-        if success and ui_components:
-            try:
-                from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_config_to_ui
-                map_config_to_ui(ui_components, default_config)
-                ui_components['config'] = default_config
-            except Exception as e:
-                if logger:
-                    logger.warning(f"{ICONS['warning']} Gagal update UI dari default: {str(e)}")
-                success = False
+        # Tampilkan pesan sukses
+        display(HTML('<div style="padding: 10px; background-color: #d4edda; color: #155724; border-radius: 5px;">' +
+                     '<b>\u2705 Konfigurasi augmentasi berhasil diatur ulang ke nilai default!</b></div>'))
         
-        return success
+        return True
+        
     except Exception as e:
-        if logger:
-            logger.error(f"{ICONS['error']} Error saat reset konfigurasi: {str(e)}")
+        # Tampilkan pesan error
+        display(HTML('<div style="padding: 10px; background-color: #f8d7da; color: #721c24; border-radius: 5px;">' +
+                     f'<b>\u274c Gagal mengatur ulang konfigurasi augmentasi: {str(e)}</b></div>'))
+        logger.error(f"{ICONS['error']} Error saat reset konfigurasi: {str(e)}")
         return False
 
 def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
-    """Sinkronisasi konfigurasi dengan file di drive.
+    """
+    Menyimpan konfigurasi augmentasi ke Google Drive.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Boolean status keberhasilan
+        True jika berhasil, False jika gagal
     """
     try:
         # Dapatkan logger jika tersedia
-        logger = ui_components.get('logger')
+        local_logger = ui_components.get('logger', logger)
+        
+        # Dapatkan config manager
+        config_manager = get_config_manager_instance()
         
         # Dapatkan konfigurasi dari UI
         from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_ui_to_config
-        updated_config = map_ui_to_config(ui_components, ui_components.get('config', {}))
+        updated_config = map_ui_to_config(ui_components)
         
-        # Validasi konfigurasi sebelum disimpan
-        if not updated_config or not isinstance(updated_config, dict):
-            if logger:
-                logger.warning(f"{ICONS['warning']} Konfigurasi tidak valid untuk disinkronkan")
+        # Validasi konfigurasi
+        try:
+            from smartcash.ui.dataset.augmentation.handlers.config_validator import validate_augmentation_config
+            updated_config = validate_augmentation_config(updated_config)
+        except Exception as e:
+            local_logger.warning(f"{ICONS['warning']} Konfigurasi tidak valid untuk disinkronkan: {str(e)}")
             return False
-            
+        
         # Pastikan struktur konfigurasi benar
         if 'augmentation' not in updated_config:
             updated_config['augmentation'] = {}
         
+        # Pastikan parameter yang dibutuhkan oleh service tersedia
+        aug_config = updated_config.get('augmentation', {})
+        if 'types' not in aug_config:
+            aug_config['types'] = ['combined']
+        if 'output_prefix' not in aug_config:
+            aug_config['output_prefix'] = aug_config.get('prefix', 'aug_')
+        if 'num_variations' not in aug_config:
+            aug_config['num_variations'] = int(aug_config.get('factor', 2))
+        if 'validate_results' not in aug_config:
+            aug_config['validate_results'] = True
+        if 'process_bboxes' not in aug_config:
+            aug_config['process_bboxes'] = True
+        if 'target_balance' not in aug_config:
+            aug_config['target_balance'] = aug_config.get('balance_classes', True)
+        if 'balance_classes' not in aug_config:
+            aug_config['balance_classes'] = aug_config.get('target_balance', True)
+        if 'num_workers' not in aug_config:
+            aug_config['num_workers'] = 4
+        if 'move_to_preprocessed' not in aug_config:
+            aug_config['move_to_preprocessed'] = True
+        if 'target_count' not in aug_config:
+            aug_config['target_count'] = 1000
+        if 'resume' not in aug_config:
+            aug_config['resume'] = False
+            
+        # Pastikan data path tersedia
+        if 'data' not in updated_config:
+            updated_config['data'] = {}
+        if 'dataset_path' not in updated_config['data']:
+            updated_config['data']['dataset_path'] = ui_components.get('data_dir', 'data/preprocessed')
+        
+        # Log konfigurasi sebelum disimpan
+        local_logger.debug(f"{ICONS['info']} Konfigurasi yang akan disimpan: {updated_config}")
+        
         # Simpan konfigurasi ke drive melalui ConfigManager
         success = save_augmentation_config(updated_config)
         
-        # Log info
+        # Perbarui UI components
         if success:
-            if logger:
-                logger.info(f"{ICONS['success']} Konfigurasi berhasil disinkronkan dengan drive")
-            # Simpan kembali config yang diupdate ke ui_components
-            ui_components['config'] = updated_config
+            try:
+                from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_config_to_ui
+                map_config_to_ui(ui_components, updated_config)
+                ui_components['config'] = updated_config
+                
+                local_logger.info(f"{ICONS['success']} Konfigurasi berhasil disinkronkan dengan drive")
+            except Exception as e:
+                local_logger.warning(f"{ICONS['warning']} Gagal update UI dari konfigurasi: {str(e)}")
+                success = False
         else:
-            if logger:
-                logger.error(f"{ICONS['error']} Gagal menyinkronkan konfigurasi dengan drive")
+            local_logger.error(f"{ICONS['error']} Gagal menyinkronkan konfigurasi dengan drive")
+        
+        # Tampilkan pesan sukses
+        if success:
+            display(HTML('<div style="padding: 10px; background-color: #d4edda; color: #155724; border-radius: 5px;">' +
+                         '<b>\u2705 Konfigurasi augmentasi berhasil disimpan!</b></div>'))
+        else:
+            display(HTML('<div style="padding: 10px; background-color: #f8d7da; color: #721c24; border-radius: 5px;">' +
+                         '<b>\u274c Gagal menyimpan konfigurasi augmentasi!</b></div>'))
         
         return success
     except Exception as e:
-        if logger:
-            logger.error(f"{ICONS['error']} Error saat menyinkronkan konfigurasi: {str(e)}")
+        # Tampilkan pesan error
+        display(HTML('<div style="padding: 10px; background-color: #f8d7da; color: #721c24; border-radius: 5px;">' +
+                     f'<b>\u274c Gagal menyimpan konfigurasi augmentasi: {str(e)}</b></div>'))
+        logger.error(f"{ICONS['error']} Error saat menyinkronkan konfigurasi: {str(e)}")
         return False

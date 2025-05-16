@@ -272,34 +272,47 @@ class TestConfigPersistence(unittest.TestCase):
         # Verifikasi hasil
         self.assertIsNotNone(result)
         self.assertIn('augmentation', result)
-        self.assertIn('prefix', result['augmentation'])
-        self.assertIn('factor', result['augmentation'])
+        
+        # Verifikasi parameter untuk service
+        self.assertIn('output_prefix', result['augmentation'])
+        self.assertIn('num_variations', result['augmentation'])
         self.assertIn('types', result['augmentation'])
+        self.assertIn('validate_results', result['augmentation'])
+        self.assertIn('process_bboxes', result['augmentation'])
+        self.assertIn('target_balance', result['augmentation'])
+        self.assertIn('balance_classes', result['augmentation'])
+        self.assertIn('num_workers', result['augmentation'])
+        self.assertIn('move_to_preprocessed', result['augmentation'])
+        self.assertIn('target_count', result['augmentation'])
+        
+        # Verifikasi parameter tambahan untuk UI
         self.assertIn('techniques', result['augmentation'])
         self.assertIn('advanced', result['augmentation'])
+        
+        # Verifikasi data path
     
     def test_ensure_valid_aug_types(self):
         """Pengujian ensure_valid_aug_types"""
-        # Test dengan nilai valid
-        result = ensure_valid_aug_types(['Horizontal Flip', 'Vertical Flip'])
-        self.assertEqual(result, ['Horizontal Flip', 'Vertical Flip'])
-        
-        # Test dengan nilai None
+        # Test dengan None
         result = ensure_valid_aug_types(None)
-        self.assertEqual(result, ['Combined (Recommended)'])
+        self.assertEqual(result, ['combined'])
         
-        # Test dengan string tunggal
-        result = ensure_valid_aug_types('Horizontal Flip')
-        self.assertEqual(result, ['Horizontal Flip'])
+        # Test dengan string
+        result = ensure_valid_aug_types('flip')
+        self.assertEqual(result, ['flip'])
+        
+        # Test dengan list
+        result = ensure_valid_aug_types(['flip', 'rotate'])
+        self.assertEqual(result, ['flip', 'rotate'])
+        
+        # Test dengan list yang berisi None
+        result = ensure_valid_aug_types(['flip', None, 'rotate'])
+        self.assertEqual(result, ['flip', 'rotate'])
         
         # Test dengan list kosong
         result = ensure_valid_aug_types([])
-        self.assertEqual(result, ['Combined (Recommended)'])
+        self.assertEqual(result, ['combined'])
         
-        # Test dengan nilai None dalam list
-        result = ensure_valid_aug_types([None, 'Horizontal Flip', ''])
-        self.assertEqual(result, ['Horizontal Flip'])
-    
     def test_safe_convert_type(self):
         """Pengujian safe_convert_type"""
         # Test konversi ke int

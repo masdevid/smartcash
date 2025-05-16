@@ -31,7 +31,8 @@ class ConfigManager:
     def __init__(self, base_dir: Optional[str] = None, config_file: Optional[str] = None, env_prefix: str = 'SMARTCASH_'):
         """Inisialisasi config manager dengan base directory, file konfigurasi utama, dan prefix environment variable"""
         self.base_dir = Path(base_dir) if base_dir else Path.cwd()
-        self.config_dir = self.base_dir / self.DEFAULT_CONFIG_DIR
+        # Gunakan direktori configs/ di direktori saat ini untuk konsistensi dengan cell_utils.py
+        self.config_dir = Path('configs')
         self.env_prefix = env_prefix
         self.config = {}
         self._dependencies = {}
@@ -483,8 +484,8 @@ class ConfigManager:
         Returns:
             Path file konfigurasi
         """
-        # Gunakan direktori home user untuk menyimpan konfigurasi
-        config_dir = os.path.join(os.path.expanduser('~'), '.smartcash', 'config')
+        # Gunakan direktori configs/ di direktori saat ini untuk konsistensi dengan cell_utils.py
+        config_dir = 'configs'
         return os.path.join(config_dir, f"{module_name}_config.yaml")
     
     def get_module_config(self, module_name: str, default_config: Dict[str, Any] = None) -> Dict[str, Any]:

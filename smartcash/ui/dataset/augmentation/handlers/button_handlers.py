@@ -54,6 +54,11 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
     @try_except_decorator(ui_components.get('status'))
     def on_augment_click(b):
         """Handler tombol augmentasi dengan dukungan progress tracking yang dioptimalkan."""
+        # Dapatkan logger jika tersedia
+        logger = ui_components.get('logger')
+        if logger:
+            logger.info(f"{ICONS['info']} Tombol augmentasi diklik")
+        
         # Update UI: menampilkan proses dimulai
         with ui_components['status']: 
             clear_output(wait=True)
@@ -73,10 +78,16 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         ui_components['augment_button'].layout.display = 'none'
         ui_components['stop_button'].layout.display = 'block'
         
+        # Tandai bahwa augmentasi sedang berjalan
+        ui_components['augmentation_running'] = True
+        
         # Update konfigurasi dari UI dan simpan dengan ConfigManager
         try:
             # Gunakan config mapper untuk update konfigurasi dari UI
             updated_config = map_ui_to_config(ui_components, config)
+            if logger:
+                logger.info(f"{ICONS['info']} Konfigurasi berhasil diupdate dari UI")
+                
             success = save_augmentation_config(updated_config)
             if success and logger:
                 logger.info(f"{ICONS['success']} Konfigurasi augmentasi berhasil disimpan")
@@ -85,26 +96,39 @@ def setup_button_handlers(ui_components: Dict[str, Any], env=None, config=None) 
         except Exception as e:
             if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan konfigurasi: {str(e)}")
         
-        # Tandai augmentasi sedang berjalan
-        ui_components['augmentation_running'] = True
-        
         # Jalankan augmentasi dengan handler terpisah
         try:
+            # Log proses yang akan dilakukan
+            if logger:
+                logger.info(f"{ICONS['info']} Memulai proses augmentasi dataset")
+            
             # Gunakan execution_handler untuk menjalankan augmentasi
             from smartcash.ui.dataset.augmentation.handlers.initialization_handler import initialize_augmentation_directories
             
             # Inisialisasi direktori terlebih dahulu
+            if logger:
+                logger.info(f"{ICONS['info']} Menginisialisasi direktori augmentasi")
+                
             init_result = initialize_augmentation_directories(ui_components)
             if not init_result['success']:
                 # Jika inisialisasi gagal, tampilkan error dan hentikan proses
+                error_message = init_result.get('message', 'Gagal menginisialisasi direktori augmentasi')
+                if logger:
+                    logger.error(f"{ICONS['error']} {error_message}")
+                    
                 with ui_components['status']:
                     clear_output(wait=True)
-                    display(create_status_indicator("error", f"{ICONS['error']} {init_result['message']}"))
+                    display(create_status_indicator("error", f"{ICONS['error']} {error_message}"))
                 cleanup_ui(ui_components)
                 ui_components['augmentation_running'] = False
                 return
             
             # Jalankan augmentasi dengan execution_handler
+            if logger:
+                logger.info(f"{ICONS['info']} Menjalankan proses augmentasi dengan execution_handler")
+                
+            # Import di sini untuk menghindari circular import
+            from smartcash.ui.dataset.augmentation.handlers.execution_handler import run_augmentation
             result = run_augmentation(ui_components, config)
             
             # Tampilkan hasil jika berhasil

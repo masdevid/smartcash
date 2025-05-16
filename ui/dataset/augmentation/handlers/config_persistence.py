@@ -61,12 +61,21 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], config: Optional[Dict[s
         # Update UI dari konfigurasi jika ada
         if config:
             try:
+                # Log konfigurasi yang akan digunakan untuk memperbarui UI
+                local_logger.debug(f"{ICONS['info']} Konfigurasi yang akan digunakan untuk memperbarui UI: {config}")
+                
                 from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_config_to_ui
-                map_config_to_ui(ui_components, config)
+                ui_components = map_config_to_ui(ui_components, config)
+                
                 # Simpan referensi config di ui_components
                 ui_components['config'] = config
+                
+                # Log komponen UI setelah diperbarui
+                ui_keys = [k for k in ui_components.keys() if k != 'config' and k != 'logger']
+                local_logger.debug(f"{ICONS['info']} Komponen UI yang diperbarui: {ui_keys}")
             except Exception as e:
                 local_logger.warning(f"{ICONS['warning']} Gagal update UI dari konfigurasi: {str(e)}")
+                local_logger.debug(f"{ICONS['debug']} Detail error: {e}", exc_info=True)
         
         # Log info
         local_logger.info(f"{ICONS['success']} UI components berhasil terdaftar untuk persistensi")
@@ -270,10 +279,10 @@ def get_default_augmentation_config() -> Dict[str, Any]:
     return {
         'augmentation': {
             # Parameter utama untuk service
-            'types': ['combined'],
+            'types': ['combined'],  # Opsi: 'combined', 'flip', 'rotate', 'blur', dll.
             'output_prefix': 'aug_',
             'num_variations': 2,
-            'split': 'train',
+            'split': 'train',  # Opsi: 'train', 'valid', 'test'
             'validate_results': True,
             'process_bboxes': True,
             'target_balance': True,
@@ -309,7 +318,28 @@ def get_default_augmentation_config() -> Dict[str, Any]:
                 'hue_shift_limit': 20,
                 'cutout_size': 0.1,
                 'cutout_count': 4
-            }
+            },
+            
+            # Opsi jenis augmentasi yang tersedia
+            'available_types': [
+                'combined',
+                'flip',
+                'rotate',
+                'blur',
+                'noise',
+                'contrast',
+                'brightness',
+                'saturation',
+                'hue',
+                'cutout'
+            ],
+            
+            # Opsi split yang tersedia
+            'available_splits': [
+                'train',
+                'valid',
+                'test'
+            ]
         },
         # Data path untuk service
         'data': {
@@ -396,9 +426,17 @@ def sync_config_with_drive(ui_components: Dict[str, Any]) -> bool:
         # Dapatkan config manager
         config_manager = get_config_manager_instance()
         
-        # Dapatkan konfigurasi dari UI
+        # Dapatkan konfigurasi yang ada sebagai dasar
+        existing_config = ui_components.get('config', {})
+        if not existing_config:
+            existing_config = get_augmentation_config()
+        
+        # Log konfigurasi yang ada
+        local_logger.debug(f"{ICONS['info']} Konfigurasi yang ada sebelum update: {existing_config}")
+        
+        # Dapatkan konfigurasi dari UI dengan menggunakan konfigurasi yang ada sebagai dasar
         from smartcash.ui.dataset.augmentation.handlers.config_mapper import map_ui_to_config
-        updated_config = map_ui_to_config(ui_components)
+        updated_config = map_ui_to_config(ui_components, existing_config)
         
         # Validasi konfigurasi
         try:

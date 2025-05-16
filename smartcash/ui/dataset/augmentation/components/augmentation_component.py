@@ -144,7 +144,17 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         # Default dataset paths
         'data_dir': 'data',
         'preprocessed_dir': 'data/preprocessed',
-        'augmented_dir': 'data/augmented'
+        'augmented_dir': 'data/augmented',
+        
+        # Komponen opsi augmentasi
+        'aug_types_dropdown': aug_options.aug_types_dropdown if hasattr(aug_options, 'aug_types_dropdown') else None,
+        'split_dropdown': aug_options.split_dropdown if hasattr(aug_options, 'split_dropdown') else None,
+        'prefix_text': aug_options.prefix_text if hasattr(aug_options, 'prefix_text') else None,
+        'factor_slider': aug_options.factor_slider if hasattr(aug_options, 'factor_slider') else None,
+        'balance_checkbox': aug_options.balance_checkbox if hasattr(aug_options, 'balance_checkbox') else None,
+        'target_count_slider': aug_options.target_count_slider if hasattr(aug_options, 'target_count_slider') else None,
+        'num_workers_slider': aug_options.num_workers_slider if hasattr(aug_options, 'num_workers_slider') else None,
+        'move_to_preprocessed_checkbox': aug_options.move_to_preprocessed_checkbox if hasattr(aug_options, 'move_to_preprocessed_checkbox') else None
     }
     
     return ui_components

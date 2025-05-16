@@ -24,9 +24,13 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     target_count = 1000
     move_to_preprocessed = True
     
-    # Nilai tetap untuk augmentasi
-    augmentations = ['Combined (Recommended)']  # Selalu menggunakan Combined
-    target_split = 'train'  # Selalu menggunakan train split
+    # Nilai default untuk augmentasi
+    aug_type = 'combined'
+    target_split = 'train'
+    
+    # Opsi yang tersedia
+    available_aug_types = ['combined', 'flip', 'rotate', 'blur', 'noise', 'contrast', 'brightness', 'saturation', 'hue', 'cutout']
+    available_splits = ['train', 'valid', 'test']
     
     if config and 'augmentation' in config:
         aug_config = config['augmentation']
@@ -37,9 +41,19 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         target_count = aug_config.get('target_count', target_count)
         move_to_preprocessed = aug_config.get('move_to_preprocessed', move_to_preprocessed)
         
-        # Simpan nilai default untuk jenis augmentasi dan target split
-        aug_config['types'] = augmentations
-        aug_config['split'] = target_split
+        # Ambil nilai dari config jika tersedia
+        if 'types' in aug_config and isinstance(aug_config['types'], list) and aug_config['types']:
+            aug_type = aug_config['types'][0]
+        
+        if 'split' in aug_config:
+            target_split = aug_config['split']
+            
+        # Pastikan nilai valid
+        if aug_type not in available_aug_types:
+            aug_type = 'combined'
+            
+        if target_split not in available_splits:
+            target_split = 'train'
     
     # Buat tab untuk opsi dasar dan opsi lanjutan
     basic_tab = widgets.VBox()
@@ -63,15 +77,36 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
         layout=widgets.Layout(width='70%')
     )
     
-    # Informasi tentang target split (tidak lagi sebagai dropdown)
-    split_info = widgets.HTML(
-        value=f"<div style='padding: 5px; margin: 5px 0;'><b>Target split:</b> train (default)</div>",
+    # Dropdown untuk memilih jenis augmentasi
+    aug_types_dropdown = widgets.Dropdown(
+        options=[
+            ('Combined (Recommended)', 'combined'),
+            ('Flip', 'flip'),
+            ('Rotate', 'rotate'),
+            ('Blur', 'blur'),
+            ('Noise', 'noise'),
+            ('Contrast', 'contrast'),
+            ('Brightness', 'brightness'),
+            ('Saturation', 'saturation'),
+            ('Hue', 'hue'),
+            ('Cutout', 'cutout')
+        ],
+        value=aug_type,
+        description='Jenis augmentasi:',
+        style={'description_width': 'initial'},
         layout=widgets.Layout(width='70%')
     )
     
-    # Informasi tentang jenis augmentasi (tidak lagi sebagai selector)
-    aug_type_info = widgets.HTML(
-        value=f"<div style='padding: 5px; margin: 5px 0;'><b>Jenis augmentasi:</b> Combined (Recommended)</div>",
+    # Dropdown untuk memilih target split
+    split_dropdown = widgets.Dropdown(
+        options=[
+            ('Train', 'train'),
+            ('Validation', 'valid'),
+            ('Test', 'test')
+        ],
+        value=target_split,
+        description='Target split:',
+        style={'description_width': 'initial'},
         layout=widgets.Layout(width='70%')
     )
     
@@ -118,10 +153,10 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     
     # Isi tab dasar
     basic_tab.children = [
-        aug_type_info,
+        aug_types_dropdown,
         prefix_text,
         factor_slider,
-        split_info
+        split_dropdown
     ]
     
     # Isi tab lanjutan
@@ -139,7 +174,19 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     tab.set_title(1, 'Opsi Lanjutan')
     
     # Gabungkan dalam container dengan komponen yang diperbarui
-    return widgets.VBox([
+    result = widgets.VBox([
         description,
         tab
     ])
+    
+    # Simpan referensi ke komponen UI untuk diakses oleh handler
+    result.aug_types_dropdown = aug_types_dropdown
+    result.split_dropdown = split_dropdown
+    result.prefix_text = prefix_text
+    result.factor_slider = factor_slider
+    result.balance_checkbox = balance_checkbox
+    result.target_count_slider = target_count_slider
+    result.num_workers_slider = num_workers_slider
+    result.move_to_preprocessed_checkbox = move_to_preprocessed_checkbox
+    
+    return result

@@ -21,13 +21,19 @@ def map_ui_to_config(ui_components: Dict[str, Any], config: Dict[str, Any] = Non
     Returns:
         Konfigurasi yang sudah diupdate
     """
+    # Log konfigurasi awal yang akan diupdate
+    logger.debug(f"ℹ️ Konfigurasi awal yang akan diupdate: {config}")
+    
     if config is None:
         config = {}
+        logger.debug("ℹ️ Konfigurasi awal kosong, membuat konfigurasi baru")
     
     # Pastikan struktur dasar tersedia
     if 'augmentation' not in config:
         config['augmentation'] = {}
+        logger.debug("ℹ️ Struktur augmentation tidak ditemukan, membuat baru")
     
+    # Simpan referensi ke konfigurasi augmentasi asli
     aug_config = config['augmentation']
     
     try:
@@ -51,43 +57,115 @@ def map_ui_to_config(ui_components: Dict[str, Any], config: Dict[str, Any] = Non
             logger.warning("⚠️ Tab dasar atau lanjutan tidak valid, menggunakan konfigurasi yang ada")
             return config
         
+        # Log nilai UI sebelum ekstraksi
+        logger.debug("ℹ️ Mulai ekstraksi nilai dari UI components")
+        
         # Ekstrak nilai dari tab dasar
         if len(basic_tab.children) >= 4:
             # Prefix (children[1])
             if hasattr(basic_tab.children[1], 'value'):
                 prefix_value = basic_tab.children[1].value
+                logger.debug(f"ℹ️ Nilai prefix dari UI: {prefix_value}")
                 aug_config['prefix'] = prefix_value  # Untuk backward compatibility
                 aug_config['output_prefix'] = prefix_value  # Untuk service
+            else:
+                logger.warning("⚠️ Komponen prefix tidak memiliki atribut value")
             
             # Jumlah variasi (children[2])
             if hasattr(basic_tab.children[2], 'value'):
-                factor_value = int(basic_tab.children[2].value)
-                aug_config['factor'] = factor_value  # Untuk backward compatibility
-                aug_config['num_variations'] = factor_value  # Untuk service
+                try:
+                    factor_value = int(basic_tab.children[2].value)
+                    logger.debug(f"ℹ️ Nilai factor dari UI: {factor_value}")
+                    aug_config['factor'] = factor_value  # Untuk backward compatibility
+                    aug_config['num_variations'] = factor_value  # Untuk service
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Gagal mengkonversi nilai factor: {e}")
+            else:
+                logger.warning("⚠️ Komponen factor tidak memiliki atribut value")
+        else:
+            logger.warning(f"⚠️ Tab dasar tidak memiliki cukup children: {len(basic_tab.children) if hasattr(basic_tab, 'children') else 'tidak ada children'}")
         
         # Ekstrak nilai dari tab lanjutan
         if len(advanced_tab.children) >= 4:
             # Balance kelas (children[0])
             if hasattr(advanced_tab.children[0], 'value'):
-                balance_value = bool(advanced_tab.children[0].value)
-                aug_config['balance_classes'] = balance_value  # Untuk backward compatibility
-                aug_config['target_balance'] = balance_value  # Untuk service
+                try:
+                    balance_value = bool(advanced_tab.children[0].value)
+                    logger.debug(f"ℹ️ Nilai balance dari UI: {balance_value}")
+                    aug_config['balance_classes'] = balance_value  # Untuk backward compatibility
+                    aug_config['target_balance'] = balance_value  # Untuk service
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Gagal mengkonversi nilai balance: {e}")
+            else:
+                logger.warning("⚠️ Komponen balance tidak memiliki atribut value")
             
             # Target count (children[1])
             if hasattr(advanced_tab.children[1], 'value'):
-                aug_config['target_count'] = int(advanced_tab.children[1].value)
+                try:
+                    target_count = int(advanced_tab.children[1].value)
+                    logger.debug(f"ℹ️ Nilai target_count dari UI: {target_count}")
+                    aug_config['target_count'] = target_count
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Gagal mengkonversi nilai target_count: {e}")
+            else:
+                logger.warning("⚠️ Komponen target_count tidak memiliki atribut value")
             
             # Num workers (children[2])
             if hasattr(advanced_tab.children[2], 'value'):
-                aug_config['num_workers'] = int(advanced_tab.children[2].value)
+                try:
+                    num_workers = int(advanced_tab.children[2].value)
+                    logger.debug(f"ℹ️ Nilai num_workers dari UI: {num_workers}")
+                    aug_config['num_workers'] = num_workers
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Gagal mengkonversi nilai num_workers: {e}")
+            else:
+                logger.warning("⚠️ Komponen num_workers tidak memiliki atribut value")
             
             # Move to preprocessed (children[3])
             if hasattr(advanced_tab.children[3], 'value'):
-                aug_config['move_to_preprocessed'] = bool(advanced_tab.children[3].value)
+                try:
+                    move_to_preprocessed = bool(advanced_tab.children[3].value)
+                    logger.debug(f"ℹ️ Nilai move_to_preprocessed dari UI: {move_to_preprocessed}")
+                    aug_config['move_to_preprocessed'] = move_to_preprocessed
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"⚠️ Gagal mengkonversi nilai move_to_preprocessed: {e}")
+            else:
+                logger.warning("⚠️ Komponen move_to_preprocessed tidak memiliki atribut value")
+        else:
+            logger.warning(f"⚠️ Tab lanjutan tidak memiliki cukup children: {len(advanced_tab.children) if hasattr(advanced_tab, 'children') else 'tidak ada children'}")
         
+        # Ekstrak nilai jenis augmentasi (jika tersedia)
+        aug_types_dropdown = ui_components.get('aug_types_dropdown')
+        if aug_types_dropdown and hasattr(aug_types_dropdown, 'value'):
+            try:
+                aug_types = aug_types_dropdown.value
+                logger.debug(f"ℹ️ Nilai aug_types dari UI: {aug_types}")
+                # Konversi ke list jika string
+                if isinstance(aug_types, str):
+                    aug_types = [aug_types]
+                aug_config['types'] = aug_types
+            except Exception as e:
+                logger.warning(f"⚠️ Gagal mengkonversi nilai aug_types: {e}")
+                aug_config['types'] = ['combined']
+        else:
+            logger.debug("ℹ️ Komponen aug_types_dropdown tidak ditemukan, menggunakan nilai default")
+            aug_config['types'] = ['combined']
+            
+        # Ekstrak nilai target split (jika tersedia)
+        split_dropdown = ui_components.get('split_dropdown')
+        if split_dropdown and hasattr(split_dropdown, 'value'):
+            try:
+                split = split_dropdown.value
+                logger.debug(f"ℹ️ Nilai split dari UI: {split}")
+                aug_config['split'] = split
+            except Exception as e:
+                logger.warning(f"⚠️ Gagal mengkonversi nilai split: {e}")
+                aug_config['split'] = 'train'
+        else:
+            logger.debug("ℹ️ Komponen split_dropdown tidak ditemukan, menggunakan nilai default")
+            aug_config['split'] = 'train'
+            
         # Nilai tetap untuk service
-        aug_config['types'] = ['combined']
-        aug_config['split'] = 'train'
         aug_config['process_bboxes'] = True
         aug_config['validate_results'] = True
         aug_config['resume'] = False
@@ -99,13 +177,18 @@ def map_ui_to_config(ui_components: Dict[str, Any], config: Dict[str, Any] = Non
             config['data']['dataset_path'] = ui_components.get('data_dir', 'data/preprocessed')
         
         # Validasi konfigurasi
-        config = validate_augmentation_config(config)
+        try:
+            from smartcash.ui.dataset.augmentation.handlers.config_validator import validate_augmentation_config
+            config = validate_augmentation_config(config)
+        except Exception as e:
+            logger.warning(f"⚠️ Gagal validasi konfigurasi: {e}")
         
         # Log konfigurasi yang dihasilkan
         logger.debug(f"ℹ️ Konfigurasi augmentasi setelah mapping: {config}")
         
     except Exception as e:
         logger.error(f"❌ Error saat memetakan UI ke config: {str(e)}")
+        logger.debug(f"ℹ️ Detail error: {e}", exc_info=True)
     
     return config
 
@@ -121,12 +204,16 @@ def map_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> D
         Dictionary komponen UI yang sudah diupdate
     """
     try:
+        # Log konfigurasi yang akan digunakan untuk memperbarui UI
+        logger.debug(f"ℹ️ Konfigurasi yang akan digunakan untuk memperbarui UI: {config}")
+        
         # Pastikan config valid
         if not config or not isinstance(config, dict) or 'augmentation' not in config:
             logger.warning("⚠️ Konfigurasi tidak valid, tidak dapat memperbarui UI")
             return ui_components
         
         aug_config = config['augmentation']
+        logger.debug(f"ℹ️ Konfigurasi augmentasi: {aug_config}")
         
         # Dapatkan komponen UI
         aug_options = ui_components.get('aug_options')
@@ -148,36 +235,94 @@ def map_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> D
             logger.warning("⚠️ Tab dasar atau lanjutan tidak valid, tidak dapat memperbarui UI")
             return ui_components
         
+        # Log struktur UI sebelum pembaruan
+        logger.debug(f"ℹ️ Tab dasar memiliki {len(basic_tab.children) if hasattr(basic_tab, 'children') else 0} children")
+        logger.debug(f"ℹ️ Tab lanjutan memiliki {len(advanced_tab.children) if hasattr(advanced_tab, 'children') else 0} children")
+        
         # Update nilai di tab dasar
         if len(basic_tab.children) >= 4:
             # Prefix (children[1]) - Prioritaskan output_prefix untuk service
             if hasattr(basic_tab.children[1], 'value'):
                 prefix_value = aug_config.get('output_prefix', aug_config.get('prefix', 'aug_'))
+                logger.debug(f"ℹ️ Memperbarui nilai prefix UI ke: {prefix_value}")
                 basic_tab.children[1].value = prefix_value
+            else:
+                logger.warning("⚠️ Komponen prefix tidak memiliki atribut value")
             
             # Jumlah variasi (children[2]) - Prioritaskan num_variations untuk service
             if hasattr(basic_tab.children[2], 'value'):
                 factor_value = aug_config.get('num_variations', aug_config.get('factor', 2))
+                logger.debug(f"ℹ️ Memperbarui nilai factor UI ke: {factor_value}")
                 basic_tab.children[2].value = factor_value
+            else:
+                logger.warning("⚠️ Komponen factor tidak memiliki atribut value")
+        else:
+            logger.warning(f"⚠️ Tab dasar tidak memiliki cukup children: {len(basic_tab.children) if hasattr(basic_tab, 'children') else 'tidak ada children'}")
         
         # Update nilai di tab lanjutan
         if len(advanced_tab.children) >= 4:
             # Balance kelas (children[0]) - Prioritaskan target_balance untuk service
             if hasattr(advanced_tab.children[0], 'value'):
                 balance_value = aug_config.get('target_balance', aug_config.get('balance_classes', True))
+                logger.debug(f"ℹ️ Memperbarui nilai balance UI ke: {balance_value}")
                 advanced_tab.children[0].value = balance_value
+            else:
+                logger.warning("⚠️ Komponen balance tidak memiliki atribut value")
             
             # Target count (children[1])
             if hasattr(advanced_tab.children[1], 'value'):
-                advanced_tab.children[1].value = aug_config.get('target_count', 1000)
+                target_count = aug_config.get('target_count', 1000)
+                logger.debug(f"ℹ️ Memperbarui nilai target_count UI ke: {target_count}")
+                advanced_tab.children[1].value = target_count
+            else:
+                logger.warning("⚠️ Komponen target_count tidak memiliki atribut value")
             
             # Num workers (children[2])
             if hasattr(advanced_tab.children[2], 'value'):
-                advanced_tab.children[2].value = aug_config.get('num_workers', 4)
+                num_workers = aug_config.get('num_workers', 4)
+                logger.debug(f"ℹ️ Memperbarui nilai num_workers UI ke: {num_workers}")
+                advanced_tab.children[2].value = num_workers
+            else:
+                logger.warning("⚠️ Komponen num_workers tidak memiliki atribut value")
             
             # Move to preprocessed (children[3])
             if hasattr(advanced_tab.children[3], 'value'):
-                advanced_tab.children[3].value = aug_config.get('move_to_preprocessed', True)
+                move_to_preprocessed = aug_config.get('move_to_preprocessed', True)
+                logger.debug(f"ℹ️ Memperbarui nilai move_to_preprocessed UI ke: {move_to_preprocessed}")
+                advanced_tab.children[3].value = move_to_preprocessed
+            else:
+                logger.warning("⚠️ Komponen move_to_preprocessed tidak memiliki atribut value")
+        else:
+            logger.warning(f"⚠️ Tab lanjutan tidak memiliki cukup children: {len(advanced_tab.children) if hasattr(advanced_tab, 'children') else 'tidak ada children'}")
+        
+        # Update jenis augmentasi dropdown (jika tersedia)
+        aug_types_dropdown = ui_components.get('aug_types_dropdown')
+        if aug_types_dropdown and hasattr(aug_types_dropdown, 'value'):
+            try:
+                aug_types = aug_config.get('types', ['combined'])
+                # Jika list, ambil nilai pertama untuk dropdown
+                if isinstance(aug_types, list) and aug_types:
+                    aug_type = aug_types[0]
+                else:
+                    aug_type = 'combined'
+                logger.debug(f"ℹ️ Memperbarui nilai aug_types UI ke: {aug_type}")
+                aug_types_dropdown.value = aug_type
+            except Exception as e:
+                logger.warning(f"⚠️ Gagal memperbarui nilai aug_types: {e}")
+        else:
+            logger.debug("ℹ️ Komponen aug_types_dropdown tidak ditemukan")
+            
+        # Update target split dropdown (jika tersedia)
+        split_dropdown = ui_components.get('split_dropdown')
+        if split_dropdown and hasattr(split_dropdown, 'value'):
+            try:
+                split = aug_config.get('split', 'train')
+                logger.debug(f"ℹ️ Memperbarui nilai split UI ke: {split}")
+                split_dropdown.value = split
+            except Exception as e:
+                logger.warning(f"⚠️ Gagal memperbarui nilai split: {e}")
+        else:
+            logger.debug("ℹ️ Komponen split_dropdown tidak ditemukan")
         
         # Pastikan data path tersedia
         if 'data' not in config:
@@ -193,6 +338,7 @@ def map_config_to_ui(ui_components: Dict[str, Any], config: Dict[str, Any]) -> D
         
     except Exception as e:
         logger.error(f"❌ Error saat memetakan config ke UI: {str(e)}")
+        logger.debug(f"ℹ️ Detail error: {e}", exc_info=True)
     
     return ui_components
 

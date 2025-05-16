@@ -216,9 +216,31 @@ def setup_processing_button_handlers(
             display_info = f"Split {split}" if split else "Semua split"
         else:  # augmentation
             # Dapatkan target split dari UI untuk augmentasi
-            split_option = ui_components['aug_options'].children[4].value
-            split = split_option
-            display_info = f"Split {split_option}"
+            # Gunakan augmentation_options yang merupakan nama komponen yang benar
+            augmentation_options = ui_components.get('augmentation_options')
+            
+            if augmentation_options and hasattr(augmentation_options, 'children') and len(augmentation_options.children) > 0:
+                # Struktur: Tab -> children[1] adalah split section
+                tabs = augmentation_options.children[0]
+                if hasattr(tabs, 'children') and len(tabs.children) > 1:
+                    split_section = tabs.children[1]
+                    if hasattr(split_section, 'children') and len(split_section.children) > 1:
+                        # Dropdown split adalah children[1] dari split_section
+                        split_option = split_section.children[1].value
+                        split = split_option
+                        display_info = f"Split {split_option}"
+                    else:
+                        # Fallback jika tidak bisa mendapatkan split dari UI
+                        split = 'train'
+                        display_info = "Split train (default)"
+                else:
+                    # Fallback jika tidak bisa mendapatkan split dari UI
+                    split = 'train'
+                    display_info = "Split train (default)"
+            else:
+                # Fallback jika komponen augmentation_options tidak ditemukan
+                split = 'train'
+                display_info = "Split train (default)"
         
         # Update UI: menampilkan proses dimulai
         with ui_components['status']: 
@@ -268,15 +290,38 @@ def setup_processing_button_handlers(
         # Notifikasi observer tentang mulai proses
         _notify_process_start(ui_components, module_type, process_name, display_info, split)
         
-        # Jika augmentation, dapatkan parameter tambahan
+        # Jika augmentasi, dapatkan parameter tambahan
         if module_type == 'augmentation':
-            aug_options = ui_components.get('aug_options')
-            if aug_options and hasattr(aug_options, 'children') and len(aug_options.children) >= 7:
-                aug_types = aug_options.children[0].value
-                aug_prefix = aug_options.children[2].value
-                aug_factor = aug_options.children[3].value
-                balance_classes = aug_options.children[5].value
-                num_workers = aug_options.children[6].value
+            # Dapatkan parameter augmentasi dari UI
+            augmentation_options = ui_components.get('augmentation_options')
+            aug_types = ['combined']
+            aug_prefix = 'aug'
+            aug_factor = 2
+            balance_classes = False
+            num_workers = 4
+            
+            # Ekstrak nilai dari UI jika tersedia
+            if augmentation_options and hasattr(augmentation_options, 'children') and len(augmentation_options.children) > 0:
+                tabs = augmentation_options.children[0]
+                
+                if hasattr(tabs, 'children') and len(tabs.children) >= 3:
+                    # Tab 0: Basic Options
+                    basic_tab = tabs.children[0]
+                    if hasattr(basic_tab, 'children') and len(basic_tab.children) >= 4:
+                        # Num variations (factor)
+                        aug_factor = basic_tab.children[0].value
+                        # Output prefix
+                        aug_prefix = basic_tab.children[3].value
+                        # Num workers
+                        num_workers = basic_tab.children[2].value
+                    
+                    # Tab 2: Augmentation Types
+                    aug_types_tab = tabs.children[2]
+                    if hasattr(aug_types_tab, 'children') and len(aug_types_tab.children) >= 5:
+                        # Aug types
+                        aug_types = aug_types_tab.children[1].value
+                        # Balance classes
+                        balance_classes = aug_types_tab.children[3].children[1].value if hasattr(aug_types_tab.children[3], 'children') else False
                 
                 # Update params di ui_components
                 ui_components.update({
@@ -286,6 +331,10 @@ def setup_processing_button_handlers(
                     'balance_classes': balance_classes,
                     'num_workers': num_workers
                 })
+                
+                # Log parameter augmentasi yang digunakan
+                if logger:
+                    logger.debug(f"🔧 Parameter augmentasi: types={aug_types}, prefix={aug_prefix}, factor={aug_factor}, balance={balance_classes}, workers={num_workers}")
         
         # Execute processing (preprocessing atau augmentation)
         if module_type == 'preprocessing':

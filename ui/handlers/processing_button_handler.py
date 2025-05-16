@@ -260,8 +260,12 @@ def setup_processing_button_handlers(
         _disable_ui_during_processing(ui_components, True, module_type)
         
         # Update tombol untuk mode processing
-        ui_components[primary_button_key].layout.display = 'none'
-        ui_components['stop_button'].layout.display = 'block'
+        if primary_button_key in ui_components and hasattr(ui_components[primary_button_key], 'layout'):
+            ui_components[primary_button_key].layout.display = 'none'
+        
+        # Tampilkan tombol stop jika tersedia
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'block'
         
         # Update konfigurasi dari UI dan simpan
         try:

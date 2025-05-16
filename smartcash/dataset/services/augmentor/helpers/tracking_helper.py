@@ -70,8 +70,6 @@ def track_class_progress(
                 # Cek jika sudah mencapai target
                 if updated_counts[cls] >= target_count and cls not in fulfilled_classes:
                     fulfilled_classes.add(cls)
-                    if logger:
-                        logger.info(f"✅ Kelas {cls} telah mencapai target {target_count} instance (via multi-class)")
     
     # Return hasil tracking
     return {

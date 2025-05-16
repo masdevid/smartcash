@@ -458,15 +458,14 @@ class AugmentationPipelineFactory:
         if params.get('jpeg_prob', 0) > 0:
             quality_range = (int(params.get('jpeg_quality', (80, 100))[0]), int(params.get('jpeg_quality', (80, 100))[1]))
             try:
-                # Gunakan quality_lower dan quality_upper jika versi lama, atau compression_type jika versi baru
+                # Gunakan transformasi yang lebih stabil
                 transforms.append(
-                    A.Downscale(
-                        scale_min=0.8,
-                        scale_max=0.9,
+                    A.Blur(
+                        blur_limit=3,
                         p=params.get('jpeg_prob', 0.1)
                     )
                 )
-                self.logger.info(f"✅ Menggunakan Downscale sebagai pengganti ImageCompression")
+                self.logger.info(f"✅ Menggunakan Blur sebagai pengganti ImageCompression")
             except Exception as e:
                 self.logger.warning(f"⚠️ Error pada Downscale: {str(e)}. Menggunakan Blur sebagai alternatif")
                 transforms.append(

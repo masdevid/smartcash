@@ -319,12 +319,10 @@ class ClassBalancer:
                         self.current_class_counts[file_cls] += count
                         if self.current_class_counts[file_cls] >= target_count:
                             fulfilled_classes.add(file_cls)
-                            self.logger.info(f"✅ Kelas {file_cls} telah mencapai target {target_count}")
             
             # Cek apakah kelas saat ini sudah terpenuhi
             if current_needs.get(cls_id, 0) <= 0 or self.current_class_counts[cls_id] >= target_count:
                 fulfilled_classes.add(cls_id)
-                self.logger.info(f"✅ Kelas {cls_id} telah mencapai target {target_count}")
             else:
                 self.logger.info(f"⚠️ Kelas {cls_id} masih membutuhkan {current_needs.get(cls_id, 0)} instances")
                 

@@ -395,15 +395,16 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                         aug_types = aug_config.get('types', ['combined'])
                         
                         # Validasi nilai aug_types terhadap opsi yang tersedia
-                        available_options = [opt[1] for opt in aug_types_widget.options]
+                        available_options = [opt[1] for opt in aug_types_widget.options] if isinstance(aug_types_widget.options[0], tuple) else aug_types_widget.options
                         valid_aug_types = [t for t in aug_types if t in available_options]
                         
                         # Jika tidak ada nilai valid, gunakan default
-                        if not valid_aug_types:
+                        if not valid_aug_types and available_options:
                             valid_aug_types = ['combined'] if 'combined' in available_options else [available_options[0]]
                         
                         # Update widget dengan nilai yang valid
-                        aug_types_widget.value = tuple(valid_aug_types)
+                        if valid_aug_types:
+                            aug_types_widget.value = tuple(valid_aug_types)
                         logger.info(f"🔍 Berhasil memperbarui aug_types: {valid_aug_types}")
                 except Exception as e:
                     logger.warning(f"🔶 Gagal memperbarui nilai aug_types: {str(e)}")
@@ -422,7 +423,19 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                 
                 if len(aug_options.children) >= 2:
                     # Types selector
-                    aug_options.children[1].value = aug_config.get('types', ['combined'])
+                    types_value = aug_config.get('types', ['combined'])
+                    # Validasi nilai types_value terhadap opsi yang tersedia
+                    if hasattr(aug_options.children[1], 'options'):
+                        available_options = [opt[1] for opt in aug_options.children[1].options] if isinstance(aug_options.children[1].options[0], tuple) else aug_options.children[1].options
+                        valid_types = [t for t in types_value if t in available_options]
+                        
+                        # Jika tidak ada nilai valid, gunakan default yang tersedia
+                        if not valid_types and available_options:
+                            valid_types = ['combined'] if 'combined' in available_options else [available_options[0]]
+                        
+                        # Update widget dengan nilai yang valid
+                        if valid_types:
+                            aug_options.children[1].value = valid_types
                 
                 if len(aug_options.children) >= 3:
                     # Num variations
@@ -430,7 +443,8 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                 
                 if len(aug_options.children) >= 4:
                     # Target count
-                    aug_options.children[3].value = aug_config.get('target_count', 1000)
+                    target_count = aug_config.get('target_count', 1000)
+                    aug_options.children[3].value = target_count
             else:
                 # Struktur UI yang sebenarnya
                 # Update nilai dari tab pertama (opsi dasar)
@@ -472,9 +486,27 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                         if child.description == 'Jenis Augmentasi:':
                             types_value = aug_config.get('types', ['combined'])
                             if isinstance(types_value, list) and len(types_value) > 0:
-                                child.value = tuple(types_value)
+                                # Validasi nilai types_value terhadap opsi yang tersedia
+                                if hasattr(child, 'options'):
+                                    available_options = [opt[1] for opt in child.options] if isinstance(child.options[0], tuple) else child.options
+                                    valid_types = [t for t in types_value if t in available_options]
+                                    
+                                    # Jika tidak ada nilai valid, gunakan default yang tersedia
+                                    if not valid_types:
+                                        valid_types = ['combined'] if 'combined' in available_options else [available_options[0]]
+                                    
+                                    # Update widget dengan nilai yang valid
+                                    child.value = tuple(valid_types)
+                                    logger.info(f"🔍 Berhasil memperbarui types: {valid_types}")
                         elif child.description == 'Target Split:':
-                            child.value = aug_config.get('target_split', 'train')
+                            target_split = aug_config.get('target_split', 'train')
+                            # Validasi nilai target_split terhadap opsi yang tersedia
+                            if hasattr(child, 'options'):
+                                available_options = child.options
+                                if target_split in available_options:
+                                    child.value = target_split
+                                else:
+                                    logger.warning(f"🔶 Target split '{target_split}' tidak ditemukan dalam opsi yang tersedia: {available_options}")
         
         # Update komponen advanced_options
         adv_options = ui_components.get('advanced_options')
@@ -576,6 +608,9 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                             child.value = aug_config.get('process_bboxes', True)
     except Exception as e:
         logger.warning(f"🔶 Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        # Tampilkan traceback untuk debugging
+        import traceback
+        logger.warning(f"🔶 Traceback: {traceback.format_exc()}")
 
 def save_augmentation_config(config: Dict[str, Any]) -> bool:
     """

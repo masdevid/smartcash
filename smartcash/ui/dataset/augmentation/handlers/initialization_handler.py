@@ -67,8 +67,8 @@ def initialize_augmentation_directories(ui_components: Dict[str, Any]) -> Dict[s
         # Direktori final output (jika move_to_preprocessed diaktifkan)
         final_output_dir = os.path.join(data_dir, 'preprocessed', split)
         
-        # Direktori backup (jika cleanup.backup_enabled diaktifkan)
-        backup_enabled = config.get('cleanup', {}).get('backup_enabled', True)
+        # Direktori backup (dinonaktifkan secara default)
+        backup_enabled = config.get('cleanup', {}).get('backup_enabled', False)  # Default dinonaktifkan
         backup_dir = config.get('cleanup', {}).get('backup_dir', 'data/backup/augmentation')
         backup_dir = os.path.join(backup_dir, split)
         
@@ -306,7 +306,7 @@ def initialize_directories(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'labels_output_dir': labels_output_dir,
             'final_output_dir': os.path.join(data_dir, 'preprocessed', 'train'),
             'backup_dir': os.path.join(data_dir, 'backup', 'augmentation', 'train'),
-            'backup_enabled': True,
+            'backup_enabled': False,  # Dinonaktifkan secara default
             'split': 'train'
         }
         

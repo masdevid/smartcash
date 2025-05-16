@@ -86,7 +86,8 @@ def cleanup_augmentation_results(ui_components: Dict[str, Any]) -> Dict[str, Any
                     if os.path.isfile(src):
                         shutil.copy2(src, dst)
             
-            logger.info(f"✅ Backup {num_images} gambar dan {num_labels} label ke {backup_dir}")
+            # Log backup dinonaktifkan untuk mengurangi output log
+            pass
         
         # Hapus file di direktori output
         if os.path.exists(images_output_dir):
@@ -221,8 +222,8 @@ def remove_augmented_files_from_preprocessed(ui_components: Dict[str, Any], pref
                 'message': f'Tidak ada file dengan prefix "{prefix}" di direktori preprocessed'
             }
         
-        # Log info
-        logger.info(f"✅ Berhasil menghapus {num_images} gambar dan {num_labels} label dengan prefix '{prefix}' dari {final_output_dir}")
+        # Log penghapusan dinonaktifkan untuk mengurangi output log
+        pass
         
         return {
             'status': 'success',

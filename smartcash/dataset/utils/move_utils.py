@@ -46,23 +46,16 @@ def move_files_to_preprocessed(
             pattern = os.path.join(images_output_dir, f"{output_prefix}_*{ext}")
             augmented_files.extend(glob.glob(pattern))
         
-        # Debug info untuk membantu troubleshooting
+        # Hanya log jumlah file yang ditemukan
         if logger:
-            logger.info(f"🔍 Mencari file dengan pola: {os.path.join(images_output_dir, f'{output_prefix}_*')}")
-            logger.info(f"💾 Direktori output gambar: {images_output_dir}")
-            logger.info(f"💾 Direktori output label: {labels_output_dir}")
-            logger.info(f"💾 Direktori tujuan akhir: {os.path.join(final_output_dir, split)}")
             logger.info(f"📦 Ditemukan {len(augmented_files)} file augmentasi")
         
-        # Jika tidak ada file yang ditemukan, coba cari semua file di direktori
-        if not augmented_files and logger:
+        # Jika tidak ada file yang ditemukan, coba cari semua file di direktori (tanpa log detail)
+        if not augmented_files:
             all_files = []
             for ext in IMG_EXTENSIONS:
                 pattern = os.path.join(images_output_dir, f"*{ext}")
                 all_files.extend(glob.glob(pattern))
-            logger.info(f"📦 Total {len(all_files)} file ditemukan di direktori output")
-            if all_files:
-                logger.info(f"💾 Contoh file: {os.path.basename(all_files[0])}")
         
         # Pindahkan file yang ditemukan
         moved_count = 0
@@ -78,10 +71,7 @@ def move_files_to_preprocessed(
             # Copy file dengan debug info
             for src, dst in [(img_file, img_target), (label_file, label_target)]:
                 if os.path.exists(src):
-                    # Debug info
-                    if logger:
-                        logger.info(f"📋 Menyalin {os.path.basename(src)} ke {dst}")
-                    # Copy file tanpa menghapus aslinya
+                    # Copy file tanpa menghapus aslinya (tanpa log per file)
                     shutil.copy2(src, dst)
                     moved_count += 1
         

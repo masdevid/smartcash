@@ -42,12 +42,12 @@ def create_action_buttons() -> Dict[str, Any]:
         layout=widgets.Layout(width='auto')
     )
     
-    # Tombol cleanup
+    # Tombol cleanup dengan deskripsi yang lebih jelas
     cleanup_button = widgets.Button(
-        description='Cleanup',
+        description='Hapus Hasil',
         icon='trash',
         button_style='danger',
-        tooltip='Hapus hasil augmentasi',
+        tooltip='Hapus file hasil augmentasi tanpa backup',
         layout=widgets.Layout(width='auto', display='none')
     )
     

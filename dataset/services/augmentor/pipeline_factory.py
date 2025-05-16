@@ -444,9 +444,13 @@ class AugmentationPipelineFactory:
                     )
                 )
             
-        # Blur
+        # Blur - pastikan blur_limit selalu ganjil
         if params.get('blur_prob', 0) > 0:
-            blur_limit = max(1, int(params.get('blur_limit', 3)))
+            # Pastikan blur_limit selalu ganjil untuk menghindari warning
+            blur_limit = max(3, int(params.get('blur_limit', 3)))
+            if blur_limit % 2 == 0:
+                blur_limit += 1  # Tambahkan 1 jika genap
+                
             transforms.append(
                 A.Blur(
                     blur_limit=blur_limit,
@@ -513,14 +517,15 @@ class AugmentationPipelineFactory:
             
         # Snow - ganti dengan transformasi yang lebih stabil
         if params.get('snow_prob', 0) > 0:
-            # Gunakan RandomBrightness sebagai alternatif yang lebih stabil
+            # Gunakan RandomBrightnessContrast sebagai alternatif yang lebih stabil
             transforms.append(
-                A.RandomBrightness(
-                    limit=0.1,
+                A.RandomBrightnessContrast(
+                    brightness_limit=0.1,
+                    contrast_limit=0,
                     p=params.get('snow_prob', 0.05)
                 )
             )
-            self.logger.info(f"✅ Menggunakan RandomBrightness sebagai pengganti RandomSnow untuk menghindari warning")
+            self.logger.info(f"✅ Menggunakan RandomBrightnessContrast sebagai pengganti RandomSnow untuk menghindari warning")
             
         # Sun Flare - ganti dengan transformasi yang lebih stabil
         if params.get('sun_flare_prob', 0) > 0:

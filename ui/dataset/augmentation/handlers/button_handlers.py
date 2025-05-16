@@ -265,7 +265,7 @@ def on_cleanup_click(b, ui_components=None):
     # Clear output hanya saat pertama kali tombol diklik
     with ui_components['status']: 
         clear_output(wait=True)
-        display(create_status_indicator("info", f"{ICONS['cleanup']} Membersihkan hasil augmentasi..."))
+        display(create_status_indicator("info", f"{ICONS['cleanup']} Menghapus file hasil augmentasi..."))
     
     # Disable UI selama proses
     disable_ui_during_processing(ui_components, True)

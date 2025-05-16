@@ -76,11 +76,9 @@ def verify_augmentation_files(paths: Dict[str, str], output_prefix: str, logger=
         if image_files:
             result["image_examples"] = [os.path.basename(f) for f in image_files[:3]]
         
-        # Log hasil verifikasi
+        # Log hasil verifikasi (hanya jumlah total tanpa detail)
         if logger:
             logger.info(f"🔍 Verifikasi file augmentasi: {result['found_images']} gambar, {result['found_labels']} label")
-            if result["image_examples"]:
-                logger.info(f"📷 Contoh file: {', '.join(result['image_examples'])}")
         
         # Tentukan status berdasarkan jumlah file yang ditemukan
         if result["found_images"] == 0:
@@ -157,9 +155,9 @@ def copy_augmentation_files(
                 shutil.copy2(label_file, target_label_path)
                 result["copied_labels"] += 1
         
-        # Log hasil penyalinan
+        # Log hasil penyalinan (hanya jumlah total)
         if logger:
-            logger.info(f"📋 Menyalin {result['copied_images']} gambar dan {result['copied_labels']} label ke {target_dir}/{split}")
+            logger.info(f"✅ Selesai memproses {result['copied_images']} file")
         
         # Tentukan status berdasarkan jumlah file yang disalin
         if result["copied_images"] == 0:

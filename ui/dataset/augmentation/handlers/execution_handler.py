@@ -118,10 +118,28 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
             minutes, seconds = divmod(execution_time, 60)
             time_str = f"{int(minutes)} menit {int(seconds)} detik"
             
+            # Pastikan jumlah gambar yang dihasilkan valid
+            generated_images = result.get('generated', 0)
+            
+            # Jika status sukses tapi tidak ada gambar yang dihasilkan, ubah status menjadi warning
+            if generated_images <= 0:
+                logger.warning("⚠️ Status sukses tapi tidak ada gambar yang dihasilkan, mengubah status menjadi warning")
+                result['status'] = 'warning'
+                result['message'] = "Augmentasi selesai tapi tidak ada gambar yang dihasilkan. Periksa parameter augmentasi."
+                
+                # Lanjutkan ke blok warning
+                update_status_panel(ui_components, result['message'], "warning")
+                
+                # Tampilkan pesan warning
+                with ui_components['status']:
+                    clear_output(wait=True)
+                    display(create_status_indicator("warning", f"{ICONS['warning']} {result['message']}"))
+                return
+            
             # Update status panel
             update_status_panel(
                 ui_components, 
-                f"Augmentasi selesai: {result.get('generated', 0)} gambar dihasilkan", 
+                f"Augmentasi selesai: {generated_images} gambar dihasilkan", 
                 "success"
             )
             
@@ -130,7 +148,7 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
                 clear_output(wait=True)
                 display(create_status_indicator(
                     "success", 
-                    f"{ICONS['success']} Augmentasi berhasil! {result.get('generated', 0)} gambar dihasilkan dalam {time_str}."
+                    f"{ICONS['success']} Augmentasi berhasil! {generated_images} gambar dihasilkan dalam {time_str}."
                 ))
             
             # Tampilkan tombol cleanup

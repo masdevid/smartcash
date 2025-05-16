@@ -142,13 +142,13 @@ class AugmentationService:
                 'class_counts': {}
             }
             
+        # Laporkan progres analisis
+        self.report_progress(
+            message="🔍 Menganalisis distribusi kelas untuk balancing optimal",
+            status="info", step=0
+        )
+        
         try:
-            # Laporkan progres analisis
-            self.report_progress(
-                message="🔍 Menganalisis distribusi kelas untuk balancing optimal",
-                status="info", step=0
-            )
-            
             # Gunakan class_balancer dengan prioritisasi kelas
             result = self.class_balancer.prepare_balanced_dataset(
                 image_files=image_files,
@@ -163,13 +163,44 @@ class AugmentationService:
             classes_needing = result.get('classes_to_augment', 0)
             total_needed = result.get('total_needed', 0)
             
+            # Log distribusi kelas saat ini untuk debugging
+            self.logger.info(f"📊 Distribusi kelas saat ini: {result.get('class_counts', {})}")
             self.logger.info(f"📊 Hasil balancing: {classes_needing} kelas perlu ditambah {total_needed} instance")
             self.logger.info(f"🎯 Menggunakan {total_files} file untuk augmentasi")
             
             # Cek apakah ada file yang terpilih
             if total_files == 0:
-                self.logger.info("ℹ️ Tidak ada file yang terpilih untuk augmentasi (semua kelas sudah memenuhi target)")
-                return None
+                self.logger.info("⚠️ Tidak ada file yang terpilih untuk augmentasi (semua kelas sudah memenuhi target)")
+                
+                # Jika tidak ada file yang terpilih, gunakan beberapa file untuk memaksa augmentasi
+                # Ini memastikan bahwa augmentasi tetap dilakukan meskipun target sudah terpenuhi
+                self.logger.info("🔄 Memaksa augmentasi dengan menggunakan beberapa file dari setiap kelas")
+                
+                # Gunakan maksimal 10 file per kelas atau 20% dari total file, mana yang lebih kecil
+                class_count = len(result.get('class_counts', {}))
+                if class_count > 0:
+                    max_files_per_class = min(10, max(1, int(len(image_files) * 0.2 / class_count)))
+                else:
+                    max_files_per_class = 10
+                
+                # Ambil beberapa file dari setiap kelas
+                forced_files = []
+                for class_id, files in result.get('files_metadata', {}).items():
+                    class_files = list(files.keys())[:max_files_per_class]
+                    forced_files.extend(class_files)
+                    self.logger.info(f"📑 Memaksa augmentasi untuk kelas {class_id} dengan {len(class_files)} file")
+                
+                # Update result dengan file yang dipaksa
+                result['selected_files'] = forced_files
+                result['forced_augmentation'] = True
+                
+                # Jika masih tidak ada file yang terpilih, gunakan semua file
+                if not forced_files:
+                    self.logger.warning("⚠️ Tidak dapat memaksa augmentasi, menggunakan semua file")
+                    result['selected_files'] = image_files
+                    result['forced_augmentation'] = True
+                
+                self.logger.info(f"🎯 Menggunakan {len(result['selected_files'])} file untuk augmentasi yang dipaksa")
                 
             return result
         except Exception as e:

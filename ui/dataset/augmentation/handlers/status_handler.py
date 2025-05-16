@@ -193,24 +193,43 @@ def update_progress_bar(ui_components: Dict[str, Any], value: int, max_value: in
     # Update deskripsi jika ada
     if description and 'overall_label' in ui_components:
         ui_components['overall_label'].layout.visibility = 'visible'
-        ui_components['overall_label'].value = description
         
-    # Log progress ke logger jika ada
+        # Cek apakah deskripsi berbeda dari yang sebelumnya untuk mencegah duplikasi
+        current_description = getattr(ui_components.get('_last_progress_description', None), 'value', None)
+        if current_description != description:
+            ui_components['overall_label'].value = description
+            # Simpan deskripsi terakhir untuk mencegah duplikasi
+            ui_components['_last_progress_description'] = ui_components['overall_label']
+    
+    # Log progress ke logger jika ada, tapi batasi log dengan teks yang sama
     logger = ui_components.get('logger')
     if logger and description:
         percent = int((value / max_value) * 100) if max_value > 0 else 0
-        logger.info(f" Progress: {percent}% - {description}")
         
-    # Pastikan UI diupdate dengan flush output
+        # Cek apakah pesan progress ini berbeda dari yang terakhir
+        last_progress_message = ui_components.get('_last_progress_message', '')
+        current_progress_message = f"Progress: {percent}% - {description}"
+        
+        # Hanya log jika pesan berbeda atau persentase berubah signifikan
+        if current_progress_message != last_progress_message or \
+           abs(percent - ui_components.get('_last_progress_percent', 0)) >= 5:
+            logger.info(f"📊 {current_progress_message}")
+            ui_components['_last_progress_message'] = current_progress_message
+            ui_components['_last_progress_percent'] = percent
+    
+    # Pastikan UI diupdate dengan flush output, tapi batasi frekuensi update
     try:
-        from IPython.display import display, clear_output
-        import time
+        # Cek waktu terakhir update untuk membatasi frekuensi update
+        current_time = time.time()
+        last_update_time = ui_components.get('_last_progress_update_time', 0)
         
-        # Gunakan teknik minimal flush untuk memastikan UI diupdate
-        if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
-            with ui_components['status']:
-                # Flush output dengan clear minimal
-                pass
+        # Update UI maksimal setiap 0.5 detik untuk mencegah terlalu banyak update
+        if current_time - last_update_time >= 0.5:
+            if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
+                with ui_components['status']:
+                    # Flush output dengan clear minimal
+                    pass
+            ui_components['_last_progress_update_time'] = current_time
     except Exception:
         # Ignore error, ini hanya untuk memastikan UI diupdate
         pass

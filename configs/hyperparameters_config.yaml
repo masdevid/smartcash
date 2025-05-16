@@ -11,7 +11,7 @@ image_size: 640
 epochs: 100
 
 # Parameter optimasi
-optimizer: 'SGD'
+optimizer: 'Adam'
 learning_rate: 0.01
 weight_decay: 0.0005
 momentum: 0.937

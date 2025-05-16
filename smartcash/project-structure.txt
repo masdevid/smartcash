@@ -3,11 +3,34 @@
 ├── __init_.py
 ├── common
 |  ├── __init__.py
+|  ├── __pycache__
+|  |  ├── __init__.cpython-312.pyc
+|  |  ├── default_config.cpython-312.pyc
+|  |  ├── environment.cpython-312.pyc
+|  |  ├── exceptions.cpython-312.pyc
+|  |  ├── layer_config.cpython-312.pyc
+|  |  ├── logger.cpython-312.pyc
+|  |  ├── threadpools.cpython-312.pyc
+|  |  ├── types.cpython-312.pyc
+|  |  └── utils.cpython-312.pyc
 |  ├── config
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── manager.cpython-312.pyc
+|  |  |  └── sync.cpython-312.pyc
 |  |  ├── manager.py
 |  |  └── sync.py
 |  ├── constants
+|  |  ├── __pycache__
+|  |  |  ├── core.cpython-312.pyc
+|  |  |  ├── dataset.cpython-312.pyc
+|  |  |  ├── enums.cpython-312.pyc
+|  |  |  ├── file_types.cpython-312.pyc
+|  |  |  ├── log_messages.cpython-312.pyc
+|  |  |  ├── model.cpython-312.pyc
+|  |  |  ├── paths.cpython-312.pyc
+|  |  |  └── ui.cpython-312.pyc
 |  |  ├── core.py
 |  |  ├── dataset.py
 |  |  ├── enums.py
@@ -18,15 +41,26 @@
 |  |  ├── paths.py
 |  |  └── ui.py
 |  ├── default_config.py
+|  ├── drive_sync.py
 |  ├── environment.py
 |  ├── exceptions.py
 |  ├── interfaces
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── checkpoint_interface.cpython-312.pyc
+|  |  |  ├── layer_config_interface.cpython-312.pyc
+|  |  |  └── visualization_interface.cpython-312.pyc
 |  |  ├── checkpoint_interface.py
 |  |  ├── layer_config_interface.py
 |  |  └── visualization_interface.py
 |  ├── io
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── file_utils.cpython-312.pyc
+|  |  |  ├── path_utils.cpython-312.pyc
+|  |  |  └── serialization.cpython-312.pyc
 |  |  ├── file_utils.py
 |  |  ├── path_utils.py
 |  |  └── serialization.py
@@ -34,6 +68,10 @@
 |  ├── logger.py
 |  ├── progress
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── observer.cpython-312.pyc
+|  |  |  └── tracker.cpython-312.pyc
 |  |  ├── observer.py
 |  |  └── tracker.py
 |  ├── threadpools.py
@@ -43,9 +81,19 @@
 |     ├── __init_.py
 |     ├── core
 |     |  ├── __init_.py
+|     |  ├── __pycache__
+|     |  |  └── visualization_base.cpython-312.pyc
 |     |  └── visualization_base.py
 |     └── helpers
 |        ├── __init__.py
+|        ├── __pycache__
+|        |  ├── __init__.cpython-312.pyc
+|        |  ├── annotation_helper.cpython-312.pyc
+|        |  ├── chart_helper.cpython-312.pyc
+|        |  ├── color_helper.cpython-312.pyc
+|        |  ├── export_helper.cpython-312.pyc
+|        |  ├── layout_helper.cpython-312.pyc
+|        |  └── style_helper.cpython-312.pyc
 |        ├── annotation_helper.py
 |        ├── chart_helper.py
 |        ├── color_helper.py
@@ -63,6 +111,16 @@
 |  |  └── storage_cache.py
 |  └── observer
 |     ├── __init__.py
+|     ├── __pycache__
+|     |  ├── __init__.cpython-312.pyc
+|     |  ├── base_observer.cpython-312.pyc
+|     |  ├── cleanup_observer.cpython-312.pyc
+|     |  ├── decorators_observer.cpython-312.pyc
+|     |  ├── event_dispatcher_observer.cpython-312.pyc
+|     |  ├── event_registry_observer.cpython-312.pyc
+|     |  ├── event_topics_observer.cpython-312.pyc
+|     |  ├── manager_observer.cpython-312.pyc
+|     |  └── priority_observer.cpython-312.pyc
 |     ├── base_observer.py
 |     ├── cleanup_observer.py
 |     ├── decorators_observer.py
@@ -78,47 +136,95 @@
 |  ├── colab_config.yaml
 |  ├── dataset_config.yaml
 |  ├── evaluation_config.yaml
+|  ├── hyperparameters_config.yaml
 |  ├── model_config.yaml
 |  ├── preprocessing_config.yaml
 |  └── training_config.yaml
 ├── dataset
 |  ├── __init__.py
+|  ├── __pycache__
+|  |  ├── __init__.cpython-312.pyc
+|  |  └── manager.cpython-312.pyc
 |  ├── components
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  └── __init__.cpython-312.pyc
 |  |  ├── collate
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── multilayer_collate.cpython-312.pyc
+|  |  |  |  └── yolo_collate.cpython-312.pyc
 |  |  |  ├── multilayer_collate.py
 |  |  |  └── yolo_collate.py
 |  |  ├── datasets
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── base_dataset.cpython-312.pyc
+|  |  |  |  ├── multilayer_dataset.cpython-312.pyc
+|  |  |  |  └── yolo_dataset.cpython-312.pyc
 |  |  |  ├── base_dataset.py
 |  |  |  ├── multilayer_dataset.py
 |  |  |  └── yolo_dataset.py
 |  |  ├── geometry
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── coord_converter.cpython-312.pyc
+|  |  |  |  ├── geometry_utils.cpython-312.pyc
+|  |  |  |  └── polygon_handler.cpython-312.pyc
 |  |  |  ├── coord_converter.py
 |  |  |  ├── geometry_utils.py
 |  |  |  └── polygon_handler.py
 |  |  ├── labels
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── format_converter.cpython-312.pyc
+|  |  |  |  ├── label_handler.cpython-312.pyc
+|  |  |  |  └── multilayer_handler.cpython-312.pyc
 |  |  |  ├── format_converter.py
 |  |  |  ├── label_handler.py
 |  |  |  └── multilayer_handler.py
 |  |  └── samplers
 |  |     ├── __init__.py
+|  |     ├── __pycache__
+|  |     |  ├── __init__.cpython-312.pyc
+|  |     |  ├── balanced_sampler.cpython-312.pyc
+|  |     |  └── weighted_sampler.cpython-312.pyc
 |  |     ├── balanced_sampler.py
 |  |     └── weighted_sampler.py
 |  ├── manager.py
 |  ├── services
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── preprocessing_manager.cpython-312.pyc
+|  |  |  └── service_factory.cpython-312.pyc
 |  |  ├── augmentor
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── augmentation_service.cpython-312.pyc
+|  |  |  |  ├── augmentation_worker.cpython-312.pyc
+|  |  |  |  ├── bbox_augmentor.cpython-312.pyc
+|  |  |  |  ├── class_balancer.cpython-312.pyc
+|  |  |  |  ├── image_augmentor.cpython-312.pyc
+|  |  |  |  └── pipeline_factory.cpython-312.pyc
 |  |  |  ├── augmentation_service.py
 |  |  |  ├── augmentation_worker.py
 |  |  |  ├── bbox_augmentor.py
 |  |  |  ├── class_balancer.py
 |  |  |  ├── helpers
 |  |  |  |  ├── __init__.py
+|  |  |  |  ├── __pycache__
+|  |  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  |  ├── augmentation_executor.cpython-312.pyc
+|  |  |  |  |  ├── parallel_helper.cpython-312.pyc
+|  |  |  |  |  ├── path_helper.cpython-312.pyc
+|  |  |  |  |  ├── tracking_helper.cpython-312.pyc
+|  |  |  |  |  └── validation_helper.cpython-312.pyc
 |  |  |  |  ├── augmentation_executor.py
 |  |  |  |  ├── parallel_helper.py
 |  |  |  |  ├── path_helper.py
@@ -128,12 +234,26 @@
 |  |  |  └── pipeline_factory.py
 |  |  ├── balancer
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── balance_service.cpython-312.pyc
+|  |  |  |  ├── oversampler.cpython-312.pyc
+|  |  |  |  ├── undersampler.cpython-312.pyc
+|  |  |  |  └── weight_calculator.cpython-312.pyc
 |  |  |  ├── balance_service.py
 |  |  |  ├── oversampler.py
 |  |  |  ├── undersampler.py
 |  |  |  └── weight_calculator.py
 |  |  ├── downloader
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── backup_service.cpython-312.pyc
+|  |  |  |  ├── download_service.cpython-312.pyc
+|  |  |  |  ├── download_validator.cpython-312.pyc
+|  |  |  |  ├── file_processor.cpython-312.pyc
+|  |  |  |  ├── notification_utils.cpython-312.pyc
+|  |  |  |  └── roboflow_downloader.cpython-312.pyc
 |  |  |  ├── backup_service.py
 |  |  |  ├── download_service.py
 |  |  |  ├── download_validator.py
@@ -142,6 +262,15 @@
 |  |  |  └── roboflow_downloader.py
 |  |  ├── explorer
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── base_explorer.cpython-312.pyc
+|  |  |  |  ├── bbox_explorer.cpython-312.pyc
+|  |  |  |  ├── class_explorer.cpython-312.pyc
+|  |  |  |  ├── data_explorer.cpython-312.pyc
+|  |  |  |  ├── explorer_service.cpython-312.pyc
+|  |  |  |  ├── image_explorer.cpython-312.pyc
+|  |  |  |  └── layer_explorer.cpython-312.pyc
 |  |  |  ├── base_explorer.py
 |  |  |  ├── bbox_explorer.py
 |  |  |  ├── class_explorer.py
@@ -151,6 +280,13 @@
 |  |  |  └── layer_explorer.py
 |  |  ├── loader
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── batch_generator.cpython-312.pyc
+|  |  |  |  ├── cache_manager.cpython-312.pyc
+|  |  |  |  ├── dataset_loader.cpython-312.pyc
+|  |  |  |  ├── multilayer_loader.cpython-312.pyc
+|  |  |  |  └── preprocessed_dataset_loader.cpython-312.pyc
 |  |  |  ├── batch_generator.py
 |  |  |  ├── cache_manager.py
 |  |  |  ├── dataset_loader.py
@@ -159,6 +295,12 @@
 |  |  ├── preprocessing_manager.py
 |  |  ├── preprocessor
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── cleaner.cpython-312.pyc
+|  |  |  |  ├── dataset_preprocessor.cpython-312.pyc
+|  |  |  |  ├── pipeline.cpython-312.pyc
+|  |  |  |  └── storage.cpython-312.pyc
 |  |  |  ├── cleaner.py
 |  |  |  ├── dataset_preprocessor.py
 |  |  |  ├── pipeline.py
@@ -166,6 +308,12 @@
 |  |  |  └── storage.py
 |  |  ├── reporter
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── export_formatter.cpython-312.pyc
+|  |  |  |  ├── metrics_reporter.cpython-312.pyc
+|  |  |  |  ├── report_service.cpython-312.pyc
+|  |  |  |  └── visualization_service.cpython-312.pyc
 |  |  |  ├── export_formatter.py
 |  |  |  ├── metrics_reporter.py
 |  |  |  ├── report_service.py
@@ -173,23 +321,50 @@
 |  |  ├── service_factory.py
 |  |  └── validator
 |  |     ├── __init__.py
+|  |     ├── __pycache__
+|  |     |  ├── __init__.cpython-312.pyc
+|  |     |  ├── dataset_validator.cpython-312.pyc
+|  |     |  ├── fixer.cpython-312.pyc
+|  |     |  ├── image_validator.cpython-312.pyc
+|  |     |  └── label_validator.cpython-312.pyc
 |  |     ├── dataset_validator.py
 |  |     ├── fixer.py
 |  |     ├── image_validator.py
 |  |     └── label_validator.py
 |  ├── utils
 |  |  ├── __init__.py
+|  |  ├── __pycache__
+|  |  |  ├── __init__.cpython-312.pyc
+|  |  |  ├── bbox_utils.cpython-312.pyc
+|  |  |  ├── data_utils.cpython-312.pyc
+|  |  |  ├── dataset_constants.cpython-312.pyc
+|  |  |  ├── dataset_utils.cpython-312.pyc
+|  |  |  ├── denomination_utils.cpython-312.pyc
+|  |  |  ├── file_mapping_utils.cpython-312.pyc
+|  |  |  ├── image_utils.cpython-312.pyc
+|  |  |  ├── label_utils.cpython-312.pyc
+|  |  |  ├── move_utils.cpython-312.pyc
+|  |  |  ├── preprocessing_image_utils.cpython-312.pyc
+|  |  |  ├── progress_utils.cpython-312.pyc
+|  |  |  └── progress_wrapper.cpython-312.pyc
+|  |  ├── bbox_utils.py
 |  |  ├── data_utils.py
 |  |  ├── dataset_constants.py
 |  |  ├── dataset_utils.py
 |  |  ├── denomination_utils.py
 |  |  ├── file
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── file_processor.cpython-312.pyc
+|  |  |  |  ├── image_processor.cpython-312.pyc
+|  |  |  |  └── label_processor.cpython-312.pyc
 |  |  |  ├── file_processor.py
 |  |  |  ├── image_processor.py
 |  |  |  └── label_processor.py
 |  |  ├── file_mapping_utils.py
 |  |  ├── image_analysis_utils.py
+|  |  ├── image_utils.py
 |  |  ├── label_utils.py
 |  |  ├── move_utils.py
 |  |  ├── preprocessing_image_utils.py
@@ -197,16 +372,33 @@
 |  |  ├── progress_wrapper.py
 |  |  ├── split
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── dataset_splitter.cpython-312.pyc
+|  |  |  |  ├── merger.cpython-312.pyc
+|  |  |  |  └── stratifier.cpython-312.pyc
 |  |  |  ├── dataset_splitter.py
 |  |  |  ├── merger.py
 |  |  |  └── stratifier.py
 |  |  ├── statistics
 |  |  |  ├── __init__.py
+|  |  |  ├── __pycache__
+|  |  |  |  ├── __init__.cpython-312.pyc
+|  |  |  |  ├── class_stats.cpython-312.pyc
+|  |  |  |  ├── distribution_analyzer.cpython-312.pyc
+|  |  |  |  └── image_stats.cpython-312.pyc
 |  |  |  ├── class_stats.py
 |  |  |  ├── distribution_analyzer.py
 |  |  |  └── image_stats.py
 |  |  └── transform
 |  |     ├── __init__.py
+|  |     ├── __pycache__
+|  |     |  ├── __init__.cpython-312.pyc
+|  |     |  ├── albumentations_adapter.cpython-312.pyc
+|  |     |  ├── bbox_transform.cpython-312.pyc
+|  |     |  ├── format_converter.cpython-312.pyc
+|  |     |  ├── image_transform.cpython-312.pyc
+|  |     |  └── polygon_transform.cpython-312.pyc
 |  |     ├── albumentations_adapter.py
 |  |     ├── bbox_transform.py
 |  |     ├── format_converter.py
@@ -214,8 +406,21 @@
 |  |     └── polygon_transform.py
 |  └── visualization
 |     ├── __init__.py
+|     ├── __pycache__
+|     |  ├── __init__.cpython-312.pyc
+|     |  ├── dashboard_visualizer.cpython-312.pyc
+|     |  ├── data.cpython-312.pyc
+|     |  └── report.cpython-312.pyc
 |     ├── dashboard
 |     |  ├── __init__.py
+|     |  ├── __pycache__
+|     |  |  ├── __init__.cpython-312.pyc
+|     |  |  ├── bbox_visualizer.cpython-312.pyc
+|     |  |  ├── class_visualizer.cpython-312.pyc
+|     |  |  ├── layer_visualizer.cpython-312.pyc
+|     |  |  ├── quality_visualizer.cpython-312.pyc
+|     |  |  ├── recommendation_visualizer.cpython-312.pyc
+|     |  |  └── split_visualizer.cpython-312.pyc
 |     |  ├── bbox_visualizer.py
 |     |  ├── class_visualizer.py
 |     |  ├── layer_visualizer.py
@@ -253,6 +458,10 @@
 |     |  ├── postprocessing_service.py
 |     |  └── result_formatter.py
 |     └── visualization_adapter.py
+├── examples
+|  ├── visualisasi_augmentasi.ipynb
+|  ├── visualisasi_augmentasi_fixed.py
+|  └── visualization_augmentation_example.py
 ├── model
 |  ├── __init__.py
 |  ├── analysis
@@ -279,7 +488,8 @@
 |  |  ├── __init__.py
 |  |  ├── backbone_config.py
 |  |  ├── experiment_config.py
-|  |  └── model_config.py
+|  |  ├── model_config.py
+|  |  └── model_config_definitions.py
 |  ├── manager.py
 |  ├── manager_checkpoint.py
 |  ├── models
@@ -309,6 +519,8 @@
 |  |  |  ├── core_prediction_service.py
 |  |  |  ├── interface_prediction_service.py
 |  |  |  └── postprocessing_prediction_service.py
+|  |  ├── pretrained_downloader.py
+|  |  ├── pretrained_setup.py
 |  |  ├── research
 |  |  |  ├── __init__.py
 |  |  |  ├── comparison_runner.py
@@ -316,7 +528,8 @@
 |  |  |  ├── experiment_creator.py
 |  |  |  ├── experiment_runner.py
 |  |  |  ├── experiment_service.py
-|  |  |  └── parameter_tuner.py
+|  |  |  ├── parameter_tuner.py
+|  |  |  └── scenario_service.py
 |  |  └── training
 |  |     ├── __init__.py
 |  |     ├── callbacks_training_service.py
@@ -343,72 +556,166 @@
 |     ├── detection_visualizer.py
 |     ├── evaluation_visualizer.py
 |     ├── metrics_visualizer.py
-|     └── research
-|        ├── __init__.py
-|        ├── base_research_visualizer.py
-|        ├── experiment_visualizer.py
-|        ├── research_visualizer.py
-|        └── scenario_visualizer.py
+|     ├── research
+|     |  ├── __init__.py
+|     |  ├── base_research_visualizer.py
+|     |  ├── experiment_visualizer.py
+|     |  ├── research_visualizer.py
+|     |  └── scenario_visualizer.py
+|     └── setup_visualization.py
 ├── panduan_cells.md
 ├── project-structure.txt
 └── ui
-   ├── backbone_selection
-   |  └── handlers
    ├── cell_template.py
    ├── cells
    |  ├── cell_1_1_repo_clone.py
    |  ├── cell_1_2_env_config.py
    |  ├── cell_1_3_dependency_installer.py
    |  ├── cell_2_1_dataset_download.py
-   |  ├── cell_2_2_preprocessing.py
-   |  ├── cell_2_3_split_config.py
+   |  ├── cell_2_2_split_config.py
+   |  ├── cell_2_3_preprocessing.py
    |  ├── cell_2_4_augmentation.py
+   |  ├── cell_2_5_dataset_visualization.py
+   |  ├── cell_2_5_dataset_visualization_new.py
+   |  ├── cell_2_6_pretrained_model.py
    |  ├── cell_3_1_backbone_selection.py
    |  ├── cell_3_2_hyperparameters.py
-   |  └── cell_3_3_training_strategy.py
+   |  ├── cell_3_3_training_strategy.py
+   |  └── cell_4_1_model_training.py
    ├── charts
-   |  ├── __init__.py
-   |  ├── class_distribution_analyzer.py
-   |  ├── compare_original_vs_augmented.py
-   |  ├── compare_original_vs_preprocessed.py
-   |  ├── distribution_summary_display.py
-   |  ├── get_preprocessing_stats.py
-   |  ├── plot_base.py
-   |  ├── plot_comparison.py
-   |  ├── plot_single.py
-   |  ├── plot_stacked.py
-   |  ├── visualization_integrator.py
-   |  ├── visualize_augmented_samples.py
-   |  └── visualize_preprocessed_samples.py
+   |  └── __init__.py
    ├── components
    |  ├── __init__.py
+   |  ├── __pycache__
+   |  |  ├── __init__.cpython-312.pyc
+   |  |  ├── action_buttons.cpython-312.pyc
+   |  |  ├── confirmation_dialog.cpython-312.pyc
+   |  |  ├── progress_component.cpython-312.pyc
+   |  |  └── visualization_buttons.cpython-312.pyc
+   |  ├── accordion_factory.py
    |  ├── action_buttons.py
+   |  ├── config_buttons.py
    |  ├── confirmation_dialog.py
    |  ├── progress_component.py
    |  ├── status_panel.py
+   |  ├── tab_factory.py
    |  └── visualization_buttons.py
    ├── dataset
-   |  ├── .DS_Store
-   |  ├── __init__.py
    |  ├── augmentation
    |  |  ├── __init__.py
+   |  |  ├── __pycache__
+   |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  └── augmentation_initializer.cpython-312.pyc
    |  |  ├── augmentation_initializer.py
    |  |  ├── components
    |  |  |  ├── __init__.py
+   |  |  |  ├── __pycache__
+   |  |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  |  ├── action_buttons.cpython-312.pyc
+   |  |  |  |  ├── advanced_options.cpython-312.pyc
+   |  |  |  |  ├── augmentation_component.cpython-312.pyc
+   |  |  |  |  ├── augmentation_options.cpython-312.pyc
+   |  |  |  |  └── split_selector.cpython-312.pyc
    |  |  |  ├── action_buttons.py
+   |  |  |  ├── advanced_options.py
    |  |  |  ├── augmentation_component.py
    |  |  |  ├── augmentation_options.py
-   |  |  |  ├── info_component.py
-   |  |  |  ├── output_component.py
-   |  |  |  └── progress_component.py
-   |  |  └── handlers
-   |  |     ├── __init__.py
-   |  |     ├── button_handlers.py
-   |  |     ├── cleanup_handler.py
-   |  |     ├── config_handlers.py
-   |  |     ├── state_handler.py
-   |  |     ├── status_handler.py
-   |  |     └── visualization_handler.py
+   |  |  |  └── split_selector.py
+   |  |  ├── handlers
+   |  |  |  ├── __init__.py
+   |  |  |  ├── __pycache__
+   |  |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  |  ├── augmentation_service_handler.cpython-312.pyc
+   |  |  |  |  ├── button_handlers.cpython-312.pyc
+   |  |  |  |  ├── cleanup_handler.cpython-312.pyc
+   |  |  |  |  ├── config_handler.cpython-312.pyc
+   |  |  |  |  ├── execution_handler.cpython-312.pyc
+   |  |  |  |  ├── initialization_handler.cpython-312.pyc
+   |  |  |  |  ├── parameter_handler.cpython-312.pyc
+   |  |  |  |  ├── persistence_handler.cpython-312.pyc
+   |  |  |  |  ├── status_handler.cpython-312.pyc
+   |  |  |  |  └── visualization_handler.cpython-312.pyc
+   |  |  |  ├── augmentation_service_handler.py
+   |  |  |  ├── button_handlers.py
+   |  |  |  ├── cleanup_handler.py
+   |  |  |  ├── config_handler.py
+   |  |  |  ├── execution_handler.py
+   |  |  |  ├── initialization_handler.py
+   |  |  |  ├── parameter_handler.py
+   |  |  |  ├── persistence_handler.py
+   |  |  |  ├── status_handler.py
+   |  |  |  └── visualization_handler.py
+   |  |  ├── tests
+   |  |  |  ├── __init__.py
+   |  |  |  ├── __pycache__
+   |  |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  |  ├── conftest.cpython-312.pyc
+   |  |  |  |  ├── mock_utils.cpython-312.pyc
+   |  |  |  |  ├── run_tests.cpython-312.pyc
+   |  |  |  |  ├── test_augmentation_service_handler.cpython-312.pyc
+   |  |  |  |  ├── test_button_handlers.cpython-312.pyc
+   |  |  |  |  ├── test_cleanup_handler.cpython-312.pyc
+   |  |  |  |  ├── test_components.cpython-312.pyc
+   |  |  |  |  ├── test_config_handler.cpython-312.pyc
+   |  |  |  |  ├── test_config_handler_fixed.cpython-312.pyc
+   |  |  |  |  ├── test_config_handlers.cpython-312.pyc
+   |  |  |  |  ├── test_execution_handler.cpython-312.pyc
+   |  |  |  |  ├── test_initialization_handler.cpython-312.pyc
+   |  |  |  |  ├── test_integration.cpython-312.pyc
+   |  |  |  |  ├── test_parameter_handler.cpython-312.pyc
+   |  |  |  |  ├── test_persistence_handler.cpython-312.pyc
+   |  |  |  |  ├── test_status_handler.cpython-312.pyc
+   |  |  |  |  └── test_visualization_handler.cpython-312.pyc
+   |  |  |  ├── conftest.py
+   |  |  |  ├── mock_utils.py
+   |  |  |  ├── run_tests.py
+   |  |  |  ├── test_augmentation_service_handler.py
+   |  |  |  ├── test_button_handlers.py
+   |  |  |  ├── test_cleanup_handler.py
+   |  |  |  ├── test_components.py
+   |  |  |  ├── test_config_handler.py
+   |  |  |  ├── test_config_handler_fixed.py
+   |  |  |  ├── test_config_handlers.py
+   |  |  |  ├── test_execution_handler.py
+   |  |  |  ├── test_initialization_handler.py
+   |  |  |  ├── test_integration.py
+   |  |  |  ├── test_parameter_handler.py
+   |  |  |  ├── test_persistence_handler.py
+   |  |  |  └── test_status_handler.py
+   |  |  └── visualization
+   |  |     ├── __pycache__
+   |  |     |  ├── visualization_base.cpython-312.pyc
+   |  |     |  ├── visualization_initializer.cpython-312.pyc
+   |  |     |  └── visualization_manager.cpython-312.pyc
+   |  |     ├── components
+   |  |     |  ├── __pycache__
+   |  |     |  |  └── visualization_components.cpython-312.pyc
+   |  |     |  └── visualization_components.py
+   |  |     ├── handlers
+   |  |     |  ├── __pycache__
+   |  |     |  |  ├── compare_visualization_handler.cpython-312.pyc
+   |  |     |  |  └── sample_visualization_handler.cpython-312.pyc
+   |  |     |  ├── compare_visualization_handler.py
+   |  |     |  └── sample_visualization_handler.py
+   |  |     ├── tests
+   |  |     |  ├── __pycache__
+   |  |     |  |  ├── test_compare_visualization_handler.cpython-312.pyc
+   |  |     |  |  ├── test_sample_visualization_handler.cpython-312.pyc
+   |  |     |  |  ├── test_visualization_base.cpython-312.pyc
+   |  |     |  |  ├── test_visualization_components.cpython-312.pyc
+   |  |     |  |  ├── test_visualization_initializer.cpython-312.pyc
+   |  |     |  |  ├── test_visualization_manager.cpython-312.pyc
+   |  |     |  |  └── test_visualization_simple.cpython-312.pyc
+   |  |     |  ├── test_compare_visualization_handler.py
+   |  |     |  ├── test_sample_visualization_handler.py
+   |  |     |  ├── test_visualization_base.py
+   |  |     |  ├── test_visualization_components.py
+   |  |     |  ├── test_visualization_initializer.py
+   |  |     |  ├── test_visualization_manager.py
+   |  |     |  └── test_visualization_simple.py
+   |  |     ├── visualization_base.py
+   |  |     ├── visualization_initializer.py
+   |  |     └── visualization_manager.py
    |  ├── download
    |  |  ├── __init__.py
    |  |  ├── download_component.py
@@ -425,31 +732,113 @@
    |  |     └── endpoint_handler.py
    |  ├── preprocessing
    |  |  ├── __init__.py
+   |  |  ├── __pycache__
+   |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  └── preprocessing_initializer.cpython-312.pyc
    |  |  ├── components
    |  |  |  ├── __init__.py
+   |  |  |  ├── __pycache__
+   |  |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  |  ├── input_options.cpython-312.pyc
+   |  |  |  |  ├── preprocessing_component.cpython-312.pyc
+   |  |  |  |  ├── split_selector.cpython-312.pyc
+   |  |  |  |  └── validation_options.cpython-312.pyc
    |  |  |  ├── input_options.py
    |  |  |  ├── preprocessing_component.py
    |  |  |  ├── split_selector.py
    |  |  |  └── validation_options.py
    |  |  ├── handlers
    |  |  |  ├── __init__.py
+   |  |  |  ├── __pycache__
+   |  |  |  |  ├── __init__.cpython-312.pyc
+   |  |  |  |  ├── button_handlers.cpython-312.pyc
+   |  |  |  |  ├── config_handler.cpython-312.pyc
+   |  |  |  |  ├── execution_handler.cpython-312.pyc
+   |  |  |  |  ├── initialization_handler.cpython-312.pyc
+   |  |  |  |  ├── parameter_handler.cpython-312.pyc
+   |  |  |  |  ├── persistence_handler.cpython-312.pyc
+   |  |  |  |  ├── preprocessing_service_handler.cpython-312.pyc
+   |  |  |  |  ├── service_handler.cpython-312.pyc
+   |  |  |  |  ├── state_handler.cpython-312.pyc
+   |  |  |  |  └── status_handler.cpython-312.pyc
    |  |  |  ├── button_handlers.py
    |  |  |  ├── cleanup_handler.py
    |  |  |  ├── config_handler.py
+   |  |  |  ├── execution_handler.py
+   |  |  |  ├── initialization_handler.py
+   |  |  |  ├── observer_handler.py
+   |  |  |  ├── parameter_handler.py
+   |  |  |  ├── persistence_handler.py
+   |  |  |  ├── preprocessing_service_handler.py
+   |  |  |  ├── service_handler.py
    |  |  |  ├── state_handler.py
-   |  |  |  └── visualization_handler.py
+   |  |  |  └── status_handler.py
    |  |  └── preprocessing_initializer.py
-   |  └── split
+   |  ├── split
+   |  |  ├── components
+   |  |  |  └── split_components.py
+   |  |  ├── handlers
+   |  |  |  ├── button_handlers.py
+   |  |  |  ├── config_handlers.py
+   |  |  |  └── ui_handlers.py
+   |  |  ├── split_initializer.py
+   |  |  └── tests
+   |  |     ├── __init__.py
+   |  |     ├── run_tests.py
+   |  |     ├── test_button_handlers.py
+   |  |     ├── test_config_handlers.py
+   |  |     ├── test_drive_handlers.py
+   |  |     └── test_ui_handlers.py
+   |  ├── tests
+   |  |  ├── __pycache__
+   |  |  |  ├── run_all_tests.cpython-312.pyc
+   |  |  |  └── test_config_integration.cpython-312.pyc
+   |  |  ├── run_all_tests.py
+   |  |  └── test_config_integration.py
+   |  └── visualization
+   |     ├── __init__.py
+   |     ├── auto_refresh.py
    |     ├── components
-   |     |  └── split_component.py
+   |     |  ├── __init__.py
+   |     |  ├── dashboard_cards.py
+   |     |  ├── dashboard_component.py
+   |     |  ├── dataset_stats_cards.py
+   |     |  ├── split_stats_cards.py
+   |     |  ├── visualization_components.py
+   |     |  └── visualization_tabs.py
+   |     ├── conflict_resolver.py
    |     ├── handlers
-   |     |  ├── button_handlers.py
-   |     |  └── visualization_handler.py
-   |     └── split_initializer.py
+   |     |  ├── __init__.py
+   |     |  ├── dashboard_handler.py
+   |     |  ├── dashboard_handler_fixed.py
+   |     |  ├── dashboard_handler_new.py
+   |     |  ├── dashboard_handler_test.py
+   |     |  ├── tab_handlers.py
+   |     |  ├── visualization_handler.py
+   |     |  └── visualization_tab_handler.py
+   |     ├── setup.py
+   |     ├── tests
+   |     |  ├── __init__.py
+   |     |  ├── test_dashboard_cards.py
+   |     |  ├── test_dashboard_visualization.py
+   |     |  └── test_visualization_tabs.py
+   |     ├── visualization_initializer.py
+   |     ├── visualization_initializer_new.py
+   |     └── visualization_manager.py
    ├── detection
    |  └── __init_.py
    ├── handlers
    |  ├── __init__.py
+   |  ├── __pycache__
+   |  |  ├── __init__.cpython-312.pyc
+   |  |  ├── error_handler.cpython-312.pyc
+   |  |  ├── observer_handler.cpython-312.pyc
+   |  |  ├── status_handler.cpython-312.pyc
+   |  |  ├── visualization_compare_handler.cpython-312.pyc
+   |  |  ├── visualization_handler.cpython-312.pyc
+   |  |  └── visualization_sample_handler.cpython-312.pyc
+   |  ├── config_handler.py
+   |  ├── config_handlers.py
    |  ├── error_handler.py
    |  ├── multi_progress.py
    |  ├── observer_handler.py
@@ -457,21 +846,44 @@
    |  ├── processing_cleanup_handler.py
    |  ├── progress_handler.py
    |  ├── single_progress.py
-   |  ├── status_handler.py
-   |  └── visualization_handler.py
+   |  └── status_handler.py
    ├── helpers
    |  ├── __init__.py
    |  └── ui_helpers.py
    ├── info_boxes
    |  ├── __init__.py
+   |  ├── __pycache__
+   |  |  ├── __init__.cpython-312.pyc
+   |  |  ├── augmentation_info.cpython-312.pyc
+   |  |  ├── backbones_info.cpython-312.pyc
+   |  |  ├── dataset_info.cpython-312.pyc
+   |  |  ├── dependencies_info.cpython-312.pyc
+   |  |  ├── download_info.cpython-312.pyc
+   |  |  ├── environment_info.cpython-312.pyc
+   |  |  ├── preprocessing_info.cpython-312.pyc
+   |  |  └── split_info.cpython-312.pyc
    |  ├── augmentation_info.py
    |  ├── backbones_info.py
    |  ├── dataset_info.py
    |  ├── dependencies_info.py
    |  ├── download_info.py
    |  ├── environment_info.py
+   |  ├── hyperparameters_info.py
    |  ├── preprocessing_info.py
-   |  └── split_info.py
+   |  ├── split_info.py
+   |  └── training_strategy_info.py
+   ├── model
+   |  ├── __init__.py
+   |  ├── components
+   |  |  └── pretrained_components.py
+   |  ├── handlers
+   |  |  ├── download_handlers.py
+   |  |  ├── simple_download.py
+   |  |  └── sync_handlers.py
+   |  ├── pretrained_initializer.py
+   |  └── tests
+   |     ├── test_simple_download.py
+   |     └── test_ui_components.py
    ├── setup
    |  ├── __init__.py
    |  ├── dependency_installer_component.py
@@ -489,31 +901,108 @@
    |  ├── package_analyzer.py
    |  ├── package_installer.py
    |  └── package_requirements.py
-   ├── training_config
+   ├── training
    |  ├── __init__.py
-   |  ├── backbone_selection_component.py
-   |  ├── backbone_selection_handler.py
-   |  ├── cell_skeleton.py
-   |  ├── config_buttons.py
-   |  ├── config_handler.py
+   |  ├── components
+   |  |  └── training_components.py
    |  ├── handlers
-   |  |  ├── optimization_handler.py
-   |  |  ├── policy_handler.py
-   |  |  └── summary_handler.py
-   |  ├── hyperparameters_component.py
-   |  ├── hyperparameters_handler.py
-   |  ├── model_config_definitions.py
-   |  ├── model_config_extractor.py
-   |  ├── model_ui_updater.py
-   |  ├── training_initializer.py
-   |  ├── training_strategy_component.py
-   |  └── training_strategy_handler.py
+   |  |  ├── __init__.py
+   |  |  ├── button_event_handlers.py
+   |  |  ├── button_handlers.py
+   |  |  ├── setup_handler.py
+   |  |  ├── training_execution_handler.py
+   |  |  ├── training_handler_utils.py
+   |  |  └── training_info_handler.py
+   |  └── training_initializer.py
+   ├── training_config
+   |  ├── backbone
+   |  |  ├── __init__.py
+   |  |  ├── backbone_initializer.py
+   |  |  ├── components
+   |  |  |  ├── __init__.py
+   |  |  |  └── backbone_components.py
+   |  |  ├── handlers
+   |  |  |  ├── __init__.py
+   |  |  |  ├── button_handlers.py
+   |  |  |  ├── config_handlers.py
+   |  |  |  ├── drive_handlers.py
+   |  |  |  └── form_handlers.py
+   |  |  └── tests
+   |  |     ├── __init__.py
+   |  |     ├── run_tests.py
+   |  |     ├── test_backbone_config.py
+   |  |     └── test_drive_handlers.py
+   |  ├── hyperparameters
+   |  |  ├── __init__.py
+   |  |  ├── components
+   |  |  |  ├── __init__.py
+   |  |  |  ├── advanced_components.py
+   |  |  |  ├── basic_components.py
+   |  |  |  ├── button_components.py
+   |  |  |  ├── info_panel_components.py
+   |  |  |  ├── main_components.py
+   |  |  |  └── optimization_components.py
+   |  |  ├── handlers
+   |  |  |  ├── __init__.py
+   |  |  |  ├── button_handlers.py
+   |  |  |  ├── config_handlers.py
+   |  |  |  ├── drive_handlers.py
+   |  |  |  └── form_handlers.py
+   |  |  ├── hyperparameters_initializer.py
+   |  |  └── tests
+   |  |     ├── run_tests.py
+   |  |     ├── test_drive_handlers.py
+   |  |     ├── test_hyperparameters_config.py
+   |  |     └── test_hyperparameters_ui.py
+   |  ├── model
+   |  |  ├── config_extractor.py
+   |  |  └── ui_updater.py
+   |  └── training_strategy
+   |     ├── __init__.py
+   |     ├── components
+   |     |  ├── __init__.py
+   |     |  ├── button_components.py
+   |     |  ├── info_panel_components.py
+   |     |  ├── main_components.py
+   |     |  ├── multiscale_components.py
+   |     |  ├── utils_components.py
+   |     |  └── validation_components.py
+   |     ├── handlers
+   |     |  ├── __init__.py
+   |     |  ├── button_handlers.py
+   |     |  ├── config_handlers.py
+   |     |  ├── drive_handlers.py
+   |     |  └── form_handlers.py
+   |     ├── tests
+   |     |  ├── __init__.py
+   |     |  ├── run_tests.py
+   |     |  ├── test_config.py
+   |     |  ├── test_drive_handlers.py
+   |     |  └── test_ui.py
+   |     └── training_strategy_initializer.py
    └── utils
       ├── __init__.py
+      ├── __pycache__
+      |  ├── __init__.cpython-312.pyc
+      |  ├── alert_utils.cpython-312.pyc
+      |  ├── base_initializer.cpython-312.pyc
+      |  ├── cell_utils.cpython-312.pyc
+      |  ├── constants.cpython-312.pyc
+      |  ├── drive_utils.cpython-312.pyc
+      |  ├── fallback_utils.cpython-312.pyc
+      |  ├── file_utils.cpython-312.pyc
+      |  ├── header_utils.cpython-312.pyc
+      |  ├── info_utils.cpython-312.pyc
+      |  ├── layout_utils.cpython-312.pyc
+      |  ├── logging_utils.cpython-312.pyc
+      |  ├── metric_utils.cpython-312.pyc
+      |  ├── validator_utils.cpython-312.pyc
+      |  └── visualization_utils.cpython-312.pyc
       ├── alert_utils.py
       ├── base_initializer.py
       ├── card_utils.py
       ├── cell_utils.py
+      ├── color_utils.py
       ├── constants.py
       ├── drive_utils.py
       ├── fallback_utils.py
@@ -521,14 +1010,16 @@
       ├── header_utils.py
       ├── info_utils.py
       ├── layout_utils.py
+      ├── loading_indicator.py
       ├── logging_utils.py
       ├── metric_utils.py
+      ├── persistence_utils.py
       ├── ui_logger.py
       ├── validator_utils.py
       ├── visualization_utils.py
       └── widget_utils.py
 
-directory: 90 file: 437
+directory: 168 file: 850
 
 
 

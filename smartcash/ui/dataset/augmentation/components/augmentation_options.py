@@ -1,14 +1,14 @@
 """
 File: smartcash/ui/dataset/augmentation/components/augmentation_options.py
-Deskripsi: Komponen opsi augmentasi untuk augmentasi dataset
+Deskripsi: Komponen UI untuk opsi augmentasi dataset
 """
 
 import ipywidgets as widgets
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List, Optional
 
-def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
+def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     """
-    Buat komponen UI untuk opsi augmentasi.
+    Buat komponen UI untuk opsi augmentasi dataset.
     
     Args:
         config: Konfigurasi aplikasi
@@ -16,185 +16,163 @@ def create_augmentation_options(config: Optional[Dict[str, Any]] = None) -> widg
     Returns:
         Widget VBox berisi opsi augmentasi
     """
-    # Dapatkan nilai default dari config jika tersedia
-    num_variations = 2
-    output_prefix = 'aug'
-    balance_classes = True
-    num_workers = 4
-    target_count = 1000
-    move_to_preprocessed = True
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.common.config.manager import get_config_manager
     
-    # Nilai default untuk augmentasi
-    aug_type = 'combined'
-    target_split = 'train'
+    # Dapatkan konfigurasi augmentasi
+    config_manager = get_config_manager()
+    aug_config = config_manager.get_module_config('augmentation')
     
-    # Opsi yang tersedia
-    available_aug_types = ['combined', 'flip', 'rotate', 'blur', 'noise', 'contrast', 'brightness', 'saturation', 'hue', 'cutout']
+    # Daftar jenis augmentasi yang tersedia
+    available_types = [
+        'combined',  # Kombinasi posisi dan pencahayaan (direkomendasikan)
+        'position',  # Variasi posisi seperti rotasi, flipping, dan scaling
+        'lighting'   # Variasi pencahayaan seperti brightness, contrast dan HSV
+    ]
+    
+    # Daftar split yang tersedia
     available_splits = ['train', 'valid', 'test']
     
-    if config and 'augmentation' in config:
-        aug_config = config['augmentation']
-        num_variations = aug_config.get('num_variations', num_variations)
-        output_prefix = aug_config.get('output_prefix', output_prefix)
-        balance_classes = aug_config.get('balance_classes', balance_classes)
-        num_workers = aug_config.get('num_workers', num_workers)
-        target_count = aug_config.get('target_count', target_count)
-        move_to_preprocessed = aug_config.get('move_to_preprocessed', move_to_preprocessed)
-        
-        # Ambil nilai dari config jika tersedia
-        if 'types' in aug_config and isinstance(aug_config['types'], list) and aug_config['types']:
-            aug_type = aug_config['types'][0]
-        
-        if 'split' in aug_config:
-            target_split = aug_config['split']
-            
-        # Pastikan nilai valid
-        if aug_type not in available_aug_types:
-            aug_type = 'combined'
-            
-        if target_split not in available_splits:
-            target_split = 'train'
+    # Opsi dasar
+    aug_enabled = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('enabled', True),
+        description='Aktifkan Augmentasi',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
     
-    # Buat tab untuk opsi dasar dan opsi lanjutan
-    basic_tab = widgets.VBox()
-    advanced_tab = widgets.VBox()
-    
-    # Tab 1: Opsi Dasar
-    factor_slider = widgets.IntSlider(
-        value=num_variations,
+    # Jumlah variasi per gambar
+    num_variations = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('num_variations', 2),
         min=1,
         max=10,
         step=1,
-        description='Jumlah variasi:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+        description='Jumlah Variasi:',
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='95%')
     )
     
-    prefix_text = widgets.Text(
-        value=output_prefix,
-        description='File prefix:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+    # Jenis augmentasi (multi-select) dengan deskripsi
+    aug_types_options = [
+        ('Combined: Kombinasi posisi dan pencahayaan (direkomendasikan)', 'combined'),
+        ('Position: Variasi posisi seperti rotasi, flipping, dan scaling', 'position'),
+        ('Lighting: Variasi pencahayaan seperti brightness, contrast dan HSV', 'lighting')
+    ]
+    
+    aug_types = widgets.SelectMultiple(
+        options=aug_types_options,
+        value=aug_config.get('augmentation', {}).get('types', ['combined']),
+        description='Jenis Augmentasi:',
+        disabled=False,
+        layout=widgets.Layout(width='95%', height='120px')
     )
     
-    # Multiple select untuk memilih jenis augmentasi
-    aug_types_select = widgets.SelectMultiple(
-        options=[
-            ('Combined (Recommended)', 'combined'),
-            ('Flip', 'flip'),
-            ('Rotate', 'rotate'),
-            ('Blur', 'blur'),
-            ('Noise', 'noise'),
-            ('Contrast', 'contrast'),
-            ('Brightness', 'brightness'),
-            ('Saturation', 'saturation'),
-            ('Hue', 'hue'),
-            ('Cutout', 'cutout')
-        ],
-        value=[aug_type],
-        description='Jenis augmentasi:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%', height='120px')
+    # Target split
+    target_split = widgets.Dropdown(
+        options=available_splits,
+        value=aug_config.get('augmentation', {}).get('target_split', 'train'),
+        description='Target Split:',
+        disabled=False,
+        layout=widgets.Layout(width='95%')
     )
     
-    # Label bantuan untuk SelectMultiple
-    aug_types_help = widgets.HTML(
-        value="<div style='margin-top: -15px; margin-bottom: 10px; font-size: 12px; color: #666;'>"
-              "<i>Tahan Ctrl/Cmd untuk memilih beberapa jenis augmentasi</i></div>"
+    # Prefix output
+    output_prefix = widgets.Text(
+        value=aug_config.get('augmentation', {}).get('output_prefix', 'aug'),
+        placeholder='Prefix untuk file hasil augmentasi',
+        description='Output Prefix:',
+        disabled=False,
+        layout=widgets.Layout(width='95%')
     )
     
-    # Dropdown untuk memilih target split
-    split_dropdown = widgets.Dropdown(
-        options=[
-            ('Train', 'train'),
-            ('Validation', 'valid'),
-            ('Test', 'test')
-        ],
-        value=target_split,
-        description='Target split:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
-    )
-    
-    # Tab 2: Opsi Lanjutan
-    balance_checkbox = widgets.Checkbox(
-        value=balance_classes,
-        description='Balance kelas',
-        style={'description_width': 'initial'}
-    )
-    
-    target_count_slider = widgets.IntSlider(
-        value=target_count,
+    # Target jumlah per kelas
+    target_count = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('target_count', 1000),
         min=100,
         max=5000,
         step=100,
-        description='Target per kelas:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+        description='Target per Kelas:',
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='95%')
     )
     
-    num_workers_slider = widgets.IntSlider(
-        value=num_workers,
+    # Balancing kelas
+    balance_classes = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('balance_classes', True),
+        description='Balancing Kelas',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Pindahkan ke preprocessed
+    move_to_preprocessed = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('move_to_preprocessed', True),
+        description='Pindahkan ke Preprocessed',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Validasi hasil
+    validate_results = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('validate_results', True),
+        description='Validasi Hasil',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Resume augmentasi
+    resume = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('resume', False),
+        description='Resume Augmentasi',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Jumlah workers
+    num_workers = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('num_workers', 4),
         min=1,
         max=16,
         step=1,
-        description='Workers:',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+        description='Jumlah Workers:',
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='95%')
     )
     
-    move_to_preprocessed_checkbox = widgets.Checkbox(
-        value=move_to_preprocessed,
-        description='Pindahkan ke preprocessed',
-        style={'description_width': 'initial'}
-    )
+    # Layout opsi dasar
+    basic_options = widgets.VBox([
+        widgets.HBox([aug_enabled, balance_classes], layout=widgets.Layout(justify_content='space-between')),
+        widgets.HBox([move_to_preprocessed, validate_results], layout=widgets.Layout(justify_content='space-between')),
+        widgets.HBox([resume], layout=widgets.Layout(justify_content='flex-start')),
+        num_variations,
+        target_count,
+        num_workers,
+        output_prefix
+    ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
-    # Deskripsi singkat dengan informasi tambahan tentang default values
-    description = widgets.HTML(
-        value=f"""<div style="margin: 10px 0; padding: 8px; background-color: #f8f9fa; border-left: 3px solid #5bc0de;">
-            <p style="margin: 0;"><strong>Augmentasi</strong> akan memperbanyak data training dengan kombinasi variasi posisi, 
-            pencahayaan, dan rotasi untuk meningkatkan akurasi model.</p>
-        </div>"""
-    )
+    # Layout jenis augmentasi
+    augmentation_types_box = widgets.VBox([
+        aug_types,
+        target_split
+    ], layout=widgets.Layout(padding='10px', border='1px solid #ddd', width='100%'))
     
-    # Isi tab dasar
-    basic_tab.children = [
-        aug_types_select,
-        aug_types_help,
-        prefix_text,
-        factor_slider,
-        split_dropdown
-    ]
+    # Tab untuk opsi dasar dan jenis augmentasi
+    tabs = widgets.Tab(children=[basic_options, augmentation_types_box])
+    tabs.set_title(0, f"{ICONS['settings']} Opsi Dasar")
+    tabs.set_title(1, f"{ICONS['augmentation']} Jenis Augmentasi")
     
-    # Isi tab lanjutan
-    advanced_tab.children = [
-        balance_checkbox,
-        target_count_slider,
-        num_workers_slider,
-        move_to_preprocessed_checkbox
-    ]
+    # Container utama
+    container = widgets.VBox([
+        tabs
+    ], layout=widgets.Layout(margin='10px 0'))
     
-    # Buat tab container
-    tab = widgets.Tab()
-    tab.children = [basic_tab, advanced_tab]
-    tab.set_title(0, 'Opsi Dasar')
-    tab.set_title(1, 'Opsi Lanjutan')
-    
-    # Gabungkan dalam container dengan komponen yang diperbarui
-    result = widgets.VBox([
-        description,
-        tab
-    ])
-    
-    # Simpan referensi ke komponen UI untuk diakses oleh handler
-    result.aug_types_select = aug_types_select
-    result.aug_types_help = aug_types_help
-    result.split_dropdown = split_dropdown
-    result.prefix_text = prefix_text
-    result.factor_slider = factor_slider
-    result.balance_checkbox = balance_checkbox
-    result.target_count_slider = target_count_slider
-    result.num_workers_slider = num_workers_slider
-    result.move_to_preprocessed_checkbox = move_to_preprocessed_checkbox
-    
-    return result
+    return container

@@ -22,55 +22,75 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.augmentation_info import get_augmentation_info
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
+    from smartcash.ui.handlers.status_handler import create_status_panel
     
     # Import komponen submodules augmentasi
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
+    from smartcash.ui.dataset.augmentation.components.split_selector import create_split_selector
+    from smartcash.ui.dataset.augmentation.components.advanced_options import create_advanced_options
     
-    # Import komponen button standar
-    from smartcash.ui.components.action_buttons import create_action_buttons
+    # Import komponen button khusus untuk augmentasi
+    from smartcash.ui.dataset.augmentation.components.action_buttons import create_action_buttons
     from smartcash.ui.components.visualization_buttons import create_visualization_buttons
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
-                          "Augmentasi dataset untuk memperkaya data training")
+                          "Augmentasi dataset untuk meningkatkan performa model SmartCash")
     
     # Panel info status
-    status_panel = widgets.HTML(
-        value=f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']};">
-            <p style="margin:5px 0">{ICONS['info']} Konfigurasi augmentasi dataset</p>
-        </div>"""
-    )
+    status_panel = create_status_panel("Konfigurasi augmentasi dataset", "info")
     
-    # Augmentation options
-    aug_options = create_augmentation_options(config)
+    # Augmentation options (split dari komponen besar)
+    augmentation_options = create_augmentation_options(config)
+    split_selector = create_split_selector()
     
-    # Buat tombol-tombol augmentasi dengan komponen standar
-    action_buttons = create_action_buttons(
-        primary_label="Run Augmentation",
-        primary_icon="cog",
-        cleanup_enabled=True
-    )
+    # Advanced options dalam accordion
+    advanced_options = create_advanced_options(config)
+    
+    # Accordion untuk advanced options - selalu tertutup di awal
+    advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
+    advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
+    
+    # Buat tombol-tombol augmentasi dengan komponen khusus
+    action_buttons = create_action_buttons()
     
     # Tombol-tombol visualisasi dengan komponen standar
-    visualization_buttons = create_visualization_buttons(module_name="augmentation")
+    visualization_buttons = create_visualization_buttons(include_distribution=True)
     
-    # Progress tracking dengan komponen standar
-    from smartcash.ui.components.progress_component import create_progress_component
-    progress_components = create_progress_component(module_name="augmentation")
+    # Progress tracking dengan styling standar
+    progress_bar = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Total:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
     
-    # Ekstrak komponen progress untuk kemudahan akses
-    progress_container = progress_components['container']
-    progress_bar = progress_components['progress_bar']
-    current_progress = progress_components['current_progress']
-    overall_label = progress_components['overall_label']
-    step_label = progress_components['step_label']
+    current_progress = widgets.IntProgress(
+        value=0, min=0, max=100, 
+        description='Kelas:',
+        bar_style='info', 
+        orientation='horizontal',
+        layout=widgets.Layout(visibility='hidden', width='100%')
+    )
+    
+    # Labels untuk progress
+    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
+    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
+    
+    # Container progress dengan styling yang lebih konsisten
+    progress_container = widgets.VBox([
+        widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
+        progress_bar,
+        overall_label,
+        current_progress,
+        step_label
+    ])
     
     # Status output dengan layout standar
     status = widgets.Output(layout=OUTPUT_WIDGET)
     
-    # Log accordion dengan styling standar
+    # Log accordion dengan styling standar - terbuka secara default (selected_index=0)
     log_accordion = widgets.Accordion(children=[status], selected_index=0)
     log_accordion.set_title(0, f"{ICONS['file']} Augmentation Logs")
     
@@ -105,7 +125,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         header,
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Augmentation Settings</h4>"),
-        aug_options,
+        augmentation_options,
+        split_selector,
+        advanced_accordion,
         create_divider(),
         action_buttons['container'],
         progress_container,
@@ -121,7 +143,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
-        'aug_options': aug_options,
+        'augmentation_options': augmentation_options,
+        'advanced_options': advanced_options,
+        'split_selector': split_selector,
+        'advanced_accordion': advanced_accordion,
         'augment_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
         'reset_button': action_buttons['reset_button'],
@@ -143,18 +168,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'module_name': 'augmentation',
         # Default dataset paths
         'data_dir': 'data',
-        'preprocessed_dir': 'data/preprocessed',
-        'augmented_dir': 'data/augmented',
-        
-        # Komponen opsi augmentasi
-        'aug_types_dropdown': aug_options.aug_types_dropdown if hasattr(aug_options, 'aug_types_dropdown') else None,
-        'split_dropdown': aug_options.split_dropdown if hasattr(aug_options, 'split_dropdown') else None,
-        'prefix_text': aug_options.prefix_text if hasattr(aug_options, 'prefix_text') else None,
-        'factor_slider': aug_options.factor_slider if hasattr(aug_options, 'factor_slider') else None,
-        'balance_checkbox': aug_options.balance_checkbox if hasattr(aug_options, 'balance_checkbox') else None,
-        'target_count_slider': aug_options.target_count_slider if hasattr(aug_options, 'target_count_slider') else None,
-        'num_workers_slider': aug_options.num_workers_slider if hasattr(aug_options, 'num_workers_slider') else None,
-        'move_to_preprocessed_checkbox': aug_options.move_to_preprocessed_checkbox if hasattr(aug_options, 'move_to_preprocessed_checkbox') else None
+        'augmented_dir': 'data/augmented'
     }
     
     return ui_components

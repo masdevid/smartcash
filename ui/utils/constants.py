@@ -160,6 +160,8 @@ ICONS = {
     'cleanup': '🧹',
     'dataset': DOMAIN_ICONS['dataset'],
     'cache': '💽',
+    'reset': '🔄',
+    'visualize': '👁️',
     
     # Control icons
     'stop': '🛑',

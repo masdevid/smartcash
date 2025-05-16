@@ -9,7 +9,7 @@ _base_: 'base_config.yaml'
 augmentation:
   # Parameter dasar
   enabled: true
-  num_variations: 2
+  num_variations: 3
   output_prefix: 'aug'
   process_bboxes: true
   output_dir: 'data/augmented'
@@ -22,10 +22,9 @@ augmentation:
   
   # Jenis augmentasi yang didukung
   types: 
-    - 'combined'
-    - 'position'
-    - 'lighting'
-    - 'extreme_rotation'
+    - 'combined'  # Kombinasi posisi dan pencahayaan (direkomendasikan)
+    - 'position'  # Variasi posisi seperti rotasi, flipping, dan scaling
+    - 'lighting'  # Variasi pencahayaan seperti brightness, contrast dan HSV
   
   # Parameter augmentasi posisi
   position:

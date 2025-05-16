@@ -1,33 +1,21 @@
-streamlit>=1.20.0
-torch>=1.8.0
-torchvision>=0.9.0
-numpy>=1.19.0
-pandas>=1.2.0
-pillow>=8.0.0
-matplotlib>=3.4.0
-opencv-python>=4.5.1
-pyyaml>=5.4.0
-scikit-learn>=0.24.0
-timm>=0.5.0
-tensorboard>=2.5.0
-requests>=2.25.0
-pathlib>=1.0.1
-ultralytics>=8.0.0  # Untuk YOLOv5
-pycocotools>=2.0.2
-seaborn>=0.11.0
-ipython>=7.23.0  # Untuk visualisasi notebook
-ipywidgets>=7.6.0  # Untuk progres bar interaktif
-psutil>=5.8.0  # Untuk monitoring sumber daya sistem
-urllib3>=1.26.0
-packaging>=20.9
-albumentations>=1.1.0  # Untuk augmentasi dataset
-h5py>=3.2.0  # Untuk menangani format data HDF5
-shapely>=1.7.0  # Untuk operasi geometris pada bounding box
-jsonschema>=3.2.0
-natsort>=7.0.0  # Untuk pengurutan natural file
-importlib-metadata>=4.0.0
-typing-extensions>=3.7.4
-dataclasses>=0.8; python_version < '3.7'
-future>=0.18.0
-colorama>=0.4.4  # Untuk log berwarna
-rich>=10.0.0  # Untuk log yang lebih baik
+# SmartCash Requirements
+# Catatan: Sebagian besar package dasar sudah didefinisikan di smartcash/ui/setup/package_requirements.py
+# File ini hanya berisi package tambahan yang tidak ada di setup atau yang memerlukan versi spesifik
+
+# Package khusus untuk YOLOv5 dengan EfficientNet-B4 backbone
+yolov5==7.0.14
+
+# Package untuk augmentasi khusus
+albucore==0.0.24
+
+# Package untuk optimasi dan evaluasi model
+pybboxes==0.1.6
+sahi==0.11.21
+thop==0.1.1.post2209072238
+
+# Package untuk integrasi dengan tensorboard
+tensorboard==2.19.0
+
+# Package untuk utilitas tambahan
+python-dotenv==1.0.1
+ipython==8.12.3

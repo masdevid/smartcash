@@ -1,44 +1,105 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer untuk modul augmentasi dataset dengan pendekatan DRY
+Deskripsi: Inisialisasi antarmuka augmentasi dataset
 """
 
-from typing import Dict, Any
-from smartcash.ui.utils.base_initializer import initialize_module_ui
-from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
-from smartcash.ui.dataset.augmentation.handlers.config_handlers import setup_augmentation_config_handler
-from smartcash.ui.dataset.augmentation.handlers.state_handler import detect_augmentation_state
-from smartcash.ui.handlers.visualization_handler import setup_visualization_handlers
+from typing import Dict, Any, Optional
+import ipywidgets as widgets
+from IPython.display import display
+from smartcash.common.logger import get_logger
 
-def setup_augmentation_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
-    """Setup handler spesifik untuk modul augmentasi"""
-    # Setup visualization handlers dengan shared handler
-    return setup_visualization_handlers(ui_components, module_name='augmentation', env=env, config=config)
+def initialize_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
+    """
+    Inisialisasi antarmuka augmentasi dataset.
+    
+    Args:
+        env: Environment manager
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary komponen UI
+    """
+    logger = get_logger('augmentation')
+    
+    # Import komponen UI
+    from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
+    
+    # Buat komponen UI
+    ui_components = create_augmentation_ui(env, config)
+    
+    # Tambahkan logger
+    ui_components['logger'] = logger
+    
+    # Setup handler
+    setup_handlers(ui_components, env, config)
+    
+    # Inisialisasi UI dari konfigurasi
+    if 'update_ui_from_config' in ui_components and callable(ui_components['update_ui_from_config']):
+        ui_components['update_ui_from_config'](ui_components)
+    
+    # Pastikan UI persisten
+    from smartcash.ui.dataset.augmentation.handlers.persistence_handler import ensure_ui_persistence
+    ensure_ui_persistence(ui_components)
+    
+    # Update informasi augmentasi
+    from smartcash.ui.dataset.augmentation.handlers.status_handler import update_augmentation_info
+    update_augmentation_info(ui_components)
+    
+    return ui_components
 
-def initialize_augmentation_ui() -> Dict[str, Any]:
-    """Inisialisasi UI modul augmentasi dataset."""
+def setup_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """
+    Setup handler untuk antarmuka augmentasi dataset.
     
-    # Konfigurasi multi-progress tracking
-    multi_progress_config = {
-        "module_name": "augmentation",
-        "step_key": "augmentation_step",
-        "progress_bar_key": "progress_bar",
-        "current_progress_key": "current_progress",
-        "overall_label_key": "overall_label",
-        "step_label_key": "step_label"
-    }
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment manager
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary komponen UI yang diupdate
+    """
+    # Import handler
+    from smartcash.ui.dataset.augmentation.handlers.button_handlers import setup_button_handlers
+    from smartcash.ui.dataset.augmentation.handlers.config_handler import update_config_from_ui, update_ui_from_config
+    from smartcash.ui.dataset.augmentation.handlers.initialization_handler import register_progress_callback, reset_progress_bar
     
-    # Tombol yang perlu diattach dengan ui_components
-    button_keys = ['augment_button', 'stop_button', 'reset_button', 'cleanup_button', 'save_button']
+    # Setup handler
+    ui_components = setup_button_handlers(ui_components, env, config)
     
-    # Gunakan base initializer
-    return initialize_module_ui(
-        module_name='augmentation',
-        create_ui_func=create_augmentation_ui,
-        setup_config_handler_func=setup_augmentation_config_handler,
-        setup_specific_handlers_func=setup_augmentation_handlers,
-        detect_state_func=detect_augmentation_state,
-        button_keys=button_keys,
-        multi_progress_config=multi_progress_config,
-        observer_group="augmentation_observers"
-    )
+    # Tambahkan referensi ke handler
+    ui_components['update_config_from_ui'] = update_config_from_ui
+    ui_components['update_ui_from_config'] = update_ui_from_config
+    ui_components['register_progress_callback'] = register_progress_callback
+    ui_components['reset_progress_bar'] = reset_progress_bar
+    
+    return ui_components
+
+def display_augmentation_ui(ui_components: Dict[str, Any]) -> None:
+    """
+    Tampilkan antarmuka augmentasi dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    # Tampilkan UI
+    display(ui_components['ui'])
+
+def create_and_display_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
+    """
+    Buat dan tampilkan antarmuka augmentasi dataset.
+    
+    Args:
+        env: Environment manager
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary komponen UI
+    """
+    # Inisialisasi UI
+    ui_components = initialize_augmentation_ui(env, config)
+    
+    # Tampilkan UI
+    display_augmentation_ui(ui_components)
+    
+    return ui_components

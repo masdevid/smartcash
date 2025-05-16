@@ -55,7 +55,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     action_buttons = create_action_buttons()
     
     # Tombol-tombol visualisasi dengan komponen standar
-    visualization_buttons = create_visualization_buttons(include_distribution=True)
+    visualization_buttons = create_visualization_buttons(module_name="augmentation")
     
     # Progress tracking dengan styling standar
     progress_bar = widgets.IntProgress(

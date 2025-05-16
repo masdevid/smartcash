@@ -295,7 +295,7 @@ def sync_all_configs(
             # Cek jika realpath sama
             if os.path.realpath(local_config_dir / file_name) == os.path.realpath(drive_config_dir / file_name):
                 msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
-                logger.info(STATUS_INFO.format(message=msg))
+                logger.debug(STATUS_INFO.format(message=msg))
                 results["skipped"].append({"file": file_name, "message": msg})
                 continue
             
@@ -318,14 +318,15 @@ def sync_all_configs(
         except Exception as e:
             results["failure"].append({"file": file_name, "message": str(e)})
     
-    # Log hasil
+    # Log hasil hanya jika ada perubahan atau error
     counts = {k: len(v) for k, v in results.items()}
-    logger.info(
-        OPERATION_COMPLETED.format(
-            operation=f"Sinkronisasi {len(all_config_files)} file",
-            duration=f"{counts['success']} disinkronisasi, {counts['skipped']} dilewati, {counts['failure']} gagal"
+    if counts['success'] > 0 or counts['failure'] > 0:
+        logger.info(
+            OPERATION_COMPLETED.format(
+                operation=f"Sinkronisasi {len(all_config_files)} file",
+                duration=f"{counts['success']} disinkronisasi, {counts['skipped']} dilewati, {counts['failure']} gagal"
+            )
         )
-    )
     
     return results
     
@@ -353,13 +354,13 @@ def sync_all_configs(
     
     # Sinkronisasi setiap file
     for file_name in all_config_files:
-        logger.info(f"🔄 Sinkronisasi {file_name}...")
+        logger.debug(f"🔄 Sinkronisasi {file_name}...")
         
         try:
             # Cek jika realpath sama
             if os.path.realpath(local_config_dir / file_name) == os.path.realpath(drive_config_dir / file_name):
                 msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
-                logger.info(f"ℹ️ {msg}")
+                logger.debug(f"ℹ️ {msg}")
                 results["skipped"].append({"file": file_name, "message": msg})
                 continue
             
@@ -382,11 +383,12 @@ def sync_all_configs(
         except Exception as e:
             results["failure"].append({"file": file_name, "message": str(e)})
     
-    # Log hasil
+    # Log hasil hanya jika ada perubahan atau error
     counts = {k: len(v) for k, v in results.items()}
-    logger.info(
-        f"🔄 Sinkronisasi selesai: {len(all_config_files)} file diproses - "
-        f"{counts['success']} disinkronisasi, {counts['skipped']} dilewati, {counts['failure']} gagal"
-    )
+    if counts['success'] > 0 or counts['failure'] > 0:
+        logger.info(
+            f"🔄 Sinkronisasi selesai: {len(all_config_files)} file diproses - "
+            f"{counts['success']} disinkronisasi, {counts['skipped']} dilewati, {counts['failure']} gagal"
+        )
     
     return results

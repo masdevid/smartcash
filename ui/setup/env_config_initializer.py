@@ -7,6 +7,7 @@ from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.setup.env_config_component import create_env_config_ui
 from smartcash.ui.setup.env_config_handlers import setup_env_config_handlers
+from smartcash.ui.utils.ui_logger import auto_intercept_when_ready, log_to_ui
 
 # Helper function untuk disable UI selama processing
 def _disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True) -> None:
@@ -57,9 +58,17 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     button_keys = ['save_button', 'reset_button', 'check_button']
     
     # Gunakan base initializer
-    return initialize_module_ui(
+    ui_components = initialize_module_ui(
         module_name='env_config',
         create_ui_func=create_env_config_ui,
         setup_specific_handlers_func=setup_env_config_specific,
         button_keys=button_keys
     )
+    
+    # Aktifkan UI logger saat UI sudah siap
+    auto_intercept_when_ready(ui_components)
+    
+    # Log informasi inisialisasi
+    log_to_ui(ui_components, "Environment config UI berhasil diinisialisasi", "success", "✅")
+    
+    return ui_components

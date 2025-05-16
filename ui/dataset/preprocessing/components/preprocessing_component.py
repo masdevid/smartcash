@@ -57,8 +57,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_enabled=True
     )
     
-    # Tombol-tombol visualisasi dengan komponen standar (tanpa tombol distribusi kelas)
-    visualization_buttons = create_visualization_buttons(include_distribution=False)
+    # Tidak menggunakan tombol visualisasi sample dan bandingkan data
     
     # Progress tracking dengan styling standar
     progress_bar = widgets.IntProgress(
@@ -136,8 +135,6 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         progress_container,
         log_accordion,
         summary_container,
-        visualization_buttons['container'],
-        visualization_container,
         help_panel
     ])
     
@@ -164,11 +161,6 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'status': status,
         'log_accordion': log_accordion,
         'summary_container': summary_container,
-        'visualization_buttons': visualization_buttons['container'],
-        'visualize_button': visualization_buttons['visualize_button'],
-        'compare_button': visualization_buttons['compare_button'],
-        # 'distribution_button' dihapus karena tidak diperlukan lagi
-        'visualization_container': visualization_container,
         'module_name': 'preprocessing',
         # Default dataset paths
         'data_dir': 'data',

@@ -387,14 +387,31 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
                 # Update nilai dari tab kedua (jenis augmentasi)
                 aug_types_tab = aug_options.children[0].children[1]  # Tab -> aug_types_tab
                 
+                # Jenis augmentasi
+                try:
+                    aug_types_widget = ui_components['augmentation_options'].children[0].children[1].children[0]
+                    if hasattr(aug_types_widget, 'value'):
+                        # Dapatkan nilai dari konfigurasi atau default
+                        aug_types = aug_config.get('types', ['combined'])
+                        
+                        # Validasi nilai aug_types terhadap opsi yang tersedia
+                        available_options = [opt[1] for opt in aug_types_widget.options]
+                        valid_aug_types = [t for t in aug_types if t in available_options]
+                        
+                        # Jika tidak ada nilai valid, gunakan default
+                        if not valid_aug_types:
+                            valid_aug_types = ['combined'] if 'combined' in available_options else [available_options[0]]
+                        
+                        # Update widget dengan nilai yang valid
+                        aug_types_widget.value = tuple(valid_aug_types)
+                        logger.info(f"🔍 Berhasil memperbarui aug_types: {valid_aug_types}")
+                except Exception as e:
+                    logger.warning(f"🔶 Gagal memperbarui nilai aug_types: {str(e)}")
+                
                 # Update nilai dari jenis augmentasi
                 for child in aug_types_tab.children:
                     if hasattr(child, 'description') and hasattr(child, 'value'):
-                        if child.description == 'Jenis Augmentasi:':
-                            types_value = aug_config.get('types', ['combined'])
-                            if isinstance(types_value, list) and len(types_value) > 0:
-                                child.value = tuple(types_value)
-                        elif child.description == 'Target Split:':
+                        if child.description == 'Target Split:':
                             child.value = aug_config.get('target_split', 'train')
             elif is_from_test:
                 # Struktur mock sederhana untuk pengujian lainnya

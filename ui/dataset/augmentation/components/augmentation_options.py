@@ -23,6 +23,12 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     config_manager = get_config_manager()
     aug_config = config_manager.get_module_config('augmentation')
     
+    # Pastikan aug_config memiliki struktur yang benar
+    if not aug_config:
+        aug_config = {}
+    if 'augmentation' not in aug_config:
+        aug_config['augmentation'] = {}
+    
     # Daftar jenis augmentasi yang tersedia
     available_types = [
         'combined',  # Kombinasi posisi dan pencahayaan (direkomendasikan)
@@ -62,9 +68,21 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
         ('Lighting: Variasi pencahayaan seperti brightness, contrast dan HSV', 'lighting')
     ]
     
+    # Dapatkan nilai types dari konfigurasi atau gunakan default
+    aug_types_value = aug_config.get('augmentation', {}).get('types', ['combined'])
+    
+    # Validasi nilai aug_types terhadap opsi yang tersedia
+    available_values = [opt[1] for opt in aug_types_options]
+    valid_aug_types = [t for t in aug_types_value if t in available_values]
+    
+    # Jika tidak ada nilai valid, gunakan default
+    if not valid_aug_types:
+        valid_aug_types = ['combined']
+    
+    # Pastikan nilai adalah tuple untuk SelectMultiple
     aug_types = widgets.SelectMultiple(
         options=aug_types_options,
-        value=aug_config.get('augmentation', {}).get('types', ['combined']),
+        value=tuple(valid_aug_types),
         description='Jenis Augmentasi:',
         disabled=False,
         layout=widgets.Layout(width='95%', height='120px')

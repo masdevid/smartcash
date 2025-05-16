@@ -69,47 +69,32 @@ def run_augmentation(ui_components: Dict[str, Any], config: Optional[Dict[str, A
         execution_time = time.time() - start_time
         result['execution_time'] = execution_time
 
-        # Notifikasi observer bahwa proses telah selesai
-        notify_process_complete(ui_components, result, display_info)
-
-        # Update status di UI
-        if status:
-            with status:
-                clear_output(wait=True)
-                display(create_status_indicator("success", f"{ICONS['success']} Augmentasi selesai dalam {execution_time:.2f} detik"))
-
-        return result
-        
         # Cek hasil augmentasi
-        if result['status'] == 'success':
+        if result.get('status') == 'success':
             logger.info(f"{ICONS['success']} Augmentasi berhasil dijalankan")
             
-            # Tambahkan path output jika tidak ada
-            if 'output_dir' not in result:
-                result['output_dir'] = directories['output_dir']
+            # Notifikasi observer bahwa proses telah selesai
+            notify_process_complete(ui_components, result, display_info)
             
-            # Update status panel
-            update_status_panel(ui_components, "success", 
-                f"{ICONS['success']} Augmentasi dataset berhasil diselesaikan")
+            # Update status di UI
+            if status:
+                with status:
+                    clear_output(wait=True)
+                    display(create_status_indicator("success", f"{ICONS['success']} Augmentasi selesai dalam {execution_time:.2f} detik"))
             
-            # Notifikasi observer tentang selesai
-            notify_process_complete(ui_components, result, split_info)
-            
-            return {
-                'status': 'success',
-                'message': f"Augmentasi {split_info} berhasil diselesaikan",
-                'result': result
-            }
+            return result
         else:
             error_message = result.get('message', 'Terjadi kesalahan saat augmentasi')
             logger.error(f"{ICONS['error']} {error_message}")
             
-            # Update status panel
-            update_status_panel(ui_components, "error", 
-                f"{ICONS['error']} Augmentasi gagal: {error_message}")
-            
             # Notifikasi observer tentang error
             notify_process_error(ui_components, error_message)
+            
+            # Update status di UI
+            if status:
+                with status:
+                    clear_output(wait=True)
+                    display(create_status_indicator("error", f"{ICONS['error']} Augmentasi gagal: {error_message}"))
             
             return {
                 'status': 'error',
@@ -120,12 +105,15 @@ def run_augmentation(ui_components: Dict[str, Any], config: Optional[Dict[str, A
         error_message = str(e)
         logger.error(f"{ICONS['error']} Error saat augmentasi dataset: {error_message}")
         
-        # Update status panel
-        update_status_panel(ui_components, "error", 
-            f"{ICONS['error']} Augmentasi gagal: {error_message}")
-        
         # Notifikasi observer tentang error
         notify_process_error(ui_components, error_message)
+        
+        # Update status di UI
+        status = ui_components.get('status')
+        if status:
+            with status:
+                clear_output(wait=True)
+                display(create_status_indicator("error", f"{ICONS['error']} Augmentasi gagal: {error_message}"))
         
         return {
             'status': 'error',

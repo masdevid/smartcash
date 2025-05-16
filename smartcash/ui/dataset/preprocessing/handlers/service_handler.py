@@ -27,7 +27,7 @@ def get_dataset_manager(ui_components: Dict[str, Any], config: Optional[Dict[str
     
     try:
         # Import dataset manager
-        from smartcash.dataset.services.dataset_manager import DatasetManager
+        from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
         
         # Dapatkan path dari UI components
         data_dir = ui_components.get('data_dir', 'data')
@@ -37,10 +37,17 @@ def get_dataset_manager(ui_components: Dict[str, Any], config: Optional[Dict[str
         data_dir_str = str(data_dir) if isinstance(data_dir, Path) else data_dir
         preprocessed_dir_str = str(preprocessed_dir) if isinstance(preprocessed_dir, Path) else preprocessed_dir
         
+        # Buat konfigurasi untuk PreprocessingManager
+        preprocessing_config = {
+            'preprocessing': {
+                'raw_dataset_dir': data_dir_str,
+                'preprocessed_dir': preprocessed_dir_str
+            }
+        }
+        
         # Buat instance dataset manager
-        dataset_manager = DatasetManager(
-            dataset_dir=data_dir_str,
-            preprocessed_dir=preprocessed_dir_str,
+        dataset_manager = PreprocessingManager(
+            config=preprocessing_config,
             logger=logger
         )
         

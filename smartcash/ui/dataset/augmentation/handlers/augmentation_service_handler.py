@@ -3,13 +3,14 @@ File: smartcash/ui/dataset/augmentation/handlers/augmentation_service_handler.py
 Deskripsi: Handler untuk mengelola AugmentationService
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.dataset.services.augmentor import AugmentationService
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.augmentation.handlers.observer_handler import (
     notify_process_start, notify_process_complete, notify_process_error
 )
+from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_augmentation_config
 
 logger = get_logger("augmentation_service_handler")
 
@@ -113,6 +114,49 @@ def execute_augmentation(
     except Exception as e:
         logger.error(f"❌ Error saat eksekusi augmentasi: {str(e)}")
         return {"status": "error", "message": f"Error saat eksekusi augmentasi: {str(e)}"}
+
+def get_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Dapatkan konfigurasi augmentasi dari UI components atau load dari file.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi augmentasi
+    """
+    try:
+        # Cek apakah konfigurasi sudah ada di UI components
+        if 'config' in ui_components and ui_components['config'] and 'augmentation' in ui_components['config']:
+            logger.debug(f"{ICONS['info']} Menggunakan konfigurasi augmentasi dari UI components")
+            return ui_components['config']
+        
+        # Jika tidak ada, load dari ConfigManager
+        logger.debug(f"{ICONS['info']} Loading konfigurasi augmentasi dari ConfigManager")
+        # Gunakan fungsi get_augmentation_config dari config_persistence
+        from smartcash.ui.dataset.augmentation.handlers.config_persistence import get_augmentation_config as get_config
+        config = get_config()
+        
+        # Simpan ke UI components untuk penggunaan berikutnya
+        ui_components['config'] = config
+        
+        return config
+    except Exception as e:
+        logger.warning(f"⚠️ Error saat mendapatkan konfigurasi augmentasi: {str(e)}")
+        # Kembalikan konfigurasi default
+        return {
+            'augmentation': {
+                'types': ['combined'],
+                'num_variations': 2,
+                'output_prefix': 'aug_',
+                'validate_results': True,
+                'process_bboxes': True,
+                'target_balance': True,
+                'num_workers': 4,
+                'move_to_preprocessed': True,
+                'target_count': 1000
+            }
+        }
 
 def stop_augmentation(augmentation_service: AugmentationService) -> bool:
     """

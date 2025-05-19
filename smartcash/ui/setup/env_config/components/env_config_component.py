@@ -92,4 +92,6 @@ class EnvConfigComponent:
             self.ui_components.get('progress_bar', None),
             self.ui_components.get('progress_message', None)
         ])
+        # Filter out None values from the VBox children
+        ui_layout.children = [child for child in ui_layout.children if child is not None]
         display(ui_layout)

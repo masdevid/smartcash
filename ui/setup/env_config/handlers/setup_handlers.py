@@ -1,67 +1,136 @@
 """
 File: smartcash/ui/setup/env_config/handlers/setup_handlers.py
-Deskripsi: Setup handler untuk UI konfigurasi environment
+Deskripsi: Setup handler untuk konfigurasi environment
 """
 
-import logging
-from typing import Dict, Any, Callable
-from IPython import get_ipython
+from typing import Dict, Any
 import asyncio
+from pathlib import Path
 
-from smartcash.ui.setup.env_config.utils.environment_detector import detect_environment
-from smartcash.ui.utils.logging_utils import create_cleanup_function
+from smartcash.common.environment import EnvironmentManager
+from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.singleton import Singleton
 
-def setup_env_config_handlers(ui_components: Dict[str, Any], env_manager: Any, config_manager: Any) -> Dict[str, Any]:
+def setup_env_config_handlers(ui_components: Dict[str, Any], env_manager: EnvironmentManager, config_manager: ConfigManager) -> None:
     """
-    Setup handler untuk UI konfigurasi environment
+    Setup handler untuk konfigurasi environment
     
     Args:
-        ui_components: Dictionary berisi komponen UI
-        env_manager: Environment manager
-        config_manager: Konfigurasi manager
-    
-    Returns:
-        Dictionary berisi komponen UI yang telah diupdate
+        ui_components: Dictionary UI components
+        env_manager: Environment manager instance
+        config_manager: Config manager instance
     """
-    # Detect environment
-    ui_components = detect_environment(ui_components, env_manager)
+    logger = ui_components['logger']
+    output = ui_components['output']
     
-    # Setup handler untuk tombol
-    from smartcash.ui.setup.env_config.handlers.drive_button_handler import setup_drive_button_handler
-    from smartcash.ui.setup.env_config.handlers.directory_button_handler import setup_directory_button_handler
-    from smartcash.ui.setup.env_config.handlers.sync_button_handler import setup_sync_button_handler
+    async def on_sync_click(b):
+        """
+        Handler untuk tombol sinkronisasi
+        """
+        try:
+            # Nonaktifkan tombol
+            ui_components['sync_button'].disabled = True
+            ui_components['check_button'].disabled = True
+            ui_components['save_button'].disabled = True
+            
+            # Update progress
+            ui_components['progress_message'].value = "Sinkronisasi konfigurasi..."
+            ui_components['progress_message'].layout.visibility = 'visible'
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            ui_components['progress_bar'].value = 25
+            
+            # Sinkronkan dengan Google Drive
+            success, message, _ = config_manager.sync_with_drive(config_manager.config_file)
+            if not success:
+                raise Exception(message)
+            
+            # Update progress
+            ui_components['progress_bar'].value = 100
+            ui_components['progress_message'].value = "Sinkronisasi selesai"
+            logger.info("Konfigurasi berhasil disinkronkan")
+            
+        except Exception as e:
+            logger.error(f"Gagal sinkronisasi konfigurasi: {str(e)}")
+            ui_components['progress_message'].value = f"Error: {str(e)}"
+        finally:
+            # Aktifkan kembali tombol
+            ui_components['sync_button'].disabled = False
+            ui_components['check_button'].disabled = False
+            ui_components['save_button'].disabled = False
     
-    setup_drive_button_handler(ui_components, config_manager)
-    setup_directory_button_handler(ui_components, config_manager)
-    setup_sync_button_handler(ui_components, config_manager)
+    async def on_check_click(b):
+        """
+        Handler untuk tombol cek environment
+        """
+        try:
+            # Nonaktifkan tombol
+            ui_components['sync_button'].disabled = True
+            ui_components['check_button'].disabled = True
+            ui_components['save_button'].disabled = True
+            
+            # Update progress
+            ui_components['progress_message'].value = "Memeriksa environment..."
+            ui_components['progress_message'].layout.visibility = 'visible'
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            ui_components['progress_bar'].value = 25
+            
+            # Cek environment
+            with output:
+                output.clear_output()
+                print("=== Status Environment ===")
+                print(f"Environment: {'Colab' if Singleton.is_colab_environment() else 'Lokal'}")
+                print(f"Base Directory: {config_manager.base_dir}")
+                print(f"Config File: {config_manager.config_file}")
+                print("========================")
+            
+            # Update progress
+            ui_components['progress_bar'].value = 100
+            ui_components['progress_message'].value = "Pemeriksaan selesai"
+            logger.info("Environment berhasil diperiksa")
+            
+        except Exception as e:
+            logger.error(f"Gagal memeriksa environment: {str(e)}")
+            ui_components['progress_message'].value = f"Error: {str(e)}"
+        finally:
+            # Aktifkan kembali tombol
+            ui_components['sync_button'].disabled = False
+            ui_components['check_button'].disabled = False
+            ui_components['save_button'].disabled = False
     
-    # Setup cleanup function
-    cleanup_func = create_cleanup_function(ui_components)
-    _register_cleanup_event(cleanup_func)
+    async def on_save_click(b):
+        """
+        Handler untuk tombol simpan
+        """
+        try:
+            # Nonaktifkan tombol
+            ui_components['sync_button'].disabled = True
+            ui_components['check_button'].disabled = True
+            ui_components['save_button'].disabled = True
+            
+            # Update progress
+            ui_components['progress_message'].value = "Menyimpan konfigurasi..."
+            ui_components['progress_message'].layout.visibility = 'visible'
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            ui_components['progress_bar'].value = 25
+            
+            # Simpan konfigurasi
+            config_manager.save_config()
+            
+            # Update progress
+            ui_components['progress_bar'].value = 100
+            ui_components['progress_message'].value = "Konfigurasi berhasil disimpan"
+            logger.info("Konfigurasi berhasil disimpan")
+            
+        except Exception as e:
+            logger.error(f"Gagal menyimpan konfigurasi: {str(e)}")
+            ui_components['progress_message'].value = f"Error: {str(e)}"
+        finally:
+            # Aktifkan kembali tombol
+            ui_components['sync_button'].disabled = False
+            ui_components['check_button'].disabled = False
+            ui_components['save_button'].disabled = False
     
-    return ui_components
-
-def _register_cleanup_event(cleanup_function: Callable) -> bool:
-    """Register cleanup function ke IPython event
-    
-    Args:
-        cleanup_function: Fungsi cleanup yang akan dijalankan
-        
-    Returns:
-        bool: True jika berhasil mendaftarkan fungsi, False jika gagal
-    """
-    try:
-        # Coba dapatkan IPython shell
-        ipython = get_ipython()
-        if ipython is not None:
-            # Register cleanup function ke pre_run_cell event
-            ipython.events.register('pre_run_cell', cleanup_function)
-            logging.info(f"✅ Berhasil mendaftarkan {cleanup_function.__qualname__} ke event pre_run_cell")
-            return True
-        else:
-            logging.warning("⚠️ IPython shell tidak ditemukan")
-            return True  # Tetap kembalikan True untuk unit testing
-    except Exception as e:
-        logging.warning(f"⚠️ Gagal mendaftarkan cleanup function: {str(e)}")
-        return True  # Tetap kembalikan True untuk unit testing
-    return True
+    # Register handlers
+    ui_components['sync_button'].on_click(lambda b: asyncio.create_task(on_sync_click(b)))
+    ui_components['check_button'].on_click(lambda b: asyncio.create_task(on_check_click(b)))
+    ui_components['save_button'].on_click(lambda b: asyncio.create_task(on_save_click(b)))

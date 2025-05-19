@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/env_config_initializer.py
-Deskripsi: Initializer untuk konfigurasi environment dengan alur otomatis yang lebih robust
+Deskripsi: Initializer untuk konfigurasi environment dengan dukungan Google Colab
 """
 
 from typing import Dict, Any, Optional
@@ -13,11 +13,14 @@ from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_conf
 from smartcash.ui.setup.env_config.handlers.auto_check_handler import setup_auto_check_handler
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config.singleton import Singleton
 from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+from smartcash.common.constants.paths import COLAB_PATH
+from smartcash.common.constants.core import DEFAULT_CONFIG_DIR, APP_NAME
 
 async def _sync_configs(config_manager: Any, ui_components: Dict[str, Any]) -> None:
     """
-    Sinkronkan konfigurasi dengan Google Drive dan Colab
+    Sinkronkan konfigurasi dengan Google Drive
     
     Args:
         config_manager: Config manager instance
@@ -33,15 +36,10 @@ async def _sync_configs(config_manager: Any, ui_components: Dict[str, Any]) -> N
         ui_components['progress_bar'].value = 25
         
         # Sinkronkan dengan Google Drive
-        await config_manager.sync_with_drive()
-        ui_components['progress_bar'].value = 50
+        success, message, _ = config_manager.sync_with_drive(config_manager.config_file)
+        if not success:
+            raise Exception(message)
         
-        # Sinkronkan dengan Colab jika dalam environment Colab
-        if config_manager.is_colab_environment():
-            await config_manager.sync_with_colab()
-            ui_components['progress_bar'].value = 75
-        
-        # Update status
         ui_components['progress_bar'].value = 100
         ui_components['progress_message'].value = "Sinkronisasi selesai"
         logger.info("Konfigurasi berhasil disinkronkan")
@@ -64,8 +62,15 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     env_manager = get_environment_manager()
     
     # Inisialisasi config manager dengan path yang sesuai
-    base_dir = str(Path.home() / '.smartcash')
-    config_file = str(Path(base_dir) / 'config.yaml')
+    if Singleton.is_colab_environment():
+        # Gunakan path Colab
+        base_dir = f"{COLAB_PATH}/{APP_NAME}"
+        config_file = f"{DEFAULT_CONFIG_DIR}/config.yaml"
+    else:
+        # Gunakan path lokal
+        base_dir = str(Path.home() / APP_NAME)
+        config_file = str(Path(base_dir) / DEFAULT_CONFIG_DIR / 'config.yaml')
+    
     config_manager = get_config_manager(base_dir=base_dir, config_file=config_file)
     
     # Buat komponen UI

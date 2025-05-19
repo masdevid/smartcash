@@ -11,7 +11,7 @@ from IPython.display import display, HTML, clear_output
 import asyncio
 from datetime import datetime
 
-from smartcash.common.config.singleton import ConfigManager
+from smartcash.common.config.manager import ConfigManager
 from smartcash.common.config.colab_manager import ColabConfigManager
 from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 from smartcash.common.constants.core import APP_NAME, DEFAULT_CONFIG_DIR

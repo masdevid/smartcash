@@ -32,11 +32,11 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.validation_options import create_validation_options
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
     from smartcash.ui.components.sync_info_message import create_sync_info_message
-    # Tidak menggunakan split_config lagi sesuai permintaan
 
-    # Import komponen submodules augmentasi
-    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
+    # Import komponen terpisah untuk augmentasi
+    from smartcash.ui.dataset.augmentation.components.basic_options_component import create_basic_options_component
     from smartcash.ui.dataset.augmentation.components.advanced_options import create_advanced_options
+    from smartcash.ui.dataset.augmentation.components.augmentation_types_component import create_augmentation_types_component
 
     # Header dengan komponen standar
     header = create_header(f"{ICONS['augmentation']} Dataset Augmentation", 
@@ -45,15 +45,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Panel info status
     status_panel = create_status_panel("Konfigurasi augmentasi dataset", "info")
 
-    # Augmentation options
-    augmentation_options = create_augmentation_options(config)
-
-    # Advanced options dalam accordion
+    # Buat komponen terpisah
+    basic_options = create_basic_options_component(config)
     advanced_options = create_advanced_options(config)
-
-    # Accordion untuk advanced options - selalu tertutup di awal
-    advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
-    advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
+    augmentation_types = create_augmentation_types_component(config)
 
     # Tombol save dan reset dan sync info akan dibuat nanti untuk menghindari duplikasi
     
@@ -104,20 +99,24 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Help panel dengan komponen info_box standar
     help_panel = get_augmentation_info()
 
-    # Import komponen untuk opsi augmentasi (tanpa tab)
-    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
-    combined_options = create_combined_options(config)
+    # Baris 1: Basic Option (50%) dan Advanced Option (50%)
+    row1 = widgets.HBox([
+        # Kolom 1: Basic Option (50%)
+        widgets.VBox([
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Dasar</h4>"),
+            basic_options
+        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px')),
+        
+        # Kolom 2: Advanced Option (50%)
+        widgets.VBox([
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
+            advanced_options
+        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
+    ], layout=widgets.Layout(width='100%', justify_content='space-between'))
     
-    # Baris 1: Opsi Lanjut saja
-    row1 = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-        advanced_options
-    ], layout=widgets.Layout(width='100%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
-    
-    # Baris 2: Hanya Jenis Augmentasi & Split dengan lebar penuh
+    # Baris 2: Jenis Augmentasi & Split (100%)
     row2 = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['augmentation']} Jenis Augmentasi & Target Split</h4>"),
-        combined_options
+        augmentation_types
     ], layout=widgets.Layout(width='100%', padding='5px', margin='10px 0', border='1px solid #eaeaea', border_radius='5px'))
     
     # Container untuk tombol save/reset
@@ -150,11 +149,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
-        'augmentation_options': augmentation_options,
-        'combined_options': combined_options,
+        'basic_options': basic_options,
         'advanced_options': advanced_options,
-        'advanced_accordion': advanced_accordion,
-        # Split selector dihapus karena sudah termasuk dalam combined_options
+        'augmentation_types': augmentation_types,
+        # Komponen lama diganti dengan komponen baru
         'save_reset_buttons': save_reset_buttons,
         'sync_info': sync_info,
         'save_button': save_reset_buttons['save_button'],

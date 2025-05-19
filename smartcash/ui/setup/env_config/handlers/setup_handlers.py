@@ -6,6 +6,7 @@ Deskripsi: Setup handler untuk UI konfigurasi environment
 import logging
 from typing import Dict, Any, Callable
 from IPython import get_ipython
+import asyncio
 
 from smartcash.ui.setup.env_config.utils.environment_detector import detect_environment
 from smartcash.ui.utils.logging_utils import create_cleanup_function
@@ -28,9 +29,11 @@ def setup_env_config_handlers(ui_components: Dict[str, Any], env_manager: Any, c
     # Setup handler untuk tombol
     from smartcash.ui.setup.env_config.handlers.drive_button_handler import setup_drive_button_handler
     from smartcash.ui.setup.env_config.handlers.directory_button_handler import setup_directory_button_handler
+    from smartcash.ui.setup.env_config.handlers.sync_button_handler import setup_sync_button_handler
     
-    setup_drive_button_handler(ui_components)
-    setup_directory_button_handler(ui_components)
+    setup_drive_button_handler(ui_components, config_manager)
+    setup_directory_button_handler(ui_components, config_manager)
+    setup_sync_button_handler(ui_components, config_manager)
     
     # Setup cleanup function
     cleanup_func = create_cleanup_function(ui_components)

@@ -5,6 +5,7 @@ Deskripsi: Komponen UI untuk konfigurasi environment
 
 import ipywidgets as widgets
 from typing import Dict, Any
+from datetime import datetime
 
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.alert_utils import create_info_box
@@ -29,11 +30,14 @@ def create_env_config_ui(env_manager: Any, config_manager: Any) -> Dict[str, Any
         "Setup environment dan direktori untuk SmartCash"
     )
     
-    # Panel status
+    # Panel status dengan informasi sinkronisasi
+    last_sync = config_manager.get_last_sync_time()
+    sync_status = "Terakhir sinkronisasi: " + (last_sync.strftime("%Y-%m-%d %H:%M:%S") if last_sync else "Belum pernah")
+    
     status_panel = widgets.HTML(
         create_info_box(
             "Konfigurasi Environment", 
-            "Sistem akan melakukan pemeriksaan environment dan sinkronisasi konfigurasi secara otomatis.",
+            f"Sistem akan melakukan pemeriksaan environment dan sinkronisasi konfigurasi secara otomatis.<br>{sync_status}",
             style="info"
         ).value
     )
@@ -56,6 +60,15 @@ def create_env_config_ui(env_manager: Any, config_manager: Any) -> Dict[str, Any
         button_style="info",
         icon="folder-plus",
         tooltip="Buat struktur direktori yang diperlukan untuk aplikasi",
+        layout=widgets.Layout(margin='5px')
+    )
+    
+    # Tombol untuk sinkronisasi manual
+    sync_button = widgets.Button(
+        description="Sinkronisasi",
+        button_style="success",
+        icon="sync",
+        tooltip="Sinkronkan konfigurasi dengan Google Drive dan Colab",
         layout=widgets.Layout(margin='5px')
     )
     
@@ -91,7 +104,7 @@ def create_env_config_ui(env_manager: Any, config_manager: Any) -> Dict[str, Any
     
     # Container untuk tombol
     button_container = widgets.HBox(
-        [drive_button, directory_button],
+        [drive_button, directory_button, sync_button],
         layout=widgets.Layout(
             display='flex',
             flex_flow='row',
@@ -131,6 +144,7 @@ def create_env_config_ui(env_manager: Any, config_manager: Any) -> Dict[str, Any
         "ui": main_container,
         "drive_button": drive_button,
         "directory_button": directory_button,
+        "sync_button": sync_button,
         "status": status,
         "status_panel": status_panel,
         "progress_bar": progress_bar,

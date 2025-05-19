@@ -5,6 +5,7 @@ Deskripsi: Handler untuk tombol Google Drive
 
 import ipywidgets as widgets
 from typing import Dict, Any
+import asyncio
 
 from smartcash.ui.setup.env_config.utils.environment_detector import detect_environment
 from smartcash.ui.setup.env_config.utils.ui_helpers import disable_ui_during_processing, cleanup_ui
@@ -12,26 +13,28 @@ from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.utils.ui_logger import log_to_ui
 
-def setup_drive_button_handler(ui_components: Dict[str, Any]) -> None:
+def setup_drive_button_handler(ui_components: Dict[str, Any], config_manager: Any) -> None:
     """
     Setup handler untuk tombol connect drive
     
     Args:
         ui_components: Dictionary berisi komponen UI
+        config_manager: Konfigurasi manager
     """
     # Register handler
     if 'drive_button' in ui_components:
         ui_components['drive_button'].on_click(
-            lambda b: on_drive_button_click(b, ui_components)
+            lambda b: asyncio.create_task(on_drive_button_click(b, ui_components, config_manager))
         )
 
-def on_drive_button_click(b: widgets.Button, ui_components: Dict[str, Any]) -> None:
+async def on_drive_button_click(b: widgets.Button, ui_components: Dict[str, Any], config_manager: Any) -> None:
     """
     Handler untuk tombol connect drive
     
     Args:
         b: Button widget
         ui_components: Dictionary berisi komponen UI
+        config_manager: Konfigurasi manager
     """
     # Simpan status tombol Drive
     drive_button_disabled = ui_components['drive_button'].disabled
@@ -57,7 +60,7 @@ def on_drive_button_click(b: widgets.Button, ui_components: Dict[str, Any]) -> N
         env_manager = get_environment_manager()
         
         # Mount drive
-        success, message = env_manager.mount_drive()
+        success, message = await env_manager.mount_drive()
         
         if success:
             # Log success
@@ -75,6 +78,9 @@ def on_drive_button_click(b: widgets.Button, ui_components: Dict[str, Any]) -> N
                 "Google Drive berhasil terhubung.",
                 style="success"
             ).value
+            
+            # Sinkronkan konfigurasi dengan Drive
+            await config_manager.sync_with_drive()
             
             # Detect environment lagi
             detect_environment(ui_components, env_manager)

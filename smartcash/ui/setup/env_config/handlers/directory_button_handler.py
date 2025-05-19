@@ -7,6 +7,7 @@ import ipywidgets as widgets
 from typing import Dict, Any, List, Tuple
 import os
 from pathlib import Path
+import asyncio
 
 from smartcash.ui.setup.env_config.utils.environment_detector import detect_environment
 from smartcash.ui.setup.env_config.utils.ui_helpers import disable_ui_during_processing, cleanup_ui
@@ -14,26 +15,28 @@ from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.utils.ui_logger import log_to_ui
 
-def setup_directory_button_handler(ui_components: Dict[str, Any]) -> None:
+def setup_directory_button_handler(ui_components: Dict[str, Any], config_manager: Any) -> None:
     """
     Setup handler untuk tombol setup direktori
     
     Args:
         ui_components: Dictionary berisi komponen UI
+        config_manager: Konfigurasi manager
     """
     # Register handler
     if 'directory_button' in ui_components:
         ui_components['directory_button'].on_click(
-            lambda b: on_directory_button_click(b, ui_components)
+            lambda b: asyncio.create_task(on_directory_button_click(b, ui_components, config_manager))
         )
 
-def on_directory_button_click(b: widgets.Button, ui_components: Dict[str, Any]) -> None:
+async def on_directory_button_click(b: widgets.Button, ui_components: Dict[str, Any], config_manager: Any) -> None:
     """
     Handler untuk tombol setup direktori
     
     Args:
         b: Button widget
         ui_components: Dictionary berisi komponen UI
+        config_manager: Konfigurasi manager
     """
     # Simpan status tombol Drive
     drive_button_disabled = ui_components['drive_button'].disabled if 'drive_button' in ui_components else False
@@ -59,7 +62,7 @@ def on_directory_button_click(b: widgets.Button, ui_components: Dict[str, Any]) 
         env_manager = get_environment_manager()
         
         # Buat struktur direktori
-        success, message, created_dirs = setup_directory_structure(env_manager)
+        success, message, created_dirs = await setup_directory_structure(env_manager, config_manager)
         
         if success:
             # Log success
@@ -75,6 +78,10 @@ def on_directory_button_click(b: widgets.Button, ui_components: Dict[str, Any]) 
                 f"Struktur direktori berhasil dibuat. {len(created_dirs)} direktori dibuat.",
                 style="success"
             ).value
+            
+            # Sinkronkan konfigurasi dengan Drive jika terhubung
+            if env_manager.is_drive_mounted:
+                await config_manager.sync_with_drive()
             
             # Detect environment lagi
             detect_environment(ui_components, env_manager)
@@ -109,12 +116,13 @@ def on_directory_button_click(b: widgets.Button, ui_components: Dict[str, Any]) 
             ui_components['drive_button'].tooltip = drive_button_tooltip
             ui_components['drive_button'].icon = drive_button_icon
 
-def setup_directory_structure(env_manager) -> Tuple[bool, str, List[str]]:
+async def setup_directory_structure(env_manager, config_manager) -> Tuple[bool, str, List[str]]:
     """
     Setup struktur direktori untuk aplikasi
     
     Args:
         env_manager: Environment manager
+        config_manager: Konfigurasi manager
     
     Returns:
         Tuple (success, message, created_dirs)
@@ -158,6 +166,18 @@ def setup_directory_structure(env_manager) -> Tuple[bool, str, List[str]]:
                 if not dir_path.exists():
                     os.makedirs(dir_path, exist_ok=True)
                     created_dirs.append(str(dir_path))
+        
+        # Update konfigurasi dengan path direktori
+        config_manager.update_config({
+            'paths': {
+                'base_dir': str(base_dir),
+                'data_dir': str(Path(base_dir) / 'SmartCash/data'),
+                'models_dir': str(Path(base_dir) / 'SmartCash/models'),
+                'output_dir': str(Path(base_dir) / 'SmartCash/output'),
+                'logs_dir': str(Path(base_dir) / 'SmartCash/logs'),
+                'exports_dir': str(Path(base_dir) / 'SmartCash/exports')
+            }
+        })
         
         return True, f"Berhasil membuat {len(created_dirs)} direktori", created_dirs
     except Exception as e:

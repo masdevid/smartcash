@@ -29,8 +29,22 @@ class EnvConfigComponent:
         """
         Inisialisasi komponen UI
         """
-        self.config_manager = ConfigManager.get_instance()
-        self.colab_manager = ColabConfigManager.get_instance()
+        # Initialize base directory based on environment
+        if ColabConfigManager.is_colab_environment():
+            base_dir = Path(COLAB_PATH) / APP_NAME
+        else:
+            base_dir = Path.home() / APP_NAME
+            
+        # Initialize managers with proper paths
+        self.config_manager = ConfigManager.get_instance(
+            base_dir=str(base_dir),
+            config_file='base_config.yaml'
+        )
+        self.colab_manager = ColabConfigManager.get_instance(
+            base_dir=str(base_dir),
+            config_file='base_config.yaml'
+        )
+        
         self._setup_ui()
     
     def _setup_ui(self):

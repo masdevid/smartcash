@@ -5,20 +5,24 @@ Deskripsi: Observer untuk menangani notifikasi UI pada proses download dataset
 
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
-from smartcash.components.observer import Observer
+from smartcash.components.observer import BaseObserver
 from smartcash.ui.dataset.download.utils.notification_manager import DownloadUIEvents
 
-class LogOutputObserver(Observer):
+class LogOutputObserver(BaseObserver):
     """Observer untuk menangani notifikasi log ke output UI"""
     
-    def __init__(self, log_output: widgets.Output):
+    def __init__(self, log_output: widgets.Output, priority: int = 0, name: str = None):
         """
         Inisialisasi observer log output
         
         Args:
             log_output: Widget output untuk menampilkan log
+            priority: Prioritas observer
+            name: Nama observer
         """
         self.log_output = log_output
+        self.priority = priority
+        self.name = name or self.__class__.__name__
         self.event_types = [
             DownloadUIEvents.LOG_INFO,
             DownloadUIEvents.LOG_WARNING,
@@ -60,17 +64,21 @@ class LogOutputObserver(Observer):
             print(f"<span style='color: {color}'>{emoji} {message}</span>")
 
 
-class ProgressBarObserver(Observer):
+class ProgressBarObserver(BaseObserver):
     """Observer untuk menangani notifikasi progress bar"""
     
-    def __init__(self, ui_components: Dict[str, Any]):
+    def __init__(self, ui_components: Dict[str, Any], priority: int = 0, name: str = None):
         """
         Inisialisasi observer progress bar
         
         Args:
             ui_components: Dictionary berisi komponen UI
+            priority: Prioritas observer
+            name: Nama observer
         """
         self.ui_components = ui_components
+        self.priority = priority
+        self.name = name or self.__class__.__name__
         self.event_types = [
             DownloadUIEvents.PROGRESS_START,
             DownloadUIEvents.PROGRESS_UPDATE,

@@ -414,3 +414,26 @@ class ObserverManager:
             self.shutdown()
         except:
             pass
+
+    def register(self, observer, event_types=None):
+        """
+        Register an observer for the given event types (or observer.event_types if not provided).
+        """
+        if event_types is None and hasattr(observer, 'event_types'):
+            event_types = getattr(observer, 'event_types')
+        if event_types is None:
+            raise ValueError('event_types must be provided or observer must have event_types attribute')
+        if isinstance(event_types, (list, tuple, set)):
+            for event_type in event_types:
+                EventDispatcher.register(event_type, observer)
+        else:
+            EventDispatcher.register(event_types, observer)
+
+# Singleton instance for ObserverManager
+_observer_manager_instance = None
+
+def get_observer_manager():
+    global _observer_manager_instance
+    if _observer_manager_instance is None:
+        _observer_manager_instance = ObserverManager()
+    return _observer_manager_instance

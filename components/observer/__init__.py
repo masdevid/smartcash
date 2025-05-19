@@ -6,7 +6,7 @@ Deskripsi: Package initialization untuk observer pattern terkonsolidasi di Smart
 from smartcash.components.observer.event_dispatcher_observer import EventDispatcher
 from smartcash.components.observer.base_observer import BaseObserver
 from smartcash.components.observer.event_registry_observer import EventRegistry
-from smartcash.components.observer.manager_observer import ObserverManager
+from smartcash.components.observer.manager_observer import ObserverManager, get_observer_manager
 from smartcash.components.observer.decorators_observer import observable, observe
 from smartcash.components.observer.event_topics_observer import EventTopics
 from smartcash.components.observer.priority_observer import ObserverPriority
@@ -24,6 +24,7 @@ __all__ = [
     'EventDispatcher',
     'EventRegistry',
     'ObserverManager',
+    'get_observer_manager',
     'observable',
     'observe',
     'register',

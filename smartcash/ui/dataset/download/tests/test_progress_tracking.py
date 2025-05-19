@@ -6,6 +6,7 @@ Deskripsi: Test untuk progress tracking download dataset menggunakan sistem noti
 import unittest
 from unittest.mock import MagicMock, patch
 import ipywidgets as widgets
+from smartcash.components.observer import get_observer_manager
 
 class TestProgressTracking(unittest.TestCase):
     """Test untuk progress tracking download dataset dengan sistem notifikasi baru."""
@@ -32,8 +33,7 @@ class TestProgressTracking(unittest.TestCase):
         # Import fungsi notifikasi yang akan ditest
         from smartcash.ui.dataset.download.utils.notification_manager import (
             notify_log,
-            notify_progress,
-            get_observer_manager
+            notify_progress
         )
         
         from smartcash.ui.dataset.download.utils.ui_observers import (
@@ -48,7 +48,7 @@ class TestProgressTracking(unittest.TestCase):
         self.observer_manager.register_observer = MagicMock()
         
         # Patch get_observer_manager untuk mengembalikan mock
-        with patch('smartcash.ui.dataset.download.utils.notification_manager.get_observer_manager', 
+        with patch('smartcash.components.observer.get_observer_manager', 
                   return_value=self.observer_manager):
             self.ui_components['observer_manager'] = get_observer_manager()
         

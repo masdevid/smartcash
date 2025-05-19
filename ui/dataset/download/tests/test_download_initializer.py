@@ -18,56 +18,84 @@ class TestDownloadInitializer(unittest.TestCase):
         self.mock_env_manager = MagicMock()
         self.mock_env_manager.base_dir = str(self.test_dir)
         self.mock_config_manager = MagicMock()
-        self.mock_progress_bar = MagicMock()
-        self.mock_logger = MagicMock()
-        self.mock_ui = MagicMock()
-        self.mock_config = {}
+        self.mock_ui_components = {
+            'ui': MagicMock(),
+            'progress_bar': MagicMock(),
+            'logger': MagicMock(),
+            'config': {},
+            'workspace': MagicMock(value='test-workspace'),
+            'project': MagicMock(value='test-project'),
+            'version': MagicMock(value='1'),
+            'api_key': MagicMock(value='test-api-key'),
+            'output_dir': MagicMock(value='data/test'),
+            'validate_dataset': MagicMock(value=True),
+            'backup_checkbox': MagicMock(value=True),
+            'backup_dir': MagicMock(value='data/backup'),
+            'status_panel': MagicMock(),
+            'log_output': MagicMock(),
+            'progress_container': MagicMock()
+        }
 
         # Patch where used in download_initializer
         self.patcher_env = patch('smartcash.ui.dataset.download.download_initializer.get_environment_manager', return_value=self.mock_env_manager)
         self.patcher_config = patch('smartcash.ui.dataset.download.download_initializer.get_config_manager', return_value=self.mock_config_manager)
-        self.patcher_base_init = patch('smartcash.ui.dataset.download.download_initializer.initialize_module_ui', return_value={
-            'ui': self.mock_ui,
-            'progress_bar': self.mock_progress_bar,
-            'logger': self.mock_logger,
-            'config': self.mock_config
-        })
-        self.patcher_colab = patch('smartcash.ui.dataset.download.download_initializer.check_colab_secrets')
+        self.patcher_create_ui = patch('smartcash.ui.dataset.download.download_initializer.create_download_ui', return_value=self.mock_ui_components)
+        self.patcher_setup_handlers = patch('smartcash.ui.dataset.download.download_initializer.setup_download_handlers', return_value=self.mock_ui_components)
+        self.patcher_load_config = patch('smartcash.ui.dataset.download.download_initializer.load_config', return_value={})
+        self.patcher_update_ui = patch('smartcash.ui.dataset.download.download_initializer.update_ui_from_config')
 
         self.mock_env = self.patcher_env.start()
         self.mock_config = self.patcher_config.start()
-        self.mock_base_init = self.patcher_base_init.start()
-        self.mock_colab = self.patcher_colab.start()
+        self.mock_create_ui = self.patcher_create_ui.start()
+        self.mock_setup_handlers = self.patcher_setup_handlers.start()
+        self.mock_load_config = self.patcher_load_config.start()
+        self.mock_update_ui = self.patcher_update_ui.start()
 
     def tearDown(self):
         self.patcher_env.stop()
         self.patcher_config.stop()
-        self.patcher_base_init.stop()
-        self.patcher_colab.stop()
+        self.patcher_create_ui.stop()
+        self.patcher_setup_handlers.stop()
+        self.patcher_load_config.stop()
+        self.patcher_update_ui.stop()
 
     def test_initialize_dataset_download_ui(self):
+        """Test inisialisasi UI download dataset"""
         ui_components = download_initializer.initialize_dataset_download_ui()
-        self.assertIn('ui', ui_components)
-        self.assertIn('progress_bar', ui_components)
-        self.assertIn('logger', ui_components)
-        self.assertIn('config', ui_components)
-        self.assertIn('config_manager', ui_components)
-        self.assertIs(ui_components['config_manager'], self.mock_config_manager)
-        self.mock_base_init.assert_called_once()
+        
+        # Verify environment setup
         self.mock_env.assert_called_once()
-        self.mock_config.assert_called_once_with(base_dir=str(self.test_dir))
-        self.mock_colab.assert_called_once()
+        self.mock_config.assert_called_once_with(
+            base_dir=str(self.test_dir),
+            config_file='dataset_config.yaml'
+        )
+        
+        # Verify UI creation and setup
+        self.mock_create_ui.assert_called_once()
+        self.mock_setup_handlers.assert_called_once_with(self.mock_ui_components)
+        self.mock_load_config.assert_called_once()
+        self.mock_update_ui.assert_called_once()
+        
+        # Verify config manager registration
+        self.mock_config_manager.register_ui_components.assert_called_once_with(
+            'dataset_download',
+            self.mock_ui_components
+        )
+        
+        # Verify returned components
+        self.assertEqual(ui_components, self.mock_ui_components)
 
-    def test_config_sync(self):
-        ui_components = download_initializer.initialize_dataset_download_ui()
-        self.mock_config.assert_called_once_with(base_dir=str(self.test_dir))
-        self.assertIn('config_manager', ui_components)
-        self.assertIs(ui_components['config_manager'], self.mock_config_manager)
-
-    def test_environment_sync(self):
-        ui_components = download_initializer.initialize_dataset_download_ui()
-        self.mock_env.assert_called_once()
-        self.assertEqual(self.mock_env_manager.base_dir, str(self.test_dir))
+    def test_error_handling(self):
+        """Test error handling saat inisialisasi"""
+        # Simulate error in create_download_ui
+        self.mock_create_ui.side_effect = Exception("Test error")
+        
+        # Verify that error is logged and re-raised
+        with self.assertRaises(Exception):
+            download_initializer.initialize_dataset_download_ui()
+        
+        # Verify logger was called
+        self.mock_ui_components['logger'].error.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main() 

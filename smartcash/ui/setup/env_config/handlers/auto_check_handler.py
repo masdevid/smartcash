@@ -32,25 +32,25 @@ class AutoCheckHandler:
         """
         try:
             # Update progress
-            self.component.progress_section.children[1].value = 0.2
+            self.component.ui_components['progress'].value = 0.2
             
             # Check environment
-            with self.component.log_section.children[0]:
+            with self.component.ui_components['log']:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking environment...")
                 print(f"Environment: {'Colab' if is_colab() else 'Local'}")
                 print(f"Base Directory: {self.component.config_manager.base_dir}")
-                print(f"Config File: {self.component.config_manager.config_file}")
+                print(f"Config Directory: {self.component.config_dir}")
             
             # Update progress
-            self.component.progress_section.children[1].value = 1.0
+            self.component.ui_components['progress'].value = 1.0
             
             # Update status
             self.component._update_status()
             
-            with self.component.log_section.children[0]:
+            with self.component.ui_components['log']:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Environment check completed")
             
         except Exception as e:
-            with self.component.log_section.children[0]:
+            with self.component.ui_components['log']:
                 print(f"[{datetime.now().strftime('%H:%M:%S')}] Error checking environment: {str(e)}")
-            self.component.progress_section.children[1].value = 0
+            self.component.ui_components['progress'].value = 0

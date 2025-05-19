@@ -4,6 +4,7 @@ Deskripsi: Component untuk konfigurasi environment
 """
 
 import os
+import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
 import ipywidgets as widgets
@@ -24,6 +25,113 @@ from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckH
 
 logger = get_logger(__name__)
 
+def create_env_config_ui() -> Dict[str, Any]:
+    """
+    Buat komponen UI untuk konfigurasi environment
+    
+    Returns:
+        Dictionary berisi komponen UI
+    """
+    # Import komponen dari ui_helpers untuk konsistensi
+    from smartcash.ui.utils.alert_utils import create_info_box
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.ui.helpers.ui_helpers import create_spacing
+    
+    # Header dengan komponen standar
+    header = create_header(
+        "⚙️ Environment Configuration", 
+        "Setup environment dan konfigurasi SmartCash"
+    )
+    
+    # Status panel menggunakan komponen alert standar
+    status_panel = widgets.HTML(
+        create_info_box(
+            "Environment Status", 
+            "Connect to Google Drive dan setup directory",
+            style="info"
+        ).value
+    )
+    
+    # Drive section
+    drive_section = widgets.VBox([
+        widgets.HTML("<h3>Google Drive Connection</h3>"),
+        widgets.Button(
+            description="Connect to Drive",
+            button_style="primary",
+            icon="cloud-upload",
+            tooltip="Connect to Google Drive"
+        )
+    ])
+    
+    # Directory section
+    directory_section = widgets.VBox([
+        widgets.HTML("<h3>Directory Setup</h3>"),
+        widgets.Button(
+            description="Setup Directory",
+            button_style="primary",
+            icon="folder",
+            tooltip="Setup directory structure"
+        )
+    ])
+    
+    # Progress section
+    progress_section = widgets.VBox([
+        widgets.HTML("<h3>Progress</h3>"),
+        widgets.FloatProgress(
+            value=0.0,
+            min=0,
+            max=1.0,
+            description="Progress:",
+            bar_style="info",
+            style={'description_width': 'initial'}
+        )
+    ])
+    
+    # Log section
+    log_section = widgets.VBox([
+        widgets.HTML("<h3>Logs</h3>"),
+        widgets.Output(
+            layout=widgets.Layout(
+                width='100%',
+                border=f'1px solid {COLORS["border"]}',
+                min_height='100px',
+                max_height='300px',
+                margin='10px 0',
+                padding='10px',
+                overflow='auto'
+            )
+        )
+    ])
+    
+    # Container utama dengan semua komponen
+    main = widgets.VBox(
+        [
+            header,
+            status_panel,
+            drive_section,
+            directory_section,
+            progress_section,
+            log_section
+        ],
+        layout=widgets.Layout(
+            width='100%',
+            padding='10px'
+        )
+    )
+    
+    # Struktur final komponen UI
+    ui_components = {
+        'ui': main,
+        'status_panel': status_panel,
+        'drive_button': drive_section.children[1],
+        'directory_button': directory_section.children[1],
+        'progress': progress_section.children[1],
+        'log': log_section.children[1]
+    }
+    
+    return ui_components
+
 class EnvConfigComponent:
     """
     Component untuk konfigurasi environment
@@ -35,25 +143,11 @@ class EnvConfigComponent:
         """
         self.logger = logger
         
-        # Determine base directory
-        if is_colab():
-            self.base_dir = Path("/content/SmartCash")
-        else:
-            self.base_dir = Path.home() / "SmartCash"
+        # Create UI first
+        self.ui_components = create_env_config_ui()
         
         # Initialize managers
-        self.config_manager = ConfigManager(
-            base_dir=str(self.base_dir),
-            config_file=str(self.base_dir / "configs" / "base_config.yaml")
-        )
-        
-        self.colab_manager = ColabConfigManager(
-            base_dir=str(self.base_dir),
-            config_file=str(self.base_dir / "configs" / "base_config.yaml")
-        )
-        
-        # Initialize UI components
-        self._init_ui_components()
+        self._init_managers()
         
         # Initialize handlers
         self.handlers = EnvConfigHandlers(self)
@@ -65,48 +159,155 @@ class EnvConfigComponent:
         # Run auto check
         asyncio.create_task(self.auto_check.auto_check())
     
-    def _init_ui_components(self):
+    def _init_managers(self):
         """
-        Inisialisasi UI components
+        Initialize configuration managers
         """
-        # Create sections
-        self.drive_section = widgets.VBox([
-            widgets.HTML("<h3>Google Drive Connection</h3>"),
-            widgets.Button(description="Connect to Drive", button_style="primary")
-        ])
+        # Determine base directory
+        if is_colab():
+            self.base_dir = Path("/content")
+            self.config_dir = self.base_dir / "configs"
+            
+            # Copy configs from smartcash/configs if not exists
+            if not self.config_dir.exists():
+                source_configs = Path("/content/smartcash/configs")
+                if source_configs.exists():
+                    shutil.copytree(source_configs, self.config_dir)
+        else:
+            self.base_dir = Path.home() / "SmartCash"
+            self.config_dir = self.base_dir / "configs"
         
-        self.config_section = widgets.VBox([
-            widgets.HTML("<h3>Configuration Sync</h3>"),
-            widgets.Button(description="Sync Configurations", button_style="primary")
-        ])
+        # Initialize managers
+        self.config_manager = ConfigManager(
+            base_dir=str(self.base_dir),
+            config_file=str(self.config_dir / "base_config.yaml")
+        )
         
-        self.progress_section = widgets.VBox([
-            widgets.HTML("<h3>Progress</h3>"),
-            widgets.FloatProgress(value=0.0, min=0, max=1.0)
-        ])
-        
-        self.log_section = widgets.VBox([
-            widgets.HTML("<h3>Logs</h3>"),
-            widgets.Output()
-        ])
-        
-        # Create main layout
-        self.layout = widgets.VBox([
-            self.drive_section,
-            self.config_section,
-            self.progress_section,
-            self.log_section
-        ])
+        self.colab_manager = ColabConfigManager(
+            base_dir=str(self.base_dir),
+            config_file=str(self.config_dir / "base_config.yaml")
+        )
+    
+    async def _handle_drive_connection(self):
+        """
+        Handle Google Drive connection
+        """
+        try:
+            # Update progress
+            self.ui_components['progress'].value = 0.2
+            
+            # Connect to drive
+            await self.colab_manager.connect_to_drive()
+            
+            # Update progress
+            self.ui_components['progress'].value = 0.5
+            
+            # Replace configs with drive configs
+            drive_configs = Path("/content/drive/MyDrive/SmartCash/configs")
+            if drive_configs.exists():
+                # Backup current configs
+                backup_dir = self.config_dir.parent / "configs_backup"
+                if self.config_dir.exists():
+                    shutil.move(self.config_dir, backup_dir)
+                
+                # Create symlink to drive configs
+                os.symlink(drive_configs, self.config_dir)
+            else:
+                # Create drive configs directory
+                drive_configs.mkdir(parents=True)
+                
+                # Copy local configs to drive
+                if self.config_dir.exists():
+                    shutil.copytree(self.config_dir, drive_configs, dirs_exist_ok=True)
+            
+            # Update progress
+            self.ui_components['progress'].value = 1.0
+            
+            # Update status
+            self._update_status()
+            
+            with self.ui_components['log']:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully connected to Google Drive")
+                print(f"Drive path: {self.colab_manager.drive_base_path}")
+            
+        except Exception as e:
+            with self.ui_components['log']:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error connecting to Google Drive: {str(e)}")
+            self.ui_components['progress'].value = 0
+    
+    async def _handle_directory_setup(self):
+        """
+        Handle directory setup
+        """
+        try:
+            # Update progress
+            self.ui_components['progress'].value = 0.2
+            
+            # Create directory structure
+            if is_colab():
+                # Create base directories
+                base_dirs = [
+                    "/content/data",
+                    "/content/models",
+                    "/content/output",
+                    "/content/logs",
+                    "/content/exports"
+                ]
+                
+                for dir_path in base_dirs:
+                    path = Path(dir_path)
+                    path.mkdir(exist_ok=True)
+                    with self.ui_components['log']:
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Created directory: {dir_path}")
+                
+                # Create symlinks to drive if connected
+                if self.colab_manager.is_drive_connected():
+                    drive_base = Path("/content/drive/MyDrive/SmartCash")
+                    drive_dirs = {
+                        "/content/data": drive_base / "data",
+                        "/content/models": drive_base / "models",
+                        "/content/output": drive_base / "output",
+                        "/content/logs": drive_base / "logs",
+                        "/content/exports": drive_base / "exports"
+                    }
+                    
+                    for local_path, drive_path in drive_dirs.items():
+                        # Create drive directory if not exists
+                        drive_path.mkdir(parents=True, exist_ok=True)
+                        
+                        # Remove existing symlink if exists
+                        local_path = Path(local_path)
+                        if local_path.is_symlink():
+                            local_path.unlink()
+                        
+                        # Create new symlink
+                        os.symlink(drive_path, local_path)
+                        with self.ui_components['log']:
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] Created symlink: {local_path} -> {drive_path}")
+            
+            # Update progress
+            self.ui_components['progress'].value = 1.0
+            
+            # Update status
+            self._update_status()
+            
+            with self.ui_components['log']:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Directory setup completed")
+            
+        except Exception as e:
+            with self.ui_components['log']:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error setting up directory: {str(e)}")
+            self.ui_components['progress'].value = 0
     
     def _update_status(self):
         """
         Update status UI
         """
-        with self.log_section.children[0]:
+        with self.ui_components['log']:
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Current Status:")
             print(f"Environment: {'Colab' if is_colab() else 'Local'}")
             print(f"Base Directory: {self.config_manager.base_dir}")
-            print(f"Config File: {self.config_manager.config_file}")
+            print(f"Config Directory: {self.config_dir}")
             if is_colab():
                 print(f"Drive Connected: {self.colab_manager.is_drive_connected()}")
                 print(f"Drive Path: {self.colab_manager.drive_base_path}")
@@ -115,4 +316,4 @@ class EnvConfigComponent:
         """
         Display component
         """
-        display(self.layout)
+        display(self.ui_components['ui'])

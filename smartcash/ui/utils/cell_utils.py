@@ -42,29 +42,14 @@ def setup_notebook_environment(cell_name: str) -> Tuple[Any, Dict[str, Any]]:
         
         # Import config manager dan load configuration
         from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager(base_dir=str(base_dir), config_file=str(config_dir / "base_config.yaml"))
+        config_manager = get_config_manager(
+            base_dir=str(base_dir),
+            config_file=str(config_dir / "model_config.yaml")
+        )
         
-        # Coba load konfigurasi dari file
-        try:
-            # Load konfigurasi base terlebih dahulu
-            if Path('configs/base_config.yaml').exists():
-                config = config_manager.load_config('configs/base_config.yaml')
-            
-            # Coba load konfigurasi spesifik cell jika ada
-            cell_config_file = f"configs/{cell_name.lower()}_config.yaml"
-            if Path(cell_config_file).exists():
-                config = config_manager.merge_config(cell_config_file)
-        except Exception as e:
-            print(f"⚠️ Error saat load konfigurasi: {str(e)}")
-            
-            # Coba fallback ke default config
-            try:
-                from smartcash.common.default_config import ensure_base_config_exists
-                if ensure_base_config_exists():
-                    config = config_manager.load_config('configs/base_config.yaml')
-            except Exception:
-                pass
-                
+        # Load configuration
+        config = config_manager.config
+        
         return env, config
         
     except Exception as e:

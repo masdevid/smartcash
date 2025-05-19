@@ -2,9 +2,6 @@
 # Author: Alfrida Sabar
 # Deskripsi: Konfigurasi khusus untuk model deteksi dengan EfficientNet-B4 sebagai backbone
 
-# Inherit dari base_config.yaml
-_base_: 'base_config.yaml'
-
 # Konfigurasi detail model
 model:
   # Type model
@@ -122,3 +119,36 @@ experiments:
         use_attention: true
         use_residual: true
         use_ciou: true
+
+# Konfigurasi training
+training:
+  epochs: 100
+  batch_size: 16
+  early_stopping_patience: 10
+  optimizer: 'Adam'
+  lr: 0.001
+  weight_decay: 0.0005
+  momentum: 0.937
+  lr_scheduler: 'ReduceLROnPlateau'
+  lr_patience: 3
+  lr_factor: 0.1
+  save_best_only: false  # Hanya menyimpan model terbaik
+  save_every: 0  # Simpan checkpoint setiap N epoch (0 = disable)
+
+# Konfigurasi data
+data:
+  dir: 'data'  # Direktori utama data
+  preprocessed_dir: 'data/preprocessed'  # Direktori untuk hasil preprocessed
+  split_ratios:  # Rasio split dataset
+    train: 0.7
+    valid: 0.15
+    test: 0.15
+  stratified_split: true  # Gunakan stratified split
+  random_seed: 42  # Random seed untuk reproduksibilitas
+
+# Konfigurasi checkpoint
+checkpoint:
+  save_dir: 'checkpoints'  # Direktori untuk menyimpan checkpoint
+  save_interval: 10  # Interval penyimpanan checkpoint
+  save_last: true  # Simpan checkpoint terakhir
+  save_best: true  # Simpan checkpoint terbaik

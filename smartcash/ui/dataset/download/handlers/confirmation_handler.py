@@ -82,9 +82,9 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', 
 
 def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
     """Dapatkan detail spesifik untuk Roboflow."""
-    workspace = ui_components['rf_workspace'].value
-    project = ui_components['rf_project'].value
-    version = ui_components['rf_version'].value
+    workspace = ui_components['workspace'].value
+    project = ui_components['project'].value
+    version = ui_components['version'].value
     return f"Dataset akan diunduh dari Roboflow (workspace: {workspace}, project: {project}, version: {version})."
 
 def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
@@ -126,11 +126,16 @@ def _reset_download_ui(ui_components: Dict[str, Any]) -> None:
         if button_key in ui_components and hasattr(ui_components[button_key], 'layout'):
             ui_components[button_key].layout.display = 'block'
     
+    # Reset API key highlight jika ada
+    if 'api_key' in ui_components:
+        ui_components['api_key'].layout.border = ""
+    
     # Reset progress bar
     if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
         ui_components['progress_bar'].layout.visibility = 'hidden'
         ui_components['progress_bar'].value = 0
     
+    # Reset progress message
     if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):
         ui_components['progress_message'].layout.visibility = 'hidden'
         ui_components['progress_message'].value = ""

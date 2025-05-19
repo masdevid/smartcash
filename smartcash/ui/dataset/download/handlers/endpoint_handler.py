@@ -22,7 +22,7 @@ def handle_endpoint_change(change: Dict[str, Any], ui_components: Dict[str, Any]
 
 def _reset_accordion_visibility(ui_components: Dict[str, Any]) -> None:
     """Reset visibility untuk semua accordion."""
-    for accordion_key in ['rf_accordion', 'drive_accordion']:
+    for accordion_key in ['roboflow_accordion', 'drive_accordion']:
         if accordion_key in ui_components:
             ui_components[accordion_key].selected_index = None
 

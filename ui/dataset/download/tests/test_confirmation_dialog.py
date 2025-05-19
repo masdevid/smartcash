@@ -17,13 +17,18 @@ class TestConfirmationDialog(unittest.TestCase):
         self.ui_components = {
             'logger': MagicMock(),
             'output_dir': MagicMock(value='data/test'),
-            'rf_workspace': MagicMock(value='test-workspace'),
-            'rf_project': MagicMock(value='test-project'),
-            'rf_version': MagicMock(value='1'),
+            'workspace': MagicMock(value='test-workspace'),
+            'project': MagicMock(value='test-project'),
+            'version': MagicMock(value='1'),
+            'api_key': MagicMock(value='test-api-key'),
+            'source_dropdown': MagicMock(value='roboflow'),
+            'backup_checkbox': MagicMock(value=True),
+            'backup_dir': MagicMock(value='data/downloads_backup'),
             'confirmation_area': MagicMock(),
             'status_panel': MagicMock(),
             'download_button': MagicMock(),
             'check_button': MagicMock(),
+            'save_button': MagicMock(),
             'progress_bar': MagicMock(),
             'progress_message': MagicMock()
         }
@@ -103,7 +108,7 @@ class TestConfirmationDialog(unittest.TestCase):
             mock_execute_download.assert_called_once_with(self.ui_components, 'Roboflow')
             
             # Verifikasi bahwa current_operation diset
-            self.assertEqual(self.ui_components['current_operation'], 'download')
+            self.assertEqual(self.ui_components['current_operation'], 'download_only')
 
 if __name__ == '__main__':
     unittest.main()

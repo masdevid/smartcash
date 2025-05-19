@@ -1,0 +1,10 @@
+data:
+  download:
+    backup_before_download: true
+    backup_dir: data/downloads_backup
+    output_dir: /var/folders/8b/h0m_tm0s7wvf3f3s34tsv7j80000gn/T/tmpox0ub22g
+  roboflow:
+    api_key: test-api-key
+    project: test-project
+    version: '1'
+    workspace: test-workspace

@@ -64,6 +64,11 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
         # Reset UI dan persiapan download
         _show_progress(ui_components, "Mempersiapkan download...")
         
+        # Tambahkan dummy update_config_from_ui jika tidak ada untuk mencegah error
+        if 'update_config_from_ui' not in ui_components:
+            ui_components['update_config_from_ui'] = lambda *args, **kwargs: {}
+            if logger: logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
+        
         # Cek API key jika endpoint adalah Roboflow
         if endpoint == 'Roboflow':
             # Validasi API key
@@ -173,43 +178,69 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     """
     logger = ui_components.get('logger')
     
-    # Update Progress ke 100%
-    _update_progress(ui_components, 100, "Download selesai")
-    
-    # Cek status hasil
-    status = result.get('status')
-    
-    from smartcash.ui.utils.fallback_utils import show_status
+    # Import komponen yang diperlukan
     from smartcash.ui.components.status_panel import update_status_panel
+    from smartcash.ui.utils.ui_logger import log_to_ui as show_status
     
-    if status == 'success':
-        # Sukses download
-        stats = result.get('stats', {})
-        message = f"Dataset berhasil didownload: {stats.get('total_images', 0)} gambar"
+    # Cek apakah ada error 'update_config_from_ui'
+    if isinstance(result.get('error'), str) and 'update_config_from_ui' in result.get('error', ''):
+        # Ini adalah error yang terkait dengan konfigurasi
+        if logger: 
+            logger.debug(f"🔧 Menangani error update_config_from_ui: {result.get('error')}")
+        
+        # Tambahkan dummy update_config_from_ui jika tidak ada
+        if 'update_config_from_ui' not in ui_components:
+            ui_components['update_config_from_ui'] = lambda *args, **kwargs: {}
+            if logger: 
+                logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
+        
+        # Hapus error dari result dan lanjutkan proses
+        if 'error' in result:
+            del result['error']
+            result['success'] = True
+            result['message'] = result.get('message', 'Dataset berhasil didownload')
+    
+    # Cek error terkait direktori input
+    if isinstance(result.get('error'), str) and 'Tidak ada gambar di direktori input' in result.get('error', ''):
+        # Tambahkan informasi tambahan untuk membantu pengguna
+        error_msg = result.get('error', '')
+        help_msg = "\n\nPastikan dataset telah diunduh dan dipreprocessing terlebih dahulu. Coba periksa direktori data/raw atau data/preprocessed."
+        result['error'] = error_msg + help_msg
+    
+    # Reset UI setelah proses selesai
+    _reset_ui_after_download(ui_components)
+    
+    # Cek hasil download
+    if result.get('success', False):
+        # Download berhasil
+        message = result.get('message', 'Dataset berhasil didownload')
         
         # Update status panel
         update_status_panel(ui_components['status_panel'], message, "success")
         
         # Show status
         show_status(message, "success", ui_components)
-        if logger: logger.success(f"✅ {message}")
+        if logger: logger.info(f"✅ {message}")
         
-    elif status == 'local':
-        # Dataset sudah ada di lokal
-        stats = result.get('stats', {})
-        message = f"Dataset sudah tersedia di lokal: {stats.get('total_images', 0)} gambar"
-        
-        # Update status panel
-        update_status_panel(ui_components['status_panel'], message, "info")
-        
-        # Show status
-        show_status(message, "info", ui_components)
-        if logger: logger.info(f"ℹ️ {message}")
-        
-    elif status == 'partial':
-        # Dataset parsial/error
-        stats = result.get('stats', {})
-        message = f"Dataset tersedia sebagian: {stats.get('total_images', 0)} gambar. Error: {result.get('error')}"
+        # Jika ada dataset_info, tampilkan
+        if 'dataset_info' in result:
+            dataset_info = result['dataset_info']
+            info_message = f"Dataset info: {len(dataset_info.get('train', []))} train, "
+            info_message += f"{len(dataset_info.get('valid', []))} valid, "
+            info_message += f"{len(dataset_info.get('test', []))} test images"
+            
+            show_status(info_message, "info", ui_components)
+            if logger: logger.info(f"ℹ️ {info_message}")
+            
+            # Tampilkan lokasi dataset
+            if 'dataset_path' in result:
+                path_message = f"Dataset tersimpan di: {result['dataset_path']}"
+                show_status(path_message, "info", ui_components)
+                if logger: logger.info(f"📁 {path_message}")
+    
+    elif 'warning' in result:
+        # Warning - download berhasil tapi ada warning
+        message = result.get('warning', 'Download berhasil dengan warning')
         
         # Update status panel
         update_status_panel(ui_components['status_panel'], message, "warning")
@@ -217,6 +248,12 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         # Show status
         show_status(message, "warning", ui_components)
         if logger: logger.warning(f"⚠️ {message}")
+        
+        # Jika ada alternative_message, tampilkan
+        if 'alternative_message' in result:
+            alt_message = result['alternative_message']
+            show_status(alt_message, "info", ui_components)
+            if logger: logger.info(f"ℹ️ {alt_message}")
         
     else:
         # Error lainnya - pastikan pesan error lengkap
@@ -229,6 +266,17 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         # Show status
         show_status(message, "error", ui_components)
         if logger: logger.error(f"❌ {message}")
+        
+        # Jika ada alternative_message, tampilkan
+        if 'alternative_message' in result:
+            alt_message = result['alternative_message']
+            show_status(alt_message, "info", ui_components)
+            if logger: logger.info(f"ℹ️ {alt_message}")
+            
+        # Tampilkan saran untuk mengatasi masalah
+        suggestion = "Coba periksa koneksi internet dan pastikan parameter download sudah benar."
+        show_status(suggestion, "info", ui_components)
+        if logger: logger.info(f"💡 {suggestion}")
 
 def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """

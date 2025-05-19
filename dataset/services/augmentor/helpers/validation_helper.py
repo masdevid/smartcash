@@ -22,40 +22,95 @@ def validate_input_files(images_dir: str, file_prefix: str, logger = None) -> Tu
     Returns:
         Tuple (list file yang ditemukan, dict hasil validasi)
     """
-    # Buat direktori output jika belum ada
-    os.makedirs(images_dir, exist_ok=True)
+    # Konversi ke Path untuk operasi path yang lebih robust
+    images_path = Path(images_dir)
+    
+    # Cek apakah direktori ada
+    if not images_path.exists():
+        if logger:
+            logger.warning(f"⚠️ Direktori {images_dir} tidak ditemukan, mencoba membuat direktori...")
+        try:
+            # Buat direktori output jika belum ada
+            os.makedirs(images_dir, exist_ok=True)
+        except Exception as e:
+            if logger:
+                logger.error(f"❌ Gagal membuat direktori {images_dir}: {str(e)}")
+    
+    # Inisialisasi list untuk menyimpan file gambar
+    image_files = []
     
     # Dapatkan file dengan pattern spesifik
     pattern = f"{file_prefix}_*.jpg"
-    image_files = glob.glob(os.path.join(images_dir, pattern))
+    if images_path.exists():
+        pattern_files = list(images_path.glob(pattern))
+        image_files.extend([str(f) for f in pattern_files])
     
     # Jika tidak ada file dengan pattern spesifik, coba cari semua file gambar
-    if not image_files:
+    if not image_files and images_path.exists():
         if logger:
             logger.info(f"⚠️ Tidak ada file dengan pola {pattern}, mencari semua file gambar...")
         
         # Cari semua file gambar umum
         all_patterns = ["*.jpg", "*.jpeg", "*.png"]
         for img_pattern in all_patterns:
-            pattern_files = glob.glob(os.path.join(images_dir, img_pattern))
-            image_files.extend(pattern_files)
+            pattern_files = list(images_path.glob(img_pattern))
+            image_files.extend([str(f) for f in pattern_files])
     
-    # Validasi input file
+    # Daftar lokasi alternatif untuk mencari gambar
+    alternative_locations = [
+        # Subdirektori images
+        images_path.parent / "images",
+        # Direktori data/images
+        Path("data/images"),
+        # Direktori data/raw/images
+        Path("data/raw/images"),
+        # Direktori data/preprocessed/images
+        Path("data/preprocessed/images"),
+        # Direktori data/preprocessed/train/images
+        Path("data/preprocessed/train/images"),
+        # Direktori data/preprocessed/valid/images
+        Path("data/preprocessed/valid/images"),
+        # Direktori data/preprocessed/test/images
+        Path("data/preprocessed/test/images")
+    ]
+    
+    # Jika masih tidak ada file, coba cari di lokasi alternatif
     if not image_files:
-        # Coba cari di subdirektori images jika ada
-        images_subdir = os.path.join(os.path.dirname(images_dir), "images")
-        if os.path.exists(images_subdir):
-            if logger:
-                logger.info(f"🔍 Mencoba mencari di subdirektori: {images_subdir}")
-            for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
-                pattern_files = glob.glob(os.path.join(images_subdir, img_pattern))
-                image_files.extend(pattern_files)
+        for alt_dir in alternative_locations:
+            if alt_dir.exists():
+                if logger:
+                    logger.info(f"🔍 Mencoba mencari di lokasi alternatif: {alt_dir}")
+                
+                for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
+                    pattern_files = list(alt_dir.glob(img_pattern))
+                    if pattern_files:
+                        if logger:
+                            logger.info(f"✅ Ditemukan {len(pattern_files)} file di {alt_dir}")
+                        image_files.extend([str(f) for f in pattern_files])
+                        # Gunakan direktori ini sebagai direktori input
+                        images_dir = str(alt_dir)
+                        break
+                
+                # Jika sudah menemukan file, hentikan pencarian
+                if image_files:
+                    break
+    
+    # Jika masih tidak ada file, coba cari di direktori saat ini
+    if not image_files:
+        current_dir = Path(".").absolute()
+        if logger:
+            logger.info(f"🔍 Mencoba mencari di direktori saat ini: {current_dir}")
+        
+        for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
+            pattern_files = list(current_dir.glob(img_pattern))
+            image_files.extend([str(f) for f in pattern_files])
     
     # Jika masih tidak ada file
     if not image_files:
         result = {
             "success": False,
-            "message": f"❌ Tidak ada gambar di direktori input: {images_dir}"
+            "message": f"❌ Tidak ada gambar di direktori input: {images_dir}",
+            "alternative_message": "Pastikan dataset telah diunduh dan dipreprocessing terlebih dahulu"
         }
         return [], result
     
@@ -67,7 +122,8 @@ def validate_input_files(images_dir: str, file_prefix: str, logger = None) -> Tu
     result = {
         "success": True,
         "message": f"Ditemukan {len(image_files)} file gambar",
-        "count": len(image_files)
+        "count": len(image_files),
+        "directory": images_dir
     }
     
     return image_files, result

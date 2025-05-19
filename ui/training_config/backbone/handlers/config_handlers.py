@@ -13,6 +13,11 @@ from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def get_default_backbone_config() -> Dict[str, Any]:
     """
     Dapatkan konfigurasi default untuk backbone model.
@@ -51,19 +56,12 @@ def get_backbone_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
         Dictionary konfigurasi backbone
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('backbone')
-        
         if config:
             return config
-            
-        # Jika tidak ada config, gunakan default
         logger.warning("⚠️ Konfigurasi backbone tidak ditemukan, menggunakan default")
         return get_default_backbone_config()
-        
     except Exception as e:
         logger.error(f"❌ Error saat mengambil konfigurasi backbone: {str(e)}")
         return get_default_backbone_config()
@@ -79,10 +77,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get current config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('backbone') or get_default_backbone_config()
         
         # Update config from UI

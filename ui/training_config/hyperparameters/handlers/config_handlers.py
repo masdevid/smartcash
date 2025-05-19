@@ -13,6 +13,11 @@ from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def get_default_hyperparameters_config() -> Dict[str, Any]:
     """
     Dapatkan konfigurasi default untuk hyperparameters training.
@@ -81,19 +86,12 @@ def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str
         Dictionary konfigurasi hyperparameters
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('hyperparameters')
-        
         if config:
             return config
-            
-        # Jika tidak ada config, gunakan default
         logger.warning("⚠️ Konfigurasi hyperparameters tidak ditemukan, menggunakan default")
         return get_default_hyperparameters_config()
-        
     except Exception as e:
         logger.error(f"❌ Error saat mengambil konfigurasi hyperparameters: {str(e)}")
         return get_default_hyperparameters_config()
@@ -109,10 +107,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get current config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('hyperparameters') or get_default_hyperparameters_config()
         
         # Update config from UI

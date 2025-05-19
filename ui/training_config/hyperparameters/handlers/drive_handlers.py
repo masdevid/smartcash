@@ -8,6 +8,7 @@ import os
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 from unittest.mock import MagicMock
+from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
@@ -20,6 +21,10 @@ from smartcash.ui.training_config.hyperparameters.handlers.config_handlers impor
 logger = get_logger(__name__)
 logger.set_level(LogLevel.CRITICAL)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def _display_status(status_panel: Any, content: Any) -> None:
     """
@@ -77,7 +82,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
             display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive..."))
     try:
         # Dapatkan environment manager
-        env_manager = get_environment_manager()
+        env_manager = get_environment_manager(base_dir=get_default_base_dir())
         
         # Cek apakah drive diaktifkan
         if not env_manager.is_drive_mounted:
@@ -89,7 +94,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
             return
         
         # Dapatkan ConfigManager singleton
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Dapatkan konfigurasi
         config = config_manager.get_module_config('hyperparameters')
@@ -182,7 +187,7 @@ def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, A
             display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter dari Google Drive..."))
     try:
         # Dapatkan environment manager
-        env_manager = get_environment_manager()
+        env_manager = get_environment_manager(base_dir=get_default_base_dir())
         
         # Cek apakah drive diaktifkan
         if not env_manager.is_drive_mounted:
@@ -194,7 +199,7 @@ def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, A
             return
         
         # Dapatkan ConfigManager singleton
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Register UI components untuk persistensi
         config_manager.register_ui_components('hyperparameters', ui_components)

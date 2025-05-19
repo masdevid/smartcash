@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, Callable
 import os
 import ipywidgets as widgets
 from IPython.display import display, clear_output
+from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
@@ -17,6 +18,11 @@ from smartcash.ui.training_config.training_strategy.handlers.drive_handlers impo
 from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_config_from_ui, update_ui_from_config, get_default_config, update_training_strategy_info
 
 logger = get_logger(__name__)
+
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -32,10 +38,10 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
     """
     try:
         # Dapatkan environment manager jika belum tersedia
-        env = env or get_environment_manager()
+        env = env or get_environment_manager(base_dir=get_default_base_dir())
         
         # Dapatkan config manager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Validasi config
         if config is None:

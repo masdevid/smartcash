@@ -6,6 +6,8 @@ Deskripsi: Handler untuk tombol pada UI pemilihan backbone model SmartCash
 from typing import Dict, Any, Callable
 import ipywidgets as widgets
 from IPython.display import clear_output, display
+from pathlib import Path
+import os
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
@@ -22,6 +24,11 @@ from smartcash.ui.training_config.backbone.handlers.drive_handlers import sync_t
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
 logger.set_level(LogLevel.CRITICAL)
+
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -41,8 +48,7 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyimpan konfigurasi backbone..."))
     
     try:
-        # Dapatkan ConfigManager singleton
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Update config dari UI
         config_to_save = update_config_from_ui(ui_components)
@@ -116,8 +122,7 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi backbone..."))
     
     try:
-        # Dapatkan ConfigManager singleton
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Dapatkan default config
         default_config = config_manager.get_module_config('model', {})

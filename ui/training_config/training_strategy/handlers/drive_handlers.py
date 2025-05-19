@@ -8,6 +8,7 @@ import ipywidgets as widgets
 from IPython.display import display, clear_output
 import os
 import shutil
+from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
@@ -18,6 +19,11 @@ from smartcash.common.io import save_yaml
 from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_ui_from_config, update_config_from_ui
 
 logger = get_logger(__name__)
+
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
     """
@@ -32,10 +38,10 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         return
     
     # Dapatkan environment manager
-    env = get_environment_manager()
+    env = get_environment_manager(base_dir=get_default_base_dir())
     
     # Dapatkan config manager
-    config_manager = get_config_manager()
+    config_manager = get_config_manager(base_dir=get_default_base_dir())
     
     # Tampilkan status
     with ui_components['status']:
@@ -114,10 +120,10 @@ def sync_from_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         return
     
     # Dapatkan environment manager
-    env = get_environment_manager()
+    env = get_environment_manager(base_dir=get_default_base_dir())
     
     # Dapatkan config manager
-    config_manager = get_config_manager()
+    config_manager = get_config_manager(base_dir=get_default_base_dir())
     
     # Tampilkan status
     with ui_components['status']:

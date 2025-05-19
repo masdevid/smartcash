@@ -13,6 +13,11 @@ from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def get_default_training_strategy_config() -> Dict[str, Any]:
     """
     Dapatkan konfigurasi default untuk training strategy.
@@ -61,19 +66,12 @@ def get_training_strategy_config(ui_components: Dict[str, Any] = None) -> Dict[s
         Dictionary konfigurasi training strategy
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('training_strategy')
-        
         if config:
             return config
-            
-        # Jika tidak ada config, gunakan default
         logger.warning("⚠️ Konfigurasi training strategy tidak ditemukan, menggunakan default")
         return get_default_training_strategy_config()
-        
     except Exception as e:
         logger.error(f"❌ Error saat mengambil konfigurasi training strategy: {str(e)}")
         return get_default_training_strategy_config()
@@ -89,10 +87,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
-        # Get current config
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('training_strategy') or get_default_training_strategy_config()
         
         # Update config from UI

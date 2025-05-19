@@ -5,6 +5,8 @@ Deskripsi: Inisialisasi UI dan logika bisnis untuk pemilihan backbone model Smar
 
 from typing import Dict, Any
 from IPython.display import display, clear_output
+from pathlib import Path
+import os
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
@@ -12,6 +14,11 @@ from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
 logger = get_logger(__name__)
+
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def initialize_backbone_ui() -> Dict[str, Any]:
     """
@@ -85,7 +92,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
         # Perbarui informasi sinkronisasi berdasarkan status drive
         try:
-            env_manager = get_environment_manager()
+            env_manager = get_environment_manager(base_dir=get_default_base_dir())
             if not env_manager.is_drive_mounted:
                 # Jika drive tidak diaktifkan, perbarui pesan
                 ui_components['sync_info'].value = f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('warning', '⚠️')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi otomatis.</div>"
@@ -99,7 +106,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         )
         
         # Dapatkan ConfigManager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Dapatkan konfigurasi
         current_config = config_manager.get_module_config('model')

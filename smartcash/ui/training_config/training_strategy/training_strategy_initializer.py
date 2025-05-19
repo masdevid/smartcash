@@ -6,6 +6,8 @@ Deskripsi: Initializer untuk UI konfigurasi strategi pelatihan model
 from typing import Dict, Any, Optional
 from IPython.display import display, clear_output
 import ipywidgets as widgets
+from pathlib import Path
+import os
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
@@ -20,6 +22,11 @@ from smartcash.ui.training_config.training_strategy.handlers.form_handlers impor
 
 logger = get_logger(__name__)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def initialize_training_strategy_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Inisialisasi dan tampilkan komponen UI untuk konfigurasi strategi pelatihan.
@@ -32,16 +39,11 @@ def initialize_training_strategy_ui(env: Any = None, config: Dict[str, Any] = No
         Dict berisi komponen UI
     """
     try:
-        # Dapatkan environment manager jika belum tersedia
-        env = env or get_environment_manager()
+        env = env or get_environment_manager(base_dir=get_default_base_dir())
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
-        # Dapatkan config manager
-        config_manager = get_config_manager()
-        
-        # Dapatkan konfigurasi strategi pelatihan jika belum tersedia
         if config is None:
             config = config_manager.get_module_config('training_strategy', {})
-            # Jika masih tidak ada, gunakan default
             if not config:
                 config = get_default_config()
         
@@ -96,8 +98,7 @@ def get_training_strategy_ui(env: Any = None, config: Dict[str, Any] = None) -> 
     Returns:
         Dict berisi komponen UI
     """
-    # Dapatkan config manager
-    config_manager = get_config_manager()
+    config_manager = get_config_manager(base_dir=get_default_base_dir())
     
     # Coba dapatkan UI components yang sudah teregistrasi
     ui_components = config_manager.get_ui_components('training_strategy')

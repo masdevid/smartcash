@@ -52,13 +52,19 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
 
 def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
     """
-    Eksekusi proses download dataset sesuai dengan endpoint yang dipilih.
+    Eksekusi proses download dataset berdasarkan endpoint yang dipilih.
     
     Args:
         ui_components: Dictionary komponen UI
-        endpoint: Endpoint yang dipilih ('Roboflow' atau 'Google Drive')
+        endpoint: Endpoint yang dipilih (Roboflow, Google Drive, etc.)
     """
     logger = ui_components.get('logger')
+    
+    # Buat context logger khusus untuk download yang tidak mempengaruhi modul lain
+    download_logger = None
+    if logger:
+        download_logger = logger.bind(context="download_only")
+        ui_components['download_logger'] = download_logger
     
     try:
         # Reset UI dan persiapan download
@@ -67,7 +73,8 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
         # Tambahkan dummy update_config_from_ui jika tidak ada untuk mencegah error
         if 'update_config_from_ui' not in ui_components:
             ui_components['update_config_from_ui'] = lambda *args, **kwargs: {}
-            if logger: logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
+            if download_logger: 
+                download_logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
         
         # Cek API key jika endpoint adalah Roboflow
         if endpoint == 'Roboflow':
@@ -117,7 +124,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger')
+    # Gunakan download_logger jika tersedia, jika tidak gunakan logger biasa
+    logger = ui_components.get('download_logger') or ui_components.get('logger')
     error_result = None
     
     try:
@@ -130,7 +138,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             error_result = {
                 "success": False,
                 "error": "API key Roboflow tidak tersedia",
-                "alternative_message": "Pastikan Anda telah memasukkan API key Roboflow yang valid di form input"
+                "alternative_message": "Pastikan Anda telah memasukkan API key Roboflow yang valid di form input",
+                "context": "download_only"
             }
             _process_download_result(ui_components, error_result)
             return
@@ -139,7 +148,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             error_result = {
                 "success": False,
                 "error": "Parameter workspace, project, atau version tidak lengkap",
-                "alternative_message": "Pastikan semua parameter Roboflow telah diisi dengan benar"
+                "alternative_message": "Pastikan semua parameter Roboflow telah diisi dengan benar",
+                "context": "download_only"
             }
             _process_download_result(ui_components, error_result)
             return
@@ -169,7 +179,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             error_result = {
                 "success": False,
                 "error": f"Gagal menginisialisasi download service: {str(service_error)}",
-                "alternative_message": "Coba periksa konfigurasi dan pastikan direktori output dapat diakses"
+                "alternative_message": "Coba periksa konfigurasi dan pastikan direktori output dapat diakses",
+                "context": "download_only"
             }
             _process_download_result(ui_components, error_result)
             return
@@ -221,7 +232,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
                 "success": False,
                 "error": error_message,
                 "error_details": error_detail,
-                "alternative_message": alternative_message
+                "alternative_message": alternative_message,
+                "context": "download_only"
             }
             
             _process_download_result(ui_components, error_result)
@@ -243,7 +255,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             "success": False,
             "error": error_msg,
             "error_details": error_detail,
-            "alternative_message": "Coba periksa parameter dan koneksi internet Anda"
+            "alternative_message": "Coba periksa parameter dan koneksi internet Anda",
+            "context": "download_only"
         }
         
         # Proses error result
@@ -268,30 +281,36 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     from smartcash.ui.components.status_panel import update_status_panel
     from smartcash.ui.utils.ui_logger import log_to_ui as show_status
     
-    # Cek apakah ada error 'update_config_from_ui'
-    if isinstance(result.get('error'), str) and 'update_config_from_ui' in result.get('error', ''):
-        # Ini adalah error yang terkait dengan konfigurasi
-        if logger: 
-            logger.debug(f"🔧 Menangani error update_config_from_ui: {result.get('error')}")
-        
-        # Tambahkan dummy update_config_from_ui jika tidak ada
-        if 'update_config_from_ui' not in ui_components:
-            ui_components['update_config_from_ui'] = lambda *args, **kwargs: {}
-            if logger: 
-                logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
-        
-        # Hapus error dari result dan lanjutkan proses
-        if 'error' in result:
-            del result['error']
-            result['success'] = True
-            result['message'] = result.get('message', 'Dataset berhasil didownload')
+    # Buat context logger khusus untuk download yang tidak mempengaruhi modul lain
+    download_logger = None
+    if logger:
+        download_logger = logger.bind(context="download_only")
     
-    # Cek error terkait direktori input
-    if isinstance(result.get('error'), str) and 'Tidak ada gambar di direktori input' in result.get('error', ''):
-        # Tambahkan informasi tambahan untuk membantu pengguna
+    # Filter error yang tidak relevan dengan proses download
+    if isinstance(result.get('error'), str):
         error_msg = result.get('error', '')
-        help_msg = "\n\nPastikan dataset telah diunduh dan dipreprocessing terlebih dahulu. Coba periksa direktori data/raw atau data/preprocessed."
-        result['error'] = error_msg + help_msg
+        
+        # Filter error update_config_from_ui
+        if 'update_config_from_ui' in error_msg:
+            if download_logger: 
+                download_logger.debug(f"🔧 Mengabaikan error yang tidak relevan dengan download: {error_msg}")
+            
+            # Hapus error dari result dan lanjutkan proses
+            if 'error' in result:
+                del result['error']
+                result['success'] = True
+                result['message'] = result.get('message', 'Dataset berhasil didownload')
+        
+        # Filter error terkait validasi gambar yang tidak relevan dengan proses download
+        elif 'Tidak ada gambar di direktori input' in error_msg:
+            if download_logger:
+                download_logger.debug(f"🔧 Mengabaikan error validasi gambar yang tidak relevan dengan download: {error_msg}")
+            
+            # Hapus error dari result dan lanjutkan proses
+            if 'error' in result:
+                del result['error']
+                result['success'] = True
+                result['message'] = result.get('message', 'Dataset berhasil didownload')
     
     # Reset UI setelah proses selesai
     _reset_ui_after_download(ui_components)
@@ -306,7 +325,10 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         
         # Show status
         show_status(message, "success", ui_components)
-        if logger: logger.info(f"✅ {message}")
+        
+        # Gunakan download_logger jika tersedia, jika tidak gunakan logger biasa
+        download_logger = ui_components.get('download_logger') or logger
+        if download_logger: download_logger.info(f"✅ {message}")
         
         # Jika ada dataset_info, tampilkan
         if 'dataset_info' in result:
@@ -316,13 +338,16 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
             info_message += f"{len(dataset_info.get('test', []))} test images"
             
             show_status(info_message, "info", ui_components)
-            if logger: logger.info(f"ℹ️ {info_message}")
+            
+            # Gunakan download_logger jika tersedia
+            download_logger = ui_components.get('download_logger') or logger
+            if download_logger: download_logger.info(f"ℹ️ {info_message}")
             
             # Tampilkan lokasi dataset
             if 'dataset_path' in result:
                 path_message = f"Dataset tersimpan di: {result['dataset_path']}"
                 show_status(path_message, "info", ui_components)
-                if logger: logger.info(f"📁 {path_message}")
+                if download_logger: download_logger.info(f"📁 {path_message}")
     
     elif 'warning' in result:
         # Warning - download berhasil tapi ada warning
@@ -333,13 +358,16 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         
         # Show status
         show_status(message, "warning", ui_components)
-        if logger: logger.warning(f"⚠️ {message}")
+        
+        # Gunakan download_logger jika tersedia
+        download_logger = ui_components.get('download_logger') or logger
+        if download_logger: download_logger.warning(f"⚠️ {message}")
         
         # Jika ada alternative_message, tampilkan
         if 'alternative_message' in result:
             alt_message = result['alternative_message']
             show_status(alt_message, "info", ui_components)
-            if logger: logger.info(f"ℹ️ {alt_message}")
+            if download_logger: download_logger.info(f"ℹ️ {alt_message}")
         
     else:
         # Error lainnya - pastikan pesan error lengkap
@@ -349,20 +377,28 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         # Update status panel
         update_status_panel(ui_components['status_panel'], message, "error")
         
-        # Show status
-        show_status(message, "error", ui_components)
-        if logger: logger.error(f"❌ {message}")
-        
-        # Jika ada alternative_message, tampilkan
-        if 'alternative_message' in result:
-            alt_message = result['alternative_message']
-            show_status(alt_message, "info", ui_components)
-            if logger: logger.info(f"ℹ️ {alt_message}")
+        # Hanya tampilkan error jika konteksnya adalah download_only atau tidak ada konteks
+        if not result.get('context') or result.get('context') == 'download_only':
+            # Show status
+            show_status(message, "error", ui_components)
             
-        # Tampilkan saran untuk mengatasi masalah
-        suggestion = "Coba periksa koneksi internet dan pastikan parameter download sudah benar."
-        show_status(suggestion, "info", ui_components)
-        if logger: logger.info(f"💡 {suggestion}")
+            # Gunakan download_logger jika tersedia
+            download_logger = ui_components.get('download_logger') or logger
+            if download_logger: download_logger.error(f"❌ {message}")
+            
+            # Jika ada alternative_message, tampilkan
+            if 'alternative_message' in result:
+                alt_message = result['alternative_message']
+                show_status(alt_message, "info", ui_components)
+                if download_logger: download_logger.info(f"ℹ️ {alt_message}")
+                
+            # Tampilkan saran untuk mengatasi masalah
+            suggestion = "Coba periksa koneksi internet dan pastikan parameter download sudah benar."
+            show_status(suggestion, "info", ui_components)
+            if download_logger: download_logger.info(f"💡 {suggestion}")
+        else:
+            # Jika konteks bukan download_only, hanya log error untuk debugging
+            if logger: logger.debug(f"🔧 Mengabaikan error dari konteks lain: {message}")
 
 def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """

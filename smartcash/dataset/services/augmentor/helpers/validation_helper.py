@@ -74,45 +74,82 @@ def validate_input_files(images_dir: str, file_prefix: str, logger = None) -> Tu
         Path("data/preprocessed/test/images")
     ]
     
-    # Jika masih tidak ada file, coba cari di lokasi alternatif
+    # Buat context logger khusus untuk augmentasi yang tidak mempengaruhi modul lain
+    aug_logger = None
+    if logger:
+        # Cek apakah logger memiliki metode bind
+        if hasattr(logger, 'bind'):
+            aug_logger = logger.bind(context="augmentation_only")
+        else:
+            aug_logger = logger
+    
+    # Jika tidak ada file gambar ditemukan, coba cari di lokasi alternatif
     if not image_files:
-        for alt_dir in alternative_locations:
+        if aug_logger:
+            aug_logger.debug(f"🔍 Tidak ada gambar di direktori {images_dir}, mencoba lokasi alternatif...")
+        
+        for alt_path in alternative_locations:
+            alt_dir = images_path / alt_path
             if alt_dir.exists():
-                if logger:
-                    logger.info(f"🔍 Mencoba mencari di lokasi alternatif: {alt_dir}")
+                if aug_logger:
+                    aug_logger.debug(f"🔍 Mencari gambar di {alt_dir}...")
                 
-                for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
+                for img_pattern in all_patterns:
                     pattern_files = list(alt_dir.glob(img_pattern))
                     if pattern_files:
-                        if logger:
-                            logger.info(f"✅ Ditemukan {len(pattern_files)} file di {alt_dir}")
                         image_files.extend([str(f) for f in pattern_files])
-                        # Gunakan direktori ini sebagai direktori input
-                        images_dir = str(alt_dir)
+                        if aug_logger:
+                            aug_logger.debug(f"✅ Menemukan {len(pattern_files)} gambar di {alt_dir}")
                         break
-                
-                # Jika sudah menemukan file, hentikan pencarian
-                if image_files:
+    
+    # Jika masih tidak ada file gambar, coba cari di direktori parent
+    if not image_files and images_path.parent.exists() and images_path.parent != images_path:
+        parent_dir = images_path.parent
+        if aug_logger:
+            aug_logger.debug(f"🔍 Mencari gambar di direktori parent {parent_dir}...")
+        
+        # Cari di direktori parent/images jika ada
+        parent_images_dir = parent_dir / 'images'
+        if parent_images_dir.exists():
+            for img_pattern in all_patterns:
+                pattern_files = list(parent_images_dir.glob(img_pattern))
+                if pattern_files:
+                    image_files.extend([str(f) for f in pattern_files])
+                    if aug_logger:
+                        aug_logger.debug(f"✅ Menemukan {len(pattern_files)} gambar di {parent_images_dir}")
                     break
     
-    # Jika masih tidak ada file, coba cari di direktori saat ini
+    # Jika masih tidak ada file gambar, cari di direktori lain yang umum
     if not image_files:
-        current_dir = Path(".").absolute()
-        if logger:
-            logger.info(f"🔍 Mencoba mencari di direktori saat ini: {current_dir}")
+        common_dirs = [
+            Path('data/raw/images'),
+            Path('data/raw'),
+            Path('data/preprocessed/images'),
+            Path('data/preprocessed'),
+            Path('data/images'),
+            Path('data')
+        ]
         
-        for img_pattern in ["*.jpg", "*.jpeg", "*.png"]:
-            pattern_files = list(current_dir.glob(img_pattern))
-            image_files.extend([str(f) for f in pattern_files])
+        for common_dir in common_dirs:
+            if common_dir.exists():
+                if aug_logger:
+                    aug_logger.debug(f"🔍 Mencari gambar di direktori umum {common_dir}...")
+                
+                for img_pattern in all_patterns:
+                    pattern_files = list(common_dir.glob(img_pattern))
+                    if pattern_files:
+                        image_files.extend([str(f) for f in pattern_files])
+                        if aug_logger:
+                            aug_logger.debug(f"✅ Menemukan {len(pattern_files)} gambar di {common_dir}")
+                        break
     
-    # Jika masih tidak ada file
+    # Jika masih tidak ada file gambar, berikan pesan error dengan konteks augmentasi
     if not image_files:
-        result = {
-            "success": False,
-            "message": f"❌ Tidak ada gambar di direktori input: {images_dir}",
-            "alternative_message": "Pastikan dataset telah diunduh dan dipreprocessing terlebih dahulu"
-        }
-        return [], result
+        error_message = f"❌ Tidak ada gambar di direktori input: {images_dir}"
+        if aug_logger:
+            aug_logger.debug(error_message)
+        
+        return [], {"success": False, "error": error_message, "context": "augmentation_only"}
     
     # Log jumlah file yang ditemukan
     if logger:

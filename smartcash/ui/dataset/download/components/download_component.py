@@ -122,24 +122,30 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Progress tracking dengan shared component dan layout yang konsisten
+    # Catatan: Layout akan diatur setelah komponen dibuat
     progress_components = create_progress_tracking(
         module_name='download',
         show_step_progress=True,
         show_overall_progress=True,
-        width='100%',
-        margin='15px 0',
-        padding='5px 0',
-        border_radius='5px'
+        width='100%'
     )
     
+    # Atur layout untuk progress container setelah dibuat
+    progress_components['progress_container'].layout.margin = '15px 0'
+    progress_components['progress_container'].layout.padding = '5px 0'
+    progress_components['progress_container'].layout.border_radius = '5px'
+    
     # Log accordion dengan shared component dan layout yang konsisten
+    # Catatan: Layout akan diatur setelah komponen dibuat
     log_components = create_log_accordion(
         module_name='download',
         height='200px',
-        width='100%',
-        margin='15px 0',
-        border_radius='5px'
+        width='100%'
     )
+    
+    # Atur layout untuk log accordion setelah dibuat
+    log_components['log_accordion'].layout.margin = '15px 0'
+    log_components['log_accordion'].layout.border_radius = '5px'
     
     # Summary stats container dengan styling yang konsisten
     summary_container = widgets.Output(

@@ -136,3 +136,27 @@ def create_alert_html(message: str, alert_type: str = 'info', icon: Optional[str
         f'</div></div>'
     )
     return html_content
+
+def update_status_panel(panel: widgets.HTML, message: str, status_type: str = "info") -> None:
+    """
+    Update status panel yang sudah ada.
+    
+    Args:
+        panel: Widget HTML status panel
+        message: Pesan baru
+        status_type: Tipe status baru ('info', 'success', 'warning', 'error')
+    """
+    # Dapatkan style berdasarkan tipe status
+    style_info = ALERT_STYLES.get(status_type, ALERT_STYLES['info'])
+    bg_color = style_info['bg_color']
+    text_color = style_info['text_color'] 
+    icon = style_info['icon']
+    
+    # Update HTML
+    panel.value = f"""
+    <div style="padding:10px; background-color:{bg_color}; 
+               color:{text_color}; border-radius:4px; margin:5px 0;
+               border-left:4px solid {text_color};">
+        <p style="margin:5px 0">{icon} {message}</p>
+    </div>
+    """

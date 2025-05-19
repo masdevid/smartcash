@@ -26,7 +26,7 @@ def handle_reset_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         
         # Update status panel jika tersedia
         if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-            ui_components['update_status_panel']("Konfigurasi download dataset", "info")
+            ui_components['update_status_panel'](ui_components, "info", "Konfigurasi download dataset")
         
     except Exception as e:
         # Tampilkan error

@@ -182,9 +182,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         _update_progress(ui_components, 20, "Mendownload dataset dari Roboflow...")
         
         # Download dataset menggunakan dataset manager
-        result = dataset_manager.download_dataset(
-            source="roboflow",
-            config=config
+        result = dataset_manager.download_from_roboflow(
+            **config
         )
         
         # Proses hasil download

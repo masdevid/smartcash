@@ -78,11 +78,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
         base_dir = Path.home() / APP_NAME
         config_file = 'base_config.yaml'  # File akan dicari di DEFAULT_CONFIG_DIR
     
-    # Pastikan direktori ada
-    base_dir.mkdir(parents=True, exist_ok=True)
-    config_dir = base_dir / DEFAULT_CONFIG_DIR
-    config_dir.mkdir(parents=True, exist_ok=True)
-    
+    # Inisialisasi config manager
     config_manager = get_config_manager(
         base_dir=str(base_dir),
         config_file=config_file

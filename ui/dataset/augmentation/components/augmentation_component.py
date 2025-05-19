@@ -31,6 +31,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.validation_options import create_validation_options
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.sync_info_message import create_sync_info_message
     # Tidak menggunakan split_config lagi sesuai permintaan
 
     # Import komponen submodules augmentasi
@@ -54,7 +55,23 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
 
-    # Split config tidak digunakan lagi sesuai permintaan
+    # Tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label='Simpan Konfigurasi',
+        reset_label='Reset Konfigurasi',
+        button_width='100px',
+        container_width='100%'
+    )
+    
+    # Pesan sinkronisasi menggunakan shared component
+    sync_info = create_sync_info_message(
+        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        icon="info",
+        color="#666",
+        font_style="italic",
+        margin_top="5px",
+        width="100%"
+    )
     
     # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
@@ -114,7 +131,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     settings_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
         combined_options,
-        # split_config dihilangkan sesuai permintaan
+        save_reset_buttons['container'],
+        sync_info['container'],
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
         advanced_options,
@@ -143,7 +161,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_options': advanced_options,
         'advanced_accordion': advanced_accordion,
         'split_selector': split_selector,
-        # 'split_config' dihilangkan sesuai permintaan
+        'save_reset_buttons': save_reset_buttons,
+        'sync_info': sync_info,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_config_button': save_reset_buttons['reset_button'],
         'augment_button': action_buttons['primary_button'],
         'augmentation_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],

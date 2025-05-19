@@ -262,3 +262,75 @@ def remove_augmented_files_from_preprocessed(ui_components: Dict[str, Any], pref
             'status': 'error',
             'message': f'Error saat menghapus file augmentasi dari preprocessed: {str(e)}'
         }
+
+def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Setup handler untuk pembersihan hasil augmentasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary komponen UI dengan handler terpasang
+    """
+    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger.info("🧹 Setup cleanup handler untuk augmentasi...")
+    
+    try:
+        # Daftarkan handler untuk tombol cleanup
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].on_click(
+                lambda b: on_cleanup_augmentation(b, ui_components)
+            )
+            
+        return ui_components
+    except Exception as e:
+        logger.error(f"❌ Error saat setup cleanup handler: {str(e)}")
+        return ui_components
+
+def on_cleanup_augmentation(b, ui_components: Dict[str, Any]) -> None:
+    """
+    Handler untuk tombol cleanup augmentasi.
+    
+    Args:
+        b: Button widget
+        ui_components: Dictionary komponen UI
+    """
+    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger.info("🧹 Memulai pembersihan hasil augmentasi...")
+    
+    # Tampilkan status
+    status_output = ui_components.get('status_panel', None)
+    if status_output:
+        with status_output:
+            status_output.clear_output()
+            display(create_status_indicator(
+                "🧹 Membersihkan hasil augmentasi...", 
+                "info"
+            ))
+    
+    # Jalankan pembersihan
+    result = cleanup_augmentation_results(ui_components)
+    
+    # Tampilkan hasil
+    if status_output:
+        with status_output:
+            status_output.clear_output()
+            if result['status'] == 'success':
+                display(create_status_indicator(
+                    f"✅ {result['message']}", 
+                    "success"
+                ))
+            elif result['status'] == 'warning':
+                display(create_status_indicator(
+                    f"⚠️ {result['message']}", 
+                    "warning"
+                ))
+            else:
+                display(create_status_indicator(
+                    f"❌ {result['message']}", 
+                    "error"
+                ))
+    
+    logger.info(f"🧹 Pembersihan selesai dengan status: {result['status']}")
+

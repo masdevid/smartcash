@@ -35,8 +35,6 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.feature_checkbox_group import create_feature_checkbox_group
     from smartcash.ui.components.config_form import create_config_form
-    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-    from smartcash.ui.components.sync_info_message import create_sync_info_message
     from smartcash.ui.info_boxes.training_info import get_training_info
     
     # Dapatkan logger
@@ -85,23 +83,8 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         icon="settings"
     )
     
-    # Tombol save dan reset menggunakan shared component
-    save_reset_buttons = create_save_reset_buttons(
-        module_name='training',
-        save_label='Simpan Konfigurasi',
-        reset_label='Reset Konfigurasi',
-        width='100%'
-    )
-    
-    # Pesan sinkronisasi menggunakan shared component
-    sync_info = create_sync_info_message(
-        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
-        icon="info",
-        color="#666",
-        font_style="italic",
-        margin_top="5px",
-        width="100%"
-    )
+    # Fokus pada menjalankan training dan menampilkan metrik realtime F1 dan mAP plot
+    # Tidak menggunakan save_reset_buttons karena fokus pada eksekusi training
     
     # Gunakan shared component config_form untuk konfigurasi training
     training_config_fields = [
@@ -232,8 +215,6 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Konfigurasi Training</h4>"),
         training_config_form['container'],
         training_options['container'],
-        save_reset_buttons['container'],
-        sync_info['container'],
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],
@@ -256,8 +237,6 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         'create_metrics_chart': create_metrics_chart,
         'module_name': 'training',
         'logger': logger,
-        'save_reset_buttons': save_reset_buttons,
-        'sync_info': sync_info,
         
         # Tambahkan komponen config form
         'training_config_form': training_config_form,
@@ -279,7 +258,9 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         'start_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
         'cleanup_button': action_buttons.get('cleanup_button'),
-        'button_container': action_buttons['container']
+        'button_container': action_buttons['container'],
+        # Tambahkan tombol reset untuk reset form saja, bukan untuk save/reset konfigurasi
+        'reset_form_button': action_buttons.get('reset_button')
     })
     
     # Tambahkan komponen progress tracking

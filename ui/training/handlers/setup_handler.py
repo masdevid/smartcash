@@ -109,19 +109,8 @@ def register_button_handlers(ui_components: Dict[str, Any], env=None, config=Non
             lambda b: on_cleanup_training(b, ui_components, env, config)
         )
         
-    # Daftarkan handler untuk tombol save dan reset dari shared component save_reset_buttons
-    if 'save_reset_buttons' in ui_components:
-        # Handler untuk tombol save
-        if 'save_button' in ui_components['save_reset_buttons']:
-            ui_components['save_reset_buttons']['save_button'].on_click(
-                lambda b: on_save_config(b, ui_components, env, config)
-            )
-        
-        # Handler untuk tombol reset
-        if 'reset_button' in ui_components['save_reset_buttons']:
-            ui_components['save_reset_buttons']['reset_button'].on_click(
-                lambda b: on_reset_config(b, ui_components, env, config)
-            )
+    # Training UI tidak lagi menggunakan save_reset_buttons
+    # Fokus pada menjalankan training dan menampilkan metrik realtime F1 dan mAP plot
 
 def update_training_info_from_config(ui_components: Dict[str, Any], config_manager) -> None:
     """

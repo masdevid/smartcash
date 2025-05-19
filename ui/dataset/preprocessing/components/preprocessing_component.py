@@ -91,9 +91,19 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         reset_tooltip="Reset konfigurasi preprocessing ke default",
         save_icon="save",
         reset_icon="reset",
-        with_sync_info=True,
-        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
-        button_width="100px"
+        with_sync_info=False,
+        button_width="100px",
+        container_width="100%"
+    )
+    
+    # Pesan sinkronisasi menggunakan shared component
+    sync_info = create_sync_info_message(
+        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        icon="info",
+        color="#666",
+        font_style="italic",
+        margin_top="5px",
+        width="100%"
     )
     
     # Buat tombol-tombol preprocessing dengan shared component
@@ -135,6 +145,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         advanced_accordion,
         save_reset_buttons['container'],  # Tambahkan tombol save dan reset
+        sync_info['container'],  # Tambahkan pesan sinkronisasi
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],
@@ -156,11 +167,11 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'preprocess_button': action_buttons['primary_button'],
         'preprocessing_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],
-        'reset_button': action_buttons['reset_button'],
         'cleanup_button': action_buttons['cleanup_button'],
         'save_button': save_reset_buttons['save_button'],  # Gunakan dari save_reset_buttons
-        'reset_button': save_reset_buttons['reset_button'],  # Gunakan dari save_reset_buttons
+        'reset_config_button': save_reset_buttons['reset_button'],  # Gunakan dari save_reset_buttons
         'save_reset_buttons': save_reset_buttons,  # Tambahkan referensi lengkap
+        'sync_info': sync_info,  # Tambahkan referensi ke sync_info
         'button_container': action_buttons['container'],
         'module_name': 'preprocessing',
         # Default dataset paths

@@ -34,6 +34,8 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.sync_info_message import create_sync_info_message
     import os
     
     # Ambil konfigurasi jika tersedia
@@ -138,15 +140,32 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     ))
     
     # Buat tombol-tombol download dengan shared component (tanpa redundansi)
-    # Catatan: reset_button dan save_button sudah tersedia secara default dalam create_action_buttons
+    # Tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label='Simpan Konfigurasi',
+        reset_label='Reset Konfigurasi',
+        button_width='100px',
+        container_width='100%'
+    )
+    
+    # Pesan sinkronisasi menggunakan shared component
+    sync_info = create_sync_info_message(
+        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        icon="info",
+        color="#666",
+        font_style="italic",
+        margin_top="5px",
+        width="100%"
+    )
+    
+    # Tombol aksi utama
     action_buttons = create_action_buttons(
         primary_label="Download Dataset",
         primary_icon="download",
         secondary_buttons=[
             ("Check Dataset", "search", "info")
         ],
-        cleanup_enabled=True,  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
-        save_enabled=True  # Aktifkan tombol save untuk menyimpan konfigurasi
+        cleanup_enabled=True  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
     )
     
     # Progress tracking dengan shared component dan layout yang konsisten
@@ -206,6 +225,8 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
         input_options,
+        save_reset_buttons['container'],
+        sync_info['container'],
         create_divider(),
         action_buttons['container'],
         confirmation_area,  # Tambahkan area konfirmasi sebelum progress
@@ -230,8 +251,10 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         'input_options': input_options,
         'download_button': action_buttons['primary_button'],
         'check_button': action_buttons['secondary_buttons'][0] if 'secondary_buttons' in action_buttons else None,
-        'reset_button': action_buttons.get('reset_button'),  # Menggunakan reset_button dari shared component
-        'save_button': action_buttons.get('save_button'),  # Tombol save untuk menyimpan konfigurasi
+        'save_button': save_reset_buttons['save_button'],  # Tombol save dari save_reset_buttons
+        'reset_config_button': save_reset_buttons['reset_button'],  # Tombol reset dari save_reset_buttons
+        'save_reset_buttons': save_reset_buttons,  # Referensi ke save_reset_buttons
+        'sync_info': sync_info,  # Referensi ke sync_info
         'cleanup_button': action_buttons.get('cleanup_button'),
         'button_container': action_buttons['container'],
         'summary_container': summary_container,

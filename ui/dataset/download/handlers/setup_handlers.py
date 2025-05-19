@@ -56,16 +56,23 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     return ui_components
 
 def _setup_observers(ui_components: Dict[str, Any]) -> None:
-    """Setup observer handlers."""
+    """Setup observer handlers untuk sistem notifikasi baru."""
     try:
-        from smartcash.ui.handlers.observer_handler import setup_observer_handlers
-        from smartcash.ui.dataset.download.handlers.download_progress_observer import setup_download_progress_observer
+        # Import sistem notifikasi baru
+        from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+        from smartcash.ui.dataset.download.utils.notification_manager import get_observer_manager
         
-        # Setup basic observers
-        ui_components = setup_observer_handlers(ui_components, "dataset_download_observers")
+        # Setup observer manager dan register UI observers
+        observer_manager = get_observer_manager()
+        ui_components['observer_manager'] = observer_manager
         
-        # Setup download progress observer
-        setup_download_progress_observer(ui_components)
+        # Register UI observers untuk log dan progress
+        register_ui_observers(ui_components)
+        
+        # Log setup berhasil
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug("✅ Observer untuk sistem notifikasi berhasil disetup")
     except ImportError as e:
         # Log gagal import jika logger tersedia
         logger = ui_components.get('logger')

@@ -7,6 +7,7 @@ from typing import Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
 import os
 import time
+from pathlib import Path
 
 def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
@@ -16,7 +17,12 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         b: Button widget
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger')
+    # Import sistem notifikasi baru
+    from smartcash.ui.dataset.download.utils.notification_manager import notify_log
+    from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+    
+    # Daftarkan observer untuk notifikasi UI
+    observer_manager = register_ui_observers(ui_components)
     
     # Reset log output saat tombol diklik
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
@@ -43,13 +49,27 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         # Reset progress bar terlebih dahulu
         _reset_progress_bar(ui_components)
         
+        # Kirim notifikasi log bahwa proses download akan dimulai
+        notify_log(
+            sender=ui_components,
+            message="Mempersiapkan proses download dataset...",
+            level="info"
+        )
+        
         # Konfirmasi download
         from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download, cancel_download
         # Sebelum menampilkan konfirmasi, persiapkan cancel_callback
         def cancel_callback():
             # Pastikan tombol diaktifkan kembali saat cancel
             _disable_buttons(ui_components, False)
-            cancel_download(ui_components, logger)
+            cancel_download(ui_components)
+            
+            # Kirim notifikasi log bahwa proses download dibatalkan
+            notify_log(
+                sender=ui_components,
+                message="Proses download dibatalkan oleh pengguna",
+                level="warning"
+            )
             
         # Tetapkan callback ke ui_components agar bisa diakses di confirmation_handler
         ui_components['cancel_download_callback'] = cancel_callback
@@ -59,10 +79,12 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         
     except Exception as e:
         # Tampilkan error
-        from smartcash.ui.utils.ui_logger import log_to_ui
         error_msg = f"Error saat persiapan download: {str(e)}"
-        log_to_ui(ui_components, error_msg, "error", "❌")
-        if logger: logger.error(f"❌ {error_msg}")
+        notify_log(
+            sender=ui_components,
+            message=error_msg,
+            level="error"
+        )
         
         # Aktifkan kembali tombol
         _disable_buttons(ui_components, False)
@@ -75,60 +97,58 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
         ui_components: Dictionary komponen UI
         endpoint: Parameter dipertahankan untuk kompatibilitas, selalu 'Roboflow'
     """
-    logger = ui_components.get('logger')
+    # Import sistem notifikasi baru
+    from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
     
-    # Buat context logger khusus untuk download yang tidak mempengaruhi modul lain
-    download_logger = logger
-    
-    # Coba gunakan bind jika tersedia, jika tidak gunakan logger biasa
-    try:
-        if logger and hasattr(logger, 'bind'):
-            download_logger = logger.bind(context="download_only")
-            ui_components['download_logger'] = download_logger
-    except Exception as e:
-        # Jika terjadi error saat bind, gunakan logger biasa
-        if logger:
-            # Log error untuk debugging (opsional)
-            logger.debug(f"🔧 Tidak dapat membuat context logger: {str(e)}")
-        # Simpan logger ke ui_components untuk digunakan nanti
-        ui_components['download_logger'] = download_logger
+    # Pastikan observer sudah terdaftar
+    from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+    observer_manager = register_ui_observers(ui_components)
     
     try:
-        # Reset UI dan persiapan download
-        _show_progress(ui_components, "Mempersiapkan download dari Roboflow...")
-        
-        # Tambahkan dummy update_config_from_ui jika tidak ada untuk mencegah error
-        if 'update_config_from_ui' not in ui_components:
-            ui_components['update_config_from_ui'] = lambda *args, **kwargs: {}
-            if download_logger: 
-                download_logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
-        
-        # Validasi API key
-        from smartcash.ui.dataset.download.handlers.api_key_handler import check_api_key
-        has_key, api_key = check_api_key(ui_components)
-        
-        if not has_key:
-            # Tampilkan error
-            from smartcash.ui.utils.ui_logger import log_to_ui
-            error_msg = "API key Roboflow diperlukan untuk download"
-            log_to_ui(ui_components, error_msg, "error", "🔑")
+        # Jalankan download berdasarkan endpoint yang dipilih
+        if endpoint.lower() == 'roboflow':
+            # Tampilkan progress
+            _show_progress(ui_components, "Memulai download dari Roboflow...")
+            
+            # Kirim notifikasi log
+            notify_log(
+                sender=ui_components,
+                message=f"Memulai proses download dataset dari Roboflow",
+                level="info"
+            )
+            
+            # Jalankan download di thread terpisah agar UI tetap responsif
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                executor.submit(_download_from_roboflow, ui_components)
+        else:
+            # Endpoint tidak didukung
+            notify_log(
+                sender=ui_components,
+                message=f"Endpoint '{endpoint}' tidak didukung",
+                level="error"
+            )
+            
+            notify_progress(
+                sender=ui_components,
+                event_type="error",
+                message=f"Endpoint tidak didukung: {endpoint}"
+            )
             
             # Reset UI
             _reset_ui_after_download(ui_components)
-            return
-            
-        # Download dari Roboflow
-        _download_from_roboflow(ui_components)
-    
     except Exception as e:
-        # Tangani error
-        error_msg = f"Error saat download dataset: {str(e)}"
-        if download_logger:
-            download_logger.error(f"❌ {error_msg}")
-            
-        # Update UI dengan error
-        from smartcash.ui.utils.ui_logger import log_to_ui
-        log_to_ui(ui_components, error_msg, "error", "❌")
+        # Tampilkan error
+        notify_log(
+            sender=ui_components,
+            message=f"Error saat eksekusi download: {str(e)}",
+            level="error"
+        )
+        
+        notify_progress(
+            sender=ui_components,
+            event_type="error",
+            message=f"Error: {str(e)}"
+        )
         
         # Reset UI
         _reset_ui_after_download(ui_components)
@@ -380,35 +400,24 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
 def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """
     Reset progress bar ke nilai awal dengan layout yang konsisten.
-        Args:
+    
+    Args:
         ui_components: Dictionary komponen UI
     """
-    # Gunakan reset_progress dari shared component jika tersedia
-    try:
-        from smartcash.ui.components.progress_tracking import reset_progress
-        
-        reset_progress(ui_components)
-    except Exception as e:
-        # Log error jika ada logger
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"⚠️ Error menggunakan shared progress tracking: {str(e)}")
-            
-        # Fallback ke implementasi sederhana
-        if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_bar'].layout.visibility = 'hidden'
-            # Pastikan margin tetap konsisten
-            ui_components['progress_bar'].layout.margin = '15px 0'
-            
-        for label_key in ['overall_label', 'step_label', 'progress_message']:
-            if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
-                ui_components[label_key].value = ""
-                ui_components[label_key].layout.visibility = 'hidden'
-                # Pastikan margin tetap konsisten
-                ui_components[label_key].layout.margin = '5px 0'
+    # Pastikan progress bar ada dan dapat diakses
+    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'value'):
+        # Reset nilai progress bar ke 0
+        ui_components['progress_bar'].value = 0
     
-    # Reset tracker jika tersedia
+    # Reset label progress jika ada
+    for label_key in ['overall_label', 'step_label', 'progress_message', 'current_progress']:
+        if label_key in ui_components and hasattr(ui_components[label_key], 'value'):
+            ui_components[label_key].value = ""
+    
+    # Jangan sembunyikan progress container di sini, biarkan _reset_ui_after_download yang menangani
+    # Ini untuk mencegah flicker saat progress bar ditampilkan dan disembunyikan terlalu cepat
+    
+    # Reset progress tracker jika tersedia
     tracker_key = 'download_tracker'
     if tracker_key in ui_components:
         tracker = ui_components[tracker_key]
@@ -440,7 +449,31 @@ def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
     """
     # Set flag download_running ke True
     ui_components['download_running'] = True
-    
+    # Import sistem notifikasi baru
+    from smartcash.ui.dataset.download.utils.notification_manager import notify_progress
+
+    # Reset progress bar terlebih dahulu
+    _reset_progress_bar(ui_components)
+
+    # Pastikan progress container terlihat
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        ui_components['progress_container'].layout.display = 'block'
+        ui_components['progress_container'].layout.visibility = 'visible'
+
+    # Kirim notifikasi progress dimulai
+    notify_progress(
+        sender=ui_components,
+        event_type="start",
+        progress=0,
+        total=100,
+        message=message or "Memulai proses...",
+        step=1,
+        total_steps=5
+    )
+
+    # Tambahkan flag untuk menandai proses sedang berjalan
+    ui_components['download_running'] = True
+
     # Pastikan log accordion terbuka
     if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
         ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
@@ -501,11 +534,31 @@ def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
 
 def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     """Reset UI setelah proses download selesai."""
+    # Import sistem notifikasi baru jika diperlukan
+    try:
+        from smartcash.ui.dataset.download.utils.notification_manager import notify_log
+    except ImportError:
+        pass
+    
     # Aktifkan kembali tombol (fungsi ini juga akan mengatur display='inline-block')
     _disable_buttons(ui_components, False)
     
     # Reset progress bar
     _reset_progress_bar(ui_components)
+    
+    # Sembunyikan progress container setelah beberapa detik
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        # Setelah proses selesai, biarkan progress bar terlihat sebentar
+        # kemudian sembunyikan setelah beberapa detik
+        import threading
+        def hide_progress_container():
+            import time
+            # Tunggu 3 detik sebelum menyembunyikan progress bar
+            time.sleep(3)
+            ui_components['progress_container'].layout.display = 'none'
+        
+        # Jalankan di thread terpisah agar tidak memblokir UI
+        threading.Thread(target=hide_progress_container).start()
     
     # Bersihkan area konfirmasi jika ada
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
@@ -517,6 +570,10 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
         update_status_panel(ui_components['status_panel'], 'Download selesai', 'success')
     elif 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
         ui_components['update_status_panel'](ui_components, 'info', 'Download selesai')
+    
+    # Pastikan log accordion tetap terbuka
+    if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
+        ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
     
     # Cleanup UI jika tersedia
     if 'cleanup_ui' in ui_components and callable(ui_components['cleanup_ui']):

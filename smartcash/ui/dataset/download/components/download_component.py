@@ -17,6 +17,13 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     Returns:
         Dictionary berisi widget UI
     """
+    # Import sistem notifikasi dan observer jika tersedia
+    try:
+        from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+    except ImportError:
+        # Jika tidak tersedia, buat fungsi dummy
+        def register_ui_observers(ui_components):
+            return None
     # Import komponen UI standar 
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
@@ -258,5 +265,17 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         'log_output': log_components['log_output'],
         'log_accordion': log_components['log_accordion']
     })
+    
+    # Inisialisasi observer untuk notifikasi UI jika tersedia
+    try:
+        # Daftarkan observer untuk notifikasi UI
+        register_ui_observers(ui_components)
+        
+        # Sembunyikan progress container secara default
+        if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+            ui_components['progress_container'].layout.display = 'none'
+    except Exception:
+        # Jika gagal, tidak perlu menampilkan error
+        pass
     
     return ui_components

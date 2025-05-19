@@ -4,6 +4,8 @@ Deskripsi: Initializer untuk konfigurasi environment
 """
 
 import ipywidgets as widgets
+import os
+from pathlib import Path
 from typing import Dict, Any, Callable, Optional
 from IPython.display import display
 
@@ -43,13 +45,13 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     # Hapus log info inisialisasi
     
     # Otomatisasi pemeriksaan environment dan sinkronisasi konfigurasi
-    import threading
     import time
     from smartcash.ui.utils.alert_utils import create_info_box
     
     def auto_check_and_sync():
-        # Tunggu sebentar agar UI logger siap
-        time.sleep(1)
+        # Tidak perlu menunggu karena tidak menggunakan threading
+        # Hanya berikan sedikit jeda agar UI terender terlebih dahulu
+        time.sleep(0.5)
         
         try:
             # Update status panel untuk menunjukkan proses sedang berjalan
@@ -118,10 +120,9 @@ def initialize_env_config_ui() -> Dict[str, Any]:
             ).value
             logger.error(f"❌ Error saat otomatisasi: {str(e)}")
     
-    # Jalankan pemeriksaan dan sinkronisasi di thread terpisah
-    auto_thread = threading.Thread(target=auto_check_and_sync)
-    auto_thread.daemon = True
-    auto_thread.start()
+    # Jalankan pemeriksaan dan sinkronisasi secara langsung
+    # Colab tidak bekerja baik dengan threading
+    auto_check_and_sync()
     
     return ui_components
 

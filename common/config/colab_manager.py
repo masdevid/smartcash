@@ -5,7 +5,7 @@ Deskripsi: Pengelolaan konfigurasi untuk Google Colab dengan integrasi Google Dr
 
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 from smartcash.common.config.drive_manager import DriveConfigManager
 from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
@@ -22,6 +22,7 @@ class ColabConfigManager(DriveConfigManager):
         """
         super().__init__(*args, **kwargs)
         self._setup_colab_environment()
+        self._config_files = self._get_config_files()
     
     def _setup_colab_environment(self) -> None:
         """
@@ -32,11 +33,11 @@ class ColabConfigManager(DriveConfigManager):
             drive.mount('/content/drive')
             
             # Set base config path di Google Drive
-            self._drive_base_path = Path(f"{DRIVE_PATH}/{DEFAULT_CONFIG_DIR}")
+            self._drive_base_path = Path(DRIVE_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
             self._drive_base_path.mkdir(parents=True, exist_ok=True)
             
             # Set local config path
-            self._local_base_path = Path(f"{COLAB_PATH}/{APP_NAME}/{DEFAULT_CONFIG_DIR}")
+            self._local_base_path = Path(COLAB_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
             self._local_base_path.mkdir(parents=True, exist_ok=True)
             
             if self._logger:
@@ -49,6 +50,30 @@ class ColabConfigManager(DriveConfigManager):
             if self._logger:
                 self._logger.error(f"Error saat setup Colab environment: {str(e)}")
             raise
+    
+    def _get_config_files(self) -> List[str]:
+        """
+        Dapatkan daftar file konfigurasi yang tersedia
+        
+        Returns:
+            List nama file konfigurasi
+        """
+        config_files = []
+        for ext in ['.yaml', '.yml']:
+            config_files.extend([
+                f.name for f in self._local_base_path.glob(f'*{ext}')
+                if f.is_file() and not f.name.startswith('.')
+            ])
+        return sorted(config_files)
+    
+    def get_available_configs(self) -> List[str]:
+        """
+        Dapatkan daftar konfigurasi yang tersedia
+        
+        Returns:
+            List nama konfigurasi
+        """
+        return self._config_files
     
     def _resolve_config_path(self, config_file: str) -> Path:
         """
@@ -125,6 +150,22 @@ class ColabConfigManager(DriveConfigManager):
                 self._logger.error(f"Error saat sinkronisasi dengan Drive: {str(e)}")
             return False, str(e), {}
     
+    def sync_all_configs(self, sync_strategy: str = 'drive_priority') -> Dict[str, Tuple[bool, str]]:
+        """
+        Sinkronisasi semua file konfigurasi dengan Google Drive
+        
+        Args:
+            sync_strategy: Strategi sinkronisasi ('merge', 'drive_priority', 'local_priority')
+            
+        Returns:
+            Dictionary dengan hasil sinkronisasi untuk setiap file
+        """
+        results = {}
+        for config_file in self._config_files:
+            success, message, _ = self.sync_with_drive(config_file, sync_strategy)
+            results[config_file] = (success, message)
+        return results
+    
     def _merge_configs(self, local_config: Dict[str, Any], drive_config: Dict[str, Any], strategy: str) -> Dict[str, Any]:
         """
         Merge konfigurasi lokal dan Drive berdasarkan strategi
@@ -153,4 +194,4 @@ class ColabConfigManager(DriveConfigManager):
             config: Konfigurasi yang akan disimpan
         """
         from smartcash.common.io import save_config
-        save_config(path, config) 
+        save_config(str(path), config) 

@@ -35,14 +35,21 @@ async def _sync_configs(config_manager: Any, ui_components: Dict[str, Any]) -> N
         ui_components['progress_bar'].layout.visibility = 'visible'
         ui_components['progress_bar'].value = 25
         
-        # Sinkronkan dengan Google Drive
-        success, message, _ = config_manager.sync_with_drive(config_manager.config_file)
-        if not success:
-            raise Exception(message)
+        # Sinkronkan semua konfigurasi dengan Google Drive
+        results = config_manager.sync_all_configs()
         
-        ui_components['progress_bar'].value = 100
-        ui_components['progress_message'].value = "Sinkronisasi selesai"
-        logger.info("Konfigurasi berhasil disinkronkan")
+        # Update progress berdasarkan hasil
+        success_count = sum(1 for success, _ in results.values() if success)
+        total_count = len(results)
+        
+        if success_count == total_count:
+            ui_components['progress_bar'].value = 100
+            ui_components['progress_message'].value = "Sinkronisasi selesai"
+            logger.info("Semua konfigurasi berhasil disinkronkan")
+        else:
+            failed_files = [f for f, (success, _) in results.items() if not success]
+            ui_components['progress_message'].value = f"Error: Gagal sinkronisasi {len(failed_files)} file"
+            logger.error(f"Gagal sinkronisasi file: {', '.join(failed_files)}")
         
     except Exception as e:
         logger.error(f"Gagal sinkronisasi konfigurasi: {str(e)}")
@@ -64,14 +71,22 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     # Inisialisasi config manager dengan path yang sesuai
     if Singleton.is_colab_environment():
         # Gunakan path Colab
-        base_dir = f"{COLAB_PATH}/{APP_NAME}"
-        config_file = f"{DEFAULT_CONFIG_DIR}/config.yaml"
+        base_dir = Path(COLAB_PATH) / APP_NAME
+        config_file = Path(DEFAULT_CONFIG_DIR) / 'base_config.yaml'
     else:
         # Gunakan path lokal
-        base_dir = str(Path.home() / APP_NAME)
-        config_file = str(Path(base_dir) / DEFAULT_CONFIG_DIR / 'config.yaml')
+        base_dir = Path.home() / APP_NAME
+        config_file = Path(DEFAULT_CONFIG_DIR) / 'base_config.yaml'
     
-    config_manager = get_config_manager(base_dir=base_dir, config_file=config_file)
+    # Pastikan direktori ada
+    base_dir.mkdir(parents=True, exist_ok=True)
+    config_dir = base_dir / DEFAULT_CONFIG_DIR
+    config_dir.mkdir(parents=True, exist_ok=True)
+    
+    config_manager = get_config_manager(
+        base_dir=str(base_dir),
+        config_file=str(config_file)
+    )
     
     # Buat komponen UI
     ui_components = create_env_config_ui(env_manager, config_manager)

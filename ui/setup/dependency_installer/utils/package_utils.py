@@ -8,7 +8,11 @@ from typing import Dict, List, Any, Optional, Set
 import importlib
 import pkg_resources
 import sys
+import logging
 from smartcash.ui.utils.ui_logger import log_to_ui
+
+# Configure logging to only show errors
+logging.basicConfig(level=logging.ERROR)
 
 def get_project_requirements(project_name: str) -> List[str]:
     """
@@ -76,8 +80,10 @@ def get_project_requirements(project_name: str) -> List[str]:
                                 requirements.append(package_line)
                     if requirements:
                         return requirements
-            except Exception:
-                pass
+            except Exception as e:
+                # Log error ke UI jika ada
+                if 'ui_components' in locals():
+                    log_to_ui(ui_components, f"Error membaca requirements.txt: {str(e)}", "error", "❌")
     
     # Return default requirements jika tidak ada file
     return default_requirements.get(project_name, [])

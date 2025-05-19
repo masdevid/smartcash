@@ -10,6 +10,12 @@ from typing import Dict, Any, List, Tuple
 from tqdm.notebook import tqdm
 from smartcash.ui.utils.ui_logger import log_to_ui
 
+class SilentTqdm(tqdm):
+    """Custom tqdm class that doesn't display to console"""
+    def __init__(self, *args, **kwargs):
+        kwargs['display'] = False  # Disable display
+        super().__init__(*args, **kwargs)
+
 def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
     """
     Dapatkan semua package yang perlu diinstall berdasarkan UI state
@@ -93,8 +99,8 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
     # Log info ke UI
     log_to_ui(ui_components, f"Memulai instalasi {len(packages)} package...", "info", "🚀")
     
-    # Gunakan tqdm untuk progress bar
-    for i, package in enumerate(tqdm(packages, desc="Instalasi Package")):
+    # Gunakan SilentTqdm untuk progress bar yang tidak menampilkan ke console
+    for i, package in enumerate(SilentTqdm(packages, desc="Instalasi Package")):
         # Update progress
         progress_pct = int((i / len(packages)) * 100)
         if progress_bar: progress_bar.value = progress_pct
@@ -105,7 +111,7 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
         log_to_ui(ui_components, f"Menginstall {package}...", "info", "💶")
         
         try:
-            # Jalankan pip install
+            # Jalankan pip install dengan --quiet untuk mengurangi output
             cmd = [sys.executable, "-m", "pip", "install", package, "--quiet"]
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             

@@ -71,7 +71,9 @@ def execute_prioritized_class_augmentation(
             message=f"✅ Augmentasi selesai: {total_generated} variasi dibuat",
             status="success", step=1,
             progress=len(selected_files),
-            total=len(selected_files)
+            total=len(selected_files),
+            module_type="augmentation",
+            context="augmentation_only"
         )
         
         return result_stats
@@ -239,7 +241,9 @@ def execute_prioritized_class_augmentation(
         status="success", 
         step=2,
         progress=total_files_all_classes,
-        total=total_files_all_classes
+        total=total_files_all_classes,
+        module_type="augmentation",
+        context="augmentation_only"
     )
     
     return result_stats
@@ -299,7 +303,9 @@ def execute_augmentation_with_tracking(
     service.report_progress(
         message=f"🚀 Memulai augmentasi {total_files_to_process} file dengan tracking dinamis",
         status="info", step=1,
-        total_files_all=total_files_to_process
+        total_files_all=total_files_to_process,
+        module_type="augmentation",
+        context="augmentation_only"
     )
     
     # Proses augmentasi dengan prioritas kelas

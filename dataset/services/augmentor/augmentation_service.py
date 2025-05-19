@@ -27,7 +27,17 @@ class AugmentationService:
         """Inisialisasi AugmentationService dengan parameter utama."""
         self.config = config or {}
         self.data_dir = data_dir
-        self.logger = logger or get_logger("augmentation_service")
+        
+        # Gunakan logger dengan konteks augmentation untuk mencegah interferensi dengan log download
+        if logger and hasattr(logger, 'bind'):
+            try:
+                self.logger = logger.bind(context="augmentation_only")
+            except Exception as e:
+                # Fallback jika bind tidak tersedia
+                self.logger = logger or get_logger("augmentation_service")
+        else:
+            self.logger = logger or get_logger("augmentation_service")
+            
         self.num_workers = num_workers if num_workers is not None else self.config.get('augmentation', {}).get('num_workers', 4)
         self.logger.info(f"🔧 Menggunakan {self.num_workers} worker untuk augmentasi")
         
@@ -49,7 +59,7 @@ class AugmentationService:
         for callback in self._progress_callbacks:
             try:
                 # Buat params bersih dengan one-liner
-                explicit_params = ['progress', 'total', 'message', 'status', 'current_progress', 'current_total', 'class_id']
+                explicit_params = ['progress', 'total', 'message', 'status', 'current_progress', 'current_total', 'class_id', 'module_type', 'context']
                 filtered_kwargs = {k: v for k, v in kwargs.items() if k not in explicit_params}
                 
                 # Gabungkan parameter yang ada nilainya dengan one-liner
@@ -58,7 +68,10 @@ class AugmentationService:
                     'progress': progress, 'total': total,
                     'current_progress': kwargs.get('current_progress'), 
                     'current_total': kwargs.get('current_total'),
-                    'class_id': kwargs.get('class_id')
+                    'class_id': kwargs.get('class_id'),
+                    # Tambahkan konteks dan modul untuk memudahkan filter
+                    'module_type': kwargs.get('module_type', 'augmentation'),
+                    'context': kwargs.get('context', 'augmentation_only')
                 }.items() if v is not None}
                 
                 # Gabungkan dan panggil callback
@@ -126,7 +139,10 @@ class AugmentationService:
         if move_to_preprocessed and augmentation_result['status'] == 'success':
             self.report_progress(
                 message=f"🔄 Memindahkan {augmentation_result['generated']} file ke direktori preprocessed",
-                status="info", step=2
+                status="info", step=2,
+                module_type="augmentation",
+                context="augmentation_only",
+                silent=True  # Tambahkan flag silent untuk mengurangi output log yang tidak perlu
             )
             
             move_success = move_files_to_preprocessed(

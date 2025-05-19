@@ -49,6 +49,8 @@ def process_files_with_executor(
             total=100,  # Dari total 100%
             current_progress=0, 
             current_total=total_files,
+            module_type="augmentation",
+            context="augmentation_only",
             **callback_params
         )
     
@@ -71,6 +73,9 @@ def process_files_with_executor(
                         total=100,  # Dari total 100%
                         current_progress=i + 1,
                         current_total=total_files,
+                        module_type="augmentation",
+                        context="augmentation_only",
+                        silent=True,  # Tambahkan flag silent untuk mengurangi output log
                         **callback_params
                     )
         return results
@@ -119,6 +124,8 @@ def process_files_with_executor(
             total=100,    # Dari total 100%
             current_progress=total_files,
             current_total=total_files,
+            module_type="augmentation",
+            context="augmentation_only",
             **callback_params
         )
     

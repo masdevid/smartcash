@@ -16,7 +16,7 @@ from smartcash.common.config.colab_manager import ColabConfigManager
 from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 from smartcash.common.constants.core import APP_NAME, DEFAULT_CONFIG_DIR
 from smartcash.common.io import load_config, save_config
-from smartcash.common.utils.logger import get_logger
+from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 

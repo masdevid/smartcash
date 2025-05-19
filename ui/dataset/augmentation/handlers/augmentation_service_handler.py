@@ -348,6 +348,37 @@ def run_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'message': f'Error saat menjalankan augmentasi: {str(e)}'
         }
 
+def initialize_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Inisialisasi augmentasi dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    logger = ui_components.get('logger', get_logger('augmentation'))
+    
+    try:
+        # Dapatkan service
+        service = get_augmentation_service(ui_components)
+        
+        if not service:
+            logger.error(f"❌ Gagal membuat augmentation service")
+            return ui_components
+        
+        # Simpan ke ui_components
+        ui_components['augmentation_service'] = service
+        
+        # Log info
+        logger.info(f"✅ Augmentation service berhasil diinisialisasi")
+        
+        return ui_components
+    except Exception as e:
+        logger.error(f"❌ Error saat inisialisasi augmentasi: {str(e)}")
+        return ui_components
+
 def copy_augmented_to_preprocessed(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     Salin hasil augmentasi ke direktori preprocessed.

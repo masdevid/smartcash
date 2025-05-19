@@ -85,7 +85,6 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_icon="trash",
         width="100%"
     )
-    )
     
     # Box untuk metrik training
     metrics_box = widgets.Output(

@@ -92,25 +92,27 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     # Tambahkan ke ui_components untuk kompatibilitas dengan tes
     ui_components['sync_info'] = sync_info_component['sync_info']
     
-    # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar
+    # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar dengan spasi yang lebih compact
     form_container = widgets.VBox([
         widgets.HBox([
-            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible')),
-            widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible')),
-            widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible'))
+            widgets.Box([basic_components['basic_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible', padding='0 5px 0 0')),
+            widgets.Box([optimization_components['optimization_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible', padding='0 5px')),
+            widgets.Box([advanced_components['advanced_box']], layout=widgets.Layout(width='32%', height='100%', overflow='visible', padding='0 0 0 5px'))
         ], layout=widgets.Layout(
-            width='auto',
+            width='100%',
             display='flex',
             flex_flow='row nowrap',
             align_items='flex-start',
             justify_content='space-between',
-            overflow='visible'
+            overflow='visible',
+            margin='0',
+            padding='0'
         )),
         widgets.VBox([
             ui_components['button_container'],
-            widgets.HBox([ui_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='auto'))
-        ], layout=widgets.Layout(width='auto', overflow='visible'))
-    ], layout=widgets.Layout(width='auto', overflow='visible'))
+            widgets.HBox([ui_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='100%', margin='0', padding='0'))
+        ], layout=widgets.Layout(width='100%', overflow='visible', margin='5px 0 0 0', padding='0'))
+    ], layout=widgets.Layout(width='100%', overflow='visible', margin='0', padding='0'))
     
     # Buat info box umum untuk hyperparameter
     general_info = get_hyperparameters_info(open_by_default=True)
@@ -180,13 +182,13 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         overflow='visible'
     ))
     
-    # Buat container utama
+    # Buat container utama dengan layout yang lebih compact
     main_container = widgets.VBox([
         header,
         tabs,
         button_components['status'],
         footer_info
-    ], layout=widgets.Layout(width='auto', padding='10px', overflow='visible'))
+    ], layout=widgets.Layout(width='100%', padding='5px', overflow='visible', margin='0'))
     
     ui_components['main_container'] = main_container
     ui_components['main_layout'] = main_container  # Untuk kompatibilitas

@@ -108,7 +108,7 @@ def create_backbone_ui() -> Dict[str, Any]:
         feature_group['container'],
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
         widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='5px 0')),
-        widgets.Box([save_reset_buttons['sync_info']['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='0'))
+        widgets.Box([save_reset_buttons.get('sync_info', {}).get('container', widgets.HTML(''))], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='0'))
     ], layout=widgets.Layout(width='100%', padding='0', overflow='visible'))
     
     # Buat container untuk info dengan layout yang lebih compact

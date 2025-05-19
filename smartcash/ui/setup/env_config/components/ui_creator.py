@@ -21,19 +21,26 @@ def create_env_config_ui() -> Dict[str, Any]:
     Returns:
         dict: Dictionary of UI components
     """
+    # Import shared components
+    from smartcash.ui.utils.header_utils import create_header
+    from smartcash.ui.components.status_panel import create_status_panel
+    from smartcash.ui.components.progress_tracking import create_progress_tracking
+    from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.utils.layout_utils import STANDARD_LAYOUTS
+
     # Header
-    header = create_header("Environment Configuration")
+    header = create_header("Konfigurasi Environment", "Atur dan konfigurasi environment untuk SmartCash")
 
     # Buttons
-    drive_button = Button(description="Connect to Google Drive", button_style="primary")
-    directory_button = Button(description="Set Up Directories", button_style="primary")
+    drive_button = Button(description="Hubungkan ke Google Drive", button_style="primary")
+    directory_button = Button(description="Atur Direktori", button_style="primary")
     button_layout = HBox([drive_button, directory_button], layout=STANDARD_LAYOUTS['hbox'])
 
     # Status Panel
-    status_panel = create_status_panel("Ready to configure environment", "info")
+    status_panel = create_status_panel("Siap untuk mengkonfigurasi environment", "info")
 
     # Log Panel
-    log_panel = create_log_accordion("Environment Configuration Log")
+    log_panel = create_log_accordion("Log Konfigurasi Environment")
     log_accordion = log_panel['log_accordion']  # Accordion widget for display
     log_output = log_panel['log_output']        # Output widget for logging
 

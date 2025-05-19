@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Tuple, Optional
 from datetime import datetime
 from IPython.display import display, clear_output
 from tqdm.notebook import tqdm
-from smartcash.ui.components.status_indicator import create_status_indicator
+from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 
 def cleanup_augmentation_results(ui_components: Dict[str, Any]) -> Dict[str, Any]:

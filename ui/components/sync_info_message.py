@@ -34,9 +34,9 @@ def create_sync_info_message(
     if icon and icon in ICONS:
         icon_html = f"{ICONS.get(icon, 'ℹ️')} "
     
-    # Buat komponen HTML untuk pesan
+    # Buat komponen HTML untuk pesan dengan text-align: right
     sync_info = widgets.HTML(
-        value=f"<div style='margin-top: {margin_top}; font-style: {font_style}; color: {color};'>{icon_html}{message}</div>",
+        value=f"<div style='margin-top: {margin_top}; font-style: {font_style}; color: {color}; text-align: right;'>{icon_html}{message}</div>",
         layout=widgets.Layout(width=width)
     )
     

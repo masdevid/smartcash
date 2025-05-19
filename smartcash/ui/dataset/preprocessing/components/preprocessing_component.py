@@ -34,7 +34,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.config_form import create_config_form
     from smartcash.ui.components.validation_options import create_validation_options
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-    from smartcash.ui.components.split_config import create_split_config
+    # Tidak menggunakan split_config lagi sesuai permintaan
     
     # Import komponen submodules preprocessing
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
@@ -52,16 +52,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Preprocessing options (split dari komponen besar)
     preprocess_options = create_preprocessing_options(config)
     
-    # Split config menggunakan shared component
-    split_config = create_split_config(
-        title="Konfigurasi Split Dataset",
-        description="Tentukan pembagian dataset untuk training, validation, dan testing",
-        train_value=0.7,
-        val_value=0.2,
-        test_value=0.1,
-        width='100%',
-        icon='split'
-    )
+    # Split config tidak digunakan lagi sesuai permintaan
     
     # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
@@ -140,7 +131,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
         preprocess_options,
-        split_config['container'],  # Gunakan split_config baru
+        # split_config dihilangkan sesuai permintaan
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         advanced_accordion,
         save_reset_buttons['container'],  # Tambahkan tombol save dan reset
@@ -160,7 +151,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'validation_options': validation_options,
         'validation_options_group': validation_options_group,
         'split_selector': split_selector,
-        'split_config': split_config,  # Tambahkan split_config
+        # 'split_config' dihilangkan sesuai permintaan
         'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],
         'preprocessing_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas

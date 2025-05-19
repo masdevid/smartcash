@@ -10,310 +10,494 @@ import threading
 import time
 import yaml
 import os
+import matplotlib.pyplot as plt
+import io
+import base64
+import numpy as np
 
-def setup_training_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+from smartcash.common.config.manager import get_config_manager
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.constants import ICONS, COLORS
+from smartcash.ui.utils.alert_utils import create_info_alert
+
+# Status training global
+training_active = False
+training_thread = None
+stop_training = False
+
+# Handler untuk tombol start training
+def on_start_training(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
     """
-    Setup handler untuk tombol pada komponen UI training.
+    Handler untuk tombol start training.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    global training_active, training_thread, stop_training
+    
+    if training_active:
+        return
+    
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('play', '▶️')} Memulai proses training...")
+    
+    # Update status
+    training_active = True
+    stop_training = False
+    
+    # Update tombol
+    ui_components['start_button'].disabled = True
+    ui_components['stop_button'].disabled = False
+    
+    # Update status panel
+    with ui_components['status_panel']:
+        ui_components['status_panel'].clear_output()
+        display(create_info_alert(
+            f"{ICONS.get('play', '▶️')} Memulai proses training dengan konfigurasi yang telah diatur",
+            alert_type='info'
+        ))
+    
+    # Jalankan training dalam thread terpisah
+    training_thread = threading.Thread(target=run_training, args=(ui_components, env, config))
+    training_thread.daemon = True
+    training_thread.start()
+
+# Handler untuk tombol stop training
+def on_stop_training(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Handler untuk tombol stop training.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    global training_active, stop_training
+    
+    if not training_active:
+        return
+    
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('stop', '⏹️')} Menghentikan proses training...")
+    
+    # Set flag untuk menghentikan training
+    stop_training = True
+    ui_components['stop_button'].disabled = True
+    
+    # Update status panel
+    with ui_components['status_panel']:
+        ui_components['status_panel'].clear_output()
+        display(create_info_alert(
+            f"{ICONS.get('stop', '⏹️')} Menghentikan proses training...",
+            alert_type='warning'
+        ))
+
+# Handler untuk tombol reset training
+def on_reset_training(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Handler untuk tombol reset training.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    global training_active, stop_training
+    
+    if training_active:
+        return
+    
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('reset', '🔄')} Reset konfigurasi training...")
+    
+    # Reset form ke nilai default
+    ui_components['backbone_dropdown'].value = 'efficientnet_b4'
+    ui_components['epochs_input'].value = 100
+    ui_components['batch_size_input'].value = 16
+    ui_components['learning_rate_input'].value = 0.001
+    ui_components['save_checkpoints'].value = True
+    ui_components['use_tensorboard'].value = True
+    ui_components['use_mixed_precision'].value = True
+    ui_components['use_ema'].value = False
+    
+    # Reset chart dan metrik
+    with ui_components['chart_output']:
+        ui_components['chart_output'].clear_output()
+        display(ui_components['create_metrics_chart']())
+    
+    with ui_components['metrics_box']:
+        ui_components['metrics_box'].clear_output()
+    
+    # Update status panel
+    with ui_components['status_panel']:
+        ui_components['status_panel'].clear_output()
+        display(create_info_alert(
+            f"{ICONS.get('reset', '🔄')} Konfigurasi training telah direset ke nilai default",
+            alert_type='info'
+        ))
+
+# Handler untuk tombol cleanup training
+def on_cleanup_training(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Handler untuk tombol cleanup training.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    if training_active:
+        return
+    
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('cleanup', '🧹')} Membersihkan output training...")
+    
+    # Reset chart dan metrik
+    with ui_components['chart_output']:
+        ui_components['chart_output'].clear_output()
+        display(ui_components['create_metrics_chart']())
+    
+    with ui_components['metrics_box']:
+        ui_components['metrics_box'].clear_output()
+    
+    # Reset log output
+    with ui_components['log_output']:
+        ui_components['log_output'].clear_output()
+    
+    # Update status panel
+    with ui_components['status_panel']:
+        ui_components['status_panel'].clear_output()
+        display(create_info_alert(
+            f"{ICONS.get('cleanup', '🧹')} Output training telah dibersihkan",
+            alert_type='info'
+        ))
+
+# Handler untuk tombol save config
+def on_save_config(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Handler untuk tombol save konfigurasi.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('save', '💾')} Menyimpan konfigurasi training...")
+    
+    try:
+        # Dapatkan config manager
+        config_manager = get_config_manager()
+        
+        # Ambil nilai dari form
+        backbone = ui_components['backbone_dropdown'].value
+        epochs = ui_components['epochs_input'].value
+        batch_size = ui_components['batch_size_input'].value
+        learning_rate = ui_components['learning_rate_input'].value
+        save_checkpoints = ui_components['save_checkpoints'].value
+        use_tensorboard = ui_components['use_tensorboard'].value
+        use_mixed_precision = ui_components['use_mixed_precision'].value
+        use_ema = ui_components['use_ema'].value
+        
+        # Buat konfigurasi baru
+        new_model_config = {
+            'backbone': backbone
+        }
+        
+        new_hyperparameters_config = {
+            'learning_rate': learning_rate,
+            'batch_size': batch_size
+        }
+        
+        new_training_strategy_config = {
+            'epochs': epochs,
+            'save_checkpoints': save_checkpoints,
+            'use_tensorboard': use_tensorboard,
+            'use_mixed_precision': use_mixed_precision,
+            'use_ema': use_ema
+        }
+        
+        # Simpan konfigurasi
+        config_manager.update_module_config('model', new_model_config)
+        config_manager.update_module_config('hyperparameters', new_hyperparameters_config)
+        config_manager.update_module_config('training_strategy', new_training_strategy_config)
+        
+        # Update status
+        if 'sync_info' in ui_components:
+            with ui_components['status_panel']:
+                ui_components['status_panel'].clear_output()
+                display(create_info_alert(
+                    f"{ICONS.get('check', '✓')} Konfigurasi training berhasil disimpan dan disinkronkan.",
+                    alert_type='success'
+                ))
+        
+        logger.info(f"{ICONS.get('check', '✓')} Konfigurasi training berhasil disimpan")
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}")
+        
+        # Update status panel
+        with ui_components['status_panel']:
+            ui_components['status_panel'].clear_output()
+            display(create_info_alert(
+                f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}",
+                alert_type='error'
+            ))
+
+# Handler untuk tombol reset config
+def on_reset_config(b, ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Handler untuk tombol reset konfigurasi.
+    
+    Args:
+        b: Button widget
+        ui_components: Komponen UI
+        env: Environment manager
+        config: Konfigurasi model
+    """
+    # Dapatkan logger
+    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger.info(f"{ICONS.get('reset', '🔄')} Reset konfigurasi training...")
+    
+    try:
+        # Dapatkan config manager
+        config_manager = get_config_manager()
+        
+        # Dapatkan konfigurasi default
+        model_config = config_manager.get_default_module_config('model', {
+            'backbone': 'efficientnet_b4'
+        })
+        
+        hyperparameters_config = config_manager.get_default_module_config('hyperparameters', {
+            'learning_rate': 0.001,
+            'batch_size': 16
+        })
+        
+        training_strategy_config = config_manager.get_default_module_config('training_strategy', {
+            'epochs': 100,
+            'save_checkpoints': True,
+            'use_tensorboard': True,
+            'use_mixed_precision': True,
+            'use_ema': False
+        })
+        
+        # Reset form ke nilai default
+        ui_components['backbone_dropdown'].value = model_config.get('backbone', 'efficientnet_b4')
+        ui_components['epochs_input'].value = training_strategy_config.get('epochs', 100)
+        ui_components['batch_size_input'].value = hyperparameters_config.get('batch_size', 16)
+        ui_components['learning_rate_input'].value = hyperparameters_config.get('learning_rate', 0.001)
+        ui_components['save_checkpoints'].value = training_strategy_config.get('save_checkpoints', True)
+        ui_components['use_tensorboard'].value = training_strategy_config.get('use_tensorboard', True)
+        ui_components['use_mixed_precision'].value = training_strategy_config.get('use_mixed_precision', True)
+        ui_components['use_ema'].value = training_strategy_config.get('use_ema', False)
+        
+        # Update status
+        with ui_components['status_panel']:
+            ui_components['status_panel'].clear_output()
+            display(create_info_alert(
+                f"{ICONS.get('check', '✓')} Konfigurasi training berhasil direset ke nilai default.",
+                alert_type='success'
+            ))
+        
+        logger.info(f"{ICONS.get('check', '✓')} Konfigurasi training berhasil direset")
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}")
+        
+        # Update status panel
+        with ui_components['status_panel']:
+            ui_components['status_panel'].clear_output()
+            display(create_info_alert(
+                f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}",
+                alert_type='error'
+            ))
+
+# Fungsi untuk menjalankan training
+def run_training(ui_components: Dict[str, Any], env=None, config=None) -> None:
+    """
+    Menjalankan proses training model.
     
     Args:
         ui_components: Komponen UI
         env: Environment manager
         config: Konfigurasi model
-        
-    Returns:
-        Dict berisi komponen UI dengan handler terpasang
     """
+    global training_active, stop_training
+    
     try:
-        # Import dengan penanganan error minimal
-        from smartcash.common.config.manager import ConfigManager, get_config_manager
-        from smartcash.ui.utils.alert_utils import create_status_indicator, create_info_alert
-        from smartcash.common.logger import get_logger
-        from smartcash.model.services.training.core_training_service import TrainingService
-        from smartcash.model.services.training.callbacks_training_service import TrainingCallbacks
-        from smartcash.model.manager import ModelManager
-        
-        # Dapatkan logger jika tersedia
+        # Dapatkan logger
         logger = ui_components.get('logger', None) or get_logger("training_ui")
         
-        # Dapatkan ConfigManager
-        config_manager = get_config_manager()
+        # Dapatkan konfigurasi dari form
+        backbone = ui_components['backbone_dropdown'].value
+        epochs = ui_components['epochs_input'].value
+        batch_size = ui_components['batch_size_input'].value
+        learning_rate = ui_components['learning_rate_input'].value
+        save_checkpoints = ui_components['save_checkpoints'].value
+        use_tensorboard = ui_components['use_tensorboard'].value
+        use_mixed_precision = ui_components['use_mixed_precision'].value
+        use_ema = ui_components['use_ema'].value
         
-        # Status training
-        training_active = False
-        training_thread = None
-        stop_training = False
+        # Log konfigurasi
+        logger.info(f"{ICONS.get('info', 'ℹ️')} Konfigurasi training: backbone={backbone}, epochs={epochs}, batch_size={batch_size}, lr={learning_rate}")
         
-        # Update informasi training
-        def update_training_info():
-            """Update informasi training dari konfigurasi."""
-            try:
-                # Ambil konfigurasi dari ConfigManager
-                hyperparams_config = config_manager.get_module_config('hyperparameters')
-                training_config = config_manager.get_module_config('training')
-                model_config = config_manager.get_module_config('model')
-                
-                # Tampilkan informasi
-                with ui_components['info_box']:
-                    ui_components['info_box'].clear_output()
-                    
-                    # Informasi model
-                    display(HTML(f"""
-                    <h3 style="margin-bottom:10px">📊 Konfigurasi Training</h3>
-                    <div style="display:flex;flex-wrap:wrap">
-                        <div style="flex:1;min-width:300px;margin-right:10px">
-                            <h4>Model</h4>
-                            <ul>
-                                <li><b>Backbone:</b> {model_config.get('backbone', 'efficientnet_b4')}</li>
-                                <li><b>Layer Mode:</b> {training_config.get('training_utils', {}).get('layer_mode', 'single')}</li>
-                            </ul>
-                        </div>
-                        <div style="flex:1;min-width:300px;margin-right:10px">
-                            <h4>Hyperparameter</h4>
-                            <ul>
-                                <li><b>Batch Size:</b> {hyperparams_config.get('hyperparameters', {}).get('batch_size', 16)}</li>
-                                <li><b>Epochs:</b> {hyperparams_config.get('hyperparameters', {}).get('epochs', 100)}</li>
-                                <li><b>Image Size:</b> {hyperparams_config.get('hyperparameters', {}).get('image_size', 640)}</li>
-                                <li><b>Optimizer:</b> {hyperparams_config.get('hyperparameters', {}).get('optimizer', 'Adam')}</li>
-                                <li><b>Learning Rate:</b> {hyperparams_config.get('hyperparameters', {}).get('learning_rate', 0.001)}</li>
-                            </ul>
-                        </div>
-                        <div style="flex:1;min-width:300px">
-                            <h4>Training Strategy</h4>
-                            <ul>
-                                <li><b>Multi-scale:</b> {str(training_config.get('multi_scale', True))}</li>
-                                <li><b>Experiment:</b> {training_config.get('training_utils', {}).get('experiment_name', 'efficientnet_b4_training')}</li>
-                                <li><b>Mixed Precision:</b> {str(training_config.get('training_utils', {}).get('mixed_precision', True))}</li>
-                                <li><b>Early Stopping:</b> {str(hyperparams_config.get('hyperparameters', {}).get('early_stopping', {}).get('enabled', True))}</li>
-                            </ul>
-                        </div>
-                    </div>
-                    """))
-            except Exception as e:
-                logger.error(f"❌ Error saat memperbarui informasi training: {str(e)}")
-                with ui_components['info_box']:
-                    ui_components['info_box'].clear_output()
-                    display(HTML(f"""
-                    <div style="color:red;padding:10px;border:1px solid red;border-radius:5px">
-                        <b>Error:</b> Gagal memuat informasi training. {str(e)}
-                    </div>
-                    """))
+        # Update progress bar
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].max = epochs
+            ui_components['progress_bar'].value = 0
         
-        # Fungsi untuk menjalankan training dalam thread terpisah
-        def run_training():
-            nonlocal training_active, stop_training
-            
-            try:
-                # Update status
-                ui_components['status_label'].value = '<span style="color:#3498db">⏳ Mempersiapkan training...</span>'
-                ui_components['progress_bar'].value = 0
-                
-                # Ambil konfigurasi dari ConfigManager
-                hyperparams_config = config_manager.get_module_config('hyperparameters')
-                training_config = config_manager.get_module_config('training')
-                model_config = config_manager.get_module_config('model')
-                
-                # Gabungkan konfigurasi
-                combined_config = {
-                    'hyperparameters': hyperparams_config.get('hyperparameters', {}),
-                    'training': training_config,
-                    'model': model_config
-                }
-                
-                # Update opsi dari UI
-                combined_config['training']['training_utils']['tensorboard'] = ui_components['use_tensorboard'].value
-                combined_config['hyperparameters']['checkpoint']['save_best'] = ui_components['save_checkpoints'].value
-                
-                # Buat model manager
-                model_manager = ModelManager(config=combined_config)
-                
-                # Inisialisasi model
-                model_manager.initialize_model()
-                
-                # Persiapkan dataset
-                with ui_components['status_panel']:
-                    ui_components['status_panel'].clear_output()
-                    display(HTML('<div style="color:#3498db">⏳ Mempersiapkan dataset...</div>'))
-                
-                # TODO: Implementasi load dataset dari konfigurasi
-                # Untuk contoh, kita akan mensimulasikan proses training
-                
-                # Update status
-                ui_components['status_label'].value = '<span style="color:#2ecc71">🚀 Training sedang berjalan...</span>'
-                
-                # Simulasi training epochs
-                epochs = hyperparams_config.get('hyperparameters', {}).get('epochs', 100)
-                
-                with ui_components['metrics_box']:
-                    ui_components['metrics_box'].clear_output()
-                    display(HTML(f"""
-                    <h4>Metrik Training</h4>
-                    <div id="metrics-table">
-                        <table style="width:100%;border-collapse:collapse">
-                            <thead>
-                                <tr style="background-color:#f5f5f5">
-                                    <th style="padding:8px;border:1px solid #ddd;text-align:left">Epoch</th>
-                                    <th style="padding:8px;border:1px solid #ddd;text-align:left">Train Loss</th>
-                                    <th style="padding:8px;border:1px solid #ddd;text-align:left">Val Loss</th>
-                                    <th style="padding:8px;border:1px solid #ddd;text-align:left">mAP</th>
-                                    <th style="padding:8px;border:1px solid #ddd;text-align:left">Learning Rate</th>
-                                </tr>
-                            </thead>
-                            <tbody id="metrics-body">
-                            </tbody>
-                        </table>
-                    </div>
-                    """))
-                
-                # Simulasi epochs untuk demo
-                for epoch in range(epochs):
-                    if stop_training:
-                        break
-                    
-                    # Update progress
-                    progress = (epoch + 1) / epochs * 100
-                    ui_components['progress_bar'].value = progress
-                    
-                    # Simulasi training dan validasi
-                    train_loss = 1.0 - (epoch / epochs) * 0.7  # Simulasi loss yang menurun
-                    val_loss = 1.2 - (epoch / epochs) * 0.8  # Simulasi validation loss
-                    map_value = (epoch / epochs) * 0.85  # Simulasi mAP yang meningkat
-                    lr = 0.001 * (1 - epoch / epochs)  # Simulasi learning rate yang menurun
-                    
-                    # Update metrik
-                    with ui_components['metrics_box']:
-                        display(HTML(f"""
-                        <script>
-                            var table = document.getElementById('metrics-body');
-                            var row = table.insertRow(0);
-                            
-                            var cell1 = row.insertCell(0);
-                            var cell2 = row.insertCell(1);
-                            var cell3 = row.insertCell(2);
-                            var cell4 = row.insertCell(3);
-                            var cell5 = row.insertCell(4);
-                            
-                            cell1.innerHTML = "{epoch+1}/{epochs}";
-                            cell1.style.padding = "8px";
-                            cell1.style.border = "1px solid #ddd";
-                            
-                            cell2.innerHTML = "{train_loss:.4f}";
-                            cell2.style.padding = "8px";
-                            cell2.style.border = "1px solid #ddd";
-                            
-                            cell3.innerHTML = "{val_loss:.4f}";
-                            cell3.style.padding = "8px";
-                            cell3.style.border = "1px solid #ddd";
-                            
-                            cell4.innerHTML = "{map_value:.4f}";
-                            cell4.style.padding = "8px";
-                            cell4.style.border = "1px solid #ddd";
-                            
-                            cell5.innerHTML = "{lr:.6f}";
-                            cell5.style.padding = "8px";
-                            cell5.style.border = "1px solid #ddd";
-                        </script>
-                        """))
-                    
-                    # Update status panel
-                    with ui_components['status_panel']:
-                        ui_components['status_panel'].clear_output()
-                        display(HTML(f"""
-                        <div style="color:#2ecc71">
-                            🔄 Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, mAP: {map_value:.4f}
-                        </div>
-                        """))
-                    
-                    # Simulasi waktu training
-                    time.sleep(0.1)  # Untuk demo, kita percepat
-                
-                # Training selesai atau dihentikan
-                if stop_training:
-                    ui_components['status_label'].value = '<span style="color:#e74c3c">⚠️ Training dihentikan oleh pengguna</span>'
-                else:
-                    ui_components['status_label'].value = '<span style="color:#2ecc71">✅ Training selesai!</span>'
-                    ui_components['progress_bar'].value = 100
-                
-                with ui_components['status_panel']:
-                    ui_components['status_panel'].clear_output()
-                    if stop_training:
-                        display(HTML("""
-                        <div style="color:#e74c3c">
-                            ⚠️ Training dihentikan oleh pengguna. Model checkpoint terakhir tersimpan.
-                        </div>
-                        """))
-                    else:
-                        display(HTML("""
-                        <div style="color:#2ecc71">
-                            ✅ Training selesai! Model terbaik tersimpan di direktori checkpoint.
-                        </div>
-                        """))
-            
-            except Exception as e:
-                logger.error(f"❌ Error saat training: {str(e)}")
-                ui_components['status_label'].value = f'<span style="color:#e74c3c">❌ Error: {str(e)}</span>'
-                
-                with ui_components['status_panel']:
-                    ui_components['status_panel'].clear_output()
-                    display(HTML(f"""
-                    <div style="color:#e74c3c">
-                        ❌ Error saat training: {str(e)}
-                    </div>
-                    """))
-            
-            finally:
-                # Reset status
-                training_active = False
-                stop_training = False
-                
-                # Update tombol
-                ui_components['start_button'].disabled = False
-                ui_components['stop_button'].disabled = True
+        # Update step label
+        if 'step_label' in ui_components:
+            ui_components['step_label'].value = f"{ICONS.get('play', '▶️')} Memulai training..."
         
-        # Handler untuk tombol start
-        def on_start_click(b):
-            nonlocal training_active, training_thread, stop_training
-            
-            if training_active:
-                return
-            
-            # Update status
-            training_active = True
-            stop_training = False
-            
-            # Update tombol
-            ui_components['start_button'].disabled = True
-            ui_components['stop_button'].disabled = False
-            
-            # Jalankan training dalam thread terpisah
-            training_thread = threading.Thread(target=run_training)
-            training_thread.daemon = True
-            training_thread.start()
+        # Simulasi training loop (untuk demo)
+        # Dalam implementasi sebenarnya, ini akan memanggil TrainingService
+        train_losses = []
+        val_losses = []
+        map_values = []
         
-        # Handler untuk tombol stop
-        def on_stop_click(b):
-            nonlocal stop_training
+        for epoch in range(epochs):
+            if stop_training:
+                logger.info(f"{ICONS.get('stop', '⏹️')} Training dihentikan pada epoch {epoch+1}/{epochs}")
+                break
             
-            if not training_active:
-                return
+            # Simulasi training epoch
+            train_loss = 1.0 - 0.8 * (epoch / epochs) + 0.1 * np.random.random()
+            val_loss = 1.1 - 0.7 * (epoch / epochs) + 0.15 * np.random.random()
+            map_value = 0.2 + 0.7 * (epoch / epochs) + 0.05 * np.random.random()
             
-            # Set flag untuk menghentikan training
-            stop_training = True
-            ui_components['stop_button'].disabled = True
-            ui_components['status_label'].value = '<span style="color:#e67e22">⏳ Menghentikan training...</span>'
+            # Simpan metrik
+            train_losses.append(train_loss)
+            val_losses.append(val_loss)
+            map_values.append(map_value)
+            
+            # Update progress
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = epoch + 1
+            
+            # Update step label
+            if 'step_label' in ui_components:
+                ui_components['step_label'].value = f"{ICONS.get('training', '🏋️')} Epoch {epoch+1}/{epochs}"
+            
+            # Update overall label
+            if 'overall_label' in ui_components:
+                progress_pct = int(100 * (epoch + 1) / epochs)
+                ui_components['overall_label'].value = f"Progress: {progress_pct}%"
+            
+            # Log metrik
+            logger.info(f"{ICONS.get('chart', '📊')} Epoch {epoch+1}/{epochs} - Train Loss: {train_loss:.4f}, Val Loss: {val_loss:.4f}, mAP: {map_value:.4f}")
+            
+            # Update metrik di UI
+            with ui_components['metrics_box']:
+                ui_components['metrics_box'].clear_output()
+                display(HTML(f"""
+                <div style="padding:5px">
+                    {ICONS.get('chart', '📊')} <b>Epoch {epoch+1}/{epochs}</b>
+                    <ul>
+                        <li><b>Train Loss:</b> <span style="color:#e74c3c">{train_loss:.4f}</span></li>
+                        <li><b>Val Loss:</b> <span style="color:#3498db">{val_loss:.4f}</span></li>
+                        <li><b>mAP:</b> <span style="color:#2ecc71">{map_value:.4f}</span></li>
+                    </ul>
+                </div>
+                """))
+            
+            # Update chart
+            with ui_components['chart_output']:
+                ui_components['chart_output'].clear_output()
+                
+                plt.figure(figsize=(10, 6))
+                plt.title('Training Metrics')
+                plt.xlabel('Epoch')
+                plt.ylabel('Value')
+                plt.grid(True, linestyle='--', alpha=0.7)
+                
+                epochs_range = list(range(1, epoch + 2))
+                plt.plot(epochs_range, train_losses, '-', color='#e74c3c', label='Train Loss')
+                plt.plot(epochs_range, val_losses, '--', color='#3498db', label='Val Loss')
+                plt.plot(epochs_range, map_values, ':', color='#2ecc71', label='mAP')
+                
+                plt.legend(loc='best')
+                
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png')
+                buf.seek(0)
+                img_str = base64.b64encode(buf.read()).decode('utf-8')
+                plt.close()
+                
+                display(HTML(f'<img src="data:image/png;base64,{img_str}" width="100%">'))
+            
+            # Simulasi waktu training
+            time.sleep(0.1)  # Untuk demo, kita percepat
         
-        # Pasang handler ke tombol
-        ui_components['start_button'].on_click(on_start_click)
-        ui_components['stop_button'].on_click(on_stop_click)
-        
-        # Update informasi training saat pertama kali
-        update_training_info()
-        
-        # Daftarkan komponen UI untuk persistensi
-        config_manager.register_ui_components('training', ui_components)
-        
-        return ui_components
+        # Training selesai atau dihentikan
+        if stop_training:
+            # Update status panel
+            with ui_components['status_panel']:
+                ui_components['status_panel'].clear_output()
+                display(create_info_alert(
+                    f"{ICONS.get('warning', '⚠️')} Training dihentikan oleh pengguna pada epoch {epoch+1}/{epochs}. Model checkpoint terakhir tersimpan.",
+                    alert_type='warning'
+                ))
+            
+            # Update step label
+            if 'step_label' in ui_components:
+                ui_components['step_label'].value = f"{ICONS.get('warning', '⚠️')} Training dihentikan"
+        else:
+            # Update progress bar
+            if 'progress_bar' in ui_components:
+                ui_components['progress_bar'].value = epochs
+            
+            # Update status panel
+            with ui_components['status_panel']:
+                ui_components['status_panel'].clear_output()
+                display(create_info_alert(
+                    f"{ICONS.get('check', '✓')} Training selesai! Model terbaik tersimpan di direktori checkpoint.",
+                    alert_type='success'
+                ))
+            
+            # Update step label
+            if 'step_label' in ui_components:
+                ui_components['step_label'].value = f"{ICONS.get('check', '✓')} Training selesai"
+            
+            # Update overall label
+            if 'overall_label' in ui_components:
+                ui_components['overall_label'].value = f"Progress: 100%"
+            
+            logger.info(f"{ICONS.get('check', '✓')} Training selesai dengan {epochs} epochs")
     
     except Exception as e:
-        # Fallback jika terjadi error
-        print(f"Error saat setup button handlers: {str(e)}")
-        return ui_components
+        # Log error
+        logger.error(f"{ICONS.get('error', '❌')} Error saat training: {str(e)}")
+        
+        # Update status panel
+        with ui_components['status_panel']:
+            ui_components['status_panel'].clear_output()
+            display(create_info_alert(
+                f"{ICONS.get('error', '❌')} Error saat training: {str(e)}",
+                alert_type='error'
+            ))
+        
+        # Update step label
+        if 'step_label' in ui_components:
+            ui_components['step_label'].value = f"{ICONS.get('error', '❌')} Training gagal"
+    
+    finally:
+        # Reset status
+        training_active = False
+        stop_training = False
+        
+        # Update tombol
+        ui_components['start_button'].disabled = False
+        ui_components['stop_button'].disabled = True

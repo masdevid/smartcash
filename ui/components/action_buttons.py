@@ -11,7 +11,6 @@ def create_action_buttons(
     primary_icon: str = "play",
     secondary_buttons: List[Tuple[str, str, str]] = None, 
     cleanup_enabled: bool = True,
-    save_enabled: bool = True,
     layout: Optional[widgets.Layout] = None
 ) -> Dict[str, widgets.Widget]:
     """
@@ -45,26 +44,7 @@ def create_action_buttons(
         layout=widgets.Layout(display='none', margin='5px')
     )
     
-    # Tombol reset
-    reset_button = widgets.Button(
-        description='Reset',
-        button_style='warning',
-        icon='refresh',
-        tooltip="Reset konfigurasi dan tampilan",
-        layout=widgets.Layout(margin='5px')
-    )
-    
-    # Tombol save
-    save_button = widgets.Button(
-        description='Simpan Konfigurasi',
-        button_style='success',
-        icon='save',
-        tooltip="Simpan konfigurasi saat ini",
-        layout=widgets.Layout(
-            display='none' if not save_enabled else 'inline-block',
-            margin='5px'
-        )
-    )
+    # Tidak lagi menggunakan tombol reset dan save karena sudah ada di save_reset_buttons
     
     # Tombol cleanup (optional)
     cleanup_button = widgets.Button(
@@ -79,7 +59,7 @@ def create_action_buttons(
     )
     
     # List untuk menyimpan semua tombol
-    buttons = [primary_button, stop_button, reset_button, save_button]
+    buttons = [primary_button, stop_button]
     
     # Tambahkan cleanup jika enabled
     if cleanup_enabled:
@@ -117,8 +97,6 @@ def create_action_buttons(
     buttons_dict = {
         'primary_button': primary_button,
         'stop_button': stop_button,
-        'reset_button': reset_button,
-        'save_button': save_button,
         'cleanup_button': cleanup_button,
         'container': button_container
     }

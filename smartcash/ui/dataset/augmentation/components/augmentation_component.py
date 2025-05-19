@@ -31,7 +31,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.validation_options import create_validation_options
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
-    from smartcash.ui.components.split_config import create_split_config
+    # Tidak menggunakan split_config lagi sesuai permintaan
 
     # Import komponen submodules augmentasi
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
@@ -54,16 +54,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
 
-    # Split config menggunakan shared component
-    split_config = create_split_config(
-        title="Konfigurasi Split Dataset",
-        description="Tentukan pembagian dataset untuk augmentasi",
-        train_value=0.7,
-        val_value=0.2,
-        test_value=0.1,
-        width='100%',
-        icon='split'
-    )
+    # Split config tidak digunakan lagi sesuai permintaan
     
     # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
@@ -123,7 +114,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     settings_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
         combined_options,
-        split_config['container'],  # Gunakan split_config baru
+        # split_config dihilangkan sesuai permintaan
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
         advanced_options,
@@ -152,7 +143,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_options': advanced_options,
         'advanced_accordion': advanced_accordion,
         'split_selector': split_selector,
-        'split_config': split_config,  # Tambahkan split_config
+        # 'split_config' dihilangkan sesuai permintaan
         'augment_button': action_buttons['primary_button'],
         'augmentation_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],

@@ -4,11 +4,10 @@ Deskripsi: Utilitas untuk sinkronisasi konfigurasi antara lokal dan Google Drive
 """
 
 import os
-import time
+import copy  # Digunakan di merge_configs_smart
 import json
-import yaml
 from pathlib import Path
-from typing import Dict, Any, List, Tuple, Union, Optional
+from typing import Dict, Any, List, Tuple, Optional
 
 from smartcash.common.io import (
     load_config,
@@ -16,18 +15,12 @@ from smartcash.common.io import (
     copy_file
 )
 from smartcash.common.constants.log_messages import (
-    CONFIG_IDENTICAL,
-    CONFIG_SYNC_SUCCESS,
-    CONFIG_SYNC_ERROR,
     CONFIG_ERROR,
     FILE_BACKUP_SUCCESS,
     FILE_BACKUP_ERROR,
     DRIVE_NOT_MOUNTED,
     DRIVE_PATH_IDENTICAL,
     STATUS_INFO,
-    STATUS_WARNING,
-    STATUS_ERROR,
-    STATUS_SUCCESS,
     OPERATION_COMPLETED
 )
 
@@ -175,20 +168,30 @@ def sync_config_with_drive(
             
     elif sync_strategy == 'drive_priority':
         # Strategi drive priority: Drive → lokal
-        if drive_config_path.exists():
+        # PERBAIKAN: Prioritaskan penyalinan file dari lokal ke drive jika file tidak ada di drive
+        if not drive_config_path.exists() and local_config_path.exists():
+            # Jika file tidak ada di Drive tapi ada di lokal, salin ke Drive
+            success = save_config(local_config, drive_config_path)
+            if success:
+                return True, f"Konfigurasi {config_file} berhasil disalin ke Drive", local_config
+            else:
+                if logger:
+                    logger.error(CONFIG_ERROR.format(operation="menyimpan ke Drive", error="Gagal menulis ke file drive"))
+                return False, f"Error saat menyalin {config_file} ke Drive", {}
+        elif drive_config_path.exists():
+            # Jika file ada di Drive, salin ke lokal
             if local_config_path.exists() and are_configs_identical(local_config, drive_config):
-                # logger.info(CONFIG_IDENTICAL.format(name=config_file))
-                return True, "Konfigurasi sudah identik", drive_config
+                return True, f"Konfigurasi {config_file} sudah identik", drive_config
             
             success = save_config(drive_config, local_config_path)
             if success:
-                # logger.info(CONFIG_SYNC_SUCCESS.format(direction="dari Drive"))
-                return True, "Konfigurasi berhasil disinkronisasi dari Drive", drive_config
+                return True, f"Konfigurasi {config_file} berhasil disinkronisasi dari Drive", drive_config
             else:
-                logger.error(CONFIG_ERROR.format(operation="menyimpan dari Drive", error="Gagal menulis ke file lokal"))
-                return False, "Error saat menyimpan dari Drive", {}
+                if logger:
+                    logger.error(CONFIG_ERROR.format(operation="menyimpan dari Drive", error="Gagal menulis ke file lokal"))
+                return False, f"Error saat menyimpan {config_file} dari Drive", {}
         else:
-            # Jika tidak ada di Drive, salin dari lokal ke Drive
+            # Jika tidak ada di Drive dan tidak ada di lokal, buat file kosong di kedua lokasi
             if local_config_path.exists():
                 success = save_config(local_config, drive_config_path)
                 if success:
@@ -363,79 +366,12 @@ def sync_all_configs(
     
     # Sinkronisasi setiap file
     for file_name in all_config_files:
-        # logger.info(STATUS_INFO.format(message=f"Sinkronisasi {file_name}..."))
-        
-        try:
-            # Cek jika realpath sama
-            if os.path.realpath(local_config_dir / file_name) == os.path.realpath(drive_config_dir / file_name):
-                msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
-                logger.debug(STATUS_INFO.format(message=msg))
-                results["skipped"].append({"file": file_name, "message": msg})
-                continue
-            
-            # Panggil sync_config_with_drive
-            success, message, _ = sync_config_with_drive(
-                config_file=file_name, 
-                sync_strategy=sync_strategy,
-                create_backup=create_backup,
-                logger=logger
-            )
-            
-            if success:
-                if "identik" in message:
-                    results["skipped"].append({"file": file_name, "message": message})
-                else:
-                    results["success"].append({"file": file_name, "message": message})
-            else:
-                results["failure"].append({"file": file_name, "message": message})
-                
-        except Exception as e:
-            results["failure"].append({"file": file_name, "message": str(e)})
-    
-    # Log hasil hanya jika ada perubahan atau error
-    counts = {k: len(v) for k, v in results.items()}
-    if counts['success'] > 0 or counts['failure'] > 0:
-        logger.info(
-            OPERATION_COMPLETED.format(
-                operation=f"Sinkronisasi {len(all_config_files)} file",
-                duration=f"{counts['success']} disinkronisasi, {counts['skipped']} dilewati, {counts['failure']} gagal"
-            )
-        )
-    
-    return results
-    
-    # Verifikasi Google Drive mounted
-    if not env_manager.is_drive_mounted:
-        logger.warning(DRIVE_NOT_MOUNTED)
-        return {"success": [], "failure": [], "skipped": []}
-    
-    # Setup path dan pastikan direktori ada
-    local_config_dir, drive_config_dir = Path(config_dir), env_manager.drive_path / "configs"
-    local_config_dir.mkdir(parents=True, exist_ok=True)
-    drive_config_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Kumpulkan semua file konfigurasi
-    def get_yaml_json_files(dir_path): 
-        return list(dir_path.glob("*.yaml")) + list(dir_path.glob("*.yml")) + list(dir_path.glob("*.json"))
-    
-    all_config_files = set(f.name for f in get_yaml_json_files(local_config_dir)) | set(f.name for f in get_yaml_json_files(drive_config_dir))
-    
-    # Filter file yang diawali 'backup' atau '_'
-    all_config_files = {f for f in all_config_files if not f.startswith('backup') and not f.startswith('_')}
-    
-    # Hasil sinkronisasi
-    results = {"success": [], "failure": [], "skipped": []}
-    
-    # Sinkronisasi setiap file
-    for file_name in all_config_files:
-        # Tidak perlu log debug untuk setiap file
-        
         try:
             # Dapatkan path lengkap
             local_path = local_config_dir / file_name
             drive_path = drive_config_dir / file_name
             
-            # PERBAIKAN: Hanya periksa realpath jika kedua file ada
+            # Hanya periksa realpath jika kedua file ada
             # Ini mencegah error jika salah satu file tidak ada
             if local_path.exists() and drive_path.exists():
                 try:

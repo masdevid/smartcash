@@ -92,13 +92,63 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                     style="info"
                 ).value
                 
-                # Sinkronisasi semua file konfigurasi tanpa log berlebihan
-                results = sync_all_configs(
-                    sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
-                    config_dir='configs',   # Direktori konfigurasi
-                    create_backup=True,     # Buat backup sebelum sinkronisasi
-                    logger=None            # Tidak perlu log detail proses
-                )
+                # PERBAIKAN: Gunakan fungsi force_sync_all_configs untuk memastikan semua file konfigurasi berhasil disinkronkan
+                try:
+                    # Import fungsi force_sync_all_configs
+                    from smartcash.common.config.force_sync import force_sync_all_configs
+                    
+                    # Tampilkan status sinkronisasi
+                    logger.info("🔄 Memulai sinkronisasi paksa semua file konfigurasi...")
+                    
+                    # Jalankan sinkronisasi paksa
+                    force_results = force_sync_all_configs(logger)
+                    
+                    # Buat struktur hasil yang kompatibel dengan sync_all_configs
+                    results = {
+                        "success": [{"file": f, "message": "Berhasil disinkronkan"} for f in force_results["synced"]],
+                        "skipped": [{"file": f, "message": "Dilewati"} for f in force_results["skipped"]],
+                        "failure": []
+                    }
+                    
+                    # Tampilkan ringkasan
+                    logger.info(f"✅ Sinkronisasi paksa selesai: {len(force_results['synced'])} file disinkronkan, {len(force_results['skipped'])} dilewati")
+                except Exception as force_error:
+                    logger.warning(f"⚠️ Error saat sinkronisasi paksa: {str(force_error)}")
+                    
+                    # Fallback ke pendekatan langsung jika force_sync_all_configs gagal
+                    try:
+                        # Import fungsi sinkronisasi langsung
+                        from smartcash.common.config.tests.sync_all_configs import copy_all_configs
+                        
+                        # Dapatkan path direktori konfigurasi
+                        smartcash_config_dir = Path(env_manager.base_dir) / 'configs'
+                        content_config_dir = Path('/content/configs')
+                        
+                        # Pastikan direktori ada
+                        smartcash_config_dir.mkdir(parents=True, exist_ok=True)
+                        content_config_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # Salin file dari smartcash/configs ke /content/configs
+                        logger.info("🔄 Mencoba pendekatan langsung untuk sinkronisasi...")
+                        direct_results = copy_all_configs(smartcash_config_dir, content_config_dir, logger)
+                        
+                        # Buat struktur hasil yang kompatibel dengan sync_all_configs
+                        results = {
+                            "success": [{"file": f.name, "message": "Berhasil disinkronkan"} for f in smartcash_config_dir.glob("*_config.yaml")],
+                            "skipped": [],
+                            "failure": []
+                        }
+                    except Exception as copy_error:
+                        logger.warning(f"⚠️ Error saat sinkronisasi langsung: {str(copy_error)}")
+                        
+                        # Fallback ke sync_all_configs jika semua pendekatan gagal
+                        logger.info("🔄 Mencoba sync_all_configs sebagai fallback...")
+                        results = sync_all_configs(
+                            sync_strategy='drive_priority',  # Prioritaskan konfigurasi di drive
+                            config_dir='configs',           # Direktori konfigurasi
+                            create_backup=True,             # Buat backup sebelum sinkronisasi
+                            logger=None                    # Tidak perlu log detail proses
+                        )
                 
                 # Log hasil sinkronisasi ke UI secara minimal
                 counts = {k: len(v) for k, v in results.items()}

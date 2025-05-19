@@ -23,7 +23,10 @@ class EnvironmentManager:
     
     def __new__(cls, *args, **kwargs):
         """Implementasi pola singleton."""
-        if cls._instance is None: cls._instance = super(EnvironmentManager, cls).__new__(cls)
+        if cls._instance is None: 
+            cls._instance = super(EnvironmentManager, cls).__new__(cls)
+            cls._instance._initialized = False
+            cls._instance._is_syncing = False  # Flag untuk mencegah rekursi sinkronisasi
         return cls._instance
     
     def __init__(self, base_dir: Optional[str] = None, logger = None):
@@ -249,34 +252,41 @@ class EnvironmentManager:
             except Exception:
                 stats['error'] += 1
         
-        # Sinkronisasi konfigurasi jika drive terhubung
-        if use_drive and self._drive_mounted and stats['preserved'] > 0:
+        # Sinkronisasi konfigurasi jika drive terhubung dan belum dalam proses sinkronisasi
+        if use_drive and self._drive_mounted and stats['preserved'] > 0 and not self._is_syncing:
+            # Set flag sinkronisasi untuk mencegah rekursi
+            self._is_syncing = True
+            
             try:
                 # Import fungsi sinkronisasi dari smartcash.common.config.sync
                 from smartcash.common.config.sync import sync_all_configs
                 
-                # Log ke logger
-                if self.logger:
-                    self.logger.info("🔄 Memulai sinkronisasi file konfigurasi setelah setup direktori...")
-                
-                # Sinkronisasi semua file konfigurasi
+                    # Sinkronisasi semua file konfigurasi tanpa log berlebihan
                 results = sync_all_configs(
                     sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
                     config_dir='configs',   # Direktori konfigurasi
                     create_backup=True,     # Buat backup sebelum sinkronisasi
-                    logger=self.logger      # Gunakan logger yang sama
+                    logger=None            # Tidak perlu log detail proses
                 )
                 
-                # Log hasil sinkronisasi
-                if self.logger:
-                    counts = {k: len(v) for k, v in results.items()}
-                    self.logger.info(
-                        f"🔄 Sinkronisasi setelah setup direktori: {sum(counts.values())} file diproses - "
-                        f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
-                    )
+                # Log hanya jika ada file yang berhasil disinkronkan
+                counts = {k: len(v) for k, v in results.items()}
+                
+                if self.logger and counts['success'] > 0:
+                    # Tampilkan ringkasan hanya untuk file yang berhasil
+                    success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
+                    if success_files:
+                        self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
+                        
+                # Log error jika ada
+                if self.logger and counts['failure'] > 0:
+                    self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
             except Exception as sync_error:
                 if self.logger:
                     self.logger.warning(f"⚠️ Error saat sinkronisasi setelah setup direktori: {str(sync_error)}")
+            finally:
+                # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
+                self._is_syncing = False
         
         if self.logger:
             # Log hasil setup direktori
@@ -526,36 +536,41 @@ class EnvironmentManager:
                 if self.logger:
                     self.logger.warning(f"⚠️ Error saat menyimpan konfigurasi modul: {str(save_error)}")
             
-            # Sinkronisasi semua file konfigurasi jika Drive terhubung
-            if self._drive_mounted:
+            # Sinkronisasi semua file konfigurasi jika Drive terhubung dan belum dalam proses sinkronisasi
+            if self._drive_mounted and not self._is_syncing:
+                # Set flag sinkronisasi untuk mencegah rekursi
+                self._is_syncing = True
+                
                 try:
                     # Import fungsi sinkronisasi dari smartcash.common.config.sync
                     from smartcash.common.config.sync import sync_all_configs
                     
-                    # Log ke logger
-                    if self.logger:
-                        self.logger.info("🔄 Memulai sinkronisasi semua file konfigurasi...")
-                    
-                    # Sinkronisasi semua file konfigurasi
+                    # Sinkronisasi semua file konfigurasi tanpa log berlebihan
                     results = sync_all_configs(
                         sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
                         config_dir='configs',   # Direktori konfigurasi
                         create_backup=True,     # Buat backup sebelum sinkronisasi
-                        logger=self.logger      # Gunakan logger yang sama
+                        logger=None            # Tidak perlu log detail proses
                     )
                     
-                    # Log hasil sinkronisasi
+                    # Log hanya jika ada file yang berhasil disinkronkan
                     counts = {k: len(v) for k, v in results.items()}
                     
-                    if self.logger:
-                        # Tampilkan ringkasan
-                        self.logger.info(
-                            f"🔄 Sinkronisasi selesai: {sum(counts.values())} file diproses - "
-                            f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
-                        )
+                    if self.logger and counts['success'] > 0:
+                        # Tampilkan ringkasan hanya untuk file yang berhasil
+                        success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
+                        if success_files:
+                            self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
+                            
+                    # Log error jika ada
+                    if self.logger and counts['failure'] > 0:
+                        self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
                 except Exception as sync_error:
                     if self.logger:
                         self.logger.warning(f"⚠️ Error saat sinkronisasi konfigurasi: {str(sync_error)}")
+                finally:
+                    # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
+                    self._is_syncing = False
             
             if self.logger:
                 self.logger.info("✅ Konfigurasi environment berhasil disimpan")
@@ -631,38 +646,45 @@ class EnvironmentManager:
     def _sync_config_files_on_drive_connect(self) -> None:
         """
         Sinkronisasi otomatis file **_config.yaml saat drive terhubung.
+        Menggunakan flag sinkronisasi untuk mencegah rekursi.
         """
-        if not self._drive_mounted:
+        # Cek apakah drive terhubung dan sinkronisasi belum berjalan
+        if not self._drive_mounted or self._is_syncing:
             return
             
+        # Set flag sinkronisasi untuk mencegah rekursi
+        self._is_syncing = True
+        
         try:
             # Import fungsi sinkronisasi dari smartcash.common.config.sync
             from smartcash.common.config.sync import sync_all_configs
-            
-            # Log ke logger
-            if self.logger:
-                self.logger.info("🔄 Memulai sinkronisasi otomatis file konfigurasi saat drive terhubung...")
             
             # Sinkronisasi semua file konfigurasi
             results = sync_all_configs(
                 sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
                 config_dir='configs',   # Direktori konfigurasi
                 create_backup=True,     # Buat backup sebelum sinkronisasi
-                logger=self.logger      # Gunakan logger yang sama
+                logger=None            # Tidak perlu log detail proses
             )
             
-            # Log hasil sinkronisasi
+            # Log hanya jika ada file yang berhasil disinkronkan
             counts = {k: len(v) for k, v in results.items()}
             
-            if self.logger:
-                # Tampilkan ringkasan
-                self.logger.info(
-                    f"🔄 Sinkronisasi otomatis selesai: {sum(counts.values())} file diproses - "
-                    f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
-                )
+            if self.logger and counts['success'] > 0:
+                # Tampilkan ringkasan hanya untuk file yang berhasil
+                success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
+                if success_files:
+                    self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
+                    
+            # Log error jika ada
+            if self.logger and counts['failure'] > 0:
+                self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
         except Exception as sync_error:
             if self.logger:
                 self.logger.warning(f"⚠️ Error saat sinkronisasi otomatis: {str(sync_error)}")
+        finally:
+            # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
+            self._is_syncing = False
     
     def _detect_notebook(self) -> bool:
         """

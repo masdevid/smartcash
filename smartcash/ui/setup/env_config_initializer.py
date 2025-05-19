@@ -92,34 +92,27 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                     style="info"
                 ).value
                 
-                # Log ke UI
-                logger.info("🔄 Memulai sinkronisasi semua file konfigurasi...")
-                
-                # Sinkronisasi semua file konfigurasi
+                # Sinkronisasi semua file konfigurasi tanpa log berlebihan
                 results = sync_all_configs(
                     sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
                     config_dir='configs',   # Direktori konfigurasi
                     create_backup=True,     # Buat backup sebelum sinkronisasi
-                    logger=logger           # Gunakan logger yang sama
+                    logger=None            # Tidak perlu log detail proses
                 )
                 
-                # Log hasil sinkronisasi ke UI
+                # Log hasil sinkronisasi ke UI secara minimal
                 counts = {k: len(v) for k, v in results.items()}
                 
-                # Tampilkan hasil di log output
+                # Tampilkan hasil hanya untuk file *_config.yaml yang berhasil
                 if counts['success'] > 0:
-                    for item in results['success']:
-                        logger.info(f"✅ {item['file']}: {item['message']}")
+                    success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
+                    if success_files:
+                        logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
                 
+                # Log error jika ada
                 if counts['failure'] > 0:
-                    for item in results['failure']:
-                        logger.error(f"❌ {item['file']}: {item['message']}")
-                
-                # Tampilkan ringkasan
-                logger.info(
-                    f"🔄 Sinkronisasi selesai: {sum(counts.values())} file diproses - "
-                    f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
-                )
+                    # Hanya tampilkan jumlah error, bukan detail setiap file
+                    logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
                 
                 # Update status panel dengan hasil
                 ui_components['status_panel'].value = create_info_box(

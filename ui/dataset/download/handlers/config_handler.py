@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import time
 from datetime import datetime
+import shutil
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
@@ -41,56 +42,82 @@ def load_default_config() -> Dict[str, Any]:
 
 def load_config() -> Dict[str, Any]:
     """
-    Load konfigurasi download dataset dari file YAML.
+    Muat konfigurasi download dataset dari file YAML.
     
     Returns:
-        Dictionary berisi konfigurasi download dataset
+        Dictionary konfigurasi
     """
     logger = get_logger("download_config")
+    
+    # Coba gunakan ConfigManager terlebih dahulu jika tersedia
     try:
-        # Path ke file konfigurasi dataset
-        config_path = Path("config/dataset_config.yaml")
-        if not config_path.exists():
-            # Coba cari di lokasi alternatif
-            alt_path = Path("../config/dataset_config.yaml")
-            if alt_path.exists():
-                config_path = alt_path
-            else:
-                logger.info(f"🔄 File konfigurasi tidak ditemukan, menggunakan konfigurasi default")
-                return load_default_config()
+        from smartcash.common.config.manager import get_config_manager
+        config_manager = get_config_manager()
         
-        # Load konfigurasi dari file
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
+        # Reload konfigurasi untuk mendapatkan perubahan terbaru
+        config_manager.reload()
         
-        # Pastikan struktur konfigurasi benar
-        if not config:
-            config = {}
-        if 'data' not in config:
-            config['data'] = {}
-        if 'download' not in config['data']:
-            config['data']['download'] = {
-                'source': 'roboflow',
-                'output_dir': 'data/downloads',
-                'backup_before_download': True,
-                'backup_dir': 'data/downloads_backup'
-            }
-        if 'roboflow' not in config['data']:
-            config['data']['roboflow'] = {
-                'workspace': 'smartcash-wo2us',
-                'project': 'rupiah-emisi-2022',
-                'version': '3',
-                'api_key': ''
-            }
-        
-        logger.info(f"✅ Konfigurasi berhasil dimuat dari {config_path}")
-        return config
+        # Coba dapatkan konfigurasi dataset dari ConfigManager
+        config = config_manager.get('dataset_download', None)
+        if config:
+            logger.info(f"💾 Konfigurasi dataset dimuat dari ConfigManager")
+            return config
+        else:
+            logger.debug(f"ℹ️ Konfigurasi dataset tidak ditemukan di ConfigManager")
+    except ImportError:
+        logger.debug(f"ℹ️ ConfigManager tidak tersedia, mencoba metode load langsung")
     except Exception as e:
-        logger.error(f"❌ Error saat memuat konfigurasi download dataset: {str(e)}")
-        # Kembalikan konfigurasi default
-        return load_default_config()
+        logger.debug(f"⚠️ Error saat mengakses ConfigManager: {str(e)}")
+    
+    # Coba dapatkan path dari EnvironmentManager jika tersedia
+    try:
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        
+        # Path ke file konfigurasi dataset
+        config_paths = [
+            Path(env_manager.base_dir) / "configs" / "dataset_config.yaml",  # Prioritas utama
+            Path(env_manager.base_dir) / "config" / "dataset_config.yaml",    # Alternatif
+        ]
+        
+        # Tambahkan path Google Drive jika terhubung
+        if env_manager.is_drive_mounted:
+            drive_config_path = Path(env_manager.drive_path) / "configs" / "dataset_config.yaml"
+            config_paths.append(drive_config_path)
+            
+    except ImportError:
+        # Fallback ke path default jika EnvironmentManager tidak tersedia
+        logger.debug(f"ℹ️ EnvironmentManager tidak tersedia, menggunakan path default")
+        
+        # Path ke file konfigurasi dataset
+        config_paths = [
+            Path("configs/dataset_config.yaml"),  # Prioritas utama
+            Path("config/dataset_config.yaml"),   # Alternatif
+        ]
+        
+        # Coba tambahkan path Google Drive jika tersedia
+        try:
+            if os.path.exists('/content/drive/MyDrive'):
+                config_paths.append(Path("/content/drive/MyDrive/smartcash/configs/dataset_config.yaml"))
+        except Exception:
+            pass
+    
+    # Coba load dari path yang tersedia
+    for config_path in config_paths:
+        try:
+            if config_path.exists():
+                with open(config_path, 'r') as f:
+                    config = yaml.safe_load(f)
+                logger.info(f"💾 Konfigurasi dataset dimuat dari {config_path}")
+                return config
+        except Exception as e:
+            logger.debug(f"⚠️ Tidak dapat memuat konfigurasi dari {config_path}: {str(e)}")
+    
+    # Jika tidak ada file konfigurasi yang ditemukan, gunakan default
+    logger.warning(f"⚠️ File konfigurasi tidak ditemukan, menggunakan konfigurasi default")
+    return load_default_config()
 
-def save_config(config: Dict[str, Any], logger=None) -> bool:
+def save_config(config: Dict[str, Any], logger=None) -> str:
     """
     Simpan konfigurasi download dataset ke file YAML.
     
@@ -99,14 +126,42 @@ def save_config(config: Dict[str, Any], logger=None) -> bool:
         logger: Logger untuk logging
         
     Returns:
-        Boolean yang menunjukkan keberhasilan penyimpanan
+        Path ke file konfigurasi yang disimpan
     """
     if not logger:
         logger = get_logger("download_config")
     
     try:
+        # Gunakan ConfigManager jika tersedia untuk konsistensi
+        try:
+            from smartcash.common.config.manager import get_config_manager
+            config_manager = get_config_manager()
+            
+            # Simpan konfigurasi dataset ke ConfigManager
+            config_manager.set('dataset_download', config)
+            
+            # Simpan ke file
+            config_manager.save()
+            
+            # Dapatkan path konfigurasi dari ConfigManager
+            config_path = Path(config_manager.get('config_path', 'configs')) / 'config.yaml'
+            
+            logger.info(f"💾 Konfigurasi dataset berhasil disimpan menggunakan ConfigManager")
+            
+            return str(config_path)
+        except ImportError:
+            # Fallback jika ConfigManager tidak tersedia
+            logger.debug("ℹ️ ConfigManager tidak tersedia, menggunakan metode simpan langsung")
+        
         # Path ke file konfigurasi dataset
-        config_path = Path("config/dataset_config.yaml")
+        # Prioritaskan configs/ folder yang lebih umum digunakan
+        config_paths = [
+            Path("configs/dataset_config.yaml"),  # Prioritas utama
+            Path("config/dataset_config.yaml"),   # Alternatif
+        ]
+        
+        # Pilih path pertama sebagai default
+        config_path = config_paths[0]
         
         # Buat direktori jika belum ada
         os.makedirs(config_path.parent, exist_ok=True)
@@ -115,27 +170,46 @@ def save_config(config: Dict[str, Any], logger=None) -> bool:
         with open(config_path, 'w') as f:
             yaml.dump(config, f, default_flow_style=False)
         
-        logger.info(f"💾 Konfigurasi berhasil disimpan ke {config_path}")
+        logger.info(f"💾 Konfigurasi dataset berhasil disimpan ke {config_path}")
         
-        # Coba sinkronkan dengan drive jika tersedia
+        # Buat salinan di lokasi alternatif untuk kompatibilitas
+        for alt_path in config_paths[1:]:
+            try:
+                os.makedirs(alt_path.parent, exist_ok=True)
+                shutil.copy2(config_path, alt_path)
+                logger.debug(f"🔄 Salinan konfigurasi dibuat di {alt_path}")
+            except Exception as copy_error:
+                logger.debug(f"⚠️ Tidak dapat membuat salinan di {alt_path}: {str(copy_error)}")
+        
+        # Coba sinkronkan dengan drive menggunakan EnvironmentManager jika tersedia
         try:
-            from google.colab import drive
-            # Cek apakah drive sudah di-mount
-            if os.path.exists('/content/drive'):
-                # Copy file ke drive
-                drive_path = Path("/content/drive/MyDrive/smartcash/config/dataset_config.yaml")
-                os.makedirs(drive_path.parent, exist_ok=True)
-                with open(drive_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
-                logger.info(f"🔄 Konfigurasi berhasil disinkronkan dengan Google Drive")
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager()
+            
+            if env_manager.is_drive_mounted:
+                drive_config_path = Path(env_manager.drive_path) / 'configs' / 'dataset_config.yaml'
+                os.makedirs(drive_config_path.parent, exist_ok=True)
+                shutil.copy2(config_path, drive_config_path)
+                logger.info(f"🔄 Konfigurasi berhasil disinkronkan dengan Google Drive di {drive_config_path}")
         except ImportError:
-            # Bukan di Google Colab, abaikan
-            pass
+            # Fallback ke metode lama jika EnvironmentManager tidak tersedia
+            try:
+                from google.colab import drive
+                # Cek apakah drive sudah di-mount
+                if os.path.exists('/content/drive'):
+                    # Copy file ke drive
+                    drive_path = Path("/content/drive/MyDrive/smartcash/configs/dataset_config.yaml")
+                    os.makedirs(drive_path.parent, exist_ok=True)
+                    shutil.copy2(config_path, drive_path)
+                    logger.info(f"🔄 Konfigurasi berhasil disinkronkan dengan Google Drive di {drive_path}")
+            except ImportError:
+                # Bukan di Google Colab, abaikan
+                pass
         
-        return True
+        return str(config_path)
     except Exception as e:
         logger.error(f"❌ Error saat menyimpan konfigurasi download dataset: {str(e)}")
-        return False
+        return ""
 
 def get_config_manager_instance():
     """

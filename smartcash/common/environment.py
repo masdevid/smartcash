@@ -353,6 +353,110 @@ class EnvironmentManager:
         elif ext in ['.pt', '.pth']: return "#9B4DCA"  # PyTorch model files
         return "#333"  # Default color
     
+    def sync_config(self) -> Tuple[bool, str]:
+        """
+        Sinkronisasi konfigurasi antara lokal dan Google Drive.
+        
+        Returns:
+            Tuple (sukses, pesan)
+        """
+        try:
+            # Import config manager
+            from smartcash.common.config.manager import get_config_manager
+            config_manager = get_config_manager()
+            
+            # Sinkronisasi konfigurasi
+            if self._drive_mounted:
+                # Cek apakah ada konfigurasi di Drive
+                drive_config_path = self._drive_path / 'configs'
+                local_config_path = self._base_dir / 'configs'
+                
+                # Pastikan direktori configs ada di kedua lokasi
+                os.makedirs(drive_config_path, exist_ok=True)
+                os.makedirs(local_config_path, exist_ok=True)
+                
+                # Sinkronisasi file konfigurasi dari Drive ke lokal
+                synced_files = 0
+                for config_file in drive_config_path.glob('*.yaml'):
+                    target_file = local_config_path / config_file.name
+                    if not target_file.exists() or os.path.getmtime(config_file) > os.path.getmtime(target_file):
+                        import shutil
+                        shutil.copy2(config_file, target_file)
+                        synced_files += 1
+                        if self.logger:
+                            self.logger.debug(f"🔄 Sinkronisasi konfigurasi: {config_file.name} (Drive → Lokal)")
+                
+                # Sinkronisasi file konfigurasi dari lokal ke Drive
+                for config_file in local_config_path.glob('*.yaml'):
+                    target_file = drive_config_path / config_file.name
+                    if not target_file.exists() or os.path.getmtime(config_file) > os.path.getmtime(target_file):
+                        import shutil
+                        shutil.copy2(config_file, target_file)
+                        synced_files += 1
+                        if self.logger:
+                            self.logger.debug(f"🔄 Sinkronisasi konfigurasi: {config_file.name} (Lokal → Drive)")
+                
+                # Reload konfigurasi setelah sinkronisasi
+                config_manager.reload()
+                
+                if self.logger and synced_files > 0:
+                    self.logger.info(f"✅ Sinkronisasi konfigurasi selesai: {synced_files} file disinkronkan")
+                
+                return True, f"Sinkronisasi konfigurasi berhasil: {synced_files} file disinkronkan"
+            else:
+                if self.logger:
+                    self.logger.debug("ℹ️ Google Drive tidak terhubung, sinkronisasi konfigurasi dilewati")
+                return True, "Google Drive tidak terhubung, sinkronisasi konfigurasi dilewati"
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error saat sinkronisasi konfigurasi: {str(e)}")
+            return False, f"Error saat sinkronisasi konfigurasi: {str(e)}"
+    
+    def save_environment_config(self) -> Tuple[bool, str]:
+        """
+        Simpan konfigurasi environment ke file.
+        
+        Returns:
+            Tuple (sukses, pesan)
+        """
+        try:
+            # Import config manager
+            from smartcash.common.config.manager import get_config_manager
+            config_manager = get_config_manager()
+            
+            # Dapatkan informasi environment
+            env_info = self.get_system_info()
+            
+            # Simpan informasi environment ke konfigurasi
+            config_manager.set('environment', env_info)
+            
+            # Simpan path penting
+            config_manager.set('base_dir', str(self._base_dir))
+            config_manager.set('dataset_path', str(self._base_dir / 'data'))
+            config_manager.set('model_path', str(self._base_dir / 'models'))
+            config_manager.set('config_path', str(self._base_dir / 'configs'))
+            
+            # Simpan status drive
+            if self._drive_mounted:
+                config_manager.set('drive_mounted', True)
+                config_manager.set('drive_path', str(self._drive_path))
+            
+            # Simpan konfigurasi ke file
+            config_manager.save()
+            
+            # Sinkronisasi konfigurasi jika Drive terhubung
+            if self._drive_mounted:
+                self.sync_config()
+            
+            if self.logger:
+                self.logger.info("✅ Konfigurasi environment berhasil disimpan")
+            
+            return True, "Konfigurasi environment berhasil disimpan"
+        except Exception as e:
+            if self.logger:
+                self.logger.error(f"❌ Error saat menyimpan konfigurasi environment: {str(e)}")
+            return False, f"Error saat menyimpan konfigurasi environment: {str(e)}"
+    
     def get_system_info(self) -> Dict[str, Any]:
         """
         Dapatkan informasi sistem komprehensif.

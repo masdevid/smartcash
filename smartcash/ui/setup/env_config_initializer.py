@@ -62,13 +62,36 @@ def initialize_env_config_ui() -> Dict[str, Any]:
             # Periksa environment tanpa log berlebihan
             env_info = env_manager.get_system_info()
             
-            # Sinkronisasi konfigurasi tanpa log
-            if hasattr(env_manager, 'sync_config'):
-                env_manager.sync_config()
+            # Pastikan direktori configs ada
+            configs_dir = Path(env_manager.base_dir) / 'configs'
+            os.makedirs(configs_dir, exist_ok=True)
             
-            # Simpan konfigurasi tanpa log
+            # Sinkronisasi konfigurasi dengan Google Drive jika terhubung
+            if hasattr(env_manager, 'sync_config'):
+                sync_success, sync_message = env_manager.sync_config()
+                if not sync_success:
+                    logger.warning(f"⚠️ {sync_message}")
+            
+            # Simpan konfigurasi environment
             if hasattr(env_manager, 'save_environment_config'):
-                env_manager.save_environment_config()
+                save_success, save_message = env_manager.save_environment_config()
+                if not save_success:
+                    logger.warning(f"⚠️ {save_message}")
+            
+            # Sinkronisasi dengan ConfigManager
+            try:
+                from smartcash.common.config.manager import get_config_manager
+                config_manager = get_config_manager()
+                
+                # Pastikan konfigurasi di-reload untuk mendapatkan perubahan terbaru
+                config_manager.reload()
+                
+                # Simpan konfigurasi untuk memastikan perubahan tersimpan
+                config_manager.save()
+                
+                logger.debug("🔄 Konfigurasi berhasil di-reload dan disimpan")
+            except Exception as config_error:
+                logger.debug(f"ℹ️ Tidak dapat melakukan sinkronisasi ConfigManager: {str(config_error)}")
             
             # Update status panel dengan hasil
             ui_components['status_panel'].value = create_info_box(
@@ -83,9 +106,6 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                 ui_components['drive_button'].description = "Drive Terhubung"
                 ui_components['drive_button'].tooltip = "Google Drive sudah terhubung"
                 ui_components['drive_button'].icon = "check"
-            
-            # Tunggu sebentar sebelum menampilkan pesan sukses
-            time.sleep(1)
             
             # Log ringkasan
             logger.info("✅ Pemeriksaan environment dan sinkronisasi konfigurasi berhasil")

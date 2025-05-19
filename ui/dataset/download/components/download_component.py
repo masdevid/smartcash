@@ -162,9 +162,12 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Atur layout untuk progress container setelah dibuat
-    progress_components['progress_container'].layout.margin = '15px 0'
+    progress_components['progress_container'].layout.margin = '5px 0'
     progress_components['progress_container'].layout.padding = '5px 0'
     progress_components['progress_container'].layout.border_radius = '5px'
+    
+    # Sembunyikan progress container secara default, akan ditampilkan saat proses berjalan
+    progress_components['progress_container'].layout.display = 'none'
     
     # Log accordion dengan shared component dan layout yang konsisten
     # Catatan: Layout akan diatur setelah komponen dibuat
@@ -175,7 +178,7 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     )
     
     # Atur layout untuk log accordion setelah dibuat
-    log_components['log_accordion'].layout.margin = '15px 0'
+    log_components['log_accordion'].layout.margin = '5px 0'
     log_components['log_accordion'].layout.border_radius = '5px'
     
     # Summary stats container dengan styling yang konsisten
@@ -193,10 +196,10 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     # Area untuk konfirmasi dialog dengan layout yang konsisten
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
-            margin='15px 0',
+            margin='5px 0',
             width='100%',
-            min_height='50px',
-            padding='5px 0'
+            min_height='30px',
+            padding='2px 0'
         )
     )
     
@@ -212,7 +215,7 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         progress_components['progress_container'],
         log_components['log_accordion'],
         summary_container
-    ])
+    ], layout=widgets.Layout(width='100%'))
     
     # Komponen UI dengan konsolidasi semua referensi
     ui_components = {

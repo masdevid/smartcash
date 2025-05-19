@@ -85,6 +85,8 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi endpoint
     """
+    logger = ui_components.get('logger')
+    
     # Konfigurasi Roboflow
     config = {
         'type': 'roboflow',
@@ -94,7 +96,20 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         'api_key': ui_components.get('api_key', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
         'format': 'yolov5pytorch',  # Format tetap
         'output_dir': ui_components.get('output_dir', {}).value,
-        'validate': ui_components.get('validate_dataset', {}).value
+        'validate': ui_components.get('validate_dataset', {}).value,
+        'verify_integrity': ui_components.get('validate_dataset', {}).value,  # Tambahkan parameter untuk konsistensi
+        'backup_before_download': False  # Default tidak backup
     }
+    
+    # Validasi output_dir
+    if not config['output_dir']:
+        default_dir = os.path.join('data', 'downloads')
+        config['output_dir'] = default_dir
+        if logger:
+            logger.info(f"📁 Output directory tidak diatur, menggunakan default: {default_dir}")
+    
+    # Pastikan format konsisten
+    if 'format' not in config or not config['format']:
+        config['format'] = 'yolov5pytorch'
     
     return config

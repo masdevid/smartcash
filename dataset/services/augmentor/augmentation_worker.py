@@ -9,10 +9,103 @@ import uuid
 import numpy as np
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Set, Tuple
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 # Import utils untuk denominasi dan label dari modul terkonsolidasi
 from smartcash.dataset.utils.denomination_utils import DENOMINATION_CLASS_MAP, get_denomination_label, extract_info_from_filename
 from smartcash.dataset.utils.label_utils import get_classes_from_label
+
+class AugmentationWorker:
+    """
+    Worker untuk menangani proses augmentasi dataset secara paralel
+    """
+    
+    def __init__(
+        self,
+        pipeline,
+        num_variations: int = 2,
+        output_prefix: str = 'aug',
+        process_bboxes: bool = True,
+        validate_results: bool = True,
+        bbox_augmentor = None,
+        max_workers: int = None
+    ):
+        """
+        Inisialisasi worker augmentasi
+        
+        Args:
+            pipeline: Pipeline augmentasi
+            num_variations: Jumlah variasi yang akan dibuat
+            output_prefix: Prefix untuk file output
+            process_bboxes: Proses bounding box juga
+            validate_results: Validasi hasil augmentasi
+            bbox_augmentor: Augmentor untuk bounding box
+            max_workers: Jumlah worker maksimum (default: None = CPU count)
+        """
+        self.pipeline = pipeline
+        self.num_variations = num_variations
+        self.output_prefix = output_prefix
+        self.process_bboxes = process_bboxes
+        self.validate_results = validate_results
+        self.bbox_augmentor = bbox_augmentor
+        self.max_workers = max_workers
+    
+    def process_batch(
+        self,
+        image_paths: List[str],
+        labels_input_dir: str = None,
+        images_output_dir: str = None,
+        labels_output_dir: str = None,
+        track_multi_class: bool = False
+    ) -> List[Dict[str, Any]]:
+        """
+        Proses batch file gambar secara paralel
+        
+        Args:
+            image_paths: List path file gambar
+            labels_input_dir: Direktori input label
+            images_output_dir: Direktori output gambar
+            labels_output_dir: Direktori output label
+            track_multi_class: Aktifkan tracking untuk multi-class
+            
+        Returns:
+            List hasil augmentasi untuk setiap file
+        """
+        results = []
+        
+        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            # Submit semua task
+            future_to_path = {
+                executor.submit(
+                    process_single_file,
+                    image_path,
+                    self.pipeline,
+                    self.num_variations,
+                    self.output_prefix,
+                    self.process_bboxes,
+                    self.validate_results,
+                    self.bbox_augmentor,
+                    labels_input_dir,
+                    images_output_dir,
+                    labels_output_dir,
+                    track_multi_class=track_multi_class
+                ): image_path for image_path in image_paths
+            }
+            
+            # Proses hasil
+            for future in as_completed(future_to_path):
+                image_path = future_to_path[future]
+                try:
+                    result = future.result()
+                    results.append(result)
+                except Exception as e:
+                    results.append({
+                        "status": "error",
+                        "message": f"Error saat augmentasi {image_path}: {str(e)}",
+                        "generated": 0
+                    })
+        
+        return results
 
 def process_single_file(
     image_path: str,

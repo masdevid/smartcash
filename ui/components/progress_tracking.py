@@ -149,6 +149,18 @@ def update_progress(
         step_message: Pesan untuk step saat ini
         status_type: Tipe status (success, error, info, warning)
     """
+    # Ensure progress is an integer
+    try:
+        progress = int(float(progress))
+    except (ValueError, TypeError):
+        progress = 0
+        
+    # Ensure total is an integer
+    try:
+        total = int(float(total))
+    except (ValueError, TypeError):
+        total = 100
+    
     # Update progress bar
     if 'progress_bar' in ui_components:
         progress_bar = ui_components['progress_bar']

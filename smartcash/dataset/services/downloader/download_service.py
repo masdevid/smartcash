@@ -15,7 +15,6 @@ from smartcash.dataset.services.downloader.notification_utils import notify_serv
 from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
 from smartcash.dataset.services.downloader.download_validator import DownloadValidator
 from smartcash.dataset.services.downloader.file_processor import DownloadFileProcessor
-from smartcash.dataset.services.downloader.backup_service import BackupService
 
 class DownloadService:
     """Layanan utama untuk mengelola download dataset dari berbagai sumber."""
@@ -55,11 +54,20 @@ class DownloadService:
             observer_manager=self.observer_manager
         )
         
-        self.backup_service = BackupService(
-            config=config,
-            logger=logger,
-            observer_manager=self.observer_manager
-        )
+        # Lazy initialization for backup service
+        self._backup_service = None
+    
+    @property
+    def backup_service(self):
+        """Lazy initialization of backup service."""
+        if self._backup_service is None:
+            from smartcash.dataset.services.downloader.backup_service import BackupService
+            self._backup_service = BackupService(
+                config=self.config,
+                logger=self.logger,
+                observer_manager=self.observer_manager
+            )
+        return self._backup_service
     
     def set_observer_manager(self, observer_manager):
         """Set observer manager untuk UI notifications."""
@@ -68,7 +76,10 @@ class DownloadService:
         self.downloader.observer_manager = observer_manager
         self.validator.observer_manager = observer_manager
         self.file_processor.observer_manager = observer_manager
-        self.backup_service.observer_manager = observer_manager
+        
+        # Update backup service if it exists
+        if self._backup_service is not None:
+            self._backup_service.observer_manager = observer_manager
         
         # Notifikasi inisialisasi ke UI
         if self.observer_manager:
@@ -87,6 +98,15 @@ class DownloadService:
                 self.observer_manager,
                 message="Inisialisasi komponen download selesai"
             )
+    
+    def cleanup(self):
+        """Cleanup resources."""
+        if self._backup_service is not None:
+            self._backup_service = None
+        self.observer_manager = None
+        self.downloader.observer_manager = None
+        self.validator.observer_manager = None
+        self.file_processor.observer_manager = None
     
     def download_from_roboflow(self, api_key: Optional[str] = None, workspace: Optional[str] = None, project: Optional[str] = None, version: Optional[str] = None, format: str = "yolov5pytorch", output_dir: Optional[str] = None, show_progress: bool = True, verify_integrity: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
         """Download dataset dari Roboflow dengan penanganan error yang lebih baik."""

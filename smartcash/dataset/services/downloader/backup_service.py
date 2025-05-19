@@ -13,8 +13,6 @@ from datetime import datetime
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
 from smartcash.common.io import ensure_dir
-from smartcash.dataset.services.downloader.notification_utils import notify_service_event
-
 
 class BackupService:
     """Layanan untuk membackup dataset ke file ZIP."""
@@ -29,7 +27,7 @@ class BackupService:
             observer_manager: Observer manager untuk UI notifications
         """
         self.config = config
-        self.logger = logger
+        self.logger = logger or get_logger(__name__)
         self.observer_manager = observer_manager
         self.data_dir = Path(config.get('data', {}).get('download', {}).get('output_dir', 'data'))
         self.backup_dir = Path(config.get('data', {}).get('download', {}).get('backup_dir', 'data/backups'))
@@ -40,12 +38,22 @@ class BackupService:
         
         # Notifikasi inisialisasi ke UI jika observer manager tersedia
         if self.observer_manager:
-            notify_service_event(
+            self._notify_event(
                 "backup_service",
                 "start",
+                message=f"BackupService diinisialisasi, backup dir: {self.backup_dir}"
+            )
+    
+    def _notify_event(self, event_type: str, status: str, **kwargs):
+        """Internal method untuk notifikasi event."""
+        if self.observer_manager:
+            from smartcash.dataset.services.downloader.notification_utils import notify_service_event
+            notify_service_event(
+                event_type,
+                status,
                 self,
                 self.observer_manager,
-                message=f"BackupService diinisialisasi, backup dir: {self.backup_dir}"
+                **kwargs
             )
     
     def backup_dataset(
@@ -98,10 +106,9 @@ class BackupService:
         
         total_size = sum(f.stat().st_size for f in files_to_backup)
         
-        # Notifikasi backup dimulai menggunakan notify_service_event
-        notify_service_event(
+        # Notifikasi backup dimulai
+        self._notify_event(
             "backup", "start",
-            self, None,
             message=f"Membuat backup dataset ke {zip_path.name}",
             source=str(src_path),
             destination=str(zip_path)
@@ -117,11 +124,10 @@ class BackupService:
                         zipf.write(file, arcname)
                         pbar.update(1)
                         
-                        # Notifikasi progress setiap 5% atau 20 file menggunakan notify_service_event
+                        # Notifikasi progress setiap 5% atau 20 file
                         if i % max(1, min(20, total_files // 20)) == 0:
-                            notify_service_event(
+                            self._notify_event(
                                 "backup", "progress",
-                                self, None,
                                 progress=i,
                                 total=total_files,
                                 percentage=int((i / total_files) * 100)
@@ -133,10 +139,9 @@ class BackupService:
             backup_size_mb = backup_size / (1024 * 1024)
             compression_ratio = (1 - (backup_size / total_size)) * 100 if total_size > 0 else 0
             
-            # Notifikasi selesai menggunakan notify_service_event
-            notify_service_event(
+            # Notifikasi selesai
+            self._notify_event(
                 "backup", "complete",
-                self, None,
                 message=f"Backup selesai: {backup_size_mb:.2f} MB (rasio kompresi: {compression_ratio:.1f}%)",
                 size_mb=backup_size_mb,
                 file_count=total_files,
@@ -162,10 +167,9 @@ class BackupService:
             }
             
         except Exception as e:
-            # Notifikasi error menggunakan notify_service_event
-            notify_service_event(
+            # Notifikasi error
+            self._notify_event(
                 "backup", "error",
-                self, None,
                 message=f"Error saat backup dataset: {str(e)}"
             )
                 
@@ -263,3 +267,7 @@ class BackupService:
                     self.logger.warning(f"⚠️ Gagal menghapus backup lama {name}: {str(e)}")
         except Exception as e:
             self.logger.warning(f"⚠️ Error saat pembersihan backup lama: {str(e)}")
+    
+    def cleanup(self):
+        """Cleanup resources."""
+        self.observer_manager = None

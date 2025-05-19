@@ -8,26 +8,26 @@ from unittest.mock import patch, MagicMock, ANY
 import tempfile
 from pathlib import Path
 import ipywidgets as widgets
-
-from smartcash.ui.dataset.download import download_initializer
+import shutil
 
 class TestDownloadInitializer(unittest.TestCase):
     """Test untuk download initializer"""
     
-    def setUp(self):
-        """Setup untuk setiap test case."""
+    @classmethod
+    def setUpClass(cls):
+        """Setup untuk seluruh test class."""
         # Setup temporary directory
-        self.temp_dir = Path("temp_test_download")
-        self.temp_dir.mkdir(exist_ok=True)
+        cls.temp_dir = Path("temp_test_download")
+        cls.temp_dir.mkdir(exist_ok=True)
         
         # Setup test config
-        self.config = {
+        cls.config = {
             'data': {
                 'download': {
                     'source': 'roboflow',
-                    'output_dir': str(self.temp_dir),
+                    'output_dir': str(cls.temp_dir),
                     'backup_before_download': True,
-                    'backup_dir': str(self.temp_dir / 'backups')
+                    'backup_dir': str(cls.temp_dir / 'backups')
                 },
                 'roboflow': {
                     'workspace': 'smartcash-wo2us',
@@ -37,61 +37,88 @@ class TestDownloadInitializer(unittest.TestCase):
                 }
             }
         }
-        # Setup patches
-        self.config_manager_patch = patch('smartcash.ui.dataset.download.download_initializer.get_config_manager')
-        self.environment_manager_patch = patch('smartcash.ui.dataset.download.download_initializer.get_environment_manager')
-        self.create_ui_patch = patch('smartcash.ui.dataset.download.download_initializer.create_download_ui')
-        self.observer_patch = patch('smartcash.ui.dataset.download.download_initializer.get_observer_manager')
-        self.setup_handlers_patch = patch('smartcash.ui.dataset.download.download_initializer.setup_download_handlers')
-        self.load_config_patch = patch('smartcash.ui.dataset.download.download_initializer.load_config')
-        self.update_ui_patch = patch('smartcash.ui.dataset.download.download_initializer.update_ui_from_config')
-        self.notify_patch = patch('smartcash.ui.dataset.download.download_initializer.notify_service_event')
-        # Start patches
-        self.config_manager_mock = self.config_manager_patch.start()
-        self.environment_manager_mock = self.environment_manager_patch.start()
-        self.mock_create_ui = self.create_ui_patch.start()
-        self.mock_observer = self.observer_patch.start()
-        self.mock_setup_handlers = self.setup_handlers_patch.start()
-        self.mock_load_config = self.load_config_patch.start()
-        self.mock_update_ui = self.update_ui_patch.start()
-        self.mock_notify = self.notify_patch.start()
-        # Setup mock returns
-        self.config_manager_mock.return_value.get_module_config.return_value = self.config
-        self.environment_manager_mock.return_value.base_dir = str(self.temp_dir)
-        self.mock_ui_components = { 'logger': MagicMock(), 'output_dir': MagicMock(value=str(self.temp_dir)), 'ui': widgets.VBox([]), 'log_output': MagicMock(), 'progress_container': MagicMock(), 'status_panel': MagicMock() }
-        self.mock_create_ui.return_value = self.mock_ui_components
-        self.mock_observer_manager = MagicMock()
-        self.mock_observer.return_value = self.mock_observer_manager
-        self.mock_setup_handlers.return_value = self.mock_ui_components
-        self.mock_load_config.return_value = self.config
+    
+    @classmethod
+    def tearDownClass(cls):
+        """Cleanup setelah seluruh test selesai."""
+        if cls.temp_dir.exists():
+            shutil.rmtree(cls.temp_dir)
+    
+    def setUp(self):
+        """Setup untuk setiap test case."""
+        # Create mock UI components first
+        self.mock_ui_components = {
+            'logger': MagicMock(),
+            'output_dir': MagicMock(value=str(self.temp_dir)),
+            'ui': widgets.VBox([]),
+            'log_output': MagicMock(),
+            'progress_container': MagicMock(),
+            'status_panel': MagicMock()
+        }
+
+        # Setup patches with proper order to avoid recursion
+        self.patches = []
+        
         # Import after patches
         from smartcash.ui.dataset.download import download_initializer
         self.download_initializer = download_initializer
+
     def tearDown(self):
-        self.config_manager_patch.stop()
-        self.environment_manager_patch.stop()
-        self.create_ui_patch.stop()
-        self.observer_patch.stop()
-        self.setup_handlers_patch.stop()
-        self.load_config_patch.stop()
-        self.update_ui_patch.stop()
-        self.notify_patch.stop()
+        """Cleanup after each test."""
+        # Stop all patches
+        for p in self.patches:
+            p.stop()
+        
+        # Clear mock UI components
+        self.mock_ui_components.clear()
+
+    def _setup_patches(self):
+        """Setup patches untuk test."""
+        patches = [
+            patch('smartcash.ui.dataset.download.download_initializer.get_config_manager'),
+            patch('smartcash.ui.dataset.download.download_initializer.get_environment_manager'),
+            patch('smartcash.ui.dataset.download.download_initializer.create_download_ui'),
+            patch('smartcash.ui.dataset.download.download_initializer.get_observer_manager'),
+            patch('smartcash.ui.dataset.download.download_initializer.setup_download_handlers'),
+            patch('smartcash.ui.dataset.download.download_initializer.load_config'),
+            patch('smartcash.ui.dataset.download.download_initializer.update_ui_from_config'),
+            patch('smartcash.ui.dataset.download.download_initializer.notify_service_event'),
+            patch('smartcash.dataset.services.downloader.download_service.DownloadService'),
+            patch('smartcash.dataset.services.downloader.backup_service.BackupService'),
+            patch('smartcash.common.logger.get_logger')
+        ]
+
+        # Start all patches
+        self.patches = [p.start() for p in patches]
+        
+        # Setup mock returns
+        self.patches[0].return_value.get_module_config.return_value = self.config
+        self.patches[1].return_value.base_dir = str(self.temp_dir)
+        self.patches[2].return_value = self.mock_ui_components
+        self.mock_observer_manager = MagicMock()
+        self.patches[3].return_value = self.mock_observer_manager
+        self.patches[4].return_value = self.mock_ui_components
+        self.patches[5].return_value = self.config
+        self.patches[8].return_value = MagicMock()  # DownloadService mock
+        self.patches[9].return_value = MagicMock()  # BackupService mock
+        self.patches[10].return_value = MagicMock()  # Logger mock
 
     def test_initialize_dataset_download_ui(self):
         """Test inisialisasi UI download dataset"""
+        self._setup_patches()
         ui_components = self.download_initializer.initialize_dataset_download_ui()
         
         # Verify observer setup
-        self.mock_observer.assert_called_once()
+        self.patches[3].assert_called_once()
         
         # Verify UI creation and setup
-        self.mock_create_ui.assert_called_once()
-        self.mock_setup_handlers.assert_called_once_with(self.mock_ui_components, config=None)
-        self.mock_load_config.assert_called_once()
-        self.mock_update_ui.assert_called_once()
+        self.patches[2].assert_called_once()
+        self.patches[4].assert_called_once_with(self.mock_ui_components, config=None)
+        self.patches[5].assert_called_once()
+        self.patches[6].assert_called_once()
         
         # Verify notification setup
-        self.mock_notify.assert_any_call(
+        self.patches[7].assert_any_call(
             "download",
             "start",
             ANY,
@@ -109,18 +136,19 @@ class TestDownloadInitializer(unittest.TestCase):
 
     def test_error_handling(self):
         """Test error handling saat inisialisasi"""
+        self._setup_patches()
         # Simulate error in create_download_ui
-        self.mock_create_ui.side_effect = Exception("Test error")
+        self.patches[2].side_effect = Exception("Test error")
         
         # Verify that error is logged and re-raised
         with self.assertRaises(Exception):
             self.download_initializer.initialize_dataset_download_ui()
         
-        # Verify logger was called (fallback logger)
+        # Verify logger was called
         self.mock_ui_components['logger'].error.assert_called()
         
         # Verify error notification
-        self.mock_notify.assert_any_call(
+        self.patches[7].assert_any_call(
             "download",
             "error",
             ANY,
@@ -131,12 +159,13 @@ class TestDownloadInitializer(unittest.TestCase):
 
     def test_cleanup_function(self):
         """Test cleanup function"""
+        self._setup_patches()
         ui_components = self.download_initializer.initialize_dataset_download_ui()
         
         # Call cleanup function
         ui_components['cleanup']()
         
-        # Verify observer cleanup (unregister_all)
+        # Verify observer cleanup
         self.mock_observer_manager.unregister_all.assert_called_once()
         
         # Verify UI reset
@@ -145,7 +174,7 @@ class TestDownloadInitializer(unittest.TestCase):
         ui_components['log_output'].clear_output.assert_called_once()
         
         # Verify cleanup notification
-        self.mock_notify.assert_any_call(
+        self.patches[7].assert_any_call(
             "download",
             "progress",
             ANY,
@@ -153,7 +182,7 @@ class TestDownloadInitializer(unittest.TestCase):
             message="Membersihkan resources...",
             step="cleanup"
         )
-        self.mock_notify.assert_any_call(
+        self.patches[7].assert_any_call(
             "download",
             "complete",
             ANY,

@@ -72,11 +72,11 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     if Singleton.is_colab_environment():
         # Gunakan path Colab
         base_dir = Path(COLAB_PATH) / APP_NAME
-        config_file = Path(DEFAULT_CONFIG_DIR) / 'base_config.yaml'
+        config_file = 'base_config.yaml'  # File akan dicari di DEFAULT_CONFIG_DIR
     else:
         # Gunakan path lokal
         base_dir = Path.home() / APP_NAME
-        config_file = Path(DEFAULT_CONFIG_DIR) / 'base_config.yaml'
+        config_file = 'base_config.yaml'  # File akan dicari di DEFAULT_CONFIG_DIR
     
     # Pastikan direktori ada
     base_dir.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
     
     config_manager = get_config_manager(
         base_dir=str(base_dir),
-        config_file=str(config_file)
+        config_file=config_file
     )
     
     # Buat komponen UI

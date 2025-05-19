@@ -4,6 +4,7 @@ Deskripsi: Pengelolaan konfigurasi untuk Google Colab dengan integrasi Google Dr
 """
 
 import os
+import shutil
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List
 
@@ -29,26 +30,94 @@ class ColabConfigManager(DriveConfigManager):
         Setup environment Colab dan mount Google Drive
         """
         try:
-            from google.colab import drive
-            drive.mount('/content/drive')
+            # Cek apakah Google Drive sudah terhubung
+            drive_connected = False
+            try:
+                from google.colab import drive
+                drive.mount('/content/drive')
+                drive_connected = True
+                if self._logger:
+                    self._logger.info("Google Drive berhasil di-mount")
+            except ImportError:
+                if self._logger:
+                    self._logger.warning("Google Drive tidak tersedia, menggunakan konfigurasi lokal")
+            except Exception as e:
+                if self._logger:
+                    self._logger.warning(f"Gagal mount Google Drive: {str(e)}")
             
-            # Set base config path di Google Drive
-            self._drive_base_path = Path(DRIVE_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
-            self._drive_base_path.mkdir(parents=True, exist_ok=True)
+            # Set base config path di Google Drive jika terhubung
+            if drive_connected:
+                self._drive_base_path = Path(DRIVE_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
+                self._drive_base_path.mkdir(parents=True, exist_ok=True)
             
             # Set local config path
             self._local_base_path = Path(COLAB_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
             self._local_base_path.mkdir(parents=True, exist_ok=True)
             
-            if self._logger:
-                self._logger.info("Google Drive mounted dan environment Colab disiapkan")
-        except ImportError:
-            if self._logger:
-                self._logger.error("Tidak dapat mengimpor google.colab")
-            raise
+            # Inisialisasi konfigurasi pertama kali
+            self._initialize_first_time_config(drive_connected)
+            
         except Exception as e:
             if self._logger:
                 self._logger.error(f"Error saat setup Colab environment: {str(e)}")
+            raise
+    
+    def _initialize_first_time_config(self, drive_connected: bool) -> None:
+        """
+        Inisialisasi konfigurasi untuk pertama kali
+        
+        Args:
+            drive_connected: Apakah Google Drive terhubung
+        """
+        # Path sumber konfigurasi default
+        default_config_path = Path('/content/smartcash/configs')
+        
+        # Jika Google Drive terhubung, cek konfigurasi di Drive
+        if drive_connected:
+            drive_config_path = Path(DRIVE_PATH) / APP_NAME / DEFAULT_CONFIG_DIR
+            if drive_config_path.exists():
+                # Copy dari Drive ke local jika ada
+                self._copy_config_files(drive_config_path, self._local_base_path)
+                if self._logger:
+                    self._logger.info("Konfigurasi diinisialisasi dari Google Drive")
+                return
+        
+        # Jika tidak ada di Drive atau Drive tidak terhubung, cek konfigurasi default
+        if default_config_path.exists():
+            # Copy dari default ke local
+            self._copy_config_files(default_config_path, self._local_base_path)
+            if self._logger:
+                self._logger.info("Konfigurasi diinisialisasi dari default config")
+            
+            # Jika Drive terhubung, copy ke Drive juga
+            if drive_connected:
+                self._copy_config_files(default_config_path, self._drive_base_path)
+                if self._logger:
+                    self._logger.info("Konfigurasi default disalin ke Google Drive")
+    
+    def _copy_config_files(self, src_path: Path, dst_path: Path) -> None:
+        """
+        Copy file konfigurasi dari satu lokasi ke lokasi lain
+        
+        Args:
+            src_path: Path sumber
+            dst_path: Path tujuan
+        """
+        try:
+            # Pastikan direktori tujuan ada
+            dst_path.mkdir(parents=True, exist_ok=True)
+            
+            # Copy semua file .yaml dan .yml
+            for ext in ['.yaml', '.yml']:
+                for src_file in src_path.glob(f'*{ext}'):
+                    if src_file.is_file() and not src_file.name.startswith('.'):
+                        dst_file = dst_path / src_file.name
+                        shutil.copy2(src_file, dst_file)
+                        if self._logger:
+                            self._logger.debug(f"File {src_file.name} disalin ke {dst_path}")
+        except Exception as e:
+            if self._logger:
+                self._logger.error(f"Error saat menyalin file konfigurasi: {str(e)}")
             raise
     
     def _get_config_files(self) -> List[str]:

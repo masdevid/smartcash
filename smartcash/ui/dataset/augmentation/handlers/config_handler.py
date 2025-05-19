@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/config_handler.py
-Deskripsi: Handler konfigurasi untuk augmentasi dataset
+Deskripsi: Handler untuk konfigurasi augmentation dataset
 """
 
 import os
@@ -10,91 +10,60 @@ from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-def get_default_augmentation_config() -> Dict[str, Any]:
+def get_augmentation_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dapatkan konfigurasi default untuk augmentasi dataset.
-    
-    Returns:
-        Dictionary konfigurasi default
-    """
-    return {
-        'augmentation': {
-            # Parameter dasar
-            'enabled': True,
-            'num_variations': 2,
-            'output_prefix': 'aug',
-            'process_bboxes': True,
-            'output_dir': 'data/augmented',
-            'validate_results': True,
-            'resume': False,
-            'num_workers': 4,
-            'balance_classes': True,
-            'target_count': 1000,
-            'move_to_preprocessed': True,
-            'target_split': 'train',
-            
-            # Jenis augmentasi yang didukung
-            'types': ['combined'],
-            'available_types': [
-                'combined', 'flip', 'rotate', 'position', 'lighting', 
-                'blur', 'noise', 'contrast', 'brightness', 'saturation', 
-                'hue', 'cutout', 'extreme_rotation'
-            ],
-            'available_splits': ['train', 'valid', 'test'],
-            
-            # Parameter augmentasi posisi
-            'position': {
-                'fliplr': 0.5,
-                'degrees': 15,
-                'translate': 0.15,
-                'scale': 0.15,
-                'shear_max': 10
-            },
-            
-            # Parameter augmentasi pencahayaan
-            'lighting': {
-                'hsv_h': 0.025,
-                'hsv_s': 0.7,
-                'hsv_v': 0.4,
-                'contrast': [0.7, 1.3],
-                'brightness': [0.7, 1.3],
-                'blur': 0.2,
-                'noise': 0.1
-            }
-        }
-    }
-
-def get_augmentation_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Dapatkan konfigurasi augmentasi dari config manager.
+    Get konfigurasi augmentation dataset.
     
     Args:
-        ui_components: Dictionary komponen UI (opsional)
-    
+        ui_components: Dictionary komponen UI
+        
     Returns:
-        Dictionary konfigurasi augmentasi
+        Dictionary konfigurasi augmentation dataset
     """
     try:
         # Get config manager
         config_manager = get_config_manager()
         
         # Get config
-        config = config_manager.get_module_config('augmentation')
+        config = config_manager.get_module_config('dataset')
         
-        if config:
-            return config
+        # Ensure config structure
+        if not config:
+            config = get_default_augmentation_config()
+        elif 'augmentation' not in config:
+            config['augmentation'] = get_default_augmentation_config()['augmentation']
             
-        # Jika tidak ada config, gunakan default
-        logger.warning("⚠️ Konfigurasi augmentasi tidak ditemukan, menggunakan default")
-        return get_default_augmentation_config()
+        return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat mengambil konfigurasi augmentasi: {str(e)}")
-    return get_default_augmentation_config()
+        logger.error(f"❌ Error saat get augmentation config: {str(e)}")
+        return get_default_augmentation_config()
+
+def get_default_augmentation_config() -> Dict[str, Any]:
+    """
+    Get konfigurasi default augmentation dataset.
+    
+    Returns:
+        Dictionary konfigurasi default augmentation dataset
+    """
+    return {
+        'augmentation': {
+            'enabled': True,
+            'num_variations': 2,
+            'output_prefix': 'aug_',
+            'process_bboxes': True,
+            'output_dir': 'augmented',
+            'validate_results': True,
+            'resume': False,
+            'num_workers': 4,
+            'balance_classes': False,
+            'target_count': 1000
+        }
+    }
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update konfigurasi augmentasi dari UI components.
+    Update konfigurasi dari UI.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -103,202 +72,130 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
         # Get current config
-        config = config_manager.get_module_config('augmentation') or get_default_augmentation_config()
+        config = get_augmentation_config(ui_components)
         
-        # Update config from UI
-        if 'enabled_checkbox' in ui_components:
-            config['augmentation']['enabled'] = ui_components['enabled_checkbox'].value
-            
-        if 'num_variations_slider' in ui_components:
-            config['augmentation']['num_variations'] = ui_components['num_variations_slider'].value
-            
-        if 'output_prefix' in ui_components:
-            config['augmentation']['output_prefix'] = ui_components['output_prefix'].value
-            
-        if 'process_bboxes_checkbox' in ui_components:
-            config['augmentation']['process_bboxes'] = ui_components['process_bboxes_checkbox'].value
-            
-        if 'output_dir' in ui_components:
-            config['augmentation']['output_dir'] = ui_components['output_dir'].value
-            
-        if 'validate_checkbox' in ui_components:
-            config['augmentation']['validate_results'] = ui_components['validate_checkbox'].value
-            
-        if 'resume_checkbox' in ui_components:
-            config['augmentation']['resume'] = ui_components['resume_checkbox'].value
-            
-        if 'num_workers_slider' in ui_components:
-            config['augmentation']['num_workers'] = ui_components['num_workers_slider'].value
-            
-        if 'balance_classes_checkbox' in ui_components:
-            config['augmentation']['balance_classes'] = ui_components['balance_classes_checkbox'].value
-            
-        if 'target_count_slider' in ui_components:
-            config['augmentation']['target_count'] = ui_components['target_count_slider'].value
-            
-        if 'move_to_preprocessed_checkbox' in ui_components:
-            config['augmentation']['move_to_preprocessed'] = ui_components['move_to_preprocessed_checkbox'].value
-            
-        if 'target_split_dropdown' in ui_components:
-            config['augmentation']['target_split'] = ui_components['target_split_dropdown'].value
-            
-        if 'types_multiselect' in ui_components:
-            config['augmentation']['types'] = ui_components['types_multiselect'].value
-            
-        # Update position parameters
-        if 'fliplr_slider' in ui_components:
-            config['augmentation']['position']['fliplr'] = ui_components['fliplr_slider'].value
-            
-        if 'degrees_slider' in ui_components:
-            config['augmentation']['position']['degrees'] = ui_components['degrees_slider'].value
-            
-        if 'translate_slider' in ui_components:
-            config['augmentation']['position']['translate'] = ui_components['translate_slider'].value
-            
-        if 'scale_slider' in ui_components:
-            config['augmentation']['position']['scale'] = ui_components['scale_slider'].value
-            
-        if 'shear_max_slider' in ui_components:
-            config['augmentation']['position']['shear_max'] = ui_components['shear_max_slider'].value
-            
-        # Update lighting parameters
-        if 'hsv_h_slider' in ui_components:
-            config['augmentation']['lighting']['hsv_h'] = ui_components['hsv_h_slider'].value
-            
-        if 'hsv_s_slider' in ui_components:
-            config['augmentation']['lighting']['hsv_s'] = ui_components['hsv_s_slider'].value
-            
-        if 'hsv_v_slider' in ui_components:
-            config['augmentation']['lighting']['hsv_v'] = ui_components['hsv_v_slider'].value
-            
-        if 'contrast_slider' in ui_components:
-            config['augmentation']['lighting']['contrast'] = [
-                ui_components['contrast_slider'].value[0],
-                ui_components['contrast_slider'].value[1]
-            ]
-            
-        if 'brightness_slider' in ui_components:
-            config['augmentation']['lighting']['brightness'] = [
-                ui_components['brightness_slider'].value[0],
-                ui_components['brightness_slider'].value[1]
-            ]
-            
-        if 'blur_slider' in ui_components:
-            config['augmentation']['lighting']['blur'] = ui_components['blur_slider'].value
-            
-        if 'noise_slider' in ui_components:
-            config['augmentation']['lighting']['noise'] = ui_components['noise_slider'].value
+        # Update augmentation options
+        if 'augmentation_options' in ui_components:
+            aug_options = ui_components['augmentation_options']
+            if hasattr(aug_options, 'children') and len(aug_options.children) >= 4:
+                # Update enabled checkbox
+                config['augmentation']['enabled'] = aug_options.children[0].value
+                
+                # Update num variations slider
+                config['augmentation']['num_variations'] = aug_options.children[1].value
+                
+                # Update output prefix
+                config['augmentation']['output_prefix'] = aug_options.children[2].value
+                
+                # Update process bboxes checkbox
+                config['augmentation']['process_bboxes'] = aug_options.children[3].value
+        
+        # Update output options
+        if 'output_options' in ui_components:
+            output_options = ui_components['output_options']
+            if hasattr(output_options, 'children') and len(output_options.children) >= 4:
+                # Update output dir
+                config['augmentation']['output_dir'] = output_options.children[0].value
+                
+                # Update validate checkbox
+                config['augmentation']['validate_results'] = output_options.children[1].value
+                
+                # Update resume checkbox
+                config['augmentation']['resume'] = output_options.children[2].value
+                
+                # Update num workers slider
+                config['augmentation']['num_workers'] = output_options.children[3].value
+        
+        # Update balance options
+        if 'balance_options' in ui_components:
+            balance_options = ui_components['balance_options']
+            if hasattr(balance_options, 'children') and len(balance_options.children) >= 2:
+                # Update balance classes checkbox
+                config['augmentation']['balance_classes'] = balance_options.children[0].value
+                
+                # Update target count slider
+                config['augmentation']['target_count'] = balance_options.children[1].value
             
         # Save config
-        config_manager.save_module_config('augmentation', config)
+        config_manager = get_config_manager()
+        config_manager.set_module_config('dataset', config)
         
-        logger.info("✅ Konfigurasi augmentasi berhasil diupdate")
+        logger.info("✅ Konfigurasi augmentation berhasil diupdate dari UI")
         
         return config
-    
+        
     except Exception as e:
-        logger.error(f"❌ Error saat update konfigurasi augmentasi: {str(e)}")
-        return get_default_augmentation_config()
+        logger.error(f"❌ Error saat update config dari UI: {str(e)}")
+        return get_augmentation_config(ui_components)
 
-def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update UI dari konfigurasi augmentasi.
+    Update UI dari konfigurasi.
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi yang akan digunakan (opsional)
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
     """
     try:
-        # Get config if not provided
-        if config is None:
-            config = get_augmentation_config(ui_components)
+        # Ensure config structure
+        if not config:
+            config = get_default_augmentation_config()
+        elif 'augmentation' not in config:
+            config['augmentation'] = get_default_augmentation_config()['augmentation']
             
         # Update UI components
-        if 'enabled_checkbox' in ui_components:
-            ui_components['enabled_checkbox'].value = config['augmentation']['enabled']
+        if 'augmentation_options' in ui_components:
+            aug_options = ui_components['augmentation_options']
+            if hasattr(aug_options, 'children') and len(aug_options.children) >= 4:
+                # Update enabled checkbox
+                aug_options.children[0].value = config['augmentation']['enabled']
+                
+                # Update num variations slider
+                aug_options.children[1].value = config['augmentation']['num_variations']
+                
+                # Update output prefix
+                aug_options.children[2].value = config['augmentation']['output_prefix']
+                
+                # Update process bboxes checkbox
+                aug_options.children[3].value = config['augmentation']['process_bboxes']
+        
+        # Update output options
+        if 'output_options' in ui_components:
+            output_options = ui_components['output_options']
+            if hasattr(output_options, 'children') and len(output_options.children) >= 4:
+                # Update output dir
+                output_options.children[0].value = config['augmentation']['output_dir']
+                
+                # Update validate checkbox
+                output_options.children[1].value = config['augmentation']['validate_results']
+                
+                # Update resume checkbox
+                output_options.children[2].value = config['augmentation']['resume']
+                
+                # Update num workers slider
+                output_options.children[3].value = config['augmentation']['num_workers']
+        
+        # Update balance options
+        if 'balance_options' in ui_components:
+            balance_options = ui_components['balance_options']
+            if hasattr(balance_options, 'children') and len(balance_options.children) >= 2:
+                # Update balance classes checkbox
+                balance_options.children[0].value = config['augmentation']['balance_classes']
+                
+                # Update target count slider
+                balance_options.children[1].value = config['augmentation']['target_count']
             
-        if 'num_variations_slider' in ui_components:
-            ui_components['num_variations_slider'].value = config['augmentation']['num_variations']
-            
-        if 'output_prefix' in ui_components:
-            ui_components['output_prefix'].value = config['augmentation']['output_prefix']
-            
-        if 'process_bboxes_checkbox' in ui_components:
-            ui_components['process_bboxes_checkbox'].value = config['augmentation']['process_bboxes']
-            
-        if 'output_dir' in ui_components:
-            ui_components['output_dir'].value = config['augmentation']['output_dir']
-            
-        if 'validate_checkbox' in ui_components:
-            ui_components['validate_checkbox'].value = config['augmentation']['validate_results']
-            
-        if 'resume_checkbox' in ui_components:
-            ui_components['resume_checkbox'].value = config['augmentation']['resume']
-            
-        if 'num_workers_slider' in ui_components:
-            ui_components['num_workers_slider'].value = config['augmentation']['num_workers']
-            
-        if 'balance_classes_checkbox' in ui_components:
-            ui_components['balance_classes_checkbox'].value = config['augmentation']['balance_classes']
-            
-        if 'target_count_slider' in ui_components:
-            ui_components['target_count_slider'].value = config['augmentation']['target_count']
-            
-        if 'move_to_preprocessed_checkbox' in ui_components:
-            ui_components['move_to_preprocessed_checkbox'].value = config['augmentation']['move_to_preprocessed']
-            
-        if 'target_split_dropdown' in ui_components:
-            ui_components['target_split_dropdown'].value = config['augmentation']['target_split']
-            
-        if 'types_multiselect' in ui_components:
-            ui_components['types_multiselect'].value = config['augmentation']['types']
-            
-        # Update position parameters
-        if 'fliplr_slider' in ui_components:
-            ui_components['fliplr_slider'].value = config['augmentation']['position']['fliplr']
-            
-        if 'degrees_slider' in ui_components:
-            ui_components['degrees_slider'].value = config['augmentation']['position']['degrees']
-            
-        if 'translate_slider' in ui_components:
-            ui_components['translate_slider'].value = config['augmentation']['position']['translate']
-            
-        if 'scale_slider' in ui_components:
-            ui_components['scale_slider'].value = config['augmentation']['position']['scale']
-            
-        if 'shear_max_slider' in ui_components:
-            ui_components['shear_max_slider'].value = config['augmentation']['position']['shear_max']
-            
-        # Update lighting parameters
-        if 'hsv_h_slider' in ui_components:
-            ui_components['hsv_h_slider'].value = config['augmentation']['lighting']['hsv_h']
-            
-        if 'hsv_s_slider' in ui_components:
-            ui_components['hsv_s_slider'].value = config['augmentation']['lighting']['hsv_s']
-            
-        if 'hsv_v_slider' in ui_components:
-            ui_components['hsv_v_slider'].value = config['augmentation']['lighting']['hsv_v']
-            
-        if 'contrast_slider' in ui_components:
-            ui_components['contrast_slider'].value = config['augmentation']['lighting']['contrast']
-            
-        if 'brightness_slider' in ui_components:
-            ui_components['brightness_slider'].value = config['augmentation']['lighting']['brightness']
-            
-        if 'blur_slider' in ui_components:
-            ui_components['blur_slider'].value = config['augmentation']['lighting']['blur']
-            
-        if 'noise_slider' in ui_components:
-            ui_components['noise_slider'].value = config['augmentation']['lighting']['noise']
-            
-        logger.info("✅ UI berhasil diupdate dari konfigurasi augmentasi")
+        logger.info("✅ UI augmentation berhasil diupdate dari konfigurasi")
+        
+        return ui_components
         
     except Exception as e:
-        logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        logger.error(f"❌ Error saat update UI dari config: {str(e)}")
+        return ui_components
 
 def save_augmentation_config(config: Dict[str, Any]) -> bool:
     """

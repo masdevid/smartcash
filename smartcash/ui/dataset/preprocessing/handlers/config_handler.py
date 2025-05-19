@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/config_handler.py
-Deskripsi: Handler konfigurasi untuk preprocessing dataset
+Deskripsi: Handler untuk konfigurasi preprocessing dataset
 """
 
 from typing import Dict, Any, Optional
@@ -16,67 +16,64 @@ from smartcash.ui.utils.constants import ICONS
 
 logger = get_logger(__name__)
 
-def get_default_preprocessing_config() -> Dict[str, Any]:
+def get_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dapatkan konfigurasi default untuk preprocessing dataset.
-    
-    Returns:
-        Dictionary konfigurasi default
-    """
-    return {
-        "preprocessing": {
-            "enabled": True,
-            "output_dir": DEFAULT_PREPROCESSED_DIR,
-            "img_size": DEFAULT_IMG_SIZE,
-            "normalization": {
-                "enabled": True,
-                "preserve_aspect_ratio": True
-            },
-            "validate": {
-                "enabled": True,
-                "fix_issues": True,
-                "move_invalid": True,
-                "invalid_dir": DEFAULT_INVALID_DIR
-            },
-            "splits": DEFAULT_SPLITS,
-            "num_workers": 4
-        },
-        "data": {
-            "dir": "data"
-        }
-    }
-
-def get_preprocessing_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Dapatkan konfigurasi preprocessing dari config manager.
+    Get konfigurasi preprocessing dataset.
     
     Args:
-        ui_components: Dictionary komponen UI (opsional)
+        ui_components: Dictionary komponen UI
         
     Returns:
-        Dictionary konfigurasi preprocessing
+        Dictionary konfigurasi preprocessing dataset
     """
     try:
         # Get config manager
         config_manager = get_config_manager()
         
         # Get config
-        config = config_manager.get_module_config('preprocessing')
+        config = config_manager.get_module_config('dataset')
         
-        if config:
-            return config
+        # Ensure config structure
+        if not config:
+            config = get_default_preprocessing_config()
+        elif 'preprocessing' not in config:
+            config['preprocessing'] = get_default_preprocessing_config()['preprocessing']
             
-        # Jika tidak ada config, gunakan default
-        logger.warning("⚠️ Konfigurasi preprocessing tidak ditemukan, menggunakan default")
-        return get_default_preprocessing_config()
+        return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat mengambil konfigurasi preprocessing: {str(e)}")
+        logger.error(f"❌ Error saat get preprocessing config: {str(e)}")
         return get_default_preprocessing_config()
+
+def get_default_preprocessing_config() -> Dict[str, Any]:
+    """
+    Get konfigurasi default preprocessing dataset.
+    
+    Returns:
+        Dictionary konfigurasi default preprocessing dataset
+    """
+    return {
+        'preprocessing': {
+            'img_size': 640,
+            'normalization': {
+                'enabled': True,
+                'preserve_aspect_ratio': True
+            },
+            'enabled': True,
+            'num_workers': 4,
+            'validate': {
+                'enabled': True,
+                'fix_issues': True,
+                'move_invalid': True,
+                'invalid_dir': 'invalid'
+            },
+            'splits': ['train', 'valid', 'test']
+        }
+    }
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update konfigurasi preprocessing dari UI components.
+    Update konfigurasi dari UI.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -85,99 +82,118 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
-        
         # Get current config
-        config = config_manager.get_module_config('preprocessing') or get_default_preprocessing_config()
+        config = get_preprocessing_config(ui_components)
         
-        # Update config from UI
-        if 'enabled_checkbox' in ui_components:
-            config['preprocessing']['enabled'] = ui_components['enabled_checkbox'].value
-            
-        if 'output_dir' in ui_components:
-            config['preprocessing']['output_dir'] = ui_components['output_dir'].value
-            
-        if 'img_size_slider' in ui_components:
-            config['preprocessing']['img_size'] = ui_components['img_size_slider'].value
-            
-        if 'normalize_checkbox' in ui_components:
-            config['preprocessing']['normalization']['enabled'] = ui_components['normalize_checkbox'].value
-            
-        if 'preserve_aspect_ratio_checkbox' in ui_components:
-            config['preprocessing']['normalization']['preserve_aspect_ratio'] = ui_components['preserve_aspect_ratio_checkbox'].value
-            
-        if 'validate_checkbox' in ui_components:
-            config['preprocessing']['validate']['enabled'] = ui_components['validate_checkbox'].value
-            
-        if 'fix_issues_checkbox' in ui_components:
-            config['preprocessing']['validate']['fix_issues'] = ui_components['fix_issues_checkbox'].value
-            
-        if 'move_invalid_checkbox' in ui_components:
-            config['preprocessing']['validate']['move_invalid'] = ui_components['move_invalid_checkbox'].value
-            
-        if 'invalid_dir' in ui_components:
-            config['preprocessing']['validate']['invalid_dir'] = ui_components['invalid_dir'].value
-            
-        if 'num_workers_slider' in ui_components:
-            config['preprocessing']['num_workers'] = ui_components['num_workers_slider'].value
+        # Update preprocessing config
+        if 'preprocess_options' in ui_components:
+            preproc_options = ui_components['preprocess_options']
+            if hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
+                # Update image size
+                config['preprocessing']['img_size'] = preproc_options.children[0].value
+                
+                # Update normalization options
+                config['preprocessing']['normalization']['enabled'] = preproc_options.children[1].value
+                config['preprocessing']['normalization']['preserve_aspect_ratio'] = preproc_options.children[2].value
+                
+                # Update cache dan workers
+                config['preprocessing']['enabled'] = preproc_options.children[3].value
+                config['preprocessing']['num_workers'] = preproc_options.children[4].value
+        
+        # Update validation options
+        if 'validation_options' in ui_components:
+            validation_options = ui_components['validation_options']
+            if hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
+                config['preprocessing']['validate']['enabled'] = validation_options.children[0].value
+                config['preprocessing']['validate']['fix_issues'] = validation_options.children[1].value
+                config['preprocessing']['validate']['move_invalid'] = validation_options.children[2].value
+                config['preprocessing']['validate']['invalid_dir'] = validation_options.children[3].value
+        
+        # Update split selector
+        if 'split_selector' in ui_components:
+            split_selector = ui_components['split_selector']
+            if hasattr(split_selector, 'value'):
+                split_map = {
+                    'All Splits': ['train', 'valid', 'test'],
+                    'Train Only': ['train'],
+                    'Validation Only': ['valid'],
+                    'Test Only': ['test']
+                }
+                config['preprocessing']['splits'] = split_map.get(split_selector.value, ['train', 'valid', 'test'])
             
         # Save config
-        config_manager.save_module_config('preprocessing', config)
+        config_manager = get_config_manager()
+        config_manager.set_module_config('dataset', config)
         
-        logger.info("✅ Konfigurasi preprocessing berhasil diupdate")
+        logger.info("✅ Konfigurasi preprocessing berhasil diupdate dari UI")
         
         return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat update konfigurasi preprocessing: {str(e)}")
-        return get_default_preprocessing_config()
+        logger.error(f"❌ Error saat update config dari UI: {str(e)}")
+        return get_preprocessing_config(ui_components)
 
-def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update UI dari konfigurasi preprocessing.
+    Update UI dari konfigurasi.
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi yang akan digunakan (opsional)
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
     """
     try:
-        # Get config if not provided
-        if config is None:
-            config = get_preprocessing_config(ui_components)
+        # Ensure config structure
+        if not config:
+            config = get_default_preprocessing_config()
+        elif 'preprocessing' not in config:
+            config['preprocessing'] = get_default_preprocessing_config()['preprocessing']
             
         # Update UI components
-        if 'enabled_checkbox' in ui_components:
-            ui_components['enabled_checkbox'].value = config['preprocessing']['enabled']
+        if 'preprocess_options' in ui_components:
+            preproc_options = ui_components['preprocess_options']
+            if hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
+                # Update image size
+                preproc_options.children[0].value = config['preprocessing']['img_size']
+                
+                # Update normalization options
+                preproc_options.children[1].value = config['preprocessing']['normalization']['enabled']
+                preproc_options.children[2].value = config['preprocessing']['normalization']['preserve_aspect_ratio']
+                
+                # Update cache dan workers
+                preproc_options.children[3].value = config['preprocessing']['enabled']
+                preproc_options.children[4].value = config['preprocessing']['num_workers']
+        
+        # Update validation options
+        if 'validation_options' in ui_components:
+            validation_options = ui_components['validation_options']
+            if hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
+                validation_options.children[0].value = config['preprocessing']['validate']['enabled']
+                validation_options.children[1].value = config['preprocessing']['validate']['fix_issues']
+                validation_options.children[2].value = config['preprocessing']['validate']['move_invalid']
+                validation_options.children[3].value = config['preprocessing']['validate']['invalid_dir']
+        
+        # Update split selector
+        if 'split_selector' in ui_components:
+            split_selector = ui_components['split_selector']
+            if hasattr(split_selector, 'value'):
+                split_map = {
+                    'All Splits': ['train', 'valid', 'test'],
+                    'Train Only': ['train'],
+                    'Validation Only': ['valid'],
+                    'Test Only': ['test']
+                }
+                for key, value in split_map.items():
+                    if value == config['preprocessing']['splits']:
+                        split_selector.value = key
+                        break
             
-        if 'output_dir' in ui_components:
-            ui_components['output_dir'].value = config['preprocessing']['output_dir']
-            
-        if 'img_size_slider' in ui_components:
-            ui_components['img_size_slider'].value = config['preprocessing']['img_size']
-            
-        if 'normalize_checkbox' in ui_components:
-            ui_components['normalize_checkbox'].value = config['preprocessing']['normalization']['enabled']
-            
-        if 'preserve_aspect_ratio_checkbox' in ui_components:
-            ui_components['preserve_aspect_ratio_checkbox'].value = config['preprocessing']['normalization']['preserve_aspect_ratio']
-            
-        if 'validate_checkbox' in ui_components:
-            ui_components['validate_checkbox'].value = config['preprocessing']['validate']['enabled']
-            
-        if 'fix_issues_checkbox' in ui_components:
-            ui_components['fix_issues_checkbox'].value = config['preprocessing']['validate']['fix_issues']
-            
-        if 'move_invalid_checkbox' in ui_components:
-            ui_components['move_invalid_checkbox'].value = config['preprocessing']['validate']['move_invalid']
-            
-        if 'invalid_dir' in ui_components:
-            ui_components['invalid_dir'].value = config['preprocessing']['validate']['invalid_dir']
-            
-        if 'num_workers_slider' in ui_components:
-            ui_components['num_workers_slider'].value = config['preprocessing']['num_workers']
-            
-        logger.info("✅ UI berhasil diupdate dari konfigurasi preprocessing")
+        logger.info("✅ UI preprocessing berhasil diupdate dari konfigurasi")
+        
+        return ui_components
         
     except Exception as e:
-        logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        logger.error(f"❌ Error saat update UI dari config: {str(e)}")
+        return ui_components

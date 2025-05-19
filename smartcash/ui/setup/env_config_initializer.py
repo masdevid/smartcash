@@ -80,18 +80,31 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                 if not save_success:
                     logger.warning(f"⚠️ {save_message}")
             
-            # Sinkronisasi dengan ConfigManager
+            # Sinkronisasi dengan ConfigManager menggunakan metode yang benar
             try:
                 from smartcash.common.config.manager import get_config_manager
                 config_manager = get_config_manager()
                 
-                # Pastikan konfigurasi di-reload untuk mendapatkan perubahan terbaru
-                config_manager.reload()
+                # Dapatkan daftar modul yang tersedia
+                module_configs = getattr(config_manager, 'module_configs', {})
                 
-                # Simpan konfigurasi untuk memastikan perubahan tersimpan
-                config_manager.save()
-                
-                logger.debug("🔄 Konfigurasi berhasil di-reload dan disimpan")
+                # Jika tidak ada modul yang terdaftar, tidak perlu melakukan sinkronisasi
+                if not module_configs:
+                    logger.debug("ℹ️ Tidak ada modul yang perlu disinkronkan")
+                else:
+                    # Untuk setiap modul, load ulang dan simpan konfigurasinya
+                    for module_name in module_configs.keys():
+                        try:
+                            # Dapatkan konfigurasi modul saat ini
+                            module_config = config_manager.get_module_config(module_name, {})
+                            # Simpan kembali untuk memastikan konsistensi
+                            if module_config:
+                                config_manager.save_module_config(module_name, module_config)
+                                logger.debug(f"🔄 Konfigurasi modul {module_name} berhasil disinkronkan")
+                        except Exception as module_error:
+                            logger.debug(f"ℹ️ Gagal sinkronisasi modul {module_name}: {str(module_error)}")
+                    
+                    logger.debug("✅ Sinkronisasi konfigurasi berhasil")
             except Exception as config_error:
                 logger.debug(f"ℹ️ Tidak dapat melakukan sinkronisasi ConfigManager: {str(config_error)}")
             

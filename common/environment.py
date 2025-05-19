@@ -396,8 +396,18 @@ class EnvironmentManager:
                         if self.logger:
                             self.logger.debug(f"🔄 Sinkronisasi konfigurasi: {config_file.name} (Lokal → Drive)")
                 
-                # Reload konfigurasi setelah sinkronisasi
-                config_manager.reload()
+                # Memuat ulang konfigurasi setelah sinkronisasi
+                try:
+                    # Dapatkan daftar modul yang tersedia
+                    module_configs = getattr(config_manager, 'module_configs', {})
+                    
+                    # Untuk setiap modul, load ulang konfigurasinya
+                    for module_name in module_configs.keys():
+                        # Dapatkan konfigurasi modul saat ini (ini akan memuat ulang dari file)
+                        config_manager.get_module_config(module_name, {})
+                except Exception as reload_error:
+                    if self.logger:
+                        self.logger.debug(f"ℹ️ Tidak dapat memuat ulang konfigurasi: {str(reload_error)}")
                 
                 if self.logger and synced_files > 0:
                     self.logger.info(f"✅ Sinkronisasi konfigurasi selesai: {synced_files} file disinkronkan")
@@ -441,8 +451,21 @@ class EnvironmentManager:
                 config_manager.set('drive_mounted', True)
                 config_manager.set('drive_path', str(self._drive_path))
             
-            # Simpan konfigurasi ke file
-            config_manager.save()
+            # Simpan konfigurasi ke file menggunakan metode yang tersedia
+            try:
+                # Simpan sebagai konfigurasi modul 'environment'
+                config_manager.save_module_config('environment', {
+                    'environment': env_info,
+                    'base_dir': str(self._base_dir),
+                    'dataset_path': str(self._base_dir / 'data'),
+                    'model_path': str(self._base_dir / 'models'),
+                    'config_path': str(self._base_dir / 'configs'),
+                    'drive_mounted': self._drive_mounted,
+                    'drive_path': str(self._drive_path) if self._drive_mounted else None
+                })
+            except Exception as save_error:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Error saat menyimpan konfigurasi modul: {str(save_error)}")
             
             # Sinkronisasi konfigurasi jika Drive terhubung
             if self._drive_mounted:

@@ -120,6 +120,46 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                     f"Sinkronisasi selesai: {counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal",
                     style="success" if counts['failure'] == 0 else "warning"
                 ).value
+                
+                # Jalankan test sinkronisasi konfigurasi
+                try:
+                    from smartcash.common.config.tests.test_config_sync import TestConfigSync
+                    
+                    # Update status panel
+                    ui_components['status_panel'].value = create_info_box(
+                        "Test Sinkronisasi Konfigurasi", 
+                        "Sedang menjalankan test sinkronisasi konfigurasi...",
+                        style="info"
+                    ).value
+                    
+                    # Tampung output test ke dalam variabel
+                    import io
+                    import sys
+                    from contextlib import redirect_stdout
+                    
+                    # Tangkap output test
+                    test_output = io.StringIO()
+                    with redirect_stdout(test_output):
+                        test_result = TestConfigSync.test_config_sync()
+                    
+                    # Tampilkan hasil test di log
+                    test_output_str = test_output.getvalue()
+                    for line in test_output_str.split('\n'):
+                        if line.strip():
+                            if '⚠️' in line:
+                                logger.warning(line)
+                            else:
+                                logger.info(line)
+                    
+                    # Update status panel dengan hasil test
+                    ui_components['status_panel'].value = create_info_box(
+                        "Test Sinkronisasi Konfigurasi", 
+                        "Test sinkronisasi konfigurasi selesai" + (" dengan sukses" if test_result else " dengan masalah"),
+                        style="success" if test_result else "warning"
+                    ).value
+                except Exception as test_error:
+                    logger.warning(f"⚠️ Error saat menjalankan test sinkronisasi konfigurasi: {str(test_error)}")
+                    # Tidak perlu update status panel karena error hanya pada test
             except Exception as config_error:
                 # Log error ke UI
                 logger.error(f"❌ Error saat sinkronisasi konfigurasi: {str(config_error)}")

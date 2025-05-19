@@ -129,9 +129,10 @@ def sync_config_with_drive(
     drive_config_path = env_manager.drive_path / "configs" / config_file
     
     # Hentikan proses jika path identik (cek realpath untuk symlink)
-    if os.path.realpath(local_config_path) == os.path.realpath(drive_config_path):
+    # PERBAIKAN: Hanya periksa jika kedua file ada untuk mencegah error
+    if local_config_path.exists() and drive_config_path.exists() and os.path.realpath(local_config_path) == os.path.realpath(drive_config_path):
         msg = DRIVE_PATH_IDENTICAL.format(path=local_config_path)
-        logger.warning(msg)
+        # Tidak perlu log warning
         return True, msg, load_config(local_config_path, {})
     
     # Validasi file ada
@@ -427,13 +428,16 @@ def sync_all_configs(
     
     # Sinkronisasi setiap file
     for file_name in all_config_files:
-        logger.debug(f"🔄 Sinkronisasi {file_name}...")
+        # Tidak perlu log debug untuk setiap file
         
         try:
-            # Cek jika realpath sama
-            if os.path.realpath(local_config_dir / file_name) == os.path.realpath(drive_config_dir / file_name):
+            # Cek jika realpath sama - PERBAIKAN: gunakan exists() untuk mencegah error jika file tidak ada
+            local_path = local_config_dir / file_name
+            drive_path = drive_config_dir / file_name
+            
+            if local_path.exists() and drive_path.exists() and os.path.realpath(local_path) == os.path.realpath(drive_path):
                 msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
-                logger.debug(f"ℹ️ {msg}")
+                # Tidak perlu log debug
                 results["skipped"].append({"file": file_name, "message": msg})
                 continue
             

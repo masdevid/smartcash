@@ -631,13 +631,15 @@ def _execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str
         # Restore UI
         _cleanup_ui(ui_components, "preprocessing")
 
-def setup_processing_cleanup_handler(ui_components: Dict[str, Any], module_type: str = 'preprocessing') -> Dict[str, Any]:
+def setup_processing_cleanup_handler(ui_components: Dict[str, Any], module_type: str = 'preprocessing', config: Optional[Dict[str, Any]] = None, env: Any = None) -> Dict[str, Any]:
     """
     Setup handler untuk membersihkan UI setelah proses selesai.
     
     Args:
         ui_components: Dictionary komponen UI
         module_type: Tipe modul ('preprocessing' atau 'augmentation')
+        config: Konfigurasi modul (opsional)
+        env: Environment untuk modul (opsional)
         
     Returns:
         Dictionary UI components yang telah diupdate

@@ -21,16 +21,18 @@ def handle_save_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     
     try:
         # Simpan konfigurasi dan hasil
-        save_config_and_results(ui_components)
+        output_path = save_config_and_results(ui_components)
         
-        # Log save berhasil
-        from smartcash.ui.utils.ui_logger import log_to_ui
-        log_to_ui(ui_components, "Konfigurasi dan hasil download berhasil disimpan", "success", "💾")
-        if logger: logger.info("💾 Konfigurasi dan hasil download berhasil disimpan")
+        # Log save berhasil (hanya gunakan satu metode logging untuk menghindari duplikasi)
+        success_msg = f"Konfigurasi dan hasil download berhasil disimpan ke {output_path}"
         
         # Update status panel jika tersedia
         if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-            ui_components['update_status_panel'](ui_components, "success", "Konfigurasi dan hasil download berhasil disimpan")
+            ui_components['update_status_panel'](ui_components, "success", success_msg)
+        else:
+            # Fallback ke log_to_ui jika update_status_panel tidak tersedia
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            log_to_ui(ui_components, success_msg, "success", "💾")
         
     except Exception as e:
         # Tampilkan error

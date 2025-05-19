@@ -82,8 +82,9 @@ class ServiceFactory:
                 'class': 'smartcash.dataset.services.downloader.download_service.DownloadService',
                 'params': {
                     'config': self.config,
-                    'data_dir': self.config['dataset_dir'],
-                    'logger': self.logger
+                    'output_dir': self.config['dataset_dir'],
+                    'logger': self.logger,
+                    'num_workers': self.config.get('num_workers', 4)
                 }
             }
         }

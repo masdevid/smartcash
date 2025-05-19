@@ -67,6 +67,9 @@ def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
     # Clear konfirmasi area
     ui_components['confirmation_area'].clear_output()
     
+    # Reset UI dengan benar - pastikan tombol terlihat
+    _reset_download_ui(ui_components)
+    
     # Update status panel menggunakan komponen reusable
     update_status_panel(
         ui_components['status_panel'],
@@ -75,3 +78,34 @@ def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
     )
     
     if logger: logger.info("ℹ️ Download dataset dibatalkan")
+    
+def _reset_download_ui(ui_components: Dict[str, Any]) -> None:
+    """Reset UI download ke kondisi awal."""
+    # Aktifkan kembali tombol
+    for button_key in ['download_button', 'check_button']:
+        if button_key in ui_components and hasattr(ui_components[button_key], 'disabled'):
+            ui_components[button_key].disabled = False
+        
+        # Pastikan tombol terlihat
+        if button_key in ui_components and hasattr(ui_components[button_key], 'layout'):
+            ui_components[button_key].layout.display = 'block'
+    
+    # Reset progress bar
+    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
+        ui_components['progress_bar'].layout.visibility = 'hidden'
+        ui_components['progress_bar'].value = 0
+    
+    if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):
+        ui_components['progress_message'].layout.visibility = 'hidden'
+        ui_components['progress_message'].value = ""
+    
+    # Reset tracker jika ada
+    for tracker_key in ['download_tracker', 'download_step_tracker']:
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            if hasattr(tracker, 'reset'):
+                tracker.reset()
+            if hasattr(tracker, 'current'):
+                tracker.current = 0
+            if hasattr(tracker, 'set_description'):
+                tracker.set_description("")

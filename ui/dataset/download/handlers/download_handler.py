@@ -309,6 +309,11 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     # Aktifkan kembali tombol
     _disable_buttons(ui_components, False)
     
+    # Pastikan tombol terlihat
+    for button_key in ['download_button', 'check_button']:
+        if button_key in ui_components and hasattr(ui_components[button_key], 'layout'):
+            ui_components[button_key].layout.display = 'block'
+    
     # Sembunyikan progress bar
     if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
         ui_components['progress_bar'].layout.visibility = 'hidden'

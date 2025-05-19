@@ -51,6 +51,11 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
             if hasattr(sender, '_received_from_observer') and sender._received_from_observer:
                 return
                 
+            # Pastikan event berasal dari modul download atau dataset saja
+            module_type = kwargs.get('module_type', '')
+            if module_type and module_type not in ['download', 'dataset']:
+                return  # Abaikan event dari modul lain (seperti augmentation)
+                
             # PERBAIKAN: Gunakan try-except untuk menangkap error
             try:
                 # Set flag untuk menghindari rekursi

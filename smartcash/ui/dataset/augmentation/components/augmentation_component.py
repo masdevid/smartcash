@@ -108,25 +108,11 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
     
-    # Buat augmentation_options_basic untuk Opsi Dasar tanpa tab
-    # Dapatkan opsi dasar augmentasi dari modul augmentation_options
-    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_basic_options
-    basic_options = create_basic_options(config)
-    
-    # Baris 1: Opsi Dasar (kolom 1), Opsi Lanjut (kolom 2)
-    row1 = widgets.HBox([
-        # Kolom 1: Opsi Dasar (tanpa tab)
-        widgets.VBox([
-            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Dasar</h4>"),
-            basic_options
-        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px')),
-        
-        # Kolom 2: Opsi Lanjut
-        widgets.VBox([
-            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-            advanced_options
-        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
-    ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+    # Baris 1: Opsi Lanjut saja
+    row1 = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
+        advanced_options
+    ], layout=widgets.Layout(width='100%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
     
     # Baris 2: Hanya Jenis Augmentasi & Split dengan lebar penuh
     row2 = widgets.VBox([

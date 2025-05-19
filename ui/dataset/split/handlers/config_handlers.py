@@ -35,127 +35,69 @@ def load_default_config() -> Dict[str, Any]:
 
 def load_config() -> Dict[str, Any]:
     """
-    Load konfigurasi split dataset dari file YAML.
-    
+    Load konfigurasi split dataset dari file YAML atau ConfigManager.
     Returns:
         Dictionary berisi konfigurasi split dataset
     """
     try:
-        # Path ke file konfigurasi dataset
-        config_path = Path("config/dataset_config.yaml")
-        if not config_path.exists():
-            # Coba cari di lokasi alternatif
-            alt_path = Path("../config/dataset_config.yaml")
-            if alt_path.exists():
-                config_path = alt_path
-            else:
-                return load_default_config()
-        
-        # Load konfigurasi dari file
+        from smartcash.common.config.manager import get_config_manager
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        config_manager = get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
+        config = config_manager.get_module_config('dataset_split')
+        if config:
+            return config
+    except Exception as e:
+        print(f"{ICONS['warning']} Error saat mengakses ConfigManager: {str(e)}")
+    # Fallback ke file
+    config_path = Path("configs/dataset_config.yaml")
+    if config_path.exists():
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
-        
-        # Pastikan struktur konfigurasi benar
-        if not config:
-            config = {}
-        if 'data' not in config:
-            config['data'] = {}
-        if 'split' not in config['data']:
-            config['data']['split'] = {'train': 0.7, 'val': 0.15, 'test': 0.15, 'stratified': True}
-        
         return config
-    except Exception as e:
-        print(f"{ICONS['error']} Error saat memuat konfigurasi split dataset: {str(e)}")
-        # Kembalikan konfigurasi default
-        return load_default_config()
+    return load_default_config()
 
 def save_config(config: Dict[str, Any]) -> bool:
     """
-    Simpan konfigurasi split dataset ke file YAML.
-    
+    Simpan konfigurasi split dataset ke file YAML atau ConfigManager.
     Args:
         config: Konfigurasi yang akan disimpan
-        
     Returns:
         Boolean yang menunjukkan keberhasilan penyimpanan
-    """
-    try:
-        # Path ke file konfigurasi dataset
-        config_path = Path("config/dataset_config.yaml")
-        
-        # Buat direktori jika belum ada
-        os.makedirs(config_path.parent, exist_ok=True)
-        
-        # Simpan konfigurasi ke file
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
-        
-        # Coba sinkronkan dengan drive jika tersedia
-        try:
-            from google.colab import drive
-            # Cek apakah drive sudah di-mount
-            if os.path.exists('/content/drive'):
-                # Copy file ke drive
-                drive_path = Path("/content/drive/MyDrive/smartcash/config/dataset_config.yaml")
-                os.makedirs(drive_path.parent, exist_ok=True)
-                with open(drive_path, 'w') as f:
-                    yaml.dump(config, f, default_flow_style=False)
-                print(f"{ICONS['success']} Konfigurasi berhasil disinkronkan dengan Google Drive")
-        except ImportError:
-            # Bukan di Google Colab, abaikan
-            pass
-        
-        return True
-    except Exception as e:
-        print(f"{ICONS['error']} Error saat menyimpan konfigurasi split dataset: {str(e)}")
-        return False
-
-def get_config_manager_instance():
-    """
-    Dapatkan instance ConfigManager jika tersedia.
-    
-    Returns:
-        Instance ConfigManager atau None jika tidak tersedia
     """
     try:
         from smartcash.common.config.manager import get_config_manager
-        return get_config_manager()
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        config_manager = get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
+        return config_manager.save_module_config('dataset_split', config)
     except Exception as e:
-        print(f"{ICONS['warning']} Gagal mendapatkan instance ConfigManager: {str(e)}")
+        print(f"{ICONS['warning']} Error saat menyimpan dengan ConfigManager: {str(e)}")
+    # Fallback ke file
+    config_path = Path("configs/dataset_config.yaml")
+    os.makedirs(config_path.parent, exist_ok=True)
+    with open(config_path, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    return True
+
+def get_config_manager_instance():
+    try:
+        from smartcash.common.config.manager import get_config_manager
+        from smartcash.common.environment import get_environment_manager
+        env_manager = get_environment_manager()
+        return get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
+    except Exception as e:
         return None
 
 def save_config_with_manager(config: Dict[str, Any], ui_components: Dict[str, Any], logger=None) -> bool:
-    """
-    Simpan konfigurasi menggunakan ConfigManager dengan fallback.
-    
-    Args:
-        config: Konfigurasi aplikasi
-        ui_components: Dictionary komponen UI
-        logger: Logger untuk logging
-        
-    Returns:
-        Boolean yang menunjukkan keberhasilan penyimpanan
-    """
-    success = False
-    
-    # Coba simpan dengan ConfigManager terlebih dahulu
     config_manager = get_config_manager_instance()
     if config_manager:
         try:
-            # Pastikan UI components terdaftar untuk persistensi
             config_manager.register_ui_components('dataset_split', ui_components)
-            # Simpan konfigurasi
-            success = config_manager.save_module_config('dataset', config)
-            if logger: logger.debug(f"{ICONS['info']} Konfigurasi disimpan melalui ConfigManager: {success}")
+            return config_manager.save_module_config('dataset_split', config)
         except Exception as e:
-            if logger: logger.warning(f"{ICONS['warning']} Gagal menyimpan dengan ConfigManager: {str(e)}")
-            # Fallback ke metode save_config tradisional
-            success = save_config(config)
-    else:
-        # Fallback ke metode save_config tradisional
-        success = save_config(config)
-    
-    return success
+            if logger: logger.warning(f"Gagal menyimpan dengan ConfigManager: {str(e)}")
+    return bool(save_config(config))
 
 def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

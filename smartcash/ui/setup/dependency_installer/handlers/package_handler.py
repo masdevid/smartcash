@@ -6,15 +6,31 @@ Deskripsi: Handler untuk manajemen package
 import time
 import subprocess
 import sys
+import contextlib
 from typing import Dict, Any, List, Tuple
 from tqdm.notebook import tqdm
 from smartcash.ui.utils.ui_logger import log_to_ui
+
+@contextlib.contextmanager
+def disable_tqdm():
+    """Context manager to temporarily disable tqdm output"""
+    old_disable = tqdm.disabled
+    tqdm.disabled = True
+    try:
+        yield
+    finally:
+        tqdm.disabled = old_disable
 
 class SilentTqdm(tqdm):
     """Custom tqdm class that doesn't display to console"""
     def __init__(self, *args, **kwargs):
         kwargs['display'] = False  # Disable display
+        kwargs['disable'] = True   # Completely disable tqdm
         super().__init__(*args, **kwargs)
+    
+    def display(self, *args, **kwargs):
+        """Override display to do nothing"""
+        pass
 
 def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
     """
@@ -99,37 +115,39 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
     # Log info ke UI
     log_to_ui(ui_components, f"Memulai instalasi {len(packages)} package...", "info", "🚀")
     
-    # Gunakan SilentTqdm untuk progress bar yang tidak menampilkan ke console
-    for i, package in enumerate(SilentTqdm(packages, desc="Instalasi Package")):
-        # Update progress
-        progress_pct = int((i / len(packages)) * 100)
-        if progress_bar: progress_bar.value = progress_pct
-        if progress_label: progress_label.value = f"Menginstall {package}... ({i+1}/{len(packages)})"
-        if tracker: tracker.update(progress_pct)
-        
-        # Log info ke UI
-        log_to_ui(ui_components, f"Menginstall {package}...", "info", "💶")
-        
-        try:
-            # Jalankan pip install dengan --quiet untuk mengurangi output
-            cmd = [sys.executable, "-m", "pip", "install", package, "--quiet"]
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    # Gunakan context manager untuk menonaktifkan tqdm output
+    with disable_tqdm():
+        # Gunakan SilentTqdm untuk progress bar yang tidak menampilkan ke console
+        for i, package in enumerate(SilentTqdm(packages, desc="Instalasi Package")):
+            # Update progress
+            progress_pct = int((i / len(packages)) * 100)
+            if progress_bar: progress_bar.value = progress_pct
+            if progress_label: progress_label.value = f"Menginstall {package}... ({i+1}/{len(packages)})"
+            if tracker: tracker.update(progress_pct)
             
-            if result.returncode == 0:
-                # Sukses
-                stats['success'] += 1
-                log_to_ui(ui_components, f"Berhasil menginstall {package}", "success", "✅")
-            else:
-                # Gagal
+            # Log info ke UI
+            log_to_ui(ui_components, f"Menginstall {package}...", "info", "💶")
+            
+            try:
+                # Jalankan pip install dengan --quiet untuk mengurangi output
+                cmd = [sys.executable, "-m", "pip", "install", package, "--quiet"]
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                
+                if result.returncode == 0:
+                    # Sukses
+                    stats['success'] += 1
+                    log_to_ui(ui_components, f"Berhasil menginstall {package}", "success", "✅")
+                else:
+                    # Gagal
+                    stats['failed'] += 1
+                    error_msg = result.stderr.strip() or "Unknown error"
+                    stats['errors'].append((package, error_msg))
+                    log_to_ui(ui_components, f"Gagal menginstall {package}: {error_msg}", "error", "❌")
+            except Exception as e:
+                # Error
                 stats['failed'] += 1
-                error_msg = result.stderr.strip() or "Unknown error"
-                stats['errors'].append((package, error_msg))
-                log_to_ui(ui_components, f"Gagal menginstall {package}: {error_msg}", "error", "❌")
-        except Exception as e:
-            # Error
-            stats['failed'] += 1
-            stats['errors'].append((package, str(e)))
-            log_to_ui(ui_components, f"Error saat menginstall {package}: {str(e)}", "error", "❌")
+                stats['errors'].append((package, str(e)))
+                log_to_ui(ui_components, f"Error saat menginstall {package}: {str(e)}", "error", "❌")
     
     # Update progress ke 100%
     if progress_bar: progress_bar.value = 100

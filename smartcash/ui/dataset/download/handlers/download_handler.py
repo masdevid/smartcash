@@ -290,21 +290,31 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     if isinstance(result.get('error'), str):
         error_msg = result.get('error', '')
         
-        # Filter error update_config_from_ui
-        if 'update_config_from_ui' in error_msg:
-            if download_logger: 
-                download_logger.debug(f"🔧 Mengabaikan error yang tidak relevan dengan download: {error_msg}")
-            
-            # Hapus error dari result dan lanjutkan proses
-            if 'error' in result:
-                del result['error']
-                result['success'] = True
-                result['message'] = result.get('message', 'Dataset berhasil didownload')
+        # Daftar kata kunci untuk error yang harus diabaikan
+        ignored_error_keywords = [
+            'update_config_from_ui',           # Error konfigurasi
+            'Tidak ada gambar di direktori input',  # Error validasi gambar
+            'augmentasi',                     # Error augmentasi
+            'augment',                        # Error augmentasi
+            'pipeline',                       # Error pipeline augmentasi
+            'split',                          # Error split augmentasi
+            'worker',                         # Error worker augmentasi
+            'factory'                         # Error factory augmentasi
+        ]
         
-        # Filter error terkait validasi gambar yang tidak relevan dengan proses download
-        elif 'Tidak ada gambar di direktori input' in error_msg:
-            if download_logger:
-                download_logger.debug(f"🔧 Mengabaikan error validasi gambar yang tidak relevan dengan download: {error_msg}")
+        # Cek apakah error mengandung kata kunci yang harus diabaikan
+        should_ignore = False
+        matched_keyword = None
+        for keyword in ignored_error_keywords:
+            if keyword.lower() in error_msg.lower():
+                should_ignore = True
+                matched_keyword = keyword
+                break
+        
+        # Jika error harus diabaikan
+        if should_ignore:
+            if download_logger: 
+                download_logger.debug(f"🔧 Mengabaikan error yang tidak relevan dengan download (keyword: {matched_keyword}): {error_msg}")
             
             # Hapus error dari result dan lanjutkan proses
             if 'error' in result:
@@ -377,8 +387,15 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
         # Update status panel
         update_status_panel(ui_components['status_panel'], message, "error")
         
+        # Daftar kata kunci untuk pesan yang harus diabaikan di UI
+        augmentation_keywords = ['augmentasi', 'augment', 'pipeline', 'worker', 'split', 'factory', 'update_config_from_ui']
+        
+        # Cek apakah pesan error mengandung kata kunci yang harus diabaikan
+        should_ignore_ui = any(keyword.lower() in message.lower() for keyword in augmentation_keywords)
+        
         # Hanya tampilkan error jika konteksnya adalah download_only atau tidak ada konteks
-        if not result.get('context') or result.get('context') == 'download_only':
+        # dan tidak mengandung kata kunci yang harus diabaikan
+        if (not result.get('context') or result.get('context') == 'download_only') and not should_ignore_ui:
             # Show status
             show_status(message, "error", ui_components)
             
@@ -397,8 +414,12 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
             show_status(suggestion, "info", ui_components)
             if download_logger: download_logger.info(f"💡 {suggestion}")
         else:
-            # Jika konteks bukan download_only, hanya log error untuk debugging
-            if logger: logger.debug(f"🔧 Mengabaikan error dari konteks lain: {message}")
+            # Jika konteks bukan download_only atau mengandung kata kunci yang harus diabaikan, hanya log untuk debugging
+            if logger: 
+                if should_ignore_ui:
+                    logger.debug(f"🔧 Mengabaikan pesan augmentasi di UI: {message}")
+                else:
+                    logger.debug(f"🔧 Mengabaikan error dari konteks lain: {message}")
 
 def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """

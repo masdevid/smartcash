@@ -64,11 +64,21 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
                 if logger: logger.debug(f"🔍 Mengabaikan event type: {event_type}")
                 return
             
-            # 3. Periksa jika ada kata kunci augmentasi dalam pesan
+            # 3. Periksa jika ada kata kunci augmentasi dalam pesan atau event_type
             message = kwargs.get('message', '')
-            if 'augmentasi' in message.lower():
+            # Filter lebih ketat untuk augmentasi
+            augmentation_keywords = ['augmentasi', 'augment', 'pipeline', 'worker', 'split', 'factory']
+            if any(keyword in message.lower() for keyword in augmentation_keywords):
                 if logger: logger.debug(f"🔍 Mengabaikan pesan augmentasi: {message}")
                 return
+                
+            # 4. Filter berdasarkan sender class name jika tersedia
+            if sender and hasattr(sender, '__class__') and hasattr(sender.__class__, '__name__'):
+                sender_class = sender.__class__.__name__
+                augmentation_classes = ['Augmentor', 'AugmentationService', 'AugmentationPipeline', 'AugmentationFactory']
+                if any(aug_class in sender_class for aug_class in augmentation_classes):
+                    if logger: logger.debug(f"🔍 Mengabaikan event dari kelas augmentasi: {sender_class}")
+                    return
                 
             # PERBAIKAN: Gunakan try-except untuk menangkap error
             try:

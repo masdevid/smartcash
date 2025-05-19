@@ -40,7 +40,10 @@ class EnvConfigStateManager:
         """
         # Reset UI components to initial state
         self.ui_components['status_panel'].value = ""
-        self.ui_components['log_panel'].value = ""
+        if 'log_panel' in self.ui_components:
+            self.ui_components['log_panel'].value = ""
+        elif 'log' in self.ui_components:
+            self.ui_components['log'].value = ""
         self.ui_components['drive_button'].disabled = False
         self.ui_components['directory_button'].disabled = False
         

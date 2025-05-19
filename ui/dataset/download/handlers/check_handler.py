@@ -111,7 +111,7 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
     
     # Format message berdasarkan hasil
     if stats['total_images'] == 0:
-        message = "⚠️ Tidak ada gambar ditemukan dalam dataset"
+        message = "⚠️ Dataset masih kosong, silahkan mulai download dataset terlebih dahulu"
     else:
         message = f"✅ Dataset ditemukan: {stats['total_images']} gambar, {stats['total_labels']} label"
     

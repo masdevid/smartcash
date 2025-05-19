@@ -15,12 +15,18 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
     
     # Buat context logger khusus untuk download
     logger = ui_components.get('logger')
-    download_logger = None
-    if logger and hasattr(logger, 'bind'):
-        download_logger = logger.bind(context="download_only")
-        ui_components['download_logger'] = download_logger
-    else:
+    download_logger = logger
+    
+    # Coba gunakan bind jika tersedia, jika tidak gunakan logger biasa
+    try:
+        if logger and hasattr(logger, 'bind'):
+            download_logger = logger.bind(context="download_only")
+            ui_components['download_logger'] = download_logger
+    except Exception as e:
+        # Jika terjadi error saat bind, gunakan logger biasa
         download_logger = logger
+        # Simpan logger ke ui_components untuk digunakan nanti
+        ui_components['download_logger'] = download_logger
     
     output_dir = ui_components['output_dir'].value
     
@@ -43,8 +49,11 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
             if download_logger:
                 download_logger.debug(f"🔍 Mengeksekusi download dari {endpoint} ke {output_dir}")
             
+            # Tambahkan flag untuk mencegah eksekusi proses augmentasi
+            ui_components['current_operation'] = 'download_only'
+            ui_components['prevent_augmentation'] = True
+            
             # Eksekusi download dengan konteks yang jelas
-            ui_components['current_operation'] = 'download'
             execute_download(ui_components, endpoint)
         except Exception as e:
             if download_logger:

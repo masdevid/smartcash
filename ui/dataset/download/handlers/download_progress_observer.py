@@ -23,7 +23,13 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
         # Observer manager
         observer_manager = ui_components.get('observer_manager')
         if not observer_manager:
+            if logger:
+                logger.warning(f"⚠️ Observer manager tidak tersedia, download progress observer tidak akan berfungsi")
             return
+            
+        # Log untuk debugging
+        if logger:
+            logger.debug(f"🔍 Menggunakan observer_manager: {observer_manager.__class__.__name__}")
         
         # Register observers untuk berbagai event download
         events = [
@@ -51,6 +57,13 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
             # Filter sender untuk menghindari rekursi
             if hasattr(sender, '_received_from_observer') and sender._received_from_observer:
                 return
+                
+            # Jika flag prevent_augmentation aktif, hanya proses event download
+            if ui_components.get('prevent_augmentation', False):
+                # Hanya proses event yang benar-benar terkait download
+                if not any(download_event in event_type for download_event in ['download.', 'dataset.pull.', 'zip.']):
+                    if logger: logger.debug(f"🔒 Mengabaikan event non-download saat prevent_augmentation aktif: {event_type}")
+                    return
             
             # PERBAIKAN: Filter lebih ketat untuk mencegah cross-talk dengan modul lain
             # 1. Periksa module_type jika ada
@@ -86,6 +99,11 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
                 if sender:
                     setattr(sender, '_received_from_observer', True)
                     
+                # Log untuk debugging
+                if logger:
+                    sender_name = sender.__class__.__name__ if hasattr(sender, '__class__') else str(sender)
+                    logger.debug(f"📥 Menerima event: {event_type} dari {sender_name}")
+                    
                 _handle_download_event(ui_components, event_type, **kwargs)
                 
                 # Reset flag
@@ -100,12 +118,17 @@ def setup_download_progress_observer(ui_components: Dict[str, Any]) -> None:
         ui_components['observer_group'] = observer_group
         
         for event in events:
+            observer_name = f"DownloadProgress_{event}_Observer"
             observer_manager.create_simple_observer(
                 event_type=event,
                 callback=safe_handle_download_event,
-                name=f"DownloadProgress_{event}_Observer",
+                name=observer_name,
                 group=observer_group
             )
+            
+            # Log untuk debugging
+            if logger:
+                logger.debug(f"✅ Observer terdaftar: {observer_name} untuk event {event}")
         
         if logger:
             logger.debug(f"✅ Download progress observer berhasil disetup untuk {len(events)} events")

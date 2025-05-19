@@ -61,9 +61,19 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
     logger = ui_components.get('logger')
     
     # Buat context logger khusus untuk download yang tidak mempengaruhi modul lain
-    download_logger = None
-    if logger:
-        download_logger = logger.bind(context="download_only")
+    download_logger = logger
+    
+    # Coba gunakan bind jika tersedia, jika tidak gunakan logger biasa
+    try:
+        if logger and hasattr(logger, 'bind'):
+            download_logger = logger.bind(context="download_only")
+            ui_components['download_logger'] = download_logger
+    except Exception as e:
+        # Jika terjadi error saat bind, gunakan logger biasa
+        if logger:
+            # Log error untuk debugging (opsional)
+            logger.debug(f"🔧 Tidak dapat membuat context logger: {str(e)}")
+        # Simpan logger ke ui_components untuk digunakan nanti
         ui_components['download_logger'] = download_logger
     
     try:
@@ -282,9 +292,18 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     from smartcash.ui.utils.ui_logger import log_to_ui as show_status
     
     # Buat context logger khusus untuk download yang tidak mempengaruhi modul lain
-    download_logger = None
-    if logger:
-        download_logger = logger.bind(context="download_only")
+    # Gunakan download_logger yang sudah ada jika tersedia, jika tidak gunakan logger biasa
+    download_logger = ui_components.get('download_logger') or logger
+    
+    # Jika download_logger belum ada, coba buat dengan bind jika tersedia
+    if not ui_components.get('download_logger'):
+        try:
+            if logger and hasattr(logger, 'bind'):
+                download_logger = logger.bind(context="download_only")
+                ui_components['download_logger'] = download_logger
+        except Exception as e:
+            # Jika terjadi error saat bind, gunakan logger biasa
+            download_logger = logger
     
     # Filter error yang tidak relevan dengan proses download
     if isinstance(result.get('error'), str):
@@ -324,6 +343,9 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     
     # Reset UI setelah proses selesai
     _reset_ui_after_download(ui_components)
+    
+    # Pastikan flag prevent_augmentation dihapus setelah proses selesai
+    ui_components.pop('prevent_augmentation', None)
     
     # Cek hasil download
     if result.get('success', False):

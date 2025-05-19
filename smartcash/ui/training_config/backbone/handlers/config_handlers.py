@@ -57,8 +57,8 @@ def get_backbone_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('backbone')
-        if config:
+        config = config_manager.get_module_config('model')
+        if config and 'backbone' in config:
             return config
         logger.warning("⚠️ Konfigurasi backbone tidak ditemukan, menggunakan default")
         return get_default_backbone_config()
@@ -138,6 +138,10 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if config is None:
             config = get_backbone_config(ui_components)
             
+        # Ensure config has backbone key
+        if 'backbone' not in config:
+            config['backbone'] = get_default_backbone_config()['backbone']
+            
         # Update UI components
         if 'enabled_checkbox' in ui_components:
             ui_components['enabled_checkbox'].value = config['backbone']['enabled']
@@ -192,6 +196,10 @@ def update_backbone_info(ui_components: Dict[str, Any]) -> None:
             
         # Get current config
         config = get_backbone_config(ui_components)
+        
+        # Ensure config has backbone key
+        if 'backbone' not in config:
+            config['backbone'] = get_default_backbone_config()['backbone']
         
         # Update info panel dengan informasi backbone
         info_text = f"""

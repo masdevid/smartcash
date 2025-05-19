@@ -1,250 +1,65 @@
 """
 File: smartcash/ui/dataset/split/handlers/button_handlers.py
-Deskripsi: Handler untuk tombol UI konfigurasi split dataset
+Deskripsi: Handler untuk button events split dataset
 """
 
-from typing import Dict, Any
-from IPython.display import display, clear_output
-from smartcash.ui.utils.alert_utils import create_status_indicator
-from smartcash.ui.utils.constants import ICONS
+from typing import Dict, Any, Optional
+from smartcash.common.logger import get_logger
+from smartcash.ui.dataset.split.handlers.config_handlers import get_split_config, update_config_from_ui, update_ui_from_config
+from smartcash.common.config import get_config_manager
 
-def notify_service_event(event_type: str, message: str, status_panel=None, logger=None) -> None:
+logger = get_logger(__name__)
+
+def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Notifikasi event ke service.
+    Handle click event untuk split button.
     
     Args:
-        event_type: Tipe event ('success', 'error', 'info', 'warning')
-        message: Pesan yang akan ditampilkan
-        status_panel: Panel status untuk menampilkan notifikasi
-        logger: Logger untuk logging
-    """
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Log event
-    if logger:
-        if event_type == 'success':
-            logger.debug(f"{ICONS['success']} {message}")
-        elif event_type == 'error':
-            logger.error(f"{ICONS['error']} {message}")
-        elif event_type == 'warning':
-            logger.warning(f"{ICONS['warning']} {message}")
-        else:
-            logger.info(f"{ICONS['info']} {message}")
-    
-    # Update status panel jika tersedia
-    if status_panel:
-        color_bg = COLORS.get(f'alert_{event_type}_bg', COLORS['alert_info_bg'])
-        color_text = COLORS.get(f'alert_{event_type}_text', COLORS['alert_info_text'])
-        icon = ICONS.get(event_type, ICONS['info'])
-        
-        status_panel.value = f"""<div style="padding:10px; background-color:{color_bg}; 
-                 color:{color_text}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {color_text}">
-            <p style="margin:5px 0">{icon} {message}</p>
-        </div>"""
-
-def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
-    """
-    Setup handler untuk tombol-tombol pada UI konfigurasi split dataset.
-    
-    Args:
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi aplikasi
-        env: Environment manager
+        ui_components: Dictionary komponen UI
         
     Returns:
-        Dictionary UI components yang telah diupdate
+        Dictionary komponen UI yang telah diupdate
     """
-    # Inisialisasi ui_components jika None
-    if ui_components is None:
-        ui_components = {}
-    
-    # Dapatkan ui_logger untuk logging yang lebih baik di UI
-    logger = ui_components.get('logger')
-    
-    # Pastikan konfigurasi data ada
-    if not config:
-        # Import fungsi yang diperlukan
-        from smartcash.ui.dataset.split.handlers.config_handlers import load_config, get_config_manager_instance
-        
-        # Coba dapatkan konfigurasi dari ConfigManager
-        config_manager = get_config_manager_instance()
-        if config_manager:
-            try:
-                config = config_manager.get_module_config('dataset')
-                if logger: logger.debug(f"{ICONS['info']} Konfigurasi berhasil dimuat dari ConfigManager")
-            except Exception as e:
-                if logger: logger.warning(f"{ICONS['warning']} Gagal memuat konfigurasi dari ConfigManager: {str(e)}")
-                # Fallback ke load dari file
-                config = load_config()
-        else:
-            # Fallback ke load dari file
-            config = load_config()
-    
-    # Pastikan struktur konfigurasi benar
-    if not isinstance(config, dict):
-        config = {}
-    if 'data' not in config:
-        config['data'] = {}
-    
-    # Pastikan UI components terdaftar untuk persistensi
-    from smartcash.ui.dataset.split.handlers.ui_handlers import ensure_ui_persistence
-    ensure_ui_persistence(ui_components, config, logger)
-    
-    # Inisialisasi UI dari konfigurasi
-    from smartcash.ui.dataset.split.handlers.ui_handlers import initialize_ui_from_config
-    initialize_ui_from_config(ui_components, config)
-    
-    # Register handler for split button
-    if 'split_button' in ui_components and ui_components['split_button']:
-        ui_components['split_button'].on_click(
-            lambda b: handle_split_button(b, ui_components, config, env, logger)
-        )
-        if logger: logger.debug(f"{ICONS['link']} Handler untuk split button terdaftar")
-    
-    # Register handler untuk save button
-    if 'save_button' in ui_components and ui_components['save_button']:
-        ui_components['save_button'].on_click(
-            lambda b: handle_save_button(b, ui_components, config, env, logger)
-        )
-        if logger: logger.debug(f"{ICONS['link']} Handler untuk save button terdaftar")
-    
-    # Register handler untuk reset button
-    if 'reset_button' in ui_components and ui_components['reset_button']:
-        ui_components['reset_button'].on_click(
-            lambda b: handle_reset_button(b, ui_components, config, env, logger)
-        )
-        if logger: logger.debug(f"{ICONS['link']} Handler untuk reset button terdaftar")
-    
-    return ui_components
-
-def handle_save_button(b, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
-    """
-    Handler untuk tombol save konfigurasi.
-    
-    Args:
-        b: Button widget yang dipicu
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi aplikasi
-        env: Environment manager
-        logger: Logger untuk logging
-    """
-    # Import fungsi yang diperlukan
-    from smartcash.ui.dataset.split.handlers.config_handlers import update_config_from_ui, save_config_with_manager
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Pastikan status_panel tersedia
-    status_panel = ui_components.get('status_panel')
-    if not status_panel:
-        print(f"{ICONS['warning']} Status panel tidak tersedia")
-        return
-    
-    # Tampilkan status processing
-    status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']}">
-            <p style="margin:5px 0">{ICONS['processing']} Menyimpan konfigurasi...</p>
-        </div>"""
-    
     try:
-        # Update konfigurasi dari UI
-        config = update_config_from_ui(config, ui_components)
+        # Get config
+        config = get_split_config(ui_components)
         
-        # Simpan konfigurasi dengan ConfigManager atau fallback
-        success = save_config_with_manager(config, ui_components, logger)
+        # Update config from UI
+        updated_config = update_config_from_ui(ui_components)
         
-        # Tampilkan hasil
-        if success:
-            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
-                     color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
-                     border-left:4px solid {COLORS['alert_success_text']}">
-                <p style="margin:5px 0">{ICONS['success']} Konfigurasi berhasil disimpan</p>
-            </div>"""
-            if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil disimpan")
-        else:
-            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                     color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
-                     border-left:4px solid {COLORS['alert_danger_text']}">
-                <p style="margin:5px 0">{ICONS['error']} Gagal menyimpan konfigurasi</p>
-            </div>"""
-            if logger: logger.error(f"{ICONS['error']} Gagal menyimpan konfigurasi split dataset")
+        # Update UI from config
+        update_ui_from_config(ui_components, updated_config)
+        
+        logger.info("✅ Split button berhasil dihandle")
+        
+        return ui_components
+        
     except Exception as e:
-        # Tampilkan error
-        status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                 color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_danger_text']}">
-            <p style="margin:5px 0">{ICONS['error']} Error: {str(e)}</p>
-        </div>"""
-        if logger: logger.error(f"{ICONS['error']} Error saat menyimpan konfigurasi split dataset: {str(e)}")
+        logger.error(f"❌ Error saat handle split button: {str(e)}")
+        return ui_components
 
-def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any], env=None, logger=None) -> None:
+def handle_reset_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Handler untuk tombol reset konfigurasi.
+    Handle click event untuk reset button.
     
     Args:
-        b: Button widget yang dipicu
-        ui_components: Dictionary berisi komponen UI
-        config: Konfigurasi aplikasi
-        env: Environment manager
-        logger: Logger untuk logging
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
     """
-    # Import fungsi yang diperlukan
-    from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config, save_config_with_manager
-    from smartcash.ui.dataset.split.handlers.ui_handlers import update_ui_from_config
-    from smartcash.ui.utils.constants import COLORS
-    
-    # Pastikan status_panel tersedia
-    status_panel = ui_components.get('status_panel')
-    if not status_panel:
-        print(f"{ICONS['warning']} Status panel tidak tersedia")
-        return
-    
-    # Tampilkan status processing
-    status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_info_bg']}; 
-                 color:{COLORS['alert_info_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_info_text']}">
-            <p style="margin:5px 0">{ICONS['processing']} Mereset konfigurasi...</p>
-        </div>"""
-    
     try:
-        # Load konfigurasi default
+        # Get default config
+        from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config
         default_config = get_default_split_config()
         
-        # Update UI dari konfigurasi default
+        # Update UI from default config
         update_ui_from_config(ui_components, default_config)
         
-        # Simpan konfigurasi default dengan ConfigManager atau fallback
-        success = save_config_with_manager(default_config, ui_components, logger)
+        logger.info("✅ Reset button berhasil dihandle")
         
-        # Tampilkan hasil
-        if success:
-            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_success_bg']}; 
-                     color:{COLORS['alert_success_text']}; border-radius:4px; margin:5px 0;
-                     border-left:4px solid {COLORS['alert_success_text']}">
-                <p style="margin:5px 0">{ICONS['success']} Konfigurasi berhasil direset ke default</p>
-            </div>"""
-            if logger: logger.debug(f"{ICONS['success']} Konfigurasi split dataset berhasil direset ke default")
-        else:
-            status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                     color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
-                     border-left:4px solid {COLORS['alert_danger_text']}">
-                <p style="margin:5px 0">{ICONS['error']} Gagal mereset konfigurasi</p>
-            </div>"""
-            if logger: logger.error(f"{ICONS['error']} Gagal mereset konfigurasi split dataset")
+        return ui_components
+        
     except Exception as e:
-        # Tampilkan error
-        status_panel.value = f"""<div style="padding:10px; background-color:{COLORS['alert_danger_bg']}; 
-                 color:{COLORS['alert_danger_text']}; border-radius:4px; margin:5px 0;
-                 border-left:4px solid {COLORS['alert_danger_text']}">
-            <p style="margin:5px 0">{ICONS['error']} Error: {str(e)}</p>
-        </div>"""
-        if logger: logger.error(f"{ICONS['error']} Error saat mereset konfigurasi split dataset: {str(e)}")
-
-def handle_split_button(b, ui_components, config, env, logger):
-    """Handler untuk tombol split."""
-    # Update config from UI
-    from smartcash.ui.dataset.split.handlers.config_handlers import update_config_from_ui, save_config_with_manager
-    config = update_config_from_ui(config, ui_components)
-    save_config_with_manager(config, ui_components, logger)
-    # Execute split operation here
-    # ... existing code ...
+        logger.error(f"❌ Error saat handle reset button: {str(e)}")
+        return ui_components

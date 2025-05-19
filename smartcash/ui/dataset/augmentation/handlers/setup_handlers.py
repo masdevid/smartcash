@@ -1,67 +1,81 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/setup_handlers.py
-Deskripsi: Setup handlers untuk modul augmentasi dataset
+Deskripsi: Setup handler untuk augmentasi dataset
 """
 
 from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.dataset.augmentation.handlers.config_handler import get_augmentation_config
+from smartcash.common.config import get_config_manager
 
-logger = get_logger("augmentation_setup")
+logger = get_logger(__name__)
 
-def setup_augmentation_handlers(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
-    Setup handlers untuk augmentasi dataset.
+    Setup handler untuk augmentasi dataset.
     
     Args:
         ui_components: Dictionary komponen UI
-        env: Environment manager (opsional)
-        config: Konfigurasi aplikasi (opsional)
+        env: Environment (opsional)
+        config: Konfigurasi (opsional)
         
     Returns:
-        Dictionary UI components yang telah diupdate
+        Dictionary komponen UI yang telah diupdate
     """
-    # Tambahkan logger ke ui_components jika belum ada
-    if 'logger' not in ui_components:
-        ui_components['logger'] = logger
-        
-    # Import handlers
     try:
-        from smartcash.ui.dataset.augmentation.handlers.status_handler import setup_status_handler
-        from smartcash.ui.dataset.augmentation.handlers.observer_handler import setup_observer_handler
-        from smartcash.ui.dataset.augmentation.handlers.state_handler import setup_state_handler
-        from smartcash.ui.dataset.augmentation.handlers.persistence_handler import setup_persistence_handler
-        from smartcash.ui.dataset.augmentation.handlers.button_handler import setup_augmentation_button_handlers
+        # Get config
+        if config is None:
+            config = get_augmentation_config(ui_components)
         
-        # Setup status handler
-        ui_components = setup_status_handler(ui_components)
+        # Update UI components
+        if 'augmentation_options' in ui_components:
+            aug_options = ui_components['augmentation_options']
+            if hasattr(aug_options, 'children') and len(aug_options.children) >= 4:
+                # Update enabled checkbox
+                aug_options.children[0].value = config['augmentation']['enabled']
+                
+                # Update num variations slider
+                aug_options.children[1].value = config['augmentation']['num_variations']
+                
+                # Update output prefix
+                aug_options.children[2].value = config['augmentation']['output_prefix']
+                
+                # Update process bboxes checkbox
+                aug_options.children[3].value = config['augmentation']['process_bboxes']
         
-        # Setup observer handler
-        ui_components = setup_observer_handler(ui_components)
+        # Update output options
+        if 'output_options' in ui_components:
+            output_options = ui_components['output_options']
+            if hasattr(output_options, 'children') and len(output_options.children) >= 4:
+                # Update output dir
+                output_options.children[0].value = config['augmentation']['output_dir']
+                
+                # Update validate checkbox
+                output_options.children[1].value = config['augmentation']['validate_results']
+                
+                # Update resume checkbox
+                output_options.children[2].value = config['augmentation']['resume']
+                
+                # Update num workers slider
+                output_options.children[3].value = config['augmentation']['num_workers']
         
-        # Setup state handler
-        ui_components = setup_state_handler(ui_components, env, config)
+        # Update balance options
+        if 'balance_options' in ui_components:
+            balance_options = ui_components['balance_options']
+            if hasattr(balance_options, 'children') and len(balance_options.children) >= 2:
+                # Update balance classes checkbox
+                balance_options.children[0].value = config['augmentation']['balance_classes']
+                
+                # Update target count slider
+                balance_options.children[1].value = config['augmentation']['target_count']
         
-        # Setup persistence handler
-        ui_components = setup_persistence_handler(ui_components, env, config)
+        logger.info("✅ Augmentation handlers berhasil disetup")
         
-        # Setup button handlers
-        ui_components = setup_augmentation_button_handlers(ui_components, config=config, env=env)
+        return ui_components
         
-        # Setup augmentation service
-        from smartcash.ui.dataset.augmentation.handlers.augmentation_service_handler import initialize_augmentation
-        ui_components = initialize_augmentation(ui_components)
-        
-        logger.info(f"{ICONS['success']} Handler augmentasi berhasil disetup")
     except Exception as e:
-        logger.error(f"{ICONS['error']} Error saat setup handler augmentasi: {str(e)}")
-        import traceback
-        logger.debug(f"Traceback: {traceback.format_exc()}")
-    
-    # Log hasil setup
-    logger.debug(f"{ICONS['info']} Semua handler augmentasi berhasil disetup")
-    
-    return ui_components
+        logger.error(f"❌ Error saat setup augmentation handlers: {str(e)}")
+        return ui_components
 
 def setup_state_handler(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """

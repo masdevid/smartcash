@@ -1,11 +1,60 @@
 """
 File: smartcash/ui/dataset/split/handlers/ui_handlers.py
-Deskripsi: Handler untuk interaksi UI split dataset
+Deskripsi: Handler untuk UI components split dataset
 """
 
 from typing import Dict, Any, Optional
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config
+from smartcash.common.logger import get_logger
+from smartcash.ui.dataset.split.handlers.config_handlers import get_split_config, update_config_from_ui, update_ui_from_config
+from smartcash.common.config import get_config_manager
+
+logger = get_logger(__name__)
+
+def handle_split_ui(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Handle UI components untuk split dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi (opsional)
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
+    """
+    try:
+        # Get config if not provided
+        if config is None:
+            config = get_split_config(ui_components)
+        
+        # Update UI components
+        if 'train_slider' in ui_components:
+            ui_components['train_slider'].value = config['data']['split']['train']
+            
+        if 'val_slider' in ui_components:
+            ui_components['val_slider'].value = config['data']['split']['val']
+            
+        if 'test_slider' in ui_components:
+            ui_components['test_slider'].value = config['data']['split']['test']
+            
+        if 'stratified_checkbox' in ui_components:
+            ui_components['stratified_checkbox'].value = config['data']['split']['stratified']
+            
+        if 'random_seed_slider' in ui_components:
+            ui_components['random_seed_slider'].value = config['data']['random_seed']
+            
+        if 'backup_checkbox' in ui_components:
+            ui_components['backup_checkbox'].value = config['data']['backup_before_split']
+            
+        if 'backup_dir' in ui_components:
+            ui_components['backup_dir'].value = config['data']['backup_dir']
+        
+        logger.info("✅ Split UI berhasil diupdate")
+        
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat update split UI: {str(e)}")
+        return ui_components
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """

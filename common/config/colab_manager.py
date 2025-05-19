@@ -263,4 +263,17 @@ class ColabConfigManager(DriveConfigManager):
             config: Konfigurasi yang akan disimpan
         """
         from smartcash.common.io import save_config
-        save_config(str(path), config) 
+        save_config(str(path), config)
+    
+    def is_drive_connected(self) -> bool:
+        """
+        Check if Google Drive is connected (mounted) in the current environment.
+        Returns:
+            bool: True if drive is mounted, False otherwise
+        """
+        try:
+            from smartcash.common.environment import get_environment_manager
+            env_manager = get_environment_manager()
+            return getattr(env_manager, 'is_drive_mounted', False)
+        except Exception:
+            return False 

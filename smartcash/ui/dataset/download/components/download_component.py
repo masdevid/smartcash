@@ -140,7 +140,7 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     ))
     
     # Buat tombol-tombol download dengan shared component (tanpa redundansi)
-    # Tombol save dan reset menggunakan shared component
+    # Tombol save dan reset menggunakan shared component dengan layout rata kanan
     save_reset_buttons = create_save_reset_buttons(
         save_label='Simpan Konfigurasi',
         reset_label='Reset Konfigurasi',
@@ -148,7 +148,7 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         container_width='100%'
     )
     
-    # Pesan sinkronisasi menggunakan shared component
+    # Pesan sinkronisasi menggunakan shared component dengan layout rata kanan
     sync_info = create_sync_info_message(
         message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
         icon="info",
@@ -225,8 +225,11 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
         input_options,
-        save_reset_buttons['container'],
-        sync_info['container'],
+        # Container untuk tombol save/reset dan sync_info dengan layout rata kanan
+        widgets.VBox([
+            save_reset_buttons['container'],
+            sync_info['container']
+        ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
         confirmation_area,  # Tambahkan area konfirmasi sebelum progress

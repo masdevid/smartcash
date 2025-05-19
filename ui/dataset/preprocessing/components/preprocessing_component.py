@@ -83,7 +83,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[validation_options_group['container']], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
     
-    # Buat tombol save dan reset menggunakan shared component
+    # Buat tombol save dan reset menggunakan shared component dengan layout rata kanan
     save_reset_buttons = create_save_reset_buttons(
         save_label="Simpan",
         reset_label="Reset",
@@ -96,7 +96,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         container_width="100%"
     )
     
-    # Pesan sinkronisasi menggunakan shared component
+    # Pesan sinkronisasi menggunakan shared component dengan layout rata kanan
     sync_info = create_sync_info_message(
         message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
         icon="info",
@@ -144,8 +144,11 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         # split_config dihilangkan sesuai permintaan
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         advanced_accordion,
-        save_reset_buttons['container'],  # Tambahkan tombol save dan reset
-        sync_info['container'],  # Tambahkan pesan sinkronisasi
+        # Container untuk tombol save/reset dan sync_info dengan layout rata kanan
+        widgets.VBox([
+            save_reset_buttons['container'],
+            sync_info['container']
+        ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],

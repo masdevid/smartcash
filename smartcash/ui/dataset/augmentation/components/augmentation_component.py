@@ -55,7 +55,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
 
-    # Tombol save dan reset menggunakan shared component
+    # Tombol save dan reset menggunakan shared component dengan layout rata kanan
     save_reset_buttons = create_save_reset_buttons(
         save_label='Simpan Konfigurasi',
         reset_label='Reset Konfigurasi',
@@ -63,7 +63,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         container_width='100%'
     )
     
-    # Pesan sinkronisasi menggunakan shared component
+    # Pesan sinkronisasi menggunakan shared component dengan layout rata kanan
     sync_info = create_sync_info_message(
         message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
         icon="info",
@@ -128,11 +128,16 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
 
+    # Container untuk tombol save/reset dan sync_info dengan layout rata kanan
+    save_reset_container = widgets.VBox([
+        save_reset_buttons['container'],
+        sync_info['container']
+    ], layout=widgets.Layout(align_items='flex-end', width='100%'))
+    
     settings_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
         combined_options,
-        save_reset_buttons['container'],
-        sync_info['container'],
+        save_reset_container,  # Gunakan container yang sudah diatur rata kanan
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
         advanced_options,

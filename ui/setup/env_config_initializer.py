@@ -80,33 +80,63 @@ def initialize_env_config_ui() -> Dict[str, Any]:
                 if not save_success:
                     logger.warning(f"⚠️ {save_message}")
             
-            # Sinkronisasi dengan ConfigManager menggunakan metode yang benar
+            # Sinkronisasi semua file konfigurasi di direktori configs
             try:
-                from smartcash.common.config.manager import get_config_manager
-                config_manager = get_config_manager()
+                # Import fungsi sinkronisasi dari smartcash.common.config.sync
+                from smartcash.common.config.sync import sync_all_configs
                 
-                # Dapatkan daftar modul yang tersedia
-                module_configs = getattr(config_manager, 'module_configs', {})
+                # Tampilkan status di log output
+                ui_components['status_panel'].value = create_info_box(
+                    "Sinkronisasi Konfigurasi", 
+                    "Sedang menyinkronkan semua file konfigurasi...",
+                    style="info"
+                ).value
                 
-                # Jika tidak ada modul yang terdaftar, tidak perlu melakukan sinkronisasi
-                if not module_configs:
-                    logger.debug("ℹ️ Tidak ada modul yang perlu disinkronkan")
-                else:
-                    # Untuk setiap modul, load ulang dan simpan konfigurasinya
-                    for module_name in module_configs.keys():
-                        try:
-                            # Dapatkan konfigurasi modul saat ini
-                            module_config = config_manager.get_module_config(module_name, {})
-                            # Simpan kembali untuk memastikan konsistensi
-                            if module_config:
-                                config_manager.save_module_config(module_name, module_config)
-                                logger.debug(f"🔄 Konfigurasi modul {module_name} berhasil disinkronkan")
-                        except Exception as module_error:
-                            logger.debug(f"ℹ️ Gagal sinkronisasi modul {module_name}: {str(module_error)}")
-                    
-                    logger.debug("✅ Sinkronisasi konfigurasi berhasil")
+                # Log ke UI
+                logger.info("🔄 Memulai sinkronisasi semua file konfigurasi...")
+                
+                # Sinkronisasi semua file konfigurasi
+                results = sync_all_configs(
+                    sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
+                    config_dir='configs',   # Direktori konfigurasi
+                    create_backup=True,     # Buat backup sebelum sinkronisasi
+                    logger=logger           # Gunakan logger yang sama
+                )
+                
+                # Log hasil sinkronisasi ke UI
+                counts = {k: len(v) for k, v in results.items()}
+                
+                # Tampilkan hasil di log output
+                if counts['success'] > 0:
+                    for item in results['success']:
+                        logger.info(f"✅ {item['file']}: {item['message']}")
+                
+                if counts['failure'] > 0:
+                    for item in results['failure']:
+                        logger.error(f"❌ {item['file']}: {item['message']}")
+                
+                # Tampilkan ringkasan
+                logger.info(
+                    f"🔄 Sinkronisasi selesai: {sum(counts.values())} file diproses - "
+                    f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
+                )
+                
+                # Update status panel dengan hasil
+                ui_components['status_panel'].value = create_info_box(
+                    "Sinkronisasi Konfigurasi", 
+                    f"Sinkronisasi selesai: {counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal",
+                    style="success" if counts['failure'] == 0 else "warning"
+                ).value
             except Exception as config_error:
-                logger.debug(f"ℹ️ Tidak dapat melakukan sinkronisasi ConfigManager: {str(config_error)}")
+                # Log error ke UI
+                logger.error(f"❌ Error saat sinkronisasi konfigurasi: {str(config_error)}")
+                
+                # Update status panel dengan error
+                ui_components['status_panel'].value = create_info_box(
+                    "Error Sinkronisasi", 
+                    f"Terjadi kesalahan saat sinkronisasi konfigurasi: {str(config_error)}",
+                    style="error"
+                ).value
             
             # Update status panel dengan hasil
             ui_components['status_panel'].value = create_info_box(

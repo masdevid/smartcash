@@ -467,9 +467,36 @@ class EnvironmentManager:
                 if self.logger:
                     self.logger.warning(f"⚠️ Error saat menyimpan konfigurasi modul: {str(save_error)}")
             
-            # Sinkronisasi konfigurasi jika Drive terhubung
+            # Sinkronisasi semua file konfigurasi jika Drive terhubung
             if self._drive_mounted:
-                self.sync_config()
+                try:
+                    # Import fungsi sinkronisasi dari smartcash.common.config.sync
+                    from smartcash.common.config.sync import sync_all_configs
+                    
+                    # Log ke logger
+                    if self.logger:
+                        self.logger.info("🔄 Memulai sinkronisasi semua file konfigurasi...")
+                    
+                    # Sinkronisasi semua file konfigurasi
+                    results = sync_all_configs(
+                        sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
+                        config_dir='configs',   # Direktori konfigurasi
+                        create_backup=True,     # Buat backup sebelum sinkronisasi
+                        logger=self.logger      # Gunakan logger yang sama
+                    )
+                    
+                    # Log hasil sinkronisasi
+                    counts = {k: len(v) for k, v in results.items()}
+                    
+                    if self.logger:
+                        # Tampilkan ringkasan
+                        self.logger.info(
+                            f"🔄 Sinkronisasi selesai: {sum(counts.values())} file diproses - "
+                            f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
+                        )
+                except Exception as sync_error:
+                    if self.logger:
+                        self.logger.warning(f"⚠️ Error saat sinkronisasi konfigurasi: {str(sync_error)}")
             
             if self.logger:
                 self.logger.info("✅ Konfigurasi environment berhasil disimpan")

@@ -40,7 +40,7 @@ class BaseConfigManager(Singleton):
         """
         # Setup base directories
         self.base_dir = Path(base_dir) if base_dir else Path.home() / '.smartcash'
-        self.config_dir = Path('smartcash') / 'configs'  # Default ke smartcash/configs
+        self.config_dir = self.base_dir / 'configs'  # Gunakan base_dir untuk config_dir
         self.env_prefix = env_prefix
         self.config = {}
         self.module_configs = {}  # Dictionary untuk menyimpan konfigurasi berbagai modul
@@ -88,44 +88,20 @@ class BaseConfigManager(Singleton):
     
     def _resolve_config_path(self, config_file: str) -> Path:
         """
-        Resolve path konfigurasi relatif atau absolut ke Path lengkap
+        Resolve path konfigurasi ke path absolut
         
         Args:
             config_file: Path ke file konfigurasi
             
         Returns:
-            Path lengkap ke file konfigurasi
+            Path absolut ke file konfigurasi
         """
-        config_path = Path(config_file)
-        
-        # Check absolute path
-        if config_path.is_absolute(): 
-            if config_path.exists():
-                return config_path
+        # Jika path absolut, gunakan langsung
+        if os.path.isabs(config_file):
+            return Path(config_file)
             
-            # Jika di Colab, coba cari di direktori project
-            is_colab = 'google.colab' in str(globals())
-            if is_colab and '/content/' in str(config_path):
-                # Coba cari di direktori smartcash/configs
-                project_config_path = Path('smartcash') / 'configs' / config_path.name
-                if project_config_path.exists():
-                    return project_config_path
-            
-        # Check relative to smartcash/configs
-        if (self.config_dir / config_path.name).exists(): 
-            return self.config_dir / config_path.name
-        
-        # Check relative to project root (smartcash/configs)
-        project_config_path = Path('smartcash') / 'configs' / config_path.name
-        if project_config_path.exists():
-            return project_config_path
-            
-        # Check relative to current working directory
-        if (Path.cwd() / config_path).exists(): 
-            return Path.cwd() / config_path
-        
-        # Jika semua gagal, kembalikan path di base_dir
-        return self.base_dir / config_path.name
+        # Jika path relatif, gabungkan dengan config_dir
+        return self.config_dir / config_file
     
     def _create_default_config(self, config_path: Path) -> bool:
         """
@@ -164,7 +140,7 @@ class BaseConfigManager(Singleton):
             }
             
             # Simpan konfigurasi default
-            save_config(config_path, default_config)
+            save_config(str(config_path), default_config)
             return True
             
         except Exception as e:

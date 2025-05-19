@@ -92,8 +92,8 @@ def initialize_module_ui(
             
         elif module_name == 'download':
             # Handler untuk download
-            from smartcash.ui.dataset.download.handlers.download_handler import setup_download_handler
-            ui_components = setup_download_handler(ui_components, env, config)
+            from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download_handlers
+            ui_components = setup_download_handlers(ui_components, env, config)
             
             from smartcash.ui.dataset.download.handlers.cleanup_handler import setup_download_cleanup_handler
             ui_components = setup_download_cleanup_handler(ui_components, module_name, config, env)

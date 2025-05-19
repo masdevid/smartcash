@@ -94,7 +94,7 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(width='100%')
     )
     
-    # Buat container untuk input options
+    # Buat container untuk input options dengan padding dan margin yang konsisten
     input_options = widgets.VBox([
         rf_workspace,
         rf_project,
@@ -102,49 +102,64 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         rf_apikey,
         output_dir,
         validate_dataset
-    ], layout=widgets.Layout(width='100%', margin='10px 0', padding='10px', border=f'1px solid {COLORS.get("border", "#ddd")}', border_radius='5px'))
+    ], layout=widgets.Layout(
+        width='100%', 
+        margin='10px 0', 
+        padding='15px', 
+        border=f'1px solid {COLORS.get("border", "#ddd")}', 
+        border_radius='5px'
+    ))
     
-    # Buat tombol-tombol download dengan shared component
+    # Buat tombol-tombol download dengan shared component (tanpa redundansi)
     action_buttons = create_action_buttons(
         primary_label="Download Dataset",
         primary_icon="download",
         secondary_buttons=[
-            ("Check Dataset", "search", "info"),
-            ("Reset", "refresh", "warning")
+            ("Check Dataset", "search", "info")
         ],
-        cleanup_enabled=True  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
+        cleanup_enabled=True,  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
+        reset_enabled=True     # Gunakan reset button dari shared component
     )
     
-    # Progress tracking dengan shared component
+    # Progress tracking dengan shared component dan layout yang konsisten
     progress_components = create_progress_tracking(
         module_name='download',
         show_step_progress=True,
         show_overall_progress=True,
-        width='100%'
+        width='100%',
+        margin='15px 0',
+        padding='5px 0',
+        border_radius='5px'
     )
     
-    # Log accordion dengan shared component
+    # Log accordion dengan shared component dan layout yang konsisten
     log_components = create_log_accordion(
         module_name='download',
         height='200px',
-        width='100%'
+        width='100%',
+        margin='15px 0',
+        border_radius='5px'
     )
     
     # Summary stats container dengan styling yang konsisten
     summary_container = widgets.Output(
         layout=widgets.Layout(
-            border='1px solid #ddd', 
-            padding='10px', 
-            margin='10px 0', 
-            display='none'
+            border=f'1px solid {COLORS.get("border", "#ddd")}', 
+            padding='15px', 
+            margin='15px 0', 
+            display='none',
+            border_radius='5px',
+            min_height='50px'
         )
     )
     
-    # Area untuk konfirmasi dialog
+    # Area untuk konfirmasi dialog dengan layout yang konsisten
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
-            margin='10px 0',
-            width='100%'
+            margin='15px 0',
+            width='100%',
+            min_height='50px',
+            padding='5px 0'
         )
     )
     
@@ -176,13 +191,13 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         'input_options': input_options,
         'download_button': action_buttons['primary_button'],
         'check_button': action_buttons['secondary_buttons'][0] if 'secondary_buttons' in action_buttons else None,
-        'reset_button': action_buttons['secondary_buttons'][1] if 'secondary_buttons' in action_buttons else action_buttons.get('reset_button'),
+        'reset_button': action_buttons.get('reset_button'),  # Menggunakan reset_button dari shared component
         'cleanup_button': action_buttons.get('cleanup_button'),
         'button_container': action_buttons['container'],
         'summary_container': summary_container,
-        'confirmation_area': confirmation_area,  # Tambahkan area konfirmasi
+        'confirmation_area': confirmation_area,  # Area konfirmasi untuk dialog
         'module_name': 'download',
-        'endpoint_dropdown': {'value': 'Roboflow'}  # Tambahkan dummy endpoint_dropdown untuk kompatibilitas
+        'endpoint_dropdown': {'value': 'Roboflow'}  # Dummy endpoint_dropdown untuk kompatibilitas
     }
     
     # Tambahkan komponen progress tracking

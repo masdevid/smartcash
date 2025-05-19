@@ -5,6 +5,7 @@ Deskripsi: Creator untuk komponen UI environment config
 
 from typing import Dict, Any
 import ipywidgets as widgets
+from ipywidgets import HBox, VBox, Label, Button, Output, HTML, FloatProgress
 
 from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.ui.utils.header_utils import create_header
@@ -12,117 +13,38 @@ from smartcash.ui.utils.constants import COLORS
 
 def create_env_config_ui() -> Dict[str, Any]:
     """
-    Buat komponen UI untuk konfigurasi environment
-    
+    Create the environment configuration UI components.
     Returns:
-        Dictionary berisi komponen UI
+        dict: Dictionary of UI components
     """
-    # Header dengan komponen standar
-    header = create_header(
-        "⚙️ Environment Configuration", 
-        "Setup environment dan konfigurasi SmartCash"
-    )
-    
-    # Status panel menggunakan komponen alert standar
-    status_panel = widgets.HTML(
-        create_info_box(
-            "Environment Status", 
-            "Connect to Google Drive dan setup directory",
-            style="info"
-        ).value
-    )
-    
-    # Action buttons in HBox
-    drive_button = widgets.Button(
-        description="Connect Drive",
-        button_style="success",
-        icon="cloud-upload",
-        tooltip="Connect to Google Drive",
-        layout=widgets.Layout(width='auto', margin='0 5px')
-    )
-    
-    directory_button = widgets.Button(
-        description="Setup Directory",
-        button_style="warning",
-        icon="folder",
-        tooltip="Setup directory structure",
-        layout=widgets.Layout(width='auto', margin='0 5px')
-    )
-    
-    action_buttons = widgets.HBox(
-        [drive_button, directory_button],
-        layout=widgets.Layout(
-            display='flex',
-            flex_flow='row',
-            justify_content='center',
-            width='100%',
-            margin='10px 0'
-        )
-    )
-    
-    # Progress section
-    progress = widgets.FloatProgress(
-        value=0.0,
-        min=0,
-        max=1.0,
-        description='Progress:',
-        bar_style='info',
-        style={'description_width': 'initial'},
-        layout=widgets.Layout(
-            width='100%',
-            margin='10px 0',
-            visibility='hidden'  # Hidden by default
-        )
-    )
-    
-    # Progress label
-    progress_label = widgets.HTML(
-        value="",
-        layout=widgets.Layout(
-            margin='5px 0',
-            visibility='hidden'  # Hidden by default
-        )
-    )
-    
-    # Log section
-    log = widgets.Output(
-        layout=widgets.Layout(
-            width='100%',
-            border=f'1px solid {COLORS["border"]}',
-            min_height='100px',
-            max_height='300px',
-            margin='10px 0',
-            padding='10px',
-            overflow='auto'
-        )
-    )
-    
-    # Container utama dengan semua komponen
-    main = widgets.VBox(
-        [
-            header,
-            status_panel,
-            action_buttons,
-            progress,
-            progress_label,
-            log
-        ],
-        layout=widgets.Layout(
-            width='100%',
-            padding='10px'
-        )
-    )
-    
-    # Struktur final komponen UI
+    # Header
+    header = HTML("<h2>Environment Configuration</h2>")
+
+    # Buttons
+    drive_button = Button(description="Connect to Google Drive", button_style="primary")
+    directory_button = Button(description="Set Up Directories", button_style="primary")
+    button_layout = HBox([drive_button, directory_button])
+
+    # Status Panel
+    status_panel = Output()
+
+    # Log Panel
+    log_panel = Output()
+
+    # Progress Bar
+    progress_bar = FloatProgress(min=0, max=100, value=0)
+    progress_message = Label(value="")
+
+    # Assemble UI components
     ui_components = {
-        'ui': main,
-        'status_panel': status_panel,
+        'header': header,
         'drive_button': drive_button,
         'directory_button': directory_button,
-        'progress': progress,
-        'progress_label': progress_label,
-        'log': log,
-        'module_name': 'env_config'
+        'status_panel': status_panel,
+        'log_panel': log_panel,
+        'progress_bar': progress_bar,
+        'progress_message': progress_message,
+        'button_layout': button_layout
     }
-    
+
     return ui_components 

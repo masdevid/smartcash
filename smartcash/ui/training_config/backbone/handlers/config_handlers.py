@@ -181,3 +181,43 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
     except Exception as e:
         logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+
+def update_backbone_info(ui_components: Dict[str, Any]) -> None:
+    """
+    Update info panel dengan informasi backbone yang dipilih.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    try:
+        info_panel = ui_components.get('info_panel')
+        if not info_panel:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Info panel tidak ditemukan")
+            return
+            
+        # Get current config
+        config = get_backbone_config(ui_components)
+        
+        # Update info panel dengan informasi backbone
+        info_text = f"""
+        <div style='font-family: monospace;'>
+        <h4>Backbone Configuration:</h4>
+        <ul>
+            <li>Type: {config['backbone']['type']}</li>
+            <li>Pretrained: {config['backbone']['pretrained']}</li>
+            <li>Freeze Backbone: {config['backbone']['freeze_backbone']}</li>
+            <li>Freeze BatchNorm: {config['backbone']['freeze_bn']}</li>
+            <li>Dropout: {config['backbone']['dropout']}</li>
+            <li>Activation: {config['backbone']['activation']}</li>
+            <li>Normalization: {config['backbone']['normalization']['type']}</li>
+            <li>BN Momentum: {config['backbone']['normalization']['momentum']}</li>
+        </ul>
+        </div>
+        """
+        
+        info_panel.value = info_text
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat update info panel: {str(e)}")
+        if info_panel:
+            info_panel.value = f"{ICONS.get('error', '❌')} Error saat update info panel: {str(e)}"

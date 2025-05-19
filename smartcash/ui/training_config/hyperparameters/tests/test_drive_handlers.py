@@ -1,25 +1,54 @@
 """
-File: smartcash/ui/training_config/hyperparameters/tests/test_drive_handlers.py
-Deskripsi: Test untuk handler sinkronisasi Google Drive pada hyperparameter
+File: tests/test_drive_handlers.py
+Deskripsi: Pengujian untuk sinkronisasi konfigurasi hyperparameter dengan Google Drive
 """
 
 import unittest
+from unittest.mock import MagicMock, patch, mock_open
 import os
-import tempfile
-from unittest.mock import patch, MagicMock, mock_open
+import yaml
 
-from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import sync_to_drive, sync_from_drive
+from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import (
+    sync_to_drive,
+    sync_from_drive
+)
 
-class TestHyperparametersDriveHandlers(unittest.TestCase):
-    """Test case untuk handler sinkronisasi Google Drive pada hyperparameter."""
+class TestDriveHandlers(unittest.TestCase):
+    """Pengujian untuk sinkronisasi konfigurasi hyperparameter dengan Google Drive"""
     
     def setUp(self):
-        """Setup untuk test."""
-        # Buat mock UI components
-        self.ui_components = {
+        """Setup untuk pengujian"""
+        # Mock config
+        self.mock_config = {
+            'batch_size': 16,
+            'image_size': 640,
+            'epochs': 100,
+            'augment': True,
+            'optimizer': 'SGD',
+            'learning_rate': 0.01,
+            'momentum': 0.937,
+            'weight_decay': 0.0005,
+            'scheduler': 'cosine',
+            'warmup_epochs': 3,
+            'warmup_momentum': 0.8,
+            'warmup_bias_lr': 0.1,
+            'early_stopping': {
+                'enabled': True,
+                'patience': 10,
+                'min_delta': 0.001
+            },
+            'save_best': {
+                'enabled': True,
+                'metric': 'mAP_0.5'
+            }
+        }
+        
+        # Mock UI components
+        self.mock_ui_components = {
             'batch_size_slider': MagicMock(value=16),
             'image_size_slider': MagicMock(value=640),
             'epochs_slider': MagicMock(value=100),
+            'augment_checkbox': MagicMock(value=True),
             'optimizer_dropdown': MagicMock(value='SGD'),
             'learning_rate_slider': MagicMock(value=0.01),
             'momentum_slider': MagicMock(value=0.937),
@@ -28,194 +57,135 @@ class TestHyperparametersDriveHandlers(unittest.TestCase):
             'warmup_epochs_slider': MagicMock(value=3),
             'warmup_momentum_slider': MagicMock(value=0.8),
             'warmup_bias_lr_slider': MagicMock(value=0.1),
-            'augment_checkbox': MagicMock(value=True),
-            'dropout_checkbox': MagicMock(value=True),
-            'dropout_slider': MagicMock(value=0.2),
-            'early_stopping_checkbox': MagicMock(value=True),
+            'early_stopping_enabled_checkbox': MagicMock(value=True),
             'early_stopping_patience_slider': MagicMock(value=10),
             'early_stopping_min_delta_slider': MagicMock(value=0.001),
             'save_best_checkbox': MagicMock(value=True),
-            'info_panel': MagicMock(),
-            'update_hyperparameters_info': MagicMock(),
-            'status': MagicMock()
+            'checkpoint_metric_dropdown': MagicMock(value='mAP_0.5'),
+            'status': MagicMock(),
+            'update_hyperparameters_info': MagicMock()
         }
         
-        # Buat mock environment
+        # Mock environment
         self.mock_env = MagicMock()
         self.mock_env.is_drive_mounted = True
         self.mock_env.drive_path = '/content/drive'
-        
-        # Buat mock config manager
-        self.mock_config_manager = MagicMock()
-        self.mock_config_manager.save_config.return_value = True
-        self.mock_config_manager.load_config.return_value = {
-            'batch_size': 32,
-            'image_size': 512,
-            'epochs': 150,
-            'optimizer': 'Adam',
-            'learning_rate': 0.001,
-            'momentum': 0.9,
-            'weight_decay': 0.0001,
-            'scheduler': 'step',
-            'warmup_epochs': 5,
-            'warmup_momentum': 0.85,
-            'warmup_bias_lr': 0.05,
-            'augment': True,
-            'dropout': {
-                'enabled': True,
-                'rate': 0.3
-            },
-            'early_stopping': {
-                'enabled': True,
-                'patience': 15,
-                'min_delta': 0.0005
-            },
-            'save_best': {
-                'enabled': True,
-                'metric': 'mAP_0.5'
-            }
-        }
-        
-        # Buat temporary file untuk test
-        self.temp_dir = tempfile.TemporaryDirectory()
-        self.temp_file = os.path.join(self.temp_dir.name, 'hyperparameters_config.yaml')
-    
-    def tearDown(self):
-        """Cleanup setelah test."""
-        self.temp_dir.cleanup()
     
     @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_logger')
+    @patch('os.path.exists')
     @patch('os.makedirs')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_status_indicator')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_info_alert')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.display')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.clear_output')
-    def test_sync_to_drive(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                         mock_makedirs, mock_get_config_manager, mock_get_environment_manager):
-        """Test sinkronisasi ke Google Drive."""
+    def test_sync_to_drive_success(self, mock_makedirs, mock_exists, mock_get_logger, mock_get_config_manager, mock_get_env):
+        """Pengujian sinkronisasi konfigurasi ke Google Drive berhasil"""
         # Setup mock
-        mock_get_environment_manager.return_value = self.mock_env
-        mock_get_config_manager.return_value = self.mock_config_manager
-        mock_create_status_indicator.return_value = "Status indicator"
-        mock_create_info_alert.return_value = "Info alert"
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
         
-        # Panggil fungsi yang ditest
-        sync_to_drive(None, self.ui_components)
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = self.mock_config
+        mock_config_manager.sync_to_drive.return_value = (True, "Success")
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_env = MagicMock()
+        mock_env.is_drive_mounted = True
+        mock_env.drive_path = '/content/drive'
+        mock_get_env.return_value = mock_env
+        
+        mock_exists.return_value = False
+        
+        # Panggil fungsi
+        sync_to_drive(None, self.mock_ui_components)
         
         # Verifikasi hasil
-        mock_get_environment_manager.assert_called_once()
-        mock_get_config_manager.assert_called_once()
         mock_makedirs.assert_called_once()
-        # Perhatikan bahwa dalam implementasi drive_handlers.py, create_info_alert mungkin dipanggil
-        # dalam blok with status_panel, sehingga tidak terdeteksi oleh mock_create_info_alert
-        # Kita hanya perlu memastikan bahwa fungsi berjalan tanpa error
+        mock_config_manager.sync_to_drive.assert_called_once()
+        self.mock_ui_components['status'].clear_output.assert_called()
     
-    @patch('os.path.exists')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.update_ui_from_config')
     @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_config_manager')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_status_indicator')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_info_alert')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.display')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.clear_output')
-    def test_sync_from_drive(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                           mock_get_config_manager, mock_get_environment_manager, mock_update_ui, mock_exists):
-        """Test sinkronisasi dari Google Drive."""
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_logger')
+    @patch('os.path.exists')
+    @patch('smartcash.common.io.load_yaml')
+    def test_sync_from_drive_success(self, mock_load_yaml, mock_exists, mock_get_logger, mock_get_config_manager, mock_get_env):
+        """Pengujian sinkronisasi konfigurasi dari Google Drive berhasil"""
         # Setup mock
-        mock_get_environment_manager.return_value = self.mock_env
-        mock_get_config_manager.return_value = self.mock_config_manager
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
+        mock_config_manager = MagicMock()
+        mock_config_manager.sync_with_drive.return_value = (True, "Success", self.mock_config)
+        mock_config_manager.save_module_config.return_value = True
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_env = MagicMock()
+        mock_env.is_drive_mounted = True
+        mock_env.drive_path = '/content/drive'
+        mock_get_env.return_value = mock_env
+        
+        mock_exists.return_value = True
+        mock_load_yaml.return_value = self.mock_config
+        
+        # Panggil fungsi
+        sync_from_drive(None, self.mock_ui_components)
+        
+        # Verifikasi hasil
+        mock_config_manager.sync_with_drive.assert_called_once()
+        mock_config_manager.save_module_config.assert_called_once()
+        self.mock_ui_components['status'].clear_output.assert_called()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_logger')
+    @patch('os.path.exists')
+    def test_sync_from_drive_file_not_exists(self, mock_exists, mock_get_logger, mock_get_config_manager, mock_get_env):
+        """Pengujian sinkronisasi konfigurasi dari Google Drive gagal karena file tidak ada"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
+        mock_config_manager = MagicMock()
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_env = MagicMock()
+        mock_env.is_drive_mounted = True
+        mock_env.drive_path = '/content/drive'
+        mock_get_env.return_value = mock_env
+        
+        mock_exists.return_value = False
+        
+        # Panggil fungsi
+        sync_from_drive(None, self.mock_ui_components)
+        
+        # Verifikasi hasil
+        mock_config_manager.save_module_config.assert_not_called()
+        self.mock_ui_components['status'].clear_output.assert_called()
+    
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_logger')
+    @patch('os.path.exists')
+    def test_sync_from_drive_drive_not_mounted(self, mock_exists, mock_get_logger, mock_get_config_manager, mock_get_env):
+        """Pengujian sinkronisasi konfigurasi dari Google Drive gagal karena drive tidak diaktifkan"""
+        # Setup mock
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
+        mock_config_manager = MagicMock()
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_env = MagicMock()
+        mock_env.is_drive_mounted = False
+        mock_get_env.return_value = mock_env
+        
         mock_exists.return_value = True
         
-        # Patch load_yaml secara manual
-        with patch('smartcash.common.io.load_yaml') as mock_load_yaml:
-            mock_load_yaml.return_value = self.mock_config_manager.load_config.return_value
-            mock_create_status_indicator.return_value = "Status indicator"
-            mock_create_info_alert.return_value = "Info alert"
-            
-            # Panggil fungsi yang ditest
-            sync_from_drive(None, self.ui_components)
-            
-            # Verifikasi hasil
-            mock_get_environment_manager.assert_called_once()
-            mock_get_config_manager.assert_called_once()
-            mock_exists.assert_called_once()
-            mock_update_ui.assert_called_once()
-            # Perhatikan bahwa dalam implementasi drive_handlers.py, create_info_alert mungkin dipanggil
-            # dalam blok with status_panel, sehingga tidak terdeteksi oleh mock_create_info_alert
-            # Kita hanya perlu memastikan bahwa fungsi berjalan tanpa error
-    
-    @patch('os.path.exists')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_config_manager')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_status_indicator')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_info_alert')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.display')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.clear_output')
-    def test_sync_from_drive_file_not_exists(self, mock_clear_output, mock_display, mock_create_info_alert, mock_create_status_indicator, 
-                                          mock_get_config_manager, mock_get_environment_manager, mock_exists):
-        """Test sinkronisasi dari Google Drive ketika file tidak ada."""
-        # Setup mock
-        mock_get_environment_manager.return_value = self.mock_env
-        mock_get_config_manager.return_value = self.mock_config_manager
-        mock_exists.return_value = False
-        mock_create_status_indicator.return_value = "Status indicator"
-        mock_create_info_alert.return_value = "Info alert"
-        
-        # Panggil fungsi yang ditest
-        sync_from_drive(None, self.ui_components)
+        # Panggil fungsi
+        sync_from_drive(None, self.mock_ui_components)
         
         # Verifikasi hasil
-        mock_get_environment_manager.assert_called_once()
-        mock_get_config_manager.assert_called_once()
-        mock_exists.assert_called_once()
-        # Perhatikan bahwa dalam implementasi drive_handlers.py, create_info_alert mungkin dipanggil
-        # dalam blok with status_panel, sehingga tidak terdeteksi oleh mock_create_info_alert
-        # Kita hanya perlu memastikan bahwa fungsi berjalan tanpa error
-    
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_status_indicator')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_info_alert')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.display')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.clear_output')
-    def test_sync_to_drive_not_mounted(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                                     mock_create_status_indicator, mock_get_environment_manager):
-        """Test sinkronisasi ke Google Drive ketika tidak di-mount."""
-        # Setup mock
-        mock_env = MagicMock()
-        mock_env.is_drive_mounted = False
-        mock_get_environment_manager.return_value = mock_env
-        mock_create_status_indicator.return_value = "Status indicator"
-        mock_create_info_alert.return_value = "Info alert"
-        
-        # Panggil fungsi yang ditest
-        sync_to_drive(None, self.ui_components)
-        
-        # Verifikasi hasil
-        mock_get_environment_manager.assert_called_once()
-        mock_create_info_alert.assert_called()
-    
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.get_environment_manager')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_status_indicator')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.create_info_alert')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.display')
-    @patch('smartcash.ui.training_config.hyperparameters.handlers.drive_handlers.clear_output')
-    def test_sync_from_drive_not_mounted(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                                      mock_create_status_indicator, mock_get_environment_manager):
-        """Test sinkronisasi dari Google Drive ketika tidak di-mount."""
-        # Setup mock
-        mock_env = MagicMock()
-        mock_env.is_drive_mounted = False
-        mock_get_environment_manager.return_value = mock_env
-        mock_create_status_indicator.return_value = "Status indicator"
-        mock_create_info_alert.return_value = "Info alert"
-        
-        # Panggil fungsi yang ditest
-        sync_from_drive(None, self.ui_components)
-        
-        # Verifikasi hasil
-        mock_get_environment_manager.assert_called_once()
-        mock_create_info_alert.assert_called()
+        mock_config_manager.save_module_config.assert_not_called()
+        self.mock_ui_components['status'].clear_output.assert_called()
 
 if __name__ == '__main__':
     unittest.main()

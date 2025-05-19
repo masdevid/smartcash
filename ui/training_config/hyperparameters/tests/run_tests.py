@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 # Import test cases
 from smartcash.ui.training_config.hyperparameters.tests.test_hyperparameters_config import TestHyperparametersConfig
 from smartcash.ui.training_config.hyperparameters.tests.test_hyperparameters_ui import TestHyperparametersUI
-from smartcash.ui.training_config.hyperparameters.tests.test_drive_handlers import TestHyperparametersDriveHandlers
+from smartcash.ui.training_config.hyperparameters.tests.test_drive_handlers import TestDriveHandlers
 
 def run_tests():
     """Jalankan semua test."""
@@ -23,7 +23,7 @@ def run_tests():
     # Tambahkan test cases
     test_suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestHyperparametersConfig))
     test_suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestHyperparametersUI))
-    test_suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestHyperparametersDriveHandlers))
+    test_suite.addTest(unittest.TestLoader().loadTestsFromTestCase(TestDriveHandlers))
     
     # Jalankan test
     runner = unittest.TextTestRunner(verbosity=2)

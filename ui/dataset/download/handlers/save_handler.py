@@ -19,6 +19,10 @@ def handle_save_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
     logger = ui_components.get('logger')
     
+    # Reset log output saat tombol diklik
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+        ui_components['log_output'].clear_output(wait=True)
+    
     try:
         # Simpan konfigurasi dan hasil
         output_path = save_config_and_results(ui_components)

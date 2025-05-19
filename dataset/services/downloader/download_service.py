@@ -65,7 +65,13 @@ class DownloadService:
                 valid = self.validator.verify_download(str(temp_download_path), metadata)
                 if not valid: self.logger.warning("⚠️ Verifikasi dataset gagal, tapi melanjutkan proses")
             notify_service_event("download", "progress", self, self.observer_manager, step="finalize", message="Memindahkan dataset ke lokasi final", progress=5, total_steps=5, current_step=5)
-            if output_path.exists(): self.logger.info(f"🧹 Menghapus direktori sebelumnya: {output_path}"); shutil.rmtree(output_path)
+            if output_path.exists():
+                self.logger.info(f"🧹 Menghapus direktori sebelumnya: {output_path}")
+                # Tangani kasus symbolic link
+                if output_path.is_symlink():
+                    os.unlink(str(output_path))
+                else:
+                    shutil.rmtree(output_path, ignore_errors=True)
             self.logger.info(f"🔄 Memindahkan dataset ke lokasi final: {output_path}"); shutil.move(str(temp_download_path), str(output_path))
             stats, elapsed_time = self.validator.get_dataset_stats(output_dir), time.time() - start_time
             notify_service_event("download", "complete", self, self.observer_manager, message=f"Download dataset selesai: {stats.get('total_images', 0)} gambar", duration=elapsed_time)

@@ -18,6 +18,10 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
     logger = ui_components.get('logger')
     
+    # Reset log output saat tombol diklik
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+        ui_components['log_output'].clear_output(wait=True)
+    
     # Nonaktifkan tombol selama proses
     _disable_buttons(ui_components, True)
     

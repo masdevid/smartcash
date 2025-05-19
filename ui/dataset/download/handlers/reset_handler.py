@@ -15,6 +15,10 @@ def handle_reset_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
     logger = ui_components.get('logger')
     
+    # Reset log output saat tombol diklik
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+        ui_components['log_output'].clear_output(wait=True)
+    
     try:
         # Reset UI components
         reset_download_ui(ui_components)
@@ -70,9 +74,8 @@ def reset_download_ui(ui_components: Dict[str, Any]) -> None:
         ui_components['summary_container'].clear_output()
         ui_components['summary_container'].layout.display = 'none'
     
-    # Reset log output
-    if 'log_output' in ui_components:
-        ui_components['log_output'].clear_output()
+    # Tidak perlu reset log output di sini karena sudah dilakukan saat tombol diklik
+    # dan tidak ingin menghapus log setelah proses selesai
     
     # Aktifkan tombol-tombol
     _enable_buttons(ui_components)

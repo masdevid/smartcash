@@ -64,19 +64,21 @@ def get_split_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
         logger.error(f"❌ Error saat mengambil konfigurasi split dataset: {str(e)}")
         return get_default_split_config()
 
-def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def update_config_from_ui(ui_components: Dict[str, Any], config_manager: Optional[Any] = None) -> Dict[str, Any]:
     """
     Update konfigurasi split dataset dari UI components.
     
     Args:
         ui_components: Dictionary komponen UI
+        config_manager: Config manager instance (opsional)
         
     Returns:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Get config manager
-        config_manager = get_config_manager()
+        # Get config manager if not provided
+        if config_manager is None:
+            config_manager = get_config_manager()
         
         # Get current config
         config = config_manager.get_module_config('dataset_split') or get_default_split_config()

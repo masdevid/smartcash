@@ -5,6 +5,7 @@ Deskripsi: Handler untuk interaksi UI split dataset
 
 from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -22,8 +23,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
     # Pastikan struktur konfigurasi benar
     if not config:
         if logger: logger.debug(f"{ICONS['warning']} Konfigurasi kosong, menggunakan default")
-        from smartcash.ui.dataset.split.handlers.config_handlers import load_default_config
-        config = load_default_config()
+        config = get_default_split_config()
     
     if 'data' not in config:
         config['data'] = {}

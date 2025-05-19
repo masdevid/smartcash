@@ -27,13 +27,8 @@ class TestConfigSync:
         content_config_dir = Path('/content/configs')
         
         # Pastikan kedua direktori ada
-        if not smartcash_config_dir.exists():
-            print(f"⚠️ Direktori {smartcash_config_dir} tidak ditemukan")
-            return False
-        
-        if not content_config_dir.exists():
-            print(f"⚠️ Direktori {content_config_dir} tidak ditemukan")
-            return False
+        assert smartcash_config_dir.exists(), f"⚠️ Direktori {smartcash_config_dir} tidak ditemukan"
+        assert content_config_dir.exists(), f"⚠️ Direktori {content_config_dir} tidak ditemukan"
         
         # Dapatkan daftar file konfigurasi di kedua direktori
         def get_config_files(dir_path: Path) -> Set[str]:
@@ -97,13 +92,11 @@ class TestConfigSync:
             else:
                 print(f"⚠️ {config_file}: Isi file berbeda")
         
-        # Tampilkan kesimpulan
-        if smartcash_count == content_count and not missing_in_content and not missing_in_smartcash:
-            print("\n✅ Semua file konfigurasi berhasil disinkronkan")
-            return True
-        else:
-            print("\n⚠️ Beberapa file konfigurasi tidak berhasil disinkronkan")
-            return False
+        # Assert bahwa semua file konfigurasi berhasil disinkronkan
+        assert smartcash_count == content_count, "Jumlah file konfigurasi tidak sama"
+        assert not missing_in_content, f"File konfigurasi yang tidak ada di {content_config_dir}: {missing_in_content}"
+        assert not missing_in_smartcash, f"File konfigurasi yang tidak ada di {smartcash_config_dir}: {missing_in_smartcash}"
+        print("\n✅ Semua file konfigurasi berhasil disinkronkan")
 
     @staticmethod
     def test_config_manager_base_dir_none():

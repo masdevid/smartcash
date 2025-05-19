@@ -189,7 +189,7 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
         logger: Logger untuk logging
     """
     # Import fungsi yang diperlukan
-    from smartcash.ui.dataset.split.handlers.config_handlers import load_default_config, save_config_with_manager
+    from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config, save_config_with_manager
     from smartcash.ui.dataset.split.handlers.ui_handlers import update_ui_from_config
     from smartcash.ui.utils.constants import COLORS
     
@@ -208,7 +208,7 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
     
     try:
         # Load konfigurasi default
-        default_config = load_default_config()
+        default_config = get_default_split_config()
         
         # Update UI dari konfigurasi default
         update_ui_from_config(ui_components, default_config)

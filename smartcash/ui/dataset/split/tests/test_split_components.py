@@ -7,14 +7,14 @@ import unittest
 from unittest.mock import patch, MagicMock
 import ipywidgets as widgets
 from smartcash.ui.dataset.split.components.split_components import create_split_ui
-from smartcash.ui.dataset.split.handlers.config_handlers import load_config, save_config, load_default_config
+from smartcash.ui.dataset.split.handlers.config_handlers import load_config, save_config, get_default_split_config
 
 class TestSplitComponents(unittest.TestCase):
     """Test suite untuk komponen split dataset"""
     
     def setUp(self):
         """Setup test environment"""
-        self.config = load_default_config()
+        self.config = get_default_split_config()
         self.ui_components = create_split_ui()
     
     def test_create_split_ui(self):
@@ -82,7 +82,7 @@ class TestSplitComponents(unittest.TestCase):
         # mock_manager.save_module_config.assert_called_once_with('dataset', self.config)
         
         # Test load default config
-        default_config = load_default_config()
+        default_config = get_default_split_config()
         self.assertIn('split', default_config['data'])
         self.assertIn('train', default_config['data']['split'])
         self.assertIn('val', default_config['data']['split'])

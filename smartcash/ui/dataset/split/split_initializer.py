@@ -53,8 +53,8 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
                 logger.debug(f"✅ Konfigurasi berhasil dimuat")
             except Exception as e:
                 logger.warning(f"⚠️ Error saat memuat konfigurasi: {str(e)}")
-                from smartcash.ui.dataset.split.handlers.config_handlers import load_default_config
-                config = load_default_config()
+                from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config
+                config = get_default_split_config()
                 logger.debug(f"ℹ️ Menggunakan konfigurasi default")
         
         # Buat komponen UI

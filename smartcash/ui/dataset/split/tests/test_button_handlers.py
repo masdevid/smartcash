@@ -16,7 +16,7 @@ from smartcash.ui.dataset.split.handlers.button_handlers import (
 from smartcash.ui.dataset.split.handlers.config_handlers import (
     update_ui_from_config,
     save_config,
-    load_default_config
+    get_default_split_config
 )
 from smartcash.ui.dataset.split.components.split_components import create_split_ui
 
@@ -59,7 +59,7 @@ class TestButtonHandlers(unittest.TestCase):
         # mock_save.assert_called()
         # mock_notify.assert_called()
     
-    @patch('smartcash.ui.dataset.split.handlers.config_handlers.load_default_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.get_default_split_config')
     @patch('smartcash.ui.dataset.split.handlers.config_handlers.save_config')
     @patch('smartcash.ui.dataset.split.handlers.config_handlers.update_ui_from_config')
     @patch('smartcash.ui.dataset.split.handlers.button_handlers.notify_service_event')

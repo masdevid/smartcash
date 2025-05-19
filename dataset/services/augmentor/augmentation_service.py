@@ -23,10 +23,11 @@ from smartcash.dataset.utils.move_utils import move_files_to_preprocessed
 class AugmentationService:
     """Layanan augmentasi dataset dengan prioritisasi kelas dan pelacakan dinamis"""
     
-    def __init__(self, config: Dict = None, data_dir: str = 'data', logger=None, num_workers: int = None):
+    def __init__(self, config: Dict = None, data_dir: str = 'data', logger=None, num_workers: int = None, ui_components: Dict[str, Any] = None):
         """Inisialisasi AugmentationService dengan parameter utama."""
         self.config = config or {}
         self.data_dir = data_dir
+        self.ui_components = ui_components or {}
         
         # Gunakan logger dengan konteks augmentation untuk mencegah interferensi dengan log download
         if logger and hasattr(logger, 'bind'):
@@ -48,14 +49,84 @@ class AugmentationService:
         
         self._stop_signal = False
         self._progress_callbacks = []
+        self._notification_manager = None
+        
+        # Inisialisasi notification manager jika ui_components tersedia
+        if ui_components:
+            try:
+                # Import notification manager hanya jika diperlukan
+                from smartcash.ui.dataset.augmentation.utils.notification_manager import get_notification_manager
+                self._notification_manager = get_notification_manager(ui_components)
+                self.logger.info("✅ NotificationManager berhasil diinisialisasi")
+            except ImportError as e:
+                self.logger.warning(f"⚠️ NotificationManager tidak tersedia: {str(e)}")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error saat inisialisasi NotificationManager: {str(e)}")
     
-    def register_progress_callback(self, callback: Callable) -> None:
-        """Register callback untuk progress tracking."""
-        if callback and callable(callback): 
+    def register_progress_callback(self, callback: Callable = None, notification_manager = None) -> None:
+        """Register callback untuk progress tracking atau notification manager.
+        
+        Args:
+            callback: Fungsi callback untuk progress tracking (pola lama)
+            notification_manager: Instance NotificationManager (pola baru)
+        """
+        if notification_manager:
+            self._notification_manager = notification_manager
+            self.logger.info("✅ NotificationManager berhasil diregistrasi")
+        elif callback and callable(callback): 
             self._progress_callbacks.append(callback)
+            self.logger.info("✅ Progress callback berhasil diregistrasi")
     
     def report_progress(self, progress: int = None, total: int = None, message: str = None, status: str = 'info', **kwargs) -> None:
-        """Laporkan progress dengan callback dan hindari duplikasi parameter."""
+        """Laporkan progress dengan callback atau notification manager.
+        
+        Args:
+            progress: Nilai progress (0-100)
+            total: Total item yang diproses
+            message: Pesan yang akan ditampilkan
+            status: Tipe status ('info', 'success', 'warning', 'error')
+            **kwargs: Parameter tambahan
+        """
+        # Gunakan notification manager jika tersedia
+        if self._notification_manager:
+            try:
+                # Deteksi jenis notifikasi berdasarkan parameter dan keyword
+                if kwargs.get('process_start', False) or kwargs.get('start', False):
+                    # Notifikasi proses dimulai
+                    process_name = kwargs.get('process_name', 'augmentation')
+                    display_info = message or kwargs.get('display_info', '')
+                    split = kwargs.get('split')
+                    self._notification_manager.notify_process_start(process_name, display_info, split)
+                    return
+                    
+                elif kwargs.get('process_complete', False) or kwargs.get('complete', False):
+                    # Notifikasi proses selesai
+                    result = kwargs.get('result', {})
+                    display_info = message or kwargs.get('display_info', '')
+                    self._notification_manager.notify_process_complete(result, display_info)
+                    return
+                    
+                elif status == 'error' or kwargs.get('error', False):
+                    # Notifikasi error
+                    error_message = message or kwargs.get('error_message', 'Unknown error')
+                    self._notification_manager.notify_process_error(error_message)
+                    return
+                    
+                elif progress is not None:
+                    # Update progress bar
+                    self._notification_manager.update_progress(progress, message or '')
+                    return
+                    
+                else:
+                    # Update status panel
+                    self._notification_manager.update_status(status, message or '')
+                    return
+                    
+            except Exception as e:
+                self.logger.error(f"❌ Error saat menggunakan NotificationManager: {str(e)}")
+                # Fallback ke callback lama jika notification manager gagal
+        
+        # Fallback ke callback lama jika notification manager tidak tersedia atau gagal
         for callback in self._progress_callbacks:
             try:
                 # Buat params bersih dengan one-liner
@@ -74,11 +145,13 @@ class AugmentationService:
                     'context': kwargs.get('context', 'augmentation_only')
                 }.items() if v is not None}
                 
-                # Gabungkan dan panggil callback
+                # Gabungkan dengan filtered_kwargs
                 params.update(filtered_kwargs)
+                
+                # Panggil callback dengan parameter yang ada
                 callback(**params)
-            except Exception as e: 
-                self.logger.warning(f"⚠️ Error pada progress callback: {str(e)}")
+            except Exception as e:
+                self.logger.error(f"❌ Error saat memanggil progress callback: {str(e)}")
     
     def augment_dataset(
         self, 
@@ -102,6 +175,16 @@ class AugmentationService:
         # Gunakan helper untuk setup paths
         paths = setup_paths(self.config, split)
         
+        # Notifikasi awal proses augmentasi
+        self.report_progress(
+            message=f"Memulai augmentasi dataset {split}",
+            status="info",
+            process_start=True,
+            process_name="augmentation",
+            display_info=f"{split} ({len(augmentation_types or [])} jenis)",
+            split=split
+        )
+        
         # Validasi input files dengan helper
         image_files, validation_result = validate_input_files(
             paths['images_input_dir'], 
@@ -111,8 +194,15 @@ class AugmentationService:
         
         # Return error jika validasi gagal
         if not validation_result['success']:
-            self.logger.warning(f"⚠️ {validation_result['message']}")
-            return {"status": "error", "message": validation_result['message']}
+            error_message = validation_result['message']
+            self.logger.warning(f"⚠️ {error_message}")
+            self.report_progress(
+                message=error_message,
+                status="error",
+                error=True,
+                error_message=error_message
+            )
+            return {"status": "error", "message": error_message}
             
         # Persiapkan balancing dengan prioritisasi kelas
         class_data = self._prepare_balancing(image_files, paths, target_count, target_balance)
@@ -138,8 +228,9 @@ class AugmentationService:
         # Handle move files jika diperlukan
         if move_to_preprocessed and augmentation_result['status'] == 'success':
             self.report_progress(
-                message=f"🔄 Memindahkan {augmentation_result['generated']} file ke direktori preprocessed",
-                status="info", step=2,
+                message=f"Memindahkan {augmentation_result['generated']} file ke direktori preprocessed",
+                status="info", 
+                step=2,
                 module_type="augmentation",
                 context="augmentation_only",
                 silent=True  # Tambahkan flag silent untuk mengurangi output log yang tidak perlu
@@ -153,6 +244,23 @@ class AugmentationService:
             # Update path output jika berhasil di-move
             if move_success:
                 augmentation_result['final_output_dir'] = paths['final_output_dir']
+        
+        # Notifikasi akhir proses augmentasi
+        if augmentation_result['status'] == 'success':
+            self.report_progress(
+                message=f"Augmentasi berhasil dengan {augmentation_result['generated']} gambar",
+                status="success",
+                process_complete=True,
+                result=augmentation_result,
+                display_info=f"{split} ({augmentation_result['generated']} gambar)"
+            )
+        else:
+            self.report_progress(
+                message=augmentation_result.get('message', 'Augmentasi gagal'),
+                status="error",
+                error=True,
+                error_message=augmentation_result.get('message', 'Augmentasi gagal')
+            )
         
         return augmentation_result
     
@@ -169,8 +277,12 @@ class AugmentationService:
             
         # Laporkan progres analisis
         self.report_progress(
-            message="🔍 Menganalisis distribusi kelas untuk balancing optimal",
-            status="info", step=0
+            message="Menganalisis distribusi kelas untuk balancing optimal",
+            status="info", 
+            step=0,
+            progress=10,  # Berikan nilai progress awal
+            current_progress=1,
+            current_total=10
         )
         
         try:

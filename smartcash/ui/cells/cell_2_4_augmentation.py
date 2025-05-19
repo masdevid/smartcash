@@ -5,7 +5,7 @@ Deskripsi: Entry point untuk augmentasi dataset dengan pendekatan DRY
 
 def setup_augmentation():
     """Setup dan tampilkan UI untuk augmentasi dataset."""
-    # Import modul augmentation dengan pendekatan DRY
+    # Import modul augmentation
     from smartcash.ui.dataset.augmentation.augmentation_initializer import initialize_augmentation_ui
     
     # Inisialisasi UI dan kembalikan komponen

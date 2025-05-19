@@ -524,3 +524,45 @@ def on_split_change(change: Dict[str, Any], ui_components: Dict[str, Any]) -> No
         # Tampilkan pesan error
         if 'status_label' in ui_components:
             ui_components['status_label'].value = f"Error: {str(e)}"
+
+
+def setup_augmentation_module() -> Dict[str, Any]:
+    """
+    Setup modul augmentasi dataset dengan pendekatan minimalis.
+    
+    Returns:
+        Dictionary UI components yang telah diinisialisasi
+    """
+    logger = get_logger('augmentation')
+    
+    try:
+        # Import komponen UI untuk augmentasi
+        from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
+        
+        # Buat UI components
+        ui_components = create_augmentation_ui()
+        
+        # Tambahkan logger
+        ui_components['logger'] = logger
+        
+        # Inisialisasi UI
+        result = initialize_augmentation_ui(ui_components)
+        
+        # Log status inisialisasi
+        if result.get('status') == 'success':
+            logger.info(f"✅ {result.get('message', 'Modul augmentasi berhasil diinisialisasi')}")
+        else:
+            logger.error(f"❌ {result.get('message', 'Error saat inisialisasi modul augmentasi')}")
+        
+        # Setup handlers
+        from smartcash.ui.dataset.augmentation.handlers.setup_handlers import setup_augmentation_handlers
+        ui_components = setup_augmentation_handlers(ui_components)
+        
+        # Tampilkan UI
+        from IPython.display import display
+        display(ui_components['ui'])
+        
+        return ui_components
+    except Exception as e:
+        logger.error(f"❌ Error saat setup modul augmentasi: {str(e)}")
+        raise e

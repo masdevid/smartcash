@@ -1,19 +1,53 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer untuk modul augmentasi dataset
+Deskripsi: Initializer untuk modul augmentasi dataset dengan pendekatan DRY
 """
 
-from typing import Dict, Any, Optional
-import ipywidgets as widgets
-from IPython.display import display
-from smartcash.ui.utils.constants import ICONS
+from typing import Dict, Any
+from smartcash.ui.utils.base_initializer import initialize_module_ui
+from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
+from smartcash.ui.dataset.augmentation.handlers.setup_handlers import setup_augmentation_handlers
 from smartcash.common.logger import get_logger
 
 logger = get_logger("augmentation_initializer")
 
+def initialize_augmentation_ui() -> Dict[str, Any]:
+    """
+    Inisialisasi UI dan handler untuk augmentasi dataset.
+    
+    Returns:
+        Dictionary UI components yang terinisialisasi
+    """
+    # Konfigurasi multi-progress tracking
+    multi_progress_config = {
+        "module_name": "augmentation",
+        "step_key": "augmentation_step",
+        "progress_bar_key": "progress_bar",
+        "current_progress_key": "current_progress",
+        "overall_label_key": "overall_label",
+        "step_label_key": "step_label"
+    }
+    
+    # Tombol yang perlu diattach dengan ui_components
+    button_keys = ['augment_button', 'augmentation_button', 'stop_button', 'reset_button', 'cleanup_button', 'save_button']
+    
+    # Gunakan base initializer dengan konfigurasi minimal
+    ui_components = initialize_module_ui(
+        module_name='augmentation',
+        create_ui_func=create_augmentation_ui,
+        setup_specific_handlers_func=setup_augmentation_handlers,
+        button_keys=button_keys,
+        multi_progress_config=multi_progress_config,
+        observer_group="augmentation_observers"
+    )
+    
+    return ui_components
+
+
 def initialize_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Inisialisasi modul augmentasi dataset.
+    Inisialisasi modul augmentasi dataset (fungsi lama untuk kompatibilitas).
+    Sebaiknya gunakan initialize_augmentation_ui() untuk pendekatan DRY.
 
     Args:
         ui_components: Dictionary komponen UI
@@ -21,62 +55,17 @@ def initialize_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    logger.warning("⚠️ Menggunakan initialize_augmentation() yang sudah usang. Sebaiknya gunakan initialize_augmentation_ui()")
+    
     # Tambahkan logger ke ui_components jika belum ada
     if 'logger' not in ui_components:
         ui_components['logger'] = logger
 
-    # Buat container untuk UI augmentasi
-    ui_components['augmentation_container'] = widgets.VBox([
-        widgets.HTML(value="<h2>Augmentasi Dataset</h2>"),
-        widgets.HTML(value="<p>Modul ini memungkinkan Anda untuk melakukan augmentasi pada dataset yang telah dipreprocessing.</p>")
-    ])
-
-    # Tambahkan status panel
-    status_panel = widgets.HTML(
-        value=f"<div style='padding:10px; background-color:#e8f4f8; border-left:4px solid #5bc0de; margin:10px 0;'>{ICONS['info']} Siap untuk augmentasi dataset</div>",
-        layout=widgets.Layout(margin='10px 0')
-    )
-    ui_components['status_panel'] = status_panel
-
-    # Tambahkan status panel ke container
-    ui_components['augmentation_container'].children += (status_panel,)
-
-    # Tambahkan output untuk status dan log
-    ui_components['status'] = widgets.Output(layout=widgets.Layout(margin='10px 0'))
-    ui_components['log_output'] = widgets.Output(layout=widgets.Layout(margin='10px 0', max_height='200px', overflow='auto'))
-
-    # Tambahkan output ke container
-    ui_components['augmentation_container'].children += (ui_components['status'],)
-
     # Setup handlers
     try:
-        from smartcash.ui.dataset.augmentation.handlers.setup_handlers import setup_augmentation_handlers
         ui_components = setup_augmentation_handlers(ui_components)
-        logger.info(f"{ICONS['success']} Modul augmentasi berhasil diinisialisasi")
+        logger.info("✅ Modul augmentasi berhasil diinisialisasi")
     except Exception as e:
-        logger.error(f"{ICONS['error']} Error saat setup handlers: {str(e)}")
-        with ui_components['status']:
-            display(widgets.HTML(
-                value=f"<div style='padding:10px; background-color:#f2dede; border-left:4px solid #d9534f; margin:10px 0;'>{ICONS['error']} Error saat setup handlers: {str(e)}</div>"
-            ))
-
-    # Tambahkan tombol-tombol ke container
-    if 'button_container' in ui_components:
-        ui_components['augmentation_container'].children += (ui_components['button_container'],)
-
-    # Tambahkan accordion options ke container
-    if 'options_accordion' in ui_components:
-        ui_components['augmentation_container'].children += (ui_components['options_accordion'],)
-
-    # Tambahkan progress bar ke container
-    if 'progress_container' in ui_components:
-        ui_components['augmentation_container'].children += (ui_components['progress_container'],)
-
-    # Tambahkan summary container ke container
-    if 'summary_container' in ui_components:
-        ui_components['augmentation_container'].children += (ui_components['summary_container'],)
-
-    # Tampilkan container
-    display(ui_components['augmentation_container'])
-
+        logger.error(f"❌ Error saat setup handlers: {str(e)}")
+    
     return ui_components

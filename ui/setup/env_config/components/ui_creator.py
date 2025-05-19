@@ -47,4 +47,17 @@ def create_env_config_ui() -> Dict[str, Any]:
         'button_layout': button_layout
     }
 
+    # Create a VBox layout for the entire UI
+    ui_layout = VBox([
+        header,
+        button_layout,
+        status_panel,
+        log_panel,
+        progress_bar,
+        progress_message
+    ])
+
+    # Add the layout to the components
+    ui_components['ui_layout'] = ui_layout
+
     return ui_components 

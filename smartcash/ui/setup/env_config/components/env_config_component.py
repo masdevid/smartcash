@@ -82,16 +82,5 @@ class EnvConfigComponent:
         else:
             self.ui_components['directory_button'].disabled = False
 
-        # Display the UI components
-        from ipywidgets import VBox
-        valid_components = [
-            self.ui_components['drive_button'],
-            self.ui_components['directory_button'],
-            self.ui_components['status_panel'],
-            self.ui_components.get('log_panel', None),
-            self.ui_components.get('progress_bar', None),
-            self.ui_components.get('progress_message', None)
-        ]
-        valid_components = [comp for comp in valid_components if comp is not None]
-        ui_layout = VBox(valid_components)
-        display(ui_layout)
+        # Display the UI components using the new ui_layout
+        display(self.ui_components['ui_layout'])

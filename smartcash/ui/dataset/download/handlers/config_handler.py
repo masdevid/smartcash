@@ -80,24 +80,25 @@ def save_config(config: Dict[str, Any], logger=None) -> str:
     Returns:
         Path ke file konfigurasi yang disimpan
     """
-    if not logger:
-        logger = get_logger(__name__)
     try:
         from smartcash.common.config.manager import get_config_manager
         from smartcash.common.environment import get_environment_manager
         env_manager = get_environment_manager()
         config_manager = get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
         config_manager.save_module_config('dataset_download', config)
-        logger.info(f"💾 Konfigurasi dataset berhasil disimpan menggunakan ConfigManager")
+        if logger:
+            logger.info(f"💾 Konfigurasi dataset berhasil disimpan menggunakan ConfigManager")
         return str(config_manager._get_module_config_path('dataset_download'))
     except Exception as e:
-        logger.warning(f"⚠️ Error saat menyimpan dengan ConfigManager: {str(e)}")
+        if logger:
+            logger.warning(f"⚠️ Error saat menyimpan dengan ConfigManager: {str(e)}")
     # Fallback ke file
     config_path = Path("configs/dataset_config.yaml")
     os.makedirs(config_path.parent, exist_ok=True)
     with open(config_path, 'w') as f:
         yaml.dump(config, f, default_flow_style=False)
-    logger.info(f"💾 Konfigurasi dataset berhasil disimpan ke {config_path}")
+    if logger:
+        logger.info(f"💾 Konfigurasi dataset berhasil disimpan ke {config_path}")
     return str(config_path)
 
 def get_config_manager_instance():
@@ -117,7 +118,8 @@ def save_config_with_manager(config: Dict[str, Any], ui_components: Dict[str, An
             config_manager.register_ui_components('dataset_download', ui_components)
             return config_manager.save_module_config('dataset_download', config)
         except Exception as e:
-            if logger: logger.warning(f"Gagal menyimpan dengan ConfigManager: {str(e)}")
+            if logger:
+                logger.warning(f"Gagal menyimpan dengan ConfigManager: {str(e)}")
     return bool(save_config(config, logger))
 
 def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any]) -> Dict[str, Any]:

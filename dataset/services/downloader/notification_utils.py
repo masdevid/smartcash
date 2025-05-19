@@ -66,7 +66,7 @@ def notify_event(
             # Langsung notifikasi via fungsi global
             from smartcash.components.observer import notify
             notify(event_type, sender, **params)
-    except Exception as e:
+    except Exception:
         # Jangan mengganggu proses jika notifikasi gagal
         pass
     finally:

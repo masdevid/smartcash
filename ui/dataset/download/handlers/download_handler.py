@@ -182,8 +182,19 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         _update_progress(ui_components, 20, "Mendownload dataset dari Roboflow...")
         
         # Download dataset menggunakan dataset manager
+        # Pastikan parameter yang dikirim sesuai dengan yang diterima oleh download_from_roboflow
+        # Ubah data_dir menjadi output_dir jika ada
+        if 'data_dir' in config and 'output_dir' not in config:
+            config['output_dir'] = config.pop('data_dir')
+            
         result = dataset_manager.download_from_roboflow(
-            **config
+            api_key=config.get('api_key'),
+            workspace=config.get('workspace'),
+            project=config.get('project'),
+            version=config.get('version'),
+            format=config.get('format', 'yolov5pytorch'),
+            output_dir=config.get('output_dir'),
+            verify_integrity=config.get('validate', True)
         )
         
         # Proses hasil download

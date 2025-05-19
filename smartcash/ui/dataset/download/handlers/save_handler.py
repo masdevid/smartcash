@@ -7,6 +7,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 from pathlib import Path
+from datetime import datetime
 
 def handle_save_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
@@ -40,7 +41,7 @@ def handle_save_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
 
 def save_config_and_results(ui_components: Dict[str, Any], output_path: Optional[str] = None) -> str:
     """
-    Simpan konfigurasi dan hasil download ke file JSON.
+    Simpan konfigurasi dan hasil download ke file JSON dan sinkronisasi dengan Google Drive jika tersedia.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -49,6 +50,8 @@ def save_config_and_results(ui_components: Dict[str, Any], output_path: Optional
     Returns:
         Path file yang disimpan
     """
+    logger = ui_components.get('logger')
+    
     # Dapatkan nilai dari komponen UI
     config = {
         'workspace': ui_components.get('rf_workspace', {}).value if 'rf_workspace' in ui_components else '',
@@ -56,7 +59,7 @@ def save_config_and_results(ui_components: Dict[str, Any], output_path: Optional
         'version': ui_components.get('rf_version', {}).value if 'rf_version' in ui_components else '',
         'output_dir': ui_components.get('output_dir', {}).value if 'output_dir' in ui_components else 'data',
         'validate_dataset': ui_components.get('validate_dataset', {}).value if 'validate_dataset' in ui_components else True,
-        'timestamp': ui_components.get('download_timestamp', '')
+        'timestamp': ui_components.get('download_timestamp', '') or datetime.now().isoformat()
     }
     
     # Tambahkan statistik dataset jika tersedia
@@ -75,6 +78,71 @@ def save_config_and_results(ui_components: Dict[str, Any], output_path: Optional
     # Simpan ke file JSON
     with open(output_path, 'w') as f:
         json.dump(config, f, indent=2)
+    
+    if logger: logger.info(f"💾 Konfigurasi disimpan ke {output_path}")
+    
+    # Sinkronisasi dengan Google Drive jika dalam environment Colab
+    try:
+        # Cek apakah kita berada di Google Colab
+        from google.colab import drive
+        
+        # Coba mount Google Drive jika belum di-mount
+        try:
+            drive_mounted = os.path.exists('/content/drive/MyDrive')
+            if not drive_mounted:
+                if logger: logger.info("🔄 Mounting Google Drive...")
+                drive.mount('/content/drive')
+                if logger: logger.info("✅ Google Drive berhasil di-mount")
+        except Exception as e:
+            if logger: logger.warning(f"⚠️ Gagal mount Google Drive: {str(e)}")
+            return output_path
+        
+        # Tentukan path di Google Drive
+        drive_dir = f"/content/drive/MyDrive/SmartCash/{config['project']}_v{config['version']}"
+        os.makedirs(drive_dir, exist_ok=True)
+        drive_config_path = os.path.join(drive_dir, 'download_config.json')
+        
+        # Salin konfigurasi ke Google Drive
+        import shutil
+        shutil.copy2(output_path, drive_config_path)
+        
+        # Salin dataset ke Google Drive jika ukurannya tidak terlalu besar
+        dataset_dir = config['output_dir']
+        if os.path.exists(dataset_dir):
+            # Hitung ukuran dataset
+            total_size = 0
+            for dirpath, dirnames, filenames in os.walk(dataset_dir):
+                for f in filenames:
+                    fp = os.path.join(dirpath, f)
+                    total_size += os.path.getsize(fp)
+            
+            # Konversi ke MB
+            size_mb = total_size / (1024 * 1024)
+            
+            # Jika ukuran < 500MB, salin ke Drive
+            if size_mb < 500:
+                if logger: logger.info(f"🔄 Menyalin dataset ({size_mb:.2f} MB) ke Google Drive...")
+                
+                # Buat direktori di Drive
+                drive_dataset_dir = os.path.join(drive_dir, os.path.basename(dataset_dir))
+                
+                # Salin dataset
+                if os.path.exists(drive_dataset_dir):
+                    shutil.rmtree(drive_dataset_dir)
+                shutil.copytree(dataset_dir, drive_dataset_dir)
+                
+                if logger: logger.info(f"✅ Dataset berhasil disalin ke {drive_dataset_dir}")
+            else:
+                if logger: logger.warning(f"⚠️ Dataset terlalu besar ({size_mb:.2f} MB) untuk disalin ke Google Drive")
+        
+        if logger: logger.info(f"✅ Konfigurasi berhasil disinkronkan ke Google Drive: {drive_config_path}")
+        return drive_config_path
+    except ImportError:
+        # Bukan di Google Colab
+        if logger: logger.debug("ℹ️ Bukan di Google Colab, tidak perlu sinkronisasi dengan Google Drive")
+    except Exception as e:
+        # Error lainnya
+        if logger: logger.warning(f"⚠️ Gagal sinkronisasi dengan Google Drive: {str(e)}")
     
     return output_path
 

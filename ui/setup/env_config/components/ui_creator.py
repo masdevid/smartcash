@@ -47,7 +47,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         'button_layout': button_layout
     }
 
-    # Create a VBox layout for the entire UI
+    # Create a VBox layout for the entire UI with consistent styling
     ui_layout = VBox([
         header,
         button_layout,
@@ -55,7 +55,11 @@ def create_env_config_ui() -> Dict[str, Any]:
         log_panel,
         progress_bar,
         progress_message
-    ])
+    ], layout=widgets.Layout(
+        padding='10px',
+        border='1px solid #ddd',
+        background_color='#f9f9f9'
+    ))
 
     # Add the layout to the components
     ui_components['ui_layout'] = ui_layout

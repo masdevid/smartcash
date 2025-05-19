@@ -83,29 +83,7 @@ def create_augmentation_types_component(config: Dict[str, Any] = None) -> widget
         layout=widgets.Layout(width='95%')
     )
     
-    # Move to preprocessed
-    move_to_preprocessed = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('move_to_preprocessed', True),
-        description='Pindahkan ke Preprocessed',
-        indent=False,
-        layout=widgets.Layout(width='auto')
-    )
-    
-    # Validasi hasil
-    validate_results = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('validate_results', True),
-        description='Validasi Hasil',
-        indent=False,
-        layout=widgets.Layout(width='auto')
-    )
-    
-    # Resume augmentasi
-    resume = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('resume', False),
-        description='Resume Augmentasi',
-        indent=False,
-        layout=widgets.Layout(width='auto')
-    )
+    # Checkbox telah dipindahkan ke basic_options_component atau dihilangkan
     
     # Informasi tentang split
     split_info = widgets.HTML(
@@ -128,9 +106,7 @@ def create_augmentation_types_component(config: Dict[str, Any] = None) -> widget
             # Kolom kiri: Jenis augmentasi
             widgets.VBox([
                 widgets.HTML(f"<h6 style='color: {COLORS['dark']}; margin: 5px 0;'>Pilih Jenis Augmentasi:</h6>"),
-                aug_types,
-                widgets.HBox([move_to_preprocessed, validate_results], layout=widgets.Layout(justify_content='space-between')),
-                widgets.HBox([resume], layout=widgets.Layout(justify_content='flex-start'))
+                aug_types
             ], layout=widgets.Layout(width='60%')),
             
             # Kolom kanan: Target split dan info

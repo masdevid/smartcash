@@ -44,14 +44,6 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
         aug_config = {}
         aug_config['augmentation'] = {}
     
-    # Opsi dasar
-    aug_enabled = widgets.Checkbox(
-        value=aug_config.get('augmentation', {}).get('enabled', True),
-        description='Aktifkan Augmentasi',
-        indent=False,
-        layout=widgets.Layout(width='auto')
-    )
-    
     # Jumlah variasi per gambar
     num_variations = widgets.IntSlider(
         value=aug_config.get('augmentation', {}).get('num_variations', 2),
@@ -66,11 +58,17 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
         layout=widgets.Layout(width='95%')
     )
     
-    # Target count
-    target_count = widgets.IntText(
-        value=aug_config.get('augmentation', {}).get('target_count', 0),
+    # Target count sebagai slider dengan default 500
+    target_count = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('target_count', 500),
+        min=100,
+        max=2000,
+        step=100,
         description='Target Count:',
-        disabled=False,
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
         layout=widgets.Layout(width='95%')
     )
     
@@ -91,13 +89,21 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
         layout=widgets.Layout(width='auto')
     )
     
+    # Pindahkan ke preprocessed (dipindahkan dari augmentation_types_component)
+    move_to_preprocessed = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('move_to_preprocessed', True),
+        description='Pindahkan ke Preprocessed',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
     # Container untuk opsi dasar
     basic_options_container = widgets.VBox([
         widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['settings']} Opsi Dasar</h5>"),
         num_variations,
         target_count,
         output_prefix,
-        widgets.HBox([aug_enabled, balance_classes], layout=widgets.Layout(justify_content='space-between'))
+        widgets.HBox([balance_classes, move_to_preprocessed], layout=widgets.Layout(justify_content='space-between'))
     ], layout=widgets.Layout(padding='10px', width='100%'))
     
     return basic_options_container

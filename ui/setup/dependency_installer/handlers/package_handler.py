@@ -20,8 +20,9 @@ def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
     Returns:
         List package yang perlu diinstall
     """
-    from smartcash.ui.setup.dependency_installer.utils.package_utils import get_package_groups, parse_custom_packages
-    from smartcash.ui.setup.package_analyzer import get_installed_packages, check_missing_packages
+    from smartcash.ui.setup.dependency_installer.utils.package_utils import (
+        get_package_groups, parse_custom_packages, get_installed_packages, check_missing_packages
+    )
     
     # Get installed packages
     installed_packages = get_installed_packages()

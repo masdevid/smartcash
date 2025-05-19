@@ -7,6 +7,7 @@ from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.dataset.download.components.download_component import create_download_ui
 from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download_handlers
+from smartcash.ui.dataset.download.handlers.api_key_handler import check_colab_secrets
 
 def initialize_dataset_download_ui() -> Dict[str, Any]:
     """
@@ -16,10 +17,15 @@ def initialize_dataset_download_ui() -> Dict[str, Any]:
         Dictionary UI components yang terinisialisasi
     """
     # Gunakan base initializer dengan konfigurasi minimal
-    return initialize_module_ui(
+    ui_components = initialize_module_ui(
         module_name='download',
         create_ui_func=create_download_ui,
         # Catatan: setup_download_handlers sudah dipanggil di base_initializer.py
         # untuk module_name='download', jadi tidak perlu dipanggil lagi di sini
         button_keys=['download_button', 'check_button', 'reset_button', 'save_button', 'cleanup_button']
     )
+    
+    # Periksa Colab secrets setelah UI diinisialisasi
+    check_colab_secrets(ui_components)
+    
+    return ui_components

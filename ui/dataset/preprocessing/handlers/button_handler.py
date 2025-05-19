@@ -12,65 +12,21 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
-
-# Fungsi notifikasi untuk observer pattern
-def notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
-    """Notifikasi observer bahwa proses telah dimulai."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
-        ui_components['on_process_start']("preprocessing", {
-            'split': split,
-            'display_info': display_info
-        })
-
-def notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any], display_info: str) -> None:
-    """Notifikasi observer bahwa proses telah selesai dengan sukses."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['success']} Preprocessing {display_info} selesai")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
-        ui_components['on_process_complete']("preprocessing", result)
-
-def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> None:
-    """Notifikasi observer bahwa proses mengalami error."""
-    logger = ui_components.get('logger')
-    if logger: logger.error(f"{ICONS['error']} Error pada preprocessing: {error_message}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
-        ui_components['on_process_error']("preprocessing", error_message)
-
-def notify_process_stop(ui_components: Dict[str, Any], display_info: str = "") -> None:
-    """Notifikasi observer bahwa proses telah dihentikan oleh pengguna."""
-    logger = ui_components.get('logger')
-    if logger: logger.warning(f"{ICONS['stop']} Proses preprocessing dihentikan oleh pengguna")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_stop' in ui_components and callable(ui_components['on_process_stop']):
-        ui_components['on_process_stop']("preprocessing", {
-            'display_info': display_info
-        })
-
-def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = True) -> None:
-    """Menonaktifkan atau mengaktifkan komponen UI selama proses berjalan."""
-    # Daftar komponen yang perlu dinonaktifkan
-    disable_components = [
-        'split_selector', 'config_accordion', 'options_accordion',
-        'reset_button', 'preprocess_button', 'save_button'
-    ]
-    
-    # Disable/enable komponen
-    for component in disable_components:
-        if component in ui_components and hasattr(ui_components[component], 'disabled'):
-            ui_components[component].disabled = disable
+from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
+    notify_process_start, 
+    notify_process_complete, 
+    notify_process_error, 
+    notify_process_stop,
+    disable_ui_during_processing
+)
 
 def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str):
     """Eksekusi preprocessing dengan parameter dari UI."""
     logger = ui_components.get('logger')
+    
+    # Dapatkan notification manager
+    from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+    notification_manager = get_notification_manager(ui_components)
     
     # Dapatkan parameter dari UI
     try:
@@ -85,92 +41,124 @@ def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str)
             ui_components['dataset_manager'] = dataset_manager
         
         # Register progress callback jika tersedia
-        if 'register_progress_callback' in ui_components and callable(ui_components['register_progress_callback']):
-            ui_components['register_progress_callback'](dataset_manager)
-        
-        # Log awal preprocessing
-        if logger: logger.info(f"{ICONS['start']} Memulai preprocessing {split_info}")
-        
-        # Dapatkan parameter dari UI
-        data_dir = ui_components.get('data_dir', '')
-        if not data_dir:
-            data_dir = ui_components.get('config', {}).get('dataset', {}).get('path', '')
+        if 'update_progress' in ui_components and callable(ui_components['update_progress']):
+            dataset_manager.register_progress_callback(ui_components['update_progress'])
         
         # Dapatkan parameter preprocessing dari UI
         params = {}
         
-        # Tambahkan parameter dari UI components
-        if 'resize_width' in ui_components:
-            params['resize_width'] = ui_components['resize_width'].value
-        if 'resize_height' in ui_components:
-            params['resize_height'] = ui_components['resize_height'].value
-        if 'grayscale' in ui_components:
-            params['grayscale'] = ui_components['grayscale'].value
-        if 'normalize' in ui_components:
-            params['normalize'] = ui_components['normalize'].value
-        if 'equalize' in ui_components:
-            params['equalize'] = ui_components['equalize'].value
-        if 'denoise' in ui_components:
-            params['denoise'] = ui_components['denoise'].value
-        if 'sharpen' in ui_components:
-            params['sharpen'] = ui_components['sharpen'].value
+        # Dapatkan parameter dari preprocess_options
+        preproc_options = ui_components.get('preprocess_options')
+        if preproc_options and hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
+            img_size = preproc_options.children[0].value
+            normalize = preproc_options.children[1].value
+            preserve_aspect_ratio = preproc_options.children[2].value
+            cache_enabled = preproc_options.children[3].value
+            num_workers = preproc_options.children[4].value
+            
+            params.update({
+                'img_size': [img_size, img_size],  # Square aspect ratio
+                'normalization': {
+                    'enabled': normalize,
+                    'preserve_aspect_ratio': preserve_aspect_ratio
+                },
+                'enabled': cache_enabled,
+                'num_workers': num_workers
+            })
+        
+        # Dapatkan parameter dari validation_options
+        validation_options = ui_components.get('validation_options')
+        if validation_options and hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
+            validate_enabled = validation_options.children[0].value
+            fix_issues = validation_options.children[1].value
+            move_invalid = validation_options.children[2].value
+            invalid_dir = validation_options.children[3].value
+            
+            params.update({
+                'validate': {
+                    'enabled': validate_enabled,
+                    'fix_issues': fix_issues,
+                    'move_invalid': move_invalid,
+                    'invalid_dir': invalid_dir
+                }
+            })
+        
+        # Dapatkan config dari ui_components
+        config = ui_components.get('config', {})
+        
+        # Update config dengan parameter dari UI
+        if 'preprocessing' not in config:
+            config['preprocessing'] = {}
+        
+        config['preprocessing'].update(params)
+        
+        # Update status
+        notification_manager.update_status("info", f"{ICONS['processing']} Menjalankan preprocessing untuk {split_info}...")
+        
+        # Set flag running
+        ui_components['preprocessing_running'] = True
         
         # Jalankan preprocessing
-        preprocess_result = dataset_manager.preprocess_dataset(
-            data_dir=data_dir,
+        result = dataset_manager.preprocess(
             split=split,
-            **params
+            config=config,
+            stop_flag=lambda: not ui_components.get('preprocessing_running', True)
         )
         
-        # Setelah selesai, update UI dengan status sukses
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("success", f"{ICONS['success']} Preprocessing {split_info} selesai"))
-        
-        # Update status panel
-        update_status_panel(ui_components, "success", 
-                           f"{ICONS['success']} Preprocessing dataset berhasil diselesaikan")
-        
-        # Update UI state - tampilkan summary dan visualisasi
-        for component in ['visualization_container', 'summary_container']:
-            if component in ui_components:
-                ui_components[component].layout.display = 'block'
-        
-        # Tampilkan tombol visualisasi
-        if 'visualization_buttons' in ui_components:
-            ui_components['visualization_buttons'].layout.display = 'flex'
-        
-        # Update summary dengan hasil preprocessing
-        if 'generate_summary' in ui_components and callable(ui_components['generate_summary']):
-            ui_components['generate_summary'](ui_components)
-        
-        # Notifikasi observer tentang selesai
-        notify_process_complete(ui_components, preprocess_result, split_info)
+        # Update UI setelah selesai
+        if ui_components.get('preprocessing_running', True):
+            # Preprocessing selesai dengan normal
+            notification_manager.update_status("success", f"{ICONS['success']} Preprocessing {split_info} selesai")
             
-    except Exception as e:
-        # Handle error dengan notifikasi
-        with ui_components['status']: 
-            display(create_status_indicator("error", f"{ICONS['error']} Error: {str(e)}"))
+            # Notifikasi observer
+            notify_process_complete(ui_components, result, split_info)
+        else:
+            # Preprocessing dihentikan oleh pengguna
+            notification_manager.update_status("warning", f"{ICONS['warning']} Preprocessing {split_info} dihentikan")
         
-        # Update status panel
-        update_status_panel(ui_components, "error", f"{ICONS['error']} Preprocessing gagal: {str(e)}")
+        # Aktifkan kembali UI
+        disable_ui_during_processing(ui_components, False)
         
-        # Notifikasi observer tentang error
-        notify_process_error(ui_components, str(e))
+        # Tampilkan tombol primary dan sembunyikan tombol stop
+        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
+            ui_components['preprocess_button'].layout.display = 'block'
         
-        # Log error
-        if logger: logger.error(f"{ICONS['error']} Error saat preprocessing dataset: {str(e)}")
-        if logger: logger.error(traceback.format_exc())
-    
-    finally:
-        # Tandai preprocessing selesai
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
+        
+        # Reset flag
         ui_components['preprocessing_running'] = False
         
-        # Restore UI
-        if 'cleanup_ui' in ui_components and callable(ui_components['cleanup_ui']):
-            ui_components['cleanup_ui'](ui_components)
-        else:
-            disable_ui_during_processing(ui_components, False)
+        return result
+    
+    except Exception as e:
+        # Tangkap error
+        error_msg = str(e)
+        stack_trace = traceback.format_exc()
+        
+        # Log error
+        if logger:
+            logger.error(f"{ICONS['error']} Error saat preprocessing {split_info}: {error_msg}")
+            logger.debug(f"Stack trace: {stack_trace}")
+        
+        # Update status
+        notification_manager.update_status("error", f"{ICONS['error']} Error: {error_msg}")
+        
+        # Notifikasi observer
+        notify_process_error(ui_components, error_msg)
+        
+        # Aktifkan kembali UI
+        disable_ui_during_processing(ui_components, False)
+        
+        # Tampilkan tombol primary dan sembunyikan tombol stop
+        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
+            ui_components['preprocess_button'].layout.display = 'block'
+        
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
+        
+        # Reset flag
+        ui_components['preprocessing_running'] = False
 
 def setup_preprocessing_button_handlers(
     ui_components: Dict[str, Any], 
@@ -185,20 +173,36 @@ def setup_preprocessing_button_handlers(
         ui_components: Dictionary komponen UI
         module_type: Tipe modul (default: 'preprocessing')
         config: Konfigurasi modul (opsional)
-        env: Environment (opsional)
+        env: Environment manager (opsional)
         
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger('preprocessing_button'))
+    logger = ui_components.get('logger', get_logger(module_type))
+    
+    # Dapatkan notification manager
+    from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+    notification_manager = get_notification_manager(ui_components)
+    
+    # Set flag running ke False
+    ui_components['preprocessing_running'] = False
     
     # Handler tombol primary dengan dukungan progress tracking
     def on_primary_click(b):
-        # Cek apakah sudah running
-        if ui_components.get('preprocessing_running', False):
-            with ui_components['status']:
-                display(create_status_indicator("warning", f"{ICONS['warning']} Preprocessing sudah berjalan"))
-            return
+        # Dapatkan split yang dipilih
+        split_selector = ui_components.get('split_selector')
+        split_value = split_selector.value if split_selector else "All Splits"
+        
+        # Map dari UI value ke split value
+        split_map = {
+            'All Splits': None,  # None berarti semua split
+            'Train Only': 'train',
+            'Validation Only': 'valid',
+            'Test Only': 'test'
+        }
+        
+        split = split_map.get(split_value, None)
+        split_info = split_value
         
         # Set flag running
         ui_components['preprocessing_running'] = True
@@ -206,49 +210,15 @@ def setup_preprocessing_button_handlers(
         # Disable UI selama proses
         disable_ui_during_processing(ui_components, True)
         
-        # Tampilkan tombol stop jika tersedia
+        # Sembunyikan tombol primary dan tampilkan tombol stop
         if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
             ui_components['preprocess_button'].layout.display = 'none'
         
         if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
             ui_components['stop_button'].layout.display = 'block'
         
-        # Expand log accordion jika tersedia
-        if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
-            ui_components['log_accordion'].selected_index = 0  # Expand log
-        
-        # Reset progress bar
-        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-            ui_components['reset_progress_bar']()
-        
-        # Dapatkan split yang dipilih
-        split = None
-        if 'split_selector' in ui_components:
-            split = ui_components['split_selector'].value
-        
-        # Validasi split
-        if not split:
-            with ui_components['status']:
-                display(create_status_indicator("error", f"{ICONS['error']} Error: Split tidak dipilih"))
-            
-            # Update status panel
-            update_status_panel(ui_components, "error", f"{ICONS['error']} Preprocessing gagal: Split tidak dipilih")
-            
-            # Reset UI
-            ui_components['preprocessing_running'] = False
-            disable_ui_during_processing(ui_components, False)
-            return
-        
-        # Dapatkan info split untuk display
-        split_info = f"untuk split '{split}'"
-        
         # Update status
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("info", f"{ICONS['processing']} Memulai preprocessing {split_info}..."))
-        
-        # Update status panel
-        update_status_panel(ui_components, "info", f"{ICONS['processing']} Memulai preprocessing {split_info}...")
+        notification_manager.update_status("info", f"{ICONS['processing']} Memulai preprocessing {split_info}...")
         
         # Notifikasi observer bahwa proses dimulai
         notify_process_start(ui_components, "preprocessing", split_info, split)
@@ -262,11 +232,7 @@ def setup_preprocessing_button_handlers(
         ui_components['preprocessing_running'] = False
         
         # Update status
-        with ui_components['status']:
-            display(create_status_indicator("warning", f"{ICONS['warning']} Menghentikan preprocessing..."))
-        
-        # Update status panel
-        update_status_panel(ui_components, "warning", f"{ICONS['warning']} Menghentikan preprocessing...")
+        notification_manager.update_status("warning", f"{ICONS['warning']} Menghentikan preprocessing...")
         
         # Notifikasi observer bahwa proses dihentikan
         notify_process_stop(ui_components)
@@ -274,15 +240,13 @@ def setup_preprocessing_button_handlers(
     # Reset UI dan konfigurasi ke default
     def on_reset_click(b):
         # Konfirmasi reset
-        with ui_components['status']:
-            clear_output(wait=True)
-            display(create_status_indicator("warning", f"{ICONS['warning']} Reset konfigurasi preprocessing..."))
+        notification_manager.update_status("warning", f"{ICONS['warning']} Reset konfigurasi preprocessing...")
         
         # Reset UI ke kondisi awal
         _reset_ui(ui_components)
         
-        # Update status panel
-        update_status_panel(ui_components, "info", f"{ICONS['info']} Konfigurasi preprocessing direset ke default")
+        # Update status
+        notification_manager.update_status("info", f"{ICONS['info']} Konfigurasi preprocessing direset ke default")
     
     # Reset UI ke kondisi awal
     def _reset_ui(ui_components: Dict[str, Any]):
@@ -294,21 +258,22 @@ def setup_preprocessing_button_handlers(
             ui_components['reset_progress_bar']()
         
         # Reset UI components ke default
-        default_values = {
-            'resize_width': 640,
-            'resize_height': 640,
-            'grayscale': False,
-            'normalize': True,
-            'equalize': False,
-            'denoise': False,
-            'sharpen': False
-        }
+        # Dapatkan parameter dari preprocess_options
+        preproc_options = ui_components.get('preprocess_options')
+        if preproc_options and hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
+            preproc_options.children[0].value = 640  # Image size
+            preproc_options.children[1].value = True  # Normalize
+            preproc_options.children[2].value = True  # Preserve Aspect Ratio
+            preproc_options.children[3].value = True  # Cache enabled
+            preproc_options.children[4].value = 4     # Workers
         
-        # Update UI components dengan nilai default
-        for key, value in default_values.items():
-            if key in ui_components:
-                if hasattr(ui_components[key], 'value'):
-                    ui_components[key].value = value
+        # Reset validation options
+        validation_options = ui_components.get('validation_options')
+        if validation_options and hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
+            validation_options.children[0].value = True  # Enable validation
+            validation_options.children[1].value = True  # Fix issues
+            validation_options.children[2].value = True  # Move invalid
+            validation_options.children[3].value = 'data/invalid'  # Invalid dir
         
         # Aktifkan kembali UI
         disable_ui_during_processing(ui_components, False)
@@ -335,12 +300,7 @@ def setup_preprocessing_button_handlers(
         'on_primary_click': on_primary_click,
         'on_stop_click': on_stop_click,
         'on_reset_click': on_reset_click,
-        'execute_preprocessing': execute_preprocessing,
-        'disable_ui_during_processing': disable_ui_during_processing,
-        'notify_process_start': notify_process_start,
-        'notify_process_complete': notify_process_complete,
-        'notify_process_error': notify_process_error,
-        'notify_process_stop': notify_process_stop
+        'execute_preprocessing': execute_preprocessing
     })
     
     # Set flag running ke False

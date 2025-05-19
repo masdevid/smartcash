@@ -119,17 +119,23 @@ def setup_directory_structure(env_manager) -> Tuple[bool, str, List[str]]:
     Returns:
         Tuple (success, message, created_dirs)
     """
-    # Direktori yang perlu dibuat
+    # Direktori yang perlu dibuat untuk SmartCash
     dirs_to_create = [
-        "configs",
-        "data",
-        "data/raw",
-        "data/processed",
-        "models",
-        "models/checkpoints",
-        "models/weights",
-        "output",
-        "logs"
+        "SmartCash/configs",
+        "SmartCash/data",
+        "SmartCash/data/train/images", 
+        "SmartCash/data/train/labels",
+        "SmartCash/data/valid/images", 
+        "SmartCash/data/valid/labels",
+        "SmartCash/data/test/images", 
+        "SmartCash/data/test/labels",
+        "SmartCash/data/preprocessed",
+        "SmartCash/models",
+        "SmartCash/models/checkpoints",
+        "SmartCash/models/weights",
+        "SmartCash/output",
+        "SmartCash/logs",
+        "SmartCash/exports"
     ]
     
     # Direktori yang berhasil dibuat

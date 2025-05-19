@@ -10,6 +10,7 @@ from typing import Dict, Any
 from smartcash.ui.handlers.status_handler import update_status_panel as global_update_status_panel
 from smartcash.ui.handlers.status_handler import create_status_panel as global_create_status_panel
 from smartcash.ui.utils.constants import ALERT_STYLES, ICONS, COLORS
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
 
 def update_status_panel(ui_components: Dict[str, Any], status_type: str, message: str) -> None:
     """
@@ -36,3 +37,26 @@ def create_status_panel(message: str = "", status_type: str = "info") -> widgets
     """
     # Delegasikan ke fungsi global untuk konsistensi
     return global_create_status_panel(message, status_type)
+
+def setup_status_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Setup handler untuk status panel preprocessing.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Pastikan status panel tersedia
+    if 'status_panel' not in ui_components:
+        ui_components['status_panel'] = create_status_panel("Siap untuk preprocessing dataset", "info")
+    
+    # Inisialisasi notification manager
+    notification_manager = get_notification_manager(ui_components)
+    
+    # Tambahkan fungsi ke ui_components
+    ui_components['update_status_panel'] = update_status_panel
+    ui_components['create_status_panel'] = create_status_panel
+    
+    return ui_components

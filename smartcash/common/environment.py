@@ -62,7 +62,7 @@ class EnvironmentManager:
         # Set direktori dasar
         self._base_dir = (
             Path(base_dir) if base_dir 
-            else Path('/content/SmartCash') if self._in_colab 
+            else Path('/content') if self._in_colab 
             else Path(os.getcwd())
         )
         

@@ -112,25 +112,15 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Buat input untuk path backup
     backup_dir = widgets.Text(
-        value='data/downloads_backup',
+        value='data/backup',
         placeholder='Path backup dataset',
         description='Backup Dir:',
         disabled=False,
         layout=widgets.Layout(width='100%')
     )
     
-    # Buat dropdown untuk sumber dataset
-    source_dropdown = widgets.Dropdown(
-        options=['roboflow'],
-        value='roboflow',
-        description='Sumber:',
-        disabled=True,  # Dinonaktifkan karena hanya mendukung Roboflow
-        layout=widgets.Layout(width='100%')
-    )
-    
     # Buat container untuk input options dengan padding dan margin yang konsisten
     input_options = widgets.VBox([
-        source_dropdown,
         workspace,
         project,
         version,
@@ -237,7 +227,6 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         'validate_dataset': validate_dataset,
         'backup_checkbox': backup_checkbox,
         'backup_dir': backup_dir,
-        'source_dropdown': source_dropdown,
         'input_options': input_options,
         'download_button': action_buttons['primary_button'],
         'check_button': action_buttons['secondary_buttons'][0] if 'secondary_buttons' in action_buttons else None,

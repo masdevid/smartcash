@@ -4,9 +4,10 @@ Deskripsi: Utilitas untuk mengelola requirements package dan dependencies
 """
 
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Set
 import importlib
 import pkg_resources
+import sys
 from smartcash.ui.utils.ui_logger import log_to_ui
 
 def get_project_requirements(project_name: str) -> List[str]:
@@ -261,3 +262,66 @@ def parse_custom_packages(custom_packages_text: str) -> List[str]:
             packages.append(line)
     
     return packages
+
+
+def get_installed_packages() -> Set[str]:
+    """
+    Dapatkan daftar package yang sudah terinstall.
+    
+    Returns:
+        Set nama package yang terinstall
+    """
+    installed_packages = set()
+    
+    # Metode 1: Gunakan pkg_resources
+    try:
+        installed_packages.update([pkg.key for pkg in pkg_resources.working_set])
+    except Exception:
+        pass
+    
+    # Metode 2: Cek sys.modules untuk package yang sudah diimport
+    common_packages = {
+        'numpy', 'pandas', 'matplotlib', 'torch', 'tensorflow', 'sklearn', 
+        'scipy', 'cv2', 'opencv_python', 'pillow', 'pil', 'requests', 
+        'bs4', 'beautifulsoup4', 'seaborn', 'plotly', 'ipywidgets', 'tqdm'
+    }
+    
+    for pkg in common_packages:
+        if pkg in sys.modules:
+            installed_packages.add(pkg)
+    
+    return installed_packages
+
+
+def check_missing_packages(required_packages: List[str], installed_packages: Set[str]) -> List[str]:
+    """
+    Cek package yang belum terinstall.
+    
+    Args:
+        required_packages: List package yang dibutuhkan
+        installed_packages: Set package yang sudah terinstall
+        
+    Returns:
+        List package yang belum terinstall
+    """
+    missing_packages = []
+    
+    for pkg_req in required_packages:
+        # Parse package name (tanpa versi)
+        pkg_name = pkg_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
+        pkg_name = pkg_name.lower()
+        
+        # Cek apakah package sudah terinstall
+        if pkg_name not in installed_packages:
+            # Cek alias umum
+            if pkg_name == 'opencv-python' and ('cv2' in installed_packages or 'opencv_python' in installed_packages):
+                continue
+            if pkg_name == 'pillow' and 'pil' in installed_packages:
+                continue
+            if pkg_name == 'beautifulsoup4' and 'bs4' in installed_packages:
+                continue
+            
+            # Tambahkan ke daftar missing jika belum terinstall
+            missing_packages.append(pkg_req)
+    
+    return missing_packages

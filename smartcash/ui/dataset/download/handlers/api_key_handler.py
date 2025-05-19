@@ -141,3 +141,45 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
         
         # Register callback
         ui_components['api_key'].observe(on_api_key_change, names='value')
+
+
+def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
+    """
+    Memeriksa Colab secret setelah init UI selesai.
+    Fungsi ini harus dipanggil setelah UI diinisialisasi untuk memastikan
+    API key dari Colab secret digunakan jika tersedia.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    from smartcash.ui.utils.ui_logger import log_to_ui
+    
+    # Coba mendapatkan API key dari Colab secrets
+    api_key = get_api_key_from_secrets('ROBOFLOW_API_KEY')
+    
+    if api_key and 'api_key' in ui_components:
+        # Update UI component dengan API key dari secret
+        ui_components['api_key'].value = api_key
+        
+        # Log ke UI
+        log_to_ui(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "success", "🔑")
+        
+        # Log ke logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.info("✅ API key Roboflow berhasil diambil dari Google Colab secrets")
+            
+        # Reset style jika sebelumnya di-highlight
+        ui_components['api_key'].layout.border = ""
+    else:
+        # Coba dari environment variable
+        api_key = os.environ.get('ROBOFLOW_API_KEY')
+        if api_key and 'api_key' in ui_components:
+            # Update UI component
+            ui_components['api_key'].value = api_key
+            
+            # Log ke UI
+            log_to_ui(ui_components, "API key Roboflow berhasil diambil dari environment variable", "success", "🔑")
+            
+            # Reset style
+            ui_components['api_key'].layout.border = ""

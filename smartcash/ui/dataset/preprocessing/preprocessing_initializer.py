@@ -6,24 +6,15 @@ Deskripsi: Initializer untuk modul preprocessing dataset dengan pendekatan DRY
 from typing import Dict, Any
 from smartcash.ui.utils.base_initializer import initialize_module_ui
 from smartcash.ui.dataset.preprocessing.components.preprocessing_component import create_preprocessing_ui
-from smartcash.ui.dataset.preprocessing.handlers.config_handler import setup_preprocessing_config_handler
-from smartcash.ui.dataset.preprocessing.handlers.state_handler import detect_preprocessing_state
-from smartcash.ui.dataset.preprocessing.handlers.preprocessing_service_handler import initialize_preprocessing
-from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
-
-def setup_preprocessing_handlers(ui_components: Dict[str, Any], env: Any, config: Any) -> Dict[str, Any]:
-    """Setup handler spesifik untuk modul preprocessing"""
-    # Setup button handlers
-    ui_components = setup_button_handlers(ui_components, env, config)
-    
-    # Pastikan persistensi konfigurasi
-    ui_components = initialize_preprocessing(ui_components)
-    
-    return ui_components
+from smartcash.ui.dataset.preprocessing.handlers.setup_handlers import setup_preprocessing_handlers
 
 def initialize_preprocessing_ui() -> Dict[str, Any]:
-    """Inisialisasi UI modul preprocessing dataset."""
+    """
+    Inisialisasi UI dan handler untuk preprocessing dataset.
     
+    Returns:
+        Dictionary UI components yang terinisialisasi
+    """
     # Konfigurasi multi-progress tracking
     multi_progress_config = {
         "module_name": "preprocessing",
@@ -37,14 +28,14 @@ def initialize_preprocessing_ui() -> Dict[str, Any]:
     # Tombol yang perlu diattach dengan ui_components
     button_keys = ['preprocess_button', 'stop_button', 'reset_button', 'cleanup_button', 'save_button']
     
-    # Gunakan base initializer
-    return initialize_module_ui(
+    # Gunakan base initializer dengan konfigurasi minimal
+    ui_components = initialize_module_ui(
         module_name='preprocessing',
         create_ui_func=create_preprocessing_ui,
-        setup_config_handler_func=setup_preprocessing_config_handler,
         setup_specific_handlers_func=setup_preprocessing_handlers,
-        detect_state_func=detect_preprocessing_state,
         button_keys=button_keys,
         multi_progress_config=multi_progress_config,
         observer_group="preprocessing_observers"
     )
+    
+    return ui_components

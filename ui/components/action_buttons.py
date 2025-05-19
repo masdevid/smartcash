@@ -11,6 +11,7 @@ def create_action_buttons(
     primary_icon: str = "play",
     secondary_buttons: List[Tuple[str, str, str]] = None, 
     cleanup_enabled: bool = True,
+    save_enabled: bool = True,
     layout: Optional[widgets.Layout] = None
 ) -> Dict[str, widgets.Widget]:
     """
@@ -59,7 +60,10 @@ def create_action_buttons(
         button_style='success',
         icon='save',
         tooltip="Simpan konfigurasi saat ini",
-        layout=widgets.Layout(margin='5px')
+        layout=widgets.Layout(
+            display='none' if not save_enabled else 'inline-block',
+            margin='5px'
+        )
     )
     
     # Tombol cleanup (optional)

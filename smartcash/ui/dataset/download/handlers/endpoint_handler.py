@@ -88,10 +88,10 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     # Konfigurasi Roboflow
     config = {
         'type': 'roboflow',
-        'workspace': ui_components.get('rf_workspace', {}).value,
-        'project': ui_components.get('rf_project', {}).value,
-        'version': ui_components.get('rf_version', {}).value,
-        'api_key': ui_components.get('rf_apikey', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
+        'workspace': ui_components.get('workspace', {}).value,
+        'project': ui_components.get('project', {}).value,
+        'version': ui_components.get('version', {}).value,
+        'api_key': ui_components.get('api_key', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
         'format': 'yolov5pytorch',  # Format tetap
         'output_dir': ui_components.get('output_dir', {}).value,
         'validate': ui_components.get('validate_dataset', {}).value

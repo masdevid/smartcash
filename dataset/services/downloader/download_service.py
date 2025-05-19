@@ -65,14 +65,72 @@ class DownloadService:
                 valid = self.validator.verify_download(str(temp_download_path), metadata)
                 if not valid: self.logger.warning("⚠️ Verifikasi dataset gagal, tapi melanjutkan proses")
             notify_service_event("download", "progress", self, self.observer_manager, step="finalize", message="Memindahkan dataset ke lokasi final", progress=5, total_steps=5, current_step=5)
+            # Gunakan backup service untuk menangani direktori yang sudah ada
             if output_path.exists():
                 self.logger.info(f"🧹 Menghapus direktori sebelumnya: {output_path}")
-                # Tangani kasus symbolic link
-                if output_path.is_symlink():
-                    os.unlink(str(output_path))
-                else:
-                    shutil.rmtree(output_path, ignore_errors=True)
-            self.logger.info(f"🔄 Memindahkan dataset ke lokasi final: {output_path}"); shutil.move(str(temp_download_path), str(output_path))
+                # Jika direktori sudah ada dan berisi data, backup terlebih dahulu
+                if not output_path.is_symlink() and any(output_path.iterdir()):
+                    self.logger.info(f"💾 Membuat backup direktori yang sudah ada: {output_path}")
+                    self.backup_service.backup_dataset(output_path, show_progress=show_progress)
+                    self.backup_service.cleanup_old_backups(max_backups=3)
+                
+                # Hapus direktori yang ada dengan aman
+                try:
+                    if output_path.is_symlink():
+                        os.unlink(str(output_path))
+                    else:
+                        shutil.rmtree(output_path, ignore_errors=True)
+                except Exception as e:
+                    self.logger.warning(f"⚠️ Gagal menghapus direktori: {str(e)}")
+                    # Jika gagal menghapus, gunakan nama alternatif
+                    output_path = Path(f"{output_path}_new")
+                    self.logger.info(f"ℹ️ Menggunakan lokasi alternatif: {output_path}")
+            
+            # Memindahkan dataset dengan progress bar
+            notify_service_event("download", "progress", self, self.observer_manager, 
+                                step="move", message=f"Memindahkan dataset ke lokasi final: {output_path}", 
+                                progress=95, total_steps=100, current_step=6)
+            
+            # Hitung ukuran data untuk progress bar
+            total_size = sum(f.stat().st_size for f in Path(temp_download_path).glob('**/*') if f.is_file())
+            moved_size = 0
+            
+            # Buat direktori tujuan
+            os.makedirs(output_path, exist_ok=True)
+            
+            # Gunakan shutil.copytree dengan progress
+            from tqdm.auto import tqdm
+            with tqdm(total=total_size, unit='B', unit_scale=True, desc=f"🔄 Memindahkan dataset") as pbar:
+                for src_dir, dirs, files in os.walk(temp_download_path):
+                    # Buat struktur direktori yang sama di tujuan
+                    dst_dir = os.path.join(str(output_path), os.path.relpath(src_dir, str(temp_download_path)))
+                    os.makedirs(dst_dir, exist_ok=True)
+                    
+                    # Salin semua file dengan progress
+                    for file in files:
+                        src_file = os.path.join(src_dir, file)
+                        dst_file = os.path.join(dst_dir, file)
+                        file_size = os.path.getsize(src_file)
+                        
+                        # Salin file
+                        shutil.copy2(src_file, dst_file)
+                        
+                        # Update progress
+                        moved_size += file_size
+                        pbar.update(file_size)
+                        
+                        # Update progress event setiap 10%
+                        progress_percent = min(95 + int(moved_size / total_size * 5), 100)
+                        if progress_percent % 1 == 0:
+                            notify_service_event("download", "progress", self, self.observer_manager, 
+                                                step="move", message=f"Memindahkan dataset: {progress_percent}%", 
+                                                progress=progress_percent, total_steps=100, current_step=6)
+            
+            # Hapus direktori sementara
+            try:
+                shutil.rmtree(temp_download_path, ignore_errors=True)
+            except Exception as e:
+                self.logger.warning(f"⚠️ Gagal menghapus direktori sementara: {str(e)}")
             stats, elapsed_time = self.validator.get_dataset_stats(output_dir), time.time() - start_time
             notify_service_event("download", "complete", self, self.observer_manager, message=f"Download dataset selesai: {stats.get('total_images', 0)} gambar", duration=elapsed_time)
             self.logger.success(f"✅ Dataset {workspace}/{project}:{version} berhasil didownload ke {output_dir} ({elapsed_time:.1f}s)\n   • Ukuran: {file_size_mb:.2f} MB\n   • Gambar: {stats.get('total_images', 0)} file\n   • Label: {stats.get('total_labels', 0)} file")

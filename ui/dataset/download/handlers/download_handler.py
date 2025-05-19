@@ -10,7 +10,7 @@ import time
 
 def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
-    Handler untuk tombol download dataset dari Roboflow.
+    Handler untuk tombol download pada UI download.
     
     Args:
         b: Button widget
@@ -21,6 +21,20 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     # Reset log output saat tombol diklik
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         ui_components['log_output'].clear_output(wait=True)
+    
+    # Simpan konfigurasi UI sebelum download
+    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui, save_config_with_manager, load_config
+    config = load_config()
+    config = update_config_from_ui(config, ui_components)
+    save_config_with_manager(config, ui_components, ui_components.get('logger'))
+    
+    # Dapatkan nilai dari komponen UI
+    workspace = ui_components.get('workspace', {}).value if 'workspace' in ui_components else ''
+    project = ui_components.get('project', {}).value if 'project' in ui_components else ''
+    version = ui_components.get('version', {}).value if 'version' in ui_components else ''
+    api_key = ui_components.get('api_key', {}).value if 'api_key' in ui_components else ''
+    output_dir = ui_components.get('output_dir', {}).value if 'output_dir' in ui_components else 'data'
+    validate = ui_components.get('validate_dataset', {}).value if 'validate_dataset' in ui_components else True
     
     # Nonaktifkan tombol selama proses
     _disable_buttons(ui_components, True)

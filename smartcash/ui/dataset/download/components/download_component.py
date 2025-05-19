@@ -41,35 +41,35 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     status_panel = create_status_panel("Konfigurasi download dataset", "info")
     
     # Ambil nilai default dari konfigurasi
-    rf_workspace_default = roboflow_config.get('workspace', 'smartcash-wo2us')
-    rf_project_default = roboflow_config.get('project', 'rupiah-emisi-2022')
-    rf_version_default = roboflow_config.get('version', '3')
+    workspace_default = roboflow_config.get('workspace', 'smartcash-wo2us')
+    project_default = roboflow_config.get('project', 'rupiah-emisi-2022')
+    version_default = roboflow_config.get('version', '3')
     api_key_env = os.environ.get('ROBOFLOW_API_KEY', '')
     output_dir_default = config.get('data', {}).get('dir', 'data')
     
     # Roboflow Config
-    rf_workspace = widgets.Text(
-        value=rf_workspace_default, 
+    workspace = widgets.Text(
+        value=workspace_default, 
         placeholder='Workspace ID', 
         description='Workspace:', 
         layout=widgets.Layout(width='100%')
     )
     
-    rf_project = widgets.Text(
-        value=rf_project_default, 
+    project = widgets.Text(
+        value=project_default, 
         placeholder='Project ID', 
         description='Project:', 
         layout=widgets.Layout(width='100%')
     )
     
-    rf_version = widgets.Text(
-        value=rf_version_default, 
+    version = widgets.Text(
+        value=version_default, 
         placeholder='Version', 
         description='Version:', 
         layout=widgets.Layout(width='100%')
     )
     
-    rf_apikey = widgets.Password(
+    api_key = widgets.Password(
         value=api_key_env, 
         placeholder='API Key', 
         description='API Key:', 
@@ -94,14 +94,44 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         layout=widgets.Layout(width='100%')
     )
     
+    # Buat checkbox untuk backup dataset
+    backup_checkbox = widgets.Checkbox(
+        value=True,
+        description='Backup dataset sebelum menghapus',
+        disabled=False,
+        indent=False,
+        layout=widgets.Layout(width='100%')
+    )
+    
+    # Buat input untuk path backup
+    backup_dir = widgets.Text(
+        value='data/downloads_backup',
+        placeholder='Path backup dataset',
+        description='Backup Dir:',
+        disabled=False,
+        layout=widgets.Layout(width='100%')
+    )
+    
+    # Buat dropdown untuk sumber dataset
+    source_dropdown = widgets.Dropdown(
+        options=['roboflow'],
+        value='roboflow',
+        description='Sumber:',
+        disabled=True,  # Dinonaktifkan karena hanya mendukung Roboflow
+        layout=widgets.Layout(width='100%')
+    )
+    
     # Buat container untuk input options dengan padding dan margin yang konsisten
     input_options = widgets.VBox([
-        rf_workspace,
-        rf_project,
-        rf_version,
-        rf_apikey,
+        source_dropdown,
+        workspace,
+        project,
+        version,
+        api_key,
         output_dir,
-        validate_dataset
+        validate_dataset,
+        backup_checkbox,
+        backup_dir
     ], layout=widgets.Layout(
         width='100%', 
         margin='10px 0', 
@@ -111,14 +141,15 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     ))
     
     # Buat tombol-tombol download dengan shared component (tanpa redundansi)
-    # Catatan: reset_button sudah tersedia secara default dalam create_action_buttons
+    # Catatan: reset_button dan save_button sudah tersedia secara default dalam create_action_buttons
     action_buttons = create_action_buttons(
         primary_label="Download Dataset",
         primary_icon="download",
         secondary_buttons=[
             ("Check Dataset", "search", "info")
         ],
-        cleanup_enabled=True  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
+        cleanup_enabled=True,  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
+        save_enabled=True  # Aktifkan tombol save untuk menyimpan konfigurasi
     )
     
     # Progress tracking dengan shared component dan layout yang konsisten
@@ -188,22 +219,25 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
         'ui': ui,
         'header': header,
         'status_panel': status_panel,
-        'rf_workspace': rf_workspace,
-        'rf_project': rf_project,
-        'rf_version': rf_version,
-        'rf_apikey': rf_apikey,
+        'workspace': workspace,
+        'project': project,
+        'version': version,
+        'api_key': api_key,
         'output_dir': output_dir,
         'validate_dataset': validate_dataset,
+        'backup_checkbox': backup_checkbox,
+        'backup_dir': backup_dir,
+        'source_dropdown': source_dropdown,
         'input_options': input_options,
         'download_button': action_buttons['primary_button'],
         'check_button': action_buttons['secondary_buttons'][0] if 'secondary_buttons' in action_buttons else None,
         'reset_button': action_buttons.get('reset_button'),  # Menggunakan reset_button dari shared component
+        'save_button': action_buttons.get('save_button'),  # Tombol save untuk menyimpan konfigurasi
         'cleanup_button': action_buttons.get('cleanup_button'),
         'button_container': action_buttons['container'],
         'summary_container': summary_container,
         'confirmation_area': confirmation_area,  # Area konfirmasi untuk dialog
-        'module_name': 'download',
-        'endpoint_dropdown': {'value': 'Roboflow'}  # Dummy endpoint_dropdown untuk kompatibilitas
+        'module_name': 'download'
     }
     
     # Tambahkan komponen progress tracking

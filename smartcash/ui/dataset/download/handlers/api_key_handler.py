@@ -25,16 +25,16 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     # 3. Environment variable
     
     # Check UI input first
-    if 'rf_apikey' in ui_components and ui_components['rf_apikey'].value:
-        api_key = ui_components['rf_apikey'].value
+    if 'api_key' in ui_components and ui_components['api_key'].value:
+        api_key = ui_components['api_key'].value
         return True, api_key
     
     # Try to get from Google Colab secrets
     api_key = get_api_key_from_secrets('ROBOFLOW_API_KEY')
     if api_key:
         # Update UI component if available
-        if 'rf_apikey' in ui_components:
-            ui_components['rf_apikey'].value = api_key
+        if 'api_key' in ui_components:
+            ui_components['api_key'].value = api_key
         
         if logger:
             logger.info("🔑 API key Roboflow berhasil diambil dari Google Colab secrets")
@@ -44,8 +44,8 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     api_key = os.environ.get('ROBOFLOW_API_KEY')
     if api_key:
         # Update UI component if available
-        if 'rf_apikey' in ui_components:
-            ui_components['rf_apikey'].value = api_key
+        if 'api_key' in ui_components:
+            ui_components['api_key'].value = api_key
             
         if logger:
             logger.info("🔑 API key Roboflow berhasil diambil dari environment variable")
@@ -93,8 +93,8 @@ def request_api_key_input(ui_components: Dict[str, Any]) -> None:
     )
     
     # Jika RF accordion tertutup, buka
-    if 'rf_accordion' in ui_components:
-        ui_components['rf_accordion'].selected_index = 0
+    if 'roboflow_accordion' in ui_components:
+        ui_components['roboflow_accordion'].selected_index = 0
     
     # Log ke UI
     log_to_ui(ui_components, api_key_msg, "warning", "🔑")
@@ -105,9 +105,9 @@ def request_api_key_input(ui_components: Dict[str, Any]) -> None:
         logger.warning(f"⚠️ {api_key_msg}")
         
     # Highlight input field jika ada
-    if 'rf_apikey' in ui_components:
+    if 'api_key' in ui_components:
         # Berikan outline merah untuk highlight
-        ui_components['rf_apikey'].layout.border = "1px solid red"
+        ui_components['api_key'].layout.border = "1px solid red"
 
 def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
     """
@@ -116,8 +116,8 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    # Hanya lakukan jika 'rf_apikey' input ada di UI components
-    if 'rf_apikey' not in ui_components:
+    # Hanya lakukan jika 'api_key' input ada di UI components
+    if 'api_key' not in ui_components:
         return
         
     # Cek apakah API key sudah diset
@@ -132,7 +132,7 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
             if change['type'] == 'change' and change['name'] == 'value':
                 # Reset style jika nilai dimasukkan
                 if change['new']:
-                    ui_components['rf_apikey'].layout.border = ""
+                    ui_components['api_key'].layout.border = ""
                     
                     # Log sukses
                     logger = ui_components.get('logger')
@@ -140,4 +140,4 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
                         logger.info("✅ API key berhasil dimasukkan")
         
         # Register callback
-        ui_components['rf_apikey'].observe(on_api_key_change, names='value')
+        ui_components['api_key'].observe(on_api_key_change, names='value')

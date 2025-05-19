@@ -12,45 +12,62 @@ from smartcash.common.exceptions import DatasetError
 from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 from smartcash.dataset.services.downloader.notification_utils import notify_service_event
+from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
+from smartcash.dataset.services.downloader.download_validator import DownloadValidator
+from smartcash.dataset.services.downloader.file_processor import DownloadFileProcessor
+from smartcash.dataset.services.downloader.backup_service import BackupService
 
 class DownloadService:
     """Layanan utama untuk mengelola download dataset dari berbagai sumber."""
     
-    def __init__(self, output_dir: str = "data", config: Optional[Dict] = None, logger=None, num_workers: int = 4):
-        """Inisialisasi DownloadService dengan komponen teroptimasi."""
-        self.config = config or {}
-        self.data_dir, self.logger, self.num_workers = Path(output_dir), logger or get_logger("dataset_download_service"), num_workers
-        self.temp_dir, self.downloads_dir = self.data_dir / ".temp", self.data_dir / "data"
-        [os.makedirs(d, exist_ok=True) for d in [self.temp_dir, self.downloads_dir]]
-        self.utils = DatasetUtils(self.config, output_dir, logger)
-        rf_config = self.config.get('data', {}).get('roboflow', {})
-        self.api_key, self.workspace, self.project, self.version = rf_config.get('api_key') or os.environ.get("ROBOFLOW_API_KEY"), rf_config.get('workspace', 'smartcash-wo2us'), rf_config.get('project', 'rupiah-emisi-2022'), rf_config.get('version', '3')
+    def __init__(self, output_dir: str, config: Dict[str, Any], logger=None, num_workers: int = 4):
+        """
+        Inisialisasi DownloadService.
         
-        # Import komponen yang diperlukan
-        from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
-        from smartcash.dataset.services.downloader.download_validator import DownloadValidator
-        from smartcash.dataset.services.downloader.file_processor import DownloadFileProcessor
-        from smartcash.dataset.services.downloader.backup_service import BackupService
-        
-        # Inisialisasi observer manager untuk UI notifications
+        Args:
+            output_dir: Direktori output untuk file yang didownload
+            config: Konfigurasi download
+            logger: Logger untuk logging
+            num_workers: Jumlah worker untuk parallel processing
+        """
+        self.output_dir = Path(output_dir)
+        self.config = config
+        self.logger = logger
+        self.num_workers = num_workers
         self.observer_manager = None
+        self.data_dir = self.output_dir.parent
         
-        # Inisialisasi komponen dengan observer manager
-        self.roboflow_downloader = RoboflowDownloader(logger=self.logger)
-        self.validator = DownloadValidator(logger=self.logger)
-        self.processor = DownloadFileProcessor(logger=self.logger, num_workers=self.num_workers)
-        self.backup_service = BackupService(logger=self.logger)
+        # Inisialisasi komponen
+        self.downloader = RoboflowDownloader(
+            logger=logger
+        )
         
-        # Log inisialisasi ke logger
-        self.logger.info("✅ DownloadService diinisialisasi")
+        self.validator = DownloadValidator(
+            logger=logger,
+            num_workers=num_workers
+        )
+        
+        self.file_processor = DownloadFileProcessor(
+            output_dir=output_dir,
+            config=config,
+            logger=logger,
+            num_workers=num_workers,
+            observer_manager=self.observer_manager
+        )
+        
+        self.backup_service = BackupService(
+            config=config,
+            logger=logger,
+            observer_manager=self.observer_manager
+        )
     
     def set_observer_manager(self, observer_manager):
         """Set observer manager untuk UI notifications."""
         self.observer_manager = observer_manager
         # Propagate observer manager ke komponen
-        self.roboflow_downloader.observer_manager = observer_manager
+        self.downloader.observer_manager = observer_manager
         self.validator.observer_manager = observer_manager
-        self.processor.observer_manager = observer_manager
+        self.file_processor.observer_manager = observer_manager
         self.backup_service.observer_manager = observer_manager
         
         # Notifikasi inisialisasi ke UI
@@ -75,22 +92,22 @@ class DownloadService:
         """Download dataset dari Roboflow dengan penanganan error yang lebih baik."""
         start_time = time.time()
         notify_service_event("download", "start", self, self.observer_manager, message="Memulai proses download dataset", step="download")
-        api_key, workspace, project, version = api_key or self.api_key, workspace or self.workspace, project or self.project, version or self.version
+        api_key, workspace, project, version = api_key or self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.environ.get("ROBOFLOW_API_KEY"), workspace or self.config.get('data', {}).get('roboflow', {}).get('workspace', 'smartcash-wo2us'), project or self.config.get('data', {}).get('roboflow', {}).get('project', 'rupiah-emisi-2022'), version or self.config.get('data', {}).get('roboflow', {}).get('version', '3')
         if not api_key: raise DatasetError("🔑 API key tidak tersedia. Berikan api_key melalui parameter atau config.")
         if not workspace or not project or not version: raise DatasetError("📋 Workspace, project, dan version diperlukan.")
-        output_dir = output_dir or str(self.downloads_dir / f"{workspace}_{project}_{version}")
+        output_dir = output_dir or str(self.output_dir / f"{workspace}_{project}_{version}")
         output_path, temp_download_path = Path(output_dir), Path(output_dir).with_name(f"{Path(output_dir).name}_temp")
         try:
             if self._handle_backup(output_path, backup_existing, show_progress): self.backup_service.cleanup_old_backups()
             if temp_download_path.exists(): shutil.rmtree(temp_download_path)
             os.makedirs(temp_download_path, exist_ok=True)
             notify_service_event("download", "progress", self, self.observer_manager, step="metadata", message="Mendapatkan metadata dataset", progress=2, total_steps=5, current_step=2)
-            metadata = self.roboflow_downloader.get_roboflow_metadata(workspace, project, version, api_key, format, self.temp_dir)
+            metadata = self.downloader.get_roboflow_metadata(workspace, project, version, api_key, format, self.data_dir)
             if 'export' not in metadata or 'link' not in metadata['export']: raise DatasetError("❌ Format metadata tidak valid, tidak ada link download")
             download_url, file_size_mb = metadata['export']['link'], metadata.get('export', {}).get('size', 0)
             if file_size_mb > 0: self.logger.info(f"📦 Ukuran dataset: {file_size_mb:.2f} MB")
             notify_service_event("download", "progress", self, self.observer_manager, step="download", message=f"Mendownload dataset ({file_size_mb:.2f} MB)", progress=3, total_steps=5, current_step=3)
-            download_success = self.roboflow_downloader.process_roboflow_download(download_url, temp_download_path, show_progress)
+            download_success = self.downloader.process_roboflow_download(download_url, temp_download_path, show_progress)
             if not download_success: raise DatasetError("❌ Proses download dan ekstraksi gagal")
             if verify_integrity:
                 notify_service_event("download", "progress", self, self.observer_manager, step="verify", message="Verifikasi integritas dataset", progress=4, total_steps=5, current_step=4)
@@ -204,7 +221,7 @@ class DownloadService:
         dst_path = Path(output_dir) if output_dir else self.data_dir
         if self._handle_backup(dst_path, backup_existing, show_progress): self.backup_service.cleanup_old_backups()
         notify_service_event("export", "progress", self, self.observer_manager, step="export", message=f"Mengekspor dataset ke {dst_path}", progress=2, total_steps=3, current_step=2)
-        result = self.processor.export_to_local(src_path, dst_path, show_progress)
+        result = self.file_processor.export_to_local(src_path, dst_path, show_progress)
         notify_service_event("export", "progress", self, self.observer_manager, step="verify", message="Memvalidasi hasil ekspor", progress=3, total_steps=3, current_step=3)
         valid, elapsed_time = self.validator.verify_local_dataset(dst_path), time.time() - start_time
         notify_service_event("export", "complete", self, self.observer_manager, message=f"Ekspor dataset selesai: {result.get('copied', 0)} file", duration=elapsed_time, status="success" if valid else "warning")
@@ -214,7 +231,7 @@ class DownloadService:
     
     def process_zip_file(self, zip_path: Union[str, Path], output_dir: Union[str, Path], extract_only: bool = False, validate_after: bool = True, remove_zip: bool = False, show_progress: bool = True) -> Dict[str, Any]:
         """Proses lengkap file ZIP dengan delegasi ke file_processor."""
-        return self.processor.process_zip_file(zip_path=zip_path, output_dir=output_dir, extract_only=extract_only, remove_zip=remove_zip, show_progress=show_progress)
+        return self.file_processor.process_zip_file(zip_path=zip_path, output_dir=output_dir, extract_only=extract_only, remove_zip=remove_zip, show_progress=show_progress)
     
     def pull_dataset(self, format: str = "yolov5pytorch", api_key: Optional[str] = None, workspace: Optional[str] = None, project: Optional[str] = None, version: Optional[str] = None, show_progress: bool = True, force_download: bool = False, backup_existing: bool = False) -> Dict[str, Any]:
         """One-step untuk download dan setup dataset siap pakai."""
@@ -249,7 +266,7 @@ class DownloadService:
         self.logger.info(f"📦 Mengimport dataset dari {zip_path} ke {target_path}")
         try:
             if self._handle_backup(target_path, backup_existing, show_progress): self.backup_service.cleanup_old_backups()
-            result = self.processor.process_zip_file(zip_path=zip_path, output_dir=target_path, extract_only=False, remove_zip=remove_zip, show_progress=show_progress)
+            result = self.file_processor.process_zip_file(zip_path=zip_path, output_dir=target_path, extract_only=False, remove_zip=remove_zip, show_progress=show_progress)
             elapsed_time = time.time() - start_time
             result['elapsed_time'] = elapsed_time
             notify_service_event("zip_import", "complete", self, self.observer_manager, message=f"Import dataset selesai: {result.get('stats', {}).get('total_images', 0)} gambar", duration=elapsed_time)
@@ -263,7 +280,7 @@ class DownloadService:
         """Dapatkan informasi dataset dari konfigurasi dan status lokal."""
         is_available = self.validator.is_dataset_available(self.data_dir)
         local_stats = self.validator.get_local_stats(self.data_dir) if is_available else {}
-        info = {'name': self.project, 'workspace': self.workspace, 'version': self.version, 'is_available_locally': is_available, 'local_stats': local_stats, 'data_dir': str(self.data_dir), 'has_api_key': bool(self.api_key)}
+        info = {'name': self.config.get('data', {}).get('roboflow', {}).get('project', 'Unnamed Project'), 'workspace': self.config.get('data', {}).get('roboflow', {}).get('workspace', 'Unnamed Workspace'), 'version': self.config.get('data', {}).get('roboflow', {}).get('version', 'Unknown Version'), 'is_available_locally': is_available, 'local_stats': local_stats, 'data_dir': str(self.data_dir), 'has_api_key': bool(self.config.get('data', {}).get('roboflow', {}).get('api_key') or os.environ.get("ROBOFLOW_API_KEY"))}
         if is_available:
             total_images = sum(local_stats.get(split, 0) for split in DEFAULT_SPLITS)
             self.logger.info(f"🔍 Dataset (Lokal): {info['name']} v{info['version']} | Total: {total_images} gambar | Train: {local_stats.get('train', 0)}, Valid: {local_stats.get('valid', 0)}, Test: {local_stats.get('test', 0)}")

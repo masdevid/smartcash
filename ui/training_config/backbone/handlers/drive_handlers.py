@@ -11,13 +11,13 @@ from IPython.display import clear_output, display
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.config import get_config_manager
-from smartcash.common.logger import get_logger
+from smartcash.common.logger import get_logger, LogLevel
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.backbone.handlers.config_handlers import update_ui_from_config
 
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
-logger.setLevel("CRITICAL")
+logger.set_level(LogLevel.CRITICAL)
 
 def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> None:
     """

@@ -19,18 +19,20 @@ from smartcash.dataset.services.downloader.notification_utils import notify_serv
 class BackupService:
     """Layanan untuk membackup dataset ke file ZIP."""
     
-    def __init__(self, backup_dir: Optional[str] = None, logger=None, observer_manager=None):
+    def __init__(self, config: Dict[str, Any], logger=None, observer_manager=None):
         """
         Inisialisasi BackupService.
         
         Args:
-            backup_dir: Direktori untuk menyimpan backup (opsional)
-            logger: Logger kustom (opsional)
-            observer_manager: Manager untuk UI notifications (opsional)
+            config: Konfigurasi backup
+            logger: Logger untuk logging
+            observer_manager: Observer manager untuk UI notifications
         """
-        self.logger = logger or get_logger("backup_service")
-        self.backup_dir = Path(backup_dir or "data/backups")
+        self.config = config
+        self.logger = logger
         self.observer_manager = observer_manager
+        self.data_dir = Path(config.get('data', {}).get('download', {}).get('output_dir', 'data'))
+        self.backup_dir = Path(config.get('data', {}).get('download', {}).get('backup_dir', 'data/backups'))
         ensure_dir(self.backup_dir)
         
         # Log inisialisasi ke logger

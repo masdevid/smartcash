@@ -22,27 +22,23 @@ from smartcash.dataset.services.downloader.notification_utils import notify_serv
 class DownloadFileProcessor:
     """Processor untuk operasi file dataset dengan dukungan ZIP dan restrukturisasi."""
     
-    def __init__(self, logger=None, num_workers: int = None, observer_manager=None):
+    def __init__(self, output_dir: str, config: Dict[str, Any], logger=None, num_workers: int = 4, observer_manager=None):
         """
-        Inisialisasi file processor dengan optimasi thread count.
+        Inisialisasi DownloadFileProcessor.
+        
+        Args:
+            output_dir: Direktori output untuk file yang diproses
+            config: Konfigurasi download
+            logger: Logger untuk logging
+            num_workers: Jumlah worker untuk parallel processing
+            observer_manager: Observer manager untuk UI notifications
         """
-        self.logger = logger or get_logger("file_processor")
-        # Optimasi: gunakan CPU count sebagai default tapi batasi maksimum
-        self.num_workers = min(num_workers or os.cpu_count() or 4, 16)
+        self.output_dir = Path(output_dir)
+        self.config = config
+        self.logger = logger
+        self.num_workers = num_workers
         self.observer_manager = observer_manager
-        
-        # Log inisialisasi ke logger
-        self.logger.info(f"✅ DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers")
-        
-        # Notifikasi inisialisasi ke UI jika observer manager tersedia
-        if self.observer_manager:
-            notify_service_event(
-                "file_processor", 
-                "start",
-                self, 
-                self.observer_manager,
-                message=f"DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers"
-            )
+        self.data_dir = self.output_dir.parent
     
     def process_zip_file(
         self,

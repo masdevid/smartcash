@@ -14,6 +14,8 @@ import shutil
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
+from smartcash.dataset.manager import DatasetManager
+from smartcash.dataset.services.downloader.download_service import DownloadService
 
 logger = get_logger(__name__)
 
@@ -220,3 +222,11 @@ def update_ui_from_config(config: Dict[str, Any], ui_components: Dict[str, Any])
     # Update nilai backup dir dari konfigurasi
     if 'backup_dir' in ui_components and 'backup_dir' in download_config:
         ui_components['backup_dir'].value = download_config['backup_dir']
+
+def get_dataset_manager() -> DatasetManager:
+    """Get the dataset manager instance."""
+    return DatasetManager()
+
+def get_download_service() -> DownloadService:
+    """Get the download service instance."""
+    return DownloadService()

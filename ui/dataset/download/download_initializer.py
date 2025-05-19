@@ -23,6 +23,17 @@ from smartcash.ui.dataset.download.handlers.config_handler import (
     update_config_from_ui,
     update_ui_from_config
 )
+from pathlib import Path
+from smartcash.common.config import ConfigManager
+from smartcash.common.environment import EnvironmentManager
+
+def get_config_manager() -> ConfigManager:
+    """Get the config manager instance."""
+    return ConfigManager()
+
+def get_environment_manager() -> EnvironmentManager:
+    """Get the environment manager instance."""
+    return EnvironmentManager()
 
 def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """

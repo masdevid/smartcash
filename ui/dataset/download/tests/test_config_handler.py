@@ -26,18 +26,12 @@ class TestDownloadConfigHandler(unittest.TestCase):
     """Test suite untuk config_handler pada modul download dataset."""
     
     def setUp(self):
-        """Setup untuk setiap test case."""
-        # Buat mock UI components
-        self.ui_components = self._create_mock_ui_components()
+        """Setup sebelum setiap test case."""
+        # Setup temporary directory
+        self.temp_dir = Path("temp_test_config")
+        self.temp_dir.mkdir(exist_ok=True)
         
-        # Setup logger mock
-        self.logger_mock = MagicMock()
-        self.ui_components['logger'] = self.logger_mock
-        
-        # Set output_dir to match test expectation
-        self.ui_components['output_dir'].value = 'data/test'
-        
-        # Default config for tests
+        # Setup test config
         self.config = {
             'data': {
                 'download': {
@@ -55,19 +49,23 @@ class TestDownloadConfigHandler(unittest.TestCase):
             }
         }
         
-        # Setup mock untuk DatasetManager dan DownloadService
-        self.dataset_manager_mock = MagicMock()
-        self.download_service_mock = MagicMock()
-        
-        # Setup patch untuk import
-        self.dataset_manager_patch = patch('smartcash.dataset.manager.DatasetManager', 
-                                          return_value=self.dataset_manager_mock)
-        self.download_service_patch = patch('smartcash.dataset.services.downloader.download_service.DownloadService', 
-                                           return_value=self.download_service_mock)
+        # Setup patches
+        self.dataset_manager_patch = patch('smartcash.ui.dataset.download.handlers.config_handler.get_dataset_manager')
+        self.download_service_patch = patch('smartcash.ui.dataset.download.handlers.config_handler.get_download_service')
         
         # Start patches
         self.dataset_manager_mock = self.dataset_manager_patch.start()
         self.download_service_mock = self.download_service_patch.start()
+        
+        # Buat mock UI components
+        self.ui_components = self._create_mock_ui_components()
+        
+        # Setup logger mock
+        self.logger_mock = MagicMock()
+        self.ui_components['logger'] = self.logger_mock
+        
+        # Set output_dir to match test expectation
+        self.ui_components['output_dir'].value = 'data/test'
     
     def tearDown(self):
         """Cleanup setelah setiap test case."""
@@ -175,12 +173,14 @@ class TestDownloadConfigHandler(unittest.TestCase):
         mock_load_default.assert_called_once()
     
     @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
-    def test_load_config_file_exists(self, mock_get_config_manager_instance):
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
+    def test_load_config_file_exists(self, mock_load_default, mock_get_config_manager_instance):
         """Test load_config ketika file ada."""
         # Setup mock
         mock_config_manager = MagicMock()
         mock_config_manager.get_module_config.return_value = self.config
         mock_get_config_manager_instance.return_value = mock_config_manager
+        mock_load_default.return_value = self.config
         
         # Panggil fungsi
         result = load_config()

@@ -23,27 +23,33 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
         # Buat mock UI components
         self.ui_components = self._create_mock_ui_components()
         
-        # Setup temporary directory untuk test
-        self.temp_dir = tempfile.mkdtemp()
-        self.ui_components['output_dir'].value = self.temp_dir
+        # Setup logger mock
+        self.logger_mock = MagicMock()
+        self.ui_components['logger'] = self.logger_mock
+        
+        # Set output_dir to match test expectation
+        self.ui_components['output_dir'].value = 'data/test'
         
         # Setup mock untuk DatasetManager dan DownloadService
         self.dataset_manager_mock = MagicMock()
         self.download_service_mock = MagicMock()
         
         # Setup patch untuk import
-        self.dataset_manager_patch = patch('smartcash.dataset.manager.DatasetManager', 
-                                          return_value=self.dataset_manager_mock)
-        self.download_service_patch = patch('smartcash.dataset.services.downloader.download_service.DownloadService', 
-                                           return_value=self.download_service_mock)
+        self.dataset_manager_patch = patch('smartcash.dataset.manager.DatasetManager',
+                                         return_value=self.dataset_manager_mock)
+        self.download_service_patch = patch('smartcash.dataset.services.downloader.download_service.DownloadService',
+                                          return_value=self.download_service_mock)
         
         # Start patches
         self.dataset_manager_mock = self.dataset_manager_patch.start()
         self.download_service_mock = self.download_service_patch.start()
         
         # Setup handlers
-        self.download_handler = DownloadHandler(self.ui_components)
-        self.cleanup_handler = CleanupHandler(self.ui_components)
+        self.download_handler = DownloadHandler(ui_components=self.ui_components)
+        self.cleanup_handler = CleanupHandler(ui_components=self.ui_components)
+        
+        # Reset download_running flag
+        self.ui_components['download_running'] = False
     
     def tearDown(self):
         """Cleanup setelah setiap test case."""

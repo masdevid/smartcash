@@ -223,6 +223,18 @@ class SmartCashLogger:
             self.warning("tqdm tidak ditemukan, progress tracking tidak aktif")
             return iterable
 
+    def set_level(self, level: LogLevel) -> None:
+        """
+        Set the logging level for the logger and all handlers.
+        Args:
+            level: LogLevel to set
+        """
+        self.level = level
+        std_level = self.LEVEL_MAPPING[level]
+        self.logger.setLevel(std_level)
+        for handler in self.logger.handlers:
+            handler.setLevel(std_level)
+
 # Fungsi helper untuk mendapatkan logger
 def get_logger(name: str, 
               level: LogLevel = LogLevel.INFO, 

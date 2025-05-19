@@ -9,6 +9,7 @@ import tempfile
 from unittest.mock import patch, MagicMock, mock_open
 
 from smartcash.ui.training_config.backbone.handlers.drive_handlers import sync_to_drive, sync_from_drive
+from smartcash.ui.utils.constants import ICONS
 
 class TestBackboneDriveHandlers(unittest.TestCase):
     """Test case untuk handler sinkronisasi Google Drive pada backbone."""
@@ -35,8 +36,8 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         
         # Buat mock config manager
         self.mock_config_manager = MagicMock()
-        self.mock_config_manager.save_config.return_value = True
-        self.mock_config_manager.load_config.return_value = {
+        self.mock_config_manager.save_module_config.return_value = True
+        self.mock_config_manager.get_module_config.return_value = {
             'backbone': {
                 'name': 'cspdarknet_s',
                 'transfer_learning': True,
@@ -57,17 +58,19 @@ class TestBackboneDriveHandlers(unittest.TestCase):
     
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
-    @patch('os.makedirs')
+    @patch('smartcash.common.config.ConfigManager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
-    def test_sync_to_drive(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                         mock_makedirs, mock_get_config_manager, mock_get_environment_manager):
-        """Test sinkronisasi ke Google Drive."""
+    def test_sync_to_drive_success(self, mock_clear_output, mock_display, mock_create_info_alert, 
+                                 mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager):
+        """Test sinkronisasi ke Google Drive berhasil."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
         mock_get_config_manager.return_value = self.mock_config_manager
+        mock_ConfigManager.return_value = self.mock_config_manager
         mock_create_info_alert.return_value = "Info alert"
+        self.mock_config_manager.sync_to_drive.return_value = (True, "Success")
         
         # Panggil fungsi yang ditest
         sync_to_drive(None, self.ui_components)
@@ -75,25 +78,66 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
         mock_get_config_manager.assert_called_once()
-        mock_makedirs.assert_called_once()
-        mock_create_info_alert.assert_called()
+        self.mock_config_manager.sync_to_drive.assert_called_once_with('model')
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
+            alert_type='success'
+        )
     
-    @patch('os.path.exists')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.common.config.ConfigManager')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
+    def test_sync_to_drive_failure(self, mock_clear_output, mock_display, mock_create_info_alert, 
+                                 mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager):
+        """Test sinkronisasi ke Google Drive gagal."""
+        # Setup mock
+        mock_get_environment_manager.return_value = self.mock_env
+        mock_get_config_manager.return_value = self.mock_config_manager
+        mock_ConfigManager.return_value = self.mock_config_manager
+        mock_create_info_alert.return_value = "Info alert"
+        self.mock_config_manager.sync_to_drive.return_value = (False, "Failed")
+        
+        # Panggil fungsi yang ditest
+        sync_to_drive(None, self.ui_components)
+        
+        # Verifikasi hasil
+        mock_get_environment_manager.assert_called_once()
+        mock_get_config_manager.assert_called_once()
+        self.mock_config_manager.sync_to_drive.assert_called_once_with('model')
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive",
+            alert_type='error'
+        )
+    
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.update_ui_from_config')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.common.config.ConfigManager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
-    def test_sync_from_drive(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                           mock_get_config_manager, mock_get_environment_manager, mock_update_ui, mock_exists):
-        """Test sinkronisasi dari Google Drive."""
+    def test_sync_from_drive_success(self, mock_clear_output, mock_display, mock_create_info_alert, 
+                                   mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager, mock_update_ui_from_config):
+        """Test sinkronisasi dari Google Drive berhasil."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
         mock_get_config_manager.return_value = self.mock_config_manager
-        mock_exists.return_value = True
-        # Konfigurasi untuk get_module_config
-        self.mock_config_manager.get_module_config.return_value = {"backbone": "efficientnet_b4"}
+        mock_ConfigManager.return_value = self.mock_config_manager
+        mock_create_info_alert.return_value = "Info alert"
+        drive_config = {
+            'backbone': {
+                'name': 'efficientnet_b4',
+                'transfer_learning': True,
+                'freeze_backbone': True,
+                'freeze_layers': 10,
+                'custom_head': False,
+                'custom_head_layers': '256,128'
+            }
+        }
+        self.mock_config_manager.sync_with_drive.return_value = (True, "Success", drive_config)
         
         # Panggil fungsi yang ditest
         sync_from_drive(None, self.ui_components)
@@ -101,28 +145,28 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
         mock_get_config_manager.assert_called_once()
-        mock_exists.assert_called_once()
-        # Pada implementasi terbaru, update_ui_from_config mungkin tidak dipanggil langsung
-        # atau dipanggil dalam konteks yang berbeda, jadi kita tidak perlu memeriksa ini
-        # mock_update_ui.assert_called_once()
-        # Perhatikan bahwa dalam implementasi drive_handlers.py, create_info_alert mungkin dipanggil
-        # dalam blok with status_panel, sehingga tidak terdeteksi oleh mock_create_info_alert
-        # Kita hanya perlu memastikan bahwa fungsi berjalan tanpa error
+        self.mock_config_manager.sync_with_drive.assert_called_once_with('model_config.yaml', sync_strategy='drive_priority')
+        self.mock_config_manager.save_module_config.assert_called_once_with('model', drive_config)
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive",
+            alert_type='success'
+        )
     
-    @patch('os.path.exists')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.common.config.ConfigManager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
-    def test_sync_from_drive_file_not_exists(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                                          mock_get_config_manager, mock_get_environment_manager, mock_exists):
-        """Test sinkronisasi dari Google Drive ketika file tidak ada."""
+    def test_sync_from_drive_failure(self, mock_clear_output, mock_display, mock_create_info_alert, 
+                                   mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager):
+        """Test sinkronisasi dari Google Drive gagal."""
         # Setup mock
         mock_get_environment_manager.return_value = self.mock_env
         mock_get_config_manager.return_value = self.mock_config_manager
-        mock_exists.return_value = False
+        mock_ConfigManager.return_value = self.mock_config_manager
         mock_create_info_alert.return_value = "Info alert"
+        self.mock_config_manager.sync_with_drive.return_value = (False, "Failed", None)
         
         # Panggil fungsi yang ditest
         sync_from_drive(None, self.ui_components)
@@ -130,15 +174,20 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
         mock_get_config_manager.assert_called_once()
-        mock_exists.assert_called_once()
-        mock_create_info_alert.assert_called()
+        self.mock_config_manager.sync_with_drive.assert_called_once_with('model_config.yaml', sync_strategy='drive_priority')
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('error', '❌')} Failed",
+            alert_type='error'
+        )
     
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.common.config.ConfigManager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
     def test_sync_to_drive_not_mounted(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                                     mock_get_environment_manager):
+                                     mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager):
         """Test sinkronisasi ke Google Drive ketika tidak di-mount."""
         # Setup mock
         mock_env = MagicMock()
@@ -151,14 +200,19 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
-        mock_create_info_alert.assert_called()
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
+            alert_type='error'
+        )
     
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_environment_manager')
+    @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.get_config_manager')
+    @patch('smartcash.common.config.ConfigManager')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.create_info_alert')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.display')
     @patch('smartcash.ui.training_config.backbone.handlers.drive_handlers.clear_output')
     def test_sync_from_drive_not_mounted(self, mock_clear_output, mock_display, mock_create_info_alert, 
-                                      mock_get_environment_manager):
+                                      mock_ConfigManager, mock_get_config_manager, mock_get_environment_manager):
         """Test sinkronisasi dari Google Drive ketika tidak di-mount."""
         # Setup mock
         mock_env = MagicMock()
@@ -171,7 +225,10 @@ class TestBackboneDriveHandlers(unittest.TestCase):
         
         # Verifikasi hasil
         mock_get_environment_manager.assert_called_once()
-        mock_create_info_alert.assert_called()
+        mock_create_info_alert.assert_called_with(
+            f"{ICONS.get('error', '❌')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.",
+            alert_type='error'
+        )
 
 if __name__ == '__main__':
     unittest.main()

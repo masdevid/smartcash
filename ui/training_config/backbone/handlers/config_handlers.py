@@ -9,11 +9,11 @@ from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.config import get_config_manager
-from smartcash.common.logger import get_logger
+from smartcash.common.logger import get_logger, LogLevel
 
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
-logger.setLevel("CRITICAL")
+logger.set_level(LogLevel.CRITICAL)
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

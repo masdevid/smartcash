@@ -38,8 +38,9 @@ class BaseConfigManager(Singleton):
             config_file: File konfigurasi utama
             env_prefix: Prefix untuk environment variables
         """
-        self.base_dir = Path(base_dir) if base_dir else Path.cwd()
-        self.config_dir = Path('configs')
+        # Setup base directories
+        self.base_dir = Path(base_dir) if base_dir else Path.home() / '.smartcash'
+        self.config_dir = Path('smartcash') / 'configs'  # Default ke smartcash/configs
         self.env_prefix = env_prefix
         self.config = {}
         self.module_configs = {}  # Dictionary untuk menyimpan konfigurasi berbagai modul
@@ -70,7 +71,12 @@ class BaseConfigManager(Singleton):
         """
         config_path = self._resolve_config_path(config_file)
         if not config_path.exists():
-            raise FileNotFoundError(f"File konfigurasi tidak ditemukan: {config_path}")
+            # Coba buat file konfigurasi default jika tidak ada
+            if self._create_default_config(config_path):
+                if self._logger:
+                    self._logger.info(f"File konfigurasi default dibuat: {config_path}")
+            else:
+                raise FileNotFoundError(f"File konfigurasi tidak ditemukan: {config_path}")
         
         # Load konfigurasi menggunakan fungsi dari io module
         self.config = load_config(config_path, {})
@@ -105,9 +111,9 @@ class BaseConfigManager(Singleton):
                 if project_config_path.exists():
                     return project_config_path
             
-        # Check relative to config_dir
-        if (self.config_dir / config_path).exists(): 
-            return self.config_dir / config_path
+        # Check relative to smartcash/configs
+        if (self.config_dir / config_path.name).exists(): 
+            return self.config_dir / config_path.name
         
         # Check relative to project root (smartcash/configs)
         project_config_path = Path('smartcash') / 'configs' / config_path.name
@@ -118,8 +124,53 @@ class BaseConfigManager(Singleton):
         if (Path.cwd() / config_path).exists(): 
             return Path.cwd() / config_path
         
-        # Jika semua gagal, kembalikan path relatif terhadap config_dir
-        return self.config_dir / config_path
+        # Jika semua gagal, kembalikan path di base_dir
+        return self.base_dir / config_path.name
+    
+    def _create_default_config(self, config_path: Path) -> bool:
+        """
+        Buat file konfigurasi default jika tidak ada
+        
+        Args:
+            config_path: Path ke file konfigurasi yang akan dibuat
+            
+        Returns:
+            True jika berhasil dibuat, False jika gagal
+        """
+        try:
+            # Buat direktori jika belum ada
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Konfigurasi default
+            default_config = {
+                'paths': {
+                    'base_dir': str(self.base_dir),
+                    'data_dir': str(self.base_dir / 'data'),
+                    'models_dir': str(self.base_dir / 'models'),
+                    'output_dir': str(self.base_dir / 'output'),
+                    'logs_dir': str(self.base_dir / 'logs'),
+                    'exports_dir': str(self.base_dir / 'exports')
+                },
+                'environment': {
+                    'is_colab': 'google.colab' in str(globals()),
+                    'is_drive_mounted': False
+                },
+                'modules': {
+                    'ui': {
+                        'enabled': True,
+                        'theme': 'light'
+                    }
+                }
+            }
+            
+            # Simpan konfigurasi default
+            save_config(config_path, default_config)
+            return True
+            
+        except Exception as e:
+            if self._logger:
+                self._logger.critical(f"Gagal membuat file konfigurasi default: {str(e)}")
+            return False
     
     def _override_with_env_vars(self) -> None:
         """

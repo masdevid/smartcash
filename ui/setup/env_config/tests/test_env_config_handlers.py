@@ -1,63 +1,151 @@
 """
 File: smartcash/ui/setup/env_config/tests/test_env_config_handlers.py
-Deskripsi: Test untuk handler UI konfigurasi environment
+Deskripsi: Test untuk handlers environment config
 """
 
 import unittest
 from unittest.mock import MagicMock, patch
-import ipywidgets as widgets
-from smartcash.ui.setup.env_config.tests.test_helper import WarningTestCase, ignore_layout_warnings
+from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_config_handlers
+from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
+from smartcash.ui.setup.env_config.components.state_manager import EnvConfigStateManager
 
-class TestEnvConfigHandlers(WarningTestCase):
-    """Test case untuk env_config_handlers.py"""
-    
+class TestEnvConfigHandlers(unittest.TestCase):
     def setUp(self):
-        """Setup untuk test"""
-        # Buat mock UI components
-        mock_layout = MagicMock()
-        mock_layout.visibility = 'hidden'
-        
+        """Setup test environment"""
+        # Create a mock/dummy ui_components dict with required keys
         self.ui_components = {
-            'drive_button': widgets.Button(),
-            'directory_button': widgets.Button(),
-            'progress_bar': MagicMock(
-                value=0,
-                min=0,
-                max=10,
-                layout=mock_layout
-            ),
-            'progress_message': MagicMock(
-                value="",
-                layout=mock_layout
-            ),
-            'status': widgets.Output(),
-            'logger': MagicMock()
+            'drive_button': MagicMock(),
+            'directory_button': MagicMock(),
+            'status_panel': MagicMock(),
+            'log': MagicMock(),  # for log context manager
+            'progress': MagicMock(),  # for progress bar
+            'progress_bar': MagicMock(),
+            'progress_message': MagicMock(),
+            'log_panel': MagicMock(),
         }
-    
-    def test_setup_handlers_import(self):
-        """Test import setup_handlers berhasil"""
-        from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_config_handlers
-        self.assertTrue(callable(setup_env_config_handlers))
-    
-    def test_drive_button_handler_import(self):
-        """Test import drive_button_handler berhasil"""
-        from smartcash.ui.setup.env_config.handlers.drive_button_handler import setup_drive_button_handler
-        self.assertTrue(callable(setup_drive_button_handler))
-    
-    def test_directory_button_handler_import(self):
-        """Test import directory_button_handler berhasil"""
-        from smartcash.ui.setup.env_config.handlers.directory_button_handler import setup_directory_button_handler
-        self.assertTrue(callable(setup_directory_button_handler))
-    
-    def test_register_cleanup_event(self):
-        """Test register cleanup function ke IPython event"""
-        from smartcash.ui.setup.env_config.handlers.setup_handlers import _register_cleanup_event
+        self.colab_manager = MagicMock()
+        # Create a mock component for AutoCheckHandler
+        self.mock_component = MagicMock()
+        self.mock_component.ui_components = self.ui_components
+        self.mock_component.config_manager.base_dir = '/dummy/base/dir'
+        self.mock_component.config_dir = '/dummy/config/dir'
+        self.mock_component._update_status = MagicMock()
         
-        # Panggil fungsi dengan dummy cleanup function
-        result = _register_cleanup_event(lambda: None)
+    def test_setup_env_config_handlers(self):
+        """Test setup_env_config_handlers function"""
+        with patch('smartcash.ui.setup.env_config.handlers.setup_handlers.setup_drive_handler') as mock_drive, \
+             patch('smartcash.ui.setup.env_config.handlers.setup_handlers.setup_directory_handler') as mock_dir:
+            
+            setup_env_config_handlers(self.ui_components, self.colab_manager)
+            
+            mock_drive.assert_called_once_with(self.ui_components, self.colab_manager)
+            mock_dir.assert_called_once_with(self.ui_components, self.colab_manager)
+            
+    def test_auto_check_handler(self):
+        """Test AutoCheckHandler lifecycle"""
+        handler = AutoCheckHandler(self.mock_component)
+        # Simulate async auto_check (just check it runs without error)
+        import asyncio
+        asyncio.run(handler.auto_check())
+        # No assertion, just ensure no exception
         
-        # Verifikasi hasil
-        self.assertTrue(result)
+    def test_state_manager_initial_state(self):
+        """Test EnvConfigStateManager initial state"""
+        state_manager = EnvConfigStateManager(self.ui_components, self.colab_manager)
+        
+        # Test initial state update
+        state_manager._update_initial_state()
+        
+        # Verify UI components are in correct initial state
+        self.assertFalse(self.ui_components['drive_button'].disabled)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertEqual(self.ui_components['status_panel'].value, "")
+        self.assertEqual(self.ui_components['log_panel'].value, "")
+        
+    def test_state_manager_drive_connection(self):
+        """Test EnvConfigStateManager drive connection states"""
+        state_manager = EnvConfigStateManager(self.ui_components, self.colab_manager)
+        
+        # Test connection start
+        state_manager.handle_drive_connection_start()
+        self.assertTrue(self.ui_components['drive_button'].disabled)
+        self.assertTrue(self.ui_components['directory_button'].disabled)
+        self.assertIn("Connecting to Google Drive", self.ui_components['status_panel'].value)
+        
+        # Test connection success
+        state_manager.handle_drive_connection_success()
+        self.assertTrue(self.ui_components['drive_button'].disabled)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertIn("Connected to Google Drive", self.ui_components['status_panel'].value)
+        
+        # Test connection error
+        error_msg = "Connection failed"
+        state_manager.handle_drive_connection_error(error_msg)
+        self.assertFalse(self.ui_components['drive_button'].disabled)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertIn(error_msg, self.ui_components['status_panel'].value)
+        
+    def test_state_manager_directory_setup(self):
+        """Test EnvConfigStateManager directory setup states"""
+        state_manager = EnvConfigStateManager(self.ui_components, self.colab_manager)
+        
+        # Test setup start
+        state_manager.handle_directory_setup_start()
+        self.assertTrue(self.ui_components['directory_button'].disabled)
+        self.assertIn("Setting up directories", self.ui_components['status_panel'].value)
+        
+        # Test setup success
+        state_manager.handle_directory_setup_success()
+        self.assertTrue(self.ui_components['directory_button'].disabled)
+        self.assertIn("Directories setup complete", self.ui_components['status_panel'].value)
+        
+        # Test setup error
+        error_msg = "Setup failed"
+        state_manager.handle_directory_setup_error(error_msg)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertIn(error_msg, self.ui_components['status_panel'].value)
+        
+    def test_state_manager_drive_sync(self):
+        """Test EnvConfigStateManager drive sync states"""
+        state_manager = EnvConfigStateManager(self.ui_components, self.colab_manager)
+        
+        # Test sync start
+        state_manager.handle_drive_sync_start()
+        self.assertTrue(self.ui_components['drive_button'].disabled)
+        self.assertTrue(self.ui_components['directory_button'].disabled)
+        self.assertIn("Syncing with Google Drive", self.ui_components['status_panel'].value)
+        
+        # Test sync success
+        state_manager.handle_drive_sync_success()
+        self.assertTrue(self.ui_components['drive_button'].disabled)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertIn("Sync complete", self.ui_components['status_panel'].value)
+        
+        # Test sync error
+        error_msg = "Sync failed"
+        state_manager.handle_drive_sync_error(error_msg)
+        self.assertFalse(self.ui_components['drive_button'].disabled)
+        self.assertFalse(self.ui_components['directory_button'].disabled)
+        self.assertIn(error_msg, self.ui_components['status_panel'].value)
+        
+    def test_state_manager_progress_tracking(self):
+        """Test EnvConfigStateManager progress tracking"""
+        state_manager = EnvConfigStateManager(self.ui_components, self.colab_manager)
+        
+        # Test progress update
+        state_manager.update_progress(50, "Halfway done")
+        self.assertEqual(self.ui_components['progress_bar'].value, 50)
+        self.assertEqual(self.ui_components['progress_message'].value, "Halfway done")
+        
+        # Test progress completion
+        state_manager.update_progress(100, "Complete")
+        self.assertEqual(self.ui_components['progress_bar'].value, 100)
+        self.assertEqual(self.ui_components['progress_message'].value, "Complete")
+        
+        # Test progress reset
+        state_manager.reset_progress()
+        self.assertEqual(self.ui_components['progress_bar'].value, 0)
+        self.assertEqual(self.ui_components['progress_message'].value, "")
 
 if __name__ == '__main__':
     unittest.main()

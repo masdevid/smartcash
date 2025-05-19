@@ -5,6 +5,7 @@ Deskripsi: Manager untuk state dan skenario environment config
 
 from typing import Dict, Any
 import ipywidgets as widgets
+from pathlib import Path
 
 from smartcash.ui.setup.env_config.utils.ui_utils import (
     update_status,
@@ -37,14 +38,18 @@ class EnvConfigStateManager:
         """
         Update state awal berdasarkan kondisi environment
         """
+        # Reset UI components to initial state
+        self.ui_components['status_panel'].value = ""
+        self.ui_components['log_panel'].value = ""
+        self.ui_components['drive_button'].disabled = False
+        self.ui_components['directory_button'].disabled = False
+        
         # Check if drive is already connected
         if self.colab_manager.is_drive_connected():
-            set_button_state(self.ui_components['drive_button'], False, "success")
-            update_status(self.ui_components, "Google Drive already connected", "success")
+            self.ui_components['drive_button'].disabled = False
             log_message(self.ui_components, "Google Drive already connected")
         else:
-            set_button_state(self.ui_components['drive_button'], False, "info")
-            update_status(self.ui_components, "Connect to Google Drive", "info")
+            self.ui_components['drive_button'].disabled = False
         
         # Check if directories are already set up
         base_dirs = [
@@ -57,29 +62,27 @@ class EnvConfigStateManager:
         
         all_dirs_exist = all(Path(dir_path).exists() for dir_path in base_dirs)
         if all_dirs_exist:
-            set_button_state(self.ui_components['directory_button'], False, "success")
-            update_status(self.ui_components, "Directories already set up", "success")
+            self.ui_components['directory_button'].disabled = False
             log_message(self.ui_components, "Directories already set up")
         else:
-            set_button_state(self.ui_components['directory_button'], False, "info")
-            update_status(self.ui_components, "Setup directories", "info")
+            self.ui_components['directory_button'].disabled = False
     
     def handle_drive_connection_start(self):
         """
         Handle state saat memulai koneksi drive
         """
-        set_button_state(self.ui_components['drive_button'], True, "info")
-        set_button_state(self.ui_components['directory_button'], True, "info")
-        update_status(self.ui_components, "Connecting to Google Drive...", "info")
+        self.ui_components['drive_button'].disabled = True
+        self.ui_components['directory_button'].disabled = True
+        update_status(self.ui_components, "Connecting to Google Drive", "info")
         update_progress(self.tracker, 0.2, "Connecting to Google Drive...")
     
     def handle_drive_connection_success(self):
         """
         Handle state saat koneksi drive berhasil
         """
-        set_button_state(self.ui_components['drive_button'], False, "success")
-        set_button_state(self.ui_components['directory_button'], False, "info")
-        update_status(self.ui_components, "Successfully connected to Google Drive", "success")
+        self.ui_components['drive_button'].disabled = True
+        self.ui_components['directory_button'].disabled = False
+        update_status(self.ui_components, "Connected to Google Drive", "success")
         update_progress(self.tracker, 1.0, "Drive connection completed")
         log_message(self.ui_components, "Successfully connected to Google Drive")
         log_message(self.ui_components, f"Drive path: {self.colab_manager.drive_base_path}")
@@ -91,9 +94,9 @@ class EnvConfigStateManager:
         Args:
             error: Error message
         """
-        set_button_state(self.ui_components['drive_button'], False, "danger")
-        set_button_state(self.ui_components['directory_button'], False, "info")
-        update_status(self.ui_components, f"Failed to connect to Google Drive: {error}", "error")
+        self.ui_components['drive_button'].disabled = False
+        self.ui_components['directory_button'].disabled = False
+        update_status(self.ui_components, error, "error")
         update_progress(self.tracker, 0, "Drive connection failed")
         log_message(self.ui_components, f"Error connecting to Google Drive: {error}", "error")
     
@@ -101,16 +104,16 @@ class EnvConfigStateManager:
         """
         Handle state saat memulai setup directory
         """
-        set_button_state(self.ui_components['directory_button'], True, "info")
-        update_status(self.ui_components, "Setting up directories...", "info")
+        self.ui_components['directory_button'].disabled = True
+        update_status(self.ui_components, "Setting up directories", "info")
         update_progress(self.tracker, 0.2, "Creating directories...")
     
     def handle_directory_setup_success(self):
         """
         Handle state saat setup directory berhasil
         """
-        set_button_state(self.ui_components['directory_button'], False, "success")
-        update_status(self.ui_components, "Successfully set up directories", "success")
+        self.ui_components['directory_button'].disabled = True
+        update_status(self.ui_components, "Directories setup complete", "success")
         update_progress(self.tracker, 1.0, "Directory setup completed")
         log_message(self.ui_components, "Successfully set up directories")
     
@@ -121,8 +124,8 @@ class EnvConfigStateManager:
         Args:
             error: Error message
         """
-        set_button_state(self.ui_components['directory_button'], False, "danger")
-        update_status(self.ui_components, f"Failed to set up directories: {error}", "error")
+        self.ui_components['directory_button'].disabled = False
+        update_status(self.ui_components, error, "error")
         update_progress(self.tracker, 0, "Directory setup failed")
         log_message(self.ui_components, f"Error setting up directory: {error}", "error")
     
@@ -130,18 +133,18 @@ class EnvConfigStateManager:
         """
         Handle state saat memulai sinkronisasi drive
         """
-        set_button_state(self.ui_components['drive_button'], True, "info")
-        set_button_state(self.ui_components['directory_button'], True, "info")
-        update_status(self.ui_components, "Syncing with Google Drive...", "info")
+        self.ui_components['drive_button'].disabled = True
+        self.ui_components['directory_button'].disabled = True
+        update_status(self.ui_components, "Syncing with Google Drive", "info")
         update_progress(self.tracker, 0.2, "Syncing with Google Drive...")
     
     def handle_drive_sync_success(self):
         """
         Handle state saat sinkronisasi drive berhasil
         """
-        set_button_state(self.ui_components['drive_button'], False, "success")
-        set_button_state(self.ui_components['directory_button'], False, "success")
-        update_status(self.ui_components, "Successfully synced with Google Drive", "success")
+        self.ui_components['drive_button'].disabled = True
+        self.ui_components['directory_button'].disabled = False
+        update_status(self.ui_components, "Sync complete", "success")
         update_progress(self.tracker, 1.0, "Drive sync completed")
         log_message(self.ui_components, "Successfully synced with Google Drive")
     
@@ -152,8 +155,28 @@ class EnvConfigStateManager:
         Args:
             error: Error message
         """
-        set_button_state(self.ui_components['drive_button'], False, "danger")
-        set_button_state(self.ui_components['directory_button'], False, "danger")
-        update_status(self.ui_components, f"Failed to sync with Google Drive: {error}", "error")
+        self.ui_components['drive_button'].disabled = False
+        self.ui_components['directory_button'].disabled = False
+        update_status(self.ui_components, error, "error")
         update_progress(self.tracker, 0, "Drive sync failed")
-        log_message(self.ui_components, f"Error syncing with Google Drive: {error}", "error") 
+        log_message(self.ui_components, f"Error syncing with Google Drive: {error}", "error")
+
+    def update_progress(self, value: int, message: str):
+        """
+        Update progress bar and message
+        
+        Args:
+            value: Progress value (0-100)
+            message: Progress message
+        """
+        self.ui_components['progress_bar'].value = value
+        self.ui_components['progress_message'].value = message
+        if self.tracker:
+            update_progress(self.tracker, value / 100, message)
+    
+    def reset_progress(self):
+        """Reset progress bar and message to initial state"""
+        self.ui_components['progress_bar'].value = 0
+        self.ui_components['progress_message'].value = ""
+        if self.tracker:
+            update_progress(self.tracker, 0, "") 

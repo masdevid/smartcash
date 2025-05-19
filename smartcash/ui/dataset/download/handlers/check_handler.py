@@ -162,7 +162,7 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
     """
     # Update status panel jika tersedia
     if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](message, "info")
+        ui_components['update_status_panel'](ui_components, "info", message)
     else:
         # Fallback ke log_to_ui
         from smartcash.ui.utils.ui_logger import log_to_ui

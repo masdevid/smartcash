@@ -19,6 +19,7 @@ def initialize_dataset_download_ui() -> Dict[str, Any]:
     return initialize_module_ui(
         module_name='download',
         create_ui_func=create_download_ui,
-        setup_specific_handlers_func=setup_download_handlers,
+        # Catatan: setup_download_handlers sudah dipanggil di base_initializer.py
+        # untuk module_name='download', jadi tidak perlu dipanggil lagi di sini
         button_keys=['download_button', 'check_button', 'reset_button']
     )

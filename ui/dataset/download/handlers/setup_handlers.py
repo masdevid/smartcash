@@ -27,6 +27,8 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     _setup_endpoint_handlers(ui_components)
     _setup_download_button_handler(ui_components)
     _setup_check_button_handler(ui_components)
+    _setup_reset_button_handler(ui_components)
+    _setup_save_button_handler(ui_components)
     
     # Setup multi-progress tracking untuk download
     _setup_progress_tracking(ui_components)
@@ -96,6 +98,24 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
     if 'check_button' in ui_components:
         ui_components['check_button'].on_click(
             lambda b: handle_check_button_click(b, ui_components)
+        )
+
+def _setup_reset_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol reset."""
+    from smartcash.ui.dataset.download.handlers.reset_handler import handle_reset_button_click
+    
+    if 'reset_button' in ui_components:
+        ui_components['reset_button'].on_click(
+            lambda b: handle_reset_button_click(b, ui_components)
+        )
+
+def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol save."""
+    from smartcash.ui.dataset.download.handlers.save_handler import handle_save_button_click
+    
+    if 'save_button' in ui_components:
+        ui_components['save_button'].on_click(
+            lambda b: handle_save_button_click(b, ui_components)
         )
 
 def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:

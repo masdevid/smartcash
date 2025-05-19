@@ -10,6 +10,10 @@ from ipywidgets import HBox, VBox, Label, Button, Output, HTML, FloatProgress
 from smartcash.ui.utils.alert_utils import create_info_box
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS
+from smartcash.ui.components.status_panel import create_status_panel
+from smartcash.ui.components.progress_tracking import create_progress_tracking
+from smartcash.ui.components.log_accordion import create_log_accordion
+from smartcash.ui.utils.layout_utils import STANDARD_LAYOUTS
 
 def create_env_config_ui() -> Dict[str, Any]:
     """
@@ -18,22 +22,21 @@ def create_env_config_ui() -> Dict[str, Any]:
         dict: Dictionary of UI components
     """
     # Header
-    header = HTML("<h2>Environment Configuration</h2>")
+    header = create_header("Environment Configuration")
 
     # Buttons
     drive_button = Button(description="Connect to Google Drive", button_style="primary")
     directory_button = Button(description="Set Up Directories", button_style="primary")
-    button_layout = HBox([drive_button, directory_button])
+    button_layout = HBox([drive_button, directory_button], layout=STANDARD_LAYOUTS['hbox'])
 
     # Status Panel
-    status_panel = Output()
+    status_panel = create_status_panel("Ready to configure environment", "info")
 
     # Log Panel
-    log_panel = Output()
+    log_panel = create_log_accordion("Environment Configuration Log")
 
     # Progress Bar
-    progress_bar = FloatProgress(min=0, max=100, value=0)
-    progress_message = Label(value="")
+    progress_components = create_progress_tracking(module_name="env_config")
 
     # Assemble UI components
     ui_components = {
@@ -42,8 +45,8 @@ def create_env_config_ui() -> Dict[str, Any]:
         'directory_button': directory_button,
         'status_panel': status_panel,
         'log_panel': log_panel,
-        'progress_bar': progress_bar,
-        'progress_message': progress_message,
+        'progress_bar': progress_components['progress_bar'],
+        'progress_message': progress_components['progress_message'],
         'button_layout': button_layout
     }
 
@@ -53,13 +56,8 @@ def create_env_config_ui() -> Dict[str, Any]:
         button_layout,
         status_panel,
         log_panel,
-        progress_bar,
-        progress_message
-    ], layout=widgets.Layout(
-        padding='10px',
-        border='1px solid #ddd',
-        background_color='#f9f9f9'
-    ))
+        progress_components['progress_container']
+    ], layout=STANDARD_LAYOUTS['vbox'])
 
     # Add the layout to the components
     ui_components['ui_layout'] = ui_layout

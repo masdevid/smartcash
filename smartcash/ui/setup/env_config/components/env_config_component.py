@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/setup/env_config/components/env_config_component.py
-Deskripsi: Komponen UI untuk konfigurasi environment
+Deskripsi: Component untuk konfigurasi environment
 """
 
 import os
@@ -17,206 +17,102 @@ from smartcash.common.constants.paths import COLAB_PATH, DRIVE_PATH
 from smartcash.common.constants.core import APP_NAME, DEFAULT_CONFIG_DIR
 from smartcash.common.io import load_config, save_config
 from smartcash.common.logger import get_logger
+from smartcash.common.utils import is_colab
+
+from smartcash.ui.setup.env_config.handlers.setup_handlers import EnvConfigHandlers
+from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
 
 logger = get_logger(__name__)
 
 class EnvConfigComponent:
     """
-    Komponen UI untuk konfigurasi environment
+    Component untuk konfigurasi environment
     """
     
     def __init__(self):
         """
-        Inisialisasi komponen UI
+        Inisialisasi component
         """
-        # Initialize base directory based on environment
-        if ColabConfigManager.is_colab_environment():
-            base_dir = Path(COLAB_PATH) / APP_NAME
+        self.logger = logger
+        
+        # Determine base directory
+        if is_colab():
+            self.base_dir = Path("/content/SmartCash")
         else:
-            base_dir = Path.home() / APP_NAME
-            
-        # Initialize managers with proper paths
-        self.config_manager = ConfigManager.get_instance(
-            base_dir=str(base_dir),
-            config_file='base_config.yaml'
-        )
-        self.colab_manager = ColabConfigManager.get_instance(
-            base_dir=str(base_dir),
-            config_file='base_config.yaml'
+            self.base_dir = Path.home() / "SmartCash"
+        
+        # Initialize managers
+        self.config_manager = ConfigManager(
+            base_dir=str(self.base_dir),
+            config_file=str(self.base_dir / "configs" / "base_config.yaml")
         )
         
-        self._setup_ui()
+        self.colab_manager = ColabConfigManager(
+            base_dir=str(self.base_dir),
+            config_file=str(self.base_dir / "configs" / "base_config.yaml")
+        )
+        
+        # Initialize UI components
+        self._init_ui_components()
+        
+        # Initialize handlers
+        self.handlers = EnvConfigHandlers(self)
+        self.auto_check = AutoCheckHandler(self)
+        
+        # Setup handlers
+        self.handlers.setup_handlers()
+        
+        # Run auto check
+        asyncio.create_task(self.auto_check.auto_check())
     
-    def _setup_ui(self):
+    def _init_ui_components(self):
         """
-        Setup UI components
+        Inisialisasi UI components
         """
-        # Create main container
-        self.main_container = widgets.VBox()
-        
-        # Create header
-        self.header = widgets.HTML(
-            value="<h2>Environment Configuration</h2>",
-            layout=widgets.Layout(margin='0 0 20px 0')
-        )
-        
-        # Create status section
-        self.status_section = widgets.VBox([
-            widgets.HTML("<h3>Status</h3>"),
-            widgets.HTML(id='status_text')
-        ])
-        
-        # Create Google Drive section
+        # Create sections
         self.drive_section = widgets.VBox([
-            widgets.HTML("<h3>Google Drive</h3>"),
-            widgets.Button(
-                description='Connect to Google Drive',
-                button_style='primary',
-                layout=widgets.Layout(width='auto', margin='10px 0')
-            ),
-            widgets.HTML(id='drive_status')
+            widgets.HTML("<h3>Google Drive Connection</h3>"),
+            widgets.Button(description="Connect to Drive", button_style="primary")
         ])
         
-        # Create configuration section
         self.config_section = widgets.VBox([
-            widgets.HTML("<h3>Configuration</h3>"),
-            widgets.Button(
-                description='Sync Configurations',
-                button_style='info',
-                layout=widgets.Layout(width='auto', margin='10px 0')
-            ),
-            widgets.HTML(id='config_status')
+            widgets.HTML("<h3>Configuration Sync</h3>"),
+            widgets.Button(description="Sync Configurations", button_style="primary")
         ])
         
-        # Create progress section
         self.progress_section = widgets.VBox([
             widgets.HTML("<h3>Progress</h3>"),
-            widgets.FloatProgress(
-                value=0,
-                min=0,
-                max=1,
-                description='Progress:',
-                bar_style='info',
-                style={'bar_color': '#007bff'},
-                layout=widgets.Layout(width='100%')
-            ),
-            widgets.HTML(id='progress_text')
+            widgets.FloatProgress(value=0.0, min=0, max=1.0)
         ])
         
-        # Create log section
         self.log_section = widgets.VBox([
             widgets.HTML("<h3>Logs</h3>"),
-            widgets.Output(layout=widgets.Layout(height='200px', overflow_y='auto'))
+            widgets.Output()
         ])
         
-        # Add all sections to main container
-        self.main_container.children = [
-            self.header,
-            self.status_section,
+        # Create main layout
+        self.layout = widgets.VBox([
             self.drive_section,
             self.config_section,
             self.progress_section,
             self.log_section
-        ]
-        
-        # Setup event handlers
-        self.drive_section.children[1].on_click(self._on_connect_drive)
-        self.config_section.children[1].on_click(self._on_sync_configs)
-        
-        # Initialize status
-        self._update_status()
+        ])
     
     def _update_status(self):
         """
-        Update status display
-        """
-        is_colab = self.colab_manager.is_colab_environment()
-        drive_connected = self.colab_manager.is_drive_connected()
-        
-        status_html = f"""
-        <div style='padding: 10px; background-color: #f8f9fa; border-radius: 5px;'>
-            <p><strong>Environment:</strong> {'Google Colab' if is_colab else 'Local'}</p>
-            <p><strong>Google Drive:</strong> {'Connected' if drive_connected else 'Not Connected'}</p>
-            <p><strong>Base Directory:</strong> {self.config_manager.base_dir}</p>
-            <p><strong>Config Directory:</strong> {self.config_manager.base_dir / DEFAULT_CONFIG_DIR}</p>
-        </div>
-        """
-        self.status_section.children[1].value = status_html
-    
-    async def _on_connect_drive(self, b):
-        """
-        Handle Google Drive connection
+        Update status UI
         """
         with self.log_section.children[0]:
-            clear_output()
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Connecting to Google Drive...")
-        
-        try:
-            # Update progress
-            self.progress_section.children[1].value = 0.2
-            
-            # Connect to drive
-            await self.colab_manager.connect_to_drive()
-            
-            # Update progress
-            self.progress_section.children[1].value = 1.0
-            
-            # Update status
-            self._update_status()
-            
-            with self.log_section.children[0]:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully connected to Google Drive")
-                print(f"Drive path: {self.colab_manager.drive_base_path}")
-            
-        except Exception as e:
-            with self.log_section.children[0]:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error connecting to Google Drive: {str(e)}")
-            self.progress_section.children[1].value = 0
-    
-    async def _on_sync_configs(self, b):
-        """
-        Handle configuration synchronization
-        """
-        with self.log_section.children[0]:
-            clear_output()
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Starting configuration sync...")
-        
-        try:
-            # Update progress
-            self.progress_section.children[1].value = 0.2
-            
-            # Get available configs
-            configs = await self.colab_manager.get_available_configs()
-            
-            with self.log_section.children[0]:
-                print(f"Found {len(configs)} configuration files")
-            
-            # Sync each config
-            for i, config in enumerate(configs):
-                progress = 0.2 + (0.6 * (i / len(configs)))
-                self.progress_section.children[1].value = progress
-                
-                with self.log_section.children[0]:
-                    print(f"Syncing {config}...")
-                
-                await self.colab_manager.sync_with_drive(config)
-            
-            # Update progress
-            self.progress_section.children[1].value = 1.0
-            
-            # Update status
-            self._update_status()
-            
-            with self.log_section.children[0]:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Configuration sync completed successfully")
-            
-        except Exception as e:
-            with self.log_section.children[0]:
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error syncing configurations: {str(e)}")
-            self.progress_section.children[1].value = 0
+            print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Current Status:")
+            print(f"Environment: {'Colab' if is_colab() else 'Local'}")
+            print(f"Base Directory: {self.config_manager.base_dir}")
+            print(f"Config File: {self.config_manager.config_file}")
+            if is_colab():
+                print(f"Drive Connected: {self.colab_manager.is_drive_connected()}")
+                print(f"Drive Path: {self.colab_manager.drive_base_path}")
     
     def display(self):
         """
-        Display the UI component
+        Display component
         """
-        display(self.main_container)
+        display(self.layout)

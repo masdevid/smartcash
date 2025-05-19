@@ -3,47 +3,54 @@ File: smartcash/ui/setup/env_config/handlers/auto_check_handler.py
 Deskripsi: Handler untuk auto check environment
 """
 
-from typing import Dict, Any
 import asyncio
+from datetime import datetime
 
-from smartcash.common.config.singleton import Singleton
+from smartcash.common.utils import is_colab
+from smartcash.common.logger import get_logger
 
-def setup_auto_check_handler(ui_components: Dict[str, Any]) -> None:
+logger = get_logger(__name__)
+
+class AutoCheckHandler:
     """
-    Setup handler untuk auto check environment
-    
-    Args:
-        ui_components: Dictionary UI components
+    Handler untuk auto check environment
     """
-    logger = ui_components['logger']
-    output = ui_components['output']
     
-    async def auto_check():
+    def __init__(self, component):
+        """
+        Inisialisasi handler
+        
+        Args:
+            component: EnvConfigComponent instance
+        """
+        self.component = component
+        self.logger = logger
+    
+    async def auto_check(self):
         """
         Auto check environment saat startup
         """
         try:
             # Update progress
-            ui_components['progress_message'].value = "Memeriksa environment..."
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 25
+            self.component.progress_section.children[1].value = 0.2
             
-            # Cek environment
-            with output:
-                output.clear_output()
-                print("=== Status Environment ===")
-                print(f"Environment: {'Colab' if Singleton.is_colab_environment() else 'Lokal'}")
-                print("========================")
+            # Check environment
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Checking environment...")
+                print(f"Environment: {'Colab' if is_colab() else 'Local'}")
+                print(f"Base Directory: {self.component.config_manager.base_dir}")
+                print(f"Config File: {self.component.config_manager.config_file}")
             
             # Update progress
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_message'].value = "Pemeriksaan selesai"
-            logger.info("Environment berhasil diperiksa")
+            self.component.progress_section.children[1].value = 1.0
+            
+            # Update status
+            self.component._update_status()
+            
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Environment check completed")
             
         except Exception as e:
-            logger.error(f"Gagal memeriksa environment: {str(e)}")
-            ui_components['progress_message'].value = f"Error: {str(e)}"
-    
-    # Jalankan auto check
-    asyncio.create_task(auto_check())
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error checking environment: {str(e)}")
+            self.component.progress_section.children[1].value = 0

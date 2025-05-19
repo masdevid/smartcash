@@ -3,134 +3,105 @@ File: smartcash/ui/setup/env_config/handlers/setup_handlers.py
 Deskripsi: Setup handler untuk konfigurasi environment
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import asyncio
 from pathlib import Path
+from datetime import datetime
 
-from smartcash.common.environment import EnvironmentManager
-from smartcash.common.config.manager import ConfigManager
-from smartcash.common.config.singleton import Singleton
+from smartcash.common.utils import is_colab
+from smartcash.common.logger import get_logger
 
-def setup_env_config_handlers(ui_components: Dict[str, Any], env_manager: EnvironmentManager, config_manager: ConfigManager) -> None:
+logger = get_logger(__name__)
+
+class EnvConfigHandlers:
     """
-    Setup handler untuk konfigurasi environment
-    
-    Args:
-        ui_components: Dictionary UI components
-        env_manager: Environment manager instance
-        config_manager: Config manager instance
+    Handler untuk konfigurasi environment
     """
-    logger = ui_components['logger']
-    output = ui_components['output']
     
-    async def on_sync_click(b):
+    def __init__(self, component):
         """
-        Handler untuk tombol sinkronisasi
+        Inisialisasi handler
+        
+        Args:
+            component: EnvConfigComponent instance
+        """
+        self.component = component
+        self.logger = logger
+    
+    async def on_connect_drive(self, b):
+        """
+        Handler untuk tombol connect drive
         """
         try:
-            # Nonaktifkan tombol
-            ui_components['sync_button'].disabled = True
-            ui_components['check_button'].disabled = True
-            ui_components['save_button'].disabled = True
+            # Update progress
+            self.component.progress_section.children[1].value = 0.2
+            
+            # Connect to drive
+            await self.component.colab_manager.connect_to_drive()
             
             # Update progress
-            ui_components['progress_message'].value = "Sinkronisasi konfigurasi..."
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 25
+            self.component.progress_section.children[1].value = 1.0
             
-            # Sinkronkan dengan Google Drive
-            success, message, _ = config_manager.sync_with_drive(config_manager.config_file)
-            if not success:
-                raise Exception(message)
+            # Update status
+            self.component._update_status()
             
-            # Update progress
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_message'].value = "Sinkronisasi selesai"
-            logger.info("Konfigurasi berhasil disinkronkan")
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Successfully connected to Google Drive")
+                print(f"Drive path: {self.component.colab_manager.drive_base_path}")
             
         except Exception as e:
-            logger.error(f"Gagal sinkronisasi konfigurasi: {str(e)}")
-            ui_components['progress_message'].value = f"Error: {str(e)}"
-        finally:
-            # Aktifkan kembali tombol
-            ui_components['sync_button'].disabled = False
-            ui_components['check_button'].disabled = False
-            ui_components['save_button'].disabled = False
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error connecting to Google Drive: {str(e)}")
+            self.component.progress_section.children[1].value = 0
     
-    async def on_check_click(b):
+    async def on_sync_configs(self, b):
         """
-        Handler untuk tombol cek environment
+        Handler untuk tombol sync configs
         """
         try:
-            # Nonaktifkan tombol
-            ui_components['sync_button'].disabled = True
-            ui_components['check_button'].disabled = True
-            ui_components['save_button'].disabled = True
+            # Update progress
+            self.component.progress_section.children[1].value = 0.2
+            
+            # Get available configs
+            configs = await self.component.colab_manager.get_available_configs()
+            
+            with self.component.log_section.children[0]:
+                print(f"Found {len(configs)} configuration files")
+            
+            # Sync each config
+            for i, config in enumerate(configs):
+                progress = 0.2 + (0.6 * (i / len(configs)))
+                self.component.progress_section.children[1].value = progress
+                
+                with self.component.log_section.children[0]:
+                    print(f"Syncing {config}...")
+                
+                await self.component.colab_manager.sync_with_drive(config)
             
             # Update progress
-            ui_components['progress_message'].value = "Memeriksa environment..."
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 25
+            self.component.progress_section.children[1].value = 1.0
             
-            # Cek environment
-            with output:
-                output.clear_output()
-                print("=== Status Environment ===")
-                print(f"Environment: {'Colab' if Singleton.is_colab_environment() else 'Lokal'}")
-                print(f"Base Directory: {config_manager.base_dir}")
-                print(f"Config File: {config_manager.config_file}")
-                print("========================")
+            # Update status
+            self.component._update_status()
             
-            # Update progress
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_message'].value = "Pemeriksaan selesai"
-            logger.info("Environment berhasil diperiksa")
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Configuration sync completed successfully")
             
         except Exception as e:
-            logger.error(f"Gagal memeriksa environment: {str(e)}")
-            ui_components['progress_message'].value = f"Error: {str(e)}"
-        finally:
-            # Aktifkan kembali tombol
-            ui_components['sync_button'].disabled = False
-            ui_components['check_button'].disabled = False
-            ui_components['save_button'].disabled = False
+            with self.component.log_section.children[0]:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] Error syncing configurations: {str(e)}")
+            self.component.progress_section.children[1].value = 0
     
-    async def on_save_click(b):
+    def setup_handlers(self):
         """
-        Handler untuk tombol simpan
+        Setup semua handler
         """
-        try:
-            # Nonaktifkan tombol
-            ui_components['sync_button'].disabled = True
-            ui_components['check_button'].disabled = True
-            ui_components['save_button'].disabled = True
-            
-            # Update progress
-            ui_components['progress_message'].value = "Menyimpan konfigurasi..."
-            ui_components['progress_message'].layout.visibility = 'visible'
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            ui_components['progress_bar'].value = 25
-            
-            # Simpan konfigurasi
-            config_manager.save_config()
-            
-            # Update progress
-            ui_components['progress_bar'].value = 100
-            ui_components['progress_message'].value = "Konfigurasi berhasil disimpan"
-            logger.info("Konfigurasi berhasil disimpan")
-            
-        except Exception as e:
-            logger.error(f"Gagal menyimpan konfigurasi: {str(e)}")
-            ui_components['progress_message'].value = f"Error: {str(e)}"
-        finally:
-            # Aktifkan kembali tombol
-            ui_components['sync_button'].disabled = False
-            ui_components['check_button'].disabled = False
-            ui_components['save_button'].disabled = False
-    
-    # Register handlers
-    ui_components['sync_button'].on_click(lambda b: asyncio.create_task(on_sync_click(b)))
-    ui_components['check_button'].on_click(lambda b: asyncio.create_task(on_check_click(b)))
-    ui_components['save_button'].on_click(lambda b: asyncio.create_task(on_save_click(b)))
+        # Setup drive connection handler
+        self.component.drive_section.children[1].on_click(
+            lambda b: asyncio.create_task(self.on_connect_drive(b))
+        )
+        
+        # Setup sync configs handler
+        self.component.config_section.children[1].on_click(
+            lambda b: asyncio.create_task(self.on_sync_configs(b))
+        )

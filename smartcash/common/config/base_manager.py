@@ -39,6 +39,16 @@ class BaseConfigManager:
         """
         return self._base_dir
     
+    @base_dir.setter
+    def base_dir(self, value: str) -> None:
+        """
+        Set base directory
+        
+        Args:
+            value: Path ke base directory
+        """
+        self._base_dir = Path(value)
+    
     @property
     def config_file(self) -> str:
         """
@@ -48,6 +58,16 @@ class BaseConfigManager:
             Path ke file konfigurasi
         """
         return self._config_file
+    
+    @config_file.setter
+    def config_file(self, value: str) -> None:
+        """
+        Set config file path
+        
+        Args:
+            value: Path ke file konfigurasi
+        """
+        self._config_file = value
     
     @property
     def config(self) -> Dict[str, Any]:

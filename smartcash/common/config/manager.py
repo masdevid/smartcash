@@ -38,7 +38,7 @@ class ConfigManager(DriveConfigManager, DependencyManager):
         DependencyManager.__init__(self)
         
         # Simpan config_file untuk referensi
-        self.config_file = config_file
+        self._config_file = config_file
 
 # Singleton instance
 _config_manager = None

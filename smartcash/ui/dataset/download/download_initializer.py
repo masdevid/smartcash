@@ -37,117 +37,133 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
     # Setup logger
     logger = get_logger(__name__)
     
-    # Dapatkan observer manager
-    observer_manager = get_observer_manager()
-    
-    # Buat UI components
-    ui_components = create_download_ui(config)
-    
-    # Daftarkan observer
-    register_ui_observers(ui_components, observer_manager)
-    
-    # Tambahkan observer manager ke UI components
-    ui_components['observer_manager'] = observer_manager
-    
-    # Tambahkan fungsi notifikasi ke UI components
-    ui_components['notify_log'] = notify_log
-    ui_components['notify_progress'] = notify_progress
-    ui_components['notify_service_event'] = notify_service_event
-    
-    # Inisialisasi download service
-    download_service = DownloadService(
-        output_dir=ui_components.get('output_dir', {}).get('value', 'data'),
-        config=config,
-        logger=logger
-    )
-    
-    # Tambahkan download service ke UI components
-    ui_components['download_service'] = download_service
-    
-    # Setup handlers untuk UI events
-    ui_components = setup_download_handlers(ui_components, config=config)
-    
-    # Load konfigurasi dan update UI
     try:
-        loaded_config = load_config()
-        update_ui_from_config(loaded_config, ui_components)
+        # Dapatkan observer manager
+        observer_manager = get_observer_manager()
         
-        # Notifikasi bahwa konfigurasi berhasil dimuat
-        notify_service_event(
-            "download",
-            "start",
-            ui_components,
-            observer_manager,
-            message="Konfigurasi berhasil dimuat",
-            step="config"
-        )
-    except Exception as e:
-        logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
+        # Buat UI components
+        ui_components = create_download_ui(config)
         
-        # Notifikasi error konfigurasi
-        notify_service_event(
-            "download",
-            "error",
-            ui_components,
-            observer_manager,
-            message=f"Gagal memuat konfigurasi: {str(e)}",
-            step="config"
+        # Daftarkan observer
+        register_ui_observers(ui_components, observer_manager)
+        
+        # Tambahkan observer manager ke UI components
+        ui_components['observer_manager'] = observer_manager
+        
+        # Tambahkan fungsi notifikasi ke UI components
+        ui_components['notify_log'] = notify_log
+        ui_components['notify_progress'] = notify_progress
+        ui_components['notify_service_event'] = notify_service_event
+        
+        # Inisialisasi download service
+        output_dir = ui_components['output_dir'].value if hasattr(ui_components['output_dir'], 'value') else 'data'
+        download_service = DownloadService(
+            output_dir=output_dir,
+            config=config,
+            logger=logger
         )
-    
-    # Setup cleanup function
-    def cleanup_resources():
-        """Fungsi untuk membersihkan resources."""
+        
+        # Tambahkan download service ke UI components
+        ui_components['download_service'] = download_service
+        
+        # Setup handlers untuk UI events
+        ui_components = setup_download_handlers(ui_components, config=config)
+        
+        # Load konfigurasi dan update UI
         try:
-            # Notifikasi cleanup
+            loaded_config = load_config()
+            update_ui_from_config(loaded_config, ui_components)
+            
+            # Notifikasi bahwa konfigurasi berhasil dimuat
             notify_service_event(
                 "download",
-                "progress",
+                "start",
                 ui_components,
                 observer_manager,
-                message="Membersihkan resources...",
-                step="cleanup"
+                message="Konfigurasi berhasil dimuat",
+                step="config"
             )
-            # Hapus observer
-            if observer_manager:
-                # Use unregister_all if available
-                if hasattr(observer_manager, 'unregister_all'):
-                    observer_manager.unregister_all()
-                elif hasattr(observer_manager, 'clear_observers'):
-                    observer_manager.clear_observers()
-            # Reset UI components
-            if 'progress_container' in ui_components:
-                ui_components['progress_container'].layout.display = 'none'
-            if 'status_panel' in ui_components:
-                ui_components['status_panel'].value = "Siap untuk download dataset"
-            if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-                ui_components['log_output'].clear_output()
-            # Notifikasi cleanup selesai
-            notify_service_event(
-                "download",
-                "complete",
-                ui_components,
-                observer_manager,
-                message="Resources berhasil dibersihkan",
-                step="cleanup"
-            )
-            logger.info("🧹 Resources berhasil dibersihkan")
         except Exception as e:
-            error_msg = f"Error saat membersihkan resources: {str(e)}"
-            # Use logger from ui_components if available
-            if 'logger' in ui_components and hasattr(ui_components['logger'], 'error'):
-                ui_components['logger'].error(error_msg)
-            logger.error(f"❌ {error_msg}")
-            # Notifikasi error cleanup
+            logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
+            
+            # Notifikasi error konfigurasi
             notify_service_event(
                 "download",
                 "error",
                 ui_components,
                 observer_manager,
-                message=error_msg,
-                step="cleanup"
+                message=f"Gagal memuat konfigurasi: {str(e)}",
+                step="config"
             )
-    
-    # Tambahkan cleanup function ke UI components
-    ui_components['cleanup'] = cleanup_resources
-    
-    return ui_components
+        
+        # Setup cleanup function
+        def cleanup_resources():
+            """Fungsi untuk membersihkan resources."""
+            try:
+                # Notifikasi cleanup
+                notify_service_event(
+                    "download",
+                    "progress",
+                    ui_components,
+                    observer_manager,
+                    message="Membersihkan resources...",
+                    step="cleanup"
+                )
+                # Hapus observer
+                if observer_manager:
+                    # Use unregister_all if available
+                    if hasattr(observer_manager, 'unregister_all'):
+                        observer_manager.unregister_all()
+                    elif hasattr(observer_manager, 'clear_observers'):
+                        observer_manager.clear_observers()
+                # Reset UI components
+                if 'progress_container' in ui_components:
+                    ui_components['progress_container'].layout.display = 'none'
+                if 'status_panel' in ui_components:
+                    ui_components['status_panel'].value = "Siap untuk download dataset"
+                if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+                    ui_components['log_output'].clear_output()
+                # Notifikasi cleanup selesai
+                notify_service_event(
+                    "download",
+                    "complete",
+                    ui_components,
+                    observer_manager,
+                    message="Resources berhasil dibersihkan",
+                    step="cleanup"
+                )
+                logger.info("🧹 Resources berhasil dibersihkan")
+            except Exception as e:
+                error_msg = f"Error saat membersihkan resources: {str(e)}"
+                # Use logger from ui_components if available
+                if 'logger' in ui_components and hasattr(ui_components['logger'], 'error'):
+                    ui_components['logger'].error(error_msg)
+                logger.error(f"❌ {error_msg}")
+                # Notifikasi error cleanup
+                notify_service_event(
+                    "download",
+                    "error",
+                    ui_components,
+                    observer_manager,
+                    message=error_msg,
+                    step="cleanup"
+                )
+        
+        # Tambahkan cleanup function ke UI components
+        ui_components['cleanup'] = cleanup_resources
+        
+        return ui_components
+        
+    except Exception as e:
+        # Log error and re-raise
+        logger.error(f"Error saat inisialisasi UI: {str(e)}")
+        # Notifikasi error inisialisasi
+        notify_service_event(
+            "download",
+            "error",
+            {},  # UI components may not be available
+            None,  # Observer manager may not be available
+            message=f"Gagal memuat konfigurasi: {str(e)}",
+            step="config"
+        )
+        raise

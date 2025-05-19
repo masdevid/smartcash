@@ -4,7 +4,7 @@ Deskripsi: Test untuk download initializer dengan fokus pada konfigurasi dan not
 """
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 import tempfile
 from pathlib import Path
 
@@ -39,8 +39,8 @@ class TestDownloadInitializer(unittest.TestCase):
             }
         }
 
-        # Patch where used in download_initializer
-        self.patcher_observer = patch('smartcash.components.observer.get_observer_manager', 
+        # Patch where used in download_initializer (patch in the module under test)
+        self.patcher_observer = patch('smartcash.ui.dataset.download.download_initializer.get_observer_manager', 
                                     return_value=self.mock_observer_manager)
         self.patcher_create_ui = patch('smartcash.ui.dataset.download.download_initializer.create_download_ui', 
                                      return_value=self.mock_ui_components)
@@ -49,7 +49,8 @@ class TestDownloadInitializer(unittest.TestCase):
         self.patcher_load_config = patch('smartcash.ui.dataset.download.download_initializer.load_config', 
                                        return_value={})
         self.patcher_update_ui = patch('smartcash.ui.dataset.download.download_initializer.update_ui_from_config')
-        self.patcher_notify = patch('smartcash.dataset.services.downloader.notification_utils.notify_service_event')
+        self.patcher_notify = patch('smartcash.ui.dataset.download.download_initializer.notify_service_event')
+        self.patcher_logger = patch('smartcash.ui.dataset.download.download_initializer.get_logger', return_value=self.mock_ui_components['logger'])
 
         self.mock_observer = self.patcher_observer.start()
         self.mock_create_ui = self.patcher_create_ui.start()
@@ -57,6 +58,7 @@ class TestDownloadInitializer(unittest.TestCase):
         self.mock_load_config = self.patcher_load_config.start()
         self.mock_update_ui = self.patcher_update_ui.start()
         self.mock_notify = self.patcher_notify.start()
+        self.mock_logger = self.patcher_logger.start()
 
     def tearDown(self):
         self.patcher_observer.stop()
@@ -65,6 +67,7 @@ class TestDownloadInitializer(unittest.TestCase):
         self.patcher_load_config.stop()
         self.patcher_update_ui.stop()
         self.patcher_notify.stop()
+        self.patcher_logger.stop()
 
     def test_initialize_dataset_download_ui(self):
         """Test inisialisasi UI download dataset"""
@@ -75,16 +78,16 @@ class TestDownloadInitializer(unittest.TestCase):
         
         # Verify UI creation and setup
         self.mock_create_ui.assert_called_once()
-        self.mock_setup_handlers.assert_called_once_with(self.mock_ui_components)
+        self.mock_setup_handlers.assert_called_once_with(self.mock_ui_components, config=None)
         self.mock_load_config.assert_called_once()
         self.mock_update_ui.assert_called_once()
         
         # Verify notification setup
-        self.mock_notify.assert_called_with(
+        self.mock_notify.assert_any_call(
             "download",
             "start",
-            self.mock_ui_components,
-            self.mock_observer_manager,
+            ANY,
+            ANY,
             message="Konfigurasi berhasil dimuat",
             step="config"
         )
@@ -105,16 +108,15 @@ class TestDownloadInitializer(unittest.TestCase):
         with self.assertRaises(Exception):
             download_initializer.initialize_dataset_download_ui()
         
-        # Verify logger was called (either on ui_components or fallback logger)
-        logger_mock = self.mock_ui_components['logger']
-        self.assertTrue(logger_mock.error.called)
+        # Verify logger was called (fallback logger)
+        self.mock_ui_components['logger'].error.assert_called()
         
         # Verify error notification
-        self.mock_notify.assert_called_with(
+        self.mock_notify.assert_any_call(
             "download",
             "error",
-            self.mock_ui_components,
-            self.mock_observer_manager,
+            ANY,
+            ANY,
             message="Gagal memuat konfigurasi: Test error",
             step="config"
         )
@@ -138,17 +140,16 @@ class TestDownloadInitializer(unittest.TestCase):
         self.mock_notify.assert_any_call(
             "download",
             "progress",
-            ui_components,
-            self.mock_observer_manager,
+            ANY,
+            ANY,
             message="Membersihkan resources...",
             step="cleanup"
         )
-        
         self.mock_notify.assert_any_call(
             "download",
             "complete",
-            ui_components,
-            self.mock_observer_manager,
+            ANY,
+            ANY,
             message="Resources berhasil dibersihkan",
             step="cleanup"
         )

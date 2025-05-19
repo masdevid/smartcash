@@ -9,6 +9,8 @@ from pathlib import Path
 
 from smartcash.common.exceptions import DatasetError, DatasetFileError, DatasetProcessingError
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_IMG_SIZE, DEFAULT_PREPROCESSED_DIR
+from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
+
 class PreprocessingManager:
     """Manager khusus untuk fungsionalitas preprocessing dataset dengan SRP approach."""
     
@@ -23,7 +25,7 @@ class PreprocessingManager:
         self.config = config
         self.logger = logger
         self.preprocess_config = config.get('preprocessing', {})
-        self._preprocessor = None
+        self._preprocessing_service = None
         self._preprocessed_loader = None
         self._progress_callback = None
     
@@ -35,23 +37,21 @@ class PreprocessingManager:
             callback: Fungsi callback untuk progress tracking
         """
         self._progress_callback = callback
-        if self._preprocessor:
-            self._preprocessor.register_progress_callback(callback)
+        if self._preprocessing_service:
+            self._preprocessing_service.observer_manager = self._progress_callback
             if self.logger:
-                self.logger.debug("🔄 Progress callback telah diregister ke preprocessor")
+                self.logger.debug("🔄 Progress callback telah diregister ke preprocessing service")
     
-    def _get_preprocessor(self):
+    def _get_preprocessing_service(self):
         """
-        Dapatkan preprocessor dataset dengan lazy initialization.
+        Dapatkan preprocessing service dengan lazy initialization.
         
         Returns:
-            DatasetPreprocessor instance
+            PreprocessingService instance
         """
-        if not self._preprocessor:
+        if not self._preprocessing_service:
             try:
-                from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
-                
-                # Integrasikan konfigurasi untuk preprocessor
+                # Integrasikan konfigurasi untuk preprocessing service
                 integrated_config = {
                     'preprocessing': {
                         'img_size': self.preprocess_config.get('img_size', DEFAULT_IMG_SIZE),
@@ -66,27 +66,23 @@ class PreprocessingManager:
                     }
                 }
                 
-                # Inisialisasi preprocessor dengan logger yang sama untuk konsistensi logging
-                self._preprocessor = DatasetPreprocessor(
+                # Inisialisasi preprocessing service
+                self._preprocessing_service = PreprocessingService(
                     config=integrated_config,
                     logger=self.logger
                 )
                 
                 # Register callback jika ada
                 if self._progress_callback:
-                    self._preprocessor.register_progress_callback(self._progress_callback)
+                    self._preprocessing_service.observer_manager = self._progress_callback
                     if self.logger:
-                        self.logger.debug("🔄 Progress callback diregister ke preprocessor saat inisialisasi")
-            except ImportError as e:
-                if self.logger:
-                    self.logger.error(f"🚨 Error saat memuat DatasetPreprocessor: {str(e)}")
-                raise DatasetError(f"🚨 Error saat memuat DatasetPreprocessor: {str(e)}")
+                        self.logger.debug("🔄 Progress callback diregister ke preprocessing service saat inisialisasi")
             except Exception as e:
                 if self.logger:
-                    self.logger.error(f"🚨 Error saat menginisialisasi preprocessor: {str(e)}")
-                raise DatasetError(f"🚨 Error saat menginisialisasi preprocessor: {str(e)}")
+                    self.logger.error(f"🚨 Error saat menginisialisasi preprocessing service: {str(e)}")
+                raise DatasetError(f"🚨 Error saat menginisialisasi preprocessing service: {str(e)}")
                 
-        return self._preprocessor
+        return self._preprocessing_service
     
     def _get_preprocessed_loader(self):
         """
@@ -109,7 +105,7 @@ class PreprocessingManager:
                         'batch_size': self.config.get('batch_size', 16),
                         'num_workers': self.config.get('num_workers', 4)
                     },
-                    logger=self.logger  # Teruskan logger yang sama
+                    logger=self.logger
                 )
             except ImportError as e:
                 if self.logger:
@@ -139,7 +135,7 @@ class PreprocessingManager:
                 split_info = split if split != 'all' else 'semua split'
                 self.logger.info(f"🚀 Memulai preprocessing dataset ({split_info})")
                 
-            preprocessor = self._get_preprocessor()
+            preprocessing_service = self._get_preprocessing_service()
             
             # Extract parameter yang diperlukan untuk preprocessing
             valid_preprocessor_params = {
@@ -149,7 +145,7 @@ class PreprocessingManager:
             }
             
             # Jalankan preprocessing
-            result = preprocessor.preprocess_dataset(
+            result = preprocessing_service.preprocess_dataset(
                 split=split, 
                 force_reprocess=force_reprocess,
                 **valid_preprocessor_params
@@ -169,6 +165,14 @@ class PreprocessingManager:
                 self.logger.error(error_msg)
             raise DatasetProcessingError(error_msg)
     
+    def cleanup(self):
+        """Cleanup resources."""
+        if self._preprocessing_service:
+            self._preprocessing_service.cleanup()
+            self._preprocessing_service = None
+        self._preprocessed_loader = None
+        self._progress_callback = None
+    
     def clean_preprocessed(self, split='all') -> bool:
         """
         Bersihkan hasil preprocessing.
@@ -184,8 +188,8 @@ class PreprocessingManager:
                 split_info = split if split != 'all' else 'semua split'
                 self.logger.info(f"🧹 Membersihkan data preprocessed ({split_info})")
                 
-            preprocessor = self._get_preprocessor()
-            preprocessor.clean_preprocessed(split=None if split == 'all' else split)
+            preprocessing_service = self._get_preprocessing_service()
+            preprocessing_service.clean_preprocessed(split=None if split == 'all' else split)
             
             if self.logger:
                 self.logger.success(f"✅ Pembersihan data preprocessing selesai")
@@ -205,8 +209,8 @@ class PreprocessingManager:
             Dictionary berisi statistik dataset preprocessed
         """
         try:
-            preprocessor = self._get_preprocessor()
-            stats = preprocessor.get_preprocessed_stats()
+            preprocessing_service = self._get_preprocessing_service()
+            stats = preprocessing_service.get_preprocessed_stats()
             
             if self.logger:
                 total_stats = sum(

@@ -1,211 +1,229 @@
 """
 File: smartcash/ui/training_config/training_strategy/handlers/config_handlers.py
-Deskripsi: Handler untuk konfigurasi strategi pelatihan model
+Deskripsi: Handler konfigurasi untuk training strategy
 """
 
-from typing import Dict, Any, Optional, List, Callable
-import ipywidgets as widgets
-from IPython.display import display, clear_output
-
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
+from typing import Dict, Any, Optional
+import os
+import yaml
+from pathlib import Path
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
-from smartcash.common.environment import get_environment_manager
+from smartcash.ui.utils.constants import ICONS
 
-# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
-logger.setLevel("CRITICAL")
 
-def get_default_config() -> Dict[str, Any]:
+def get_default_training_strategy_config() -> Dict[str, Any]:
     """
-    Mendapatkan konfigurasi default untuk strategi pelatihan.
+    Dapatkan konfigurasi default untuk training strategy.
     
     Returns:
-        Dict berisi konfigurasi default
+        Dictionary konfigurasi default
     """
     return {
-        # Parameter validasi
-        'validation': {
-            'frequency': 1,
-            'iou_thres': 0.6,
-            'conf_thres': 0.001
-        },
-        
-        # Parameter multi-scale training
-        'multi_scale': True,
-        
-        # Konfigurasi tambahan untuk proses training
-        'training_utils': {
-            'experiment_name': 'efficientnet_b4_training',
-            'checkpoint_dir': '/content/runs/train/checkpoints',
-            'tensorboard': True,
-            'log_metrics_every': 10,
-            'visualize_batch_every': 100,
-            'gradient_clipping': 1.0,
-            'mixed_precision': True,
-            'layer_mode': 'single'
+        "training_strategy": {
+            "enabled": True,
+            "batch_size": 16,
+            "epochs": 100,
+            "learning_rate": 0.001,
+            "optimizer": {
+                "type": "adam",
+                "weight_decay": 0.0005,
+                "momentum": 0.9
+            },
+            "scheduler": {
+                "enabled": True,
+                "type": "cosine",
+                "warmup_epochs": 5,
+                "min_lr": 0.00001
+            },
+            "early_stopping": {
+                "enabled": True,
+                "patience": 10,
+                "min_delta": 0.001
+            },
+            "checkpoint": {
+                "enabled": True,
+                "save_best_only": True,
+                "save_freq": 1
+            }
         }
     }
 
-def update_config_from_ui(ui_components: Dict[str, Any], config_to_use: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def get_training_strategy_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Update konfigurasi dari nilai UI.
+    Dapatkan konfigurasi training strategy dari config manager.
     
     Args:
-        ui_components: Dictionary komponen UI
-        config_to_use: Konfigurasi yang akan digunakan (opsional)
+        ui_components: Dictionary komponen UI (opsional)
         
     Returns:
-        Konfigurasi yang diupdate
+        Dictionary konfigurasi training strategy
     """
-    # Dapatkan config manager
-    config_manager = get_config_manager()
-    
-    # Dapatkan konfigurasi yang akan digunakan
-    if config_to_use is None:
-        # Gunakan config dari ui_components jika ada
-        if 'config' in ui_components:
-            current_config = ui_components['config']
-        else:
-            # Jika tidak ada, ambil dari config manager
-            current_config = config_manager.get_module_config('training_strategy', {})
-    else:
-        current_config = config_to_use
-    
-    # Update parameter validasi
-    if 'validation' not in current_config:
-        current_config['validation'] = {}
+    try:
+        # Get config manager
+        config_manager = get_config_manager()
         
-    current_config['validation']['frequency'] = ui_components['validation_frequency'].value
-    current_config['validation']['iou_thres'] = ui_components['iou_threshold'].value
-    current_config['validation']['conf_thres'] = ui_components['conf_threshold'].value
-    
-    # Update parameter multi-scale training
-    current_config['multi_scale'] = ui_components['multi_scale'].value
-    
-    # Update parameter training_utils
-    if 'training_utils' not in current_config:
-        current_config['training_utils'] = {}
+        # Get config
+        config = config_manager.get_module_config('training_strategy')
         
-    current_config['training_utils']['experiment_name'] = ui_components['experiment_name'].value
-    current_config['training_utils']['checkpoint_dir'] = ui_components['checkpoint_dir'].value
-    current_config['training_utils']['tensorboard'] = ui_components['tensorboard'].value
-    current_config['training_utils']['log_metrics_every'] = ui_components['log_metrics_every'].value
-    current_config['training_utils']['visualize_batch_every'] = ui_components['visualize_batch_every'].value
-    current_config['training_utils']['gradient_clipping'] = ui_components['gradient_clipping'].value
-    current_config['training_utils']['mixed_precision'] = ui_components['mixed_precision'].value
-    current_config['training_utils']['layer_mode'] = ui_components['layer_mode'].value
-    
-    # Simpan konfigurasi di ui_components
-    ui_components['config'] = current_config
-    
-    return current_config
+        if config:
+            return config
+            
+        # Jika tidak ada config, gunakan default
+        logger.warning("⚠️ Konfigurasi training strategy tidak ditemukan, menggunakan default")
+        return get_default_training_strategy_config()
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat mengambil konfigurasi training strategy: {str(e)}")
+        return get_default_training_strategy_config()
 
-def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional[Dict[str, Any]] = None) -> None:
+def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Update UI dari konfigurasi.
+    Update konfigurasi training strategy dari UI components.
     
     Args:
         ui_components: Dictionary komponen UI
-        config_to_use: Konfigurasi yang akan digunakan (opsional)
+        
+    Returns:
+        Dictionary konfigurasi yang telah diupdate
     """
-    # Dapatkan config manager
-    config_manager = get_config_manager()
-    
-    # Dapatkan konfigurasi yang akan digunakan
-    if config_to_use is None:
-        # Gunakan config dari ui_components jika ada
-        if 'config' in ui_components:
-            current_config = ui_components['config']
-        else:
-            # Jika tidak ada, ambil dari config manager
-            current_config = config_manager.get_module_config('training_strategy', {})
-            # Jika masih tidak ada, gunakan default
-            if not current_config:
-                current_config = get_default_config()
-    else:
-        current_config = config_to_use
-    
     try:
-        # Update parameter validasi
-        if 'validation' in current_config:
-            if 'frequency' in current_config['validation']:
-                ui_components['validation_frequency'].value = current_config['validation']['frequency']
-            if 'iou_thres' in current_config['validation']:
-                ui_components['iou_threshold'].value = current_config['validation']['iou_thres']
-            if 'conf_thres' in current_config['validation']:
-                ui_components['conf_threshold'].value = current_config['validation']['conf_thres']
+        # Get config manager
+        config_manager = get_config_manager()
         
-        # Update parameter multi-scale training
-        if 'multi_scale' in current_config:
-            ui_components['multi_scale'].value = current_config['multi_scale']
+        # Get current config
+        config = config_manager.get_module_config('training_strategy') or get_default_training_strategy_config()
         
-        # Update parameter training_utils
-        if 'training_utils' in current_config:
-            if 'experiment_name' in current_config['training_utils']:
-                ui_components['experiment_name'].value = current_config['training_utils']['experiment_name']
-            if 'checkpoint_dir' in current_config['training_utils']:
-                ui_components['checkpoint_dir'].value = current_config['training_utils']['checkpoint_dir']
-            if 'tensorboard' in current_config['training_utils']:
-                ui_components['tensorboard'].value = current_config['training_utils']['tensorboard']
-            if 'log_metrics_every' in current_config['training_utils']:
-                ui_components['log_metrics_every'].value = current_config['training_utils']['log_metrics_every']
-            if 'visualize_batch_every' in current_config['training_utils']:
-                ui_components['visualize_batch_every'].value = current_config['training_utils']['visualize_batch_every']
-            if 'gradient_clipping' in current_config['training_utils']:
-                ui_components['gradient_clipping'].value = current_config['training_utils']['gradient_clipping']
-            if 'mixed_precision' in current_config['training_utils']:
-                ui_components['mixed_precision'].value = current_config['training_utils']['mixed_precision']
-            if 'layer_mode' in current_config['training_utils']:
-                ui_components['layer_mode'].value = current_config['training_utils']['layer_mode']
+        # Update config from UI
+        if 'enabled_checkbox' in ui_components:
+            config['training_strategy']['enabled'] = ui_components['enabled_checkbox'].value
+            
+        if 'batch_size_slider' in ui_components:
+            config['training_strategy']['batch_size'] = ui_components['batch_size_slider'].value
+            
+        if 'epochs_slider' in ui_components:
+            config['training_strategy']['epochs'] = ui_components['epochs_slider'].value
+            
+        if 'learning_rate_slider' in ui_components:
+            config['training_strategy']['learning_rate'] = ui_components['learning_rate_slider'].value
+            
+        if 'optimizer_dropdown' in ui_components:
+            config['training_strategy']['optimizer']['type'] = ui_components['optimizer_dropdown'].value
+            
+        if 'weight_decay_slider' in ui_components:
+            config['training_strategy']['optimizer']['weight_decay'] = ui_components['weight_decay_slider'].value
+            
+        if 'momentum_slider' in ui_components:
+            config['training_strategy']['optimizer']['momentum'] = ui_components['momentum_slider'].value
+            
+        if 'scheduler_checkbox' in ui_components:
+            config['training_strategy']['scheduler']['enabled'] = ui_components['scheduler_checkbox'].value
+            
+        if 'scheduler_dropdown' in ui_components:
+            config['training_strategy']['scheduler']['type'] = ui_components['scheduler_dropdown'].value
+            
+        if 'warmup_epochs_slider' in ui_components:
+            config['training_strategy']['scheduler']['warmup_epochs'] = ui_components['warmup_epochs_slider'].value
+            
+        if 'min_lr_slider' in ui_components:
+            config['training_strategy']['scheduler']['min_lr'] = ui_components['min_lr_slider'].value
+            
+        if 'early_stopping_checkbox' in ui_components:
+            config['training_strategy']['early_stopping']['enabled'] = ui_components['early_stopping_checkbox'].value
+            
+        if 'patience_slider' in ui_components:
+            config['training_strategy']['early_stopping']['patience'] = ui_components['patience_slider'].value
+            
+        if 'min_delta_slider' in ui_components:
+            config['training_strategy']['early_stopping']['min_delta'] = ui_components['min_delta_slider'].value
+            
+        if 'checkpoint_checkbox' in ui_components:
+            config['training_strategy']['checkpoint']['enabled'] = ui_components['checkpoint_checkbox'].value
+            
+        if 'save_best_only_checkbox' in ui_components:
+            config['training_strategy']['checkpoint']['save_best_only'] = ui_components['save_best_only_checkbox'].value
+            
+        if 'save_freq_slider' in ui_components:
+            config['training_strategy']['checkpoint']['save_freq'] = ui_components['save_freq_slider'].value
+            
+        # Save config
+        config_manager.save_module_config('training_strategy', config)
         
-        # Simpan konfigurasi di ui_components
-        ui_components['config'] = current_config
+        logger.info("✅ Konfigurasi training strategy berhasil diupdate")
         
-        # Update info strategi pelatihan
-        update_training_strategy_info(ui_components)
+        return config
         
-        logger.info(f"{ICONS.get('success', '✅')} UI strategi pelatihan diperbarui dari config")
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error update UI: {e}")
+        logger.error(f"❌ Error saat update konfigurasi training strategy: {str(e)}")
+        return get_default_training_strategy_config()
 
-def update_training_strategy_info(ui_components: Dict[str, Any]) -> None:
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
     """
-    Update informasi strategi pelatihan pada UI.
+    Update UI dari konfigurasi training strategy.
     
     Args:
         ui_components: Dictionary komponen UI
+        config: Konfigurasi yang akan digunakan (opsional)
     """
     try:
-        # Dapatkan nilai dari UI
-        experiment_name = ui_components['experiment_name'].value
-        checkpoint_dir = ui_components['checkpoint_dir'].value
-        tensorboard = ui_components['tensorboard'].value
-        validation_frequency = ui_components['validation_frequency'].value
-        iou_threshold = ui_components['iou_threshold'].value
-        conf_threshold = ui_components['conf_threshold'].value
-        multi_scale = ui_components['multi_scale'].value
-        mixed_precision = ui_components['mixed_precision'].value
-        layer_mode = ui_components['layer_mode'].value
+        # Get config if not provided
+        if config is None:
+            config = get_training_strategy_config(ui_components)
+            
+        # Update UI components
+        if 'enabled_checkbox' in ui_components:
+            ui_components['enabled_checkbox'].value = config['training_strategy']['enabled']
+            
+        if 'batch_size_slider' in ui_components:
+            ui_components['batch_size_slider'].value = config['training_strategy']['batch_size']
+            
+        if 'epochs_slider' in ui_components:
+            ui_components['epochs_slider'].value = config['training_strategy']['epochs']
+            
+        if 'learning_rate_slider' in ui_components:
+            ui_components['learning_rate_slider'].value = config['training_strategy']['learning_rate']
+            
+        if 'optimizer_dropdown' in ui_components:
+            ui_components['optimizer_dropdown'].value = config['training_strategy']['optimizer']['type']
+            
+        if 'weight_decay_slider' in ui_components:
+            ui_components['weight_decay_slider'].value = config['training_strategy']['optimizer']['weight_decay']
+            
+        if 'momentum_slider' in ui_components:
+            ui_components['momentum_slider'].value = config['training_strategy']['optimizer']['momentum']
+            
+        if 'scheduler_checkbox' in ui_components:
+            ui_components['scheduler_checkbox'].value = config['training_strategy']['scheduler']['enabled']
+            
+        if 'scheduler_dropdown' in ui_components:
+            ui_components['scheduler_dropdown'].value = config['training_strategy']['scheduler']['type']
+            
+        if 'warmup_epochs_slider' in ui_components:
+            ui_components['warmup_epochs_slider'].value = config['training_strategy']['scheduler']['warmup_epochs']
+            
+        if 'min_lr_slider' in ui_components:
+            ui_components['min_lr_slider'].value = config['training_strategy']['scheduler']['min_lr']
+            
+        if 'early_stopping_checkbox' in ui_components:
+            ui_components['early_stopping_checkbox'].value = config['training_strategy']['early_stopping']['enabled']
+            
+        if 'patience_slider' in ui_components:
+            ui_components['patience_slider'].value = config['training_strategy']['early_stopping']['patience']
+            
+        if 'min_delta_slider' in ui_components:
+            ui_components['min_delta_slider'].value = config['training_strategy']['early_stopping']['min_delta']
+            
+        if 'checkpoint_checkbox' in ui_components:
+            ui_components['checkpoint_checkbox'].value = config['training_strategy']['checkpoint']['enabled']
+            
+        if 'save_best_only_checkbox' in ui_components:
+            ui_components['save_best_only_checkbox'].value = config['training_strategy']['checkpoint']['save_best_only']
+            
+        if 'save_freq_slider' in ui_components:
+            ui_components['save_freq_slider'].value = config['training_strategy']['checkpoint']['save_freq']
+            
+        logger.info("✅ UI berhasil diupdate dari konfigurasi training strategy")
         
-        # Buat informasi HTML
-        info_html = f"""
-        <h4>Ringkasan Strategi Pelatihan</h4>
-        <ul>
-            <li><b>Experiment Name:</b> {experiment_name}</li>
-            <li><b>Checkpoint Dir:</b> {checkpoint_dir}</li>
-            <li><b>TensorBoard:</b> {'Aktif' if tensorboard else 'Nonaktif'}</li>
-            <li><b>Validasi Setiap:</b> {validation_frequency} epoch</li>
-            <li><b>IoU Threshold:</b> {iou_threshold}</li>
-            <li><b>Conf Threshold:</b> {conf_threshold}</li>
-            <li><b>Multi-scale Training:</b> {'Aktif' if multi_scale else 'Nonaktif'}</li>
-            <li><b>Mixed Precision:</b> {'Aktif' if mixed_precision else 'Nonaktif'}</li>
-            <li><b>Layer Mode:</b> {layer_mode}</li>
-        </ul>
-        <p><i>Catatan: Pastikan parameter pelatihan sesuai dengan kebutuhan dan kapasitas hardware.</i></p>
-        """
-        
-        ui_components['training_strategy_info'].value = info_html
     except Exception as e:
-        ui_components['training_strategy_info'].value = f"<p style='color:red'>{ICONS.get('error', '❌')} Error: {str(e)}</p>"
+        logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")

@@ -1,6 +1,6 @@
 """
 File: smartcash/dataset/services/augmentor/augmentation_service.py
-Deskripsi: Layanan augmentasi dataset dengan prioritisasi sampel yang direfactor untuk modularitas
+Deskripsi: Layanan augmentasi dataset dengan integrasi observer pattern
 """
 
 import os, time
@@ -10,9 +10,13 @@ from concurrent.futures import ProcessPoolExecutor
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
+from smartcash.common.exceptions import DatasetError
+from smartcash.common.config import ConfigManager, get_config_manager
 from smartcash.dataset.services.augmentor.pipeline_factory import AugmentationPipelineFactory
 from smartcash.dataset.services.augmentor.bbox_augmentor import BBoxAugmentor
 from smartcash.dataset.services.augmentor.class_balancer import ClassBalancer
+from smartcash.dataset.services.augmentor.dataset_augmentor import DatasetAugmentor
+from smartcash.dataset.utils.dataset_constants import DEFAULT_AUGMENTED_DIR
 
 # Import helper modules yang dipisah
 from smartcash.dataset.services.augmentor.helpers.path_helper import setup_paths
@@ -21,31 +25,40 @@ from smartcash.dataset.services.augmentor.helpers.validation_helper import valid
 from smartcash.dataset.utils.move_utils import move_files_to_preprocessed
 
 class AugmentationService:
-    """Layanan augmentasi dataset dengan prioritisasi kelas dan pelacakan dinamis"""
+    """Layanan augmentasi dataset dengan integrasi observer pattern."""
     
-    def __init__(self, config: Dict = None, data_dir: str = 'data', logger=None, num_workers: int = None, ui_components: Dict[str, Any] = None):
-        """Inisialisasi AugmentationService dengan parameter utama."""
-        self.config = config or {}
-        self.data_dir = data_dir
-        self.ui_components = ui_components or {}
+    def __init__(self, config: Dict[str, Any], data_dir: str = 'data', logger=None, num_workers: int = 4, ui_components: Dict[str, Any] = None):
+        """
+        Inisialisasi AugmentationService.
         
-        # Gunakan logger dengan konteks augmentation untuk mencegah interferensi dengan log download
-        if logger and hasattr(logger, 'bind'):
-            try:
-                self.logger = logger.bind(context="augmentation_only")
-            except Exception as e:
-                # Fallback jika bind tidak tersedia
-                self.logger = logger or get_logger("augmentation_service")
-        else:
-            self.logger = logger or get_logger("augmentation_service")
-            
-        self.num_workers = num_workers if num_workers is not None else self.config.get('augmentation', {}).get('num_workers', 4)
-        self.logger.info(f"🔧 Menggunakan {self.num_workers} worker untuk augmentasi")
+        Args:
+            config: Konfigurasi augmentasi
+            data_dir: Direktori data
+            logger: Logger untuk logging
+            num_workers: Jumlah worker untuk parallel processing
+            ui_components: Komponen UI untuk notifikasi
+        """
+        self.config = config
+        self.data_dir = Path(data_dir)
+        self.logger = logger or get_logger(__name__)
+        self.num_workers = num_workers
+        self.ui_components = ui_components
+        self.config_manager = get_config_manager()
         
-        # Inisialisasi komponen-komponen utama dengan one-liner
-        self.pipeline_factory = AugmentationPipelineFactory(self.config, self.logger)
-        self.bbox_augmentor = BBoxAugmentor(self.config, self.logger)
-        self.class_balancer = ClassBalancer(self.config, self.logger)
+        # Setup paths
+        self.augmented_dir = Path(config.get('augmentation', {}).get('output_dir', DEFAULT_AUGMENTED_DIR))
+        
+        # Ensure directories exist
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.augmented_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize augmentor
+        self._augmentor = None
+        
+        # Log initialization
+        self.logger.info(f"✅ AugmentationService diinisialisasi:")
+        self.logger.info(f"  - Data dir: {self.data_dir}")
+        self.logger.info(f"  - Augmented dir: {self.augmented_dir}")
         
         self._stop_signal = False
         self._progress_callbacks = []
@@ -71,19 +84,124 @@ class AugmentationService:
             except Exception as e:
                 self.logger.warning(f"⚠️ Error saat inisialisasi NotificationManager: {str(e)}")
     
-    def register_progress_callback(self, callback: Callable = None, notification_manager = None) -> None:
-        """Register callback untuk progress tracking atau notification manager.
+    @property
+    def augmentor(self) -> DatasetAugmentor:
+        """Lazy initialization of augmentor."""
+        if self._augmentor is None:
+            # Get config from config manager
+            config = self.config_manager.get_config()
+            
+            # Create integrated config
+            integrated_config = {
+                'augmentation': {
+                    'types': config.get('augmentation', {}).get('types', ['combined']),
+                    'num_variations': config.get('augmentation', {}).get('num_variations', 2),
+                    'output_dir': str(self.augmented_dir),
+                    'process_bboxes': config.get('augmentation', {}).get('process_bboxes', True),
+                    'target_balance': config.get('augmentation', {}).get('target_balance', True),
+                    'num_workers': self.num_workers,
+                    'target_count': config.get('augmentation', {}).get('target_count', 1000)
+                },
+                'data': {
+                    'dir': str(self.data_dir)
+                }
+            }
+            
+            # Initialize augmentor
+            self._augmentor = DatasetAugmentor(
+                config=integrated_config,
+                logger=self.logger
+            )
+            
+            # Register progress callback if ui_components exists
+            if self.ui_components and 'progress_callback' in self.ui_components:
+                self._augmentor.register_progress_callback(
+                    self.ui_components['progress_callback']
+                )
+        
+        return self._augmentor
+    
+    def register_progress_callback(self, callback: Callable) -> None:
+        """
+        Register progress callback untuk tracking progress.
         
         Args:
-            callback: Fungsi callback untuk progress tracking (pola lama)
-            notification_manager: Instance NotificationManager (pola baru)
+            callback: Fungsi callback untuk progress tracking
         """
-        if notification_manager:
-            self._notification_manager = notification_manager
-            self.logger.info("✅ NotificationManager berhasil diregistrasi")
-        elif callback and callable(callback): 
-            self._progress_callbacks.append(callback)
-            self.logger.info("✅ Progress callback berhasil diregistrasi")
+        if self.ui_components:
+            self.ui_components['progress_callback'] = callback
+            if self._augmentor:
+                self._augmentor.register_progress_callback(callback)
+    
+    def augment_dataset(
+        self,
+        split: str = 'train',
+        augmentation_types: List[str] = None,
+        num_variations: int = 2,
+        output_prefix: str = 'aug',
+        validate_results: bool = True,
+        resume: bool = False,
+        process_bboxes: bool = True,
+        target_balance: bool = True,
+        num_workers: int = None,
+        move_to_preprocessed: bool = True,
+        target_count: int = 1000
+    ) -> Dict[str, Any]:
+        """
+        Augmentasi dataset dan simpan hasilnya.
+        
+        Args:
+            split: Split dataset ('train', 'val', 'test')
+            augmentation_types: Jenis augmentasi yang akan digunakan
+            num_variations: Jumlah variasi per gambar
+            output_prefix: Prefix untuk file output
+            validate_results: Validasi hasil augmentasi
+            resume: Lanjutkan augmentasi yang terhenti
+            process_bboxes: Proses bounding box
+            target_balance: Balance kelas target
+            num_workers: Jumlah worker untuk parallel processing
+            move_to_preprocessed: Pindahkan hasil ke direktori preprocessed
+            target_count: Target jumlah gambar per kelas
+            
+        Returns:
+            Dict: Statistik hasil augmentasi
+        """
+        try:
+            # Get latest config
+            config = self.config_manager.get_config()
+            
+            # Update parameters from config if not specified
+            if augmentation_types is None:
+                augmentation_types = config.get('augmentation', {}).get('types', ['combined'])
+            if num_workers is None:
+                num_workers = config.get('augmentation', {}).get('num_workers', self.num_workers)
+            
+            # Get augmentor and run augmentation
+            result = self.augmentor.augment_dataset(
+                split=split,
+                augmentation_types=augmentation_types,
+                num_variations=num_variations,
+                output_prefix=output_prefix,
+                validate_results=validate_results,
+                resume=resume,
+                process_bboxes=process_bboxes,
+                target_balance=target_balance,
+                num_workers=num_workers,
+                move_to_preprocessed=move_to_preprocessed,
+                target_count=target_count
+            )
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error saat augmentasi dataset: {str(e)}"
+            self.logger.error(error_msg)
+            raise DatasetError(error_msg)
+    
+    def cleanup(self):
+        """Cleanup resources."""
+        self._augmentor = None
+        self.ui_components = None
     
     def report_progress(self, progress: int = None, total: int = None, message: str = None, status: str = 'info', **kwargs) -> None:
         """Laporkan progress dengan callback atau notification manager.
@@ -160,117 +278,6 @@ class AugmentationService:
                 callback(**params)
             except Exception as e:
                 self.logger.error(f"❌ Error saat memanggil progress callback: {str(e)}")
-    
-    def augment_dataset(
-        self, 
-        split: str = 'train', 
-        augmentation_types: List[str] = None, 
-        num_variations: int = 2,
-        output_prefix: str = 'aug', 
-        validate_results: bool = True, 
-        resume: bool = False,
-        process_bboxes: bool = True, 
-        target_balance: bool = True, 
-        num_workers: int = None,
-        move_to_preprocessed: bool = True, 
-        target_count: int = 1000
-    ) -> Dict[str, Any]:
-        """Augmentasi dataset dengan prioritisasi kelas dan pelacakan mencapai target."""
-        # Reset stop signal dan setup paths
-        self._stop_signal = False
-        start_time = time.time()
-        
-        # Gunakan helper untuk setup paths
-        paths = setup_paths(self.config, split)
-        
-        # Notifikasi awal proses augmentasi
-        self.report_progress(
-            message=f"Memulai augmentasi dataset {split}",
-            status="info",
-            process_start=True,
-            process_name="augmentation",
-            display_info=f"{split} ({len(augmentation_types or [])} jenis)",
-            split=split
-        )
-        
-        # Validasi input files dengan helper
-        image_files, validation_result = validate_input_files(
-            paths['images_input_dir'], 
-            self.config.get('preprocessing', {}).get('file_prefix', 'rp'),
-            self.logger
-        )
-        
-        # Return error jika validasi gagal
-        if not validation_result['success']:
-            error_message = validation_result['message']
-            self.logger.warning(f"⚠️ {error_message}")
-            self.report_progress(
-                message=error_message,
-                status="error",
-                error=True,
-                error_message=error_message
-            )
-            return {"status": "error", "message": error_message}
-            
-        # Persiapkan balancing dengan prioritisasi kelas
-        class_data = self._prepare_balancing(image_files, paths, target_count, target_balance)
-        if not class_data:
-            return {"status": "info", "message": "Tidak ada kelas yang memerlukan augmentasi", "generated": 0}
-        
-        # Eksekusi augmentasi dengan tracking
-        augmentation_result = execute_augmentation_with_tracking(
-            service=self,
-            class_data=class_data,
-            augmentation_types=augmentation_types,
-            num_variations=max(1, num_variations),  # Pastikan minimal 1 variasi
-            output_prefix=output_prefix,
-            validate_results=False,  # Nonaktifkan validasi untuk memastikan semua gambar diproses
-            process_bboxes=process_bboxes,
-            n_workers=num_workers or self.num_workers,
-            paths=paths,
-            split=split,
-            target_count=target_count,
-            start_time=start_time
-        )
-        
-        # Handle move files jika diperlukan
-        if move_to_preprocessed and augmentation_result['status'] == 'success':
-            self.report_progress(
-                message=f"Memindahkan {augmentation_result['generated']} file ke direktori preprocessed",
-                status="info", 
-                step=2,
-                module_type="augmentation",
-                context="augmentation_only",
-                silent=True  # Tambahkan flag silent untuk mengurangi output log yang tidak perlu
-            )
-            
-            move_success = move_files_to_preprocessed(
-                paths['images_output_dir'], paths['labels_output_dir'],
-                output_prefix, paths['final_output_dir'], split, self.logger
-            )
-            
-            # Update path output jika berhasil di-move
-            if move_success:
-                augmentation_result['final_output_dir'] = paths['final_output_dir']
-        
-        # Notifikasi akhir proses augmentasi
-        if augmentation_result['status'] == 'success':
-            self.report_progress(
-                message=f"Augmentasi berhasil dengan {augmentation_result['generated']} gambar",
-                status="success",
-                process_complete=True,
-                result=augmentation_result,
-                display_info=f"{split} ({augmentation_result['generated']} gambar)"
-            )
-        else:
-            self.report_progress(
-                message=augmentation_result.get('message', 'Augmentasi gagal'),
-                status="error",
-                error=True,
-                error_message=augmentation_result.get('message', 'Augmentasi gagal')
-            )
-        
-        return augmentation_result
     
     def _prepare_balancing(self, image_files: List[str], paths: Dict, target_count: int, target_balance: bool) -> Optional[Dict[str, Any]]:
         """Persiapkan balancing kelas dengan prioritisasi optimal menggunakan ClassBalancer."""

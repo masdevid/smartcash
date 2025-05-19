@@ -34,8 +34,11 @@ def setup_ipython_logging(ui_components: Dict[str, Any], module_name: Optional[s
         # Buat logger yang langsung ke UI
         logger = create_direct_ui_logger(ui_components, module_name)
         
-        # Setup observer integration jika tersedia, tapi dengan logging minimal
-        _setup_observer_integration_minimal(ui_components, logger)
+        # Setup observer integration tanpa logging
+        try:
+            _setup_observer_integration_minimal(ui_components, logger)
+        except Exception:
+            pass
         
         return logger
         

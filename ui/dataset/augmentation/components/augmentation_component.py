@@ -24,7 +24,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import create_divider
 
     # Import shared components
-    from smartcash.ui.components.split_selector import create_split_selector
+    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
     from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel

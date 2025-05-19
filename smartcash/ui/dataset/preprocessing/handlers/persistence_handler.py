@@ -256,6 +256,47 @@ def get_persisted_ui_components() -> Dict[str, Any]:
         logger.debug(f"{ICONS['info']} Tidak dapat memuat UI components dari ConfigManager: {str(e)}")
         return None
 
+def setup_persistence_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """
+    Setup persistence handler untuk preprocessing dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment manager (opsional)
+        config: Konfigurasi aplikasi (opsional)
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Pastikan persistensi UI components
+    ui_components = ensure_ui_persistence(ui_components, config)
+    
+    # Tambahkan fungsi ke ui_components
+    ui_components.update({
+        'get_preprocessing_config': get_preprocessing_config,
+        'sync_config_with_drive': sync_config_with_drive,
+        'reset_config_to_default': reset_config_to_default
+    })
+    
+    # Setup handler untuk tombol save
+    if 'save_button' in ui_components:
+        def on_save_click(b):
+            # Dapatkan konfigurasi dari UI
+            config = get_preprocessing_config(ui_components)
+            
+            # Simpan ke file dan drive
+            success = sync_config_with_drive(ui_components)
+            
+            # Update status
+            if success and 'update_status_panel' in ui_components:
+                ui_components['update_status_panel'](ui_components, "success", f"{ICONS['success']} Konfigurasi preprocessing berhasil disimpan")
+        
+        # Register handler
+        ui_components['save_button'].on_click(on_save_click)
+        ui_components['on_save_click'] = on_save_click
+    
+    return ui_components
+
 def reset_config_to_default(ui_components: Dict[str, Any]) -> bool:
     """
     Reset konfigurasi ke default dan perbarui UI.

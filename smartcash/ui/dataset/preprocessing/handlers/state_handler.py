@@ -225,6 +225,27 @@ def generate_preprocessing_summary(ui_components: Dict[str, Any], preprocessed_d
             </div>
             """))
 
+def setup_state_handler(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """
+    Setup state handler untuk preprocessing dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment manager (opsional)
+        config: Konfigurasi aplikasi (opsional)
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Dapatkan preprocessed_dir dari config atau default
+    preprocessed_dir = config.get('preprocessing', {}).get('output_dir', 'data/preprocessed') if config else 'data/preprocessed'
+    ui_components['preprocessed_dir'] = preprocessed_dir
+    
+    # Deteksi state preprocessing
+    ui_components = detect_preprocessing_state(ui_components)
+    
+    return ui_components
+
 def get_preprocessing_stats(ui_components: Dict[str, Any], preprocessed_dir: str) -> Dict[str, Any]:
     """
     Mendapatkan statistik dataset preprocessing dengan pendekatan one-liner.

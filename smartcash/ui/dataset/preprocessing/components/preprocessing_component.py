@@ -24,7 +24,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import create_divider
     
     # Import shared components
-    from smartcash.ui.components.split_selector import create_split_selector
+    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
     from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
@@ -46,10 +46,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Split selector menggunakan shared component
     split_selector = create_split_selector(
-        selected_split='train',
-        description="Split Dataset:",
-        width='100%',
-        icon='split'
+        selected_value='Train Only'
     )
     
     # Validation options dalam accordion

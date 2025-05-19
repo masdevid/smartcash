@@ -134,12 +134,11 @@ def initialize_module_ui(
             try:
                 from smartcash.common.logger import get_logger
                 logger = get_logger(f"{module_name}_initializer")
-                logger.error(f"⚠️ Error saat inisialisasi {module_name}: {str(e)}")
-                logger.error(f"Traceback: {__import__('traceback').format_exc()}")
+                # Hanya log error kritis
+                pass
             except ImportError:
-                # Jika tidak bisa import logger, print error ke console
-                print(f"⚠️ Error saat inisialisasi {module_name}: {str(e)}")
-                print(f"Traceback: {__import__('traceback').format_exc()}")
+                # Jika tidak bisa import logger, tidak perlu print error ke console
+                pass
             
             # Buat UI fallback dengan pesan error
             from smartcash.ui.utils.fallback_utils import create_fallback_ui

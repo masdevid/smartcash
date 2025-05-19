@@ -29,8 +29,8 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any
         ui_components = ensure_ui_persistence(ui_components)
         
         # Setup button handlers
-        from smartcash.ui.dataset.preprocessing.handlers.button_handlers import setup_button_handlers
-        ui_components = setup_button_handlers(ui_components)
+        from smartcash.ui.dataset.preprocessing.handlers.button_handler import setup_preprocessing_button_handlers
+        ui_components = setup_preprocessing_button_handlers(ui_components, 'preprocessing')
         
         return ui_components
     except Exception as e:

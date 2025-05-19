@@ -35,20 +35,25 @@ def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logge
     # Simpan referensi ke fungsi log asli
     original_log = logger.log
     
-    # Dapatkan referensi ke logger Python standar
+    # Dapatkan referensi ke logger Python standar tapi skip semua log non-critical
     python_logger = None
     if hasattr(logger, 'logger'):
         python_logger = logger.logger
         
-        # Hapus semua console handlers dari logger
+        # Hapus semua handlers dari logger untuk menghilangkan semua log
         for handler in list(python_logger.handlers):
-            if isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler):
-                python_logger.removeHandler(handler)
+            python_logger.removeHandler(handler)
     
     def ui_log(level, message):
         # Jangan log debug message ke UI untuk mengurangi noise
         level_name = level.name.lower() if hasattr(level, 'name') else 'info'
         
+        # Filter semua log inisialisasi dan non-critical
+        if ('inisialisasi' in message.lower() or 'setup' in message.lower() or 
+            'handler' in message.lower() or 'initializing' in message.lower() or 
+            'module' in message.lower() or 'preprocessing' in message.lower()):
+            return
+            
         # Konversi ke level logging standar
         std_level = logger.LEVEL_MAPPING[level] if hasattr(logger, 'LEVEL_MAPPING') else logging.INFO
         
@@ -57,23 +62,18 @@ def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logge
             _, file_msg = logger._format_message(level, message)
         else:
             file_msg = message
-            
-        # Log ke file melalui Python logger (tanpa console output karena handlers sudah dihapus)
-        if python_logger:
-            python_logger.log(std_level, file_msg)
         
-        # Skip UI display untuk debug messages
-        if level_name == 'debug':
+        # Skip UI display untuk debug messages dan info yang tidak penting
+        if level_name == 'debug' or level_name == 'info':
             return
             
-        # Log ke UI untuk non-debug messages
-        with ui_components['status']:
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            # Map LogLevel ke status type
-            status_type = "success" if level_name == "success" else \
-                         "warning" if level_name in ("warning", "warn") else \
-                         "error" if level_name in ("error", "critical") else "info"
-            display(create_status_indicator(status_type, message))
+        # Hanya log error dan warning ke UI
+        if level_name in ('error', 'critical', 'warning', 'warn'):
+            with ui_components['status']:
+                from smartcash.ui.utils.alert_utils import create_status_indicator
+                # Map LogLevel ke status type
+                status_type = "warning" if level_name in ("warning", "warn") else "error"
+                display(create_status_indicator(status_type, message))
     
     # Ganti implementasi log dengan versi kustom
     logger.log = ui_log
@@ -188,13 +188,16 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
             # Write ke terminal asli
             self.terminal.write(message)
             
-            # Skip pesan yang tidak perlu ditampilkan di UI
+            # Skip semua pesan yang tidak kritis untuk cell_1_x, cell_2_1, dan cell_2_2
             msg_strip = message.strip()
             if not msg_strip or len(msg_strip) < 2:  # Skip pesan kosong atau terlalu pendek
                 return
                 
-            # Filter berdasarkan prefiks yang umum untuk log yang tidak perlu
-            if any(prefix in msg_strip for prefix in self.ignore_debug_prefix):
+            # Filter semua log inisialisasi handler dan log non-critical
+            if any(prefix in msg_strip for prefix in self.ignore_debug_prefix) or \
+               'inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or \
+               'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower() or \
+               'module' in msg_strip.lower() or 'preprocessing' in msg_strip.lower():
                 return
                 
             # Filter tambahan untuk pesan pertama kali cell dijalankan

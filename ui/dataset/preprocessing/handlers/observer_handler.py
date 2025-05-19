@@ -56,3 +56,33 @@ def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> N
     # Panggil callback jika tersedia
     if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
         ui_components['on_process_error']("preprocessing", error_message)
+
+def setup_observer_handler(ui_components: Dict[str, Any], observer_group: str = "preprocessing_observers") -> Dict[str, Any]:
+    """
+    Setup observer handler untuk preprocessing dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        observer_group: Nama grup observer (default: preprocessing_observers)
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Import observer manager dari utils
+    try:
+        from smartcash.ui.utils.ui_observers import get_observer_manager
+        
+        # Dapatkan observer manager
+        observer_manager = get_observer_manager()
+        ui_components['observer_manager'] = observer_manager
+        ui_components['observer_group'] = observer_group
+        
+        # Register fungsi notifikasi ke ui_components
+        ui_components['notify_process_start'] = notify_process_start
+        ui_components['notify_process_complete'] = notify_process_complete
+        ui_components['notify_process_error'] = notify_process_error
+    except ImportError:
+        # Jika tidak bisa import, gunakan fungsi dummy
+        pass
+    
+    return ui_components

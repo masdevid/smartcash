@@ -4,45 +4,16 @@ Deskripsi: Handler tombol untuk modul augmentasi dataset
 """
 
 from typing import Dict, Any, Optional, Callable, Union, List
-from IPython.display import display, clear_output
 import os
-import traceback
+import time
 from pathlib import Path
+from tqdm.auto import tqdm
+
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.augmentation.handlers.status_handler import update_status_panel
+from smartcash.ui.dataset.augmentation.utils.notification_manager import notify_process_start, notify_process_complete, notify_process_error
 
-# Fungsi notifikasi untuk observer pattern
-def notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
-    """Notifikasi observer bahwa proses telah dimulai."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
-        ui_components['on_process_start']("augmentation", {
-            'split': split,
-            'display_info': display_info
-        })
-
-def notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any], display_info: str) -> None:
-    """Notifikasi observer bahwa proses telah selesai dengan sukses."""
-    logger = ui_components.get('logger')
-    if logger: logger.info(f"{ICONS['success']} Augmentasi {display_info} selesai")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
-        ui_components['on_process_complete']("augmentation", result)
-
-def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> None:
-    """Notifikasi observer bahwa proses mengalami error."""
-    logger = ui_components.get('logger')
-    if logger: logger.error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
-    
-    # Panggil callback jika tersedia
-    if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
-        ui_components['on_process_error']("augmentation", error_message)
+logger = get_logger("augmentation_button_handler")
 
 def notify_process_stop(ui_components: Dict[str, Any], display_info: str = "") -> None:
     """Notifikasi observer bahwa proses telah dihentikan oleh pengguna."""
@@ -63,25 +34,42 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
         'reset_button', 'augmentation_button', 'save_button'
     ]
     
-    # Tambahan komponen untuk augmentation
+    # Tambahan komponen untuk augmentasi
     if 'augmentation_options' in ui_components:
         disable_components.append('augmentation_options')
-    if 'aug_factor_slider' in ui_components:
-        disable_components.append('aug_factor_slider')
+    if 'rotation_range' in ui_components:
+        disable_components.append('rotation_range')
+    if 'width_shift_range' in ui_components:
+        disable_components.append('width_shift_range')
+    if 'height_shift_range' in ui_components:
+        disable_components.append('height_shift_range')
+    if 'zoom_range' in ui_components:
+        disable_components.append('zoom_range')
+    if 'horizontal_flip' in ui_components:
+        disable_components.append('horizontal_flip')
     
     # Disable/enable komponen
     for component in disable_components:
         if component in ui_components and hasattr(ui_components[component], 'disabled'):
             ui_components[component].disabled = disable
 
-def execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: str):
-    """Eksekusi augmentasi dengan parameter dari UI."""
+def execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: str) -> Dict[str, Any]:
+    """Eksekusi augmentasi dengan parameter dari UI.
+
+    Args:
+        ui_components: Dictionary komponen UI
+        split: Split dataset yang akan diaugmentasi
+        split_info: Informasi tambahan tentang split
+
+    Returns:
+        Dictionary hasil augmentasi
+    """
     logger = ui_components.get('logger')
     
     # Dapatkan parameter dari UI
     try:
-        # Dapatkan dataset manager
-        augmentation_service = ui_components.get('augmentation_manager')
+        # Dapatkan augmentation service
+        augmentation_service = ui_components.get('augmentation_service')
         
         # Dapatkan parameter dari UI
         data_dir = ui_components.get('data_dir', '')

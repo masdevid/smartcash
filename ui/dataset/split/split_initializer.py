@@ -37,8 +37,12 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
         # Dapatkan environment jika belum tersedia
         env = env or get_environment_manager()
         
+        # Ensure base_dir is set
+        if not getattr(env, 'base_dir', None):
+            raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
+        
         # Dapatkan config manager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=env.base_dir, config_file='dataset_config.yaml')
         
         # Load konfigurasi dari config manager
         if config is None:

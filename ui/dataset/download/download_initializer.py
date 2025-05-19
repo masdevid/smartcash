@@ -48,6 +48,13 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
         # Buat UI components
         ui_components = create_download_ui(config)
         
+        # Validasi UI components
+        if not isinstance(ui_components, dict):
+            raise ValueError("UI components must be a dictionary")
+            
+        if 'main_container' not in ui_components:
+            raise ValueError("UI components must contain 'main_container'")
+        
         # Daftarkan observer
         register_ui_observers(ui_components, observer_manager)
         
@@ -65,6 +72,7 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
             if hasattr(ui_components['output_dir'], 'value') 
             else str(ui_components['output_dir'])
         ) if 'output_dir' in ui_components else 'data'
+        
         download_service = DownloadService(
             output_dir=output_dir,
             config=config,

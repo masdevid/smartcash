@@ -70,7 +70,7 @@ def get_augmentation_config(ui_components: Dict[str, Any] = None) -> Dict[str, A
     
     Args:
         ui_components: Dictionary komponen UI (opsional)
-        
+    
     Returns:
         Dictionary konfigurasi augmentasi
     """
@@ -90,7 +90,7 @@ def get_augmentation_config(ui_components: Dict[str, Any] = None) -> Dict[str, A
         
     except Exception as e:
         logger.error(f"❌ Error saat mengambil konfigurasi augmentasi: {str(e)}")
-        return get_default_augmentation_config()
+    return get_default_augmentation_config()
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -199,7 +199,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         logger.info("✅ Konfigurasi augmentasi berhasil diupdate")
         
         return config
-        
+    
     except Exception as e:
         logger.error(f"❌ Error saat update konfigurasi augmentasi: {str(e)}")
         return get_default_augmentation_config()

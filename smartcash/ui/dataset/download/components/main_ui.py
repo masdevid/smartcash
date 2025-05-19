@@ -8,21 +8,37 @@ from .action_section import create_action_section
 from .progress_section import create_progress_section
 from .log_section import create_log_section
 
-def create_download_ui(env=None, config=None):
+def create_download_ui(config=None):
+    """
+    Create download UI components.
+    
+    Args:
+        config: Optional configuration dictionary
+        
+    Returns:
+        Dictionary containing UI components
+    """
     config = config or {}
     roboflow_config = config.get('data', {}).get('roboflow', {})
+    
     # Header
     header = create_header(f"{ICONS.get('download', '📥')} Dataset Download", "Download dataset untuk training model SmartCash")
+    
     # Status panel
     status_panel = create_status_panel("Konfigurasi download dataset", "info")
+    
     # Options panel (form fields)
     options = create_options_panel(roboflow_config)
+    
     # Action section
     actions = create_action_section()
+    
     # Progress section
     progress = create_progress_section()
+    
     # Log section
     logs = create_log_section()
+    
     # Create main container with proper layout
     main_container = widgets.VBox([
         header,
@@ -49,9 +65,11 @@ def create_download_ui(env=None, config=None):
         border_radius='5px',
         background_color='#fff'
     ))
+    
     # Compose ui_components dict
     ui_components = {
         'ui': main_container,
+        'main_container': main_container,
         'header': header,
         'status_panel': status_panel,
         'workspace': options['workspace'],
@@ -83,4 +101,5 @@ def create_download_ui(env=None, config=None):
         'log_output': logs['log_output'],
         'log_accordion': logs['log_accordion']
     }
+    
     return ui_components 

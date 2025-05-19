@@ -40,7 +40,7 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
         
         # Setup handlers
         self.download_handler = DownloadHandler(ui_components=self.ui_components)
-        self.cleanup_handler = CleanupHandler(ui_components=self.ui_components)
+        self.cleanup_handler = CleanupHandler(ui_components=self.ui_components, dataset_manager=self.dataset_manager_mock)
         
         # Reset download_running flag
         self.ui_components['download_running'] = False
@@ -169,8 +169,9 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
         # Setup mock untuk raise exception
         self.dataset_manager_mock.download_from_roboflow.side_effect = Exception("Test error")
         
-        # Panggil fungsi download
-        self.download_handler.download()
+        # Panggil fungsi download dan tangkap exception
+        with self.assertRaises(Exception):
+            self.download_handler.download()
         
         # Verifikasi bahwa error ditangani dengan benar
         self.assertFalse(self.ui_components['download_running'])

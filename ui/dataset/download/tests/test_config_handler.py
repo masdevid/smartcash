@@ -13,13 +13,13 @@ from unittest.mock import patch, MagicMock, mock_open
 import ipywidgets as widgets
 
 from smartcash.ui.dataset.download.handlers.config_handler import (
-    load_default_config,
-    load_config,
-    save_config,
-    get_config_manager_instance,
-    save_config_with_manager,
+    get_default_download_config,
+    get_config_from_ui,
     update_config_from_ui,
-    update_ui_from_config
+    get_download_config,
+    update_ui_from_config,
+    get_dataset_manager,
+    get_download_service
 )
 
 class TestDownloadConfigHandler(unittest.TestCase):
@@ -33,13 +33,11 @@ class TestDownloadConfigHandler(unittest.TestCase):
         
         # Setup test config
         self.config = {
-            'data': {
-                'download': {
-                    'source': 'roboflow',
-                    'output_dir': 'data/downloads',
-                    'backup_before_download': True,
-                    'backup_dir': 'data/downloads_backup'
-                },
+            'download': {
+                'source': 'roboflow',
+                'output_dir': 'data/downloads',
+                'backup_before_download': True,
+                'backup_dir': 'data/downloads_backup',
                 'roboflow': {
                     'workspace': 'smartcash-wo2us',
                     'project': 'rupiah-emisi-2022',
@@ -122,132 +120,78 @@ class TestDownloadConfigHandler(unittest.TestCase):
         
         return ui_components
     
-    def test_load_default_config(self):
-        """Test load_default_config."""
-        config = load_default_config()
+    def test_get_default_download_config(self):
+        """Test get_default_download_config."""
+        config = get_default_download_config()
         
         # Verifikasi struktur config
-        self.assertIn('data', config)
-        self.assertIn('download', config['data'])
-        self.assertIn('roboflow', config['data'])
+        self.assertIn('download', config)
+        self.assertIn('source', config['download'])
+        self.assertIn('output_dir', config['download'])
+        self.assertIn('roboflow', config['download'])
         
         # Verifikasi nilai default
-        self.assertEqual(config['data']['download']['source'], 'roboflow')
-        self.assertEqual(config['data']['download']['output_dir'], 'data/downloads')
-        self.assertEqual(config['data']['roboflow']['workspace'], 'smartcash-wo2us')
+        self.assertEqual(config['download']['source'], 'roboflow')
+        self.assertEqual(config['download']['output_dir'], 'data/downloads')
+        self.assertEqual(config['download']['roboflow']['workspace'], 'smartcash-wo2us')
     
-    @patch('os.makedirs')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('yaml.dump')
-    def test_save_config(self, mock_yaml_dump, mock_file_open, mock_makedirs):
-        """Test save_config."""
-        # Mock logger
-        logger = MagicMock()
-        
-        # Panggil fungsi
-        result = save_config(self.config, logger)
-        
-        # Verifikasi hasil
-        self.assertTrue(result)
-        mock_makedirs.assert_called_once()
-        # Verifikasi bahwa file config dibuka untuk menulis
-        mock_file_open.assert_any_call(Path('configs/dataset_config.yaml'), 'w')
-        mock_yaml_dump.assert_called_once()
-        logger.info.assert_called()
-    
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
-    def test_load_config_file_not_exists(self, mock_load_default, mock_get_config_manager_instance):
-        """Test load_config ketika file tidak ada."""
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
+    def test_get_config_from_ui(self, mock_get_config_manager):
+        """Test get_config_from_ui."""
         # Setup mock
         mock_config_manager = MagicMock()
-        mock_config_manager.get_module_config.return_value = None
-        mock_get_config_manager_instance.return_value = mock_config_manager
-        mock_load_default.return_value = self.config
+        mock_config_manager.get_config.return_value = self.config
+        mock_get_config_manager.return_value = mock_config_manager
         
         # Panggil fungsi
-        result = load_config()
+        result = get_config_from_ui(self.ui_components)
         
         # Verifikasi hasil
-        self.assertEqual(result, self.config)
-        mock_load_default.assert_called_once()
+        self.assertIn('download', result)
+        self.assertEqual(result['download']['source'], 'roboflow')
+        self.assertEqual(result['download']['output_dir'], 'data/test')
+        self.assertEqual(result['download']['roboflow']['workspace'], 'test-workspace')
     
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
-    def test_load_config_file_exists(self, mock_load_default, mock_get_config_manager_instance):
-        """Test load_config ketika file ada."""
-        # Setup mock
-        mock_config_manager = MagicMock()
-        mock_config_manager.get_module_config.return_value = self.config
-        mock_get_config_manager_instance.return_value = mock_config_manager
-        mock_load_default.return_value = self.config
-        
-        # Panggil fungsi
-        result = load_config()
-        
-        # Verifikasi hasil
-        self.assertEqual(result, self.config)
-        mock_config_manager.get_module_config.assert_called_once_with('dataset_download')
-    
-    def test_update_config_from_ui(self):
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
+    def test_update_config_from_ui(self, mock_get_config_manager):
         """Test update_config_from_ui."""
+        # Setup mock
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_config.return_value = self.config
+        mock_get_config_manager.return_value = mock_config_manager
+        
         # Panggil fungsi
-        result = update_config_from_ui({}, self.ui_components)
+        result = update_config_from_ui(self.ui_components)
         
         # Verifikasi hasil
-        self.assertIn('data', result)
-        self.assertIn('download', result['data'])
-        self.assertIn('roboflow', result['data'])
+        self.assertIn('download', result)
+        mock_config_manager.update_config.assert_called_once()
+    
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
+    def test_get_download_config(self, mock_get_config_manager):
+        """Test get_download_config."""
+        # Setup mock
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_config.return_value = self.config
+        mock_get_config_manager.return_value = mock_config_manager
         
-        # Verifikasi nilai dari UI
-        self.assertEqual(result['data']['download']['output_dir'], 'data/test')
-        self.assertEqual(result['data']['roboflow']['workspace'], 'test-workspace')
-        self.assertEqual(result['data']['roboflow']['project'], 'test-project')
-        self.assertEqual(result['data']['roboflow']['version'], '1')
-        self.assertEqual(result['data']['roboflow']['api_key'], 'test-api-key')
+        # Panggil fungsi
+        result = get_download_config(self.ui_components)
+        
+        # Verifikasi hasil
+        self.assertIn('source', result)
+        self.assertIn('output_dir', result)
+        self.assertIn('roboflow', result)
     
     def test_update_ui_from_config(self):
         """Test update_ui_from_config."""
         # Panggil fungsi
-        update_ui_from_config(self.config, self.ui_components)
-        
-        # Verifikasi UI components diupdate
-        self.ui_components['workspace'].value = self.config['data']['roboflow']['workspace']
-        self.ui_components['project'].value = self.config['data']['roboflow']['project']
-        self.ui_components['version'].value = self.config['data']['roboflow']['version']
-        self.ui_components['api_key'].value = self.config['data']['roboflow']['api_key']
-        self.ui_components['output_dir'].value = self.config['data']['download']['output_dir']
-    
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.save_config')
-    def test_save_config_with_manager_fallback(self, mock_save_config, mock_get_manager):
-        """Test save_config_with_manager dengan fallback."""
-        # Setup mock
-        mock_get_manager.return_value = None
-        mock_save_config.return_value = True
-        
-        # Panggil fungsi
-        result = save_config_with_manager(self.config, self.ui_components, self.ui_components['logger'])
+        update_ui_from_config(self.ui_components, self.config['download'])
         
         # Verifikasi hasil
-        self.assertTrue(result)
-        mock_save_config.assert_called_once()
-    
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
-    def test_save_config_with_manager(self, mock_get_manager):
-        """Test save_config_with_manager dengan ConfigManager."""
-        # Setup mock
-        mock_manager = MagicMock()
-        mock_manager.save_module_config.return_value = True
-        mock_get_manager.return_value = mock_manager
-        
-        # Panggil fungsi
-        result = save_config_with_manager(self.config, self.ui_components, self.ui_components['logger'])
-        
-        # Verifikasi hasil
-        self.assertTrue(result)
-        mock_manager.register_ui_components.assert_called_once()
-        mock_manager.save_module_config.assert_called_once()
+        self.assertEqual(self.ui_components['source_dropdown'].value, 'roboflow')
+        self.assertEqual(self.ui_components['output_dir'].value, 'data/downloads')
+        self.assertEqual(self.ui_components['workspace'].value, 'smartcash-wo2us')
 
 if __name__ == '__main__':
     unittest.main()

@@ -9,6 +9,8 @@ import ipywidgets as widgets
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
+from smartcash.dataset.manager import DatasetManager
+from smartcash.dataset.services.downloader.download_service import DownloadService
 
 def cleanup_ui(ui_components: Dict[str, Any]) -> None:
     """Membersihkan UI setelah proses selesai."""
@@ -124,11 +126,10 @@ def setup_download_cleanup_handler(ui_components: Dict[str, Any], module_type: s
 
 class CleanupHandler:
     """Handler untuk proses cleanup dataset."""
-    def __init__(self, ui_components: Dict[str, Any]):
+    def __init__(self, ui_components: Dict[str, Any], dataset_manager=None):
         self.ui_components = ui_components
+        self.dataset_manager = dataset_manager or DatasetManager()
     
     def cleanup(self) -> None:
-        from smartcash.dataset.manager import DatasetManager
         output_dir = self.ui_components.get('output_dir', {}).value if 'output_dir' in self.ui_components else 'data'
-        manager = DatasetManager()
-        manager.cleanup_dataset(output_dir=output_dir)
+        self.dataset_manager.cleanup_dataset(output_dir=output_dir)

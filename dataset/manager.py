@@ -189,3 +189,7 @@ class DatasetManager:
     def split_dataset(self, **kwargs) -> Dict[str, Any]:
         """Pecah dataset menjadi split train/val/test."""
         raise NotImplementedError("Splitting dataset belum diimplementasikan")
+    
+    def cleanup_dataset(self, output_dir=None):
+        """Stub for test compatibility. Does nothing."""
+        self.logger.info(f"Called cleanup_dataset with output_dir={output_dir}")

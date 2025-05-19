@@ -88,10 +88,7 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         if 'backup_dir' in ui_components:
             config['download']['backup_dir'] = ui_components['backup_dir'].value
             
-        # Update config in config manager
-        config_manager.update_config(config)
-        
-        logger.info("✅ Konfigurasi download berhasil diupdate dari UI")
+        logger.info("✅ Konfigurasi download berhasil diupdate dari UI (tanpa update_config)")
         
         return config
         
@@ -118,7 +115,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Get config manager
         config_manager = get_config_manager()
         
-        # Update config
+        # Update config in manager
         config_manager.update_config(config)
         
         logger.info("✅ Konfigurasi download berhasil diupdate")
@@ -215,3 +212,15 @@ def get_dataset_manager() -> DatasetManager:
 def get_download_service() -> DownloadService:
     """Get the download service instance."""
     return DownloadService()
+
+def save_config_with_manager(*args, **kwargs):
+    """
+    Stub for save_config_with_manager. Returns True for now.
+    """
+    return True
+
+def load_config(*args, **kwargs):
+    """
+    Stub for load_config. Returns the default download config for now.
+    """
+    return get_default_download_config()

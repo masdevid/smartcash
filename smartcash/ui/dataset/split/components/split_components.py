@@ -21,7 +21,8 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS
     from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET, create_divider
-    from smartcash.ui.components.config_buttons import create_config_buttons
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.sync_info_message import create_sync_info_message
     
     # Inisialisasi komponen
     ui_components = {}
@@ -151,10 +152,24 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     )
     ui_components['preprocessed_path'] = preprocessed_path
     
-    # Buat tombol konfigurasi
-    config_buttons = create_config_buttons()
-    ui_components['save_button'] = config_buttons['save_button']
-    ui_components['reset_button'] = config_buttons['reset_button']
+    # Buat tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan",
+        reset_label="Reset",
+        save_tooltip="Simpan konfigurasi split dataset dan sinkronkan ke Google Drive",
+        reset_tooltip="Reset konfigurasi split dataset ke default",
+        save_icon="save",
+        reset_icon="reset",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        button_width="100px"
+    )
+    
+    # Tambahkan referensi ke ui_components
+    ui_components['save_button'] = save_reset_buttons['save_button']
+    ui_components['reset_button'] = save_reset_buttons['reset_button']
+    ui_components['save_reset_buttons'] = save_reset_buttons
+    ui_components['sync_info'] = save_reset_buttons.get('sync_info', {})
     
     # Tambahkan handler untuk slider untuk memastikan total selalu 1.0
     def update_sliders(change):
@@ -226,10 +241,7 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
                 backup_dir
             ], layout=widgets.Layout(width='50%'))
         ]),
-        widgets.HBox([
-            ui_components['save_button'],
-            ui_components['reset_button']
-        ])
+        save_reset_buttons['container']
     ])
     
     # Tambahkan UI ke komponen

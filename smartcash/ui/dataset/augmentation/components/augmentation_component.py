@@ -55,23 +55,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
 
-    # Tombol save dan reset menggunakan shared component dengan layout rata kanan
-    save_reset_buttons = create_save_reset_buttons(
-        save_label='Simpan Konfigurasi',
-        reset_label='Reset Konfigurasi',
-        button_width='100px',
-        container_width='100%'
-    )
-    
-    # Pesan sinkronisasi menggunakan shared component dengan layout rata kanan
-    sync_info = create_sync_info_message(
-        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
-        icon="info",
-        color="#666",
-        font_style="italic",
-        margin_top="5px",
-        width="100%"
-    )
+    # Tombol save dan reset dan sync info akan dibuat nanti untuk menghindari duplikasi
     
     # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
@@ -93,6 +77,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
         button_width="100px"
     )
+    
+    # Gunakan sync_info dari save_reset_buttons
+    sync_info = save_reset_buttons.get('sync_info', {})
 
     # Buat tombol-tombol augmentasi dengan shared component
     action_buttons = create_action_buttons(
@@ -128,10 +115,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
 
-    # Container untuk tombol save/reset dan sync_info dengan layout rata kanan
+    # Container untuk tombol save/reset dengan layout rata kanan
+    # Sync info sudah termasuk dalam save_reset_buttons jika with_sync_info=True
     save_reset_container = widgets.VBox([
-        save_reset_buttons['container'],
-        sync_info['container']
+        save_reset_buttons['container']
     ], layout=widgets.Layout(align_items='flex-end', width='100%'))
     
     settings_container = widgets.VBox([
@@ -140,8 +127,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         save_reset_container,  # Gunakan container yang sudah diatur rata kanan
         split_selector,  # Tetap tampilkan untuk kompatibilitas
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-        advanced_options,
-        save_reset_buttons['container']  # Tambahkan tombol save dan reset
+        advanced_options
     ], layout=widgets.Layout(width='100%'))
 
     # Rakit komponen UI

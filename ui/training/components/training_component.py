@@ -61,73 +61,30 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Chart untuk visualisasi metrik realtime
+    # Chart untuk visualisasi metrik realtime dengan layout yang lebih baik
     chart_output = widgets.Output(
         layout=widgets.Layout(
             width='100%',
             height='300px',
-            margin='10px 0'
+            margin='20px 0',
+            border='1px solid #ddd',
+            padding='10px'
         )
     )
     
-    # Gunakan shared component feature_checkbox_group untuk opsi training
-    training_options = create_feature_checkbox_group(
-        features=[
-            ("Simpan checkpoint", True),
-            ("Gunakan TensorBoard", True),
-            ("Gunakan Mixed Precision", True),
-            ("Gunakan EMA (Exponential Moving Average)", False)
-        ],
-        title="Opsi Training",
-        width="100%",
-        icon="settings"
+    # Buat tombol-tombol untuk training dengan shared component
+    action_buttons = create_action_buttons(
+        primary_label="Mulai Training",
+        primary_tooltip="Mulai proses training model dengan konfigurasi yang sudah diatur",
+        stop_label="Hentikan",
+        stop_tooltip="Hentikan proses training",
+        cleanup_label="Bersihkan",
+        cleanup_tooltip="Bersihkan hasil training",
+        primary_icon="play",
+        stop_icon="stop",
+        cleanup_icon="trash",
+        width="100%"
     )
-    
-    # Fokus pada menjalankan training dan menampilkan metrik realtime F1 dan mAP plot
-    # Tidak menggunakan save_reset_buttons karena fokus pada eksekusi training
-    
-    # Gunakan shared component config_form untuk konfigurasi training
-    training_config_fields = [
-        {
-            'type': 'dropdown',
-            'name': 'backbone',
-            'description': 'Backbone:',
-            'options': [('EfficientNet-B4', 'efficientnet_b4'), ('CSPDarknet-S', 'cspdarknet_s')],
-            'value': 'efficientnet_b4'
-        },
-        {
-            'type': 'int',
-            'name': 'epochs',
-            'description': 'Epochs:',
-            'value': 100,
-            'min': 1,
-            'max': 1000
-        },
-        {
-            'type': 'int',
-            'name': 'batch_size',
-            'description': 'Batch Size:',
-            'value': 16,
-            'min': 1,
-            'max': 128
-        },
-        {
-            'type': 'float',
-            'name': 'learning_rate',
-            'description': 'Learning Rate:',
-            'value': 0.001,
-            'min': 0.0001,
-            'max': 0.1
-        }
-    ]
-    
-    training_config_form = create_config_form(
-        fields=training_config_fields,
-        title="Konfigurasi Training",
-        width="100%",
-        icon="model",
-        with_save_button=False,
-        with_reset_button=False
     )
     
     # Box untuk metrik training
@@ -208,21 +165,46 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         "</div>"
     )
     
-    # Komponen utama
+    # Buat container untuk informasi konfigurasi yang sudah diatur
+    config_info = widgets.Output(
+        layout=widgets.Layout(
+            width='100%',
+            border='1px solid #ddd',
+            padding='10px',
+            margin='10px 0',
+            max_height='200px',
+            overflow_y='auto'
+        )
+    )
+    
+    # Tampilkan informasi konfigurasi yang sudah diatur
+    with config_info:
+        display(HTML(f"""
+        <h4 style='margin-top:0;'>{ICONS.get('info', 'ℹ️')} Informasi Konfigurasi</h4>
+        <p>Training akan menggunakan konfigurasi yang sudah diatur pada modul-modul sebelumnya:</p>
+        <ul>
+            <li><b>Backbone:</b> {config.get('model', {}).get('backbone', 'efficientnet_b4')}</li>
+            <li><b>Batch Size:</b> {config.get('hyperparameters', {}).get('batch_size', 16)}</li>
+            <li><b>Epochs:</b> {config.get('hyperparameters', {}).get('epochs', 100)}</li>
+            <li><b>Learning Rate:</b> {config.get('hyperparameters', {}).get('learning_rate', 0.001)}</li>
+        </ul>
+        <p>Untuk mengubah konfigurasi, gunakan cell konfigurasi model, hyperparameter, dan training strategy.</p>
+        """))
+    
+    # Komponen utama dengan layout yang lebih baik
     main_box = widgets.VBox([
         header,
         status_panel,
-        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Konfigurasi Training</h4>"),
-        training_config_form['container'],
-        training_options['container'],
+        config_info,
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],
+        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('chart', '📊')} Metrik Training</h4>"),
         chart_output,
-        metrics_box,
+        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('log', '📝')} Log Training</h4>"),
         log_components['log_accordion'],
         help_panel
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+    ], layout=widgets.Layout(width='100%', padding='15px'))
     
     # Kumpulkan semua komponen
     ui_components = {
@@ -232,25 +214,15 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         'header': header,
         'status_panel': status_panel,
         'info_box': info_box,
+        'config_info': config_info,
         'metrics_box': metrics_box,
         'chart_output': chart_output,
         'create_metrics_chart': create_metrics_chart,
         'module_name': 'training',
         'logger': logger,
         
-        # Tambahkan komponen config form
-        'training_config_form': training_config_form,
-        'backbone_dropdown': training_config_form['fields']['backbone'],
-        'epochs_input': training_config_form['fields']['epochs'],
-        'batch_size_input': training_config_form['fields']['batch_size'],
-        'learning_rate_input': training_config_form['fields']['learning_rate'],
-        
-        # Tambahkan komponen training options
-        'training_options': training_options,
-        'save_checkpoints': training_options['checkboxes']['simpan_checkpoint'],
-        'use_tensorboard': training_options['checkboxes']['gunakan_tensorboard'],
-        'use_mixed_precision': training_options['checkboxes']['gunakan_mixed_precision'],
-        'use_ema': training_options['checkboxes']['gunakan_ema_exponential_moving_average']
+        # Simpan konfigurasi yang diambil dari modul-modul sebelumnya
+        'config': config
     }
     
     # Tambahkan komponen action buttons

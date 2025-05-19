@@ -118,11 +118,31 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         ui_components: Dictionary komponen UI
     """
     logger = ui_components.get('logger')
+    error_result = None
     
     try:
         # Ambil konfigurasi Roboflow
         from smartcash.ui.dataset.download.handlers.endpoint_handler import get_endpoint_config
         config = get_endpoint_config(ui_components)
+        
+        # Validasi konfigurasi
+        if not config.get('api_key'):
+            error_result = {
+                "success": False,
+                "error": "API key Roboflow tidak tersedia",
+                "alternative_message": "Pastikan Anda telah memasukkan API key Roboflow yang valid di form input"
+            }
+            _process_download_result(ui_components, error_result)
+            return
+            
+        if not config.get('workspace') or not config.get('project') or not config.get('version'):
+            error_result = {
+                "success": False,
+                "error": "Parameter workspace, project, atau version tidak lengkap",
+                "alternative_message": "Pastikan semua parameter Roboflow telah diisi dengan benar"
+            }
+            _process_download_result(ui_components, error_result)
+            return
         
         # Update status panel menggunakan komponen reusable
         from smartcash.ui.components.status_panel import update_status_panel
@@ -133,40 +153,106 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         from smartcash.dataset.services.downloader.download_service import DownloadService
         
         output_dir = config.get('output_dir', 'data')
-        download_service = DownloadService(output_dir=output_dir, config={'data': {'roboflow': config}}, logger=logger)
+        if logger: logger.debug(f"💾 Output directory: {output_dir}")
         
-        if not download_service:
-            raise ValueError("Tidak dapat membuat download service")
+        # Buat direktori output jika belum ada
+        import os
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Inisialisasi download service
+        try:
+            download_service = DownloadService(output_dir=output_dir, config={'data': {'roboflow': config}}, logger=logger)
+            
+            if not download_service:
+                raise ValueError("Tidak dapat membuat download service")
+        except Exception as service_error:
+            error_result = {
+                "success": False,
+                "error": f"Gagal menginisialisasi download service: {str(service_error)}",
+                "alternative_message": "Coba periksa konfigurasi dan pastikan direktori output dapat diakses"
+            }
+            _process_download_result(ui_components, error_result)
+            return
         
         # Jalankan download melalui download service
         _update_progress(ui_components, 20, "Memulai download dataset dari Roboflow...")
         
-        result = download_service.download_from_roboflow(
-            api_key=config.get('api_key'),
-            workspace=config.get('workspace'),
-            project=config.get('project'), 
-            version=config.get('version'),
-            format=config.get('format', 'yolov5pytorch'),
-            show_progress=True
-        )
+        # Log parameter download untuk debugging
+        if logger:
+            logger.debug(f"🔍 Download parameters: workspace={config.get('workspace')}, project={config.get('project')}, version={config.get('version')}")
         
-        # Analisis hasil
-        _process_download_result(ui_components, result)
+        try:
+            result = download_service.download_from_roboflow(
+                api_key=config.get('api_key'),
+                workspace=config.get('workspace'),
+                project=config.get('project'), 
+                version=config.get('version'),
+                format=config.get('format', 'yolov5pytorch'),
+                show_progress=True
+            )
+            
+            # Analisis hasil
+            _process_download_result(ui_components, result)
+            
+        except Exception as download_error:
+            error_detail = str(download_error)
+            
+            # Deteksi jenis error yang umum
+            if "API key tidak tersedia" in error_detail:
+                error_message = "API key Roboflow tidak valid atau tidak tersedia"
+                alternative_message = "Pastikan Anda telah memasukkan API key Roboflow yang valid"
+            elif "Workspace, project, dan version diperlukan" in error_detail:
+                error_message = "Parameter workspace, project, atau version tidak lengkap"
+                alternative_message = "Pastikan semua parameter Roboflow telah diisi dengan benar"
+            elif "404" in error_detail or "Not Found" in error_detail:
+                error_message = f"Dataset tidak ditemukan: {config.get('workspace')}/{config.get('project')}:{config.get('version')}"
+                alternative_message = "Periksa kembali workspace, project, dan version yang dimasukkan"
+            elif "403" in error_detail or "Forbidden" in error_detail:
+                error_message = "Akses ditolak oleh Roboflow API"
+                alternative_message = "Periksa apakah API key Anda memiliki akses ke dataset yang diminta"
+            elif "timeout" in error_detail.lower() or "timed out" in error_detail.lower():
+                error_message = "Koneksi timeout saat download dataset"
+                alternative_message = "Periksa koneksi internet Anda dan coba lagi"
+            else:
+                error_message = f"Error saat download dataset: {error_detail}"
+                alternative_message = "Coba periksa parameter dan koneksi internet Anda"
+            
+            error_result = {
+                "success": False,
+                "error": error_message,
+                "error_details": error_detail,
+                "alternative_message": alternative_message
+            }
+            
+            _process_download_result(ui_components, error_result)
         
     except Exception as e:
-        # Tampilkan error - gunakan string error yang spesifik
+        # Tangani error yang tidak tertangkap sebelumnya
         from smartcash.ui.utils.ui_logger import log_to_ui
-        error_msg = f"Error saat download dataset: {str(e)}"
-        log_to_ui(ui_components, error_msg, "error", "❌")
-        if logger: logger.error(f"❌ {error_msg}")
+        error_detail = str(e)
+        error_msg = f"Error saat proses download dataset: {error_detail}"
         
-        # Update status panel dengan error
-        from smartcash.ui.components.status_panel import update_status_panel
-        update_status_panel(ui_components['status_panel'], f"Error saat download dataset: {str(e)}", "error")
+        # Log error untuk debugging
+        if logger: 
+            logger.error(f"❌ {error_msg}")
+            import traceback
+            logger.debug(f"Traceback: {traceback.format_exc()}")
+        
+        # Buat error result yang lebih informatif
+        error_result = {
+            "success": False,
+            "error": error_msg,
+            "error_details": error_detail,
+            "alternative_message": "Coba periksa parameter dan koneksi internet Anda"
+        }
+        
+        # Proses error result
+        _process_download_result(ui_components, error_result)
     
     finally:
-        # Reset UI
-        _reset_ui_after_download(ui_components)
+        # Reset UI jika belum di-reset oleh _process_download_result
+        if not error_result:
+            _reset_ui_after_download(ui_components)
 
 def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
     """

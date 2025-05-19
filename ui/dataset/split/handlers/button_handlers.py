@@ -60,6 +60,13 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     from smartcash.ui.dataset.split.handlers.ui_handlers import initialize_ui_from_config
     initialize_ui_from_config(ui_components, config)
     
+    # Register handler for split button
+    if 'split_button' in ui_components and ui_components['split_button']:
+        ui_components['split_button'].on_click(
+            lambda b: handle_split_button(b, ui_components, config, env, logger)
+        )
+        if logger: logger.debug(f"{ICONS['link']} Handler untuk split button terdaftar")
+    
     # Register handler untuk save button
     if 'save_button' in ui_components and ui_components['save_button']:
         ui_components['save_button'].on_click(
@@ -197,3 +204,12 @@ def handle_reset_button(b, ui_components: Dict[str, Any], config: Dict[str, Any]
             <p style="margin:5px 0">{ICONS['error']} Error: {str(e)}</p>
         </div>"""
         if logger: logger.error(f"{ICONS['error']} Error saat mereset konfigurasi split dataset: {str(e)}")
+
+def handle_split_button(b, ui_components, config, env, logger):
+    """Handler untuk tombol split."""
+    # Update config from UI
+    from smartcash.ui.dataset.split.handlers.config_handlers import update_config_from_ui, save_config_with_manager
+    config = update_config_from_ui(config, ui_components)
+    save_config_with_manager(config, ui_components, logger)
+    # Execute split operation here
+    # ... existing code ...

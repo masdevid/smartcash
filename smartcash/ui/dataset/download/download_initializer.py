@@ -20,7 +20,9 @@ def initialize_dataset_download_ui() -> Dict[str, Any]:
     """
     # Inisialisasi environment dan config manager
     env_manager = get_environment_manager()
-    config_manager = get_config_manager(base_dir=env_manager.base_dir)
+    if not getattr(env_manager, 'base_dir', None):
+        raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
+    config_manager = get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
     
     # Gunakan base initializer dengan konfigurasi minimal
     ui_components = initialize_module_ui(

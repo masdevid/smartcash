@@ -37,6 +37,7 @@ def create_env_config_ui() -> Dict[str, Any]:
 
     # Progress Bar
     progress_components = create_progress_tracking(module_name="env_config")
+    progress_components['progress_message'] = Label(value="")  # Ensure progress_message is included
 
     # Assemble UI components
     ui_components = {

@@ -20,29 +20,23 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
     
     def setUp(self):
         """Setup untuk setiap test case."""
+        # Create temporary directory
+        self.temp_dir = tempfile.mkdtemp()
+        
         # Buat mock UI components
         self.ui_components = self._create_mock_ui_components()
-        
-        # Setup logger mock
-        self.logger_mock = MagicMock()
-        self.ui_components['logger'] = self.logger_mock
-        
-        # Set output_dir to match test expectation
         self.ui_components['output_dir'].value = 'data/test'
         
-        # Setup mock untuk DatasetManager dan DownloadService
-        self.dataset_manager_mock = MagicMock()
-        self.download_service_mock = MagicMock()
+        # Patch DatasetManager and DownloadService at the correct import path
+        self.dataset_manager_patch = patch('smartcash.ui.dataset.download.handlers.download_handler.DatasetManager')
+        self.download_service_patch = patch('smartcash.ui.dataset.download.handlers.download_handler.DownloadService')
+        self.cleanup_manager_patch = patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DatasetManager')
+        self.cleanup_service_patch = patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DownloadService')
         
-        # Setup patch untuk import
-        self.dataset_manager_patch = patch('smartcash.dataset.manager.DatasetManager',
-                                         return_value=self.dataset_manager_mock)
-        self.download_service_patch = patch('smartcash.dataset.services.downloader.download_service.DownloadService',
-                                          return_value=self.download_service_mock)
-        
-        # Start patches
-        self.dataset_manager_mock = self.dataset_manager_patch.start()
-        self.download_service_mock = self.download_service_patch.start()
+        self.dataset_manager_mock = self.dataset_manager_patch.start().return_value
+        self.download_service_mock = self.download_service_patch.start().return_value
+        self.cleanup_manager_mock = self.cleanup_manager_patch.start().return_value
+        self.cleanup_service_mock = self.cleanup_service_patch.start().return_value
         
         # Setup handlers
         self.download_handler = DownloadHandler(ui_components=self.ui_components)
@@ -53,11 +47,10 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
     
     def tearDown(self):
         """Cleanup setelah setiap test case."""
-        # Stop patches
         self.dataset_manager_patch.stop()
         self.download_service_patch.stop()
-        
-        # Hapus temporary directory
+        self.cleanup_manager_patch.stop()
+        self.cleanup_service_patch.stop()
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
     
@@ -141,22 +134,21 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
     
     def test_download_service_parameter_compatibility(self):
         """Test kompatibilitas parameter antara handler dan service."""
-        # Setup mock untuk download_from_roboflow
         self.dataset_manager_mock.download_from_roboflow.return_value = True
-        
-        # Panggil fungsi download
         self.download_handler.download()
-        
-        # Verifikasi bahwa parameter yang dikirim ke service sesuai dengan yang diharapkan
-        call_args = self.dataset_manager_mock.download_from_roboflow.call_args[1]
-        self.assertEqual(call_args['workspace'], 'test-workspace')
-        self.assertEqual(call_args['project'], 'test-project')
-        self.assertEqual(call_args['version'], '1')
-        self.assertEqual(call_args['api_key'], 'test-api-key')
-        self.assertEqual(call_args['output_dir'], self.temp_dir)
-        self.assertTrue(call_args['validate_dataset'])
-        self.assertTrue(call_args['backup_before_download'])
-        self.assertEqual(call_args['backup_dir'], 'data/backup')
+        # Safely get call_args if the call was made
+        if self.dataset_manager_mock.download_from_roboflow.call_args:
+            call_args = self.dataset_manager_mock.download_from_roboflow.call_args[1]
+            self.assertEqual(call_args['workspace'], 'test-workspace')
+            self.assertEqual(call_args['project'], 'test-project')
+            self.assertEqual(call_args['version'], '1')
+            self.assertEqual(call_args['api_key'], 'test-api-key')
+            self.assertEqual(call_args['output_dir'], 'data/test')
+            self.assertTrue(call_args['validate_dataset'])
+            self.assertTrue(call_args['backup_before_download'])
+            self.assertEqual(call_args['backup_dir'], 'data/backup')
+        else:
+            self.fail('download_from_roboflow was not called')
     
     def test_integration_with_dataset_manager(self):
         """Test integrasi handler dengan DatasetManager."""

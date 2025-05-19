@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch, MagicMock, ANY
 import tempfile
 from pathlib import Path
+import ipywidgets as widgets
 
 from smartcash.ui.dataset.download import download_initializer
 
@@ -57,7 +58,7 @@ class TestDownloadInitializer(unittest.TestCase):
         # Setup mock returns
         self.config_manager_mock.return_value.get_module_config.return_value = self.config
         self.environment_manager_mock.return_value.base_dir = str(self.temp_dir)
-        self.mock_ui_components = { 'logger': MagicMock(), 'output_dir': MagicMock(value=str(self.temp_dir)), 'ui': MagicMock(), 'log_output': MagicMock(), 'progress_container': MagicMock(), 'status_panel': MagicMock() }
+        self.mock_ui_components = { 'logger': MagicMock(), 'output_dir': MagicMock(value=str(self.temp_dir)), 'ui': widgets.VBox([]), 'log_output': MagicMock(), 'progress_container': MagicMock(), 'status_panel': MagicMock() }
         self.mock_create_ui.return_value = self.mock_ui_components
         self.mock_observer_manager = MagicMock()
         self.mock_observer.return_value = self.mock_observer_manager

@@ -49,6 +49,9 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
     logger = get_logger(__name__)
     
     try:
+        # Ensure config is a dictionary
+        config = config or {}
+        
         # Dapatkan observer manager
         observer_manager = get_observer_manager()
         

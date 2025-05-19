@@ -10,6 +10,7 @@ import traceback
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
+from smartcash.common.logger import get_logger
 
 # Import status handler yang konsisten
 try:
@@ -82,6 +83,29 @@ def _cleanup_ui(ui_components: Dict[str, Any], module_type: str = 'preprocessing
     """Membersihkan UI setelah proses selesai."""
     # Aktifkan kembali UI
     _disable_ui_during_processing(ui_components, False, module_type)
+    
+    # Reset progress bar jika ada
+    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
+        ui_components['progress_bar'].layout.visibility = 'hidden'
+        ui_components['progress_bar'].value = 0
+    
+    # Reset label progress jika ada
+    if 'progress_label' in ui_components and hasattr(ui_components['progress_label'], 'layout'):
+        ui_components['progress_label'].layout.visibility = 'hidden'
+        ui_components['progress_label'].value = ''
+    
+    # Aktifkan kembali tombol yang dinonaktifkan
+    primary_button_key = f"{module_type}_button"
+    if primary_button_key in ui_components and hasattr(ui_components[primary_button_key], 'layout'):
+        ui_components[primary_button_key].layout.display = 'block'
+    
+    # Sembunyikan tombol stop jika ada
+    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+        ui_components['stop_button'].layout.display = 'none'
+    
+    # Set flag running ke False
+    running_key = f"{module_type}_running"
+    ui_components[running_key] = False
     
     # Tampilkan tombol utama, sembunyikan tombol stop
     primary_button_key = f"{module_type}_button"
@@ -606,8 +630,36 @@ def _execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str
         
         # Restore UI
         _cleanup_ui(ui_components, "preprocessing")
-def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: str) -> None:
+
+def setup_processing_cleanup_handler(ui_components: Dict[str, Any], module_type: str = 'preprocessing') -> Dict[str, Any]:
+    """
+    Setup handler untuk membersihkan UI setelah proses selesai.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        module_type: Tipe modul ('preprocessing' atau 'augmentation')
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    logger = get_logger(f"{module_type}_cleanup")
+    logger.info(f"🧹 Setup cleanup handler untuk modul {module_type}")
+    
+    # Tambahkan fungsi cleanup ke ui_components
+    ui_components['cleanup_ui'] = lambda: _cleanup_ui(ui_components, module_type)
+    
+    # Tambahkan fungsi update status panel
+    ui_components['update_status_panel'] = lambda status_type, message: _update_status_panel(ui_components, status_type, message)
+    
+    # Set flag running ke False
+    running_key = f"{module_type}_running"
+    ui_components[running_key] = False
+    
+    return ui_components
+
+def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: str):
     """Eksekusi augmentasi dengan parameter dari UI."""
+    # Dapatkan logger
     logger = ui_components.get('logger')
     data_dir = ui_components.get('data_dir', 'data')
     preprocessed_dir = ui_components.get('preprocessed_dir', 'data/preprocessed')
@@ -642,15 +694,16 @@ def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info:
         # Log awal augmentasi
         if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
         
-        # Jalankan augmentasi
+        # Jalankan augmentasi dengan parameter yang benar
         augment_result = augmentation_service.augment_dataset(
             split=split,
             augmentation_types=aug_types,
-            augmentation_factor=aug_factor,
-            target_dir=preprocessed_dir,
-            output_dir=augmented_dir,
-            prefix=aug_prefix,
-            balance_classes=balance_classes
+            num_variations=aug_factor,  # Menggunakan num_variations sebagai pengganti augmentation_factor
+            output_prefix=aug_prefix,   # Menggunakan output_prefix sebagai pengganti prefix
+            target_balance=balance_classes,  # Menggunakan target_balance sebagai pengganti balance_classes
+            target_count=1000,  # Nilai default untuk target jumlah gambar
+            move_to_preprocessed=True,  # Pindahkan hasil ke preprocessed
+            validate_results=True  # Validasi hasil augmentasi
         )
         
         # Tambahkan path output jika tidak ada

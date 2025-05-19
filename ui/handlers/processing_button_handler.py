@@ -83,17 +83,17 @@ def _cleanup_ui(ui_components: Dict[str, Any], module_type: str = 'preprocessing
     # Aktifkan kembali UI
     _disable_ui_during_processing(ui_components, False, module_type)
     
-    # Tampilkan tombol utama, sembunyikan tombol stop
+    # Tampilkan tombol utama, sembunyikan tombol stop dengan pengecekan atribut layout
     primary_button_key = f"{module_type}_button"
-    # Periksa keberadaan tombol primary sebelum mengakses
-    if primary_button_key in ui_components:
+    # Periksa keberadaan tombol primary dan atribut layout sebelum mengakses
+    if primary_button_key in ui_components and hasattr(ui_components[primary_button_key], 'layout'):
         ui_components[primary_button_key].layout.display = 'block'
-    elif 'augment_button' in ui_components and module_type == 'augmentation':
-        # Fallback untuk augmentation module
+    elif 'augment_button' in ui_components and module_type == 'augmentation' and hasattr(ui_components['augment_button'], 'layout'):
+        # Fallback untuk augmentation module dengan pengecekan atribut layout
         ui_components['augment_button'].layout.display = 'block'
     
-    # Sembunyikan tombol stop jika ada
-    if 'stop_button' in ui_components:
+    # Sembunyikan tombol stop jika ada dan memiliki atribut layout
+    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
         ui_components['stop_button'].layout.display = 'none'
     
     # Reset progress bar
@@ -256,9 +256,13 @@ def setup_processing_button_handlers(
         # Disable semua UI input
         _disable_ui_during_processing(ui_components, True, module_type)
         
-        # Update tombol untuk mode processing
-        ui_components[primary_button_key].layout.display = 'none'
-        ui_components['stop_button'].layout.display = 'block'
+        # Update tombol untuk mode processing dengan pengecekan atribut layout
+        if primary_button_key in ui_components and hasattr(ui_components[primary_button_key], 'layout'):
+            ui_components[primary_button_key].layout.display = 'none'
+        
+        # Tampilkan tombol stop jika tersedia dan memiliki atribut layout
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'block'
         
         # Update konfigurasi dari UI dan simpan
         try:
@@ -563,14 +567,17 @@ def _execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str
         _update_status_panel(ui_components, "success", 
                            f"{ICONS['success']} Preprocessing dataset berhasil diselesaikan")
         
-        # Update UI state - tampilkan summary dan visualisasi
+        # Update UI state - tampilkan summary dan visualisasi dengan pengecekan atribut layout
         for component in ['visualization_container', 'summary_container']:
-            if component in ui_components:
+            if component in ui_components and hasattr(ui_components[component], 'layout'):
                 ui_components[component].layout.display = 'block'
         
-        # Tampilkan tombol visualisasi dan cleanup
-        ui_components['visualization_buttons'].layout.display = 'flex'
-        ui_components['cleanup_button'].layout.display = 'block'
+        # Tampilkan tombol visualisasi dan cleanup dengan pengecekan atribut layout
+        if 'visualization_buttons' in ui_components and hasattr(ui_components['visualization_buttons'], 'layout'):
+            ui_components['visualization_buttons'].layout.display = 'flex'
+        
+        if 'cleanup_button' in ui_components and hasattr(ui_components['cleanup_button'], 'layout'):
+            ui_components['cleanup_button'].layout.display = 'block'
         
         # Update summary dengan hasil preprocessing
         if 'generate_summary' in ui_components and callable(ui_components['generate_summary']):
@@ -635,15 +642,16 @@ def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info:
         # Log awal augmentasi
         if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
         
-        # Jalankan augmentasi
+        # Jalankan augmentasi dengan parameter yang benar
         augment_result = augmentation_service.augment_dataset(
             split=split,
             augmentation_types=aug_types,
-            augmentation_factor=aug_factor,
-            target_dir=preprocessed_dir,
-            output_dir=augmented_dir,
-            prefix=aug_prefix,
-            balance_classes=balance_classes
+            num_variations=aug_factor,  # Menggunakan num_variations sebagai pengganti augmentation_factor
+            output_prefix=aug_prefix,   # Menggunakan output_prefix sebagai pengganti prefix
+            target_balance=balance_classes,  # Menggunakan target_balance sebagai pengganti balance_classes
+            target_count=1000,  # Nilai default untuk target jumlah gambar
+            move_to_preprocessed=True,  # Pindahkan hasil ke preprocessed
+            validate_results=True  # Validasi hasil augmentasi
         )
         
         # Tambahkan path output jika tidak ada
@@ -659,14 +667,17 @@ def _execute_augmentation(ui_components: Dict[str, Any], split: str, split_info:
         _update_status_panel(ui_components, "success", 
                            f"{ICONS['success']} Augmentasi dataset berhasil diselesaikan")
         
-        # Update UI state - tampilkan summary dan visualisasi
+        # Update UI state - tampilkan summary dan visualisasi dengan pengecekan atribut layout
         for component in ['visualization_container', 'summary_container']:
-            if component in ui_components:
+            if component in ui_components and hasattr(ui_components[component], 'layout'):
                 ui_components[component].layout.display = 'block'
         
-        # Tampilkan tombol visualisasi dan cleanup
-        ui_components['visualization_buttons'].layout.display = 'flex'
-        ui_components['cleanup_button'].layout.display = 'block'
+        # Tampilkan tombol visualisasi dan cleanup dengan pengecekan atribut layout
+        if 'visualization_buttons' in ui_components and hasattr(ui_components['visualization_buttons'], 'layout'):
+            ui_components['visualization_buttons'].layout.display = 'flex'
+        
+        if 'cleanup_button' in ui_components and hasattr(ui_components['cleanup_button'], 'layout'):
+            ui_components['cleanup_button'].layout.display = 'block'
         
         # Update summary dengan hasil augmentasi
         if 'generate_summary' in ui_components and callable(ui_components['generate_summary']):

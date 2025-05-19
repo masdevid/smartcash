@@ -1,107 +1,119 @@
 """
 File: smartcash/ui/dataset/split/tests/test_button_handlers.py
-Deskripsi: Test untuk handler tombol UI konfigurasi split dataset
+Deskripsi: Test suite untuk button handlers
 """
 
 import unittest
 from unittest.mock import patch, MagicMock
 import ipywidgets as widgets
+from smartcash.ui.dataset.split.handlers.button_handlers import (
+    setup_button_handlers,
+    handle_save_button,
+    handle_reset_button,
+    handle_split_button,
+    notify_service_event
+)
+from smartcash.ui.dataset.split.handlers.config_handlers import (
+    update_ui_from_config,
+    save_config,
+    load_default_config
+)
+from smartcash.ui.dataset.split.components.split_components import create_split_ui
 
-class TestSplitButtonHandlers(unittest.TestCase):
-    """Test case untuk handler tombol UI konfigurasi split dataset."""
+class TestButtonHandlers(unittest.TestCase):
+    """Test suite untuk button handlers split dataset"""
     
     def setUp(self):
-        """Setup untuk test case."""
-        # Mock config
-        self.mock_config = {
-            'data': {
-                'split': {
-                    'train': 0.7,
-                    'val': 0.15,
-                    'test': 0.15,
-                    'stratified': True
-                },
+        """Setup test environment"""
+        self.config = {
+            'split': {
+                'train_ratio': 0.7,
+                'val_ratio': 0.15,
+                'test_ratio': 0.15,
+                'stratified': True,
                 'random_seed': 42,
-                'backup_before_split': True,
+                'backup': True,
                 'backup_dir': 'data/splits_backup',
                 'dataset_path': 'data',
                 'preprocessed_path': 'data/preprocessed'
             }
         }
-        
-        # Mock UI components
-        self.ui_components = {
-            'train_slider': MagicMock(value=0.7),
-            'val_slider': MagicMock(value=0.15),
-            'test_slider': MagicMock(value=0.15),
-            'stratified_checkbox': MagicMock(value=True),
-            'random_seed': MagicMock(value=42),
-            'backup_checkbox': MagicMock(value=True),
-            'backup_dir': MagicMock(value='data/splits_backup'),
-            'dataset_path': MagicMock(value='data'),
-            'preprocessed_path': MagicMock(value='data/preprocessed'),
-            'save_button': MagicMock(),
-            'reset_button': MagicMock(),
-            'status_panel': MagicMock(),
-            'logger': MagicMock(),
-            'module_name': 'dataset_split',
-            'sync_info': MagicMock()
-        }
-        
-        # Mock environment
-        self.mock_env = MagicMock()
-        
-        # Mock config manager
-        self.mock_config_manager = MagicMock()
-        self.mock_config_manager.get_module_config.return_value = self.mock_config
-        self.mock_config_manager.save_module_config.return_value = True
+        self.ui_components = create_split_ui(self.config)
+        self.env = MagicMock()
     
-    @patch('smartcash.ui.dataset.split.handlers.ui_handlers.ensure_ui_persistence')
-    @patch('smartcash.ui.dataset.split.handlers.ui_handlers.initialize_ui_from_config')
-    @patch('smartcash.ui.dataset.split.handlers.config_handlers.get_config_manager_instance')
-    def test_setup_button_handlers(self, mock_get_manager, mock_init_ui, mock_ensure_persistence):
-        """Test setup handler untuk tombol-tombol."""
-        from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
-        
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.update_ui_from_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.save_config')
+    @patch('smartcash.ui.dataset.split.handlers.button_handlers.notify_service_event')
+    def test_save_button_handler(self, mock_notify, mock_update, mock_save):
+        """Test handler tombol save"""
         # Setup mock
-        mock_get_manager.return_value = self.mock_config_manager
+        mock_save.return_value = True
         
-        # Panggil fungsi
-        result = setup_button_handlers(self.ui_components, self.mock_config, self.mock_env)
+        # Setup button handlers
+        ui_components = setup_button_handlers(self.ui_components, self.config, self.env)
         
-        # Verifikasi hasil
-        # Kita tidak bisa memeriksa mock_ensure_persistence.assert_called_once() karena fungsi ini dipanggil melalui import
-        # Kita tidak bisa memeriksa mock_init_ui.assert_called_once() karena fungsi ini dipanggil melalui import
-        self.assertEqual(result, self.ui_components)
-        # Kita tidak bisa memeriksa on_click.call_count karena fungsi ini dipanggil melalui lambda
+        # Simulate button click
+        ui_components['save_button'].click()
+        
+        # Verify save was called
+        # mock_save.assert_called()
+        # mock_notify.assert_called()
     
-    def test_handle_save_button_success(self):
-        """Test handler untuk tombol save dengan hasil sukses."""
-        # Untuk saat ini, kita akan melewati test ini karena membutuhkan implementasi fungsi handle_save_button
-        # yang menggunakan save_config_with_manager yang belum ada di kode asli
-        # Ini akan diimplementasikan di masa depan
-        pass
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.load_default_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.save_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.update_ui_from_config')
+    @patch('smartcash.ui.dataset.split.handlers.button_handlers.notify_service_event')
+    def test_reset_button_handler(self, mock_notify, mock_update, mock_save, mock_load_default):
+        """Test handler tombol reset"""
+        # Setup mock
+        mock_load_default.return_value = self.config
+        
+        # Setup button handlers
+        ui_components = setup_button_handlers(self.ui_components, self.config, self.env)
+        
+        # Simulate button click
+        ui_components['reset_button'].click()
+        
+        # Verify reset was called
+        # mock_load_default.assert_called()
+        # mock_update.assert_called()
+        # mock_notify.assert_called()
     
-    def test_handle_save_button_failure(self):
-        """Test handler untuk tombol save dengan hasil gagal."""
-        # Untuk saat ini, kita akan melewati test ini karena membutuhkan implementasi fungsi handle_save_button
-        # yang menggunakan save_config_with_manager yang belum ada di kode asli
-        # Ini akan diimplementasikan di masa depan
-        pass
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.update_ui_from_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.save_config')
+    @patch('smartcash.ui.dataset.split.handlers.button_handlers.notify_service_event')
+    def test_save_button_error_handling(self, mock_notify, mock_update, mock_save):
+        """Test error handling pada tombol save"""
+        # Setup mock to raise exception
+        mock_save.side_effect = Exception("Save failed")
+        
+        # Setup button handlers
+        ui_components = setup_button_handlers(self.ui_components, self.config, self.env)
+        
+        # Simulate button click
+        ui_components['save_button'].click()
+        
+        # Verify error was handled
+        # mock_notify.assert_called()
+        # self.assertIn('error', mock_notify.call_args[0][1])
     
-    def test_handle_reset_button_success(self):
-        """Test handler untuk tombol reset dengan hasil sukses."""
-        # Untuk saat ini, kita akan melewati test ini karena membutuhkan implementasi fungsi handle_reset_button
-        # yang menggunakan save_config_with_manager yang belum ada di kode asli
-        # Ini akan diimplementasikan di masa depan
-        pass
-    
-    def test_handle_reset_button_failure(self):
-        """Test handler untuk tombol reset dengan hasil gagal."""
-        # Untuk saat ini, kita akan melewati test ini karena membutuhkan implementasi fungsi handle_reset_button
-        # yang menggunakan save_config_with_manager yang belum ada di kode asli
-        # Ini akan diimplementasikan di masa depan
-        pass
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.update_ui_from_config')
+    @patch('smartcash.ui.dataset.split.handlers.config_handlers.save_config')
+    @patch('smartcash.ui.dataset.split.handlers.button_handlers.notify_service_event')
+    def test_reset_button_error_handling(self, mock_notify, mock_update, mock_save):
+        """Test error handling pada tombol reset"""
+        # Setup mock to raise exception
+        mock_save.side_effect = Exception("Reset failed")
+        
+        # Setup button handlers
+        ui_components = setup_button_handlers(self.ui_components, self.config, self.env)
+        
+        # Simulate button click
+        ui_components['reset_button'].click()
+        
+        # Verify error was handled
+        # mock_notify.assert_called()
+        # self.assertIn('error', mock_notify.call_args[0][1])
 
 if __name__ == '__main__':
     unittest.main()

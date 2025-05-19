@@ -165,6 +165,28 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
             align_items='stretch'
         )
         
+        # Redirect logger output ke log widget
+        class LogRedirector:
+            def __init__(self, log_output):
+                self.log_output = log_output
+                self.buffer = []
+            
+            def write(self, message):
+                if message.strip():
+                    self.buffer.append(message)
+                    with self.log_output:
+                        from IPython.display import display
+                        display(widgets.HTML(f"<p>{message}</p>"))
+            
+            def flush(self):
+                pass
+        
+        # Redirect logger ke log widget
+        import sys
+        log_redirector = LogRedirector(ui_components['log_output'])
+        sys.stdout = log_redirector
+        sys.stderr = log_redirector
+        
         return main_ui
         
     except Exception as e:

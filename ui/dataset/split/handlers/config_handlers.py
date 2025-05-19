@@ -151,3 +151,51 @@ def update_config_from_ui(config: Dict[str, Any], ui_components: Dict[str, Any])
         config['data']['preprocessed_path'] = ui_components['preprocessed_path'].value
     
     return config
+
+def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
+    """
+    Update nilai UI dari konfigurasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi
+    """
+    # Pastikan struktur konfigurasi benar
+    if not config:
+        config = {}
+    if 'data' not in config:
+        config['data'] = {}
+    if 'split' not in config['data']:
+        config['data']['split'] = {}
+    
+    # Update nilai slider dari konfigurasi
+    if 'train_slider' in ui_components:
+        ui_components['train_slider'].value = config['data']['split'].get('train', 0.7)
+    if 'val_slider' in ui_components:
+        ui_components['val_slider'].value = config['data']['split'].get('val', 0.15)
+    if 'test_slider' in ui_components:
+        ui_components['test_slider'].value = config['data']['split'].get('test', 0.15)
+    
+    # Update nilai checkbox dari konfigurasi
+    if 'stratified_checkbox' in ui_components:
+        ui_components['stratified_checkbox'].value = config['data']['split'].get('stratified', True)
+    
+    # Update nilai random seed dari konfigurasi
+    if 'random_seed' in ui_components:
+        ui_components['random_seed'].value = config['data'].get('random_seed', 42)
+    
+    # Update nilai backup dari konfigurasi
+    if 'backup_checkbox' in ui_components:
+        ui_components['backup_checkbox'].value = config['data'].get('backup_before_split', True)
+    
+    # Update nilai backup dir dari konfigurasi
+    if 'backup_dir' in ui_components:
+        ui_components['backup_dir'].value = config['data'].get('backup_dir', 'data/splits_backup')
+    
+    # Update nilai dataset path dari konfigurasi
+    if 'dataset_path' in ui_components:
+        ui_components['dataset_path'].value = config['data'].get('dataset_path', 'data')
+    
+    # Update nilai preprocessed path dari konfigurasi
+    if 'preprocessed_path' in ui_components:
+        ui_components['preprocessed_path'].value = config['data'].get('preprocessed_path', 'data/preprocessed')

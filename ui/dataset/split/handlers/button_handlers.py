@@ -8,6 +8,41 @@ from IPython.display import display, clear_output
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.ui.utils.constants import ICONS
 
+def notify_service_event(event_type: str, message: str, status_panel=None, logger=None) -> None:
+    """
+    Notifikasi event ke service.
+    
+    Args:
+        event_type: Tipe event ('success', 'error', 'info', 'warning')
+        message: Pesan yang akan ditampilkan
+        status_panel: Panel status untuk menampilkan notifikasi
+        logger: Logger untuk logging
+    """
+    from smartcash.ui.utils.constants import COLORS
+    
+    # Log event
+    if logger:
+        if event_type == 'success':
+            logger.debug(f"{ICONS['success']} {message}")
+        elif event_type == 'error':
+            logger.error(f"{ICONS['error']} {message}")
+        elif event_type == 'warning':
+            logger.warning(f"{ICONS['warning']} {message}")
+        else:
+            logger.info(f"{ICONS['info']} {message}")
+    
+    # Update status panel jika tersedia
+    if status_panel:
+        color_bg = COLORS.get(f'alert_{event_type}_bg', COLORS['alert_info_bg'])
+        color_text = COLORS.get(f'alert_{event_type}_text', COLORS['alert_info_text'])
+        icon = ICONS.get(event_type, ICONS['info'])
+        
+        status_panel.value = f"""<div style="padding:10px; background-color:{color_bg}; 
+                 color:{color_text}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {color_text}">
+            <p style="margin:5px 0">{icon} {message}</p>
+        </div>"""
+
 def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env=None) -> Dict[str, Any]:
     """
     Setup handler untuk tombol-tombol pada UI konfigurasi split dataset.

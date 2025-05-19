@@ -110,6 +110,11 @@ class ProgressBarObserver(BaseObserver):
         if 'progress_bar' in self.ui_components:
             progress_bar = self.ui_components['progress_bar']
             if hasattr(progress_bar, 'value'):
+                # Ensure percentage is an integer
+                try:
+                    percentage = int(float(percentage))
+                except (ValueError, TypeError):
+                    percentage = 0
                 progress_bar.value = percentage
         
         # Update label progress

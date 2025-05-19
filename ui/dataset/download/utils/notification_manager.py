@@ -108,15 +108,24 @@ def notify_progress(
     # Hitung persentase jika progress dan total tersedia
     percentage = None
     if progress is not None and total is not None and total > 0:
-        percentage = min(100, max(0, int((progress / total) * 100)))
+        try:
+            percentage = min(100, max(0, int((float(progress) / float(total)) * 100)))
+        except (ValueError, TypeError):
+            percentage = 0
     
     # Kirim notifikasi ke UI
     try:
         params = {}
         if progress is not None:
-            params["progress"] = progress
+            try:
+                params["progress"] = int(float(progress))
+            except (ValueError, TypeError):
+                params["progress"] = 0
         if total is not None:
-            params["total"] = total
+            try:
+                params["total"] = int(float(total))
+            except (ValueError, TypeError):
+                params["total"] = 100
         if percentage is not None:
             params["percentage"] = percentage
         if message is not None:

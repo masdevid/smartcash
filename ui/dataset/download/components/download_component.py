@@ -111,14 +111,14 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     ))
     
     # Buat tombol-tombol download dengan shared component (tanpa redundansi)
+    # Catatan: reset_button sudah tersedia secara default dalam create_action_buttons
     action_buttons = create_action_buttons(
         primary_label="Download Dataset",
         primary_icon="download",
         secondary_buttons=[
             ("Check Dataset", "search", "info")
         ],
-        cleanup_enabled=True,  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
-        reset_enabled=True     # Gunakan reset button dari shared component
+        cleanup_enabled=True  # Aktifkan tombol cleanup untuk menghapus hasil download jika diperlukan
     )
     
     # Progress tracking dengan shared component dan layout yang konsisten

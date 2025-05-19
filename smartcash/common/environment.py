@@ -103,6 +103,10 @@ class EnvironmentManager:
                 # Pastikan directory SmartCash ada di Drive
                 os.makedirs(self._drive_path, exist_ok=True)
                 if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
+                
+                # Sinkronisasi otomatis file **_config.yaml saat drive terhubung
+                self._sync_config_files_on_drive_connect()
+                
                 return True
         except ImportError:
             # Fallback jika drive_utils tidak tersedia
@@ -111,10 +115,14 @@ class EnvironmentManager:
             
             if drive_mount_point.exists():
                 # Pastikan directory SmartCash ada di Drive
-                os.makedirs(drive_path, exist_ok=True)
                 self._drive_mounted = True
                 self._drive_path = drive_path
-                if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {drive_path}")
+                os.makedirs(self._drive_path, exist_ok=True)
+                if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
+                
+                # Sinkronisasi otomatis file **_config.yaml saat drive terhubung
+                self._sync_config_files_on_drive_connect()
+                
                 return True
         return False
     
@@ -194,12 +202,17 @@ class EnvironmentManager:
         base = (self._drive_path if use_drive and self._drive_mounted else self._base_dir)
         
         # Buat direktori dengan fallback ke method langsung
-        stats = {'created': 0, 'existing': 0, 'error': 0}
+        stats = {'created': 0, 'existing': 0, 'error': 0, 'preserved': 0}
         total_dirs = len(directories)
         
-        # Fungsi sederhana untuk membuat direktori
+        # Fungsi sederhana untuk membuat direktori dengan mempertahankan file yang sudah ada
         def ensure_dir(path):
             try:
+                # Cek apakah direktori sudah ada
+                if path.exists() and path.is_dir():
+                    return path
+                    
+                # Jika direktori belum ada, buat direktori baru
                 os.makedirs(path, exist_ok=True)
                 return path
             except Exception as e:
@@ -214,6 +227,20 @@ class EnvironmentManager:
                 
             full_path = base / dir_path
             try:
+                # Khusus untuk direktori configs, pastikan file konfigurasi yang sudah ada tidak terhapus
+                if dir_path == "configs" and full_path.exists():
+                    # Hitung jumlah file konfigurasi yang dipertahankan
+                    config_files = list(full_path.glob("*_config.yaml"))
+                    stats['preserved'] += len(config_files)
+                    
+                    if self.logger and config_files:
+                        self.logger.info(f"💾 Mempertahankan {len(config_files)} file konfigurasi yang sudah ada")
+                        
+                    # Pastikan direktori configs tetap ada
+                    stats['existing'] += 1
+                    continue
+                
+                # Untuk direktori lain, buat seperti biasa
                 if not full_path.exists():
                     ensure_dir(full_path)
                     stats['created'] += 1
@@ -222,9 +249,41 @@ class EnvironmentManager:
             except Exception:
                 stats['error'] += 1
         
-        if self.logger and stats['created'] > 0:
-            # Hanya log jika ada direktori yang dibuat
-            self.logger.info(f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada")
+        # Sinkronisasi konfigurasi jika drive terhubung
+        if use_drive and self._drive_mounted and stats['preserved'] > 0:
+            try:
+                # Import fungsi sinkronisasi dari smartcash.common.config.sync
+                from smartcash.common.config.sync import sync_all_configs
+                
+                # Log ke logger
+                if self.logger:
+                    self.logger.info("🔄 Memulai sinkronisasi file konfigurasi setelah setup direktori...")
+                
+                # Sinkronisasi semua file konfigurasi
+                results = sync_all_configs(
+                    sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
+                    config_dir='configs',   # Direktori konfigurasi
+                    create_backup=True,     # Buat backup sebelum sinkronisasi
+                    logger=self.logger      # Gunakan logger yang sama
+                )
+                
+                # Log hasil sinkronisasi
+                if self.logger:
+                    counts = {k: len(v) for k, v in results.items()}
+                    self.logger.info(
+                        f"🔄 Sinkronisasi setelah setup direktori: {sum(counts.values())} file diproses - "
+                        f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
+                    )
+            except Exception as sync_error:
+                if self.logger:
+                    self.logger.warning(f"⚠️ Error saat sinkronisasi setelah setup direktori: {str(sync_error)}")
+        
+        if self.logger:
+            # Log hasil setup direktori
+            self.logger.info(
+                f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada, "
+                f"{stats['preserved']} file konfigurasi dipertahankan"
+            )
         
         return stats
     
@@ -569,6 +628,42 @@ class EnvironmentManager:
         except ImportError:
             return False
             
+    def _sync_config_files_on_drive_connect(self) -> None:
+        """
+        Sinkronisasi otomatis file **_config.yaml saat drive terhubung.
+        """
+        if not self._drive_mounted:
+            return
+            
+        try:
+            # Import fungsi sinkronisasi dari smartcash.common.config.sync
+            from smartcash.common.config.sync import sync_all_configs
+            
+            # Log ke logger
+            if self.logger:
+                self.logger.info("🔄 Memulai sinkronisasi otomatis file konfigurasi saat drive terhubung...")
+            
+            # Sinkronisasi semua file konfigurasi
+            results = sync_all_configs(
+                sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
+                config_dir='configs',   # Direktori konfigurasi
+                create_backup=True,     # Buat backup sebelum sinkronisasi
+                logger=self.logger      # Gunakan logger yang sama
+            )
+            
+            # Log hasil sinkronisasi
+            counts = {k: len(v) for k, v in results.items()}
+            
+            if self.logger:
+                # Tampilkan ringkasan
+                self.logger.info(
+                    f"🔄 Sinkronisasi otomatis selesai: {sum(counts.values())} file diproses - "
+                    f"{counts['success']} disinkronkan, {counts['skipped']} dilewati, {counts['failure']} gagal"
+                )
+        except Exception as sync_error:
+            if self.logger:
+                self.logger.warning(f"⚠️ Error saat sinkronisasi otomatis: {str(sync_error)}")
+    
     def _detect_notebook(self) -> bool:
         """
         Deteksi lingkungan Jupyter/IPython notebook.

@@ -218,6 +218,115 @@ def create_combined_options(config: Dict[str, Any] = None) -> widgets.VBox:
     
     return combined_box
 
+def create_basic_options(config: Dict[str, Any] = None) -> widgets.VBox:
+    """
+    Buat komponen UI untuk opsi dasar augmentasi dataset tanpa tab.
+    
+    Args:
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Widget VBox berisi opsi dasar augmentasi
+    """
+    from smartcash.ui.utils.constants import COLORS, ICONS
+    from smartcash.common.config.manager import get_config_manager
+    from smartcash.common.logger import get_logger
+    
+    logger = get_logger('augmentation')
+    
+    try:
+        # Dapatkan konfigurasi augmentasi
+        config_manager = get_config_manager()
+        if config_manager is None:
+            aug_config = {}
+        else:
+            aug_config = config_manager.get_module_config('augmentation')
+        
+        # Gunakan config yang diberikan jika ada
+        if config is not None and isinstance(config, dict):
+            if 'augmentation' in config:
+                aug_config = config.get('augmentation', {})
+        
+        # Pastikan aug_config memiliki struktur yang benar
+        if not aug_config or not isinstance(aug_config, dict):
+            aug_config = {}
+        if 'augmentation' not in aug_config:
+            aug_config['augmentation'] = {}
+    except Exception as e:
+        aug_config = {}
+        aug_config['augmentation'] = {}
+    
+    # Opsi dasar
+    aug_enabled = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('enabled', True),
+        description='Aktifkan Augmentasi',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Jumlah variasi per gambar
+    num_variations = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('num_variations', 2),
+        min=1,
+        max=10,
+        step=1,
+        description='Jumlah Variasi:',
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='95%')
+    )
+    
+    # Target count
+    target_count = widgets.IntText(
+        value=aug_config.get('augmentation', {}).get('target_count', 0),
+        description='Target Count:',
+        disabled=False,
+        layout=widgets.Layout(width='95%')
+    )
+    
+    # Jumlah workers
+    num_workers = widgets.IntSlider(
+        value=aug_config.get('augmentation', {}).get('num_workers', 4),
+        min=1,
+        max=16,
+        step=1,
+        description='Jumlah Workers:',
+        continuous_update=False,
+        orientation='horizontal',
+        readout=True,
+        readout_format='d',
+        layout=widgets.Layout(width='95%')
+    )
+    
+    # Prefix output
+    output_prefix = widgets.Text(
+        value=aug_config.get('augmentation', {}).get('output_prefix', 'aug_'),
+        description='Output Prefix:',
+        disabled=False,
+        layout=widgets.Layout(width='95%')
+    )
+    
+    # Balance classes
+    balance_classes = widgets.Checkbox(
+        value=aug_config.get('augmentation', {}).get('balance_classes', False),
+        description='Balance Classes',
+        indent=False,
+        layout=widgets.Layout(width='auto')
+    )
+    
+    # Container untuk opsi dasar
+    basic_container = widgets.VBox([
+        widgets.HBox([aug_enabled, balance_classes], layout=widgets.Layout(justify_content='space-between', width='100%')),
+        num_variations,
+        target_count,
+        num_workers,
+        output_prefix
+    ], layout=widgets.Layout(width='100%'))
+    
+    return basic_container
+
 def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     """
     Buat komponen UI untuk opsi augmentasi dataset.

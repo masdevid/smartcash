@@ -96,13 +96,13 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     form_container = widgets.VBox([
         widgets.HBox([
             widgets.Box([basic_components['basic_box']], 
-                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
                                             border='1px solid #eaeaea', border_radius='5px', margin='0 5px 0 0')),
             widgets.Box([optimization_components['optimization_box']], 
-                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
                                             border='1px solid #eaeaea', border_radius='5px', margin='0 5px')),
             widgets.Box([advanced_components['advanced_box']], 
-                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                       layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
                                             border='1px solid #eaeaea', border_radius='5px', margin='0 0 0 5px'))
         ], layout=widgets.Layout(
             width='100%',

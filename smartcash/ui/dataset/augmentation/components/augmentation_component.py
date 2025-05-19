@@ -104,20 +104,21 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Help panel dengan komponen info_box standar
     help_panel = get_augmentation_info()
 
-    # Rakit komponen UI dengan layout yang lebih compact
-    # Gunakan tab opsi dasar, target split, dan jenis augmentasi dengan checkbox opsi di bawah jenis augmentasi
+    # Import komponen untuk opsi augmentasi (tanpa tab)
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
-
-    # Buat Opsi Dasar dari combined_options
-    # Gunakan layout 2 baris dengan 2 kolom di baris pertama
+    
+    # Buat augmentation_options_basic untuk Opsi Dasar tanpa tab
+    # Dapatkan opsi dasar augmentasi dari modul augmentation_options
+    from smartcash.ui.dataset.augmentation.components.augmentation_options import create_basic_options
+    basic_options = create_basic_options(config)
     
     # Baris 1: Opsi Dasar (kolom 1), Opsi Lanjut (kolom 2)
     row1 = widgets.HBox([
-        # Kolom 1: Opsi Dasar
+        # Kolom 1: Opsi Dasar (tanpa tab)
         widgets.VBox([
             widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Dasar</h4>"),
-            augmentation_options
+            basic_options
         ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px')),
         
         # Kolom 2: Opsi Lanjut
@@ -127,7 +128,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
     ], layout=widgets.Layout(width='100%', justify_content='space-between'))
     
-    # Baris 2: Jenis Augmentasi & Target Split
+    # Baris 2: Hanya Jenis Augmentasi & Split dengan lebar penuh
     row2 = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['augmentation']} Jenis Augmentasi & Target Split</h4>"),
         combined_options

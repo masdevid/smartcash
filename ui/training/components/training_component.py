@@ -61,14 +61,16 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
-    # Chart untuk visualisasi metrik realtime dengan layout yang lebih baik
+    # Chart untuk visualisasi metrik realtime dengan layout yang lebih baik dan max-height untuk mencegah overflow
     chart_output = widgets.Output(
         layout=widgets.Layout(
             width='100%',
-            height='300px',
-            margin='20px 0',
+            max_height='300px',  # Gunakan max-height untuk mencegah overflow
+            height='auto',       # Biarkan height auto-adjust sampai max-height
+            margin='10px 0',
             border='1px solid #ddd',
-            padding='10px'
+            padding='10px',
+            overflow_y='auto'    # Tambahkan scrollbar jika konten melebihi max-height
         )
     )
     

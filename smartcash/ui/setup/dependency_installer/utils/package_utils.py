@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Any, Optional
 import importlib
 import pkg_resources
+from smartcash.ui.utils.ui_logger import log_to_ui
 
 def get_project_requirements(project_name: str) -> List[str]:
     """
@@ -153,6 +154,9 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> None:
     """
     from smartcash.ui.utils.constants import COLORS
     
+    # Log info ke UI
+    log_to_ui(ui_components, "Menganalisis paket yang terinstal...", "info", "🔍")
+    
     # Dapatkan package groups
     package_groups = get_package_groups()
     
@@ -198,6 +202,43 @@ def analyze_installed_packages(ui_components: Dict[str, Any]) -> None:
                 status_widget.value = f"<div style='width:100px;color:{COLORS['success']}'>✅ Terinstall</div>"
             else:
                 status_widget.value = f"<div style='width:100px;color:{COLORS['warning']}'>⚠️ Belum lengkap</div>"
+                # Log info ke UI tentang paket yang belum terinstal
+                if missing_packages:
+                    log_to_ui(ui_components, f"Paket yang belum terinstal untuk {package_info['name']}: {', '.join(missing_packages)}", "warning", "⚠️")
+
+    # Log ringkasan analisis
+    total_packages = 0
+    total_installed = 0
+    total_missing = 0
+    
+    for category in package_categories:
+        for package_info in category['packages']:
+            package_key = package_info['key']
+            packages_to_check = package_groups.get(package_key, [])
+            if callable(packages_to_check):
+                packages_to_check = packages_to_check()
+            
+            total_packages += len(packages_to_check)
+            
+            # Hitung paket yang terinstal dan yang belum
+            for package_req in packages_to_check:
+                package_name = package_req.split('>=')[0].split('==')[0].split('>')[0].split('<')[0].strip()
+                try:
+                    importlib.import_module(package_name)
+                    total_installed += 1
+                except ImportError:
+                    try:
+                        pkg_resources.get_distribution(package_name)
+                        total_installed += 1
+                    except pkg_resources.DistributionNotFound:
+                        total_missing += 1
+    
+    # Log ringkasan ke UI
+    if total_missing > 0:
+        log_to_ui(ui_components, f"Analisis selesai: {total_installed}/{total_packages} paket terinstal, {total_missing} paket perlu diinstal", "info", "📊")
+    else:
+        log_to_ui(ui_components, f"Semua paket ({total_packages}) sudah terinstal dengan baik", "success", "✅")
+
 
 def parse_custom_packages(custom_packages_text: str) -> List[str]:
     """

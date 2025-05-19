@@ -8,6 +8,7 @@ import subprocess
 import sys
 from typing import Dict, Any, List, Tuple
 from tqdm.notebook import tqdm
+from smartcash.ui.utils.ui_logger import log_to_ui
 
 def get_all_missing_packages(ui_components: Dict[str, Any]) -> List[str]:
     """
@@ -88,8 +89,8 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
     # Waktu mulai
     start_time = time.time()
     
-    # Log info
-    if logger: logger.info(f"🚀 Memulai instalasi {len(packages)} package...")
+    # Log info ke UI
+    log_to_ui(ui_components, f"Memulai instalasi {len(packages)} package...", "info", "🚀")
     
     # Gunakan tqdm untuk progress bar
     for i, package in enumerate(tqdm(packages, desc="Instalasi Package")):
@@ -99,8 +100,8 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
         if progress_label: progress_label.value = f"Menginstall {package}... ({i+1}/{len(packages)})"
         if tracker: tracker.update(progress_pct)
         
-        # Log info
-        if logger: logger.info(f"📦 Menginstall {package}...")
+        # Log info ke UI
+        log_to_ui(ui_components, f"Menginstall {package}...", "info", "💶")
         
         try:
             # Jalankan pip install
@@ -110,18 +111,18 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
             if result.returncode == 0:
                 # Sukses
                 stats['success'] += 1
-                if logger: logger.info(f"✅ Berhasil menginstall {package}")
+                log_to_ui(ui_components, f"Berhasil menginstall {package}", "success", "✅")
             else:
                 # Gagal
                 stats['failed'] += 1
                 error_msg = result.stderr.strip() or "Unknown error"
                 stats['errors'].append((package, error_msg))
-                if logger: logger.error(f"❌ Gagal menginstall {package}: {error_msg}")
+                log_to_ui(ui_components, f"Gagal menginstall {package}: {error_msg}", "error", "❌")
         except Exception as e:
             # Error
             stats['failed'] += 1
             stats['errors'].append((package, str(e)))
-            if logger: logger.error(f"❌ Error saat menginstall {package}: {str(e)}")
+            log_to_ui(ui_components, f"Error saat menginstall {package}: {str(e)}", "error", "❌")
     
     # Update progress ke 100%
     if progress_bar: progress_bar.value = 100
@@ -131,10 +132,9 @@ def run_batch_installation(packages: List[str], ui_components: Dict[str, Any]) -
     # Hitung durasi
     stats['duration'] = time.time() - start_time
     
-    # Log ringkasan
-    if logger: 
-        logger.info(f"✅ Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal")
-        logger.info(f"⏱️ Waktu: {stats['duration']:.1f} detik")
+    # Log ringkasan ke UI
+    log_to_ui(ui_components, f"Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal", "success", "✅")
+    log_to_ui(ui_components, f"Waktu: {stats['duration']:.1f} detik", "info", "⏱️")
     
     # Return success jika semua berhasil
     return stats['failed'] == 0, stats

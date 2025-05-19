@@ -46,11 +46,16 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         level: Log level (info, error)
     """
     timestamp = datetime.now().strftime('%H:%M:%S')
-    with ui_components['log']:
-        if level == "error":
-            print(f"[{timestamp}] ❌ {message}")
-        else:
-            print(f"[{timestamp}] ℹ️ {message}")
+    log_widget = ui_components.get('log_panel')
+    if log_widget is not None:
+        with log_widget:
+            if level == "error":
+                print(f"[{timestamp}] ❌ {message}")
+            else:
+                print(f"[{timestamp}] ℹ️ {message}")
+    else:
+        # Fallback to print if log_panel is missing
+        print(f"[{timestamp}] {message}")
 
 def update_progress(tracker: Any, value: float, message: str) -> None:
     """

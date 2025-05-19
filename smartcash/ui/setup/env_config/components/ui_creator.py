@@ -34,6 +34,7 @@ def create_env_config_ui() -> Dict[str, Any]:
 
     # Log Panel
     log_panel = create_log_accordion("Environment Configuration Log")
+    log_accordion = log_panel['log_accordion']  # Get the actual widget
 
     # Progress Bar
     progress_components = create_progress_tracking(module_name="env_config")
@@ -45,7 +46,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         'drive_button': drive_button,
         'directory_button': directory_button,
         'status_panel': status_panel,
-        'log_panel': log_panel,
+        'log_panel': log_accordion,  # Use the actual widget
         'progress_bar': progress_components['progress_bar'],
         'progress_message': progress_components['progress_message'],
         'button_layout': button_layout
@@ -56,7 +57,7 @@ def create_env_config_ui() -> Dict[str, Any]:
         header,
         button_layout,
         status_panel,
-        log_panel,
+        log_accordion,  # Use the actual widget
         progress_components['progress_container']
     ], layout=STANDARD_LAYOUTS['vbox'])
 

@@ -22,8 +22,8 @@ def initialize_dependency_installer() -> Dict[str, Any]:
     # Inisialisasi environment manager
     env_manager = get_environment_manager()
     
-    # Inisialisasi config manager
-    config_manager = get_config_manager()
+    # Inisialisasi config manager dengan base_dir dari environment manager
+    config_manager = get_config_manager(base_dir=env_manager.base_dir)
     
     # Buat komponen UI
     ui_components = create_dependency_installer_ui(env_manager, config_manager)

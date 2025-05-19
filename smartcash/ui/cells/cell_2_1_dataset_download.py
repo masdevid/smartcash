@@ -1,12 +1,11 @@
 """
 File: smartcash/ui/cells/cell_2_1_dataset_download.py
-Deskripsi: Entry point untuk cell download dataset
+Deskripsi: Cell untuk download dataset
 """
 
-def setup_dataset_download():
-    """Setup dan tampilkan UI untuk download dataset."""
-    from smartcash.ui.dataset.download.download_initializer import initialize_dataset_download_ui
-    return initialize_dataset_download_ui()
+from IPython.display import display
+from smartcash.ui.dataset.download.download_initializer import initialize_dataset_download_ui
 
-# Eksekusi saat modul diimpor
-ui_components = setup_dataset_download()
+# Inisialisasi dan tampilkan UI
+ui = initialize_dataset_download_ui()
+display(ui)

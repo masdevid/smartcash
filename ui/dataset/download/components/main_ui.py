@@ -23,8 +23,8 @@ def create_download_ui(env=None, config=None):
     progress = create_progress_section()
     # Log section
     logs = create_log_section()
-    # UI assembly
-    ui = widgets.VBox([
+    # Create main container with proper layout
+    main_container = widgets.VBox([
         header,
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 15px; margin-bottom: 10px;'>{ICONS.get('settings', '⚙️')} Pengaturan Download</h4>"),
@@ -39,10 +39,19 @@ def create_download_ui(env=None, config=None):
         progress['progress_container'],
         logs['log_accordion'],
         logs['summary_container']
-    ], layout=widgets.Layout(width='100%'))
+    ], layout=widgets.Layout(
+        width='100%',
+        display='flex',
+        flex_flow='column',
+        align_items='stretch',
+        padding='10px',
+        border='1px solid #ddd',
+        border_radius='5px',
+        background_color='#fff'
+    ))
     # Compose ui_components dict
     ui_components = {
-        'ui': ui,
+        'ui': main_container,
         'header': header,
         'status_panel': status_panel,
         'workspace': options['workspace'],

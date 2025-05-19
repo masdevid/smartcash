@@ -24,7 +24,7 @@ from smartcash.ui.dataset.download.handlers.config_handler import (
     update_ui_from_config
 )
 
-def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """
     Inisialisasi UI untuk download dataset
     
@@ -32,7 +32,7 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
         config: Konfigurasi opsional untuk UI
         
     Returns:
-        Dictionary berisi komponen UI
+        Widget VBox berisi UI lengkap
     """
     # Setup logger
     logger = get_logger(__name__)
@@ -152,7 +152,20 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
         # Tambahkan cleanup function ke UI components
         ui_components['cleanup'] = cleanup_resources
         
-        return ui_components['ui']
+        # Pastikan semua komponen terhubung dengan benar
+        main_ui = ui_components['ui']
+        if not isinstance(main_ui, widgets.VBox):
+            raise ValueError("UI component must be a VBox widget")
+            
+        # Set layout untuk memastikan tampilan yang benar
+        main_ui.layout = widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='column',
+            align_items='stretch'
+        )
+        
+        return main_ui
         
     except Exception as e:
         # Log error and re-raise

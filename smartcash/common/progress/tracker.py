@@ -109,6 +109,32 @@ class ProgressTracker:
             self.pbar.total = total
             self.pbar.refresh()
     
+    def reset(self) -> None:
+        """
+        Reset progress tracker ke kondisi awal.
+        
+        Mengembalikan current progress ke 0 dan me-reset timer
+        tanpa mengubah total atau deskripsi.
+        """
+        # Reset state
+        self.current = 0
+        self.start_time = time.time()
+        self.last_update_time = self.start_time
+        self.is_completed = False
+        
+        # Reset progress bar jika ada
+        if self.pbar:
+            self.pbar.reset()
+            self.pbar.refresh()
+        
+        # Reset metrics tapi pertahankan konfigurasi
+        self.metrics = {}
+        
+        # Notifikasi callbacks
+        self._execute_callbacks()
+        
+        self.logger.debug(f" Progress tracker '{self.desc}' direset")
+    
     def add_callback(self, callback: Callable[[Dict[str, Any]], None]) -> None:
         """
         Tambahkan callback function yang akan dipanggil pada setiap update.
@@ -190,7 +216,7 @@ class ProgressTracker:
             self.pbar = None
             
         elapsed = time.time() - self.start_time
-        self.logger.info(f"✅ {self.desc} selesai dalam {format_time(elapsed)}")
+        self.logger.info(f" {self.desc} selesai dalam {format_time(elapsed)}")
         
         self._execute_callbacks()
     
@@ -201,7 +227,7 @@ class ProgressTracker:
             try:
                 callback(progress_info)
             except Exception as e:
-                self.logger.warning(f"⚠️ Error pada callback: {str(e)}")
+                self.logger.warning(f" Error pada callback: {str(e)}")
     
     def __enter__(self):
         """Context manager entry."""

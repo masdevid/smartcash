@@ -10,6 +10,7 @@ import os
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
+from smartcash.common.io import load_config, save_config
 
 logger = get_logger(__name__)
 
@@ -155,3 +156,38 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
     except Exception as e:
         logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+
+def load_config_with_manager(config_manager: Any, module_name: str) -> Dict[str, Any]:
+    """
+    Load konfigurasi menggunakan config manager.
+    
+    Args:
+        config_manager: Config manager instance
+        module_name: Nama modul
+        
+    Returns:
+        Dictionary konfigurasi
+    """
+    try:
+        return config_manager.get_module_config(module_name) or get_default_split_config()
+    except Exception as e:
+        logger.error(f"❌ Error saat memuat konfigurasi: {str(e)}")
+        return get_default_split_config()
+
+def save_config_with_manager(config_manager: Any, module_name: str, config: Dict[str, Any]) -> bool:
+    """
+    Simpan konfigurasi menggunakan config manager.
+    
+    Args:
+        config_manager: Config manager instance
+        module_name: Nama modul
+        config: Konfigurasi yang akan disimpan
+        
+    Returns:
+        True jika berhasil, False jika gagal
+    """
+    try:
+        return config_manager.save_module_config(module_name, config)
+    except Exception as e:
+        logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
+        return False

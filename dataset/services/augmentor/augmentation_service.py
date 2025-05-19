@@ -55,8 +55,16 @@ class AugmentationService:
         if ui_components:
             try:
                 # Import notification manager hanya jika diperlukan
-                from smartcash.ui.dataset.augmentation.utils.notification_manager import get_notification_manager
-                self._notification_manager = get_notification_manager(ui_components)
+                from smartcash.ui.dataset.augmentation.utils.notification_manager import NotificationManager
+                
+                # Cek apakah notification_manager sudah ada di ui_components
+                if 'notification_manager' in ui_components and ui_components['notification_manager'] is not None:
+                    self._notification_manager = ui_components['notification_manager']
+                else:
+                    # Buat instance baru jika belum ada
+                    self._notification_manager = NotificationManager(ui_components)
+                    ui_components['notification_manager'] = self._notification_manager
+                    
                 self.logger.info("✅ NotificationManager berhasil diinisialisasi")
             except ImportError as e:
                 self.logger.warning(f"⚠️ NotificationManager tidak tersedia: {str(e)}")

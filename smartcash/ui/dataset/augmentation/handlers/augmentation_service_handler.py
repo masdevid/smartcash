@@ -38,16 +38,34 @@ def get_augmentation_service(ui_components: Dict[str, Any], config: Dict[str, An
             from smartcash.ui.dataset.augmentation.handlers.config_handler import get_config_from_ui
             config = get_config_from_ui(ui_components)
         
-        # Buat instance service
+        # Buat instance service dengan ui_components untuk NotificationManager
         service = AugmentationService(
             config=config,
             data_dir=ui_components.get('data_dir', 'data'),
             logger=logger,
-            num_workers=config.get('augmentation', {}).get('num_workers', 4)
+            num_workers=config.get('augmentation', {}).get('num_workers', 4),
+            ui_components=ui_components  # Teruskan ui_components untuk NotificationManager
         )
         
-        # Register progress callback
-        if 'progress_callback' in ui_components and callable(ui_components['progress_callback']):
+        # Cek apakah ada NotificationManager di ui_components
+        from smartcash.ui.dataset.augmentation.utils.notification_manager import NotificationManager
+        notification_manager = None
+        
+        # Jika tidak ada, buat instance baru
+        if not hasattr(ui_components, 'notification_manager') or ui_components.get('notification_manager') is None:
+            try:
+                notification_manager = NotificationManager(ui_components)
+                ui_components['notification_manager'] = notification_manager
+            except Exception as e:
+                logger.warning(f"⚠️ Tidak dapat membuat NotificationManager: {str(e)}")
+        else:
+            notification_manager = ui_components.get('notification_manager')
+            
+        # Register NotificationManager ke service
+        if notification_manager:
+            service.register_progress_callback(notification_manager=notification_manager)
+        # Fallback ke callback lama jika ada
+        elif 'progress_callback' in ui_components and callable(ui_components['progress_callback']):
             service.register_progress_callback(ui_components['progress_callback'])
         
         # Simpan ke ui_components

@@ -24,11 +24,14 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import create_divider
     
     # Import shared components
-    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
+    from smartcash.ui.components.split_selector import create_split_selector
     from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.components.model_info_panel import create_model_info_panel
+    from smartcash.ui.components.feature_checkbox_group import create_feature_checkbox_group
+    from smartcash.ui.components.config_form import create_config_form
     
     # Import komponen submodules preprocessing
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
@@ -46,14 +49,33 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Split selector menggunakan shared component
     split_selector = create_split_selector(
-        selected_value='Train Only'
+        selected_value='Train Only',
+        description="Target Split:",
+        width='100%',
+        icon='split'
     )
     
-    # Validation options dalam accordion
+    # Validation options menggunakan shared component feature_checkbox_group
+    validation_features = [
+        ("Validasi format gambar", True),
+        ("Validasi label format", True),
+        ("Validasi dimensi gambar", True),
+        ("Validasi bounding box", True)
+    ]
+    
+    validation_options_group = create_feature_checkbox_group(
+        features=validation_features,
+        title="Opsi Validasi",
+        description="Pilih opsi validasi yang akan dijalankan selama preprocessing",
+        width="100%",
+        icon="search"
+    )
+    
+    # Gunakan komponen lama untuk kompatibilitas
     validation_options = create_validation_options(config)
     
     # Accordion untuk validation options - selalu tertutup di awal
-    advanced_accordion = widgets.Accordion(children=[validation_options], selected_index=None)
+    advanced_accordion = widgets.Accordion(children=[validation_options_group['container']], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
     
     # Buat tombol-tombol preprocessing dengan shared component
@@ -127,6 +149,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'status_panel': status_panel,
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
+        'validation_options_group': validation_options_group,
         'split_selector': split_selector,
         'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],

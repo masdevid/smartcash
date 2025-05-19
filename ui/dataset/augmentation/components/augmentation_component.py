@@ -24,8 +24,8 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.layout_utils import create_divider
 
     # Import shared components
-    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
-    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.split_selector import create_split_selector
+    from smartcash.ui.components.action_buttons import create_action_buttons
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
@@ -53,7 +53,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
 
     # Split selector menggunakan shared component
     split_selector = create_split_selector(
-        selected_split='train',
+        selected_value='Train Only',
         description="Target Split:",
         width='100%',
         icon='split'
@@ -66,8 +66,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_enabled=True
     )
 
-    # Tombol-tombol visualisasi dengan shared component
-    visualization_buttons = create_visualization_buttons(include_distribution=True)
+    # Tidak lagi menggunakan tombol visualisasi lama
 
     # Progress tracking dengan shared component
     progress_components = create_progress_tracking(
@@ -120,8 +119,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         progress_components['progress_container'],
         log_components['log_accordion'],
         summary_container,
-        visualization_buttons['container'],
-        widgets.Output(layout=widgets.Layout(border='1px solid #ddd', padding='10px', margin='10px 0', display='none')),
         help_panel
     ])
 
@@ -143,11 +140,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'save_button': action_buttons['save_button'],
         'button_container': action_buttons['container'],
         'summary_container': summary_container,
-        'visualization_buttons': visualization_buttons['container'],
-        'visualize_button': visualization_buttons['visualize_button'],
-        'compare_button': visualization_buttons['compare_button'],
-        'distribution_button': visualization_buttons.get('distribution_button'),
-        'visualization_container': widgets.Output(layout=widgets.Layout(border='1px solid #ddd', padding='10px', margin='10px 0', display='none')),
         'module_name': 'augmentation',
         # Default dataset paths
         'data_dir': 'data',

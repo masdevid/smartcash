@@ -219,30 +219,61 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     val_slider.observe(update_sliders, names='value')
     test_slider.observe(update_sliders, names='value')
     
-    # Buat layout UI
+    # Buat panel informasi
+    from smartcash.ui.info_boxes.split_info import get_split_info
+    info_panel = get_split_info() if 'get_split_info' in globals() else widgets.HTML(
+        f"<div style='padding: 10px; background-color: #f8f9fa; border-left: 5px solid {COLORS.get('info', '#3498db')}; margin-top: 15px;'>"
+        f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Split Dataset</h4>"
+        "<p>Konfigurasi split dataset digunakan untuk membagi dataset menjadi train, validation, dan test.</p>"
+        "<p>Pastikan total ratio selalu 1.0 untuk hasil yang optimal.</p>"
+        "</div>"
+    )
+    
+    # Buat container untuk ratio split
+    ratio_box = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 5px; margin-bottom: 5px;'>{ICONS.get('split', '🔀')} Ratio Split Dataset</h4>"),
+        train_slider,
+        val_slider,
+        test_slider,
+        total_label,
+        stratified_checkbox,
+        random_seed
+    ], layout=widgets.Layout(width='100%', padding='5px', overflow='visible'))
+    
+    # Buat container untuk path dan backup
+    path_box = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS.get('dark', '#333')}; margin-top: 5px; margin-bottom: 5px;'>{ICONS.get('folder', '📁')} Path dan Backup</h4>"),
+        dataset_path,
+        preprocessed_path,
+        backup_checkbox,
+        backup_dir
+    ], layout=widgets.Layout(width='100%', padding='5px', overflow='visible'))
+    
+    # Buat form container dengan 2 kolom sejajar
+    form_container = widgets.VBox([
+        widgets.HBox([
+            widgets.Box([ratio_box], layout=widgets.Layout(width='48%', overflow='visible')),
+            widgets.Box([path_box], layout=widgets.Layout(width='48%', overflow='visible'))
+        ], layout=widgets.Layout(
+            width='100%',
+            display='flex',
+            flex_flow='row nowrap',
+            align_items='flex-start',
+            justify_content='space-between',
+            overflow='visible'
+        )),
+        widgets.VBox([
+            widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0'))
+        ], layout=widgets.Layout(width='100%', overflow='visible'))
+    ], layout=widgets.Layout(width='100%', overflow='visible'))
+    
+    # Buat container utama
     split_config_box = widgets.VBox([
         header,
         ui_components['status_panel'],
-        widgets.HBox([
-            widgets.VBox([
-                widgets.HTML(value="<h3>Ratio Split Dataset</h3>"),
-                train_slider,
-                val_slider,
-                test_slider,
-                total_label,
-                stratified_checkbox,
-                random_seed
-            ], layout=widgets.Layout(width='50%')),
-            widgets.VBox([
-                widgets.HTML(value="<h3>Path dan Backup</h3>"),
-                dataset_path,
-                preprocessed_path,
-                backup_checkbox,
-                backup_dir
-            ], layout=widgets.Layout(width='50%'))
-        ]),
-        save_reset_buttons['container']
-    ])
+        form_container,
+        info_panel
+    ], layout=widgets.Layout(width='100%', padding='10px', overflow='visible'))
     
     # Tambahkan UI ke komponen
     ui_components['ui'] = split_config_box

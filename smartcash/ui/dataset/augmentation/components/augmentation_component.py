@@ -57,13 +57,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
 
     # Tombol save dan reset dan sync info akan dibuat nanti untuk menghindari duplikasi
     
-    # Split selector tetap digunakan untuk kompatibilitas
-    split_selector = create_split_selector(
-        selected_value='Train Only',
-        description="Target Split:",
-        width='100%',
-        icon='split'
-    )
+    # Target split sudah termasuk dalam combined_options, tidak perlu split_selector terpisah
     
     # Buat tombol save dan reset menggunakan shared component
     save_reset_buttons = create_save_reset_buttons(
@@ -115,22 +109,17 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
 
-    # Container untuk tombol save/reset dengan layout rata kanan
-    # Sync info sudah termasuk dalam save_reset_buttons jika with_sync_info=True
-    save_reset_container = widgets.VBox([
-        save_reset_buttons['container']
-    ], layout=widgets.Layout(align_items='flex-end', width='100%'))
+    # Tidak perlu container terpisah untuk save_reset_buttons
     
     settings_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
         combined_options,
-        save_reset_container,  # Gunakan container yang sudah diatur rata kanan
-        split_selector,  # Tetap tampilkan untuk kompatibilitas
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-        advanced_options
-    ], layout=widgets.Layout(width='100%'))
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
+        advanced_options,
+        widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0'))
+    ], layout=widgets.Layout(width='100%', padding='0'))
 
-    # Rakit komponen UI
+    # Rakit komponen UI dengan layout yang lebih compact
     ui = widgets.VBox([
         header,
         status_panel,
@@ -140,7 +129,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         progress_components['progress_container'],
         log_components['log_accordion'],
         help_panel
-    ])
+    ], layout=widgets.Layout(width='100%', padding='0', margin='0'))
 
     # Komponen UI dengan konsolidasi semua referensi
     ui_components = {
@@ -151,7 +140,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'combined_options': combined_options,
         'advanced_options': advanced_options,
         'advanced_accordion': advanced_accordion,
-        'split_selector': split_selector,
+        # Split selector dihapus karena sudah termasuk dalam combined_options
         'save_reset_buttons': save_reset_buttons,
         'sync_info': sync_info,
         'save_button': save_reset_buttons['save_button'],

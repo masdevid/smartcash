@@ -101,19 +101,20 @@ def create_backbone_ui() -> Dict[str, Any]:
         icon="info"
     )
     
-    # Buat container untuk form
+    # Buat container untuk form dengan sync_info rata kanan
     form_container = widgets.VBox([
         config_form_components['container'],
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
         feature_group['container'],
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
-        save_reset_buttons['container']
-    ])
+        widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='5px 0')),
+        widgets.Box([save_reset_buttons['sync_info']['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='0'))
+    ], layout=widgets.Layout(width='100%', padding='0', overflow='visible'))
     
-    # Buat container untuk info
+    # Buat container untuk info dengan layout yang lebih compact
     info_container = widgets.VBox([
         info_panel_components['container']
-    ])
+    ], layout=widgets.Layout(width='100%', padding='0', overflow='visible'))
     
     # Buat tab untuk form dan info
     tab_items = [
@@ -125,12 +126,12 @@ def create_backbone_ui() -> Dict[str, Any]:
     # Set tab yang aktif
     tabs.selected_index = 0
     
-    # Buat container utama
+    # Buat container utama dengan layout yang lebih compact
     main_container = widgets.VBox([
         header,
         tabs,
         status_panel
-    ], layout=widgets.Layout(width='100%', padding='10px'))
+    ], layout=widgets.Layout(width='100%', padding='5px', margin='0', overflow='visible'))
     
     # Kumpulkan semua komponen UI
     ui_components = {

@@ -171,12 +171,16 @@ class TestPersistenceHandler(unittest.TestCase):
         """Test untuk fungsi ensure_ui_persistence."""
         from smartcash.ui.dataset.augmentation.handlers.persistence_handler import ensure_ui_persistence
         
+        # Setup config manager mock
+        mock_config_manager = MagicMock()
+        self.mock_config_manager.return_value = mock_config_manager
+        
         # Panggil fungsi yang akan ditest
         result = ensure_ui_persistence(self.mock_ui_components)
         
         # Verifikasi hasil
         self.assertEqual(result, self.mock_ui_components)
-        self.mock_config_manager.return_value.register_ui_components.assert_called_once_with('augmentation', self.mock_ui_components)
+        mock_config_manager.register_ui_components.assert_called_once_with('augmentation', self.mock_ui_components)
     
     def test_get_augmentation_config(self):
         """Test untuk fungsi get_augmentation_config."""

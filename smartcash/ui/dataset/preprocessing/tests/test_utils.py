@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch, MagicMock, call
 import ipywidgets as widgets
 from IPython.display import display
+from ipywidgets import Layout
 
 class TestPreprocessingUtils(unittest.TestCase):
     """Test untuk utilitas preprocessing dataset."""
@@ -95,28 +96,38 @@ class TestPreprocessingUtils(unittest.TestCase):
     def test_disable_ui_during_processing(self):
         """Test untuk fungsi disable_ui_during_processing."""
         from smartcash.ui.dataset.preprocessing.utils.ui_observers import disable_ui_during_processing
-        
+        from ipywidgets import Layout
+
+        # Setup mock UI components
+        mock_ui_components = {
+            'button1': MagicMock(),
+            'button2': MagicMock(),
+            'layout': Layout(),
+            'other_widget': MagicMock()
+        }
+
         # Panggil fungsi yang akan ditest
-        disable_ui_during_processing(self.mock_ui_components, True)
-        
+        disable_ui_during_processing(mock_ui_components, True)
+
         # Verifikasi hasil
-        self.assertTrue(self.mock_ui_components['split_selector'].disabled)
-        self.assertTrue(self.mock_ui_components['config_accordion'].disabled)
-        self.assertTrue(self.mock_ui_components['options_accordion'].disabled)
-        self.assertTrue(self.mock_ui_components['reset_button'].disabled)
-        self.assertTrue(self.mock_ui_components['preprocess_button'].disabled)
-        self.assertTrue(self.mock_ui_components['save_button'].disabled)
-        
+        self.assertTrue(mock_ui_components['button1'].disabled)
+        self.assertTrue(mock_ui_components['button2'].disabled)
+        self.assertFalse(hasattr(mock_ui_components['layout'], 'disabled'))
+        self.assertTrue(mock_ui_components['other_widget'].disabled)
+
+        # Reset disabled state
+        mock_ui_components['button1'].disabled = False
+        mock_ui_components['button2'].disabled = False
+        mock_ui_components['other_widget'].disabled = False
+
         # Test enable
-        disable_ui_during_processing(self.mock_ui_components, False)
-        
+        disable_ui_during_processing(mock_ui_components, False)
+
         # Verifikasi hasil
-        self.assertFalse(self.mock_ui_components['split_selector'].disabled)
-        self.assertFalse(self.mock_ui_components['config_accordion'].disabled)
-        self.assertFalse(self.mock_ui_components['options_accordion'].disabled)
-        self.assertFalse(self.mock_ui_components['reset_button'].disabled)
-        self.assertFalse(self.mock_ui_components['preprocess_button'].disabled)
-        self.assertFalse(self.mock_ui_components['save_button'].disabled)
+        self.assertFalse(mock_ui_components['button1'].disabled)
+        self.assertFalse(mock_ui_components['button2'].disabled)
+        self.assertFalse(hasattr(mock_ui_components['layout'], 'disabled'))
+        self.assertFalse(mock_ui_components['other_widget'].disabled)
 
 class TestNotificationManager(unittest.TestCase):
     """Test untuk notification manager preprocessing dataset."""
@@ -153,16 +164,25 @@ class TestNotificationManager(unittest.TestCase):
     def test_notification_manager_update_status(self):
         """Test untuk metode update_status dari PreprocessingNotificationManager."""
         from smartcash.ui.dataset.preprocessing.utils.notification_manager import PreprocessingNotificationManager
+        from IPython.display import display
         
-        # Buat instance notification manager
-        manager = PreprocessingNotificationManager(self.mock_ui_components)
+        # Setup mock status output
+        mock_status_output = MagicMock()
+        self.mock_ui_components['status'] = mock_status_output
         
-        # Panggil metode yang akan ditest
-        with patch('IPython.display.display') as mock_display_local:
-            manager.update_status("success", "Test message")
+        # Setup mock status indicator
+        mock_status_indicator = MagicMock()
+        with patch('smartcash.ui.utils.alert_utils.create_status_indicator', return_value=mock_status_indicator):
+            # Buat instance notification manager
+            manager = PreprocessingNotificationManager(self.mock_ui_components)
             
-            # Verifikasi hasil
-            mock_display_local.assert_called_once()
+            # Panggil metode yang akan ditest
+            with patch('IPython.display.display') as mock_display:
+                manager.update_status("success", "Test message")
+                
+                # Verifikasi hasil
+                mock_display.assert_called_once_with(mock_status_indicator)
+                mock_status_output.clear_output.assert_called_once()
         
         self.mock_status_indicator.assert_called_once_with("success", "Test message")
         self.mock_ui_components['update_status_panel'].assert_called_once_with(self.mock_ui_components, "success", "Test message")

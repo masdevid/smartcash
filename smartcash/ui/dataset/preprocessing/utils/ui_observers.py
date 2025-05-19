@@ -94,5 +94,16 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
     
     # Disable/enable komponen
     for component in disable_components:
-        if component in ui_components and hasattr(ui_components[component], 'disabled'):
-            ui_components[component].disabled = disable
+        if component in ui_components:
+            widget = ui_components[component]
+            if hasattr(widget, 'disabled'):
+                widget.disabled = disable
+            elif hasattr(widget, 'layout'):
+                # For widgets without disabled attribute, use opacity
+                if not hasattr(widget.layout, 'opacity'):
+                    # Create new layout with opacity
+                    new_layout = type(widget.layout)()
+                    for key, value in widget.layout.trait_values().items():
+                        setattr(new_layout, key, value)
+                    widget.layout = new_layout
+                widget.layout.opacity = '0.5' if disable else '1'

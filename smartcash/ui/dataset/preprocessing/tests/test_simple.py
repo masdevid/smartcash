@@ -44,8 +44,18 @@ class TestPreprocessingInitializer(unittest.TestCase):
         result = initialize_preprocessing_ui()
         
         # Verifikasi hasil
-        self.assertEqual(result, self.mock_ui_components)
-        self.mock_base_initializer.assert_called_once()
+        self.assertIsInstance(result, dict)
+        self.assertIn('main_container', result)
+        self.assertIn('status', result)
+        self.assertIn('logger', result)
+        self.assertIn('preprocess_button', result)
+        self.assertIn('stop_button', result)
+        self.assertIn('reset_button', result)
+        self.assertIn('cleanup_button', result)
+        self.assertIn('save_button', result)
+        self.assertIn('split_selector', result)
+        self.assertIn('preprocess_options', result)
+        self.assertIn('validation_options', result)
         
         # Verifikasi parameter yang diberikan ke base_initializer
         args, kwargs = self.mock_base_initializer.call_args

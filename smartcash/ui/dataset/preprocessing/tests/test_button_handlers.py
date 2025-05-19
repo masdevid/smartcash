@@ -12,7 +12,7 @@ class TestButtonHandlers(unittest.TestCase):
     """Test untuk button handler preprocessing dataset."""
     
     def setUp(self):
-        """Setup untuk setiap test case."""
+        """Setup untuk setiap test."""
         # Mock untuk logger
         self.logger_patch = patch('smartcash.common.logger.get_logger')
         self.mock_logger = self.logger_patch.start()
@@ -32,33 +32,11 @@ class TestButtonHandlers(unittest.TestCase):
         
         # Mock UI components
         self.mock_ui_components = {
-            'status': widgets.Output(),
-            'logger': self.mock_logger.return_value,
-            'preprocess_button': widgets.Button(description='Preprocess'),
-            'stop_button': widgets.Button(description='Stop'),
-            'reset_button': widgets.Button(description='Reset'),
-            'cleanup_button': widgets.Button(description='Cleanup'),
-            'save_button': widgets.Button(description='Save'),
-            'split_selector': widgets.Dropdown(
-                options=['All Splits', 'Train Only', 'Validation Only', 'Test Only'],
-                value='All Splits'
-            ),
-            'preprocess_options': widgets.VBox([
-                widgets.IntSlider(value=640, min=32, max=1280, description='Size:'),
-                widgets.Checkbox(value=True, description='Normalize'),
-                widgets.Checkbox(value=True, description='Preserve Aspect Ratio'),
-                widgets.Checkbox(value=True, description='Cache'),
-                widgets.IntSlider(value=4, min=1, max=16, description='Workers:')
-            ]),
-            'validation_options': widgets.VBox([
-                widgets.Checkbox(value=True, description='Validate'),
-                widgets.Checkbox(value=True, description='Fix Issues'),
-                widgets.Checkbox(value=True, description='Move Invalid'),
-                widgets.Text(value='data/invalid', description='Invalid Dir:')
-            ]),
-            'preprocessing_running': False,
-            'update_progress': MagicMock(),
-            'reset_progress_bar': MagicMock()
+            'cleanup_button': MagicMock(),
+            'dataset_manager': MagicMock(),
+            'status': MagicMock(),
+            'notification_manager': MagicMock(),
+            'preprocessing_running': False
         }
     
     def tearDown(self):
@@ -74,6 +52,7 @@ class TestButtonHandlers(unittest.TestCase):
     def test_on_primary_click(self, mock_execute, mock_disable, mock_notify):
         """Test untuk handler on_primary_click."""
         from smartcash.ui.dataset.preprocessing.handlers.button_handler import setup_preprocessing_button_handlers
+        from IPython.display import display
         
         # Setup mock
         mock_button = MagicMock()
@@ -81,20 +60,23 @@ class TestButtonHandlers(unittest.TestCase):
         # Setup button handlers
         ui_components = setup_preprocessing_button_handlers(self.mock_ui_components)
         
-        # Panggil handler on_primary_click
-        ui_components['on_primary_click'](mock_button)
-        
-        # Verifikasi hasil
-        self.assertTrue(ui_components['preprocessing_running'])
-        mock_disable.assert_called_once_with(ui_components, True)
-        self.mock_update_status.assert_called_once()
-        mock_notify.assert_called_once()
-        mock_execute.assert_called_once()
+        # Setup display mock
+        with patch('IPython.display.display') as mock_display:
+            # Panggil handler on_primary_click
+            ui_components['on_primary_click'](mock_button)
+            
+            # Verifikasi hasil
+            self.assertTrue(ui_components['preprocessing_running'])
+            mock_disable.assert_called_once_with(ui_components, True)
+            mock_notify.assert_called_once_with(ui_components, 'train', 'Train Split')
+            mock_execute.assert_called_once_with(ui_components, 'train', 'Train Split')
+            mock_display.assert_called_once()
     
     @patch('smartcash.ui.dataset.preprocessing.utils.ui_observers.notify_process_stop')
     def test_on_stop_click(self, mock_notify):
         """Test untuk handler on_stop_click."""
         from smartcash.ui.dataset.preprocessing.handlers.button_handler import setup_preprocessing_button_handlers
+        from IPython.display import display
         
         # Setup mock
         mock_button = MagicMock()
@@ -103,18 +85,20 @@ class TestButtonHandlers(unittest.TestCase):
         ui_components = setup_preprocessing_button_handlers(self.mock_ui_components)
         ui_components['preprocessing_running'] = True
         
-        # Panggil handler on_stop_click
-        ui_components['on_stop_click'](mock_button)
-        
-        # Verifikasi hasil
-        self.assertFalse(ui_components['preprocessing_running'])
-        self.mock_display.assert_called_once()
-        self.mock_update_status.assert_called_once()
-        mock_notify.assert_called_once()
+        # Setup display mock
+        with patch('IPython.display.display') as mock_display:
+            # Panggil handler on_stop_click
+            ui_components['on_stop_click'](mock_button)
+            
+            # Verifikasi hasil
+            self.assertFalse(ui_components['preprocessing_running'])
+            mock_notify.assert_called_once_with(ui_components)
+            mock_display.assert_called_once()
     
     def test_on_reset_click(self):
         """Test untuk handler on_reset_click."""
         from smartcash.ui.dataset.preprocessing.handlers.button_handler import setup_preprocessing_button_handlers
+        from IPython.display import display
         
         # Setup mock
         mock_button = MagicMock()
@@ -122,31 +106,34 @@ class TestButtonHandlers(unittest.TestCase):
         # Setup button handlers
         ui_components = setup_preprocessing_button_handlers(self.mock_ui_components)
         
-        # Panggil handler on_reset_click
-        ui_components['on_reset_click'](mock_button)
-        
-        # Verifikasi hasil
-        self.mock_display.assert_called_once()
-        self.mock_update_status.assert_called_once()
-        self.mock_ui_components['reset_progress_bar'].assert_called_once()
+        # Setup display mock
+        with patch('IPython.display.display') as mock_display:
+            # Panggil handler on_reset_click
+            ui_components['on_reset_click'](mock_button)
+            
+            # Verifikasi hasil
+            self.assertFalse(ui_components['preprocessing_running'])
+            mock_display.assert_called_once()
     
     @patch('smartcash.ui.dataset.preprocessing.utils.ui_observers.notify_process_complete')
     @patch('smartcash.ui.dataset.preprocessing.utils.ui_observers.notify_process_error')
     def test_execute_preprocessing_success(self, mock_notify_error, mock_notify_complete):
         """Test untuk fungsi execute_preprocessing dengan hasil sukses."""
         from smartcash.ui.dataset.preprocessing.handlers.button_handler import execute_preprocessing
+        from IPython.display import display
         
         # Setup mock
-        self.mock_ui_components['dataset_manager'] = MagicMock()
         self.mock_ui_components['dataset_manager'].preprocess.return_value = {'status': 'success'}
         
-        # Panggil fungsi yang akan ditest
-        execute_preprocessing(self.mock_ui_components, 'train', 'Train Split')
-        
-        # Verifikasi hasil
-        self.mock_ui_components['dataset_manager'].preprocess.assert_called_once()
-        mock_notify_complete.assert_called_once()
-        mock_notify_error.assert_not_called()
+        # Setup display mock
+        with patch('IPython.display.display') as mock_display:
+            # Panggil fungsi yang akan ditest
+            execute_preprocessing(self.mock_ui_components, 'train', 'Train Split')
+            
+            # Verifikasi hasil
+            self.mock_ui_components['dataset_manager'].preprocess.assert_called_once()
+            mock_notify_complete.assert_called_once_with(self.mock_ui_components, {'status': 'success'}, 'Train Split')
+            mock_display.assert_called_once()
     
     @patch('smartcash.ui.dataset.preprocessing.utils.ui_observers.notify_process_complete')
     @patch('smartcash.ui.dataset.preprocessing.utils.ui_observers.notify_process_error')

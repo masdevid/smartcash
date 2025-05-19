@@ -67,7 +67,11 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
         ui_components['notify_service_event'] = notify_service_event
         
         # Inisialisasi download service
-        output_dir = ui_components['output_dir'].value if hasattr(ui_components['output_dir'], 'value') else 'data'
+        output_dir = (
+            ui_components['output_dir'].value 
+            if hasattr(ui_components['output_dir'], 'value') 
+            else str(ui_components['output_dir'])
+        ) if 'output_dir' in ui_components else 'data'
         download_service = DownloadService(
             output_dir=output_dir,
             config=config,

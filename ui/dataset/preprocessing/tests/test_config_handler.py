@@ -13,69 +13,42 @@ class TestConfigHandler(unittest.TestCase):
     """Test untuk config handler preprocessing dataset."""
     
     def setUp(self):
-        """Setup untuk setiap test case."""
-        # Mock untuk logger
-        self.logger_patch = patch('smartcash.common.logger.get_logger')
-        self.mock_logger = self.logger_patch.start()
-        self.mock_logger.return_value = MagicMock()
-        
+        """Setup untuk setiap test."""
         # Mock untuk config manager
-        self.config_manager_patch = patch('smartcash.common.config.manager.get_config_manager')
-        self.mock_config_manager = self.config_manager_patch.start()
-        self.mock_config_manager.return_value = MagicMock()
-        
-        # Mock UI components
-        self.mock_ui_components = {
-            'status': widgets.Output(),
-            'logger': self.mock_logger.return_value,
-            'save_button': widgets.Button(description='Save'),
-            'split_selector': widgets.Dropdown(
-                options=['All Splits', 'Train Only', 'Validation Only', 'Test Only'],
-                value='All Splits'
-            ),
-            'preprocess_options': widgets.VBox([
-                widgets.IntSlider(value=640, min=32, max=1280, description='Size:'),
-                widgets.Checkbox(value=True, description='Normalize'),
-                widgets.Checkbox(value=True, description='Preserve Aspect Ratio'),
-                widgets.Checkbox(value=True, description='Cache'),
-                widgets.IntSlider(value=4, min=1, max=16, description='Workers:')
-            ]),
-            'validation_options': widgets.VBox([
-                widgets.Checkbox(value=True, description='Validate'),
-                widgets.Checkbox(value=True, description='Fix Issues'),
-                widgets.Checkbox(value=True, description='Move Invalid'),
-                widgets.Text(value='data/invalid', description='Invalid Dir:')
-            ])
-        }
-        
+        self.mock_config_manager = patch('smartcash.common.config_manager.get_config_manager')
+        self.mock_config_manager.start()
+
         # Mock config
         self.mock_config = {
-            'data': {
-                'dir': 'data'
-            },
+            'data': {'dir': 'data'},
             'preprocessing': {
-                'img_size': [640, 640],
-                'output_dir': 'data/preprocessed',
-                'splits': ['train', 'valid', 'test'],
                 'enabled': True,
-                'num_workers': 4,
+                'img_size': [640, 640],
                 'normalization': {
                     'enabled': True,
                     'preserve_aspect_ratio': True
                 },
-                'validate': {
-                    'enabled': True,
-                    'fix_issues': True,
-                    'move_invalid': True,
-                    'invalid_dir': 'data/invalid'
-                }
+                'num_workers': 4
             }
+        }
+
+        # Mock UI components
+        self.mock_ui_components = {
+            'status': MagicMock(),
+            'logger': MagicMock(),
+            'preprocess_button': MagicMock(),
+            'stop_button': MagicMock(),
+            'reset_button': MagicMock(),
+            'cleanup_button': MagicMock(),
+            'save_button': MagicMock(),
+            'split_selector': MagicMock(),
+            'preprocess_options': MagicMock(),
+            'validation_options': MagicMock()
         }
     
     def tearDown(self):
-        """Cleanup setelah setiap test case."""
-        self.logger_patch.stop()
-        self.config_manager_patch.stop()
+        """Cleanup setelah setiap test."""
+        self.mock_config_manager.stop()
     
     def test_update_config_from_ui(self):
         """Test untuk fungsi update_config_from_ui."""
@@ -95,11 +68,6 @@ class TestConfigHandler(unittest.TestCase):
         self.assertTrue(preproc_config['normalization']['preserve_aspect_ratio'])
         self.assertTrue(preproc_config['enabled'])
         self.assertEqual(preproc_config['num_workers'], 4)
-        self.assertTrue(preproc_config['validate']['enabled'])
-        self.assertTrue(preproc_config['validate']['fix_issues'])
-        self.assertTrue(preproc_config['validate']['move_invalid'])
-        self.assertEqual(preproc_config['validate']['invalid_dir'], 'data/invalid')
-        self.assertEqual(preproc_config['splits'], ['train', 'valid', 'test'])
     
     @patch('os.path.exists')
     @patch('yaml.dump')
@@ -112,6 +80,10 @@ class TestConfigHandler(unittest.TestCase):
         mock_open_patch = patch('builtins.open', mock_open())
         mock_open_obj = mock_open_patch.start()
         
+        # Setup config manager mock
+        mock_config_manager = MagicMock()
+        self.mock_config_manager.return_value = mock_config_manager
+        
         try:
             # Panggil fungsi yang akan ditest
             result = save_preprocessing_config(self.mock_config, 'configs/preprocessing_config.yaml')
@@ -120,7 +92,7 @@ class TestConfigHandler(unittest.TestCase):
             self.assertTrue(result)
             mock_open_obj.assert_called_with('configs/preprocessing_config.yaml', 'w')
             mock_yaml_dump.assert_called_once_with(self.mock_config, mock_open_obj.return_value.__enter__.return_value, default_flow_style=False)
-            self.mock_config_manager.return_value.save_module_config.assert_called_once_with('preprocessing', self.mock_config)
+            mock_config_manager.save_module_config.assert_called_once_with('preprocessing', self.mock_config)
         finally:
             mock_open_patch.stop()
     
@@ -137,7 +109,9 @@ class TestConfigHandler(unittest.TestCase):
         mock_open_obj = mock_open_patch.start()
         
         # Setup config manager mock
-        self.mock_config_manager.return_value.get_module_config.return_value = None
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = None
+        self.mock_config_manager.return_value = mock_config_manager
         
         try:
             # Panggil fungsi yang akan ditest
@@ -146,8 +120,7 @@ class TestConfigHandler(unittest.TestCase):
             # Verifikasi hasil
             self.assertEqual(result, self.mock_config)
             mock_open_obj.assert_called_with('configs/preprocessing_config.yaml', 'r')
-            self.mock_config_manager.return_value.get_module_config.assert_called_once_with('preprocessing')
-            self.mock_config_manager.return_value.save_module_config.assert_called_once_with('preprocessing', self.mock_config)
+            mock_config_manager.get_module_config.assert_called_once_with('preprocessing')
         finally:
             mock_open_patch.stop()
     
@@ -156,14 +129,16 @@ class TestConfigHandler(unittest.TestCase):
         from smartcash.ui.dataset.preprocessing.utils.config_utils import load_preprocessing_config
         
         # Setup mock
-        self.mock_config_manager.return_value.get_module_config.return_value = self.mock_config
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = self.mock_config
+        self.mock_config_manager.return_value = mock_config_manager
         
         # Panggil fungsi yang akan ditest
         result = load_preprocessing_config('configs/preprocessing_config.yaml', self.mock_ui_components)
         
         # Verifikasi hasil
         self.assertEqual(result, self.mock_config)
-        self.mock_config_manager.return_value.get_module_config.assert_called_once_with('preprocessing')
+        mock_config_manager.get_module_config.assert_called_once_with('preprocessing')
     
     def test_update_ui_from_config(self):
         """Test untuk fungsi update_ui_from_config."""

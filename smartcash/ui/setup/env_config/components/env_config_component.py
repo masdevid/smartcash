@@ -86,6 +86,7 @@ class EnvConfigComponent:
         display(self.ui_components['drive_button'])
         display(self.ui_components['directory_button'])
         display(self.ui_components['status_panel'])
-        display(self.ui_components['log_panel'])
+        if 'log_panel' in self.ui_components:
+            display(self.ui_components['log_panel'])
         display(self.ui_components['progress_bar'])
         display(self.ui_components['progress_message'])

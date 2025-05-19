@@ -15,6 +15,8 @@ import shutil
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 
+logger = get_logger(__name__)
+
 def load_default_config() -> Dict[str, Any]:
     """
     Load konfigurasi default untuk download dataset.
@@ -46,7 +48,6 @@ def load_config() -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi
     """
-    logger = get_logger("download_config")
     try:
         from smartcash.common.config.manager import get_config_manager
         from smartcash.common.environment import get_environment_manager
@@ -80,7 +81,7 @@ def save_config(config: Dict[str, Any], logger=None) -> str:
         Path ke file konfigurasi yang disimpan
     """
     if not logger:
-        logger = get_logger("download_config")
+        logger = get_logger(__name__)
     try:
         from smartcash.common.config.manager import get_config_manager
         from smartcash.common.environment import get_environment_manager
@@ -106,6 +107,7 @@ def get_config_manager_instance():
         env_manager = get_environment_manager()
         return get_config_manager(base_dir=env_manager.base_dir, config_file='dataset_config.yaml')
     except Exception as e:
+        logger.error(f"❌ Error saat mendapatkan ConfigManager instance: {str(e)}")
         return None
 
 def save_config_with_manager(config: Dict[str, Any], ui_components: Dict[str, Any], logger=None) -> bool:

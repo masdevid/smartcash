@@ -31,6 +31,13 @@ class ModuleConfigManager(BaseConfigManager):
         
         # Dictionary untuk menyimpan referensi UI components
         self.ui_components = {}
+        
+        # Dictionary untuk menyimpan konfigurasi modul
+        self.module_configs = {}
+        
+        # Setup config directory
+        self.config_dir = self._base_dir / 'configs'
+        ensure_dir(self.config_dir)
     
     def get_module_config(self, module_name: str, default_config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -131,7 +138,7 @@ class ModuleConfigManager(BaseConfigManager):
     
     def register_ui_components(self, module_name: str, ui_components: Dict[str, Any]) -> None:
         """
-        Register UI components untuk persistensi.
+        Daftarkan UI components untuk modul tertentu.
         
         Args:
             module_name: Nama modul

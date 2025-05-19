@@ -58,7 +58,7 @@ def create_hyperparameters_basic_components() -> Dict[str, Any]:
         ui_components['epochs_slider']
     ], layout=widgets.Layout(
         width='100%',
-        padding='10px',
+        padding='5px',
         border='1px solid #ddd',
         border_radius='5px',
         height='100%',

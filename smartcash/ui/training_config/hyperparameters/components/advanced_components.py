@@ -120,8 +120,8 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         ui_components['patience_slider'],
         ui_components['min_delta_slider']
     ], layout=widgets.Layout(
-        width='auto',
-        padding='10px',
+        width='100%',
+        padding='5px',
         border='1px solid #ddd',
         border_radius='5px',
         height='100%',

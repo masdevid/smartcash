@@ -31,6 +31,8 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             config_file: File konfigurasi utama
             env_prefix: Prefix untuk environment variables
         """
+        if base_dir is None:
+            raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)
         
@@ -56,6 +58,8 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
         Instance singleton ConfigManager
     """
     global _config_manager
+    if base_dir is None:
+        raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
     if _config_manager is None:
         _config_manager = ConfigManager(base_dir, config_file, env_prefix)
     return _config_manager

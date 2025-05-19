@@ -1,11 +1,13 @@
 """
 File: smartcash/common/config/tests/test_config_sync.py
-Deskripsi: Test untuk memastikan semua file konfigurasi berhasil disinkronkan
+Deskripsi: Test untuk memastikan semua file konfigurasi berhasil disinkronkan dan error base_dir None dicegah
 """
 
 import os
+import pytest
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
+from smartcash.common.config.manager import ConfigManager, get_config_manager
 
 class TestConfigSync:
     """Test untuk sinkronisasi konfigurasi antara smartcash/configs dan /content/configs"""
@@ -102,6 +104,21 @@ class TestConfigSync:
         else:
             print("\n⚠️ Beberapa file konfigurasi tidak berhasil disinkronkan")
             return False
+
+    @staticmethod
+    def test_config_manager_base_dir_none():
+        """Test ConfigManager raises ValueError if base_dir is None"""
+        with pytest.raises(ValueError):
+            ConfigManager(base_dir=None, config_file='test.yaml')
+
+    @staticmethod
+    def test_get_config_manager_base_dir_none():
+        """Test get_config_manager raises ValueError if base_dir is None"""
+        from importlib import reload
+        import smartcash.common.config.manager as manager_mod
+        reload(manager_mod)  # Reset singleton
+        with pytest.raises(ValueError):
+            manager_mod.get_config_manager(base_dir=None, config_file='test.yaml')
 
 def run_test():
     """Menjalankan test sinkronisasi konfigurasi"""

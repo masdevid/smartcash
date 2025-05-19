@@ -142,8 +142,8 @@ def create_download_ui(env=None, config=None) -> Dict[str, Any]:
     # Buat tombol-tombol download dengan shared component (tanpa redundansi)
     # Tombol save dan reset menggunakan shared component dengan layout rata kanan
     save_reset_buttons = create_save_reset_buttons(
-        save_label='Simpan Konfigurasi',
-        reset_label='Reset Konfigurasi',
+        save_label='Simpan',
+        reset_label='Reset',
         button_width='100px',
         container_width='100%'
     )

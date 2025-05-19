@@ -263,12 +263,14 @@ def remove_augmented_files_from_preprocessed(ui_components: Dict[str, Any], pref
             'message': f'Error saat menghapus file augmentasi dari preprocessed: {str(e)}'
         }
 
-def setup_cleanup_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def setup_cleanup_handler(ui_components: Dict[str, Any], env: Dict[str, Any] = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk pembersihan hasil augmentasi.
     
     Args:
         ui_components: Dictionary komponen UI
+        env: Dictionary environment variables (opsional)
+        config: Dictionary konfigurasi (opsional)
         
     Returns:
         Dictionary komponen UI dengan handler terpasang

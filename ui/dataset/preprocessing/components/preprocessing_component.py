@@ -34,6 +34,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.config_form import create_config_form
     from smartcash.ui.components.validation_options import create_validation_options
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.sync_info_message import create_sync_info_message
     # Tidak menggunakan split_config lagi sesuai permintaan
     
     # Import komponen submodules preprocessing

@@ -30,7 +30,19 @@ class DownloadFileProcessor:
         # Optimasi: gunakan CPU count sebagai default tapi batasi maksimum
         self.num_workers = min(num_workers or os.cpu_count() or 4, 16)
         self.observer_manager = observer_manager
-        self.logger.info(f"📂 DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers")
+        
+        # Log inisialisasi ke logger
+        self.logger.info(f"✅ DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers")
+        
+        # Notifikasi inisialisasi ke UI jika observer manager tersedia
+        if self.observer_manager:
+            notify_service_event(
+                "file_processor", 
+                "start",
+                self, 
+                self.observer_manager,
+                message=f"DownloadFileProcessor diinisialisasi dengan {self.num_workers} workers"
+            )
     
     def process_zip_file(
         self,

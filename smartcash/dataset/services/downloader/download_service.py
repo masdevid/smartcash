@@ -20,23 +20,56 @@ class DownloadService:
         """Inisialisasi DownloadService dengan komponen teroptimasi."""
         self.config = config or {}
         self.data_dir, self.logger, self.num_workers = Path(output_dir), logger or get_logger("dataset_download_service"), num_workers
-        self.temp_dir, self.downloads_dir = self.data_dir / ".temp", self.data_dir / "downloads"
+        self.temp_dir, self.downloads_dir = self.data_dir / ".temp", self.data_dir / "data"
         [os.makedirs(d, exist_ok=True) for d in [self.temp_dir, self.downloads_dir]]
         self.utils = DatasetUtils(self.config, output_dir, logger)
         rf_config = self.config.get('data', {}).get('roboflow', {})
         self.api_key, self.workspace, self.project, self.version = rf_config.get('api_key') or os.environ.get("ROBOFLOW_API_KEY"), rf_config.get('workspace', 'smartcash-wo2us'), rf_config.get('project', 'rupiah-emisi-2022'), rf_config.get('version', '3')
+        
+        # Import komponen yang diperlukan
         from smartcash.dataset.services.downloader.roboflow_downloader import RoboflowDownloader
         from smartcash.dataset.services.downloader.download_validator import DownloadValidator
         from smartcash.dataset.services.downloader.file_processor import DownloadFileProcessor
         from smartcash.dataset.services.downloader.backup_service import BackupService
-        self.roboflow_downloader, self.validator = RoboflowDownloader(logger=self.logger), DownloadValidator(logger=self.logger, num_workers=self.num_workers)
-        self.processor, self.backup_service = DownloadFileProcessor(logger=self.logger, num_workers=self.num_workers), BackupService(logger=self.logger)
-        try:
-            from smartcash.components.observer.manager_observer import ObserverManager
-            self.observer_manager = ObserverManager()
-        except ImportError:
-            self.observer_manager = None
-        self.logger.info(f"📥 DatasetDownloadService diinisialisasi dengan {num_workers} workers\n   • Data dir: {self.data_dir}\n   • Default sumber: {self.workspace}/{self.project}:{self.version}")
+        
+        # Inisialisasi observer manager untuk UI notifications
+        self.observer_manager = None
+        
+        # Inisialisasi komponen dengan observer manager
+        self.roboflow_downloader = RoboflowDownloader(logger=self.logger)
+        self.validator = DownloadValidator(logger=self.logger)
+        self.processor = DownloadFileProcessor(logger=self.logger, num_workers=self.num_workers)
+        self.backup_service = BackupService(logger=self.logger)
+        
+        # Log inisialisasi ke logger
+        self.logger.info("✅ DownloadService diinisialisasi")
+    
+    def set_observer_manager(self, observer_manager):
+        """Set observer manager untuk UI notifications."""
+        self.observer_manager = observer_manager
+        # Propagate observer manager ke komponen
+        self.roboflow_downloader.observer_manager = observer_manager
+        self.validator.observer_manager = observer_manager
+        self.processor.observer_manager = observer_manager
+        self.backup_service.observer_manager = observer_manager
+        
+        # Notifikasi inisialisasi ke UI
+        if self.observer_manager:
+            notify_service_event(
+                "download",
+                "start",
+                self,
+                self.observer_manager,
+                message="Menginisialisasi komponen download..."
+            )
+            
+            notify_service_event(
+                "download",
+                "complete",
+                self,
+                self.observer_manager,
+                message="Inisialisasi komponen download selesai"
+            )
     
     def download_from_roboflow(self, api_key: Optional[str] = None, workspace: Optional[str] = None, project: Optional[str] = None, version: Optional[str] = None, format: str = "yolov5pytorch", output_dir: Optional[str] = None, show_progress: bool = True, verify_integrity: bool = True, backup_existing: bool = False) -> Dict[str, Any]:
         """Download dataset dari Roboflow dengan penanganan error yang lebih baik."""

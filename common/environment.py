@@ -48,8 +48,14 @@ class EnvironmentManager:
             
             self._in_colab = is_colab()
             self._in_notebook = is_notebook()
-            self.logger = logger or get_logger("environment_manager")
             self._file_utils = file_utils
+            
+            # Initialize logger properly
+            if logger is None:
+                self.logger = get_logger("environment_manager")
+            else:
+                self.logger = logger
+                
         except ImportError:
             self._in_colab = self._detect_colab()
             self._in_notebook = self._detect_notebook()

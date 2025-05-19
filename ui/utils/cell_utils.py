@@ -24,11 +24,25 @@ def setup_notebook_environment(cell_name: str) -> Tuple[Any, Dict[str, Any]]:
     try:
         # Import environment manager
         from smartcash.common.environment import get_environment_manager
-        env = get_environment_manager()
+        from smartcash.common.utils import is_colab
+        from pathlib import Path
+        
+        # Determine base directory
+        if is_colab():
+            base_dir = Path("/content")
+        else:
+            base_dir = Path(os.getcwd())
+            
+        # Ensure config directory exists
+        config_dir = base_dir / "configs"
+        config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize environment manager with base directory
+        env = get_environment_manager(base_dir=str(base_dir))
         
         # Import config manager dan load configuration
         from smartcash.common.config import get_config_manager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=str(base_dir), config_file=str(config_dir / "base_config.yaml"))
         
         # Coba load konfigurasi dari file
         try:
@@ -50,33 +64,12 @@ def setup_notebook_environment(cell_name: str) -> Tuple[Any, Dict[str, Any]]:
                     config = config_manager.load_config('configs/base_config.yaml')
             except Exception:
                 pass
-    except ImportError as e:
-        print(f"⚠️ Beberapa modul tidak tersedia: {str(e)}")
-        # Fallback untuk deteksi environment dasar
-        try:
-            from smartcash.common.utils import is_colab
-            class SimpleEnv:
-                def __init__(self):
-                    self.is_colab = is_colab()
-                    self.is_drive_mounted = Path('/content/drive/MyDrive').exists() if self.is_colab else False
-            env = SimpleEnv()
-        except ImportError:
-            # Ultra fallback
-            class UltraSimpleEnv:
-                def __init__(self):
-                    self.is_colab = 'google.colab' in sys.modules
-                    self.is_drive_mounted = Path('/content/drive/MyDrive').exists() if self.is_colab else False
-            env = UltraSimpleEnv()
-    
-    # Inisialisasi drive sync jika perlu
-    if env and hasattr(env, 'is_colab') and env.is_colab:
-        try:
-            from smartcash.ui.setup.drive_sync_initializer import initialize_configs
-            initialize_configs()
-        except ImportError:
-            pass
-    
-    return env, config
+                
+        return env, config
+        
+    except Exception as e:
+        print(f"❌ Error saat setup environment: {str(e)}")
+        return None, {}
 
 def register_resource(ui_components: Dict[str, Any], resource: Any, 
                      cleanup_func: Optional[callable] = None) -> None:

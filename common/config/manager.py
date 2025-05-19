@@ -33,6 +33,11 @@ class ConfigManager(DriveConfigManager, DependencyManager):
         """
         if base_dir is None:
             raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
+            
+        # Initialize logger first
+        from smartcash.common.logger import get_logger
+        self._logger = get_logger("config_manager")
+            
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)
         

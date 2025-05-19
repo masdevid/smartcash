@@ -34,9 +34,8 @@ class TestDownloadConfigHandler(unittest.TestCase):
         self.logger_mock = MagicMock()
         self.ui_components['logger'] = self.logger_mock
         
-        # Setup temporary directory untuk test
-        self.temp_dir = tempfile.mkdtemp()
-        self.ui_components['output_dir'].value = self.temp_dir
+        # Set output_dir to match test expectation
+        self.ui_components['output_dir'].value = 'data/test'
         
         # Default config for tests
         self.config = {
@@ -158,14 +157,14 @@ class TestDownloadConfigHandler(unittest.TestCase):
         mock_yaml_dump.assert_called_once()
         logger.info.assert_called()
     
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
     @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
-    def test_load_config_file_not_exists(self, mock_load_default, mock_get_config):
+    def test_load_config_file_not_exists(self, mock_load_default, mock_get_config_manager_instance):
         """Test load_config ketika file tidak ada."""
         # Setup mock
         mock_config_manager = MagicMock()
         mock_config_manager.get_module_config.return_value = None
-        mock_get_config.return_value = mock_config_manager
+        mock_get_config_manager_instance.return_value = mock_config_manager
         mock_load_default.return_value = self.config
         
         # Panggil fungsi
@@ -175,13 +174,13 @@ class TestDownloadConfigHandler(unittest.TestCase):
         self.assertEqual(result, self.config)
         mock_load_default.assert_called_once()
     
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
-    def test_load_config_file_exists(self, mock_get_config):
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager_instance')
+    def test_load_config_file_exists(self, mock_get_config_manager_instance):
         """Test load_config ketika file ada."""
         # Setup mock
         mock_config_manager = MagicMock()
         mock_config_manager.get_module_config.return_value = self.config
-        mock_get_config.return_value = mock_config_manager
+        mock_get_config_manager_instance.return_value = mock_config_manager
         
         # Panggil fungsi
         result = load_config()

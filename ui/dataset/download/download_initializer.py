@@ -152,7 +152,7 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
         # Tambahkan cleanup function ke UI components
         ui_components['cleanup'] = cleanup_resources
         
-        return ui_components
+        return ui_components['ui']
         
     except Exception as e:
         # Log error and re-raise

@@ -8,6 +8,7 @@ import os
 import tempfile
 import shutil
 from unittest.mock import patch, MagicMock, call
+import ipywidgets as widgets
 
 from smartcash.ui.dataset.download.handlers.download_handler import DownloadHandler
 from smartcash.ui.dataset.download.handlers.cleanup_handler import CleanupHandler

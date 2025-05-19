@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.augmentation.utils.notification_manager import notify_process_start, notify_process_complete, notify_process_error
+from smartcash.ui.dataset.augmentation.utils.notification_manager import get_notification_manager
 
 logger = get_logger("augmentation_button_handler")
 
@@ -378,10 +378,17 @@ def setup_augmentation_button_handlers(
         'on_reset_click': on_reset_click,
         'execute_augmentation': execute_augmentation,
         'disable_ui_during_processing': disable_ui_during_processing,
-        'notify_process_start': notify_process_start,
-        'notify_process_complete': notify_process_complete,
-        'notify_process_error': notify_process_error,
         'notify_process_stop': notify_process_stop
+    })
+    
+    # Pastikan NotificationManager tersedia
+    notification_manager = get_notification_manager(ui_components)
+    
+    # Tambahkan fungsi notifikasi dari NotificationManager
+    ui_components.update({
+        'notify_process_start': notification_manager.notify_process_start,
+        'notify_process_complete': notification_manager.notify_process_complete,
+        'notify_process_error': notification_manager.notify_process_error
     })
     
     # Set flag running ke False

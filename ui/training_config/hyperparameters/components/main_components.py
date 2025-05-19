@@ -24,6 +24,7 @@ from smartcash.ui.training_config.hyperparameters.components.optimization_compon
 from smartcash.ui.training_config.hyperparameters.components.advanced_components import create_hyperparameters_advanced_components
 from smartcash.ui.training_config.hyperparameters.components.button_components import create_hyperparameters_button_components
 from smartcash.ui.training_config.hyperparameters.components.info_panel_components import create_hyperparameters_info_panel
+from smartcash.ui.components.sync_info_message import create_sync_info_message
 
 logger = get_logger(__name__)
 
@@ -78,11 +79,18 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
         margin='10px 0px'
     ))
     
-    # Tambahkan sync_info ke ui_components untuk kompatibilitas dengan tes
-    # Periksa apakah sync_info ada dalam button_components (untuk tes)
-    ui_components['sync_info'] = button_components.get('sync_info', widgets.HTML(
-        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
-    ))
+    # Tambahkan sync_info menggunakan shared component
+    sync_info_component = create_sync_info_message(
+        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        icon="info",
+        color="#666",
+        font_style="italic",
+        margin_top="5px",
+        width="100%"
+    )
+    
+    # Tambahkan ke ui_components untuk kompatibilitas dengan tes
+    ui_components['sync_info'] = sync_info_component['sync_info']
     
     # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar
     form_container = widgets.VBox([

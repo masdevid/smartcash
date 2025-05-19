@@ -14,6 +14,8 @@ from smartcash.ui.components.tab_factory import create_tab_widget
 from smartcash.ui.components.model_info_panel import create_model_info_panel
 from smartcash.ui.components.feature_checkbox_group import create_feature_checkbox_group
 from smartcash.ui.components.config_form import create_config_form
+from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+from smartcash.ui.components.split_config import create_split_config
 from smartcash.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -55,8 +57,8 @@ def create_backbone_ui() -> Dict[str, Any]:
         title="Konfigurasi Model",
         width="100%",
         icon="model",
-        with_save_button=True,
-        with_reset_button=True
+        with_save_button=False,  # Gunakan save_reset_buttons yang terpisah
+        with_reset_button=False  # Gunakan save_reset_buttons yang terpisah
     )
     
     # Menggunakan shared component feature_checkbox_group untuk fitur optimasi
@@ -73,9 +75,17 @@ def create_backbone_ui() -> Dict[str, Any]:
         icon="settings"
     )
     
-    # Tambahkan keterangan sinkronisasi otomatis
-    sync_info = widgets.HTML(
-        value=f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('info', 'ℹ️')} Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.</div>"
+    # Buat tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan",
+        reset_label="Reset",
+        save_tooltip="Simpan konfigurasi backbone dan sinkronkan ke Google Drive",
+        reset_tooltip="Reset konfigurasi backbone ke default",
+        save_icon="save",
+        reset_icon="reset",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        button_width="100px"
     )
     
     # Buat panel untuk status
@@ -97,8 +107,7 @@ def create_backbone_ui() -> Dict[str, Any]:
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
         feature_group['container'],
         widgets.HTML("<hr style='margin: 10px 0px; border-style: dashed;'>"),
-        config_form_components['buttons']['container'],
-        sync_info
+        save_reset_buttons['container']
     ])
     
     # Buat container untuk info
@@ -131,17 +140,18 @@ def create_backbone_ui() -> Dict[str, Any]:
         'use_attention_checkbox': feature_group['checkboxes']['gunakan_featureadapter_attention'],
         'use_residual_checkbox': feature_group['checkboxes']['gunakan_residualadapter_residual'],
         'use_ciou_checkbox': feature_group['checkboxes']['gunakan_ciou_loss'],
-        'save_button': config_form_components['buttons']['save_button'],
-        'reset_button': config_form_components['buttons']['reset_button'],
-        'button_container': config_form_components['buttons']['container'],
-        'sync_info': sync_info,
+        'save_button': save_reset_buttons['save_button'],
+        'reset_button': save_reset_buttons['reset_button'],
+        'button_container': save_reset_buttons['button_container'],
+        'sync_info': save_reset_buttons['sync_info'],
         'status_panel': status_panel,
         'info_panel': info_panel_components['info_panel'],
         'tabs': tabs,
         # Tambahkan referensi ke komponen shared untuk akses lebih mudah
         'config_form': config_form_components,
         'feature_group': feature_group,
-        'info_panel_components': info_panel_components
+        'info_panel_components': info_panel_components,
+        'save_reset_buttons': save_reset_buttons
     }
     
     return ui_components

@@ -25,17 +25,22 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Import shared components
     from smartcash.ui.components.split_selector import create_split_selector
-    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.action_buttons import create_action_buttons
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
     from smartcash.ui.components.model_info_panel import create_model_info_panel
     from smartcash.ui.components.feature_checkbox_group import create_feature_checkbox_group
     from smartcash.ui.components.config_form import create_config_form
+    from smartcash.ui.components.validation_options import create_validation_options
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.split_config import create_split_config
     
     # Import komponen submodules preprocessing
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
-    from smartcash.ui.dataset.preprocessing.components.validation_options import create_validation_options
+    
+    # Gunakan shared component validation_options, jangan gunakan versi lama
+    # from smartcash.ui.dataset.preprocessing.components.validation_options import create_validation_options
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
@@ -47,7 +52,18 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Preprocessing options (split dari komponen besar)
     preprocess_options = create_preprocessing_options(config)
     
-    # Split selector menggunakan shared component
+    # Split config menggunakan shared component
+    split_config = create_split_config(
+        title="Konfigurasi Split Dataset",
+        description="Tentukan pembagian dataset untuk training, validation, dan testing",
+        train_value=0.7,
+        val_value=0.2,
+        test_value=0.1,
+        width='100%',
+        icon='split'
+    )
+    
+    # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
         selected_value='Train Only',
         description="Target Split:",
@@ -55,28 +71,39 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         icon='split'
     )
     
-    # Validation options menggunakan shared component feature_checkbox_group
-    validation_features = [
-        ("Validasi format gambar", True),
-        ("Validasi label format", True),
-        ("Validasi dimensi gambar", True),
-        ("Validasi bounding box", True)
-    ]
-    
-    validation_options_group = create_feature_checkbox_group(
-        features=validation_features,
+    # Validation options menggunakan shared component validation_options
+    validation_options = create_validation_options(
         title="Opsi Validasi",
         description="Pilih opsi validasi yang akan dijalankan selama preprocessing",
+        options=[
+            ("Validasi format gambar", "validate_image_format", True),
+            ("Validasi label format", "validate_label_format", True),
+            ("Validasi dimensi gambar", "validate_image_dimensions", True),
+            ("Validasi bounding box", "validate_bounding_box", True)
+        ],
         width="100%",
-        icon="search"
+        icon="validation"
     )
     
-    # Gunakan komponen lama untuk kompatibilitas
-    validation_options = create_validation_options(config)
+    # Simpan referensi ke komponen lama untuk kompatibilitas
+    validation_options_group = validation_options
     
     # Accordion untuk validation options - selalu tertutup di awal
     advanced_accordion = widgets.Accordion(children=[validation_options_group['container']], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
+    
+    # Buat tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan",
+        reset_label="Reset",
+        save_tooltip="Simpan konfigurasi preprocessing dan sinkronkan ke Google Drive",
+        reset_tooltip="Reset konfigurasi preprocessing ke default",
+        save_icon="save",
+        reset_icon="reset",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        button_width="100px"
+    )
     
     # Buat tombol-tombol preprocessing dengan shared component
     action_buttons = create_action_buttons(
@@ -85,8 +112,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         cleanup_enabled=True
     )
     
-    # Buat tombol visualisasi dengan shared component
-    visualization_buttons = create_visualization_buttons()
+    # Visualisasi buttons dihapus sesuai permintaan untuk memisahkan fitur visualisasi ke cell lain
     
     # Progress tracking dengan shared component
     progress_components = create_progress_tracking(
@@ -103,25 +129,7 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         width='100%'
     )
     
-    # Summary stats container dengan styling yang konsisten
-    summary_container = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd', 
-            padding='10px', 
-            margin='10px 0', 
-            display='none'
-        )
-    )
-    
-    # Container visualisasi
-    visualization_container = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd', 
-            padding='10px', 
-            margin='10px 0', 
-            display='none'
-        )
-    )
+    # Summary dan visualisasi container dihapus sesuai permintaan untuk memisahkan fitur visualisasi ke cell lain
     
     # Help panel dengan komponen info_box standar
     help_panel = get_preprocessing_info()
@@ -132,13 +140,14 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
         preprocess_options,
-        split_selector,
+        split_config['container'],  # Gunakan split_config baru
+        split_selector,  # Tetap tampilkan untuk kompatibilitas
         advanced_accordion,
+        save_reset_buttons['container'],  # Tambahkan tombol save dan reset
         create_divider(),
         action_buttons['container'],
         progress_components['progress_container'],
         log_components['log_accordion'],
-        summary_container,
         help_panel
     ])
     
@@ -151,20 +160,17 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'validation_options': validation_options,
         'validation_options_group': validation_options_group,
         'split_selector': split_selector,
+        'split_config': split_config,  # Tambahkan split_config
         'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],
         'preprocessing_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],
         'reset_button': action_buttons['reset_button'],
         'cleanup_button': action_buttons['cleanup_button'],
-        'save_button': action_buttons['save_button'],
+        'save_button': save_reset_buttons['save_button'],  # Gunakan dari save_reset_buttons
+        'reset_button': save_reset_buttons['reset_button'],  # Gunakan dari save_reset_buttons
+        'save_reset_buttons': save_reset_buttons,  # Tambahkan referensi lengkap
         'button_container': action_buttons['container'],
-        'visualization_buttons': visualization_buttons['container'],
-        'visualize_button': visualization_buttons['visualize_button'],
-        'compare_button': visualization_buttons['compare_button'],
-        'distribution_button': visualization_buttons.get('distribution_button'),
-        'summary_container': summary_container,
-        'visualization_container': visualization_container,
         'module_name': 'preprocessing',
         # Default dataset paths
         'data_dir': 'data',

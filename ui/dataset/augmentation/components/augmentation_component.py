@@ -29,6 +29,9 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.components.progress_tracking import create_progress_tracking
     from smartcash.ui.components.status_panel import create_status_panel
     from smartcash.ui.components.log_accordion import create_log_accordion
+    from smartcash.ui.components.validation_options import create_validation_options
+    from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
+    from smartcash.ui.components.split_config import create_split_config
 
     # Import komponen submodules augmentasi
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_augmentation_options
@@ -51,12 +54,36 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[advanced_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['settings']} Advanced Options")
 
-    # Split selector menggunakan shared component
+    # Split config menggunakan shared component
+    split_config = create_split_config(
+        title="Konfigurasi Split Dataset",
+        description="Tentukan pembagian dataset untuk augmentasi",
+        train_value=0.7,
+        val_value=0.2,
+        test_value=0.1,
+        width='100%',
+        icon='split'
+    )
+    
+    # Split selector tetap digunakan untuk kompatibilitas
     split_selector = create_split_selector(
         selected_value='Train Only',
         description="Target Split:",
         width='100%',
         icon='split'
+    )
+    
+    # Buat tombol save dan reset menggunakan shared component
+    save_reset_buttons = create_save_reset_buttons(
+        save_label="Simpan",
+        reset_label="Reset",
+        save_tooltip="Simpan konfigurasi augmentasi dan sinkronkan ke Google Drive",
+        reset_tooltip="Reset konfigurasi augmentasi ke default",
+        save_icon="save",
+        reset_icon="reset",
+        with_sync_info=True,
+        sync_message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan atau direset.",
+        button_width="100px"
     )
 
     # Buat tombol-tombol augmentasi dengan shared component
@@ -83,15 +110,7 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         width='100%'
     )
 
-    # Summary stats container dengan styling yang konsisten
-    summary_container = widgets.Output(
-        layout=widgets.Layout(
-            border='1px solid #ddd', 
-            padding='10px', 
-            margin='10px 0', 
-            display='none'
-        )
-    )
+    # Summary container dihapus sesuai permintaan untuk memisahkan fitur visualisasi ke cell lain
 
     # Help panel dengan komponen info_box standar
     help_panel = get_augmentation_info()
@@ -104,9 +123,11 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     settings_container = widgets.VBox([
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
         combined_options,
-        split_selector,
+        split_config['container'],  # Gunakan split_config baru
+        split_selector,  # Tetap tampilkan untuk kompatibilitas
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-        advanced_options
+        advanced_options,
+        save_reset_buttons['container']  # Tambahkan tombol save dan reset
     ], layout=widgets.Layout(width='100%'))
 
     # Rakit komponen UI
@@ -118,7 +139,6 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         action_buttons['container'],
         progress_components['progress_container'],
         log_components['log_accordion'],
-        summary_container,
         help_panel
     ])
 
@@ -132,14 +152,15 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
         'advanced_options': advanced_options,
         'advanced_accordion': advanced_accordion,
         'split_selector': split_selector,
+        'split_config': split_config,  # Tambahkan split_config
         'augment_button': action_buttons['primary_button'],
         'augmentation_button': action_buttons['primary_button'],  # Alias untuk kompatibilitas
         'stop_button': action_buttons['stop_button'],
-        'reset_button': action_buttons['reset_button'],
+        'reset_button': save_reset_buttons['reset_button'],  # Gunakan dari save_reset_buttons
         'cleanup_button': action_buttons['cleanup_button'],
-        'save_button': action_buttons['save_button'],
+        'save_button': save_reset_buttons['save_button'],  # Gunakan dari save_reset_buttons
+        'save_reset_buttons': save_reset_buttons,  # Tambahkan referensi lengkap
         'button_container': action_buttons['container'],
-        'summary_container': summary_container,
         'module_name': 'augmentation',
         # Default dataset paths
         'data_dir': 'data',

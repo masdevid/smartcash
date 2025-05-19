@@ -19,6 +19,7 @@ from smartcash.common.io import (
 )
 
 from smartcash.common.config.singleton import Singleton
+from smartcash.common.logger import LogLevel
 
 class BaseConfigManager(Singleton):
     """
@@ -46,9 +47,8 @@ class BaseConfigManager(Singleton):
         # Setup logger jika tersedia
         try:
             from smartcash.common.logger import get_logger
-            self._logger = get_logger("config_manager")
             # Hanya tampilkan log critical
-            self._logger.setLevel("CRITICAL")
+            self._logger = get_logger("config_manager", level=LogLevel.CRITICAL)
         except ImportError:
             self._logger = None
             

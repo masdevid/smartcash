@@ -75,16 +75,19 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
     # Buat tombol-tombol untuk training dengan shared component
     action_buttons = create_action_buttons(
         primary_label="Mulai Training",
-        primary_tooltip="Mulai proses training model dengan konfigurasi yang sudah diatur",
-        stop_label="Hentikan",
-        stop_tooltip="Hentikan proses training",
-        cleanup_label="Bersihkan",
-        cleanup_tooltip="Bersihkan hasil training",
         primary_icon="play",
-        stop_icon="stop",
-        cleanup_icon="trash",
-        width="100%"
+        cleanup_enabled=True,
+        layout=widgets.Layout(width="100%", margin="10px 0", gap="5px")
     )
+    
+    # Sesuaikan label dan tooltip tombol
+    action_buttons['primary_button'].tooltip = "Mulai proses training model dengan konfigurasi yang sudah diatur"
+    action_buttons['stop_button'].description = "Hentikan"
+    action_buttons['stop_button'].tooltip = "Hentikan proses training"
+    action_buttons['cleanup_button'].description = "Bersihkan"
+    action_buttons['cleanup_button'].tooltip = "Bersihkan hasil training"
+    action_buttons['stop_button'].icon = "stop"
+    action_buttons['cleanup_button'].icon = "trash"
     
     # Box untuk metrik training
     metrics_box = widgets.Output(

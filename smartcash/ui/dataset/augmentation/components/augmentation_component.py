@@ -112,10 +112,10 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     # Tidak perlu container terpisah untuk save_reset_buttons
     
     settings_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['settings']} Pengaturan Augmentasi</h4>"),
-        combined_options,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
         advanced_options,
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['augmentation']} Jenis Augmentasi & Split</h4>"),
+        combined_options,
         widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0'))
     ], layout=widgets.Layout(width='100%', padding='0'))
 

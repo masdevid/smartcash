@@ -6,8 +6,8 @@ Deskripsi: Handler konfirmasi untuk download dataset
 from typing import Dict, Any, Callable, Optional
 from IPython.display import display
 
-def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_button) -> None:
-    """Tampilkan dialog konfirmasi untuk download dataset."""
+def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', download_button = None) -> None:
+    """Tampilkan dialog konfirmasi untuk download dataset dari Roboflow."""
     # Import modul yang diperlukan
     from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
     from smartcash.ui.components.status_panel import update_status_panel
@@ -81,16 +81,11 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str, download_butt
     if download_logger: download_logger.info(f"ℹ️ Menunggu konfirmasi download dataset dari {endpoint}")
 
 def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
-    """Dapatkan detail spesifik untuk setiap endpoint."""
-    if endpoint == 'Roboflow':
-        workspace = ui_components['rf_workspace'].value
-        project = ui_components['rf_project'].value
-        version = ui_components['rf_version'].value
-        return f"Dataset akan diunduh dari Roboflow (workspace: {workspace}, project: {project}, version: {version})."
-    elif endpoint == 'Google Drive':
-        drive_folder = ui_components['drive_folder'].value
-        return f"Dataset akan disinkronkan dari Google Drive folder: {drive_folder}."
-    return ""
+    """Dapatkan detail spesifik untuk Roboflow."""
+    workspace = ui_components['rf_workspace'].value
+    project = ui_components['rf_project'].value
+    version = ui_components['rf_version'].value
+    return f"Dataset akan diunduh dari Roboflow (workspace: {workspace}, project: {project}, version: {version})."
 
 def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
     """Cancel download dan reset UI."""

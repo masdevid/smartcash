@@ -394,8 +394,13 @@ def _handle_complete_event(ui_components: Dict[str, Any], event_type: str, **kwa
     log_to_ui(ui_components, message, "success", "✅")
     
     # Update status panel menggunakan komponen reusable
-    from smartcash.ui.components.status_panel import update_status_panel
-    update_status_panel(ui_components['status_panel'], message, "success")
+    if 'status_panel' in ui_components:
+        try:
+            from smartcash.ui.utils.alert_utils import update_status_panel
+            update_status_panel(ui_components['status_panel'], message, "success")
+        except Exception as e:
+            if logger:
+                logger.debug(f"⚠️ Error menggunakan shared status panel: {str(e)}")
     
     # Reset tombol dan UI setelah download selesai
     from smartcash.ui.dataset.download.handlers.download_handler import _reset_ui_after_download
@@ -438,8 +443,13 @@ def _handle_error_event(ui_components: Dict[str, Any], event_type: str, **kwargs
     log_to_ui(ui_components, full_error_msg, "error", "❌")
     
     # Update status panel menggunakan komponen reusable
-    from smartcash.ui.components.status_panel import update_status_panel
-    update_status_panel(ui_components['status_panel'], full_error_msg, "error")
+    if 'status_panel' in ui_components:
+        try:
+            from smartcash.ui.utils.alert_utils import update_status_panel
+            update_status_panel(ui_components['status_panel'], full_error_msg, "error")
+        except Exception as e:
+            if logger:
+                logger.debug(f"⚠️ Error menggunakan shared status panel: {str(e)}")
     
     # Log error ke logger dengan detail
     if logger:

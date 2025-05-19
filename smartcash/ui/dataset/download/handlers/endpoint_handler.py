@@ -14,22 +14,11 @@ def handle_endpoint_change(change: Dict[str, Any], ui_components: Dict[str, Any]
         change: Dictionary perubahan dari widget observe
         ui_components: Dictionary komponen UI
     """
-    new_endpoint = change.get('new')
+    # Fungsi ini dipertahankan untuk kompatibilitas dengan kode lama
+    # tetapi tidak lagi digunakan karena kita hanya menggunakan Roboflow
     logger = ui_components.get('logger')
-    
-    # Reset visibility untuk semua accordion
-    _reset_accordion_visibility(ui_components)
-    
-    # Update visibility berdasarkan endpoint yang dipilih
-    if new_endpoint == 'Roboflow':
-        ui_components['rf_accordion'].selected_index = 0
-        if logger: logger.info("ℹ️ Endpoint diubah ke Roboflow")
-    elif new_endpoint == 'Google Drive':
-        ui_components['drive_accordion'].selected_index = 0
-        if logger: logger.info("ℹ️ Endpoint diubah ke Google Drive")
-    
-    # Gunakan custom logging UI
-    log_change_to_ui(ui_components, new_endpoint)
+    if logger: 
+        logger.debug("ℹ️ Endpoint handler dipanggil tapi tidak melakukan apa-apa karena hanya menggunakan Roboflow")
 
 def _reset_accordion_visibility(ui_components: Dict[str, Any]) -> None:
     """Reset visibility untuk semua accordion."""
@@ -76,19 +65,8 @@ def get_available_endpoints(ui_components: Dict[str, Any]) -> List[str]:
     Returns:
         List endpoint yang tersedia
     """
-    # Default endpoints - hanya Roboflow dan Google Drive
-    endpoints = ['Roboflow', 'Google Drive']
-    
-    # Cek ketersediaan tiap endpoint
-    try:
-        # Cek Drive (jika di Colab)
-        from smartcash.common.environment import get_environment_manager
-        env = get_environment_manager()
-        if not env.is_colab:
-            # Hapus Drive dari endpoint jika tidak di Colab
-            endpoints.remove('Google Drive')
-    except ImportError:
-        pass
+    # Hanya menggunakan Roboflow
+    endpoints = ['Roboflow']
     
     # Logging tersedia endpoint
     logger = ui_components.get('logger')
@@ -99,7 +77,7 @@ def get_available_endpoints(ui_components: Dict[str, Any]) -> List[str]:
 
 def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dapatkan konfigurasi endpoint yang dipilih.
+    Dapatkan konfigurasi Roboflow untuk download dataset.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -107,28 +85,16 @@ def get_endpoint_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi endpoint
     """
-    endpoint = ui_components.get('endpoint_dropdown', {}).value
-    config = {}
-    
-    if endpoint == 'Roboflow':
-        config = {
-            'type': 'roboflow',
-            'workspace': ui_components.get('rf_workspace', {}).value,
-            'project': ui_components.get('rf_project', {}).value,
-            'version': ui_components.get('rf_version', {}).value,
-            'api_key': ui_components.get('rf_apikey', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
-            'format': 'yolov5pytorch'  # Format tetap
-        }
-    elif endpoint == 'Google Drive':
-        config = {
-            'type': 'drive',
-            'folder': ui_components.get('drive_folder', {}).value,
-            'format': 'yolov5pytorch'  # Format tetap
-        }
-    
-    # Tambahkan konfigurasi output yang sama untuk semua endpoint
-    config.update({
+    # Konfigurasi Roboflow
+    config = {
+        'type': 'roboflow',
+        'workspace': ui_components.get('rf_workspace', {}).value,
+        'project': ui_components.get('rf_project', {}).value,
+        'version': ui_components.get('rf_version', {}).value,
+        'api_key': ui_components.get('rf_apikey', {}).value or os.environ.get('ROBOFLOW_API_KEY', ''),
+        'format': 'yolov5pytorch',  # Format tetap
         'output_dir': ui_components.get('output_dir', {}).value,
-    })
+        'validate': ui_components.get('validate_dataset', {}).value
+    }
     
     return config

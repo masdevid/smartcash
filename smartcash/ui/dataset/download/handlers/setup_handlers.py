@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/dataset/download/download_handlers.py
+File: smartcash/ui/dataset/download/handlers/setup_handlers.py
 Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan observer pattern
 """
 
@@ -54,8 +54,11 @@ def _setup_observers(ui_components: Dict[str, Any]) -> None:
         
         # Setup download progress observer
         setup_download_progress_observer(ui_components)
-    except ImportError:
-        pass
+    except ImportError as e:
+        # Log gagal import jika logger tersedia
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"ℹ️ Observer handler tidak tersedia: {str(e)}")
 
 def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
     """Setup API key handler untuk Roboflow."""
@@ -69,19 +72,13 @@ def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
             logger.debug("ℹ️ API key handler tidak tersedia")
 
 def _setup_endpoint_handlers(ui_components: Dict[str, Any]) -> None:
-    """Setup handlers untuk endpoint dropdown."""
-    # Import handler spesifik
-    from smartcash.ui.dataset.download.handlers.endpoint_handler import handle_endpoint_change
+    """Setup handlers untuk endpoint Roboflow."""
+    # Fungsi ini dipertahankan untuk kompatibilitas dengan kode lama
+    # tetapi tidak lagi memerlukan handler untuk dropdown karena kita hanya menggunakan Roboflow
     
-    # Bind handler ke dropdown
-    if 'endpoint_dropdown' in ui_components:
-        ui_components['endpoint_dropdown'].observe(
-            lambda change: handle_endpoint_change(change, ui_components),
-            names='value'
-        )
-        
-        # Inisialisasi tampilan awal
-        handle_endpoint_change({'new': ui_components['endpoint_dropdown'].value}, ui_components)
+    logger = ui_components.get('logger')
+    if logger:
+        logger.debug("ℹ️ Setup endpoint handler tidak diperlukan karena hanya menggunakan Roboflow")
 
 def _setup_download_button_handler(ui_components: Dict[str, Any]) -> None:
     """Setup handler untuk tombol download."""
@@ -113,8 +110,8 @@ def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
             step_tracker_name="download_step",
             overall_progress_key='progress_bar',
             step_progress_key='progress_bar',
-            overall_label_key='progress_message',
-            step_label_key='progress_message'
+            overall_label_key='overall_label',
+            step_label_key='step_label'
         )
         
         # Log setup berhasil jika ada logger
@@ -133,11 +130,16 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
         """Fungsi untuk membersihkan resources."""
         try:
             # Reset progress
-            if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-                ui_components['progress_bar'].layout.visibility = 'hidden'
-                ui_components['progress_message'].layout.visibility = 'hidden'
+            if 'progress_bar' in ui_components:
+                if hasattr(ui_components['progress_bar'], 'layout'):
+                    ui_components['progress_bar'].layout.visibility = 'hidden'
                 ui_components['progress_bar'].value = 0
-                ui_components['progress_message'].value = ""
+            
+            # Reset progress labels
+            for label_key in ['overall_label', 'step_label', 'progress_message']:
+                if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
+                    ui_components[label_key].layout.visibility = 'hidden'
+                    ui_components[label_key].value = ""
             
             # Unregister observer group jika ada
             if 'observer_manager' in ui_components and 'observer_group' in ui_components:

@@ -5,10 +5,12 @@ Deskripsi: Handler untuk proses download dataset dengan dukungan observer dan de
 
 from typing import Dict, Any, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor
+import os
+import time
 
 def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
-    Handler untuk tombol download dataset.
+    Handler untuk tombol download dataset dari Roboflow.
     
     Args:
         b: Button widget
@@ -23,9 +25,6 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         # Reset progress bar terlebih dahulu
         _reset_progress_bar(ui_components)
         
-        # Dapatkan endpoint yang dipilih
-        endpoint = ui_components.get('endpoint_dropdown', {}).value
-        
         # Konfirmasi download
         from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download, cancel_download
         # Sebelum menampilkan konfirmasi, persiapkan cancel_callback
@@ -38,7 +37,7 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         ui_components['cancel_download_callback'] = cancel_callback
         
         # Tampilkan konfirmasi
-        confirm_download(ui_components, endpoint, b)
+        confirm_download(ui_components, 'Roboflow', b)
         
     except Exception as e:
         # Tampilkan error
@@ -50,13 +49,13 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         # Aktifkan kembali tombol
         _disable_buttons(ui_components, False)
 
-def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
+def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') -> None:
     """
-    Eksekusi proses download dataset berdasarkan endpoint yang dipilih.
+    Eksekusi proses download dataset dari Roboflow.
     
     Args:
         ui_components: Dictionary komponen UI
-        endpoint: Endpoint yang dipilih (Roboflow, Google Drive, etc.)
+        endpoint: Parameter dipertahankan untuk kompatibilitas, selalu 'Roboflow'
     """
     logger = ui_components.get('logger')
     
@@ -78,7 +77,7 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
     
     try:
         # Reset UI dan persiapan download
-        _show_progress(ui_components, "Mempersiapkan download...")
+        _show_progress(ui_components, "Mempersiapkan download dari Roboflow...")
         
         # Tambahkan dummy update_config_from_ui jika tidak ada untuk mencegah error
         if 'update_config_from_ui' not in ui_components:
@@ -86,37 +85,23 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str) -> None:
             if download_logger: 
                 download_logger.debug("🔧 Menambahkan dummy update_config_from_ui untuk mencegah error")
         
-        # Cek API key jika endpoint adalah Roboflow
-        if endpoint == 'Roboflow':
-            # Validasi API key
-            from smartcash.ui.dataset.download.handlers.api_key_handler import check_api_key
-            has_key, api_key = check_api_key(ui_components)
-            
-            if not has_key:
-                # Tampilkan error
-                from smartcash.ui.utils.ui_logger import log_to_ui
-                error_msg = "API key Roboflow diperlukan untuk download"
-                log_to_ui(ui_components, error_msg, "error", "🔑")
-                if logger: logger.error(f"❌ {error_msg}")
-                
-                # Minta input API key
-                from smartcash.ui.dataset.download.handlers.api_key_handler import request_api_key_input
-                request_api_key_input(ui_components)
-                
-                # Reset UI
-                _reset_ui_after_download(ui_components)
-                return
-            
-            # Jalankan download dari Roboflow dalam thread terpisah
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                executor.submit(_download_from_roboflow, ui_components)
+        # Validasi API key
+        from smartcash.ui.dataset.download.handlers.api_key_handler import check_api_key
+        has_key, api_key = check_api_key(ui_components)
         
-        elif endpoint == 'Google Drive':
-            # Jalankan download dari Drive dalam thread terpisah
-            from smartcash.ui.dataset.download.handlers.drive_handler import process_drive_download
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                executor.submit(process_drive_download, ui_components)
-                
+        if not has_key:
+            # Tampilkan error
+            from smartcash.ui.utils.ui_logger import log_to_ui
+            error_msg = "API key Roboflow diperlukan untuk download"
+            log_to_ui(ui_components, error_msg, "error", "🔑")
+            
+            # Reset UI
+            _reset_ui_after_download(ui_components)
+            return
+            
+        # Download dari Roboflow
+        _download_from_roboflow(ui_components)
+    
     except Exception as e:
         # Tampilkan error
         from smartcash.ui.utils.ui_logger import log_to_ui
@@ -450,21 +435,36 @@ def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = ""
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-        ui_components['progress_message'].layout.visibility = 'hidden'
+    # Gunakan reset_progress dari shared component jika tersedia
+    try:
+        from smartcash.ui.components.progress_tracking import reset_progress
+        reset_progress(ui_components)
+        return
+    except Exception as e:
+        # Log error jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"⚠️ Error menggunakan shared progress reset: {str(e)}")
         
-        # Reset tracker jika ada
-        for tracker_key in ['download_tracker', 'download_step_tracker']:
-            if tracker_key in ui_components:
-                tracker = ui_components[tracker_key]
-                if hasattr(tracker, 'reset'):
-                    tracker.reset()
+    # Reset progress bar
+    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
+        ui_components['progress_bar'].value = 0
+        ui_components['progress_bar'].layout.visibility = 'hidden'
+    
+    # Reset labels
+    for label_key in ['overall_label', 'step_label', 'progress_message']:
+        if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
+            ui_components[label_key].value = ""
+            ui_components[label_key].layout.visibility = 'hidden'
+    
+    # Reset tracker jika tersedia
+    for tracker_key in ['download_tracker', 'download_step_tracker']:
+        if tracker_key in ui_components:
+            tracker = ui_components[tracker_key]
+            if hasattr(tracker, 'current'):
                 tracker.current = 0
-                if hasattr(tracker, 'set_description'):
-                    tracker.set_description("")
+            if hasattr(tracker, 'set_description'):
+                tracker.set_description("")
 
 def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
     """
@@ -474,11 +474,35 @@ def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
         ui_components: Dictionary komponen UI
         message: Pesan progress awal
     """
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = message
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
+    # Gunakan update_progress dari shared component jika tersedia
+    try:
+        from smartcash.ui.components.progress_tracking import update_progress
+        
+        update_progress(
+            ui_components=ui_components,
+            progress=0,
+            total=100,
+            message=message,
+            step=0,
+            total_steps=1,
+            step_message=message,
+            status_type='info'
+        )
+    except Exception as e:
+        # Log error jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"⚠️ Error menggunakan shared progress tracking: {str(e)}")
+            
+        # Fallback ke implementasi sederhana
+        if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            
+        for label_key in ['overall_label', 'step_label', 'progress_message']:
+            if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
+                ui_components[label_key].value = message
+                ui_components[label_key].layout.visibility = 'visible'
 
 def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
     """
@@ -489,17 +513,38 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: Optiona
         value: Nilai progress (0-100)
         message: Pesan progress opsional
     """
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].value = value
+    # Gunakan update_progress dari shared component jika tersedia
+    try:
+        from smartcash.ui.components.progress_tracking import update_progress
         
-    if message and 'progress_message' in ui_components:
-        ui_components['progress_message'].value = message
+        update_progress(
+            ui_components=ui_components,
+            progress=value,
+            total=100,
+            message=message,
+            status_type='info'
+        )
+    except Exception as e:
+        # Log error jika ada logger
+        logger = ui_components.get('logger')
+        if logger:
+            logger.debug(f"⚠️ Error menggunakan shared progress tracking: {str(e)}")
+            
+        # Fallback ke implementasi sederhana
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = value
+            
+        if message:
+            for label_key in ['overall_label', 'step_label', 'progress_message']:
+                if label_key in ui_components:
+                    ui_components[label_key].value = message
         
     # Update progress tracker jika tersedia
     tracker_key = 'download_tracker'
     if tracker_key in ui_components:
         tracker = ui_components[tracker_key]
-        tracker.update(value, message)
+        if hasattr(tracker, 'update'):
+            tracker.update(value, message)
 
 def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     """
@@ -523,12 +568,22 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     _disable_buttons(ui_components, False)
     
     # Pastikan tombol terlihat
-    for button_key in ['download_button', 'check_button']:
+    for button_key in ['download_button', 'check_button', 'reset_button']:
         if button_key in ui_components and hasattr(ui_components[button_key], 'layout'):
             ui_components[button_key].layout.display = 'block'
     
-    # Sembunyikan progress bar
-    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-    if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):
-        ui_components['progress_message'].layout.visibility = 'hidden'
+    # Reset progress bar
+    _reset_progress_bar(ui_components)
+    
+    # Update status panel jika tersedia
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(ui_components['status_panel'], 'Download selesai', 'success')
+    elif 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+        ui_components['update_status_panel'](ui_components, 'info', 'Download selesai')
+    
+    # Cleanup UI jika tersedia
+    if 'cleanup_ui' in ui_components and callable(ui_components['cleanup_ui']):
+        ui_components['cleanup_ui'](ui_components)
+    elif 'cleanup' in ui_components and callable(ui_components['cleanup']):
+        ui_components['cleanup']()

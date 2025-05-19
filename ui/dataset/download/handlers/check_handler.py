@@ -160,18 +160,29 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
         stats: Statistik dataset
         message: Pesan status
     """
-    from smartcash.ui.utils.ui_logger import log_to_ui
+    # Update status panel jika tersedia
+    if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+        ui_components['update_status_panel'](message, "info")
+    else:
+        # Fallback ke log_to_ui
+        from smartcash.ui.utils.ui_logger import log_to_ui
+        log_to_ui(ui_components, message, "info", "📊")
     
-    # Tentukan status berdasarkan message
-    status_type = "error" if "tidak ditemukan" in message.lower() or "tidak ada" in message.lower() else "success"
-    log_to_ui(ui_components, message, status_type)
+    # Update progress
+    _update_progress(ui_components, 100, "Pengecekan selesai")
     
-    # Jika tidak ada data, tidak perlu visualisasi
-    if stats['total_images'] == 0:
-        return
+    # Tampilkan statistik dalam summary container
+    summary_container = ui_components.get('summary_container')
+    if summary_container:
+        summary_container.clear_output()
+        summary_container.layout.display = 'block'
+        
+        # Tampilkan statistik dalam container
+        with summary_container:
+            display_dataset_stats(stats)
     
-    # Visualisasi distribusi dataset
-    status_output = ui_components.get('status')
+    # Tampilkan statistik dalam output status jika summary container tidak tersedia
+    status_output = ui_components.get('log_output') or ui_components.get('status')
     if status_output:
         with status_output:
             try:
@@ -247,11 +258,34 @@ def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
         ui_components: Dictionary komponen UI
         message: Pesan progress awal
     """
-    if 'progress_bar' in ui_components and 'progress_message' in ui_components:
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_message'].value = message
-        ui_components['progress_bar'].layout.visibility = 'visible'
-        ui_components['progress_message'].layout.visibility = 'visible'
+    # Gunakan update_progress dari shared component jika tersedia
+    from smartcash.ui.components.progress_tracking import update_progress
+    
+    try:
+        update_progress(
+            ui_components=ui_components,
+            progress=0,
+            total=100,
+            message=message,
+            step=0,
+            total_steps=1,
+            step_message=message,
+            status_type='info'
+        )
+        return
+    except Exception:
+        # Fallback ke implementasi lama
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].layout.visibility = 'visible'
+            
+        if 'overall_label' in ui_components:
+            ui_components['overall_label'].value = message
+            ui_components['overall_label'].layout.visibility = 'visible'
+            
+        if 'step_label' in ui_components:
+            ui_components['step_label'].value = message
+            ui_components['step_label'].layout.visibility = 'visible'
 
 def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
     """
@@ -262,11 +296,28 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: Optiona
         value: Nilai progress (0-100)
         message: Pesan progress opsional
     """
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].value = value
-        
-    if message and 'progress_message' in ui_components:
-        ui_components['progress_message'].value = message
+    # Gunakan update_progress dari shared component jika tersedia
+    from smartcash.ui.components.progress_tracking import update_progress
+    
+    try:
+        update_progress(
+            ui_components=ui_components,
+            progress=value,
+            total=100,
+            message=message,
+            status_type='info'
+        )
+    except Exception:
+        # Fallback ke implementasi lama
+        if 'progress_bar' in ui_components:
+            ui_components['progress_bar'].value = value
+            
+        if message:
+            if 'overall_label' in ui_components:
+                ui_components['overall_label'].value = message
+            
+            if 'step_label' in ui_components:
+                ui_components['step_label'].value = message
         
     # Update progress tracker jika tersedia
     tracker_key = 'download_tracker'

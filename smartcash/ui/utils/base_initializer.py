@@ -73,13 +73,30 @@ def initialize_module_ui(
                 multi_progress_config.get("step_label_key", "step_label")
             )
         
-        # Setup button handlers dengan shared handler
-        from smartcash.ui.handlers.processing_button_handler import setup_processing_button_handlers
-        ui_components = setup_processing_button_handlers(ui_components, module_name, config, env)
-        
-        # Setup cleanup handler dengan shared handler
-        from smartcash.ui.handlers.processing_cleanup_handler import setup_processing_cleanup_handler
-        ui_components = setup_processing_cleanup_handler(ui_components, module_name, config, env)
+        # Setup button dan cleanup handler spesifik untuk setiap modul
+        if module_name == 'preprocessing':
+            # Handler untuk preprocessing
+            from smartcash.ui.dataset.preprocessing.handlers.button_handler import setup_preprocessing_button_handlers
+            ui_components = setup_preprocessing_button_handlers(ui_components, module_name, config, env)
+            
+            from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import setup_cleanup_handler
+            ui_components = setup_cleanup_handler(ui_components, env, config)
+            
+        elif module_name == 'augmentation':
+            # Handler untuk augmentation
+            from smartcash.ui.dataset.augmentation.handlers.button_handler import setup_augmentation_button_handlers
+            ui_components = setup_augmentation_button_handlers(ui_components, module_name, config, env)
+            
+            from smartcash.ui.dataset.augmentation.handlers.cleanup_handler import setup_cleanup_handler
+            ui_components = setup_cleanup_handler(ui_components, env, config)
+            
+        elif module_name == 'download':
+            # Handler untuk download
+            from smartcash.ui.dataset.download.handlers.download_handler import setup_download_handler
+            ui_components = setup_download_handler(ui_components, env, config)
+            
+            from smartcash.ui.dataset.download.handlers.cleanup_handler import setup_download_cleanup_handler
+            ui_components = setup_download_cleanup_handler(ui_components, module_name, config, env)
         
         # Setup handler spesifik modul jika ada
         if setup_specific_handlers_func:

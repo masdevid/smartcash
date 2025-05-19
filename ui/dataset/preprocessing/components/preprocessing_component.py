@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/preprocessing_component.py
-Deskripsi: Komponen UI utama untuk preprocessing dataset
+Deskripsi: Komponen UI utama untuk preprocessing dataset menggunakan shared components
 """
 
 import ipywidgets as widgets
@@ -21,16 +21,18 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.utils.header_utils import create_header
     from smartcash.ui.utils.constants import COLORS, ICONS 
     from smartcash.ui.info_boxes.preprocessing_info import get_preprocessing_info
-    from smartcash.ui.utils.layout_utils import OUTPUT_WIDGET
-    from smartcash.ui.handlers.status_handler import create_status_panel
+    from smartcash.ui.utils.layout_utils import create_divider
+    
+    # Import shared components
+    from smartcash.ui.components.split_selector import create_split_selector
+    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
+    from smartcash.ui.components.progress_tracking import create_progress_tracking
+    from smartcash.ui.components.status_panel import create_status_panel
+    from smartcash.ui.components.log_accordion import create_log_accordion
     
     # Import komponen submodules preprocessing
     from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
     from smartcash.ui.dataset.preprocessing.components.validation_options import create_validation_options
-    from smartcash.ui.dataset.preprocessing.components.split_selector import create_split_selector
-    
-    # Import komponen button standar
-    from smartcash.ui.components.action_buttons import create_action_buttons, create_visualization_buttons
     
     # Header dengan komponen standar
     header = create_header(f"{ICONS['processing']} Dataset Preprocessing", 
@@ -41,7 +43,14 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     
     # Preprocessing options (split dari komponen besar)
     preprocess_options = create_preprocessing_options(config)
-    split_selector = create_split_selector()
+    
+    # Split selector menggunakan shared component
+    split_selector = create_split_selector(
+        selected_split='train',
+        description="Split Dataset:",
+        width='100%',
+        icon='split'
+    )
     
     # Validation options dalam accordion
     validation_options = create_validation_options(config)
@@ -50,52 +59,30 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     advanced_accordion = widgets.Accordion(children=[validation_options], selected_index=None)
     advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
     
-    # Buat tombol-tombol preprocessing dengan komponen standar
+    # Buat tombol-tombol preprocessing dengan shared component
     action_buttons = create_action_buttons(
         primary_label="Run Preprocessing",
         primary_icon="cog",
         cleanup_enabled=True
     )
     
-    # Buat tombol visualisasi meskipun tidak ditampilkan di UI utama
+    # Buat tombol visualisasi dengan shared component
     visualization_buttons = create_visualization_buttons()
     
-    # Progress tracking dengan styling standar
-    progress_bar = widgets.IntProgress(
-        value=0, min=0, max=100, 
-        description='Total:',
-        bar_style='info', 
-        orientation='horizontal',
-        layout=widgets.Layout(visibility='hidden', width='100%')
+    # Progress tracking dengan shared component
+    progress_components = create_progress_tracking(
+        module_name='preprocessing',
+        show_step_progress=True,
+        show_overall_progress=True,
+        width='100%'
     )
     
-    current_progress = widgets.IntProgress(
-        value=0, min=0, max=100, 
-        description='Split:',
-        bar_style='info', 
-        orientation='horizontal',
-        layout=widgets.Layout(visibility='hidden', width='100%')
+    # Log accordion dengan shared component
+    log_components = create_log_accordion(
+        module_name='preprocessing',
+        height='200px',
+        width='100%'
     )
-    
-    # Labels untuk progress
-    overall_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
-    step_label = widgets.HTML("", layout=widgets.Layout(margin='2px 0', visibility='hidden'))
-    
-    # Container progress dengan styling yang lebih konsisten
-    progress_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color:{COLORS['dark']}'>{ICONS['stats']} Progress</h4>"), 
-        progress_bar,
-        overall_label,
-        current_progress,
-        step_label
-    ])
-    
-    # Status output dengan layout standar
-    status = widgets.Output(layout=OUTPUT_WIDGET)
-    
-    # Log accordion dengan styling standar - terbuka secara default (selected_index=0)
-    log_accordion = widgets.Accordion(children=[status], selected_index=0)
-    log_accordion.set_title(0, f"{ICONS['file']} Preprocessing Logs")
     
     # Summary stats container dengan styling yang konsisten
     summary_container = widgets.Output(
@@ -120,9 +107,6 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
     # Help panel dengan komponen info_box standar
     help_panel = get_preprocessing_info()
     
-    # Layout UI dengan divider standar
-    from smartcash.ui.utils.layout_utils import create_divider
-    
     # Rakit komponen UI
     ui = widgets.VBox([
         header,
@@ -133,8 +117,8 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         advanced_accordion,
         create_divider(),
         action_buttons['container'],
-        progress_container,
-        log_accordion,
+        progress_components['progress_container'],
+        log_components['log_accordion'],
         summary_container,
         help_panel
     ])
@@ -155,19 +139,32 @@ def create_preprocessing_ui(env=None, config=None) -> Dict[str, Any]:
         'cleanup_button': action_buttons['cleanup_button'],
         'save_button': action_buttons['save_button'],
         'button_container': action_buttons['container'],
-        'progress_bar': progress_bar,
-        'current_progress': current_progress,
-        'overall_label': overall_label,
-        'step_label': step_label,
-        'status': status,
-        'log_accordion': log_accordion,
+        'visualization_buttons': visualization_buttons['container'],
+        'visualize_button': visualization_buttons['visualize_button'],
+        'compare_button': visualization_buttons['compare_button'],
+        'distribution_button': visualization_buttons.get('distribution_button'),
         'summary_container': summary_container,
+        'visualization_container': visualization_container,
         'module_name': 'preprocessing',
-        # Tambahkan visualization_buttons untuk mencegah KeyError
-        'visualization_buttons': visualization_buttons,
         # Default dataset paths
         'data_dir': 'data',
         'preprocessed_dir': 'data/preprocessed'
     }
+    
+    # Tambahkan komponen progress tracking
+    ui_components.update({
+        'progress_bar': progress_components['progress_bar'],
+        'progress_container': progress_components['progress_container'],
+        'current_progress': progress_components.get('current_progress'),
+        'overall_label': progress_components.get('overall_label'),
+        'step_label': progress_components.get('step_label')
+    })
+    
+    # Tambahkan komponen log
+    ui_components.update({
+        'status': log_components['log_output'],
+        'log_output': log_components['log_output'],
+        'log_accordion': log_components['log_accordion']
+    })
     
     return ui_components

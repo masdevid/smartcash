@@ -99,7 +99,6 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
     
     # Container untuk opsi dasar
     basic_options_container = widgets.VBox([
-        widgets.HTML(f"<h5 style='color: {COLORS['dark']}; margin: 5px 0;'>{ICONS['settings']} Opsi Dasar</h5>"),
         num_variations,
         target_count,
         output_prefix,

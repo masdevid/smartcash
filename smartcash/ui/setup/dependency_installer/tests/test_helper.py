@@ -14,6 +14,8 @@ class WarningTestCase(unittest.TestCase):
         """Setup untuk test case"""
         warnings.filterwarnings('ignore', category=DeprecationWarning)
         warnings.filterwarnings('ignore', category=UserWarning)
+        warnings.filterwarnings('ignore', category=ResourceWarning)
+        warnings.filterwarnings('ignore', message='.*configuration.*')
 
 def ignore_layout_warnings(func):
     """Decorator untuk mengabaikan layout warnings"""
@@ -22,5 +24,16 @@ def ignore_layout_warnings(func):
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', category=DeprecationWarning)
             warnings.filterwarnings('ignore', category=UserWarning)
+            warnings.filterwarnings('ignore', category=ResourceWarning)
+            warnings.filterwarnings('ignore', message='.*configuration.*')
+            return func(*args, **kwargs)
+    return wrapper
+
+def ignore_config_warnings(func):
+    """Decorator untuk mengabaikan configuration warnings"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='.*configuration.*')
             return func(*args, **kwargs)
     return wrapper

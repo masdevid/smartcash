@@ -39,9 +39,7 @@ def get_project_requirements(project_name: str) -> List[str]:
             "requests>=2.23.0", 
             "scipy>=1.4.1",
             "torch>=1.7.0", 
-            "torchvision>=0.8.1", 
-            # tqdm dikomentari karena akan dilewati
-            # "tqdm>=4.64.0"
+            "torchvision>=0.8.1"
         ]
     }
     
@@ -93,8 +91,8 @@ def get_package_groups() -> Dict[str, Any]:
     """
     return {
         'yolov5_req': lambda: get_project_requirements('yolov5'),
-        'torch_req': ['torch', 'torchvision', 'torchaudio'],
-        'albumentations_req': ['albumentations>=1.0.0'],
+        'torch_req': ['torch>=1.7.0', 'torchvision>=0.8.1', 'torchaudio>=0.7.0'],
+        'albumentations_req': ['opencv-python>=4.1.2', 'albumentations>=1.0.0'],
         'notebook_req': ['ipywidgets>=7.0.0', 'tqdm>=4.0.0'],
         'smartcash_req': lambda: get_project_requirements('smartcash'),
         'matplotlib_req': ['matplotlib>=3.0.0', 'pandas>=1.0.0', 'seaborn>=0.11.0']

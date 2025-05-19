@@ -15,7 +15,6 @@ from tqdm.auto import tqdm
 from smartcash.common.exceptions import DatasetProcessingError
 from smartcash.dataset.services.preprocessor.pipeline import PreprocessingPipeline
 from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
-from smartcash.components.observer import notify, EventTopics
 
 # Import utils yang dioptimalkan
 from smartcash.dataset.utils.move_utils import get_source_dir, resolve_splits, calculate_total_images
@@ -43,8 +42,11 @@ class DatasetPreprocessor:
     def preprocess_dataset(self, split: str = None, force_reprocess: bool = False, show_progress: bool = True, **kwargs) -> Dict[str, Any]:
         """Preprocess dataset dan simpan hasil dengan pelaporan progres yang dioptimalkan."""
         try:
-            try: notify(event_type=EventTopics.PREPROCESSING_START, sender="dataset_preprocessor", message=f"Memulai preprocessing dataset {split or 'semua split'}") 
-            except Exception: pass
+            try:
+                from smartcash.components.observer import notify, EventTopics
+                notify(event_type=EventTopics.PREPROCESSING_START, sender="dataset_preprocessor", message=f"Memulai preprocessing dataset {split or 'semua split'}") 
+            except Exception:
+                pass
             
             # Validasi dan inisialisasi
             if not (splits_to_process := resolve_splits(split)): return {"error": "Tidak ada split valid"}
@@ -149,17 +151,23 @@ class DatasetPreprocessor:
                 total_files_all=total_progress
             )
             
-            try: notify(event_type=EventTopics.PREPROCESSING_END, sender="dataset_preprocessor", 
+            try:
+                from smartcash.components.observer import notify, EventTopics
+                notify(event_type=EventTopics.PREPROCESSING_END, sender="dataset_preprocessor", 
                        message=f"Preprocessing selesai: {total_images} gambar berhasil diproses", 
                        duration=total_result['processing_time'])
-            except Exception: pass
+            except Exception:
+                pass
                 
             return total_result
                 
         except Exception as e:
             self.logger.error(f"❌ Gagal melakukan preprocessing: {str(e)}")
-            try: notify(event_type=EventTopics.PREPROCESSING_ERROR, sender="dataset_preprocessor", message=f"Error preprocessing: {str(e)}")
-            except Exception: pass
+            try:
+                from smartcash.components.observer import notify, EventTopics
+                notify(event_type=EventTopics.PREPROCESSING_ERROR, sender="dataset_preprocessor", message=f"Error preprocessing: {str(e)}")
+            except Exception:
+                pass
             raise DatasetProcessingError(f"Gagal melakukan preprocessing: {str(e)}")
     
     def _get_source_dir(self, split: str) -> str:

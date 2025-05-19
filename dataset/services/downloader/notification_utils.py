@@ -4,7 +4,7 @@ Deskripsi: Utilitas untuk menstandarisasi notifikasi observer dalam downloader s
 """
 
 from typing import Dict, Any, Optional
-from smartcash.components.observer import notify, EventTopics
+# from smartcash.components.observer import notify, EventTopics  # <-- REMOVE THIS
 
 def notify_event(
     sender: Any,
@@ -25,15 +25,23 @@ def notify_event(
     """
     try:
         # Cek jika sudah dalam tahap notifikasi untuk mencegah rekursi
-        if hasattr(sender, '_notify_in_progress') and sender._notify_in_progress:
+        in_progress = False
+        if isinstance(sender, dict):
+            in_progress = sender.get('_notify_in_progress', False)
+        else:
+            in_progress = getattr(sender, '_notify_in_progress', False)
+        if in_progress:
             return
-            
         # Set flag untuk mencegah rekursi
-        setattr(sender, '_notify_in_progress', True)
+        if isinstance(sender, dict):
+            sender['_notify_in_progress'] = True
+        else:
+            setattr(sender, '_notify_in_progress', True)
         
         # Coba dapatkan EventTopics dari konstanta jika string
         if isinstance(event_type, str):
             try:
+                from smartcash.components.observer import EventTopics
                 event_const = getattr(EventTopics, event_type, None)
                 event_type = event_const if event_const is not None else event_type
             except (ImportError, AttributeError):
@@ -56,13 +64,17 @@ def notify_event(
             observer_manager.notify(event_type, sender, **params)
         else:
             # Langsung notifikasi via fungsi global
+            from smartcash.components.observer import notify
             notify(event_type, sender, **params)
     except Exception as e:
         # Jangan mengganggu proses jika notifikasi gagal
         pass
     finally:
         # Reset flag
-        setattr(sender, '_notify_in_progress', False)
+        if isinstance(sender, dict):
+            sender['_notify_in_progress'] = False
+        else:
+            setattr(sender, '_notify_in_progress', False)
 
 
 # Fungsi helper untuk semua event tipe download

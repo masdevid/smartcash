@@ -12,7 +12,6 @@ from smartcash.common.exceptions import DatasetError
 from smartcash.dataset.utils.dataset_utils import DatasetUtils
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS
 from smartcash.dataset.services.downloader.notification_utils import notify_service_event
-from smartcash.components.observer import notify, EventTopics
 
 class DownloadService:
     """Layanan utama untuk mengelola download dataset dari berbagai sumber."""

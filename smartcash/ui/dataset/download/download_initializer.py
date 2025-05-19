@@ -14,6 +14,7 @@ from smartcash.ui.dataset.download.utils.notification_manager import (
     DownloadUIEvents
 )
 from smartcash.dataset.services.downloader.download_service import DownloadService
+from smartcash.dataset.services.downloader.notification_utils import notify_service_event
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download_handlers
 from smartcash.ui.dataset.download.handlers.config_handler import (
@@ -51,6 +52,7 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
     # Tambahkan fungsi notifikasi ke UI components
     ui_components['notify_log'] = notify_log
     ui_components['notify_progress'] = notify_progress
+    ui_components['notify_service_event'] = notify_service_event
     
     # Inisialisasi download service
     download_service = DownloadService(
@@ -69,30 +71,81 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> D
     try:
         loaded_config = load_config()
         update_ui_from_config(loaded_config, ui_components)
+        
+        # Notifikasi bahwa konfigurasi berhasil dimuat
+        notify_service_event(
+            "download",
+            "start",
+            ui_components,
+            observer_manager,
+            message="Konfigurasi berhasil dimuat",
+            step="config"
+        )
     except Exception as e:
         logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
+        
+        # Notifikasi error konfigurasi
+        notify_service_event(
+            "download",
+            "error",
+            ui_components,
+            observer_manager,
+            message=f"Gagal memuat konfigurasi: {str(e)}",
+            step="config"
+        )
     
     # Setup cleanup function
     def cleanup_resources():
         """Fungsi untuk membersihkan resources."""
         try:
+            # Notifikasi cleanup
+            notify_service_event(
+                "download",
+                "progress",
+                ui_components,
+                observer_manager,
+                message="Membersihkan resources...",
+                step="cleanup"
+            )
             # Hapus observer
             if observer_manager:
-                observer_manager.clear_observers()
-            
+                # Use unregister_all if available
+                if hasattr(observer_manager, 'unregister_all'):
+                    observer_manager.unregister_all()
+                elif hasattr(observer_manager, 'clear_observers'):
+                    observer_manager.clear_observers()
             # Reset UI components
             if 'progress_container' in ui_components:
                 ui_components['progress_container'].layout.display = 'none'
-            
             if 'status_panel' in ui_components:
                 ui_components['status_panel'].value = "Siap untuk download dataset"
-            
             if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
                 ui_components['log_output'].clear_output()
-                
+            # Notifikasi cleanup selesai
+            notify_service_event(
+                "download",
+                "complete",
+                ui_components,
+                observer_manager,
+                message="Resources berhasil dibersihkan",
+                step="cleanup"
+            )
             logger.info("🧹 Resources berhasil dibersihkan")
         except Exception as e:
-            logger.error(f"❌ Error saat membersihkan resources: {str(e)}")
+            error_msg = f"Error saat membersihkan resources: {str(e)}"
+            # Use logger from ui_components if available
+            if 'logger' in ui_components and hasattr(ui_components['logger'], 'error'):
+                ui_components['logger'].error(error_msg)
+            logger.error(f"❌ {error_msg}")
+            # Notifikasi error cleanup
+            notify_service_event(
+                "download",
+                "error",
+                ui_components,
+                observer_manager,
+                message=error_msg,
+                step="cleanup"
+            )
     
     # Tambahkan cleanup function ke UI components
     ui_components['cleanup'] = cleanup_resources

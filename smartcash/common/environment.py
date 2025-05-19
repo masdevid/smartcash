@@ -100,12 +100,20 @@ class EnvironmentManager:
             is_mounted, drive_path = detect_drive_mount()
             
             if is_mounted:
-                # Set drive path ke SmartCash
+                # Set drive path ke direktori root Colab
                 self._drive_mounted = True
-                self._drive_path = Path(drive_path) / 'SmartCash'
-                # Pastikan directory SmartCash ada di Drive
-                os.makedirs(self._drive_path, exist_ok=True)
-                if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
+                
+                # PERBAIKAN: Gunakan /content sebagai direktori utama di Colab
+                # Ini menghindari redundansi direktori /content/SmartCash/configs dan /content/configs
+                if Path('/content').exists():  # Deteksi lingkungan Colab
+                    self._drive_path = Path('/content')
+                    if self.logger: self.logger.debug(f"✅ Menggunakan direktori Colab: {self._drive_path}")
+                else:
+                    # Fallback ke SmartCash di drive jika bukan di Colab
+                    self._drive_path = Path(drive_path) / 'SmartCash'
+                    # Pastikan directory SmartCash ada di Drive
+                    os.makedirs(self._drive_path, exist_ok=True)
+                    if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
                 
                 # Sinkronisasi otomatis file **_config.yaml saat drive terhubung
                 self._sync_config_files_on_drive_connect()

@@ -431,15 +431,21 @@ def sync_all_configs(
         # Tidak perlu log debug untuk setiap file
         
         try:
-            # Cek jika realpath sama - PERBAIKAN: gunakan exists() untuk mencegah error jika file tidak ada
+            # Dapatkan path lengkap
             local_path = local_config_dir / file_name
             drive_path = drive_config_dir / file_name
             
-            if local_path.exists() and drive_path.exists() and os.path.realpath(local_path) == os.path.realpath(drive_path):
-                msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
-                # Tidak perlu log debug
-                results["skipped"].append({"file": file_name, "message": msg})
-                continue
+            # PERBAIKAN: Hanya periksa realpath jika kedua file ada
+            # Ini mencegah error jika salah satu file tidak ada
+            if local_path.exists() and drive_path.exists():
+                try:
+                    if os.path.realpath(local_path) == os.path.realpath(drive_path):
+                        msg = f"Path lokal sama dengan drive: {file_name}, dilewati"
+                        results["skipped"].append({"file": file_name, "message": msg})
+                        continue
+                except Exception:
+                    # Jika ada error saat memeriksa realpath, lanjutkan dengan sinkronisasi
+                    pass
             
             # Panggil sync_config_with_drive
             success, message, _ = sync_config_with_drive(

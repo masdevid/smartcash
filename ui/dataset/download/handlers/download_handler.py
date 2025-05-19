@@ -9,6 +9,31 @@ import os
 import time
 from pathlib import Path
 
+class DownloadHandler:
+    """Handler untuk proses download dataset."""
+    
+    def __init__(self, ui_components: Dict[str, Any]):
+        """
+        Inisialisasi DownloadHandler.
+        
+        Args:
+            ui_components: Dictionary komponen UI
+        """
+        self.ui_components = ui_components
+    
+    def download(self) -> None:
+        """Eksekusi proses download dataset."""
+        execute_download(self.ui_components)
+    
+    def handle_button_click(self, button: Any) -> None:
+        """
+        Handler untuk tombol download.
+        
+        Args:
+            button: Button widget
+        """
+        handle_download_button_click(button, self.ui_components)
+
 def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
     Handler untuk tombol download pada UI download.

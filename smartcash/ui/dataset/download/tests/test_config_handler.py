@@ -6,9 +6,11 @@ Deskripsi: Test untuk config_handler pada modul download dataset
 import unittest
 import os
 import tempfile
+import shutil
 import yaml
 from pathlib import Path
 from unittest.mock import patch, MagicMock, mock_open
+import ipywidgets as widgets
 
 from smartcash.ui.dataset.download.handlers.config_handler import (
     load_default_config,
@@ -21,25 +23,22 @@ from smartcash.ui.dataset.download.handlers.config_handler import (
 )
 
 class TestDownloadConfigHandler(unittest.TestCase):
-    """Test untuk config_handler pada modul download dataset."""
+    """Test suite untuk config_handler pada modul download dataset."""
     
     def setUp(self):
-        """Setup untuk setiap test."""
-        # Buat mock untuk UI components
-        self.ui_components = {
-            'workspace': MagicMock(value='test-workspace'),
-            'project': MagicMock(value='test-project'),
-            'version': MagicMock(value='1'),
-            'api_key': MagicMock(value='test-api-key'),
-            'output_dir': MagicMock(value='test-output-dir'),
-            'validate_dataset': MagicMock(value=True),
-            'backup_checkbox': MagicMock(value=True),
-            'backup_dir': MagicMock(value='test-backup-dir'),
-            'source_dropdown': MagicMock(value='roboflow'),
-            'logger': MagicMock()
-        }
+        """Setup untuk setiap test case."""
+        # Buat mock UI components
+        self.ui_components = self._create_mock_ui_components()
         
-        # Buat mock untuk config
+        # Setup logger mock
+        self.logger_mock = MagicMock()
+        self.ui_components['logger'] = self.logger_mock
+        
+        # Setup temporary directory untuk test
+        self.temp_dir = tempfile.mkdtemp()
+        self.ui_components['output_dir'].value = self.temp_dir
+        
+        # Default config for tests
         self.config = {
             'data': {
                 'download': {
@@ -56,6 +55,75 @@ class TestDownloadConfigHandler(unittest.TestCase):
                 }
             }
         }
+        
+        # Setup mock untuk DatasetManager dan DownloadService
+        self.dataset_manager_mock = MagicMock()
+        self.download_service_mock = MagicMock()
+        
+        # Setup patch untuk import
+        self.dataset_manager_patch = patch('smartcash.dataset.manager.DatasetManager', 
+                                          return_value=self.dataset_manager_mock)
+        self.download_service_patch = patch('smartcash.dataset.services.downloader.download_service.DownloadService', 
+                                           return_value=self.download_service_mock)
+        
+        # Start patches
+        self.dataset_manager_mock = self.dataset_manager_patch.start()
+        self.download_service_mock = self.download_service_patch.start()
+    
+    def tearDown(self):
+        """Cleanup setelah setiap test case."""
+        # Stop patches
+        self.dataset_manager_patch.stop()
+        self.download_service_patch.stop()
+        
+        # Hapus temporary directory
+        if os.path.exists(self.temp_dir):
+            shutil.rmtree(self.temp_dir)
+    
+    def _create_mock_ui_components(self):
+        """Buat mock UI components untuk testing."""
+        # Buat mock untuk semua komponen UI yang diperlukan
+        ui_components = {
+            'download_button': MagicMock(spec=widgets.Button),
+            'check_button': MagicMock(spec=widgets.Button),
+            'reset_button': MagicMock(spec=widgets.Button),
+            'save_button': MagicMock(spec=widgets.Button),
+            'source_dropdown': MagicMock(spec=widgets.Dropdown, value='roboflow'),
+            'backup_checkbox': MagicMock(spec=widgets.Checkbox, value=True),
+            'backup_dir': MagicMock(spec=widgets.Text, value='data/backup'),
+            'cleanup_button': MagicMock(spec=widgets.Button),
+            'progress_bar': MagicMock(spec=widgets.FloatProgress),
+            'overall_label': MagicMock(spec=widgets.HTML),
+            'step_label': MagicMock(spec=widgets.HTML),
+            'status_panel': MagicMock(spec=widgets.HTML),
+            'log_output': MagicMock(spec=widgets.Output),
+            'summary_container': MagicMock(spec=widgets.Output),
+            'confirmation_area': MagicMock(spec=widgets.Output),
+            'progress_container': MagicMock(spec=widgets.VBox),
+            'workspace': MagicMock(spec=widgets.Text, value='test-workspace'),
+            'project': MagicMock(spec=widgets.Text, value='test-project'),
+            'version': MagicMock(spec=widgets.Text, value='1'),
+            'api_key': MagicMock(spec=widgets.Text, value='test-api-key'),
+            'output_dir': MagicMock(spec=widgets.Text, value='data/test'),
+            'validate_dataset': MagicMock(spec=widgets.Checkbox, value=True),
+            'reset_progress_bar': MagicMock(),
+            'dataset_stats': {
+                'total_images': 100,
+                'total_labels': 90,
+                'classes': {'0': 50, '1': 40}
+            },
+            'download_timestamp': '2025-05-19T12:14:39+07:00',
+            'download_running': False
+        }
+        
+        # Tambahkan layout ke komponen yang membutuhkannya
+        for key in ['progress_bar', 'overall_label', 'step_label', 'progress_container', 
+                   'summary_container', 'confirmation_area']:
+            ui_components[key].layout = MagicMock()
+            ui_components[key].layout.visibility = 'visible'
+            ui_components[key].layout.display = 'block'
+        
+        return ui_components
     
     def test_load_default_config(self):
         """Test load_default_config."""
@@ -85,18 +153,19 @@ class TestDownloadConfigHandler(unittest.TestCase):
         # Verifikasi hasil
         self.assertTrue(result)
         mock_makedirs.assert_called_once()
-        mock_file_open.assert_called_once()
+        # Verifikasi bahwa file config dibuka untuk menulis
+        mock_file_open.assert_any_call(Path('configs/dataset_config.yaml'), 'w')
         mock_yaml_dump.assert_called_once()
         logger.info.assert_called()
     
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
     @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
-    @patch('pathlib.Path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data='{}')
-    @patch('yaml.safe_load')
-    def test_load_config_file_not_exists(self, mock_yaml_load, mock_file_open, mock_path_exists, mock_load_default):
+    def test_load_config_file_not_exists(self, mock_load_default, mock_get_config):
         """Test load_config ketika file tidak ada."""
         # Setup mock
-        mock_path_exists.return_value = False
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = None
+        mock_get_config.return_value = mock_config_manager
         mock_load_default.return_value = self.config
         
         # Panggil fungsi
@@ -106,24 +175,20 @@ class TestDownloadConfigHandler(unittest.TestCase):
         self.assertEqual(result, self.config)
         mock_load_default.assert_called_once()
     
-    @patch('smartcash.ui.dataset.download.handlers.config_handler.load_default_config')
-    @patch('pathlib.Path.exists')
-    @patch('builtins.open', new_callable=mock_open, read_data='{}')
-    @patch('yaml.safe_load')
-    def test_load_config_file_exists(self, mock_yaml_load, mock_file_open, mock_path_exists, mock_load_default):
+    @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
+    def test_load_config_file_exists(self, mock_get_config):
         """Test load_config ketika file ada."""
         # Setup mock
-        mock_path_exists.return_value = True
-        mock_yaml_load.return_value = self.config
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = self.config
+        mock_get_config.return_value = mock_config_manager
         
         # Panggil fungsi
         result = load_config()
         
         # Verifikasi hasil
         self.assertEqual(result, self.config)
-        # Verifikasi bahwa file config dibuka (tidak memeriksa jumlah panggilan karena ada panggilan untuk log)
-        mock_file_open.assert_any_call(Path('config/dataset_config.yaml'), 'r')
-        mock_yaml_load.assert_called_once()
+        mock_config_manager.get_module_config.assert_called_once_with('dataset_download')
     
     def test_update_config_from_ui(self):
         """Test update_config_from_ui."""
@@ -136,7 +201,7 @@ class TestDownloadConfigHandler(unittest.TestCase):
         self.assertIn('roboflow', result['data'])
         
         # Verifikasi nilai dari UI
-        self.assertEqual(result['data']['download']['output_dir'], 'test-output-dir')
+        self.assertEqual(result['data']['download']['output_dir'], 'data/test')
         self.assertEqual(result['data']['roboflow']['workspace'], 'test-workspace')
         self.assertEqual(result['data']['roboflow']['project'], 'test-project')
         self.assertEqual(result['data']['roboflow']['version'], '1')

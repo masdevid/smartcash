@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/download/handlers/cleanup_handler.py
-Deskripsi: Handler pembersihan untuk modul download dataset
+Deskripsi: Handler untuk proses cleanup dataset
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -121,3 +121,14 @@ def setup_download_cleanup_handler(ui_components: Dict[str, Any], module_type: s
     ui_components['download_running'] = False
     
     return ui_components
+
+class CleanupHandler:
+    """Handler untuk proses cleanup dataset."""
+    def __init__(self, ui_components: Dict[str, Any]):
+        self.ui_components = ui_components
+    
+    def cleanup(self) -> None:
+        from smartcash.dataset.manager import DatasetManager
+        output_dir = self.ui_components.get('output_dir', {}).value if 'output_dir' in self.ui_components else 'data'
+        manager = DatasetManager()
+        manager.cleanup_dataset(output_dir=output_dir)

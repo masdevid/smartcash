@@ -11,7 +11,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
 from smartcash.ui.training_config.hyperparameters.components import create_hyperparameters_ui_components

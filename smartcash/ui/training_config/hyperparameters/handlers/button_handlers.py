@@ -9,13 +9,15 @@ from IPython.display import display, clear_output
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import sync_to_drive, sync_from_drive
 from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import update_config_from_ui, update_ui_from_config
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.setLevel("CRITICAL")
 
 def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -33,7 +35,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         # Dapatkan environment manager jika belum tersedia
         env = env or get_environment_manager()
         
-        # Dapatkan config manager
+        # Dapatkan config manager singleton
         config_manager = get_config_manager()
         
         # Validasi config
@@ -57,11 +59,9 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 # Simpan konfigurasi
                 success = config_manager.save_module_config('hyperparameters', updated_config)
                 
-                # Pastikan UI components teregistrasi untuk persistensi
-                try:
-                    config_manager.register_ui_components('hyperparameters', ui_components)
-                except Exception as persist_error:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+                # UI components sudah teregistrasi di update_config_from_ui
+                # Memastikan persistensi UI dengan notifikasi observer
+                config_manager.notify_observers('hyperparameters', updated_config)
                 
                 # Tampilkan pesan sukses atau warning
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
@@ -86,12 +86,12 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 try:
                     if env.is_drive_mounted:
                         # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        logger.critical(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
                         sync_to_drive(None, ui_components)
                 except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                    logger.critical(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
                 
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan")
+                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan")
             except Exception as e:
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
                 with status_panel:
@@ -101,7 +101,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                         alert_type='error'
                     ))
                 
-                logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
+                logger.critical(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
         
         # Handler untuk tombol reset
         def on_reset_click(b):
@@ -120,11 +120,9 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 # Simpan default config
                 success = config_manager.save_module_config('hyperparameters', default_config)
                 
-                # Pastikan UI components teregistrasi untuk persistensi
-                try:
-                    config_manager.register_ui_components('hyperparameters', ui_components)
-                except Exception as persist_error:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+                # UI components sudah teregistrasi di update_ui_from_config
+                # Memastikan persistensi UI dengan notifikasi observer
+                config_manager.notify_observers('hyperparameters', default_config)
                 
                 # Tampilkan pesan sukses atau warning
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
@@ -149,12 +147,12 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 try:
                     if env.is_drive_mounted:
                         # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        logger.critical(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
                         sync_to_drive(None, ui_components)
                 except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                    logger.critical(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
                 
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default")
+                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default")
             except Exception as e:
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
                 with status_panel:
@@ -164,7 +162,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                         alert_type='error'
                     ))
                 
-                logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
+                logger.critical(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
         
         # Pasang handler ke tombol
         if 'save_button' in ui_components:
@@ -181,5 +179,5 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         return ui_components
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
+        logger.critical(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
         return ui_components

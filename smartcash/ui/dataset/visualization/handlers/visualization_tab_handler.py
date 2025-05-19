@@ -17,7 +17,7 @@ import threading
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.dataset.visualization.dashboard.class_visualizer import ClassVisualizer
 from smartcash.dataset.visualization.dashboard.layer_visualizer import LayerVisualizer

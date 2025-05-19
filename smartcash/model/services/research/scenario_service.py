@@ -13,7 +13,7 @@ import numpy as np
 from datetime import datetime
 
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 
 class ScenarioService:
     """
@@ -40,7 +40,9 @@ class ScenarioService:
             base_dir: Direktori dasar untuk menyimpan skenario
             logger: Logger untuk mencatat aktivitas
         """
+        # Setup logger dengan level CRITICAL untuk mengurangi log
         self.logger = logger or get_logger("scenario_service")
+        self.logger.setLevel("CRITICAL")
         self.config_manager = get_config_manager()
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(exist_ok=True, parents=True)

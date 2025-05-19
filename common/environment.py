@@ -439,7 +439,7 @@ class EnvironmentManager:
         """
         try:
             # Import config manager
-            from smartcash.common.config.manager import get_config_manager
+            from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             
             # Sinkronisasi konfigurasi
@@ -508,7 +508,7 @@ class EnvironmentManager:
         """
         try:
             # Import config manager
-            from smartcash.common.config.manager import get_config_manager
+            from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             
             # Dapatkan informasi environment

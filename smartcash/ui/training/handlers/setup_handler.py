@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from IPython.display import display, HTML
 
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.utils.constants import ICONS

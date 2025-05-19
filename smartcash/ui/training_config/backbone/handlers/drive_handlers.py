@@ -10,12 +10,14 @@ from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.backbone.handlers.config_handlers import update_ui_from_config
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.setLevel("CRITICAL")
 
 def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> None:
     """
@@ -46,30 +48,15 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                     ))
                 return
             
-            # Dapatkan ConfigManager
+            # Dapatkan ConfigManager singleton
             config_manager = get_config_manager()
             
-            # Dapatkan konfigurasi
-            config = config_manager.get_module_config('model')
+            # Gunakan sync_to_drive dari ConfigManager yang baru
+            success, message = config_manager.sync_to_drive('model')
             
-            # Dapatkan path file konfigurasi di drive
-            drive_config_path = os.path.join(
-                env_manager.drive_path,
-                'configs',
-                'model_config.yaml'
-            )
-            
-            # Pastikan direktori ada
-            os.makedirs(os.path.dirname(drive_config_path), exist_ok=True)
-            
-            # Simpan konfigurasi ke drive
-            try:
-                # Gunakan save_config dengan parameter yang benar
-                config_manager.save_config(drive_config_path, create_dirs=True)
-                success = True
-            except Exception as e:
-                logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi ke drive: {str(e)}")
-                success = False
+            # Log pesan dari sync_to_drive
+            if not success:
+                logger.critical(f"{ICONS.get('error', '❌')} {message}")
             
             if success:
                 # Tampilkan pesan sukses
@@ -80,7 +67,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                         alert_type='success'
                     ))
                 
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive")
+                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive")
             else:
                 # Tampilkan pesan error
                 with status_panel:
@@ -90,7 +77,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                         alert_type='error'
                     ))
                 
-                logger.error(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive")
+                logger.critical(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive")
         except Exception as e:
             # Tampilkan pesan error
             with status_panel:
@@ -100,7 +87,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                     alert_type='error'
                 ))
             
-            logger.error(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
+            logger.critical(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
 
 def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -131,33 +118,22 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                     ))
                 return
             
-            # Dapatkan ConfigManager
+            # Dapatkan ConfigManager singleton
             config_manager = get_config_manager()
             
-            # Dapatkan path file konfigurasi di drive
-            drive_config_path = os.path.join(
-                env_manager.drive_path,
-                'configs',
-                'model_config.yaml'
-            )
+            # Gunakan sync_with_drive dari ConfigManager yang baru
+            success, message, drive_config = config_manager.sync_with_drive('model_config.yaml', sync_strategy='drive_priority')
             
-            # Cek apakah file konfigurasi ada di drive
-            if not os.path.exists(drive_config_path):
+            # Log pesan dari sync_with_drive
+            if not success:
+                logger.critical(f"{ICONS.get('error', '❌')} {message}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} File konfigurasi tidak ditemukan di Google Drive",
+                        f"{ICONS.get('error', '❌')} {message}",
                         alert_type='error'
                     ))
                 return
-            
-            # Load konfigurasi dari drive
-            try:
-                from smartcash.common.io import load_yaml
-                drive_config = load_yaml(drive_config_path, {})
-            except Exception as e:
-                logger.error(f"{ICONS.get('error', '❌')} Error saat memuat konfigurasi dari drive: {str(e)}")
-                drive_config = None
             
             if drive_config:
                 # Simpan konfigurasi ke lokal
@@ -175,7 +151,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                             alert_type='success'
                         ))
                     
-                    logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive")
+                    logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive")
                 else:
                     # Tampilkan pesan error
                     with status_panel:
@@ -185,7 +161,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                             alert_type='error'
                         ))
                     
-                    logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive")
+                    logger.critical(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive")
             else:
                 # Tampilkan pesan error
                 with status_panel:
@@ -195,7 +171,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                         alert_type='error'
                     ))
                 
-                logger.error(f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive")
+                logger.critical(f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive")
         except Exception as e:
             # Tampilkan pesan error
             with status_panel:
@@ -205,4 +181,4 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                     alert_type='error'
                 ))
             
-            logger.error(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}")
+            logger.critical(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}")

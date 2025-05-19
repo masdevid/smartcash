@@ -9,7 +9,7 @@ from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.backbone.handlers.config_handlers import (
@@ -19,7 +19,9 @@ from smartcash.ui.training_config.backbone.handlers.config_handlers import (
 )
 from smartcash.ui.training_config.backbone.handlers.drive_handlers import sync_to_drive
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.setLevel("CRITICAL")
 
 def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -39,7 +41,7 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Menyimpan konfigurasi backbone..."))
     
     try:
-        # Dapatkan ConfigManager
+        # Dapatkan ConfigManager singleton
         config_manager = get_config_manager()
         
         # Update config dari UI
@@ -47,6 +49,9 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         
         # Simpan config ke file
         success = config_manager.save_module_config('model', config_to_save)
+        
+        # Memastikan persistensi UI dengan notifikasi observer
+        config_manager.ensure_ui_persistence('model', config_to_save)
         
         # Pastikan UI components teregistrasi untuk persistensi
         try:
@@ -81,7 +86,7 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         except Exception as e:
             logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
         
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan")
+        logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disimpan")
     except Exception as e:
         # Tampilkan pesan error
         with status_panel:
@@ -91,7 +96,7 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
                 alert_type='error'
             ))
         
-        logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
+        logger.critical(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
 
 def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -111,7 +116,7 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi backbone..."))
     
     try:
-        # Dapatkan ConfigManager
+        # Dapatkan ConfigManager singleton
         config_manager = get_config_manager()
         
         # Dapatkan default config
@@ -122,6 +127,9 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         
         # Simpan default config ke file
         success = config_manager.save_module_config('model', default_config)
+        
+        # Memastikan persistensi UI dengan notifikasi observer
+        config_manager.ensure_ui_persistence('model', default_config)
         
         # Pastikan UI components teregistrasi untuk persistensi
         try:
@@ -156,7 +164,7 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         except Exception as e:
             logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
         
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default")
+        logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default")
     except Exception as e:
         # Tampilkan pesan error
         with status_panel:
@@ -166,4 +174,4 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
                 alert_type='error'
             ))
         
-        logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
+        logger.critical(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")

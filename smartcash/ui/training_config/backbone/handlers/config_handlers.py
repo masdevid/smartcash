@@ -8,10 +8,12 @@ import ipywidgets as widgets
 from IPython.display import clear_output, display
 
 from smartcash.ui.utils.constants import ICONS
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.setLevel("CRITICAL")
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -23,11 +25,14 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary berisi konfigurasi yang diperbarui
     """
-    # Dapatkan ConfigManager
+    # Dapatkan ConfigManager singleton
     config_manager = get_config_manager()
     
-    # Dapatkan konfigurasi saat ini
-    current_config = config_manager.get_module_config('model')
+    # Dapatkan konfigurasi saat ini atau buat baru jika belum ada
+    current_config = config_manager.get_module_config('model', {})
+    
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('backbone', ui_components)
     
     # Dapatkan nilai dari komponen UI
     model_type = ui_components.get('model_type_dropdown').value
@@ -123,11 +128,14 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
         ui_components: Dictionary berisi komponen UI
         config_to_use: Dictionary berisi konfigurasi yang akan digunakan (opsional)
     """
-    # Dapatkan ConfigManager
+    # Dapatkan ConfigManager singleton
     config_manager = get_config_manager()
     
-    # Dapatkan konfigurasi
-    current_config = config_to_use if config_to_use else config_manager.get_module_config('model')
+    # Dapatkan konfigurasi saat ini atau gunakan yang diberikan
+    current_config = config_to_use if config_to_use else config_manager.get_module_config('model', {})
+    
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('backbone', ui_components)
     
     # Dapatkan nilai dari konfigurasi
     model_config = current_config.get('model', {})
@@ -177,17 +185,24 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
     # Update info panel
     update_backbone_info(ui_components)
 
-def update_backbone_info(ui_components: Dict[str, Any]) -> None:
+def update_backbone_info(ui_components: Dict[str, Any]):
     """
     Update panel informasi backbone.
     
     Args:
         ui_components: Dictionary berisi komponen UI
     """
+    # Dapatkan panel informasi
     info_panel = ui_components.get('info_panel')
     if not info_panel:
-        logger.error(f"{ICONS.get('error', '❌')} Info panel tidak ditemukan")
+        logger.critical(f"{ICONS.get('error', '❌')} Info panel tidak ditemukan")
         return
+        
+    # Dapatkan ConfigManager singleton
+    config_manager = get_config_manager()
+    
+    # Pastikan UI components teregistrasi untuk persistensi
+    config_manager.register_ui_components('backbone', ui_components)
     
     # Dapatkan nilai dari komponen UI
     model_type = ui_components.get('model_type_dropdown').value

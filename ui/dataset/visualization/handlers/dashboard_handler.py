@@ -13,7 +13,7 @@ from datetime import datetime
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config import ConfigManager, get_config_manager
 from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.ui.dataset.visualization.components.dashboard_cards import (
     create_preprocessing_cards, create_augmentation_cards

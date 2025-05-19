@@ -17,7 +17,7 @@ import random
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config import ConfigManager, get_config_manager
 
 logger = get_logger(__name__)
 

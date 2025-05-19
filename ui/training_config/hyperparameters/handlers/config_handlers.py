@@ -9,11 +9,13 @@ from IPython.display import display, clear_output
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.setLevel("CRITICAL")
 
 def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
@@ -26,7 +28,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Dapatkan config manager
+    # Dapatkan config manager singleton
     config_manager = get_config_manager()
     
     # Dapatkan konfigurasi yang akan digunakan
@@ -39,6 +41,9 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Optional
             current_config = config_manager.get_module_config('hyperparameters', {})
     else:
         current_config = config_to_use
+        
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('hyperparameters', ui_components)
     
     try:
         
@@ -155,6 +160,12 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
     Returns:
         Konfigurasi yang diupdate
     """
+    # Dapatkan config manager singleton
+    config_manager = get_config_manager()
+    
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('hyperparameters', ui_components)
+    
     try:
         
         # Update batch size
@@ -245,9 +256,9 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Simpan konfigurasi di ui_components
         ui_components['config'] = config
         
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil diupdate dari UI")
+        logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil diupdate dari UI")
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error update config: {str(e)}")
+        logger.critical(f"{ICONS.get('error', '❌')} Error update config: {str(e)}")
     
     return config
 
@@ -258,6 +269,12 @@ def update_hyperparameters_info(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
+    # Dapatkan config manager singleton
+    config_manager = get_config_manager()
+    
+    # Register UI components untuk persistensi
+    config_manager.register_ui_components('hyperparameters', ui_components)
+    
     if 'info_panel' not in ui_components:
         return
     
@@ -294,7 +311,7 @@ def update_hyperparameters_info(ui_components: Dict[str, Any]) -> None:
             clear_output(wait=True)
             display(widgets.HTML(info_html))
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat update info hyperparameter: {str(e)}")
+        logger.critical(f"{ICONS.get('error', '❌')} Error saat update info hyperparameter: {str(e)}")
         with ui_components['info_panel']:
             clear_output(wait=True)
             display(create_info_alert(

@@ -19,7 +19,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 
 logger = get_logger(__name__)
 

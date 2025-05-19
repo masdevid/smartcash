@@ -10,7 +10,7 @@ import threading
 import time
 from tqdm.auto import tqdm
 
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.ui.training.handlers.training_handler_utils import (
     get_training_status,
@@ -28,9 +28,10 @@ def run_training(ui_components: Dict[str, Any], logger=None):
         logger: Logger untuk mencatat aktivitas
     """
     # Dapatkan logger jika tidak disediakan
-    logger = logger or get_logger("training_ui")
+    logger = logger or get_logger(__name__)
+    logger.setLevel("CRITICAL")
     
-    # Dapatkan ConfigManager
+    # Dapatkan ConfigManager singleton
     config_manager = get_config_manager()
     
     try:

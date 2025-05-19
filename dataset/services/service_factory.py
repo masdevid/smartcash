@@ -141,17 +141,21 @@ def get_dataset_service(service_name: str, config: Optional[Dict[str, Any]] = No
     """
     # Jika config tidak disediakan, gunakan default
     if config is None:
-        from smartcash.common.config.manager import get_config_manager
+        from smartcash.common.config import get_config_manager
         config_manager = get_config_manager()
-        dataset_path = config_manager.get('dataset_path', None)
+        # Dapatkan konfigurasi dataset dari ConfigManager
+        dataset_config = config_manager.get_module_config('dataset', {})
+        
+        # Dapatkan dataset path dari konfigurasi
+        dataset_path = dataset_config.get('dataset_path', None)
         
         if not dataset_path:
             raise ValueError("Dataset path tidak ditemukan dalam konfigurasi")
             
         config = {
             'dataset_dir': dataset_path,
-            'img_size': config_manager.get('img_size', 640),
-            'multilayer': config_manager.get('multilayer', True)
+            'img_size': dataset_config.get('img_size', 640),
+            'multilayer': dataset_config.get('multilayer', True)
         }
     
     # Buat instance factory

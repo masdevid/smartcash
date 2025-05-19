@@ -3,7 +3,7 @@ File: smartcash/common/config/compat.py
 Deskripsi: Modul kompatibilitas untuk ConfigManager
 """
 
-from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.config import ConfigManager, get_config_manager
 
 # Tambahkan method get_instance sebagai static method ke ConfigManager
 # untuk kompatibilitas dengan kode lama

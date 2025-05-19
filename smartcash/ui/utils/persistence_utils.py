@@ -20,7 +20,7 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], module_name: str, logge
         Dictionary UI components yang sudah terdaftar
     """
     # Import ConfigManager
-    from smartcash.common.config.manager import get_config_manager
+    from smartcash.common.config import get_config_manager
     
     # Dapatkan instance ConfigManager
     config_manager = get_config_manager()
@@ -74,7 +74,7 @@ def validate_ui_param(value: Any, default_value: Any,
         Nilai yang valid atau default
     """
     # Import ConfigManager
-    from smartcash.common.config.manager import get_config_manager
+    from smartcash.common.config import get_config_manager
     
     # Dapatkan instance ConfigManager
     config_manager = get_config_manager()
@@ -187,7 +187,7 @@ def register_config_observer(module_name: str, ui_components: Dict[str, Any],
         logger: Logger untuk logging
     """
     # Import ConfigManager
-    from smartcash.common.config.manager import get_config_manager
+    from smartcash.common.config import get_config_manager
     
     # Dapatkan instance ConfigManager
     config_manager = get_config_manager()

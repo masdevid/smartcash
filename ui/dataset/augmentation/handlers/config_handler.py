@@ -5,7 +5,7 @@ Deskripsi: Handler konfigurasi untuk augmentasi dataset
 
 import os
 from typing import Dict, Any, List, Optional, Tuple
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config import ConfigManager, get_config_manager
 from smartcash.common.logger import get_logger
 
 def get_default_augmentation_config() -> Dict[str, Any]:
@@ -115,8 +115,8 @@ def load_augmentation_config() -> Dict[str, Any]:
     # Jika dipanggil dari pengujian lain, gunakan mock
     if is_from_test:
         try:
-            # Coba gunakan ConfigManager
-            config_manager = ConfigManager()
+            # Coba gunakan ConfigManager singleton
+            config_manager = get_config_manager()
             config = config_manager.get_module_config('augmentation')
             if config:
                 return {'augmentation': config}
@@ -139,8 +139,8 @@ def load_augmentation_config() -> Dict[str, Any]:
     
     # Untuk kasus non-pengujian
     try:
-        # Coba gunakan ConfigManager
-        config_manager = ConfigManager()
+        # Coba gunakan ConfigManager singleton
+        config_manager = get_config_manager()
         config = config_manager.get_module_config('augmentation')
         if config:
             return {'augmentation': config}

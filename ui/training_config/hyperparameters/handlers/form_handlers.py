@@ -9,7 +9,7 @@ from IPython.display import display, clear_output
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
 
 logger = get_logger(__name__)
 

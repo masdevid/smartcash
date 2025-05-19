@@ -86,24 +86,36 @@ def run_batch_installation(
     if not packages:
         if logger: logger.info("ℹ️ Tidak ada package yang perlu diinstall")
         return True, stats
-        
+    
+    # Dapatkan tracker
+    tracker_key = 'dependency_installer_tracker'
+    tracker = ui_components.get(tracker_key)
+    
     # Setup progress
     if progress_bar and hasattr(progress_bar, 'max'):
         progress_bar.max = len(packages)
         progress_bar.value = 0
+        # Pastikan progress bar terlihat
+        if hasattr(progress_bar, 'layout') and hasattr(progress_bar.layout, 'visibility'):
+            progress_bar.layout.visibility = 'visible'
         
     if progress_label:
         progress_label.value = "Memulai instalasi packages..."
+        # Pastikan label terlihat
+        if hasattr(progress_label, 'layout') and hasattr(progress_label.layout, 'visibility'):
+            progress_label.layout.visibility = 'visible'
     
     # Track start time
     start_time = time.time()
     
+    # Setup tracker jika tersedia
+    if tracker:
+        tracker.set_total(len(packages))
+        tracker.current = 0
+        tracker.desc = "Memulai instalasi packages..."
+    
     # Install packages satu per satu
     for i, package in enumerate(packages):
-        # Update progress
-        if progress_bar:
-            progress_bar.value = i
-            
         # Extract package name for display
         package_name = package.split('=')[0].split('>')[0].split('<')[0].strip()
         
@@ -133,10 +145,14 @@ def run_batch_installation(
                     display(create_status_indicator('error', f"Gagal menginstall {package}: {error_msg}"))
         
         # Update progress tracker jika tersedia
-        tracker_key = 'dependency_installer_tracker'
-        if tracker_key in ui_components:
-            tracker = ui_components[tracker_key]
+        if tracker:
             tracker.update(1, f"Installed {i+1}/{len(packages)}: {package_name}")
+        # Jika tidak ada tracker, update progress bar langsung
+        elif progress_bar and hasattr(progress_bar, 'value'):
+            progress_bar.value = i + 1
+            if hasattr(progress_bar, 'description'):
+                percentage = int((i + 1) / len(packages) * 100)
+                progress_bar.description = f"Proses: {percentage}%"
         
         # Custom status update jika disediakan
         if update_status:
@@ -146,14 +162,12 @@ def run_batch_installation(
     stats['duration'] = time.time() - start_time
     
     # Complete progress
-    if progress_bar:
-        progress_bar.value = len(packages)
-    
-    # Update progress tracker
-    tracker_key = 'dependency_installer_tracker'
-    if tracker_key in ui_components:
-        tracker = ui_components[tracker_key]
+    if tracker:
         tracker.complete(f"Instalasi selesai: {stats['success']}/{stats['total']} berhasil")
+    elif progress_bar:
+        progress_bar.value = len(packages)
+        if hasattr(progress_bar, 'description'):
+            progress_bar.description = f"Proses: 100%"
     
     # Update progress label
     if progress_label:

@@ -13,7 +13,7 @@ def setup_progress_tracking(
     progress_label_key: str = 'progress_message',
     total: int = 100,
     description: str = "Progress"
-) -> None:
+) -> Any:
     """
     Setup integrasi antara widget UI dan progress_tracker dari common.
     
@@ -24,6 +24,9 @@ def setup_progress_tracking(
         progress_label_key: Key untuk progress label widget di ui_components
         total: Total nilai progres
         description: Deskripsi progres
+        
+    Returns:
+        Progress tracker instance atau None jika gagal
     """
     logger = ui_components.get('logger')
     progress_bar = ui_components.get(progress_widget_key)
@@ -32,7 +35,7 @@ def setup_progress_tracking(
     if not progress_bar:
         if logger:
             logger.warning(f"⚠️ Widget progress bar '{progress_widget_key}' tidak ditemukan")
-        return
+        return None
     
     try:
         # Import progress tracker
@@ -61,12 +64,20 @@ def setup_progress_tracking(
                 if hasattr(progress_bar, 'description'):
                     percentage = int(progress_info['progress_pct'])
                     progress_bar.description = f"Proses: {percentage}%"
+                
+                # Pastikan progress bar terlihat
+                if hasattr(progress_bar, 'layout') and hasattr(progress_bar.layout, 'visibility'):
+                    progress_bar.layout.visibility = 'visible'
             
             # Update label jika ada dan message tersedia
             if progress_label and hasattr(progress_label, 'value'):
                 # Pilih pesan dari progress info
                 message = progress_info.get('desc', description)
                 progress_label.value = message
+                
+                # Pastikan label terlihat
+                if hasattr(progress_label, 'layout') and hasattr(progress_label.layout, 'visibility'):
+                    progress_label.layout.visibility = 'visible'
         
         # Daftarkan callback ke tracker
         tracker.add_callback(update_progress_ui)
@@ -82,10 +93,13 @@ def setup_progress_tracking(
         
         if logger:
             logger.debug(f"✅ Progress tracking berhasil disetup: {tracker_name}")
+        
+        return tracker
     
     except ImportError as e:
         if logger:
             logger.warning(f"⚠️ Error saat setup progress tracking: {str(e)}")
+        return None
 
 def register_progress_observer(ui_components: Dict[str, Any], tracker_name: str) -> None:
     """
@@ -139,6 +153,14 @@ def register_progress_observer(ui_components: Dict[str, Any], tracker_name: str)
                 EventTopics.DOWNLOAD_PROGRESS,
                 EventTopics.DOWNLOAD_START,
                 EventTopics.DOWNLOAD_END
+            ]
+        elif tracker_name == 'dependency_installer':
+            # Tambahkan event khusus untuk dependency installer
+            progress_events = [
+                EventTopics.PROGRESS_UPDATE,
+                EventTopics.PROGRESS_START,
+                EventTopics.PROGRESS_COMPLETE,
+                EventTopics.DEPENDENCY_INSTALL_PROGRESS
             ]
         else:
             # Default progress events
@@ -211,6 +233,9 @@ def _handle_progress_event(
             # Update progress jika ada increment
             if increment > 0:
                 tracker.update(increment, message)
+            elif increment == 0 and message:  # Update pesan meskipun tidak ada perubahan progress
+                tracker.desc = message
+                tracker.notify_callbacks()
     
     elif event_type.endswith('.complete') or event_type.endswith('.end'):
         # Complete progress

@@ -31,7 +31,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     from smartcash.ui.setup.package_installer import run_batch_installation
     
     # Setup progress tracking
-    setup_progress_tracking(
+    tracker = setup_progress_tracking(
         ui_components, 
         tracker_name="dependency_installer",
         progress_widget_key="install_progress",
@@ -39,6 +39,10 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
         total=100,
         description="Instalasi dependencies"
     )
+    
+    # Pastikan tracker tersedia di ui_components dengan kunci yang benar
+    if tracker and 'dependency_installer_tracker' not in ui_components:
+        ui_components['dependency_installer_tracker'] = tracker
     
     # Dapatkan package groups
     PACKAGE_GROUPS = get_package_groups()
@@ -137,6 +141,25 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
         """Handler untuk tombol install."""
         # Dapatkan packages yang perlu diinstall
         missing_packages = get_all_missing_packages(ui_components)
+        
+        # Reset progress bar dan label
+        progress_bar = ui_components.get('install_progress')
+        progress_label = ui_components.get('progress_label')
+        
+        if progress_bar:
+            progress_bar.value = 0
+            if hasattr(progress_bar, 'layout') and hasattr(progress_bar.layout, 'visibility'):
+                progress_bar.layout.visibility = 'visible'
+        
+        if progress_label:
+            progress_label.value = "Memulai instalasi packages..."
+            if hasattr(progress_label, 'layout') and hasattr(progress_label.layout, 'visibility'):
+                progress_label.layout.visibility = 'visible'
+        
+        # Reset tracker jika tersedia
+        tracker = ui_components.get('dependency_installer_tracker')
+        if tracker:
+            tracker.reset()
         
         # Display ringkasan
         logger = ui_components.get('logger')

@@ -23,6 +23,7 @@ class EventTopics:
     EXPORT = "export"
     RESTORE = "restore"
     PROGRESS = "progress"
+    DEPENDENCY = "dependency"
     
     # Progress events - dikonsolidasikan ke namespace sendiri
     PROGRESS_START = "progress.start"
@@ -85,6 +86,12 @@ class EventTopics:
     AUGMENTATION_CLEANUP_START = f"{AUGMENTATION}.cleanup.start"
     AUGMENTATION_CLEANUP_END = f"{AUGMENTATION}.cleanup.end"
     AUGMENTATION_CLEANUP_ERROR = f"{AUGMENTATION}.cleanup.error"
+    
+    # Event hierarkis dependency installer - menggunakan format namespace konsisten
+    DEPENDENCY_INSTALL_START = f"{DEPENDENCY}.install.start"
+    DEPENDENCY_INSTALL_PROGRESS = f"{DEPENDENCY}.install.progress"
+    DEPENDENCY_INSTALL_COMPLETE = f"{DEPENDENCY}.install.complete"
+    DEPENDENCY_INSTALL_ERROR = f"{DEPENDENCY}.install.error"
     
     # Event hierarkis checkpoint - menggunakan format namespace konsisten
     CHECKPOINT_SAVE = f"{CHECKPOINT}.save"

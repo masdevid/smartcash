@@ -179,16 +179,19 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
         )
     )
     
+    # Pastikan config tidak None
+    config_data = config or {}
+    
     # Tampilkan informasi konfigurasi yang sudah diatur
     with config_info:
         display(HTML(f"""
         <h4 style='margin-top:0;'>{ICONS.get('info', 'ℹ️')} Informasi Konfigurasi</h4>
         <p>Training akan menggunakan konfigurasi yang sudah diatur pada modul-modul sebelumnya:</p>
         <ul>
-            <li><b>Backbone:</b> {config.get('model', {}).get('backbone', 'efficientnet_b4')}</li>
-            <li><b>Batch Size:</b> {config.get('hyperparameters', {}).get('batch_size', 16)}</li>
-            <li><b>Epochs:</b> {config.get('hyperparameters', {}).get('epochs', 100)}</li>
-            <li><b>Learning Rate:</b> {config.get('hyperparameters', {}).get('learning_rate', 0.001)}</li>
+            <li><b>Backbone:</b> {config_data.get('model', {}).get('backbone', 'efficientnet_b4')}</li>
+            <li><b>Batch Size:</b> {config_data.get('hyperparameters', {}).get('batch_size', 16)}</li>
+            <li><b>Epochs:</b> {config_data.get('hyperparameters', {}).get('epochs', 100)}</li>
+            <li><b>Learning Rate:</b> {config_data.get('hyperparameters', {}).get('learning_rate', 0.001)}</li>
         </ul>
         <p>Untuk mengubah konfigurasi, gunakan cell konfigurasi model, hyperparameter, dan training strategy.</p>
         """))

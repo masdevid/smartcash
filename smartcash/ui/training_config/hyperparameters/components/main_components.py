@@ -92,34 +92,28 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     # Tambahkan ke ui_components untuk kompatibilitas dengan tes
     ui_components['sync_info'] = sync_info_component['sync_info']
     
-    # Buat form container untuk tab konfigurasi dengan grid flex layout
-    # Buat container untuk setiap box parameter
-    basic_box_container = widgets.Box([basic_components['basic_box']], 
-                                    layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                                          border='1px solid #eaeaea', border_radius='5px'))
-    
-    optimization_box_container = widgets.Box([optimization_components['optimization_box']], 
-                                           layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                                                 border='1px solid #eaeaea', border_radius='5px'))
-    
-    advanced_box_container = widgets.Box([advanced_components['advanced_box']], 
-                                        layout=widgets.Layout(width='100%', overflow='visible', padding='5px', 
-                                                              border='1px solid #eaeaea', border_radius='5px'))
-    
-    # Buat grid container menggunakan CSS Grid
-    grid_container = widgets.GridBox(
-        children=[basic_box_container, optimization_box_container, advanced_box_container],
-        layout=widgets.Layout(
+    # Buat form container untuk tab konfigurasi dengan 3 kolom sejajar
+    form_container = widgets.VBox([
+        widgets.HBox([
+            widgets.Box([basic_components['basic_box']], 
+                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                                            border='1px solid #eaeaea', border_radius='5px', margin='0 5px 0 0')),
+            widgets.Box([optimization_components['optimization_box']], 
+                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                                            border='1px solid #eaeaea', border_radius='5px', margin='0 5px')),
+            widgets.Box([advanced_components['advanced_box']], 
+                       layout=widgets.Layout(width='33%', overflow='visible', padding='5px', 
+                                            border='1px solid #eaeaea', border_radius='5px', margin='0 0 0 5px'))
+        ], layout=widgets.Layout(
             width='100%',
-            grid_template_columns='repeat(3, 1fr)',
-            grid_gap='10px',
-            padding='0',
-            margin='0'
-        )
-    )
-    
-    # Buat form container dengan grid layout
-    form_container = widgets.VBox([grid_container,
+            display='flex',
+            flex_flow='row nowrap',
+            align_items='flex-start',
+            justify_content='space-between',
+            overflow='visible',
+            margin='0',
+            padding='0'
+        )),
         widgets.VBox([
             ui_components['button_container'],
             widgets.HBox([ui_components['sync_info']], layout=widgets.Layout(justify_content='flex-end', width='100%', margin='0', padding='0'))

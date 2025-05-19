@@ -109,14 +109,41 @@ def create_augmentation_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.dataset.augmentation.components.augmentation_options import create_combined_options
     combined_options = create_combined_options(config)
 
-    # Tidak perlu container terpisah untuk save_reset_buttons
+    # Buat Opsi Dasar dari combined_options
+    # Gunakan layout 2 baris dengan 2 kolom di baris pertama
     
+    # Baris 1: Opsi Dasar (kolom 1), Opsi Lanjut (kolom 2)
+    row1 = widgets.HBox([
+        # Kolom 1: Opsi Dasar
+        widgets.VBox([
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Dasar</h4>"),
+            augmentation_options
+        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px')),
+        
+        # Kolom 2: Opsi Lanjut
+        widgets.VBox([
+            widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 5px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
+            advanced_options
+        ], layout=widgets.Layout(width='48%', padding='5px', border='1px solid #eaeaea', border_radius='5px'))
+    ], layout=widgets.Layout(width='100%', justify_content='space-between'))
+    
+    # Baris 2: Jenis Augmentasi & Target Split
+    row2 = widgets.VBox([
+        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['augmentation']} Jenis Augmentasi & Target Split</h4>"),
+        combined_options
+    ], layout=widgets.Layout(width='100%', padding='5px', margin='10px 0', border='1px solid #eaeaea', border_radius='5px'))
+    
+    # Container untuk tombol save/reset
+    button_container = widgets.Box(
+        [save_reset_buttons['container']], 
+        layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0')
+    )
+    
+    # Gabungkan semua komponen
     settings_container = widgets.VBox([
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['settings']} Opsi Lanjutan</h4>"),
-        advanced_options,
-        widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 10px; margin-bottom: 5px;'>{ICONS['augmentation']} Jenis Augmentasi & Split</h4>"),
-        combined_options,
-        widgets.Box([save_reset_buttons['container']], layout=widgets.Layout(display='flex', justify_content='flex-end', width='100%', margin='10px 0 5px 0'))
+        row1,
+        row2,
+        button_container
     ], layout=widgets.Layout(width='100%', padding='0'))
 
     # Rakit komponen UI dengan layout yang lebih compact

@@ -219,24 +219,16 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
     val_slider.observe(update_sliders, names='value')
     test_slider.observe(update_sliders, names='value')
     
-    # Buat panel informasi sebagai accordion
+    # Buat help panel dengan info box standar
     from smartcash.ui.info_boxes.split_info import get_split_info
-    from smartcash.ui.components.info_accordion import create_info_accordion
     
-    # Buat konten info
-    info_content = get_split_info() if 'get_split_info' in globals() else widgets.HTML(
-        f"<div style='padding: 10px; background-color: #f8f9fa; margin-top: 0;'>"
+    # Gunakan get_split_info jika tersedia, jika tidak buat HTML standar
+    help_panel = get_split_info() if 'get_split_info' in globals() else widgets.HTML(
+        f"<div style='padding: 10px; background-color: #f8f9fa; border-left: 5px solid {COLORS.get('info', '#3498db')}; margin-top: 15px;'>"
+        f"<h4>{ICONS.get('info', 'ℹ️')} Informasi Split Dataset</h4>"
         "<p>Konfigurasi split dataset digunakan untuk membagi dataset menjadi train, validation, dan test.</p>"
         "<p>Pastikan total ratio selalu 1.0 untuk hasil yang optimal.</p>"
         "</div>"
-    )
-    
-    # Buat accordion info
-    info_panel = create_info_accordion(
-        title="Informasi Split Dataset",
-        content=info_content,
-        icon="info",
-        open_by_default=False
     )
     
     # Buat container untuk ratio split
@@ -282,7 +274,7 @@ def create_split_ui(config: Dict[str, Any] = None) -> Dict[str, Any]:
         header,
         ui_components['status_panel'],
         form_container,
-        info_panel['container']  # Gunakan container dari accordion
+        help_panel  # Gunakan help_panel langsung
     ], layout=widgets.Layout(width='100%', padding='10px', overflow='visible'))
     
     # Tambahkan UI ke komponen

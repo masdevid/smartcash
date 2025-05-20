@@ -37,9 +37,7 @@ class TestProgressTracking(unittest.TestCase):
         )
         
         from smartcash.ui.dataset.download.utils.ui_observers import (
-            register_ui_observers,
-            LogOutputObserver,
-            ProgressBarObserver
+            register_ui_observers
         )
         
         # Setup observer manager
@@ -55,8 +53,6 @@ class TestProgressTracking(unittest.TestCase):
         self.notify_log = notify_log
         self.notify_progress = notify_progress
         self.register_ui_observers = register_ui_observers
-        self.LogOutputObserver = LogOutputObserver
-        self.ProgressBarObserver = ProgressBarObserver
     
     def test_register_ui_observers(self):
         """Test bahwa register_ui_observers berfungsi tanpa error."""

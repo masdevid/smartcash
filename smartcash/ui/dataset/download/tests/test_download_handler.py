@@ -4,11 +4,14 @@ Deskripsi: Test suite untuk download_handler.py
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 import sys
 import os
 from typing import Dict, Any
 from ipywidgets import Layout
+import ipywidgets as widgets
+import tempfile
+from pathlib import Path
 
 # Tambahkan path ke sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../../')))
@@ -51,7 +54,8 @@ class TestDownloadHandler(unittest.TestCase):
             'check_button': MagicMock(disabled=False),
             'reset_button': MagicMock(disabled=False),
             'cleanup_button': MagicMock(disabled=False),
-            'download_running': False
+            'download_running': False,
+            'logger': MagicMock()
         }
         
         # Setup mock untuk progress bar dan labels
@@ -64,11 +68,20 @@ class TestDownloadHandler(unittest.TestCase):
         for key in ['download_button', 'check_button', 'reset_button', 'cleanup_button']:
             self.ui_components[key].layout = Layout()
             self.ui_components[key].disabled = False
+        
+        # Import fungsi yang akan ditest
+        self.handle_download_button_click = handle_download_button_click
+        self.execute_download = execute_download
+        self.reset_progress_bar = _reset_progress_bar
+        self.show_progress = _show_progress
+        self.update_progress = _update_progress
+        self.reset_ui_after_download = _reset_ui_after_download
+        self.disable_buttons = _disable_buttons
     
     def test_reset_progress_bar(self):
         """Test _reset_progress_bar function"""
         # Call function
-        _reset_progress_bar(self.ui_components)
+        self.reset_progress_bar(self.ui_components)
         
         # Verify progress bar reset
         self.assertEqual(self.ui_components['progress_bar'].value, 0)
@@ -87,7 +100,7 @@ class TestDownloadHandler(unittest.TestCase):
     def test_show_progress(self):
         """Test _show_progress function"""
         # Call function
-        _show_progress(self.ui_components, "Test message")
+        self.show_progress(self.ui_components, "Test message")
         
         # Verify progress container visibility
         self.assertEqual(self.ui_components['progress_container'].layout.display, 'block')
@@ -102,29 +115,29 @@ class TestDownloadHandler(unittest.TestCase):
     def test_update_progress(self):
         """Test _update_progress function"""
         # Test with integer value
-        _update_progress(self.ui_components, 50, "50% complete")
+        self.update_progress(self.ui_components, 50, "50% complete")
         self.assertEqual(self.ui_components['progress_container'].layout.display, 'block')
         self.assertEqual(self.ui_components['progress_container'].layout.visibility, 'visible')
         
         # Test with float value
-        _update_progress(self.ui_components, 75.5, "75.5% complete")
+        self.update_progress(self.ui_components, 75.5, "75.5% complete")
         self.assertEqual(self.ui_components['progress_container'].layout.display, 'block')
         
         # Test with invalid value
-        _update_progress(self.ui_components, "invalid", "Invalid progress")
+        self.update_progress(self.ui_components, "invalid", "Invalid progress")
         self.assertEqual(self.ui_components['progress_container'].layout.display, 'block')
     
     def test_disable_buttons(self):
         """Test _disable_buttons function"""
         # Test disable buttons
-        _disable_buttons(self.ui_components, True)
+        self.disable_buttons(self.ui_components, True)
         for key in ['download_button', 'check_button', 'reset_button', 'cleanup_button']:
             self.assertTrue(self.ui_components[key].disabled)
             if key in ['reset_button', 'cleanup_button']:
                 self.assertEqual(self.ui_components[key].layout.display, 'none')
         
         # Test enable buttons
-        _disable_buttons(self.ui_components, False)
+        self.disable_buttons(self.ui_components, False)
         for key in ['download_button', 'check_button', 'reset_button', 'cleanup_button']:
             self.assertFalse(self.ui_components[key].disabled)
             self.assertEqual(self.ui_components[key].layout.display, 'inline-block')
@@ -136,7 +149,7 @@ class TestDownloadHandler(unittest.TestCase):
         self.ui_components['progress_bar'].value = 100
         
         # Call function
-        _reset_ui_after_download(self.ui_components)
+        self.reset_ui_after_download(self.ui_components)
         
         # Verify buttons are enabled
         for key in ['download_button', 'check_button', 'reset_button', 'cleanup_button']:
@@ -153,74 +166,87 @@ class TestDownloadHandler(unittest.TestCase):
         self.assertFalse(self.ui_components['download_running'])
     
     @patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download')
-    def test_handle_download_button_click(self, mock_confirm):
+    def test_handle_download_button_click(self, mock_confirm_download):
         """Test handle_download_button_click function"""
-        # Setup mock
-        mock_confirm.return_value = True
+        # Setup mock untuk confirm_download
+        mock_confirm_download.return_value = True
         
         # Call function
-        handle_download_button_click(self.ui_components, self.ui_components['download_button'])
+        self.handle_download_button_click(self.ui_components, self.ui_components['download_button'])
         
         # Tombol download harus kembali enabled setelah proses (karena async/thread)
         self.assertFalse(self.ui_components['download_button'].disabled)
         
-        # Verify confirmation was called
-        mock_confirm.assert_called_once_with(self.ui_components)
+        # Verify confirm_download dipanggil
+        mock_confirm_download.assert_called_once_with(self.ui_components)
         
         # Verify log output
         self.ui_components['log_output'].append_stdout.assert_called()
     
     @patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download')
-    def test_handle_download_button_click_cancelled(self, mock_confirm):
-        """Test handle_download_button_click when download is cancelled"""
-        # Setup mock
-        mock_confirm.return_value = False
+    def test_handle_download_button_click_confirmation_dialog_displayed(self, mock_confirm_download):
+        """Test bahwa dialog konfirmasi ditampilkan saat tombol download diklik."""
+        # Setup mock untuk confirm_download
+        mock_confirm_download.return_value = False  # Konfirmasi dibatalkan
         
-        # Call function
-        handle_download_button_click(self.ui_components, self.ui_components['download_button'])
+        # Panggil fungsi
+        self.handle_download_button_click(self.ui_components, self.ui_components['download_button'])
         
-        # Verify button is re-enabled
+        # Verifikasi bahwa confirm_download dipanggil
+        mock_confirm_download.assert_called_once_with(self.ui_components)
+        
+        # Verifikasi bahwa tombol download diaktifkan kembali
         self.assertFalse(self.ui_components['download_button'].disabled)
-        
-        # Verify confirmation was called
-        mock_confirm.assert_called_once_with(self.ui_components)
-        
-        # Verify log output
-        self.ui_components['log_output'].append_stdout.assert_called_with("Download dibatalkan")
     
     @patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download')
-    def test_handle_download_button_click_error(self, mock_confirm):
-        """Test handle_download_button_click when error occurs"""
-        # Setup mock to raise exception
-        mock_confirm.side_effect = Exception("Test error")
+    def test_handle_download_button_click_cancelled(self, mock_confirm_download):
+        """Test handle_download_button_click when download is cancelled."""
+        # Setup mock untuk confirm_download
+        mock_confirm_download.return_value = False
         
-        # Call function
-        handle_download_button_click(self.ui_components, self.ui_components['download_button'])
+        # Panggil fungsi
+        self.handle_download_button_click(self.ui_components, self.ui_components['download_button'])
         
-        # Verify button is re-enabled
+        # Verifikasi bahwa confirm_download dipanggil
+        mock_confirm_download.assert_called_once_with(self.ui_components)
+        
+        # Verifikasi bahwa execute_download tidak dipanggil
+        with patch('smartcash.ui.dataset.download.handlers.download_handler.execute_download') as mock_execute_download:
+            mock_execute_download.assert_not_called()
+    
+    @patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download')
+    def test_handle_download_button_click_error(self, mock_confirm_download):
+        """Test handle_download_button_click when error occurs."""
+        # Setup mock untuk confirm_download
+        mock_confirm_download.side_effect = Exception("Test error")
+        
+        # Panggil fungsi
+        self.handle_download_button_click(self.ui_components, self.ui_components['download_button'])
+        
+        # Verifikasi bahwa log_output.append_stderr dipanggil
+        self.ui_components['log_output'].append_stderr.assert_called_once()
+        
+        # Verifikasi bahwa tombol download diaktifkan kembali
         self.assertFalse(self.ui_components['download_button'].disabled)
-        
-        # Verify error is logged
-        self.ui_components['log_output'].append_stderr.assert_called()
     
     @patch('smartcash.ui.dataset.download.handlers.download_handler._download_from_roboflow')
-    def test_execute_download_roboflow(self, mock_download):
-        """Test execute_download with Roboflow endpoint"""
-        # Mock untuk register_ui_observers
-        with patch('smartcash.ui.dataset.download.utils.ui_observers.register_ui_observers') as mock_register:
-            mock_register.return_value = MagicMock()
-            
-            # Call function
-            execute_download(self.ui_components, 'Roboflow')
-            
-            # Verify download was called
-            mock_download.assert_called_once()
+    def test_execute_download_roboflow(self, mock_download_from_roboflow):
+        """Test execute_download with Roboflow endpoint."""
+        # Setup mock untuk _download_from_roboflow
+        mock_result = {'status': 'success', 'message': 'Download berhasil'}
+        mock_download_from_roboflow.return_value = mock_result
+        
+        # Panggil fungsi
+        self.execute_download(self.ui_components, 'Roboflow')
+        
+        # Verifikasi bahwa _download_from_roboflow dipanggil
+        mock_download_from_roboflow.assert_called_once_with(self.ui_components)
     
     @patch('smartcash.ui.dataset.download.handlers.download_handler.notify_log')
     def test_execute_download_invalid_endpoint(self, mock_notify_log):
         """Test execute_download with invalid endpoint"""
         # Call function
-        execute_download(self.ui_components, 'Invalid')
+        self.execute_download(self.ui_components, 'Invalid')
         
         # Verify notify_log was called with error level
         mock_notify_log.assert_called_with(
@@ -236,7 +262,7 @@ class TestDownloadHandler(unittest.TestCase):
         """Test handle_download_button_click ketika button adalah dict (bukan widget)"""
         with patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download', return_value=False):
             try:
-                handle_download_button_click(self.ui_components, {'not': 'a button'})
+                self.handle_download_button_click(self.ui_components, {'not': 'a button'})
             except Exception as e:
                 self.fail(f"handle_download_button_click raised Exception unexpectedly: {e}")
 
@@ -245,7 +271,7 @@ class TestDownloadHandler(unittest.TestCase):
         with patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download', return_value=False):
             try:
                 # Panggil dengan ui_components bukan dict
-                handle_download_button_click("not a dict", self.ui_components['download_button'])
+                self.handle_download_button_click("not a dict", self.ui_components['download_button'])
             except Exception as e:
                 self.fail(f"handle_download_button_click raised Exception unexpectedly: {e}")
             

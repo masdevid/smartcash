@@ -13,7 +13,6 @@ from unittest.mock import patch, MagicMock, mock_open
 import ipywidgets as widgets
 
 from smartcash.ui.dataset.download.handlers.config_handler import (
-    get_default_download_config,
     get_config_from_ui,
     update_config_from_ui,
     get_download_config,
@@ -119,21 +118,6 @@ class TestDownloadConfigHandler(unittest.TestCase):
             ui_components[key].layout.display = 'block'
         
         return ui_components
-    
-    def test_get_default_download_config(self):
-        """Test get_default_download_config."""
-        config = get_default_download_config()
-        
-        # Verifikasi struktur config
-        self.assertIn('download', config)
-        self.assertIn('source', config['download'])
-        self.assertIn('output_dir', config['download'])
-        self.assertIn('roboflow', config['download'])
-        
-        # Verifikasi nilai default
-        self.assertEqual(config['download']['source'], 'roboflow')
-        self.assertEqual(config['download']['output_dir'], 'data/downloads')
-        self.assertEqual(config['download']['roboflow']['workspace'], 'smartcash-wo2us')
     
     @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')
     def test_get_config_from_ui(self, mock_get_config_manager):

@@ -6,8 +6,18 @@ Deskripsi: Handler konfirmasi untuk download dataset
 from typing import Dict, Any, Callable, Optional
 from IPython.display import display
 
-def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', download_button = None) -> None:
-    """Tampilkan dialog konfirmasi untuk download dataset dari Roboflow."""
+def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', download_button = None) -> bool:
+    """
+    Tampilkan dialog konfirmasi untuk download dataset dari Roboflow.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        endpoint: Endpoint download (default: 'Roboflow')
+        download_button: Tombol download yang diklik
+        
+    Returns:
+        bool: True jika konfirmasi berhasil ditampilkan, False jika terjadi error
+    """
     # Import modul yang diperlukan
     from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
     from smartcash.ui.components.status_panel import update_status_panel
@@ -65,7 +75,7 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', 
     if 'confirmation_area' not in ui_components or not hasattr(ui_components['confirmation_area'], 'clear_output'):
         if download_logger:
             download_logger.error("❌ Area konfirmasi tidak tersedia")
-        return
+        return False
     
     # Tampilkan dialog konfirmasi
     ui_components['confirmation_area'].clear_output()
@@ -85,6 +95,9 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', 
     )
     
     if download_logger: download_logger.info(f"ℹ️ Menunggu konfirmasi download dataset dari {endpoint}")
+    
+    # Return True untuk menunjukkan bahwa dialog konfirmasi berhasil ditampilkan
+    return True
 
 def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
     """Dapatkan detail spesifik untuk Roboflow."""

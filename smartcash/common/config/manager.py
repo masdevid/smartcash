@@ -155,30 +155,35 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
         logger.setLevel(logging.INFO)
     
     try:
-        # Jika base_dir tidak disediakan, gunakan fallback
-        if base_dir is None:
-            # Cek apakah kita di Colab
-            try:
-                import google.colab
-                is_colab = True
-            except ImportError:
-                is_colab = False
+        # Cek apakah kita di Colab
+        try:
+            import google.colab
+            is_colab = True
+        except ImportError:
+            is_colab = False
             
-            if is_colab:
-                # Di Colab, gunakan /content sebagai base_dir
-                base_dir = '/content'
-                if not config_file:
-                    config_file = str(Path(base_dir) / 'configs' / 'dataset_config.yaml')
-                logger.info(f"Deteksi Google Colab, menggunakan base_dir: {base_dir}")
-            else:
-                # Di lokal, gunakan root project
-                base_dir = str(Path(__file__).resolve().parents[3])  # 3 levels up to reach project root
-                if not config_file:
-                    config_file = str(Path(base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
-                logger.info(f"Deteksi environment lokal, menggunakan base_dir: {base_dir}")
-        # Validasi config_file
+        # Set default base_dir dan config_file berdasarkan environment
+        if is_colab:
+            # Di Colab, gunakan /content sebagai base_dir
+            default_base_dir = '/content'
+            default_config_file = str(Path(default_base_dir) / 'configs' / 'dataset_config.yaml')
+            logger.info(f"Deteksi Google Colab, menggunakan base_dir: {default_base_dir}")
+        else:
+            # Di lokal, gunakan root project
+            default_base_dir = str(Path(__file__).resolve().parents[3])  # 3 levels up to reach project root
+            default_config_file = str(Path(default_base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
+            logger.info(f"Deteksi environment lokal, menggunakan base_dir: {default_base_dir}")
+            
+        # Gunakan nilai default jika tidak disediakan
+        base_dir = base_dir or default_base_dir
+        config_file = config_file or default_config_file
+        
+        # Validasi base_dir dan config_file
+        if not base_dir:
+            raise ValueError("base_dir tidak boleh None atau kosong")
         if not config_file:
-            raise ValueError("config_file tidak boleh None. Pastikan fallback sudah benar.")
+            raise ValueError("config_file tidak boleh None atau kosong")
+            
         # Pastikan direktori configs ada
         config_dir = Path(config_file).parent
         if not config_dir.exists():
@@ -188,6 +193,7 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 logger.info(f"✅ Direktori configs berhasil dibuat di {config_dir}")
             except Exception as e:
                 logger.error(f"❌ Gagal membuat direktori configs: {str(e)}")
+                
         # Pastikan file config ada
         if not Path(config_file).exists():
             logger.warning(f"File config tidak ditemukan di {config_file}, menggunakan default config...")
@@ -199,13 +205,16 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 logger.info(f"✅ Default config berhasil disimpan ke {config_file}")
             except Exception as e:
                 logger.error(f"❌ Gagal menyimpan default config: {str(e)}")
+                
         # Buat atau dapatkan instance ConfigManager
         if _config_manager is None:
             logger.info(f"Membuat ConfigManager baru dengan base_dir: {base_dir}")
             _config_manager = ConfigManager(base_dir, config_file, env_prefix)
         else:
             logger.info("Menggunakan ConfigManager yang sudah ada")
+            
         return _config_manager
+        
     except Exception as e:
         logger.error(f"❌ Error saat membuat ConfigManager: {str(e)}")
         raise

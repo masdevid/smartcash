@@ -159,7 +159,7 @@ def get_dataset_service(service_name: str, config: Optional[Dict[str, Any]] = No
         }
     
     # Buat instance factory
-    factory = ServiceFactory(config, logger=get_logger("dataset_service"))
+    factory = ServiceFactory(config, logger=get_logger())
     
     # Buat dan kembalikan service
     return factory.create_service(service_name)

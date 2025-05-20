@@ -37,7 +37,7 @@ class BatchProcessor:
         self.output_dir = output_dir
         self.num_workers = num_workers
         self.batch_size = batch_size
-        self.logger = logger or get_logger("BatchProcessor")
+        self.logger = logger or get_logger()
     
     def process_directory(self, 
                          input_dir: str, 

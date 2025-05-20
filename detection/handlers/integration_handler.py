@@ -33,7 +33,7 @@ class IntegrationHandler:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
         self.detection_handler = detection_handler
-        self.logger = logger or get_logger("IntegrationHandler")
+        self.logger = logger or get_logger()
         
         # Queue untuk proses asinkron
         self._task_queue = queue.Queue()

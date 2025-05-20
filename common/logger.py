@@ -236,7 +236,7 @@ class SmartCashLogger:
             handler.setLevel(std_level)
 
 # Fungsi helper untuk mendapatkan logger
-def get_logger(name: str, 
+def get_logger(name: Optional[str] = None, 
               level: LogLevel = LogLevel.INFO, 
               log_file: Optional[str] = None,
               use_colors: bool = True,
@@ -246,9 +246,9 @@ def get_logger(name: str,
     Dapatkan instance SmartCashLogger.
     
     Args:
-        name: Nama logger
+        name: Nama logger (default: __name__ dari modul pemanggil)
         level: Level minimum log
-        log_file: Path file log (auto-generated jika None)f
+        log_file: Path file log (auto-generated jika None)
         use_colors: Flag untuk menggunakan warna
         use_emojis: Flag untuk menggunakan emoji
         log_dir: Direktori untuk file log
@@ -256,4 +256,25 @@ def get_logger(name: str,
     Returns:
         Instance SmartCashLogger
     """
-    return SmartCashLogger(name, level, log_file, use_colors, use_emojis, log_dir)
+    import inspect
+    
+    # Jika name tidak disediakan, gunakan __name__ dari modul pemanggil
+    if name is None:
+        frame = inspect.currentframe()
+        if frame is not None:
+            frame = frame.f_back
+            if frame is not None:
+                name = frame.f_globals.get('__name__', 'smartcash')
+    
+    # Jika masih None, gunakan default
+    if name is None:
+        name = 'smartcash'
+    
+    return SmartCashLogger(
+        name=name,
+        level=level,
+        log_file=log_file,
+        use_colors=use_colors,
+        use_emojis=use_emojis,
+        log_dir=log_dir
+    )

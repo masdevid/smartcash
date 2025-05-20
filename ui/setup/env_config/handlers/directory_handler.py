@@ -57,7 +57,7 @@ def on_directory_click(b: widgets.Button, ui_components: Dict[str, Any], colab_m
         
         # Create symlinks to drive if connected
         if colab_manager.is_drive_connected():
-            state_manager.tracker.update(0.5, "Setting up drive symlinks...")
+            state_manager.update_progress(0.5)
             drive_base = Path("/content/drive/MyDrive/SmartCash")
             drive_dirs = {
                 "/content/data": drive_base / "data",

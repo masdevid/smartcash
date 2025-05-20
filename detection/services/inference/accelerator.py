@@ -41,7 +41,7 @@ class HardwareAccelerator:
         self.accelerator_type = accelerator_type
         self.device_id = device_id
         self.use_fp16 = use_fp16
-        self.logger = logger or get_logger("HardwareAccelerator")
+        self.logger = logger or get_logger()
         self.device = None
         
         # Deteksi otomatis hardware terbaik jika AUTO

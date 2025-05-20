@@ -25,7 +25,7 @@ class PreprocessorFactory:
         Returns:
             DatasetPreprocessor yang sudah dikonfigurasi
         """
-        logger = logger or get_logger("preprocessor_factory")
+        logger = logger or get_logger()
         
         # Ekstrak konfigurasi preprocessing
         preprocess_config = config.get('preprocessing', {})

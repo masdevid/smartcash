@@ -19,7 +19,8 @@ def create_download_ui(config=None):
         Dictionary containing UI components
     """
     config = config or {}
-    roboflow_config = config.get('data', {}).get('roboflow', {})
+    # Ambil config roboflow dari path yang benar
+    roboflow_config = config.get('roboflow', {})
     
     # Header
     header = create_header(f"{ICONS.get('download', '📥')} Dataset Download", "Download dataset untuk training model SmartCash")

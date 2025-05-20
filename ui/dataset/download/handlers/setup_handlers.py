@@ -26,7 +26,15 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
         from smartcash.ui.dataset.download.handlers.config_handler import update_ui_from_config
         config_manager = get_config_manager()
         loaded_config = config_manager.config
-        update_ui_from_config(ui_components, loaded_config)
+        
+        # Pastikan config valid
+        if loaded_config and isinstance(loaded_config, dict):
+            # Update UI dengan config yang valid
+            update_ui_from_config(ui_components, loaded_config)
+        else:
+            # Gunakan config yang diberikan jika config manager tidak valid
+            if config and isinstance(config, dict):
+                update_ui_from_config(ui_components, config)
     except Exception as e:
         logger = ui_components.get('logger')
         if logger:
@@ -242,6 +250,9 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
         from IPython import get_ipython
         ipython = get_ipython()
         if ipython:
-            ipython.events.register('pre_run_cell', cleanup_resources)
+            # Hanya register cleanup saat cell pertama kali dieksekusi
+            if not hasattr(ipython, '_dataset_downloader_cleanup_registered'):
+                ipython.events.register('pre_run_cell', cleanup_resources)
+                ipython._dataset_downloader_cleanup_registered = True
     except (ImportError, AttributeError):
         pass

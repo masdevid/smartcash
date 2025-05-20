@@ -61,6 +61,12 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', 
             # Reset UI jika terjadi error
             cancel_download(ui_components, download_logger)
     
+    # Pastikan confirmation_area ada dan valid
+    if 'confirmation_area' not in ui_components or not hasattr(ui_components['confirmation_area'], 'clear_output'):
+        if download_logger:
+            download_logger.error("❌ Area konfirmasi tidak tersedia")
+        return
+    
     # Tampilkan dialog konfirmasi
     ui_components['confirmation_area'].clear_output()
     with ui_components['confirmation_area']:

@@ -192,6 +192,7 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 logger.error(f"❌ Gagal membuat direktori configs: {str(e)}")
                 
         # Pastikan file config ada dan load API_KEY dari Colab secret jika di Colab
+        loaded_config = None
         if not Path(config_file).exists():
             default_config = get_default_config()
             
@@ -208,26 +209,34 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 # Simpan default config
                 with open(config_file, 'w') as f:
                     yaml.dump(default_config, f)
+                loaded_config = default_config
             except Exception as e:
                 logger.error(f"❌ Gagal menyimpan default config: {str(e)}")
         else:
             # Jika file config sudah ada dan di Colab, update API_KEY dari secret
-            if is_colab:
-                try:
-                    with open(config_file, 'r') as f:
-                        config = yaml.safe_load(f)
-                    
-                    api_key = userdata.get('ROBOFLOW_API_KEY')
-                    if api_key:
-                        config['data']['roboflow']['api_key'] = api_key
-                        with open(config_file, 'w') as f:
-                            yaml.dump(config, f)
-                except Exception as e:
-                    logger.error(f"❌ Gagal update API_KEY dari Colab secret: {str(e)}")
+            try:
+                with open(config_file, 'r') as f:
+                    loaded_config = yaml.safe_load(f)
+                
+                if is_colab:
+                    try:
+                        api_key = userdata.get('ROBOFLOW_API_KEY')
+                        if api_key:
+                            loaded_config['data']['roboflow']['api_key'] = api_key
+                            with open(config_file, 'w') as f:
+                                yaml.dump(loaded_config, f)
+                    except Exception as e:
+                        logger.error(f"❌ Gagal update API_KEY dari Colab secret: {str(e)}")
+            except Exception as e:
+                logger.error(f"❌ Gagal membaca config file: {str(e)}")
                 
         # Buat atau dapatkan instance ConfigManager
         if _config_manager is None:
             _config_manager = ConfigManager(base_dir, config_file, env_prefix)
+            
+        # Set loaded config ke instance jika ada
+        if loaded_config:
+            _config_manager.config = loaded_config
             
         return _config_manager
         

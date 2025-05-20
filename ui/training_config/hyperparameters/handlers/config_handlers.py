@@ -10,6 +10,7 @@ from pathlib import Path
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import get_default_hyperparameters_config
 
 logger = get_logger(__name__)
 
@@ -91,7 +92,7 @@ def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str
         
         # Pastikan config memiliki struktur yang benar
         if not config or 'hyperparameters' not in config:
-            logger.warning(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameters tidak ditemukan atau tidak valid, menggunakan default")
+            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan konfigurasi default untuk hyperparameters")
             default_config = get_default_hyperparameters_config()
             # Simpan default config ke file
             config_manager.save_module_config('hyperparameters', default_config)
@@ -286,7 +287,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         # Pastikan config memiliki struktur yang benar
         if not config or 'hyperparameters' not in config:
-            logger.warning(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameters tidak valid, menggunakan default")
+            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan konfigurasi default untuk hyperparameters")
             config = get_default_hyperparameters_config()
             
         hp = config['hyperparameters']
@@ -306,7 +307,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
                 dropdown.value = match_val
             elif options:
                 dropdown.value = options[0]
-                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai optimizer '{opt_val}' tidak valid, menggunakan default")
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan optimizer default: {options[0]}")
             
         if 'learning_rate_slider' in ui_components:
             ui_components['learning_rate_slider'].value = hp.get('optimizer', {}).get('learning_rate', 0.001)
@@ -339,7 +340,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
                 dropdown.value = match_val
             elif options:
                 dropdown.value = options[0]
-                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai scheduler '{sched_val}' tidak valid, menggunakan default")
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan scheduler default: {options[0]}")
             
         if 'warmup_epochs_slider' in ui_components:
             ui_components['warmup_epochs_slider'].value = hp.get('scheduler', {}).get('warmup_epochs', 5)
@@ -366,7 +367,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
                 dropdown.value = match_val
             elif options:
                 dropdown.value = options[0]
-                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai loss '{loss_val}' tidak valid, menggunakan default")
+                logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan loss function default: {options[0]}")
             
         if 'alpha_slider' in ui_components:
             ui_components['alpha_slider'].value = hp.get('loss', {}).get('alpha', 0.25)

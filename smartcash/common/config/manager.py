@@ -52,6 +52,22 @@ class ConfigManager(DriveConfigManager, DependencyManager):
         # Simpan config_file untuk referensi
         self._config_file = config_file
 
+    def sync_config_with_drive(self, module_name: str) -> bool:
+        """
+        Sinkronisasi konfigurasi modul ke Google Drive dan pastikan persistensi antar lokal dan drive.
+        Args:
+            module_name (str): Nama modul konfigurasi (misal: 'training_strategy')
+        Returns:
+            bool: True jika sinkronisasi berhasil, False jika gagal
+        """
+        success, message = self.sync_to_drive(module_name)
+        if self._logger:
+            if success:
+                self._logger.info(f"✅ Sinkronisasi konfigurasi '{module_name}' ke Google Drive berhasil: {message}")
+            else:
+                self._logger.warning(f"⚠️ Sinkronisasi konfigurasi '{module_name}' ke Google Drive gagal: {message}")
+        return success
+
 # Singleton instance
 _config_manager = None
 

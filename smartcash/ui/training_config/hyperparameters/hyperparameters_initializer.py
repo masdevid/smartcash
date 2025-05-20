@@ -83,13 +83,6 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
             # Simpan UI components ke config manager
             config_manager.register_ui_components('hyperparameters', ui_components)
         
-        # Tampilkan header
-        display(create_header(
-            title="Konfigurasi Hyperparameter",
-            description="Pengaturan parameter untuk proses training model",
-            icon=ICONS.get('settings', '⚙️')
-        ))
-        
         # Tampilkan layout utama
         if 'main_layout' in ui_components:
             display(ui_components['main_layout'])

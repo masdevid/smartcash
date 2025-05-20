@@ -4,6 +4,7 @@ Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan obse
 """
 
 from typing import Dict, Any, Optional
+from smartcash.common.config import get_config_manager
 
 def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -20,18 +21,19 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     # Setup observer untuk menerima event notifikasi
     _setup_observers(ui_components)
     
-    # Setup API key handler dan verifikasi
-    _setup_api_key_handler(ui_components)
-    
     # Load konfigurasi dan update UI
     try:
-        from smartcash.ui.dataset.download.handlers.config_handler import load_config, update_ui_from_config
-        loaded_config = load_config()
-        update_ui_from_config(loaded_config, ui_components)
+        from smartcash.ui.dataset.download.handlers.config_handler import update_ui_from_config
+        config_manager = get_config_manager()
+        loaded_config = config_manager.config
+        update_ui_from_config(ui_components, loaded_config)
     except Exception as e:
         logger = ui_components.get('logger')
         if logger:
             logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
+    
+    # Setup API key handler dan verifikasi (setelah config di-load)
+    _setup_api_key_handler(ui_components)
     
     # Setup handlers untuk UI events
     _setup_endpoint_handlers(ui_components)
@@ -128,8 +130,8 @@ def _setup_reset_button_handler(ui_components: Dict[str, Any]) -> None:
 
 def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
     """Setup handler untuk tombol save."""
-    # Gunakan config_handler untuk menyimpan konfigurasi
-    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui, save_config_with_manager, load_config
+    # Gunakan config_manager langsung untuk menyimpan konfigurasi
+    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui
     
     def handle_save_button_click(b, ui_components):
         # Reset log output saat tombol diklik
@@ -139,22 +141,18 @@ def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
         logger = ui_components.get('logger')
         
         try:
-            # Simpan konfigurasi dengan config_handler
-            config = load_config()
-            config = update_config_from_ui(config, ui_components)
-            success = save_config_with_manager(config, ui_components, logger)
+            # Simpan konfigurasi dengan config_manager
+            config_manager = get_config_manager()
+            config = update_config_from_ui(ui_components)
+            config_manager.update_config(config)
             
             # Update status panel jika tersedia
             from smartcash.ui.utils.ui_logger import log_to_ui
-            if success:
-                success_msg = "Konfigurasi berhasil disimpan"
-                if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-                    ui_components['update_status_panel'](ui_components, "success", success_msg)
-                else:
-                    log_to_ui(ui_components, success_msg, "success", "💾")
+            success_msg = "Konfigurasi berhasil disimpan"
+            if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+                ui_components['update_status_panel'](ui_components, "success", success_msg)
             else:
-                error_msg = "Gagal menyimpan konfigurasi"
-                log_to_ui(ui_components, error_msg, "error", "❌")
+                log_to_ui(ui_components, success_msg, "success", "💾")
         except Exception as e:
             # Tampilkan error
             from smartcash.ui.utils.ui_logger import log_to_ui

@@ -9,7 +9,10 @@ from IPython.display import display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_training_strategy_info
+from smartcash.ui.training_config.training_strategy.handlers.config_handlers import (
+    update_config_from_ui,
+    update_training_strategy_info
+)
 
 logger = get_logger(__name__)
 

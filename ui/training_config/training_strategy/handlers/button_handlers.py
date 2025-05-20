@@ -15,7 +15,12 @@ from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
 from smartcash.ui.training_config.training_strategy.handlers.drive_handlers import sync_to_drive, sync_from_drive
-from smartcash.ui.training_config.training_strategy.handlers.config_handlers import update_config_from_ui, update_ui_from_config, get_default_config, update_training_strategy_info
+from smartcash.ui.training_config.training_strategy.handlers.config_handlers import (
+    update_config_from_ui,
+    update_ui_from_config,
+    get_default_config,
+    update_training_strategy_info
+)
 
 logger = get_logger(__name__)
 

@@ -7,6 +7,7 @@ yolov5==7.0.14
 
 # Package untuk augmentasi khusus
 albucore==0.0.24
+opencv-python==4.9.0.80
 
 # Package untuk optimasi dan evaluasi model
 pybboxes==0.1.6

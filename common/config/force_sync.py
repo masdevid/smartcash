@@ -258,14 +258,33 @@ def sync_with_drive(config: Dict[str, Any], module_name: str, ui_components: Dic
         # Jika bukan di Colab, tidak perlu sinkronisasi
         if not detect_colab_environment():
             return config
-            
+        
+        # Import logger jika diperlukan
+        from smartcash.common.logger import get_logger
+        logger = get_logger(__name__)
+        
         # Pastikan config memiliki struktur yang benar
         if module_name not in config and isinstance(config, dict):
             config = {module_name: config}
             
         # Dapatkan config manager
+        from smartcash.common.config.manager import get_config_manager
         base_dir = get_default_base_dir()
         config_manager = get_config_manager(base_dir=base_dir)
+        
+        # Cek apakah ada konfigurasi yang sudah ada sebelumnya
+        existing_config = config_manager.get_module_config(module_name, {})
+        
+        # Gabungkan konfigurasi yang ada dengan yang baru untuk mempertahankan struktur lengkap
+        if existing_config and module_name in existing_config:
+            # Jika konfigurasi baru hanya berisi subset dari konfigurasi lengkap,
+            # pastikan untuk mempertahankan struktur lengkap
+            if module_name in config:
+                # Update konfigurasi yang ada dengan nilai baru
+                for key, value in config[module_name].items():
+                    existing_config[module_name][key] = value
+                # Gunakan konfigurasi gabungan
+                config = existing_config
         
         # Simpan konfigurasi lokal terlebih dahulu
         config_path = os.path.join(base_dir, 'configs', f'{module_name}_config.yaml')
@@ -274,6 +293,13 @@ def sync_with_drive(config: Dict[str, Any], module_name: str, ui_components: Dic
         # Simpan dengan format YAML untuk memastikan struktur tetap utuh
         with open(config_path, 'w') as f:
             yaml.safe_dump(config, f, default_flow_style=False)
+        
+        # Pastikan Google Drive sudah ter-mount
+        if not verify_drive_mounted():
+            success = mount_drive_if_needed()
+            if not success:
+                logger.error("❌ Gagal mount Google Drive untuk sinkronisasi")
+                return config
         
         # Sinkronisasi dengan Google Drive
         drive_path = os.path.join('/content/drive/MyDrive/SmartCash/configs')
@@ -290,16 +316,37 @@ def sync_with_drive(config: Dict[str, Any], module_name: str, ui_components: Dic
                 with open(drive_config_path, 'r') as f:
                     drive_config = yaml.safe_load(f)
                     
+                # Log informasi verifikasi
+                logger.info(f"✅ Konfigurasi {module_name} berhasil disinkronkan ke Google Drive")
+                
                 # Verifikasi konfigurasi sama dengan yang disimpan
                 if drive_config and module_name in drive_config:
+                    # Periksa apakah semua kunci ada dan nilainya sama
+                    is_consistent = True
+                    for key, value in config[module_name].items():
+                        if key not in drive_config[module_name] or drive_config[module_name][key] != value:
+                            is_consistent = False
+                            logger.warning(f"⚠️ Inkonsistensi pada key '{key}' setelah sinkronisasi")
+                    
+                    if is_consistent:
+                        logger.info(f"✅ Verifikasi sinkronisasi berhasil: semua nilai konsisten")
+                    
                     return drive_config
             except Exception as e:
-                logger.error(f"Error saat membaca konfigurasi dari Drive: {str(e)}")
+                logger.error(f"❌ Error saat membaca konfigurasi dari Drive: {str(e)}")
         
         return config
     except Exception as e:
-        logger.error(f"Error saat sinkronisasi dengan Drive: {str(e)}")
+        from smartcash.common.logger import get_logger
+        logger = get_logger(__name__)
+        logger.error(f"❌ Error saat sinkronisasi dengan Drive: {str(e)}")
         return config
+
+def get_default_base_dir():
+    """Dapatkan direktori base default."""
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def force_sync_with_drive(module_name: str, max_retries: int = 3) -> Tuple[bool, Dict[str, Any]]:
     """

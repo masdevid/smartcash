@@ -308,11 +308,11 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         config: Konfigurasi yang akan digunakan (opsional)
     """
     try:
-        # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error, update_sync_status_only
+        # Import status handler
+        from smartcash.ui.dataset.split.handlers.status_handlers import update_status_panel
         
         # Update status panel
-        update_sync_status_only(ui_components, "Memperbarui UI dari konfigurasi...", 'info')
+        update_status_panel(ui_components, "Memperbarui UI dari konfigurasi...", 'info')
         
         # Get config if not provided
         if config is None:
@@ -331,27 +331,37 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         if 'train_ratio_slider' in ui_components:
             ui_components['train_ratio_slider'].value = split_config.get('train_ratio', 0.7)
+        elif 'train_slider' in ui_components:
+            ui_components['train_slider'].value = split_config.get('train_ratio', 0.7)
             
         if 'val_ratio_slider' in ui_components:
             ui_components['val_ratio_slider'].value = split_config.get('val_ratio', 0.15)
+        elif 'val_slider' in ui_components:
+            ui_components['val_slider'].value = split_config.get('val_ratio', 0.15)
             
         if 'test_ratio_slider' in ui_components:
             ui_components['test_ratio_slider'].value = split_config.get('test_ratio', 0.15)
+        elif 'test_slider' in ui_components:
+            ui_components['test_slider'].value = split_config.get('test_ratio', 0.15)
             
         if 'random_seed_input' in ui_components:
             ui_components['random_seed_input'].value = split_config.get('random_seed', 42)
+        elif 'random_seed' in ui_components:
+            ui_components['random_seed'].value = split_config.get('random_seed', 42)
             
         if 'stratify_checkbox' in ui_components:
             ui_components['stratify_checkbox'].value = split_config.get('stratify', True)
+        elif 'stratified_checkbox' in ui_components:
+            ui_components['stratified_checkbox'].value = split_config.get('stratify', True)
             
-        log_sync_success(ui_components, "UI berhasil diupdate dari konfigurasi split")
+        update_status_panel(ui_components, "UI berhasil diupdate dari konfigurasi split", 'success')
         logger.info(f"{ICONS.get('success', '✅')} UI berhasil diupdate dari konfigurasi split")
         
     except Exception as e:
         # Log error
-        if 'logger' in ui_components:
-            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
-            log_sync_error(ui_components, f"Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        if 'status_panel' in ui_components:
+            from smartcash.ui.dataset.split.handlers.status_handlers import update_status_panel
+            update_status_panel(ui_components, f"Error saat mengupdate UI dari konfigurasi: {str(e)}", 'error')
         logger.error(f"{ICONS.get('error', '❌')} Error saat mengupdate UI dari konfigurasi: {str(e)}")
         
         # Jika terjadi error, gunakan konfigurasi default
@@ -369,11 +379,12 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary konfigurasi yang telah diupdate
     """
     try:
-        # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error, update_sync_status_only
+        # Import status handler
+        from smartcash.ui.dataset.split.handlers.status_handlers import update_status_panel
+        from smartcash.ui.dataset.split.handlers.ui_value_handlers import get_ui_values
         
         # Update status panel
-        update_sync_status_only(ui_components, "Memperbarui konfigurasi dari UI...", 'info')
+        update_status_panel(ui_components, "Memperbarui konfigurasi dari UI...", 'info')
         
         # Get current config
         config = load_config()
@@ -381,24 +392,11 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Simpan config sebelum diupdate untuk verifikasi nantinya
         pre_update_config = config.copy() if config else get_default_split_config()
         
-        # Update config from UI
-        if 'enabled_checkbox' in ui_components:
-            config['split']['enabled'] = ui_components['enabled_checkbox'].value
-            
-        if 'train_ratio_slider' in ui_components:
-            config['split']['train_ratio'] = ui_components['train_ratio_slider'].value
-            
-        if 'val_ratio_slider' in ui_components:
-            config['split']['val_ratio'] = ui_components['val_ratio_slider'].value
-            
-        if 'test_ratio_slider' in ui_components:
-            config['split']['test_ratio'] = ui_components['test_ratio_slider'].value
-            
-        if 'random_seed_input' in ui_components:
-            config['split']['random_seed'] = ui_components['random_seed_input'].value
-            
-        if 'stratify_checkbox' in ui_components:
-            config['split']['stratify'] = ui_components['stratify_checkbox'].value
+        # Dapatkan nilai dari UI
+        ui_values = get_ui_values(ui_components)
+        
+        # Update config from UI values
+        config['split'].update(ui_values)
         
         # Save config dan sinkronkan dengan Google Drive
         saved_config = save_config(config, ui_components)
@@ -407,24 +405,27 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         post_update_config = load_config()
         
         # Periksa apakah data yang disimpan sesuai
-        if (config['split']['train_ratio'] != post_update_config['split']['train_ratio'] or
-            config['split']['val_ratio'] != post_update_config['split']['val_ratio'] or
-            config['split']['test_ratio'] != post_update_config['split']['test_ratio'] or
-            config['split']['random_seed'] != post_update_config['split']['random_seed'] or
-            config['split']['stratify'] != post_update_config['split']['stratify'] or
-            config['split']['enabled'] != post_update_config['split']['enabled']):
-            log_sync_error(ui_components, "Konfigurasi tidak disimpan dengan benar, ada perbedaan data")
-            logger.error(f"{ICONS.get('error', '❌')} Konfigurasi tidak disimpan dengan benar, ada perbedaan data")
+        is_consistent = True
+        inconsistent_keys = []
+        
+        for key, value in ui_values.items():
+            if key in post_update_config['split'] and post_update_config['split'][key] != value:
+                is_consistent = False
+                inconsistent_keys.append(key)
+        
+        if not is_consistent:
+            update_status_panel(ui_components, f"Konfigurasi tidak disimpan dengan benar pada: {', '.join(inconsistent_keys)}", 'warning')
+            logger.warning(f"⚠️ Konfigurasi tidak disimpan dengan benar pada: {', '.join(inconsistent_keys)}")
         else:
-            log_sync_success(ui_components, "Konfigurasi berhasil diupdate dari UI")
+            update_status_panel(ui_components, "Konfigurasi berhasil diupdate dari UI", 'success')
             logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil diupdate dari UI")
         
         return saved_config
         
     except Exception as e:
         # Log error
-        if 'logger' in ui_components:
-            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
-            log_sync_error(ui_components, f"Error saat update config dari UI: {str(e)}")
+        if 'status_panel' in ui_components:
+            from smartcash.ui.dataset.split.handlers.status_handlers import update_status_panel
+            update_status_panel(ui_components, f"Error saat update config dari UI: {str(e)}", 'error')
         logger.error(f"{ICONS.get('error', '❌')} Error saat update config dari UI: {str(e)}")
         return load_config()

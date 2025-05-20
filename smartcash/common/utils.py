@@ -122,3 +122,26 @@ def get_project_root() -> Path:
     
     # Fallback ke parent dari direktori common
     return script_path.parent.parent
+
+def deep_merge(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Menggabungkan dua dictionary secara rekursif.
+    
+    Args:
+        dict1: Dictionary pertama
+        dict2: Dictionary kedua yang akan digabungkan ke dict1
+        
+    Returns:
+        Dictionary hasil penggabungan
+    """
+    result = dict1.copy()
+    
+    for key, value in dict2.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            # Jika kedua nilai adalah dictionary, gabungkan secara rekursif
+            result[key] = deep_merge(result[key], value)
+        else:
+            # Jika tidak, ganti nilai dengan nilai dari dict2
+            result[key] = value
+    
+    return result

@@ -132,30 +132,25 @@ def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_
         if 'status_panel' not in ui_components:
             ui_components = add_sync_status_panel(ui_components)
             
+        # Gunakan format yang konsisten dengan update_status_panel
+        # Dapatkan icon berdasarkan status
+        icon = ICONS.get(status_type, ICONS.get('info', 'ℹ️'))
+        
         # Dapatkan warna berdasarkan status
-        color_map = {
-            'info': '#0dcaf0',    # Biru muda
-            'success': '#198754', # Hijau
-            'warning': '#ffc107', # Kuning
-            'error': '#dc3545'    # Merah
-        }
-        color = color_map.get(status_type, '#6c757d')  # Default: abu-abu
+        bg_color = COLORS.get(f'alert_{status_type}_bg', COLORS.get('alert_info_bg', '#d1ecf1'))
+        text_color = COLORS.get(f'alert_{status_type}_text', COLORS.get('alert_info_text', '#0c5460'))
         
-        # Dapatkan ikon berdasarkan status
-        icon_map = {
-            'info': '🔄',
-            'success': '✅',
-            'warning': '⚠️',
-            'error': '❌'
-        }
-        icon = icon_map.get(status_type, 'ℹ️')
-        
-        # Update panel status
-        ui_components['status_panel'].value = f'<div style="padding: 5px; border-radius: 4px; background-color: #f8f9fa; margin-top: 5px;">Status: <span style="color: {color};">{icon} {message}</span></div>'
+        # Update panel status dengan format yang konsisten
+        ui_components['status_panel'].value = f"""<div style="padding:10px; background-color:{bg_color}; 
+                 color:{text_color}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {text_color}">
+            <p style="margin:5px 0">{icon} {message}</p>
+        </div>"""
     except Exception as e:
         # Fallback ke logger jika ada error
         if 'logger' in ui_components:
             ui_components['logger'].error(f"Error saat update status panel: {str(e)}")
+        logger.error(f"Error saat update status panel: {str(e)}")
 
 def create_sync_status_panel() -> widgets.HTML:
     """
@@ -164,9 +159,17 @@ def create_sync_status_panel() -> widgets.HTML:
     Returns:
         widgets.HTML: Panel status
     """
+    bg_color = COLORS.get('alert_info_bg', '#d1ecf1')
+    text_color = COLORS.get('alert_info_text', '#0c5460')
+    icon = ICONS.get('info', 'ℹ️')
+    
     return widgets.HTML(
-        value='<span style="color: blue;">Status sinkronisasi akan ditampilkan di sini</span>',
-        layout=widgets.Layout(width='100%', padding='5px')
+        value=f"""<div style="padding:10px; background-color:{bg_color}; 
+                 color:{text_color}; border-radius:4px; margin:5px 0;
+                 border-left:4px solid {text_color}">
+            <p style="margin:5px 0">{icon} Status sinkronisasi akan ditampilkan di sini</p>
+        </div>""",
+        layout=widgets.Layout(width='100%')
     )
 
 def add_sync_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -181,10 +184,7 @@ def add_sync_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Buat panel status jika belum ada
     if 'status_panel' not in ui_components:
-        status_panel = widgets.HTML(
-            value='<div style="padding: 5px; border-radius: 4px; background-color: #f8f9fa; margin-top: 5px;">Status: <span style="color: #6c757d;">Siap</span></div>',
-            layout=widgets.Layout(width='100%')
-        )
+        status_panel = create_sync_status_panel()
         ui_components['status_panel'] = status_panel
         
         # Tambahkan ke UI jika ada container

@@ -123,3 +123,46 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         # Jika terjadi error, gunakan konfigurasi default
         default_config = get_default_split_config()
         update_ui_from_config(ui_components, default_config)
+
+def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Update konfigurasi dari UI components.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi yang telah diupdate
+    """
+    try:
+        # Get current config
+        config = load_config()
+        
+        # Update config from UI
+        if 'enabled_checkbox' in ui_components:
+            config['split']['enabled'] = ui_components['enabled_checkbox'].value
+            
+        if 'train_ratio_slider' in ui_components:
+            config['split']['train_ratio'] = ui_components['train_ratio_slider'].value
+            
+        if 'val_ratio_slider' in ui_components:
+            config['split']['val_ratio'] = ui_components['val_ratio_slider'].value
+            
+        if 'test_ratio_slider' in ui_components:
+            config['split']['test_ratio'] = ui_components['test_ratio_slider'].value
+            
+        if 'random_seed_input' in ui_components:
+            config['split']['random_seed'] = ui_components['random_seed_input'].value
+            
+        if 'stratify_checkbox' in ui_components:
+            config['split']['stratify'] = ui_components['stratify_checkbox'].value
+        
+        # Save config
+        save_config(config)
+        
+        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil diupdate dari UI")
+        return config
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat update config dari UI: {str(e)}")
+        return load_config()

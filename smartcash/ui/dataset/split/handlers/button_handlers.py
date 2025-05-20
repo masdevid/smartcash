@@ -13,9 +13,9 @@ from smartcash.ui.dataset.split.handlers.config_handlers import load_config, sav
 
 logger = get_logger(__name__)
 
-def setup_button_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Setup handler untuk button di split dataset.
+    Handle click event untuk split button.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -24,6 +24,67 @@ def setup_button_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary komponen UI yang telah diupdate
     """
     try:
+        # Get current config
+        config = load_config()
+        
+        # Update UI from config
+        update_ui_from_config(ui_components, config)
+        
+        # Show success message
+        display(create_info_alert(
+            f"{ICONS.get('success', '✅')} Dataset berhasil di-split",
+            alert_type='success'
+        ))
+        
+        logger.info(f"{ICONS.get('success', '✅')} Split button berhasil dihandle")
+        return ui_components
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat handle split button: {str(e)}")
+        display(create_info_alert(
+            f"{ICONS.get('error', '❌')} Error saat split dataset: {str(e)}",
+            alert_type='error'
+        ))
+        return ui_components
+
+def handle_reset_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Handler untuk reset button split dataset (untuk keperluan unit test).
+    Args:
+        ui_components: Dictionary komponen UI
+    Returns:
+        Dictionary komponen UI yang telah diupdate
+    """
+    try:
+        # Load default config
+        config = load_config()
+        # Update UI
+        update_ui_from_config(ui_components, config)
+        # Save config
+        save_config(config)
+        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil direset ke default (unit test)")
+        return ui_components
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat reset konfigurasi (unit test): {str(e)}")
+        return ui_components
+
+def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Setup handler untuk button di split dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment manager (opsional)
+        config: Konfigurasi (opsional)
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
+    """
+    try:
+        # Split button handler
+        if 'split_button' in ui_components:
+            ui_components['split_button'].on_click(lambda b: handle_split_button_click(ui_components))
+            
         # Reset button handler
         if 'reset_button' in ui_components:
             def on_reset_clicked(b):

@@ -286,144 +286,159 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         # Pastikan config memiliki struktur yang benar
         if not config or 'hyperparameters' not in config:
-            logger.warning("⚠️ Konfigurasi hyperparameters tidak valid, menggunakan default")
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameters tidak valid, menggunakan default")
             config = get_default_hyperparameters_config()
             
+        hp = config['hyperparameters']
         # Update UI components
         if 'enabled_checkbox' in ui_components:
-            ui_components['enabled_checkbox'].value = config['hyperparameters']['enabled']
+            ui_components['enabled_checkbox'].value = hp.get('enabled', True)
             
         # Optimizer
         if 'optimizer_dropdown' in ui_components:
-            opt_val = config['hyperparameters']['optimizer']['type']
+            opt_val = hp.get('optimizer', {}).get('type', 'adam')
             dropdown = ui_components['optimizer_dropdown']
-            if opt_val in dropdown.options:
+            if hasattr(dropdown, 'options') and opt_val in getattr(dropdown, 'options', []):
                 dropdown.value = opt_val
-            else:
-                dropdown.value = dropdown.options[0]
+            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
+                dropdown.value = getattr(dropdown, 'options', [])[0]
+                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai optimizer '{opt_val}' tidak valid, menggunakan default")
             
         if 'learning_rate_slider' in ui_components:
-            ui_components['learning_rate_slider'].value = config['hyperparameters']['optimizer']['learning_rate']
+            ui_components['learning_rate_slider'].value = hp.get('optimizer', {}).get('learning_rate', 0.001)
             
         if 'weight_decay_slider' in ui_components:
-            ui_components['weight_decay_slider'].value = config['hyperparameters']['optimizer']['weight_decay']
+            ui_components['weight_decay_slider'].value = hp.get('optimizer', {}).get('weight_decay', 0.0005)
             
         if 'momentum_slider' in ui_components:
-            ui_components['momentum_slider'].value = config['hyperparameters']['optimizer']['momentum']
+            ui_components['momentum_slider'].value = hp.get('optimizer', {}).get('momentum', 0.9)
             
         if 'beta1_slider' in ui_components:
-            ui_components['beta1_slider'].value = config['hyperparameters']['optimizer']['beta1']
+            ui_components['beta1_slider'].value = hp.get('optimizer', {}).get('beta1', 0.9)
             
         if 'beta2_slider' in ui_components:
-            ui_components['beta2_slider'].value = config['hyperparameters']['optimizer']['beta2']
+            ui_components['beta2_slider'].value = hp.get('optimizer', {}).get('beta2', 0.999)
             
         if 'eps_slider' in ui_components:
-            ui_components['eps_slider'].value = config['hyperparameters']['optimizer']['eps']
+            ui_components['eps_slider'].value = hp.get('optimizer', {}).get('eps', 1e-8)
             
         # Scheduler
         if 'scheduler_checkbox' in ui_components:
-            ui_components['scheduler_checkbox'].value = config['hyperparameters']['scheduler']['enabled']
+            ui_components['scheduler_checkbox'].value = hp.get('scheduler', {}).get('enabled', True)
             
         if 'scheduler_dropdown' in ui_components:
-            sched_val = config['hyperparameters']['scheduler']['type']
+            sched_val = hp.get('scheduler', {}).get('type', 'cosine')
             dropdown = ui_components['scheduler_dropdown']
-            if sched_val in dropdown.options:
+            if hasattr(dropdown, 'options') and sched_val in getattr(dropdown, 'options', []):
                 dropdown.value = sched_val
-            else:
-                dropdown.value = dropdown.options[0]
+            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
+                dropdown.value = getattr(dropdown, 'options', [])[0]
+                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai scheduler '{sched_val}' tidak valid, menggunakan default")
             
         if 'warmup_epochs_slider' in ui_components:
-            ui_components['warmup_epochs_slider'].value = config['hyperparameters']['scheduler']['warmup_epochs']
+            ui_components['warmup_epochs_slider'].value = hp.get('scheduler', {}).get('warmup_epochs', 5)
             
         if 'min_lr_slider' in ui_components:
-            ui_components['min_lr_slider'].value = config['hyperparameters']['scheduler']['min_lr']
+            ui_components['min_lr_slider'].value = hp.get('scheduler', {}).get('min_lr', 0.00001)
             
         if 'patience_slider' in ui_components:
-            ui_components['patience_slider'].value = config['hyperparameters']['scheduler']['patience']
+            ui_components['patience_slider'].value = hp.get('scheduler', {}).get('patience', 10)
             
         if 'factor_slider' in ui_components:
-            ui_components['factor_slider'].value = config['hyperparameters']['scheduler']['factor']
+            ui_components['factor_slider'].value = hp.get('scheduler', {}).get('factor', 0.1)
             
         if 'threshold_slider' in ui_components:
-            ui_components['threshold_slider'].value = config['hyperparameters']['scheduler']['threshold']
+            ui_components['threshold_slider'].value = hp.get('scheduler', {}).get('threshold', 0.001)
             
         # Loss
         if 'loss_dropdown' in ui_components:
-            loss_val = config['hyperparameters']['loss']['type']
+            loss_val = hp.get('loss', {}).get('type', 'focal')
             dropdown = ui_components['loss_dropdown']
-            if loss_val in dropdown.options:
+            if hasattr(dropdown, 'options') and loss_val in getattr(dropdown, 'options', []):
                 dropdown.value = loss_val
-            else:
-                dropdown.value = dropdown.options[0]
+            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
+                dropdown.value = getattr(dropdown, 'options', [])[0]
+                logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai loss '{loss_val}' tidak valid, menggunakan default")
             
         if 'alpha_slider' in ui_components:
-            ui_components['alpha_slider'].value = config['hyperparameters']['loss']['alpha']
+            ui_components['alpha_slider'].value = hp.get('loss', {}).get('alpha', 0.25)
             
         if 'gamma_slider' in ui_components:
-            ui_components['gamma_slider'].value = config['hyperparameters']['loss']['gamma']
+            ui_components['gamma_slider'].value = hp.get('loss', {}).get('gamma', 2.0)
             
         if 'label_smoothing_slider' in ui_components:
-            ui_components['label_smoothing_slider'].value = config['hyperparameters']['loss']['label_smoothing']
+            ui_components['label_smoothing_slider'].value = hp.get('loss', {}).get('label_smoothing', 0.1)
             
         if 'box_loss_gain_slider' in ui_components:
-            ui_components['box_loss_gain_slider'].value = config['hyperparameters']['loss']['box_loss_gain']
+            ui_components['box_loss_gain_slider'].value = hp.get('loss', {}).get('box_loss_gain', 0.05)
             
         if 'cls_loss_gain_slider' in ui_components:
-            ui_components['cls_loss_gain_slider'].value = config['hyperparameters']['loss']['cls_loss_gain']
+            ui_components['cls_loss_gain_slider'].value = hp.get('loss', {}).get('cls_loss_gain', 0.5)
             
         if 'obj_loss_gain_slider' in ui_components:
-            ui_components['obj_loss_gain_slider'].value = config['hyperparameters']['loss']['obj_loss_gain']
+            ui_components['obj_loss_gain_slider'].value = hp.get('loss', {}).get('obj_loss_gain', 1.0)
             
         # Augmentation
         if 'augmentation_checkbox' in ui_components:
-            ui_components['augmentation_checkbox'].value = config['hyperparameters']['augmentation']['enabled']
+            ui_components['augmentation_checkbox'].value = hp.get('augmentation', {}).get('enabled', True)
             
         if 'mosaic_checkbox' in ui_components:
-            ui_components['mosaic_checkbox'].value = config['hyperparameters']['augmentation']['mosaic']
+            ui_components['mosaic_checkbox'].value = hp.get('augmentation', {}).get('mosaic', True)
             
         if 'mixup_checkbox' in ui_components:
-            ui_components['mixup_checkbox'].value = config['hyperparameters']['augmentation']['mixup']
+            ui_components['mixup_checkbox'].value = hp.get('augmentation', {}).get('mixup', True)
             
         if 'hsv_h_slider' in ui_components:
-            ui_components['hsv_h_slider'].value = config['hyperparameters']['augmentation']['hsv_h']
+            ui_components['hsv_h_slider'].value = hp.get('augmentation', {}).get('hsv_h', 0.015)
             
         if 'hsv_s_slider' in ui_components:
-            ui_components['hsv_s_slider'].value = config['hyperparameters']['augmentation']['hsv_s']
+            ui_components['hsv_s_slider'].value = hp.get('augmentation', {}).get('hsv_s', 0.7)
             
         if 'hsv_v_slider' in ui_components:
-            ui_components['hsv_v_slider'].value = config['hyperparameters']['augmentation']['hsv_v']
+            ui_components['hsv_v_slider'].value = hp.get('augmentation', {}).get('hsv_v', 0.4)
             
         if 'degrees_slider' in ui_components:
-            ui_components['degrees_slider'].value = config['hyperparameters']['augmentation']['degrees']
+            ui_components['degrees_slider'].value = hp.get('augmentation', {}).get('degrees', 0.0)
             
         if 'translate_slider' in ui_components:
-            ui_components['translate_slider'].value = config['hyperparameters']['augmentation']['translate']
+            ui_components['translate_slider'].value = hp.get('augmentation', {}).get('translate', 0.1)
             
         if 'scale_slider' in ui_components:
-            ui_components['scale_slider'].value = config['hyperparameters']['augmentation']['scale']
+            ui_components['scale_slider'].value = hp.get('augmentation', {}).get('scale', 0.5)
             
         if 'shear_slider' in ui_components:
-            ui_components['shear_slider'].value = config['hyperparameters']['augmentation']['shear']
+            ui_components['shear_slider'].value = hp.get('augmentation', {}).get('shear', 0.0)
             
         if 'perspective_slider' in ui_components:
-            ui_components['perspective_slider'].value = config['hyperparameters']['augmentation']['perspective']
+            ui_components['perspective_slider'].value = hp.get('augmentation', {}).get('perspective', 0.0)
             
         if 'flipud_slider' in ui_components:
-            ui_components['flipud_slider'].value = config['hyperparameters']['augmentation']['flipud']
+            ui_components['flipud_slider'].value = hp.get('augmentation', {}).get('flipud', 0.0)
             
         if 'fliplr_slider' in ui_components:
-            ui_components['fliplr_slider'].value = config['hyperparameters']['augmentation']['fliplr']
+            ui_components['fliplr_slider'].value = hp.get('augmentation', {}).get('fliplr', 0.5)
             
         if 'mosaic_prob_slider' in ui_components:
-            ui_components['mosaic_prob_slider'].value = config['hyperparameters']['augmentation']['mosaic_prob']
+            ui_components['mosaic_prob_slider'].value = hp.get('augmentation', {}).get('mosaic_prob', 1.0)
             
         if 'mixup_prob_slider' in ui_components:
-            ui_components['mixup_prob_slider'].value = config['hyperparameters']['augmentation']['mixup_prob']
+            ui_components['mixup_prob_slider'].value = hp.get('augmentation', {}).get('mixup_prob', 0.0)
             
-        logger.info("✅ UI berhasil diupdate dari konfigurasi hyperparameters")
+        # Early stopping dan training
+        if 'patience_slider' in ui_components:
+            # Cek di early_stopping jika ada
+            patience = hp.get('early_stopping', {}).get('patience', 10)
+            ui_components['patience_slider'].value = patience
+        if 'epochs_slider' in ui_components:
+            epochs = hp.get('epochs', 100)
+            ui_components['epochs_slider'].value = epochs
+        if 'batch_size_slider' in ui_components:
+            batch_size = hp.get('batch_size', 16)
+            ui_components['batch_size_slider'].value = batch_size
+        logger.info(f"{ICONS.get('success', '✅')} UI berhasil diupdate dari konfigurasi hyperparameters")
         
     except Exception as e:
-        logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        logger.error(f"{ICONS.get('error', '❌')} Error saat mengupdate UI dari konfigurasi: {str(e)}")
         # Jika terjadi error, gunakan konfigurasi default
         default_config = get_default_hyperparameters_config()
         update_ui_from_config(ui_components, default_config)

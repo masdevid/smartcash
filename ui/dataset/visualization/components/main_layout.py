@@ -24,13 +24,13 @@ def create_visualization_layout() -> Dict[str, Any]:
     """
     try:
         # Buat container utama
-        main_container = widgets.VBox(layout=widgets.Layout(width='100%'))
+        main_container = widgets.VBox(layout=widgets.Layout(width='100%', margin='0'))
         
         # Buat header
         header = create_header("Visualisasi Dataset", "Analisis dan visualisasi distribusi dataset")
         
         # Buat status panel
-        status = widgets.Output(layout=widgets.Layout(width='100%', min_height='50px'))
+        status = widgets.Output(layout=widgets.Layout(width='100%', min_height='40px'))
         with status:
             display(create_status_indicator("info", "Siap memvisualisasikan dataset"))
         
@@ -42,7 +42,7 @@ def create_visualization_layout() -> Dict[str, Any]:
             description='Loading:',
             bar_style='info',
             orientation='horizontal',
-            layout=widgets.Layout(width='100%', visibility='hidden')
+            layout=widgets.Layout(width='100%', visibility='hidden', margin='2px 0')
         )
         
         # Buat refresh button
@@ -51,35 +51,35 @@ def create_visualization_layout() -> Dict[str, Any]:
             icon='sync',
             button_style='primary',
             tooltip='Refresh data visualisasi',
-            layout=widgets.Layout(width='150px')
+            layout=widgets.Layout(width='130px')
         )
         
         # Buat dashboard cards container
         dashboard_container = widgets.VBox([
-            widgets.HBox([refresh_button], layout=widgets.Layout(justify_content='flex-end')),
+            widgets.HBox([refresh_button], layout=widgets.Layout(justify_content='flex-end', margin='2px 0')),
             widgets.HBox([
                 widgets.VBox([
-                    widgets.HTML("<h3>Statistik Split Dataset</h3>"),
+                    widgets.HTML("<h3 style='margin: 4px 0; font-size: 16px;'>Statistik Split Dataset</h3>"),
                     widgets.Output(layout=widgets.Layout(width='100%'))
-                ], layout=widgets.Layout(width='100%')),
-            ], layout=widgets.Layout(width='100%')),
+                ], layout=widgets.Layout(width='100%', margin='2px 0'))
+            ], layout=widgets.Layout(width='100%', margin='2px 0')),
             widgets.HBox([
                 widgets.VBox([
-                    widgets.HTML("<h3>Perbandingan Dataset</h3>"),
+                    widgets.HTML("<h3 style='margin: 4px 0; font-size: 16px;'>Perbandingan Dataset</h3>"),
                     widgets.Output(layout=widgets.Layout(width='100%'))
-                ], layout=widgets.Layout(width='100%')),
-            ], layout=widgets.Layout(width='100%')),
+                ], layout=widgets.Layout(width='100%', margin='2px 0'))
+            ], layout=widgets.Layout(width='100%', margin='2px 0')),
             widgets.HBox([
                 widgets.VBox([
-                    widgets.HTML("<h3>Preprocessing</h3>"),
+                    widgets.HTML("<h3 style='margin: 4px 0; font-size: 16px;'>Preprocessing</h3>"),
                     widgets.Output(layout=widgets.Layout(width='100%'))
-                ], layout=widgets.Layout(width='33%')),
+                ], layout=widgets.Layout(width='33%', margin='0 2px 0 0')),
                 widgets.VBox([
-                    widgets.HTML("<h3>Augmentasi</h3>"),
+                    widgets.HTML("<h3 style='margin: 4px 0; font-size: 16px;'>Augmentasi</h3>"),
                     widgets.Output(layout=widgets.Layout(width='100%'))
-                ], layout=widgets.Layout(width='33%')),
-            ], layout=widgets.Layout(width='100%'))
-        ])
+                ], layout=widgets.Layout(width='33%', margin='0 0 0 2px')),
+            ], layout=widgets.Layout(width='100%', margin='2px 0'))
+        ], layout=widgets.Layout(margin='0'))
         
         # Buat tab visualisasi
         distribution_tab = {

@@ -37,15 +37,15 @@ def create_status_card(
     
     # Buat komponen card
     title_widget = widgets.HTML(
-        value=f"<div style='font-size: 14px; font-weight: bold; color: {text_color};'>{title}</div>"
+        value=f"<div style='font-size: 13px; font-weight: bold; color: {text_color};'>{title}</div>"
     )
     
     value_widget = widgets.HTML(
-        value=f"<div style='font-size: 24px; font-weight: bold; color: {text_color};'>{icon} {value}</div>"
+        value=f"<div style='font-size: 20px; font-weight: bold; color: {text_color};'>{icon} {value}</div>"
     )
     
     description_widget = widgets.HTML(
-        value=f"<div style='font-size: 12px; color: {text_color}; opacity: 0.8;'>{description}</div>"
+        value=f"<div style='font-size: 11px; color: {text_color}; opacity: 0.8;'>{description}</div>"
     )
     
     # Buat container card
@@ -53,10 +53,10 @@ def create_status_card(
         [title_widget, value_widget, description_widget],
         layout=widgets.Layout(
             width=width,
-            padding="10px",
-            margin="5px",
+            padding="6px",
+            margin="3px",
             border="1px solid #ddd",
-            border_radius="5px"
+            border_radius="4px"
         )
     )
     
@@ -100,7 +100,7 @@ def create_split_cards(
             icon=ICONS.get("image", "🖼️"),
             status=status,
             description=f"Label: {stats.get('labels', 0)} | Objek: {stats.get('objects', 0)}",
-            width="200px"
+            width="190px"
         )
         
         cards.append(card)
@@ -112,7 +112,8 @@ def create_split_cards(
             display="flex",
             flex_flow="row wrap",
             align_items="stretch",
-            width="100%"
+            width="100%",
+            gap="2px"
         )
     )
     
@@ -143,25 +144,25 @@ def create_card(
     """
     # Buat komponen card
     title_widget = widgets.HTML(
-        value=f"<div style='font-size: 14px; font-weight: bold; color: {color};'>{title}</div>"
+        value=f"<div style='font-size: 13px; font-weight: bold; color: {color};'>{title}</div>"
     )
     
     value_widget = widgets.HTML(
-        value=f"<div style='font-size: 24px; font-weight: bold; color: {color};'>{icon} {value}</div>"
+        value=f"<div style='font-size: 20px; font-weight: bold; color: {color};'>{icon} {value}</div>"
     )
     
     description_widget = widgets.HTML(
-        value=f"<div style='font-size: 12px; color: {color}; opacity: 0.8;'>{description}</div>"
+        value=f"<div style='font-size: 11px; color: {color}; opacity: 0.8;'>{description}</div>"
     )
     
     # Buat container card
     card = widgets.VBox(
         [title_widget, value_widget, description_widget],
         layout=widgets.Layout(
-            padding="10px",
-            margin="5px",
+            padding="6px",
+            margin="3px",
             border="1px solid #ddd",
-            border_radius="5px"
+            border_radius="4px"
         )
     )
     
@@ -189,21 +190,21 @@ def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.V
     # Buat card
     card = widgets.VBox([
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Processed Images</h4>
-            <p style="font-size: 24px; font-weight: bold;">{processed_images}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Processed Images</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{processed_images}</p>
         </div>
         """),
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Filtered Images</h4>
-            <p style="font-size: 24px; font-weight: bold;">{filtered_images}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Filtered Images</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{filtered_images}</p>
         </div>
         """),
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Normalized Images</h4>
-            <p style="font-size: 24px; font-weight: bold;">{normalized_images}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Normalized Images</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{normalized_images}</p>
         </div>
         """)
     ])
@@ -229,21 +230,21 @@ def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.VBo
     # Buat card
     card = widgets.VBox([
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Augmented Images</h4>
-            <p style="font-size: 24px; font-weight: bold;">{augmented_images}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Augmented Images</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{augmented_images}</p>
         </div>
         """),
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Augmentations Created</h4>
-            <p style="font-size: 24px; font-weight: bold;">{augmentations_created}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Augmentations Created</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{augmentations_created}</p>
         </div>
         """),
         widgets.HTML(f"""
-        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
-            <h4 style="margin-top: 0;">Augmentation Types</h4>
-            <p style="font-size: 24px; font-weight: bold;">{augmentation_types}</p>
+        <div style="border: 1px solid #ddd; border-radius: 4px; padding: 6px; margin: 3px;">
+            <h4 style="margin-top: 0; font-size: 14px;">Augmentation Types</h4>
+            <p style="font-size: 18px; font-weight: bold; margin: 3px 0;">{augmentation_types}</p>
         </div>
         """)
     ])

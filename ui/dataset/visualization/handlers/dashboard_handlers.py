@@ -111,6 +111,45 @@ def get_empty_statistics() -> Dict[str, Any]:
         }
     }
 
+def find_valid_dataset_path() -> str:
+    """
+    Cari path dataset yang valid dari berbagai sumber.
+    
+    Returns:
+        Path dataset yang valid atau path default
+    """
+    # Daftar kemungkinan lokasi dataset
+    possible_paths = [
+        'data',                     # Relative to current directory
+        'data/dataset',             # Common subdirectory
+        '/content/data',            # Colab path
+        '/content/data/dataset',    # Colab subdirectory
+        os.path.join(get_default_base_dir(), 'data'),  # Base dir
+        os.path.join(get_default_base_dir(), 'data/dataset')  # Base dir subdirectory
+    ]
+    
+    # Coba dapatkan dari config manager
+    try:
+        config_manager = get_config_manager()
+        dataset_config = config_manager.get_module_config('dataset_config')
+        config_path = dataset_config.get('dataset_path', None)
+        if config_path and os.path.exists(config_path):
+            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan path dataset dari konfigurasi: {config_path}")
+            return config_path
+    except Exception as e:
+        logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat mengakses konfigurasi dataset: {str(e)}")
+    
+    # Coba setiap kemungkinan path
+    for path in possible_paths:
+        if os.path.exists(path):
+            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan path dataset yang ditemukan: {path}")
+            return path
+    
+    # Gunakan default jika tidak ada yang valid
+    default_path = 'data'
+    logger.warning(f"{ICONS.get('warning', '⚠️')} Tidak menemukan path dataset valid, menggunakan default: {default_path}")
+    return default_path
+
 def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
     """
     Update dashboard cards dengan data terbaru.
@@ -137,26 +176,26 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         # Flag untuk menandai apakah data valid
         data_valid = False
         
-        # Coba dapatkan dataset path dari konfigurasi
-        try:
-            config_manager = get_config_manager()
-            dataset_config = config_manager.get_module_config('dataset_config')
-            dataset_path = dataset_config.get('dataset_path', None)
+        # Update progress bar
+        if progress_bar:
+            progress_bar.value = 20
+        
+        # Cari dataset path yang valid
+        dataset_path = find_valid_dataset_path()
+        
+        # Update progress bar
+        if progress_bar:
+            progress_bar.value = 40
             
-            # Update progress bar
-            if progress_bar:
-                progress_bar.value = 30
-                
-            if dataset_path and os.path.exists(dataset_path):
-                # Dapatkan statistik dataset
-                dataset_stats = get_dataset_statistics(dataset_path)
-                
-                # Jika statistik tidak kosong, gunakan data tersebut
-                if dataset_stats:
-                    stats = dataset_stats
-                    data_valid = True
-        except Exception as e:
-            logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat mengakses dataset: {str(e)}")
+        # Dapatkan statistik dataset jika path valid
+        if os.path.exists(dataset_path):
+            # Dapatkan statistik dataset
+            dataset_stats = get_dataset_statistics(dataset_path)
+            
+            # Jika statistik tidak kosong, gunakan data tersebut
+            if dataset_stats:
+                stats = dataset_stats
+                data_valid = True
         
         # Update progress bar
         if progress_bar:
@@ -219,13 +258,13 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         
         # Tampilkan pesan sukses atau warning
         if data_valid:
-            show_success_status(ui_components, "Dashboard berhasil diperbarui")
+            show_success_status(ui_components, f"Dashboard berhasil diperbarui dengan data dari {dataset_path}")
         else:
-            show_warning_status(ui_components, "Dataset tidak tersedia. Menampilkan data kosong.")
+            show_warning_status(ui_components, f"Dataset tidak tersedia di {dataset_path}. Menampilkan data kosong.")
         
         # Log dengan timestamp
         current_time = datetime.now().strftime("%H:%M:%S")
-        success_message = "Dashboard berhasil diperbarui" + (" dengan data valid" if data_valid else " dengan data kosong")
+        success_message = f"Dashboard berhasil diperbarui" + (f" dengan data valid dari {dataset_path}" if data_valid else f" dengan data kosong (path: {dataset_path})")
         logger.info(f"[{current_time}] {ICONS.get('info', 'ℹ️')} 📊 {success_message}")
     
     except Exception as e:

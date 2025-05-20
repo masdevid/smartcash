@@ -39,18 +39,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         Dict berisi komponen UI dengan handler terpasang
     """
     try:
-        # Dapatkan environment manager jika belum tersedia
-        env = env or get_environment_manager(base_dir=get_default_base_dir())
-        
-        # Dapatkan config manager singleton
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        
-        # Validasi config
-        if config is None:
-            config = config_manager.get_module_config('hyperparameters', {})
-        
-        # Pastikan ui_components memiliki referensi ke config
-        ui_components['config'] = config
         
         # Handler untuk tombol save
         def on_save_click(b):
@@ -66,9 +55,18 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 # Simpan konfigurasi
                 success = config_manager.save_module_config('hyperparameters', updated_config)
                 
-                # UI components sudah teregistrasi di update_config_from_ui
-                # Memastikan persistensi UI dengan notifikasi observer
-                config_manager.notify_observers('hyperparameters', updated_config)
+                # Pastikan UI components teregistrasi untuk persistensi
+                try:
+                    config_manager.register_ui_components('hyperparameters', ui_components)
+                except Exception as persist_error:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+                
+                # Sinkronkan dengan drive
+                try:
+                    config_manager.sync_config_with_drive('hyperparameters')
+                    logger.info("✅ Konfigurasi berhasil disinkronkan dengan drive")
+                except Exception as sync_error:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
                 
                 # Tampilkan pesan sukses atau warning
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
@@ -89,26 +87,14 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
                     ui_components['update_hyperparameters_info']()
                 
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    if env.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info("Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info("Konfigurasi hyperparameter berhasil disimpan")
             except Exception as e:
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}",
+                        f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}",
                         alert_type='error'
                     ))
-                
-                logger.error(f"Gagal menyimpan konfigurasi: {str(e)}")
         
         # Handler untuk tombol reset
         def on_reset_click(b):
@@ -118,58 +104,40 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi hyperparameter..."))
             
             try:
-                # Dapatkan default config
-                default_config = config_manager.get_module_config('hyperparameters', {})
-                
-                # Update UI dari default config
+                # Reset ke konfigurasi default
+                default_config = get_default_hyperparameters_config()
                 update_ui_from_config(ui_components, default_config)
                 
-                # Simpan default config
+                # Simpan konfigurasi default
                 success = config_manager.save_module_config('hyperparameters', default_config)
                 
-                # UI components sudah teregistrasi di update_ui_from_config
-                # Memastikan persistensi UI dengan notifikasi observer
-                config_manager.notify_observers('hyperparameters', default_config)
+                # Sinkronkan dengan drive
+                try:
+                    config_manager.sync_config_with_drive('hyperparameters')
+                    logger.info("✅ Konfigurasi default berhasil disinkronkan dengan drive")
+                except Exception as sync_error:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
                 
-                # Tampilkan pesan sukses atau warning
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                # Tampilkan pesan sukses
                 with status_panel:
                     clear_output(wait=True)
-                    if success:
-                        display(create_info_alert(
-                            f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default",
-                            alert_type='success'
-                        ))
-                    else:
-                        display(create_info_alert(
-                            f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameter direset di UI tetapi mungkin tidak tersimpan ke file",
-                            alert_type='warning'
-                        ))
+                    display(create_info_alert(
+                        f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default",
+                        alert_type='success'
+                    ))
                 
                 # Update info panel jika ada
                 if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
                     ui_components['update_hyperparameters_info']()
                 
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    if env.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info("Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info("Konfigurasi hyperparameter berhasil direset ke default")
             except Exception as e:
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi: {str(e)}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}",
+                        f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi: {str(e)}",
                         alert_type='error'
                     ))
-                
-                logger.error(f"Gagal mereset konfigurasi: {str(e)}")
         
         # Pasang handler ke tombol
         if 'save_button' in ui_components:
@@ -186,5 +154,5 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         return ui_components
     except Exception as e:
-        logger.error(f"Error saat setup button handlers: {str(e)}")
+        logger.error(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
         return ui_components

@@ -412,3 +412,80 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         # Jika terjadi error, gunakan konfigurasi default
         default_config = get_default_hyperparameters_config()
         update_ui_from_config(ui_components, default_config)
+
+def update_hyperparameters_info(ui_components: Optional[Dict[str, Any]] = None):
+    """
+    Update informasi hyperparameter di info panel.
+    
+    Args:
+        ui_components: Komponen UI (opsional)
+    """
+    try:
+        if ui_components is None:
+            ui_components = get_ui_components()
+        
+        # Dapatkan info panel
+        info_panel = ui_components.get('hyperparameters_info')
+        if not info_panel:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Info panel tidak ditemukan")
+            return
+        
+        # Dapatkan konfigurasi
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
+        config = config_manager.get_module_config('hyperparameters', {})
+        
+        # Validasi konfigurasi
+        if not config or 'hyperparameters' not in config:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameter tidak valid")
+            config = get_default_hyperparameters_config()
+        
+        # Dapatkan nilai dari konfigurasi
+        hyperparams = config.get('hyperparameters', {})
+        
+        # Buat info text
+        info_text = f"""
+        <div style='font-family: monospace; white-space: pre-wrap;'>
+        <h3>Hyperparameter Configuration</h3>
+        
+        <b>Optimizer:</b>
+        • Type: {hyperparams.get('optimizer', {}).get('type', 'N/A')}
+        • Learning Rate: {hyperparams.get('optimizer', {}).get('learning_rate', 'N/A')}
+        • Weight Decay: {hyperparams.get('optimizer', {}).get('weight_decay', 'N/A')}
+        
+        <b>Scheduler:</b>
+        • Type: {hyperparams.get('scheduler', {}).get('type', 'N/A')}
+        • Step Size: {hyperparams.get('scheduler', {}).get('step_size', 'N/A')}
+        • Gamma: {hyperparams.get('scheduler', {}).get('gamma', 'N/A')}
+        
+        <b>Loss:</b>
+        • Type: {hyperparams.get('loss', {}).get('type', 'N/A')}
+        
+        <b>Augmentation:</b>
+        • Enabled: {hyperparams.get('augmentation', {}).get('enabled', 'N/A')}
+        • Rotation: {hyperparams.get('augmentation', {}).get('rotation', 'N/A')}
+        • Horizontal Flip: {hyperparams.get('augmentation', {}).get('horizontal_flip', 'N/A')}
+        • Vertical Flip: {hyperparams.get('augmentation', {}).get('vertical_flip', 'N/A')}
+        • Color Jitter: {hyperparams.get('augmentation', {}).get('color_jitter', 'N/A')}
+        
+        <b>Training:</b>
+        • Batch Size: {hyperparams.get('training', {}).get('batch_size', 'N/A')}
+        • Epochs: {hyperparams.get('training', {}).get('epochs', 'N/A')}
+        • Early Stopping: {hyperparams.get('training', {}).get('early_stopping', 'N/A')}
+        • Patience: {hyperparams.get('training', {}).get('patience', 'N/A')}
+        </div>
+        """
+        
+        # Update info panel
+        info_panel.value = info_text
+        
+        # Sinkronkan dengan drive
+        try:
+            config_manager.sync_config_with_drive('hyperparameters')
+            logger.info("✅ Konfigurasi berhasil disinkronkan dengan drive")
+        except Exception as sync_error:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat mengupdate info panel: {str(e)}")
+        if info_panel:
+            info_panel.value = f"Error: {str(e)}"

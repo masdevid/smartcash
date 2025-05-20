@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, List
 import logging
 import yaml
+import os
 
 from smartcash.common.config.singleton import Singleton
 from smartcash.common.config.base_manager import BaseConfigManager
@@ -17,6 +18,25 @@ from smartcash.common.config.dependency_manager import DependencyManager
 
 # Type variable untuk dependency injection
 T = TypeVar('T')
+
+def load_colab_secrets() -> Dict[str, str]:
+    """
+    Load secrets dari Google Colab.
+    
+    Returns:
+        Dictionary berisi secrets
+    """
+    secrets = {}
+    try:
+        from google.colab import userdata
+        # Load API key dari Colab secret
+        try:
+            secrets['roboflow_api_key'] = userdata.get('ROBOFLOW_API_KEY')
+        except Exception as e:
+            logging.getLogger(__name__).critical(f"❌ Gagal load ROBOFLOW_API_KEY dari Colab secret: {str(e)}")
+    except ImportError:
+        pass
+    return secrets
 
 class ConfigManager(DriveConfigManager, DependencyManager):
     """
@@ -43,7 +63,7 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             handler.setFormatter(formatter)
             self._logger.addHandler(handler)
-            self._logger.setLevel(logging.INFO)
+            self._logger.setLevel(logging.CRITICAL)  # Set ke CRITICAL
             
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)
@@ -53,6 +73,21 @@ class ConfigManager(DriveConfigManager, DependencyManager):
         
         # Simpan config_file untuk referensi
         self._config_file = config_file
+        
+        # Load Colab secrets jika di Colab
+        try:
+            import google.colab
+            secrets = load_colab_secrets()
+            if secrets.get('roboflow_api_key'):
+                # Update config dengan API key dari Colab secret
+                if 'data' not in self.config:
+                    self.config['data'] = {}
+                if 'roboflow' not in self.config['data']:
+                    self.config['data']['roboflow'] = {}
+                self.config['data']['roboflow']['api_key'] = secrets['roboflow_api_key']
+                self._logger.critical("✅ API key berhasil dimuat dari Colab secret")
+        except ImportError:
+            pass
 
     def sync_config_with_drive(self, module_name: str) -> bool:
         """
@@ -152,7 +187,7 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         handler.setFormatter(formatter)
         logger.addHandler(handler)
-        logger.setLevel(logging.INFO)
+        logger.setLevel(logging.CRITICAL)  # Set ke CRITICAL
     
     try:
         # Cek apakah kita di Colab
@@ -167,12 +202,12 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
             # Di Colab, gunakan /content sebagai base_dir
             default_base_dir = '/content'
             default_config_file = str(Path(default_base_dir) / 'configs' / 'dataset_config.yaml')
-            logger.info(f"Deteksi Google Colab, menggunakan base_dir: {default_base_dir}")
+            logger.critical(f"Deteksi Google Colab, menggunakan base_dir: {default_base_dir}")
         else:
             # Di lokal, gunakan root project
             default_base_dir = str(Path(__file__).resolve().parents[3])  # 3 levels up to reach project root
             default_config_file = str(Path(default_base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
-            logger.info(f"Deteksi environment lokal, menggunakan base_dir: {default_base_dir}")
+            logger.critical(f"Deteksi environment lokal, menggunakan base_dir: {default_base_dir}")
             
         # Gunakan nilai default jika tidak disediakan
         base_dir = base_dir or default_base_dir
@@ -187,36 +222,36 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
         # Pastikan direktori configs ada
         config_dir = Path(config_file).parent
         if not config_dir.exists():
-            logger.warning(f"Direktori configs tidak ditemukan di {config_dir}, mencoba membuat...")
+            logger.critical(f"Direktori configs tidak ditemukan di {config_dir}, mencoba membuat...")
             try:
                 config_dir.mkdir(parents=True, exist_ok=True)
-                logger.info(f"✅ Direktori configs berhasil dibuat di {config_dir}")
+                logger.critical(f"✅ Direktori configs berhasil dibuat di {config_dir}")
             except Exception as e:
-                logger.error(f"❌ Gagal membuat direktori configs: {str(e)}")
+                logger.critical(f"❌ Gagal membuat direktori configs: {str(e)}")
                 
         # Pastikan file config ada
         if not Path(config_file).exists():
-            logger.warning(f"File config tidak ditemukan di {config_file}, menggunakan default config...")
+            logger.critical(f"File config tidak ditemukan di {config_file}, menggunakan default config...")
             default_config = get_default_config()
             try:
                 # Simpan default config
                 with open(config_file, 'w') as f:
                     yaml.dump(default_config, f)
-                logger.info(f"✅ Default config berhasil disimpan ke {config_file}")
+                logger.critical(f"✅ Default config berhasil disimpan ke {config_file}")
             except Exception as e:
-                logger.error(f"❌ Gagal menyimpan default config: {str(e)}")
+                logger.critical(f"❌ Gagal menyimpan default config: {str(e)}")
                 
         # Buat atau dapatkan instance ConfigManager
         if _config_manager is None:
-            logger.info(f"Membuat ConfigManager baru dengan base_dir: {base_dir}")
+            logger.critical(f"Membuat ConfigManager baru dengan base_dir: {base_dir}")
             _config_manager = ConfigManager(base_dir, config_file, env_prefix)
         else:
-            logger.info("Menggunakan ConfigManager yang sudah ada")
+            logger.critical("Menggunakan ConfigManager yang sudah ada")
             
         return _config_manager
         
     except Exception as e:
-        logger.error(f"❌ Error saat membuat ConfigManager: {str(e)}")
+        logger.critical(f"❌ Error saat membuat ConfigManager: {str(e)}")
         raise
 
 # Tambahkan method get_instance sebagai staticmethod untuk kompatibilitas

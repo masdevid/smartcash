@@ -236,5 +236,17 @@ class TestDownloadHandler(unittest.TestCase):
             except Exception as e:
                 self.fail(f"handle_download_button_click raised Exception unexpectedly: {e}")
 
+    def test_handle_download_button_click_with_non_dict_ui_components(self):
+        """Test handle_download_button_click ketika ui_components bukan dict"""
+        with patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download', return_value=False):
+            try:
+                # Panggil dengan ui_components bukan dict
+                handle_download_button_click("not a dict", self.ui_components['download_button'])
+            except Exception as e:
+                self.fail(f"handle_download_button_click raised Exception unexpectedly: {e}")
+            
+            # Verify button is re-enabled
+            self.assertFalse(self.ui_components['download_button'].disabled)
+
 if __name__ == '__main__':
     unittest.main() 

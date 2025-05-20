@@ -107,11 +107,12 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> 
         button: Button widget
     """
     try:
-        # Disable tombol download
-        button.disabled = True
+        # Disable tombol download jika button adalah widget
+        if hasattr(button, 'disabled'):
+            button.disabled = True
         
-        # Log pesan persiapan
-        if 'log_output' in ui_components:
+        # Log pesan persiapan jika ui_components adalah dict
+        if isinstance(ui_components, dict) and 'log_output' in ui_components:
             ui_components['log_output'].append_stdout("Memulai persiapan download dataset...")
         
         # Tampilkan konfirmasi download
@@ -120,35 +121,36 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> 
             # Reset progress bar setelah konfirmasi
             _reset_progress_bar(ui_components)
             
-            # Ekstrak parameter dari UI
-            params = {
-                'workspace': ui_components['workspace'].value,
-                'project': ui_components['project'].value,
-                'version': ui_components['version'].value,
-                'api_key': ui_components['api_key'].value,
-                'output_dir': ui_components['output_dir'].value,
-                'validate_dataset': ui_components['validate_dataset'].value,
-                'backup_before_download': ui_components['backup_checkbox'].value,
-                'backup_dir': ui_components['backup_dir'].value
-            }
-            
-            # Log parameter yang akan digunakan
-            if 'log_output' in ui_components:
-                ui_components['log_output'].append_stdout("Parameter download:")
-                for key, value in params.items():
-                    ui_components['log_output'].append_stdout(f"- {key}: {value}")
+            # Ekstrak parameter dari UI jika ui_components adalah dict
+            if isinstance(ui_components, dict):
+                params = {
+                    'workspace': ui_components['workspace'].value,
+                    'project': ui_components['project'].value,
+                    'version': ui_components['version'].value,
+                    'api_key': ui_components['api_key'].value,
+                    'output_dir': ui_components['output_dir'].value,
+                    'validate_dataset': ui_components['validate_dataset'].value,
+                    'backup_before_download': ui_components['backup_checkbox'].value,
+                    'backup_dir': ui_components['backup_dir'].value
+                }
+                
+                # Log parameter yang akan digunakan
+                if 'log_output' in ui_components:
+                    ui_components['log_output'].append_stdout("Parameter download:")
+                    for key, value in params.items():
+                        ui_components['log_output'].append_stdout(f"- {key}: {value}")
             
             # Jalankan download
             execute_download(ui_components)
         else:
-            if 'log_output' in ui_components:
+            if isinstance(ui_components, dict) and 'log_output' in ui_components:
                 ui_components['log_output'].append_stdout("Download dibatalkan")
                 
     except Exception as e:
-        if 'log_output' in ui_components:
+        if isinstance(ui_components, dict) and 'log_output' in ui_components:
             ui_components['log_output'].append_stderr(f"Error saat persiapan download: {str(e)}")
     finally:
-        # Enable kembali tombol download
+        # Enable kembali tombol download jika button adalah widget
         if hasattr(button, 'disabled'):
             button.disabled = False
 

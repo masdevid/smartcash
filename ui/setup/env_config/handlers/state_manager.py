@@ -63,8 +63,12 @@ class StateManager:
         """
         return self._progress
     
-    def update_progress(self, value: float):
+    def update_progress(self, value: float, message: str = ""):
         """
         Update progress value
+        
+        Args:
+            value: Progress value
+            message: Progress message (optional)
         """
         self._progress = value 

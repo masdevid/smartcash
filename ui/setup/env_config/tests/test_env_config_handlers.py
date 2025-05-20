@@ -107,10 +107,10 @@ class TestEnvConfigHandlers(unittest.TestCase):
         state_manager = StateManager()
         
         # Test progress updates
-        state_manager.update_progress(0.5)
+        state_manager.update_progress(0.5, "Progress at 50%")
         self.assertEqual(state_manager.progress, 0.5)
         
-        state_manager.update_progress(1.0)
+        state_manager.update_progress(1.0, "Progress completed")
         self.assertEqual(state_manager.progress, 1.0)
     
     def test_state_manager_drive_sync(self):

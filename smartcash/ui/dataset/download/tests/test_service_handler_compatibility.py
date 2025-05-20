@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock, call
 import ipywidgets as widgets
 
 from smartcash.ui.dataset.download.handlers.download_handler import DownloadHandler
-from smartcash.ui.dataset.download.handlers.cleanup_handler import CleanupHandler
+from smartcash.ui.dataset.download.handlers.cleanup_handler import execute_cleanup
 from smartcash.dataset.services.downloader.download_service import DownloadService
 from smartcash.dataset.manager import DatasetManager
 
@@ -31,26 +31,23 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
         self.dataset_manager_patch = patch('smartcash.ui.dataset.download.handlers.download_handler.DatasetManager')
         self.download_service_patch = patch('smartcash.ui.dataset.download.handlers.download_handler.DownloadService')
         self.cleanup_manager_patch = patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DatasetManager')
-        self.cleanup_service_patch = patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DownloadService')
         
         self.dataset_manager_mock = self.dataset_manager_patch.start().return_value
         self.download_service_mock = self.download_service_patch.start().return_value
         self.cleanup_manager_mock = self.cleanup_manager_patch.start().return_value
-        self.cleanup_service_mock = self.cleanup_service_patch.start().return_value
         
         # Setup handlers
         self.download_handler = DownloadHandler(ui_components=self.ui_components)
-        self.cleanup_handler = CleanupHandler(ui_components=self.ui_components, dataset_manager=self.dataset_manager_mock)
         
         # Reset download_running flag
         self.ui_components['download_running'] = False
+        self.ui_components['cleanup_running'] = False
     
     def tearDown(self):
         """Cleanup setelah setiap test case."""
         self.dataset_manager_patch.stop()
         self.download_service_patch.stop()
         self.cleanup_manager_patch.stop()
-        self.cleanup_service_patch.stop()
         if os.path.exists(self.temp_dir):
             shutil.rmtree(self.temp_dir)
     
@@ -87,7 +84,8 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
                 'classes': {'0': 50, '1': 40}
             },
             'download_timestamp': '2025-05-19T12:14:39+07:00',
-            'download_running': False
+            'download_running': False,
+            'cleanup_running': False
         }
         
         # Tambahkan layout ke komponen yang membutuhkannya
@@ -119,17 +117,24 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
             backup_dir=self.ui_components['backup_dir'].value
         )
     
-    def test_cleanup_handler_compatibility_with_service(self):
+    @patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DatasetManager')
+    def test_cleanup_handler_compatibility_with_service(self, mock_dataset_manager_class):
         """Test kompatibilitas cleanup handler dengan service."""
         # Setup mock untuk cleanup_dataset
-        self.dataset_manager_mock.cleanup_dataset.return_value = True
+        mock_dataset_manager = mock_dataset_manager_class.return_value
+        mock_dataset_manager.cleanup_dataset.return_value = {
+            "status": "success",
+            "message": "Dataset berhasil dihapus"
+        }
         
-        # Panggil fungsi cleanup
-        self.cleanup_handler.cleanup()
+        # Panggil fungsi execute_cleanup
+        execute_cleanup(self.ui_components, self.ui_components['output_dir'].value)
         
         # Verifikasi bahwa cleanup_dataset dipanggil dengan parameter yang benar
-        self.dataset_manager_mock.cleanup_dataset.assert_called_once_with(
-            output_dir=self.ui_components['output_dir'].value
+        mock_dataset_manager.cleanup_dataset.assert_called_once_with(
+            self.ui_components['output_dir'].value,
+            backup_before_delete=True,
+            show_progress=True
         )
     
     def test_download_service_parameter_compatibility(self):
@@ -150,19 +155,26 @@ class TestServiceHandlerCompatibility(unittest.TestCase):
         else:
             self.fail('download_from_roboflow was not called')
     
-    def test_integration_with_dataset_manager(self):
+    @patch('smartcash.ui.dataset.download.handlers.cleanup_handler.DatasetManager')
+    def test_integration_with_dataset_manager(self, mock_dataset_manager_class):
         """Test integrasi handler dengan DatasetManager."""
         # Setup mock untuk DatasetManager
         self.dataset_manager_mock.download_from_roboflow.return_value = True
-        self.dataset_manager_mock.cleanup_dataset.return_value = True
+        
+        # Setup mock untuk cleanup_dataset
+        mock_dataset_manager = mock_dataset_manager_class.return_value
+        mock_dataset_manager.cleanup_dataset.return_value = {
+            "status": "success",
+            "message": "Dataset berhasil dihapus"
+        }
         
         # Test download
         self.download_handler.download()
         self.dataset_manager_mock.download_from_roboflow.assert_called_once()
         
         # Test cleanup
-        self.cleanup_handler.cleanup()
-        self.dataset_manager_mock.cleanup_dataset.assert_called_once()
+        execute_cleanup(self.ui_components, self.ui_components['output_dir'].value)
+        mock_dataset_manager.cleanup_dataset.assert_called_once()
     
     def test_error_handling_compatibility(self):
         """Test kompatibilitas penanganan error antara handler dan service."""

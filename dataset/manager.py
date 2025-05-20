@@ -7,6 +7,7 @@ import torch
 from typing import Dict, List, Optional, Union, Any, Callable
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError, DatasetProcessingError
+from pathlib import Path
 
 from smartcash.dataset.services.service_factory import ServiceFactory
 from smartcash.dataset.services.preprocessing_manager import PreprocessingManager
@@ -190,6 +191,47 @@ class DatasetManager:
         """Pecah dataset menjadi split train/val/test."""
         raise NotImplementedError("Splitting dataset belum diimplementasikan")
     
-    def cleanup_dataset(self, output_dir=None):
-        """Stub for test compatibility. Does nothing."""
-        self.logger.info(f"Called cleanup_dataset with output_dir={output_dir}")
+    def cleanup_dataset(self, dataset_path: Union[str, Path], backup_before_delete: bool = True, 
+                     show_progress: bool = True) -> Dict[str, Any]:
+        """
+        Hapus dataset dari direktori yang ditentukan.
+        
+        Args:
+            dataset_path: Path ke dataset yang akan dihapus
+            backup_before_delete: Buat backup sebelum menghapus
+            show_progress: Tampilkan progress
+            
+        Returns:
+            Dict dengan status operasi
+        """
+        self.logger.info(f"ℹ️ Menghapus dataset: {dataset_path}")
+        
+        # Dapatkan service
+        cleanup_service = self.get_cleanup_service()
+        
+        # Jalankan cleanup
+        result = cleanup_service.cleanup_dataset(
+            dataset_path,
+            backup_before_delete=backup_before_delete,
+            show_progress=show_progress
+        )
+        
+        # Log hasil
+        if result["status"] == "success":
+            self.logger.info(f"✅ Dataset berhasil dihapus: {result['message']}")
+        else:
+            self.logger.error(f"❌ Gagal menghapus dataset: {result['message']}")
+        
+        return result
+    
+    def get_cleanup_service(self):
+        """Dapatkan instance CleanupService."""
+        from smartcash.dataset.services.downloader.cleanup_service import CleanupService
+        
+        # Buat instance baru
+        cleanup_service = CleanupService(
+            config=self.config,
+            logger=self.logger
+        )
+        
+        return cleanup_service

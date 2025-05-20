@@ -124,7 +124,7 @@ class TestDownloadConfigHandler(unittest.TestCase):
         """Test get_config_from_ui."""
         # Setup mock
         mock_config_manager = MagicMock()
-        mock_config_manager.get_config.return_value = self.config
+        mock_config_manager.config = {'download': {}}
         mock_get_config_manager.return_value = mock_config_manager
         
         # Panggil fungsi
@@ -141,14 +141,15 @@ class TestDownloadConfigHandler(unittest.TestCase):
         """Test update_config_from_ui."""
         # Setup mock
         mock_config_manager = MagicMock()
-        mock_config_manager.get_config.return_value = self.config
+        mock_config_manager.config = {'download': {}}
         mock_get_config_manager.return_value = mock_config_manager
         
         # Panggil fungsi
         result = update_config_from_ui(self.ui_components)
         
         # Verifikasi hasil
-        self.assertIn('download', result)
+        self.assertIn('data', result)
+        self.assertIn('dataset', result)
         mock_config_manager.update_config.assert_called_once()
     
     @patch('smartcash.ui.dataset.download.handlers.config_handler.get_config_manager')

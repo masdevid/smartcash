@@ -87,17 +87,32 @@ def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('hyperparameters')
+        config = config_manager.get_module_config('hyperparameters', {})
         
         # Pastikan config memiliki struktur yang benar
         if not config or 'hyperparameters' not in config:
-            logger.warning("⚠️ Konfigurasi hyperparameters tidak ditemukan atau tidak valid, menggunakan default")
-            return get_default_hyperparameters_config()
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Konfigurasi hyperparameters tidak ditemukan atau tidak valid, menggunakan default")
+            default_config = get_default_hyperparameters_config()
+            # Simpan default config ke file
+            config_manager.save_module_config('hyperparameters', default_config)
+            return default_config
             
+        # Validasi struktur konfigurasi
+        default_config = get_default_hyperparameters_config()
+        for key in default_config['hyperparameters']:
+            if key not in config['hyperparameters']:
+                config['hyperparameters'][key] = default_config['hyperparameters'][key]
+        
         return config
     except Exception as e:
-        logger.error(f"❌ Error saat mengambil konfigurasi hyperparameters: {str(e)}")
-        return get_default_hyperparameters_config()
+        logger.error(f"{ICONS.get('error', '❌')} Error saat mengambil konfigurasi hyperparameters: {str(e)}")
+        default_config = get_default_hyperparameters_config()
+        # Simpan default config ke file
+        try:
+            config_manager.save_module_config('hyperparameters', default_config)
+        except Exception as save_error:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan default config: {str(save_error)}")
+        return default_config
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

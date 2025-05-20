@@ -49,7 +49,10 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         # Simpan konfigurasi dan sinkronisasi
         saved_config = save_config(config, ui_components)
         
-        # Update info panel
+        # Update UI dari konfigurasi yang disimpan untuk memastikan konsistensi
+        update_ui_from_config(ui_components, saved_config)
+        
+        # Update info panel dengan konfigurasi yang disimpan
         update_backbone_info(ui_components)
         
         # Tampilkan pesan sukses

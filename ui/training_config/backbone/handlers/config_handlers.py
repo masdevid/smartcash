@@ -207,19 +207,36 @@ def update_backbone_info(ui_components: Dict[str, Any]) -> None:
         if 'model' not in config:
             config['model'] = get_default_backbone_config()['model']
         
+        # Get model config with safe defaults
+        model_config = config['model']
+        default_config = get_default_backbone_config()['model']
+        
+        # Safely get values with defaults
+        backbone = model_config.get('backbone', default_config['backbone'])
+        pretrained = model_config.get('pretrained', default_config['pretrained'])
+        freeze_backbone = model_config.get('freeze_backbone', default_config['freeze_backbone'])
+        freeze_bn = model_config.get('freeze_bn', default_config['freeze_bn'])
+        dropout = model_config.get('dropout', default_config['dropout'])
+        activation = model_config.get('activation', default_config['activation'])
+        
+        # Safely get nested values
+        normalization = model_config.get('normalization', default_config['normalization'])
+        norm_type = normalization.get('type', default_config['normalization']['type'])
+        norm_momentum = normalization.get('momentum', default_config['normalization']['momentum'])
+        
         # Update info panel dengan informasi backbone
         info_text = f"""
         <div style='font-family: monospace;'>
         <h4>Backbone Configuration:</h4>
         <ul>
-            <li>Type: {config['model']['backbone']}</li>
-            <li>Pretrained: {config['model']['pretrained']}</li>
-            <li>Freeze Backbone: {config['model']['freeze_backbone']}</li>
-            <li>Freeze BatchNorm: {config['model']['freeze_bn']}</li>
-            <li>Dropout: {config['model']['dropout']}</li>
-            <li>Activation: {config['model']['activation']}</li>
-            <li>Normalization: {config['model']['normalization']['type']}</li>
-            <li>BN Momentum: {config['model']['normalization']['momentum']}</li>
+            <li>Type: {backbone}</li>
+            <li>Pretrained: {pretrained}</li>
+            <li>Freeze Backbone: {freeze_backbone}</li>
+            <li>Freeze BatchNorm: {freeze_bn}</li>
+            <li>Dropout: {dropout}</li>
+            <li>Activation: {activation}</li>
+            <li>Normalization: {norm_type}</li>
+            <li>BN Momentum: {norm_momentum}</li>
         </ul>
         </div>
         """

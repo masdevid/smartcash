@@ -171,108 +171,81 @@ def create_card(
     return card
 
 
-def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.HBox:
+def create_preprocessing_cards(preprocessing_stats: Dict[str, int]) -> widgets.VBox:
     """
-    Membuat cards untuk statistik preprocessing.
+    Buat card untuk statistik preprocessing.
     
     Args:
         preprocessing_stats: Dictionary berisi statistik preprocessing
         
     Returns:
-        HBox berisi cards preprocessing
+        Widget VBox berisi card preprocessing
     """
-    # Container untuk cards
-    cards_container = widgets.HBox(layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='stretch',
-        width='100%'
-    ))
+    # Dapatkan statistik
+    processed_images = preprocessing_stats.get('processed_images', 0)
+    filtered_images = preprocessing_stats.get('filtered_images', 0)
+    normalized_images = preprocessing_stats.get('normalized_images', 0)
     
-    # Buat cards
-    cards = [
-        create_card(
-            title="Gambar Diproses",
-            value=preprocessing_stats.get('processed', preprocessing_stats.get('resized', 2000)),
-            description="Total gambar yang telah diproses",
-            icon="⚙️",
-            color="#0d47a1",
-            bg_class="bg-preprocessing"
-        ),
-        create_card(
-            title="Gambar Difilter",
-            value=preprocessing_stats.get('filtered', preprocessing_stats.get('annotated', 2000)),
-            description="Gambar yang difilter karena kualitas rendah",
-            icon="🔍",
-            color="#0d47a1",
-            bg_class="bg-preprocessing"
-        ),
-        create_card(
-            title="Gambar Dinormalisasi",
-            value=preprocessing_stats.get('normalized', preprocessing_stats.get('normalized', 2000)),
-            description="Gambar yang telah dinormalisasi",
-            icon="📐",
-            color="#0d47a1",
-            bg_class="bg-preprocessing"
-        )
-    ]
+    # Buat card
+    card = widgets.VBox([
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Processed Images</h4>
+            <p style="font-size: 24px; font-weight: bold;">{processed_images}</p>
+        </div>
+        """),
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Filtered Images</h4>
+            <p style="font-size: 24px; font-weight: bold;">{filtered_images}</p>
+        </div>
+        """),
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Normalized Images</h4>
+            <p style="font-size: 24px; font-weight: bold;">{normalized_images}</p>
+        </div>
+        """)
+    ])
     
-    # Tambahkan cards ke container
-    cards_container.children = cards
-    
-    return cards_container
+    return card
 
 
-def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.HBox:
+def create_augmentation_cards(augmentation_stats: Dict[str, int]) -> widgets.VBox:
     """
-    Membuat cards untuk statistik augmentasi.
+    Buat card untuk statistik augmentasi.
     
     Args:
         augmentation_stats: Dictionary berisi statistik augmentasi
         
     Returns:
-        HBox berisi cards augmentasi
+        Widget VBox berisi card augmentasi
     """
-    # Container untuk cards
-    cards_container = widgets.HBox(layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='stretch',
-        width='100%'
-    ))
+    # Dapatkan statistik
+    augmented_images = augmentation_stats.get('augmented_images', 0)
+    augmentations_created = augmentation_stats.get('augmentations_created', 0)
+    augmentation_types = augmentation_stats.get('augmentation_types', 0)
     
-    # Hitung total augmentasi yang dibuat
-    total_augmented = sum([v for k, v in augmentation_stats.items() if k in ['flipped', 'rotated', 'blurred', 'noised', 'cropped']])
+    # Buat card
+    card = widgets.VBox([
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Augmented Images</h4>
+            <p style="font-size: 24px; font-weight: bold;">{augmented_images}</p>
+        </div>
+        """),
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Augmentations Created</h4>
+            <p style="font-size: 24px; font-weight: bold;">{augmentations_created}</p>
+        </div>
+        """),
+        widgets.HTML(f"""
+        <div style="border: 1px solid #ddd; border-radius: 5px; padding: 10px; margin: 5px;">
+            <h4 style="margin-top: 0;">Augmentation Types</h4>
+            <p style="font-size: 24px; font-weight: bold;">{augmentation_types}</p>
+        </div>
+        """)
+    ])
     
-    # Buat cards
-    cards = [
-        create_card(
-            title="Gambar Diaugmentasi",
-            value=augmentation_stats.get('augmented', 2000),
-            description="Total gambar yang telah diaugmentasi",
-            icon="🔄",
-            color="#1b5e20",
-            bg_class="bg-augmentation"
-        ),
-        create_card(
-            title="Augmentasi Dibuat",
-            value=augmentation_stats.get('generated', total_augmented),
-            description="Total gambar augmentasi yang dibuat",
-            icon="✨",
-            color="#1b5e20",
-            bg_class="bg-augmentation"
-        ),
-        create_card(
-            title="Tipe Augmentasi",
-            value=len([k for k in augmentation_stats.keys() if k in ['flipped', 'rotated', 'blurred', 'noised', 'cropped']]),
-            description="Jumlah tipe augmentasi yang digunakan",
-            icon="🔠",
-            color="#1b5e20",
-            bg_class="bg-augmentation"
-        )
-    ]
-    
-    # Tambahkan cards ke container
-    cards_container.children = cards
-    
-    return cards_container
+    return card

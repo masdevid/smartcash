@@ -1,101 +1,68 @@
 """
 File: smartcash/ui/dataset/visualization/components/split_stats_cards.py
-Deskripsi: Komponen untuk menampilkan statistik split dataset (train, test, val)
+Deskripsi: Komponen card untuk statistik split dataset
 """
 
-import ipywidgets as widgets
 from typing import Dict, Any
-import math
+import ipywidgets as widgets
 
-def create_split_stats_cards(stats: Dict[str, Any]) -> widgets.Box:
+def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.HBox:
     """
-    Buat kartu statistik untuk split dataset (train, test, val).
+    Buat card untuk statistik split dataset.
     
     Args:
-        stats: Dictionary berisi statistik split dataset
+        split_stats: Dictionary berisi statistik split dataset
         
     Returns:
-        Box widget berisi kartu statistik split
+        Widget HBox berisi card split dataset
     """
-    # Ambil statistik split
-    split_stats = stats.get('split', {})
+    # Dapatkan statistik
+    train_stats = split_stats.get('train', {'images': 0, 'labels': 0})
+    val_stats = split_stats.get('val', {'images': 0, 'labels': 0})
+    test_stats = split_stats.get('test', {'images': 0, 'labels': 0})
     
-    # Jika tidak ada statistik split, gunakan data dummy
-    if not split_stats:
-        split_stats = {
-            'train': {'images': 1400, 'labels': 1400},
-            'val': {'images': 300, 'labels': 300},
-            'test': {'images': 300, 'labels': 300}
-        }
+    # Hitung total
+    total_images = train_stats.get('images', 0) + val_stats.get('images', 0) + test_stats.get('images', 0)
     
-    # Hitung total gambar
-    total_images = sum(split['images'] for split in split_stats.values())
+    # Buat card
+    train_card = widgets.HTML(f"""
+    <div style="border: 1px solid #4285F4; border-radius: 5px; padding: 10px; margin: 5px; background-color: rgba(66, 133, 244, 0.1);">
+        <h4 style="margin-top: 0; color: #4285F4;">Train</h4>
+        <p style="font-size: 24px; font-weight: bold;">{train_stats.get('images', 0)}</p>
+        <p>Images: {train_stats.get('images', 0)} | Labels: {train_stats.get('labels', 0)}</p>
+        <p>{train_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+    </div>
+    """)
     
-    # Buat container untuk kartu split
-    split_container = widgets.Box(layout=widgets.Layout(
-        display='flex',
-        flex_flow='row wrap',
-        align_items='stretch',
-        width='100%'
-    ))
+    val_card = widgets.HTML(f"""
+    <div style="border: 1px solid #FBBC05; border-radius: 5px; padding: 10px; margin: 5px; background-color: rgba(251, 188, 5, 0.1);">
+        <h4 style="margin-top: 0; color: #FBBC05;">Validation</h4>
+        <p style="font-size: 24px; font-weight: bold;">{val_stats.get('images', 0)}</p>
+        <p>Images: {val_stats.get('images', 0)} | Labels: {val_stats.get('labels', 0)}</p>
+        <p>{val_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+    </div>
+    """)
     
-    # Buat kartu untuk setiap split
-    split_cards = []
+    test_card = widgets.HTML(f"""
+    <div style="border: 1px solid #34A853; border-radius: 5px; padding: 10px; margin: 5px; background-color: rgba(52, 168, 83, 0.1);">
+        <h4 style="margin-top: 0; color: #34A853;">Test</h4>
+        <p style="font-size: 24px; font-weight: bold;">{test_stats.get('images', 0)}</p>
+        <p>Images: {test_stats.get('images', 0)} | Labels: {test_stats.get('labels', 0)}</p>
+        <p>{test_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+    </div>
+    """)
     
-    # Warna untuk setiap split
-    split_colors = {
-        'train': '#4285F4',  # Biru
-        'val': '#FBBC05',    # Kuning
-        'test': '#34A853'    # Hijau
-    }
+    total_card = widgets.HTML(f"""
+    <div style="border: 1px solid #333; border-radius: 5px; padding: 10px; margin: 5px; background-color: rgba(0, 0, 0, 0.05);">
+        <h4 style="margin-top: 0;">Total</h4>
+        <p style="font-size: 24px; font-weight: bold;">{total_images}</p>
+        <p>Images: {total_images} | Labels: {train_stats.get('labels', 0) + val_stats.get('labels', 0) + test_stats.get('labels', 0)}</p>
+        <p>100% dari total dataset</p>
+    </div>
+    """)
     
-    # Ikon untuk setiap split
-    split_icons = {
-        'train': '🧠',
-        'val': '⚖️',
-        'test': '🧪'
-    }
+    # Buat container
+    container = widgets.HBox([train_card, val_card, test_card, total_card], 
+                             layout=widgets.Layout(width='100%', justify_content='space-between'))
     
-    for split_name, split_data in split_stats.items():
-        # Hitung persentase dari total
-        percentage = (split_data['images'] / total_images * 100) if total_images > 0 else 0
-        
-        # Buat kartu untuk split
-        card = widgets.VBox([
-            widgets.HTML(f"<div style='font-size: 14px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{split_name.capitalize()} Split</div>"),
-            widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: {split_colors.get(split_name, '#0d47a1')};'>{split_icons.get(split_name, '📊')} {split_data['images']}</div>"),
-            widgets.HTML(f"<div style='font-size: 12px; color: {split_colors.get(split_name, '#0d47a1')}; opacity: 0.8;'>{percentage:.1f}% dari total gambar</div>")
-        ], layout=widgets.Layout(
-            border='1px solid #ddd',
-            margin='5px',
-            padding='10px',
-            min_width='150px',
-            flex='1 1 auto'
-        ))
-        
-        # Tambahkan kelas CSS untuk styling
-        card._dom_classes = (f'bg-{split_name}',)
-        
-        # Tambahkan kartu ke list
-        split_cards.append(card)
-    
-    # Tambahkan kartu total
-    total_card = widgets.VBox([
-        widgets.HTML("<div style='font-size: 14px; font-weight: bold; color: #673AB7;'>Total Gambar</div>"),
-        widgets.HTML(f"<div style='font-size: 24px; font-weight: bold; color: #673AB7;'>📊 {total_images}</div>"),
-        widgets.HTML("<div style='font-size: 12px; color: #673AB7; opacity: 0.8;'>Jumlah seluruh gambar dataset</div>")
-    ], layout=widgets.Layout(
-        border='1px solid #ddd',
-        margin='5px',
-        padding='10px',
-        min_width='150px',
-        flex='1 1 auto'
-    ))
-    
-    # Tambahkan kelas CSS untuk styling
-    total_card._dom_classes = ('bg-total',)
-    
-    # Tambahkan semua kartu ke container
-    split_container.children = split_cards + [total_card]
-    
-    return split_container
+    return container

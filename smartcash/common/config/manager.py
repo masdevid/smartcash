@@ -167,14 +167,18 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
             if is_colab:
                 # Di Colab, gunakan /content sebagai base_dir
                 base_dir = '/content'
-                config_file = config_file or str(Path(base_dir) / 'configs' / 'dataset_config.yaml')
+                if not config_file:
+                    config_file = str(Path(base_dir) / 'configs' / 'dataset_config.yaml')
                 logger.info(f"Deteksi Google Colab, menggunakan base_dir: {base_dir}")
             else:
                 # Di lokal, gunakan root project
                 base_dir = str(Path(__file__).resolve().parents[3])  # 3 levels up to reach project root
-                config_file = config_file or str(Path(base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
+                if not config_file:
+                    config_file = str(Path(base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
                 logger.info(f"Deteksi environment lokal, menggunakan base_dir: {base_dir}")
-        
+        # Validasi config_file
+        if not config_file:
+            raise ValueError("config_file tidak boleh None. Pastikan fallback sudah benar.")
         # Pastikan direktori configs ada
         config_dir = Path(config_file).parent
         if not config_dir.exists():
@@ -184,7 +188,6 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 logger.info(f"✅ Direktori configs berhasil dibuat di {config_dir}")
             except Exception as e:
                 logger.error(f"❌ Gagal membuat direktori configs: {str(e)}")
-        
         # Pastikan file config ada
         if not Path(config_file).exists():
             logger.warning(f"File config tidak ditemukan di {config_file}, menggunakan default config...")
@@ -196,16 +199,13 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                 logger.info(f"✅ Default config berhasil disimpan ke {config_file}")
             except Exception as e:
                 logger.error(f"❌ Gagal menyimpan default config: {str(e)}")
-        
         # Buat atau dapatkan instance ConfigManager
         if _config_manager is None:
             logger.info(f"Membuat ConfigManager baru dengan base_dir: {base_dir}")
             _config_manager = ConfigManager(base_dir, config_file, env_prefix)
         else:
             logger.info("Menggunakan ConfigManager yang sudah ada")
-            
         return _config_manager
-        
     except Exception as e:
         logger.error(f"❌ Error saat membuat ConfigManager: {str(e)}")
         raise

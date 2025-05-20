@@ -24,6 +24,7 @@ from smartcash.ui.dataset.download.handlers.config_handler import (
 )
 from pathlib import Path
 from smartcash.common.config import get_config_manager
+import os
 
 def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> widgets.VBox:
     """
@@ -41,6 +42,19 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
     try:
         # Ensure config is a dictionary
         config = config or {}
+        
+        # Setup base directory for configuration
+        base_dir = config.get('base_dir')
+        if not base_dir:
+            raise ValueError("base_dir must be provided in config")
+            
+        config_file = config.get('config_file')
+        if not config_file:
+            raise ValueError("config_file must be provided in config")
+            
+        # Get config manager and load config
+        config_manager = get_config_manager(base_dir=base_dir, config_file=config_file)
+        config_manager.load_config()
         
         # Dapatkan observer manager
         observer_manager = get_observer_manager()
@@ -87,9 +101,6 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
         
         # Load konfigurasi dan update UI
         try:
-            # Get config manager
-            config_manager = get_config_manager()
-            
             # Get download config
             download_config = get_download_config(ui_components)
             

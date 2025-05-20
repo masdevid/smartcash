@@ -257,6 +257,11 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if config is None:
             config = get_hyperparameters_config(ui_components)
             
+        # Pastikan config memiliki struktur yang benar
+        if not config or 'hyperparameters' not in config:
+            logger.warning("⚠️ Konfigurasi hyperparameters tidak valid, menggunakan default")
+            config = get_default_hyperparameters_config()
+            
         # Update UI components
         if 'enabled_checkbox' in ui_components:
             ui_components['enabled_checkbox'].value = config['hyperparameters']['enabled']
@@ -377,3 +382,6 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
     except Exception as e:
         logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        # Jika terjadi error, gunakan konfigurasi default
+        default_config = get_default_hyperparameters_config()
+        update_ui_from_config(ui_components, default_config)

@@ -64,7 +64,7 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
             
             try:
                 # Update config dari UI
-                updated_config = update_config_from_ui(ui_components, config.copy())
+                updated_config = update_config_from_ui(ui_components)
                 
                 # Simpan konfigurasi
                 success = config_manager.save_module_config('training_strategy', updated_config)

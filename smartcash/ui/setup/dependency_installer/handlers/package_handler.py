@@ -14,12 +14,12 @@ from smartcash.ui.utils.ui_logger import log_to_ui
 @contextlib.contextmanager
 def disable_tqdm():
     """Context manager to temporarily disable tqdm output"""
-    old_disable = tqdm.disabled
-    tqdm.disabled = True
+    old_disable = getattr(tqdm, 'disable', False)
+    tqdm.disable = True
     try:
         yield
     finally:
-        tqdm.disabled = old_disable
+        tqdm.disable = old_disable
 
 class SilentTqdm(tqdm):
     """Custom tqdm class that doesn't display to console"""

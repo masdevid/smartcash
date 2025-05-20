@@ -298,10 +298,14 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if 'optimizer_dropdown' in ui_components:
             opt_val = hp.get('optimizer', {}).get('type', 'adam')
             dropdown = ui_components['optimizer_dropdown']
-            if hasattr(dropdown, 'options') and opt_val in getattr(dropdown, 'options', []):
-                dropdown.value = opt_val
-            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
-                dropdown.value = getattr(dropdown, 'options', [])[0]
+            # Mapping nama optimizer agar cocok dengan dropdown options
+            options = [str(opt) for opt in getattr(dropdown, 'options', [])]
+            # Coba match case-insensitive
+            match_val = next((o for o in options if o.lower() == str(opt_val).lower()), None)
+            if match_val:
+                dropdown.value = match_val
+            elif options:
+                dropdown.value = options[0]
                 logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai optimizer '{opt_val}' tidak valid, menggunakan default")
             
         if 'learning_rate_slider' in ui_components:
@@ -329,10 +333,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if 'scheduler_dropdown' in ui_components:
             sched_val = hp.get('scheduler', {}).get('type', 'cosine')
             dropdown = ui_components['scheduler_dropdown']
-            if hasattr(dropdown, 'options') and sched_val in getattr(dropdown, 'options', []):
-                dropdown.value = sched_val
-            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
-                dropdown.value = getattr(dropdown, 'options', [])[0]
+            options = [str(opt) for opt in getattr(dropdown, 'options', [])]
+            match_val = next((o for o in options if o.lower() == str(sched_val).lower()), None)
+            if match_val:
+                dropdown.value = match_val
+            elif options:
+                dropdown.value = options[0]
                 logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai scheduler '{sched_val}' tidak valid, menggunakan default")
             
         if 'warmup_epochs_slider' in ui_components:
@@ -354,10 +360,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if 'loss_dropdown' in ui_components:
             loss_val = hp.get('loss', {}).get('type', 'focal')
             dropdown = ui_components['loss_dropdown']
-            if hasattr(dropdown, 'options') and loss_val in getattr(dropdown, 'options', []):
-                dropdown.value = loss_val
-            elif hasattr(dropdown, 'options') and len(getattr(dropdown, 'options', [])) > 0:
-                dropdown.value = getattr(dropdown, 'options', [])[0]
+            options = [str(opt) for opt in getattr(dropdown, 'options', [])]
+            match_val = next((o for o in options if o.lower() == str(loss_val).lower()), None)
+            if match_val:
+                dropdown.value = match_val
+            elif options:
+                dropdown.value = options[0]
                 logger.warning(f"{ICONS.get('warning', '⚠️')} Nilai loss '{loss_val}' tidak valid, menggunakan default")
             
         if 'alpha_slider' in ui_components:

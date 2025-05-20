@@ -88,10 +88,13 @@ def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('hyperparameters')
-        if config:
-            return config
-        logger.warning("⚠️ Konfigurasi hyperparameters tidak ditemukan, menggunakan default")
-        return get_default_hyperparameters_config()
+        
+        # Pastikan config memiliki struktur yang benar
+        if not config or 'hyperparameters' not in config:
+            logger.warning("⚠️ Konfigurasi hyperparameters tidak ditemukan atau tidak valid, menggunakan default")
+            return get_default_hyperparameters_config()
+            
+        return config
     except Exception as e:
         logger.error(f"❌ Error saat mengambil konfigurasi hyperparameters: {str(e)}")
         return get_default_hyperparameters_config()
@@ -108,7 +111,11 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('hyperparameters') or get_default_hyperparameters_config()
+        config = config_manager.get_module_config('hyperparameters')
+        
+        # Pastikan config memiliki struktur yang benar
+        if not config or 'hyperparameters' not in config:
+            config = get_default_hyperparameters_config()
         
         # Update config from UI
         if 'enabled_checkbox' in ui_components:

@@ -8,6 +8,17 @@ import sys
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, List, Union, Callable
 
+def get_default_base_dir():
+    """
+    Dapatkan direktori dasar default untuk aplikasi.
+    
+    Returns:
+        str: Path direktori dasar
+    """
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 class EnvironmentManager:
     """
     Manajer lingkungan singleton terpusat untuk deteksi dan setup environment.

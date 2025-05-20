@@ -19,6 +19,7 @@ from smartcash.ui.dataset.visualization.components.dashboard_cards import (
     create_preprocessing_cards, create_augmentation_cards
 )
 from smartcash.ui.dataset.visualization.components.split_stats_cards import create_split_stats_cards
+from smartcash.ui.dataset.visualization.components.comparison_cards import create_comparison_cards
 from smartcash.ui.utils.loading_indicator import create_loading_indicator, LoadingIndicator
 from smartcash.ui.dataset.visualization.handlers.status_handlers import (
     show_loading_status, show_success_status, show_error_status, show_warning_status
@@ -95,12 +96,18 @@ def get_empty_statistics() -> Dict[str, Any]:
         'preprocessing': {
             'processed_images': 0,
             'filtered_images': 0,
-            'normalized_images': 0
+            'normalized_images': 0,
+            'train_images': 0,
+            'val_images': 0,
+            'test_images': 0
         },
         'augmentation': {
             'augmented_images': 0,
             'augmentations_created': 0,
-            'augmentation_types': 0
+            'augmentation_types': 0,
+            'train_images': 0,
+            'val_images': 0,
+            'test_images': 0
         }
     }
 
@@ -116,6 +123,7 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         preprocessing_cards = ui_components.get('preprocessing_cards')
         augmentation_cards = ui_components.get('augmentation_cards')
         split_cards_container = ui_components.get('split_cards_container')
+        comparison_cards_container = ui_components.get('comparison_cards_container')
         progress_bar = ui_components.get('progress_bar')
         
         # Tampilkan progress bar jika ada
@@ -154,27 +162,54 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
         if progress_bar:
             progress_bar.value = 60
         
-        # Update split cards
-        if split_cards_container:
-            with split_cards_container:
-                clear_output(wait=True)
-                display(create_split_stats_cards(stats.get('split', {})))
+        # Update split cards jika container tersedia
+        if split_cards_container is not None:
+            if hasattr(split_cards_container, 'clear_output'):
+                split_cards_container.clear_output(wait=True)
+                with split_cards_container:
+                    display(create_split_stats_cards(stats.get('split', {})))
+        
+        # Update comparison cards jika container tersedia
+        if comparison_cards_container is not None:
+            if hasattr(comparison_cards_container, 'clear_output'):
+                comparison_cards_container.clear_output(wait=True)
+                with comparison_cards_container:
+                    # Dapatkan statistik preprocessing dan augmentation
+                    preprocessing_stats = {
+                        'train': {'images': stats.get('preprocessing', {}).get('train_images', 0), 'labels': 0},
+                        'val': {'images': stats.get('preprocessing', {}).get('val_images', 0), 'labels': 0},
+                        'test': {'images': stats.get('preprocessing', {}).get('test_images', 0), 'labels': 0}
+                    }
+                    
+                    augmentation_stats = {
+                        'train': {'images': stats.get('augmentation', {}).get('train_images', 0), 'labels': 0},
+                        'val': {'images': stats.get('augmentation', {}).get('val_images', 0), 'labels': 0},
+                        'test': {'images': stats.get('augmentation', {}).get('test_images', 0), 'labels': 0}
+                    }
+                    
+                    display(create_comparison_cards(
+                        stats.get('split', {}),
+                        preprocessing_stats,
+                        augmentation_stats
+                    ))
         
         # Update progress bar
         if progress_bar:
             progress_bar.value = 80
         
-        # Update preprocessing cards
-        if preprocessing_cards:
-            with preprocessing_cards:
-                clear_output(wait=True)
-                display(create_preprocessing_cards(stats.get('preprocessing', {})))
+        # Update preprocessing cards jika container tersedia
+        if preprocessing_cards is not None:
+            if hasattr(preprocessing_cards, 'clear_output'):
+                preprocessing_cards.clear_output(wait=True)
+                with preprocessing_cards:
+                    display(create_preprocessing_cards(stats.get('preprocessing', {})))
         
-        # Update augmentation cards
-        if augmentation_cards:
-            with augmentation_cards:
-                clear_output(wait=True)
-                display(create_augmentation_cards(stats.get('augmentation', {})))
+        # Update augmentation cards jika container tersedia
+        if augmentation_cards is not None:
+            if hasattr(augmentation_cards, 'clear_output'):
+                augmentation_cards.clear_output(wait=True)
+                with augmentation_cards:
+                    display(create_augmentation_cards(stats.get('augmentation', {})))
         
         # Update progress bar
         if progress_bar:

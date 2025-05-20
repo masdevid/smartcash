@@ -23,6 +23,12 @@ def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.
     
     # Hitung total
     total_images = train_stats.get('images', 0) + val_stats.get('images', 0) + test_stats.get('images', 0)
+    total_labels = train_stats.get('labels', 0) + val_stats.get('labels', 0) + test_stats.get('labels', 0)
+    
+    # Hitung persentase dengan pengecekan pembagian nol
+    train_percentage = (train_stats.get('images', 0) / total_images * 100) if total_images > 0 else 0
+    val_percentage = (val_stats.get('images', 0) / total_images * 100) if total_images > 0 else 0
+    test_percentage = (test_stats.get('images', 0) / total_images * 100) if total_images > 0 else 0
     
     # Buat card
     train_card = widgets.HTML(f"""
@@ -30,7 +36,7 @@ def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.
         <h4 style="margin-top: 0; color: #4285F4;">Train</h4>
         <p style="font-size: 24px; font-weight: bold;">{train_stats.get('images', 0)}</p>
         <p>Images: {train_stats.get('images', 0)} | Labels: {train_stats.get('labels', 0)}</p>
-        <p>{train_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+        <p>{train_percentage:.1f}% dari total dataset</p>
     </div>
     """)
     
@@ -39,7 +45,7 @@ def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.
         <h4 style="margin-top: 0; color: #FBBC05;">Validation</h4>
         <p style="font-size: 24px; font-weight: bold;">{val_stats.get('images', 0)}</p>
         <p>Images: {val_stats.get('images', 0)} | Labels: {val_stats.get('labels', 0)}</p>
-        <p>{val_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+        <p>{val_percentage:.1f}% dari total dataset</p>
     </div>
     """)
     
@@ -48,7 +54,7 @@ def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.
         <h4 style="margin-top: 0; color: #34A853;">Test</h4>
         <p style="font-size: 24px; font-weight: bold;">{test_stats.get('images', 0)}</p>
         <p>Images: {test_stats.get('images', 0)} | Labels: {test_stats.get('labels', 0)}</p>
-        <p>{test_stats.get('images', 0) / total_images * 100:.1f}% dari total dataset</p>
+        <p>{test_percentage:.1f}% dari total dataset</p>
     </div>
     """)
     
@@ -56,7 +62,7 @@ def create_split_stats_cards(split_stats: Dict[str, Dict[str, int]]) -> widgets.
     <div style="border: 1px solid #333; border-radius: 5px; padding: 10px; margin: 5px; background-color: rgba(0, 0, 0, 0.05);">
         <h4 style="margin-top: 0;">Total</h4>
         <p style="font-size: 24px; font-weight: bold;">{total_images}</p>
-        <p>Images: {total_images} | Labels: {train_stats.get('labels', 0) + val_stats.get('labels', 0) + test_stats.get('labels', 0)}</p>
+        <p>Images: {total_images} | Labels: {total_labels}</p>
         <p>100% dari total dataset</p>
     </div>
     """)

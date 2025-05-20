@@ -5,6 +5,7 @@ Deskripsi: Komponen layout utama untuk visualisasi dataset
 
 from typing import Dict, Any
 import ipywidgets as widgets
+from IPython.display import display
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
@@ -64,6 +65,12 @@ def create_visualization_layout() -> Dict[str, Any]:
             ], layout=widgets.Layout(width='100%')),
             widgets.HBox([
                 widgets.VBox([
+                    widgets.HTML("<h3>Perbandingan Dataset</h3>"),
+                    widgets.Output(layout=widgets.Layout(width='100%'))
+                ], layout=widgets.Layout(width='100%')),
+            ], layout=widgets.Layout(width='100%')),
+            widgets.HBox([
+                widgets.VBox([
                     widgets.HTML("<h3>Preprocessing</h3>"),
                     widgets.Output(layout=widgets.Layout(width='100%'))
                 ], layout=widgets.Layout(width='33%')),
@@ -90,8 +97,13 @@ def create_visualization_layout() -> Dict[str, Any]:
             'output': widgets.Output(layout=widgets.Layout(width='100%', min_height='400px'))
         }
         
-        heatmap_tab = {
-            'button': widgets.Button(description='Tampilkan Heatmap Deteksi', button_style='info'),
+        preprocessing_samples_tab = {
+            'button': widgets.Button(description='Tampilkan Sampel Preprocessing', button_style='info'),
+            'output': widgets.Output(layout=widgets.Layout(width='100%', min_height='400px'))
+        }
+        
+        augmentation_comparison_tab = {
+            'button': widgets.Button(description='Tampilkan Perbandingan Augmentasi', button_style='info'),
             'output': widgets.Output(layout=widgets.Layout(width='100%', min_height='400px'))
         }
         
@@ -116,9 +128,14 @@ def create_visualization_layout() -> Dict[str, Any]:
             layer_tab['output']
         ])
         
-        heatmap_content = widgets.VBox([
-            heatmap_tab['button'],
-            heatmap_tab['output']
+        preprocessing_samples_content = widgets.VBox([
+            preprocessing_samples_tab['button'],
+            preprocessing_samples_tab['output']
+        ])
+        
+        augmentation_comparison_content = widgets.VBox([
+            augmentation_comparison_tab['button'],
+            augmentation_comparison_tab['output']
         ])
         
         bbox_content = widgets.VBox([
@@ -133,7 +150,8 @@ def create_visualization_layout() -> Dict[str, Any]:
             ('Distribusi Split', split_content),
             ('Distribusi Layer', layer_content),
             ('Analisis Bounding Box', bbox_content),
-            ('Heatmap Deteksi', heatmap_content)
+            ('Sampel Preprocessing', preprocessing_samples_content),
+            ('Perbandingan Augmentasi', augmentation_comparison_content)
         ])
         
         # Susun komponen
@@ -153,13 +171,15 @@ def create_visualization_layout() -> Dict[str, Any]:
             'refresh_button': refresh_button,
             'tabs': tabs,
             'split_cards_container': dashboard_container.children[1].children[0].children[1],
-            'preprocessing_cards': dashboard_container.children[2].children[0].children[1],
-            'augmentation_cards': dashboard_container.children[2].children[1].children[1],
+            'comparison_cards_container': dashboard_container.children[2].children[0].children[1],
+            'preprocessing_cards': dashboard_container.children[3].children[0].children[1],
+            'augmentation_cards': dashboard_container.children[3].children[1].children[1],
             'visualization_components': {
                 'distribution_tab': distribution_tab,
                 'split_tab': split_tab,
                 'layer_tab': layer_tab,
-                'heatmap_tab': heatmap_tab,
+                'preprocessing_samples_tab': preprocessing_samples_tab,
+                'augmentation_comparison_tab': augmentation_comparison_tab,
                 'bbox_tab': bbox_tab
             }
         }

@@ -96,10 +96,11 @@ class TestButtonHandlers(unittest.TestCase):
     
     def test_save_button_handler(self):
         """Test untuk save button handler."""
-        # Buat mock untuk save_config_with_manager
-        with patch('smartcash.ui.dataset.download.handlers.config_handler.save_config_with_manager') as mock_save:
-            # Setup mock return value
-            mock_save.return_value = True
+        # Buat mock untuk config_manager
+        with patch('smartcash.common.config.get_config_manager') as mock_get_config_manager:
+            # Setup mock config manager
+            mock_config_manager = MagicMock()
+            mock_get_config_manager.return_value = mock_config_manager
             
             # Buat mock button
             button_mock = MagicMock()

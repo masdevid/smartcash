@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from smartcash.dataset.manager import DatasetManager
 from smartcash.dataset.services.downloader.download_service import DownloadService
+from smartcash.common.config import get_config_manager
 
 class DownloadHandler:
     """Handler untuk proses download dataset."""
@@ -73,10 +74,11 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         ui_components['log_output'].clear_output(wait=True)
     
     # Simpan konfigurasi UI sebelum download
-    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui, save_config_with_manager, load_config
-    config = load_config()
+    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui
+    config_manager = get_config_manager()
+    config = config_manager.config
     config = update_config_from_ui(config, ui_components)
-    save_config_with_manager(config, ui_components, ui_components.get('logger'))
+    config_manager.update_config(config)
     
     # Dapatkan nilai dari komponen UI
     workspace = ui_components.get('workspace', {}).value if 'workspace' in ui_components else ''

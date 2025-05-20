@@ -228,5 +228,13 @@ class TestDownloadHandler(unittest.TestCase):
         # Verify UI is reset
         self.assertFalse(self.ui_components['download_running'])
 
+    def test_handle_download_button_click_with_dict(self):
+        """Test handle_download_button_click ketika button adalah dict (bukan widget)"""
+        with patch('smartcash.ui.dataset.download.handlers.confirmation_handler.confirm_download', return_value=False):
+            try:
+                handle_download_button_click(self.ui_components, {'not': 'a button'})
+            except Exception as e:
+                self.fail(f"handle_download_button_click raised Exception unexpectedly: {e}")
+
 if __name__ == '__main__':
     unittest.main() 

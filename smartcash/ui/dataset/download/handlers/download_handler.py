@@ -149,7 +149,8 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> 
             ui_components['log_output'].append_stderr(f"Error saat persiapan download: {str(e)}")
     finally:
         # Enable kembali tombol download
-        button.disabled = False
+        if hasattr(button, 'disabled'):
+            button.disabled = False
 
 def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
     """

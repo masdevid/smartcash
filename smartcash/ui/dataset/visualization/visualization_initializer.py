@@ -9,11 +9,13 @@ from IPython.display import display, clear_output
 import threading
 import os
 from datetime import datetime
+from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.environment import get_default_base_dir
 from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.ui.dataset.visualization.components.dataset_stats_cards import (
     create_dataset_stats_cards, create_preprocessing_stats_cards, create_augmentation_stats_cards

@@ -6,8 +6,15 @@ Deskripsi: Handler untuk konfigurasi split dataset
 from typing import Dict, Any, Optional
 from smartcash.common.logger import get_logger
 from smartcash.common.config import get_config_manager
+import os
+from pathlib import Path
 
 logger = get_logger(__name__)
+
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
 
 def get_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -21,7 +28,7 @@ def get_split_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         # Get config manager
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Get config
         config = config_manager.get_module_config('dataset')
@@ -98,8 +105,8 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             config['data']['backup_dir'] = ui_components['backup_dir'].value
             
         # Save config
-        config_manager = get_config_manager()
-        config_manager.set_module_config('dataset', config)
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
+        config_manager.save_module_config('dataset', config)
         
         logger.info("✅ Konfigurasi berhasil diupdate dari UI")
         

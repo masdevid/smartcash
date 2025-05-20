@@ -4,15 +4,31 @@ Deskripsi: Fungsi-fungsi untuk pengujian dashboard visualisasi dataset
 """
 
 import os
+from pathlib import Path
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output
 import glob
 
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.environment import get_default_base_dir
 
 logger = get_logger(__name__)
+
+def initialize_dashboard_test():
+    """Inisialisasi dashboard visualisasi untuk pengujian"""
+    # Get base directory
+    base_dir = get_default_base_dir()
+    
+    # Initialize config manager
+    config_manager = get_config_manager(
+        base_dir=base_dir,
+        config_file='visualization_config.yaml',
+        env_prefix='SMARTCASH_'
+    )
+    
+    # ... rest of the initialization code ...
 
 def get_dataset_stats(dataset_path: Optional[str] = None) -> Dict[str, Any]:
     """

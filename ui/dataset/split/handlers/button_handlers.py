@@ -10,6 +10,13 @@ from smartcash.common.config import get_config_manager
 
 logger = get_logger(__name__)
 
+def get_default_base_dir():
+    import os
+    from pathlib import Path
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     Handle click event untuk split button.

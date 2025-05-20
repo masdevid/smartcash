@@ -26,6 +26,10 @@ class BaseConfigManager:
         """
         self._base_dir = Path(base_dir)
         self._config_file = config_file
+        # Defensive: ensure logger is not a string
+        if isinstance(logger, str):
+            print(f"[WARNING] Logger should not be a string! Got: {logger}. Setting logger to None.")
+            logger = None
         self._logger = logger
         self._config = {}
     

@@ -4,6 +4,7 @@ Deskripsi: Handler untuk dashboard visualisasi dataset dengan pendekatan minimal
 """
 
 import os
+from pathlib import Path
 from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from IPython.display import display, clear_output
@@ -13,7 +14,8 @@ from datetime import datetime
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_status_indicator
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager
+from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.environment import get_default_base_dir
 from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.ui.dataset.visualization.components.dashboard_cards import (
     create_preprocessing_cards, create_augmentation_cards, update_preprocessing_cards, update_augmentation_cards
@@ -226,3 +228,18 @@ def update_dashboard_cards(ui_components: Dict[str, Any]) -> None:
             status_panel.clear_output(wait=True)
             with status_panel:
                 display(create_status_indicator("error", f"{ICONS.get('error', '❌')} {error_message}"))
+
+
+def initialize_dashboard_new():
+    """Inisialisasi dashboard visualisasi baru"""
+    # Get base directory
+    base_dir = get_default_base_dir()
+    
+    # Initialize config manager
+    config_manager = get_config_manager(
+        base_dir=base_dir,
+        config_file='visualization_config.yaml',
+        env_prefix='SMARTCASH_'
+    )
+    
+    # ... rest of the initialization code ...

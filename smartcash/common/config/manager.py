@@ -36,7 +36,12 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             
         # Initialize logger first
         from smartcash.common.logger import get_logger
-        self._logger = get_logger("config_manager")
+        logger = get_logger("config_manager")
+        # Defensive: ensure logger is not a string
+        if isinstance(logger, str):
+            print(f"[WARNING] Logger should not be a string! Got: {logger}. Setting logger to None.")
+            logger = None
+        self._logger = logger
             
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)

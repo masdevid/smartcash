@@ -75,10 +75,7 @@ def handle_download_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     
     # Simpan konfigurasi UI sebelum download
     from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui
-    config_manager = get_config_manager()
-    config = config_manager.config
-    config = update_config_from_ui(config, ui_components)
-    config_manager.update_config(config)
+    update_config_from_ui(ui_components)
     
     # Dapatkan nilai dari komponen UI
     workspace = ui_components.get('workspace', {}).value if 'workspace' in ui_components else ''

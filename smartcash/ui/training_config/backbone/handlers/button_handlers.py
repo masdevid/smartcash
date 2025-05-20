@@ -13,11 +13,12 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger, LogLevel
-from smartcash.common.environment import get_environment_manager
+from smartcash.common.environment import get_environment_manager, get_default_base_dir
 from smartcash.ui.training_config.backbone.handlers.config_handlers import (
     update_config_from_ui,
     update_ui_from_config,
-    update_backbone_info
+    update_backbone_info,
+    get_default_backbone_config
 )
 from smartcash.ui.training_config.backbone.handlers.drive_handlers import sync_to_drive
 
@@ -110,10 +111,10 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
             config_manager = get_config_manager(base_dir=get_default_base_dir())
             
             # Reset konfigurasi ke default
-            config = config_manager.get_default_config('model')
+            config = get_default_backbone_config()
             
             # Simpan konfigurasi default
-            success = config_manager.save_module_config('model', config)
+            success = config_manager.save_module_config('backbone', config)
             
             if not success:
                 # Tampilkan pesan error
@@ -142,13 +143,22 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
                 logger.warning(f"Gagal menyinkronkan ke Google Drive: {str(e)}")
             
             logger.info("Konfigurasi backbone berhasil direset ke default")
+            
+            # Tampilkan pesan sukses
+            with status_panel:
+                clear_output(wait=True)
+                display(create_info_alert(
+                    f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil direset ke default",
+                    alert_type='success'
+                ))
+                
         except Exception as e:
+            logger.error(f"Error saat reset konfigurasi backbone: {str(e)}")
+            
             # Tampilkan pesan error
             with status_panel:
                 clear_output(wait=True)
                 display(create_info_alert(
-                    f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}",
+                    f"{ICONS.get('error', '❌')} Error saat reset konfigurasi backbone: {str(e)}",
                     alert_type='error'
                 ))
-            
-            logger.error(f"Gagal mereset konfigurasi: {str(e)}")

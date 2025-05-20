@@ -71,8 +71,8 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         
         # Simpan konfigurasi ke file di Google Drive
         drive_config_file = os.path.join(drive_config_dir, 'training_config.yaml')
-        # Gunakan save_config dengan parameter yang benar
-        success = config_manager.save_config(drive_config_file, create_dirs=True)
+        # Gunakan save_config tanpa parameter create_dirs
+        success = config_manager.save_config(drive_config_file)
         
         # Simpan konfigurasi ke file di Google Drive menggunakan save_yaml
         try:

@@ -23,9 +23,10 @@ class TestHyperparametersUI(unittest.TestCase):
     
     def setUp(self):
         """Setup untuk pengujian"""
-        # Mock config with nested structure
+        # Mock config
         self.mock_config = {
             'hyperparameters': {
+                'enabled': True,
                 'batch_size': 16,
                 'image_size': 640,
                 'epochs': 100,
@@ -37,6 +38,7 @@ class TestHyperparametersUI(unittest.TestCase):
                     'weight_decay': 0.0005
                 },
                 'scheduler': {
+                    'enabled': True,
                     'type': 'cosine',
                     'warmup_epochs': 3,
                     'warmup_momentum': 0.8,
@@ -56,6 +58,7 @@ class TestHyperparametersUI(unittest.TestCase):
         
         # Mock UI components
         self.mock_ui_components = {
+            'enabled_checkbox': MagicMock(value=True),
             'batch_size_slider': MagicMock(value=16),
             'image_size_slider': MagicMock(value=640),
             'epochs_slider': MagicMock(value=100),
@@ -64,6 +67,7 @@ class TestHyperparametersUI(unittest.TestCase):
             'learning_rate_slider': MagicMock(value=0.01),
             'momentum_slider': MagicMock(value=0.937),
             'weight_decay_slider': MagicMock(value=0.0005),
+            'scheduler_checkbox': MagicMock(value=True),
             'scheduler_dropdown': MagicMock(value='cosine'),
             'warmup_epochs_slider': MagicMock(value=3),
             'warmup_momentum_slider': MagicMock(value=0.8),
@@ -81,8 +85,10 @@ class TestHyperparametersUI(unittest.TestCase):
         """Pengujian pembuatan komponen UI hyperparameter"""
         # Panggil fungsi
         ui_components = create_hyperparameters_ui_components()
+        
         # Verifikasi hasil
         self.assertIsInstance(ui_components, dict)
+        self.assertIn('enabled_checkbox', ui_components)
         self.assertIn('batch_size_slider', ui_components)
         self.assertIn('image_size_slider', ui_components)
         self.assertIn('epochs_slider', ui_components)
@@ -91,6 +97,7 @@ class TestHyperparametersUI(unittest.TestCase):
         self.assertIn('learning_rate_slider', ui_components)
         self.assertIn('momentum_slider', ui_components)
         self.assertIn('weight_decay_slider', ui_components)
+        self.assertIn('scheduler_checkbox', ui_components)
         self.assertIn('scheduler_dropdown', ui_components)
         self.assertIn('warmup_epochs_slider', ui_components)
         self.assertIn('warmup_momentum_slider', ui_components)
@@ -98,6 +105,8 @@ class TestHyperparametersUI(unittest.TestCase):
         self.assertIn('early_stopping_checkbox', ui_components)
         self.assertIn('patience_slider', ui_components)
         self.assertIn('min_delta_slider', ui_components)
+        self.assertIn('save_best_checkbox', ui_components)
+        self.assertIn('checkpoint_metric_dropdown', ui_components)
         self.assertIn('status', ui_components)
         self.assertIn('update_hyperparameters_info', ui_components)
     
@@ -108,6 +117,8 @@ class TestHyperparametersUI(unittest.TestCase):
         
         # Verifikasi hasil
         self.assertIsInstance(info_panel, widgets.Output)
+        self.assertIsNotNone(update_func)
+        self.assertTrue(callable(update_func))
     
     @patch('smartcash.ui.training_config.hyperparameters.handlers.config_handlers.get_config_manager')
     def test_update_ui_from_config(self, mock_get_config_manager):
@@ -121,6 +132,7 @@ class TestHyperparametersUI(unittest.TestCase):
         update_ui_from_config(self.mock_ui_components, self.mock_config)
         
         # Verifikasi hasil
+        self.assertEqual(self.mock_ui_components['enabled_checkbox'].value, True)
         self.assertEqual(self.mock_ui_components['batch_size_slider'].value, 16)
         self.assertEqual(self.mock_ui_components['image_size_slider'].value, 640)
         self.assertEqual(self.mock_ui_components['epochs_slider'].value, 100)
@@ -129,6 +141,7 @@ class TestHyperparametersUI(unittest.TestCase):
         self.assertEqual(self.mock_ui_components['learning_rate_slider'].value, 0.01)
         self.assertEqual(self.mock_ui_components['momentum_slider'].value, 0.937)
         self.assertEqual(self.mock_ui_components['weight_decay_slider'].value, 0.0005)
+        self.assertEqual(self.mock_ui_components['scheduler_checkbox'].value, True)
         self.assertEqual(self.mock_ui_components['scheduler_dropdown'].value, 'cosine')
         self.assertEqual(self.mock_ui_components['warmup_epochs_slider'].value, 3)
         self.assertEqual(self.mock_ui_components['warmup_momentum_slider'].value, 0.8)
@@ -151,6 +164,7 @@ class TestHyperparametersUI(unittest.TestCase):
         config = update_config_from_ui(self.mock_ui_components)
         
         # Verifikasi hasil
+        self.assertEqual(config['hyperparameters']['enabled'], True)
         self.assertEqual(config['hyperparameters']['batch_size'], 16)
         self.assertEqual(config['hyperparameters']['image_size'], 640)
         self.assertEqual(config['hyperparameters']['epochs'], 100)
@@ -159,6 +173,7 @@ class TestHyperparametersUI(unittest.TestCase):
         self.assertEqual(config['hyperparameters']['optimizer']['learning_rate'], 0.01)
         self.assertEqual(config['hyperparameters']['optimizer']['momentum'], 0.937)
         self.assertEqual(config['hyperparameters']['optimizer']['weight_decay'], 0.0005)
+        self.assertEqual(config['hyperparameters']['scheduler']['enabled'], True)
         self.assertEqual(config['hyperparameters']['scheduler']['type'], 'cosine')
         self.assertEqual(config['hyperparameters']['scheduler']['warmup_epochs'], 3)
         self.assertEqual(config['hyperparameters']['scheduler']['warmup_momentum'], 0.8)

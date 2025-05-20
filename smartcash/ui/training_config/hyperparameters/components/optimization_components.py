@@ -65,6 +65,14 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         layout=widgets.Layout(width='100%')
     )
     
+    # Parameter scheduler checkbox
+    ui_components['scheduler_checkbox'] = widgets.Checkbox(
+        value=True,
+        description='Gunakan Scheduler',
+        style={'description_width': 'auto'},
+        layout=widgets.Layout(width='100%')
+    )
+    
     # Parameter scheduler
     ui_components['scheduler_dropdown'] = widgets.Dropdown(
         options=['cosine', 'linear', 'step', 'exp', 'none'],
@@ -117,6 +125,7 @@ def create_hyperparameters_optimization_components() -> Dict[str, Any]:
         ui_components['weight_decay_slider'],
         ui_components['momentum_slider'],
         widgets.HTML("<hr style='margin: 10px 0'>"),
+        ui_components['scheduler_checkbox'],
         ui_components['scheduler_dropdown'],
         ui_components['warmup_epochs_slider'],
         ui_components['warmup_momentum_slider'],

@@ -103,6 +103,23 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         style={'description_width': '120px'},
         layout=widgets.Layout(width='100%')
     )
+
+    # Parameter save best model
+    ui_components['save_best_checkbox'] = widgets.Checkbox(
+        value=True,
+        description='Simpan Model Terbaik',
+        style={'description_width': 'auto'},
+        layout=widgets.Layout(width='100%')
+    )
+
+    # Parameter checkpoint metric
+    ui_components['checkpoint_metric_dropdown'] = widgets.Dropdown(
+        options=['mAP_0.5', 'mAP_0.5:0.95', 'precision', 'recall', 'f1', 'loss'],
+        value='mAP_0.5',
+        description='Metrik Checkpoint:',
+        style={'description_width': '120px'},
+        layout=widgets.Layout(width='100%')
+    )
     
     # Buat box untuk parameter lanjutan
     ui_components['advanced_box'] = widgets.VBox([
@@ -118,7 +135,11 @@ def create_hyperparameters_advanced_components() -> Dict[str, Any]:
         widgets.HTML("<b>Early Stopping</b>"),
         ui_components['early_stopping_checkbox'],
         ui_components['patience_slider'],
-        ui_components['min_delta_slider']
+        ui_components['min_delta_slider'],
+        widgets.HTML("<hr style='margin: 10px 0'>"),
+        widgets.HTML("<b>Checkpoint</b>"),
+        ui_components['save_best_checkbox'],
+        ui_components['checkpoint_metric_dropdown']
     ], layout=widgets.Layout(
         width='100%',
         padding='5px',

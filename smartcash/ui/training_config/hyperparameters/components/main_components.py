@@ -37,6 +37,14 @@ def create_hyperparameters_ui_components() -> Dict[str, Any]:
     """
     ui_components = {}
     
+    # Buat enabled checkbox
+    ui_components['enabled_checkbox'] = widgets.Checkbox(
+        value=True,
+        description='Aktifkan Hyperparameter',
+        style={'description_width': 'auto'},
+        layout=widgets.Layout(width='100%')
+    )
+    
     # Buat komponen dasar
     basic_components = create_hyperparameters_basic_components()
     ui_components.update(basic_components)

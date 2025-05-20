@@ -13,7 +13,7 @@ from smartcash.ui.dataset.split.handlers.config_handlers import (
     load_config, save_config, update_ui_from_config, update_config_from_ui, is_colab_environment
 )
 from smartcash.ui.dataset.split.handlers.sync_logger import (
-    log_sync_success, log_sync_error, log_sync_warning, update_sync_status_only
+    log_sync_success, log_sync_error, log_sync_warning, update_sync_status_only, add_sync_status_panel
 )
 
 logger = get_logger(__name__)
@@ -154,122 +154,105 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
     
     Args:
         ui_components: Dictionary komponen UI
-        config: Konfigurasi (opsional)
-        env: Environment manager (opsional)
+        config: Konfigurasi untuk dataset
+        env: Environment manager
         
     Returns:
         Dictionary komponen UI yang telah diupdate
     """
     try:
-        # Split button handler
-        if 'split_button' in ui_components:
-            ui_components['split_button'].on_click(lambda b: handle_split_button_click(ui_components))
-            
-        # Reset button handler
-        if 'reset_button' in ui_components:
-            def on_reset_clicked(b):
-                try:
-                    # Update status panel
-                    update_sync_status_only(ui_components, "Mereset konfigurasi ke default...", 'info')
-                    
-                    # Load default config
-                    config = load_config()
-                    
-                    # Simpan config sebelum reset untuk verifikasi
-                    pre_reset_config = config.copy() if config else None
-                    
-                    # Update UI
-                    update_ui_from_config(ui_components, config)
-                    
-                    # Save config
-                    saved_config = save_config(config, ui_components)
-                    
-                    # Verifikasi reset berhasil dengan memuat ulang config
-                    post_reset_config = load_config()
-                    
-                    # Bandingkan nilai config sebelum dan sesudah reset
-                    is_consistent = True
-                    for key in post_reset_config['split']:
-                        if pre_reset_config and key in pre_reset_config['split']:
-                            # Skip perbandingan jika key tidak ada di salah satu config
-                            if post_reset_config['split'][key] != pre_reset_config['split'][key]:
-                                is_consistent = False
-                                log_sync_warning(ui_components, f"Nilai {key} tidak konsisten setelah reset")
-                                break
-                            
-                    if is_consistent:
-                        # Log sync status
-                        log_sync_success(ui_components, "Konfigurasi berhasil direset ke default")
-                        
-                        # Show success message
-                        display(create_info_alert(
-                            f"{ICONS.get('success', '✅')} Konfigurasi berhasil direset ke default",
-                            alert_type='success'
-                        ))
-                    else:
-                        log_sync_error(ui_components, "Reset konfigurasi tidak konsisten")
-                        display(create_info_alert(
-                            f"{ICONS.get('error', '❌')} Reset konfigurasi tidak konsisten",
-                            alert_type='error'
-                        ))
-                        
-                except Exception as e:
-                    log_sync_error(ui_components, f"Error saat reset konfigurasi: {str(e)}")
-                    logger.error(f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}")
-                    display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}",
-                        alert_type='error'
-                    ))
-            
-            ui_components['reset_button'].on_click(on_reset_clicked)
-            
-        # Save button handler
-        if 'save_button' in ui_components:
-            def on_save_clicked(b):
-                try:
-                    # Update status panel
-                    update_sync_status_only(ui_components, "Menyimpan konfigurasi...", 'info')
-                    
-                    # Get current config dan simpan nilai UI
-                    ui_values = {
-                        'enabled': ui_components['enabled_checkbox'].value if 'enabled_checkbox' in ui_components else True,
-                        'train_ratio': ui_components['train_ratio_slider'].value if 'train_ratio_slider' in ui_components else 0.7,
-                        'val_ratio': ui_components['val_ratio_slider'].value if 'val_ratio_slider' in ui_components else 0.15,
-                        'test_ratio': ui_components['test_ratio_slider'].value if 'test_ratio_slider' in ui_components else 0.15,
-                        'random_seed': ui_components['random_seed_input'].value if 'random_seed_input' in ui_components else 42,
-                        'stratify': ui_components['stratify_checkbox'].value if 'stratify_checkbox' in ui_components else True
-                    }
-                    
-                    # Tampilkan informasi sinkronisasi jika di Colab
-                    is_colab = is_colab_environment()
-                    if is_colab:
-                        update_sync_status_only(ui_components, "Menyimpan konfigurasi dan menyinkronkan dengan Google Drive...", 'info')
-                    
-                    # Update dan simpan konfigurasi
-                    saved_config = update_config_from_ui(ui_components)
-                    
-                    # Verifikasi perubahan telah disimpan dengan benar
+        # Import dependency
+        from smartcash.ui.dataset.split.handlers.config_handlers import (
+            load_config, save_config, update_ui_from_config, update_config_from_ui, is_colab_environment
+        )
+        from smartcash.ui.dataset.split.handlers.sync_logger import (
+            update_sync_status_only, add_sync_status_panel
+        )
+        from smartcash.ui.utils.constants import ICONS
+        from smartcash.ui.utils.alert_utils import create_info_alert
+        
+        # Pastikan ada panel status
+        ui_components = add_sync_status_panel(ui_components)
+        
+        # Deteksi apakah berjalan di Colab
+        is_colab = is_colab_environment()
+        
+        # Handler untuk tombol Reset
+        def on_reset_clicked(b):
+            try:
+                # Update status
+                update_sync_status_only(ui_components, "Memuat ulang konfigurasi...", 'info')
+                
+                # Load konfigurasi
+                config = load_config()
+                
+                # Update UI dari konfigurasi
+                update_ui_from_config(ui_components, config)
+                
+                # Update status
+                update_sync_status_only(ui_components, "Konfigurasi berhasil dimuat ulang", 'success')
+                
+                # Tampilkan pesan sukses
+                display(create_info_alert(
+                    f"{ICONS.get('success', '✅')} Konfigurasi berhasil dimuat ulang",
+                    alert_type='success'
+                ))
+            except Exception as e:
+                # Update status
+                update_sync_status_only(ui_components, f"Error saat reset: {str(e)}", 'error')
+                
+                # Tampilkan pesan error
+                display(create_info_alert(
+                    f"{ICONS.get('error', '❌')} Error saat reset: {str(e)}",
+                    alert_type='danger'
+                ))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat reset: {str(e)}")
+        
+        # Handler untuk tombol Save
+        def on_save_clicked(b):
+            try:
+                # Update status
+                update_sync_status_only(ui_components, "Menyimpan konfigurasi...", 'info')
+                
+                # Dapatkan nilai dari UI
+                ui_values = {
+                    'enabled': ui_components['enabled_checkbox'].value,
+                    'train_ratio': ui_components['train_ratio_slider'].value,
+                    'val_ratio': ui_components['val_ratio_slider'].value,
+                    'test_ratio': ui_components['test_ratio_slider'].value,
+                    'random_seed': ui_components['random_seed_input'].value,
+                    'stratify': ui_components['stratify_checkbox'].value
+                }
+                
+                # Buat konfigurasi dari UI
+                config = {
+                    'split': ui_values
+                }
+                
+                # Simpan konfigurasi
+                saved_config = save_config(config, ui_components)
+                
+                # Verifikasi konfigurasi tersimpan dengan benar
+                if saved_config and 'split' in saved_config:
+                    # Muat ulang konfigurasi untuk verifikasi
                     loaded_config = load_config()
                     
-                    # Periksa apakah nilai yang disimpan sesuai dengan nilai di UI
-                    is_consistent = (
-                        ui_values['enabled'] == loaded_config['split']['enabled'] and
-                        ui_values['train_ratio'] == loaded_config['split']['train_ratio'] and
+                    # Periksa apakah data yang disimpan sesuai
+                    if (ui_values['train_ratio'] == loaded_config['split']['train_ratio'] and
                         ui_values['val_ratio'] == loaded_config['split']['val_ratio'] and
                         ui_values['test_ratio'] == loaded_config['split']['test_ratio'] and
                         ui_values['random_seed'] == loaded_config['split']['random_seed'] and
-                        ui_values['stratify'] == loaded_config['split']['stratify']
-                    )
-                    
-                    if is_consistent:
+                        ui_values['stratify'] == loaded_config['split']['stratify'] and
+                        ui_values['enabled'] == loaded_config['split']['enabled']):
+                        
                         # Pesan sukses yang berbeda berdasarkan lingkungan
                         if is_colab:
                             success_message = "Konfigurasi berhasil disimpan dan disinkronkan dengan Google Drive"
                         else:
                             success_message = "Konfigurasi berhasil disimpan"
                             
-                        # Log sync status
-                        log_sync_success(ui_components, success_message)
+                        # Update status
+                        update_sync_status_only(ui_components, success_message, 'success')
                         
                         # Tampilkan pesan sukses
                         display(create_info_alert(
@@ -291,70 +274,43 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
                             inconsistent_keys.append('random_seed')
                         if ui_values['stratify'] != loaded_config['split']['stratify']:
                             inconsistent_keys.append('stratify')
-                            
-                        log_sync_error(ui_components, f"Konfigurasi tidak disimpan dengan benar, ada perbedaan data pada: {', '.join(inconsistent_keys)}")
+                        
+                        # Update status
+                        update_sync_status_only(ui_components, f"Inkonsistensi data pada: {', '.join(inconsistent_keys)}", 'warning')
+                        
+                        # Tampilkan pesan warning
                         display(create_info_alert(
-                            f"{ICONS.get('error', '❌')} Konfigurasi tidak disimpan dengan benar",
-                            alert_type='error'
+                            f"{ICONS.get('warning', '⚠️')} Inkonsistensi data terdeteksi pada: {', '.join(inconsistent_keys)}",
+                            alert_type='warning'
                         ))
-                        
-                        # Coba simpan ulang jika tidak konsisten
-                        try:
-                            # Buat config dari nilai UI
-                            retry_config = load_config()
-                            retry_config['split']['enabled'] = ui_values['enabled']
-                            retry_config['split']['train_ratio'] = ui_values['train_ratio']
-                            retry_config['split']['val_ratio'] = ui_values['val_ratio']
-                            retry_config['split']['test_ratio'] = ui_values['test_ratio']
-                            retry_config['split']['random_seed'] = ui_values['random_seed']
-                            retry_config['split']['stratify'] = ui_values['stratify']
-                            
-                            # Simpan ulang
-                            log_sync_warning(ui_components, "Mencoba menyimpan ulang konfigurasi...")
-                            retry_saved = save_config(retry_config, ui_components)
-                            
-                            # Verifikasi ulang
-                            retry_loaded = load_config()
-                            retry_is_consistent = (
-                                ui_values['enabled'] == retry_loaded['split']['enabled'] and
-                                ui_values['train_ratio'] == retry_loaded['split']['train_ratio'] and
-                                ui_values['val_ratio'] == retry_loaded['split']['val_ratio'] and
-                                ui_values['test_ratio'] == retry_loaded['split']['test_ratio'] and
-                                ui_values['random_seed'] == retry_loaded['split']['random_seed'] and
-                                ui_values['stratify'] == retry_loaded['split']['stratify']
-                            )
-                            
-                            if retry_is_consistent:
-                                # Pesan sukses yang berbeda berdasarkan lingkungan
-                                if is_colab:
-                                    success_message = "Konfigurasi berhasil disimpan ulang dan disinkronkan dengan Google Drive"
-                                else:
-                                    success_message = "Konfigurasi berhasil disimpan ulang"
-                                    
-                                log_sync_success(ui_components, success_message)
-                                display(create_info_alert(
-                                    f"{ICONS.get('success', '✅')} {success_message}",
-                                    alert_type='success'
-                                ))
-                            else:
-                                log_sync_error(ui_components, "Gagal menyimpan ulang konfigurasi")
-                                
-                        except Exception as retry_error:
-                            log_sync_error(ui_components, f"Error saat menyimpan ulang konfigurasi: {str(retry_error)}")
-                        
-                except Exception as e:
-                    log_sync_error(ui_components, f"Error saat menyimpan konfigurasi: {str(e)}")
-                    logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}")
+                else:
+                    # Update status
+                    update_sync_status_only(ui_components, "Gagal menyimpan konfigurasi", 'error')
+                    
+                    # Tampilkan pesan error
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}",
-                        alert_type='error'
+                        f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi",
+                        alert_type='danger'
                     ))
-            
-            ui_components['save_button'].on_click(on_save_clicked)
-            
-        return ui_components
+            except Exception as e:
+                # Update status
+                update_sync_status_only(ui_components, f"Error saat menyimpan: {str(e)}", 'error')
+                
+                # Tampilkan pesan error
+                display(create_info_alert(
+                    f"{ICONS.get('error', '❌')} Error saat menyimpan: {str(e)}",
+                    alert_type='danger'
+                ))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan: {str(e)}")
         
+        # Bind handler ke button
+        if 'reset_button' in ui_components:
+            ui_components['reset_button'].on_click(on_reset_clicked)
+            
+        if 'save_button' in ui_components:
+            ui_components['save_button'].on_click(on_save_clicked)
+        
+        return ui_components
     except Exception as e:
-        log_sync_error(ui_components, f"Error saat setup button handlers: {str(e)}")
         logger.error(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
         return ui_components

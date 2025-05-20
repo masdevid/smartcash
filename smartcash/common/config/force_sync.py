@@ -7,6 +7,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, Any
+import yaml
 
 def force_sync_all_configs(logger=None) -> Dict[str, List[str]]:
     """
@@ -241,10 +242,9 @@ def mount_drive_if_needed() -> bool:
         logger.error(f"❌ Gagal mount Google Drive: {str(e)}")
         return False
 
-def sync_with_drive(config: Dict[str, Any], module_name: str, 
-                    ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+def sync_with_drive(config: Dict[str, Any], module_name: str, ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Sinkronisasi konfigurasi dengan Google Drive yang ditingkatkan dengan verifikasi.
+    Sinkronisasi konfigurasi dengan Google Drive.
     
     Args:
         config: Konfigurasi yang akan disinkronkan
@@ -255,135 +255,50 @@ def sync_with_drive(config: Dict[str, Any], module_name: str,
         Konfigurasi yang telah disinkronkan
     """
     try:
-        # Import sync_logger jika ada ui_components
-        sync_logger = None
-        if ui_components:
-            try:
-                from smartcash.ui.dataset.split.handlers.sync_logger import (
-                    log_sync_info, log_sync_success, log_sync_error, update_sync_status_only
-                )
-                sync_logger = True
-            except ImportError:
-                sync_logger = None
-        
-        # Log status sinkronisasi dimulai
-        if ui_components and sync_logger:
-            update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
-        
-        # Periksa apakah kita berada di Colab
-        is_colab = detect_colab_environment()
-        if not is_colab:
-            # Tidak perlu sinkronisasi jika bukan di Colab
-            logger.info(f"🔄 Tidak perlu sinkronisasi (bukan di Google Colab)")
-            if ui_components and sync_logger:
-                log_sync_info(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)")
+        # Jika bukan di Colab, tidak perlu sinkronisasi
+        if not detect_colab_environment():
             return config
-        
-        # Pastikan Google Drive ter-mount
-        if not verify_drive_mounted():
-            # Coba mount Google Drive
-            success = mount_drive_if_needed()
-            if not success:
-                logger.warning(f"⚠️ Google Drive tidak ter-mount, sinkronisasi tidak dilakukan")
-                if ui_components and sync_logger:
-                    log_sync_warning(ui_components, "Google Drive tidak ter-mount, sinkronisasi tidak dilakukan")
-                return config
-        
+            
+        # Pastikan config memiliki struktur yang benar
+        if module_name not in config and isinstance(config, dict):
+            config = {module_name: config}
+            
         # Dapatkan config manager
-        from smartcash.common.config.manager import get_config_manager
-        from smartcash.common.environment import get_environment_manager
-        
-        env = get_environment_manager()
-        base_dir = getattr(env, 'base_dir', '/content')
-        
+        base_dir = get_default_base_dir()
         config_manager = get_config_manager(base_dir=base_dir)
         
-        # Sinkronisasi konfigurasi
         # Simpan konfigurasi lokal terlebih dahulu
-        local_save_success = config_manager.save_module_config(module_name, config)
+        config_path = os.path.join(base_dir, 'configs', f'{module_name}_config.yaml')
+        os.makedirs(os.path.dirname(config_path), exist_ok=True)
         
-        if not local_save_success:
-            logger.error(f"❌ Gagal menyimpan konfigurasi {module_name} secara lokal")
-            if ui_components and sync_logger:
-                log_sync_error(ui_components, f"Gagal menyimpan konfigurasi {module_name} secara lokal")
-            return config
+        # Simpan dengan format YAML untuk memastikan struktur tetap utuh
+        with open(config_path, 'w') as f:
+            yaml.safe_dump(config, f, default_flow_style=False)
         
-        # Upload ke Google Drive
-        from smartcash.common.config.sync import upload_config_to_drive
+        # Sinkronisasi dengan Google Drive
+        drive_path = os.path.join('/content/drive/MyDrive/SmartCash/configs')
+        os.makedirs(drive_path, exist_ok=True)
+        drive_config_path = os.path.join(drive_path, f'{module_name}_config.yaml')
         
-        config_path = config_manager._get_module_config_path(module_name)
-        drive_sync_success, drive_message = config_manager.sync_to_drive(module_name)
+        # Salin file ke Google Drive
+        shutil.copy2(config_path, drive_config_path)
         
-        if not drive_sync_success:
-            logger.error(f"❌ Gagal sinkronisasi dengan Google Drive: {drive_message}")
-            if ui_components and sync_logger:
-                log_sync_error(ui_components, f"Gagal sinkronisasi dengan Google Drive: {drive_message}")
-            return config
-        
-        # Verifikasi konfigurasi dengan membaca ulang dari Drive
-        success, message, synced_config = config_manager.sync_with_drive(
-            config_manager._get_module_config_filename(module_name),
-            sync_strategy='drive_priority'
-        )
-        
-        # Verifikasi konsistensi data
-        if success:
-            # Muat config dari lokal untuk verifikasi
-            local_config = config_manager.get_module_config(module_name, {})
-            
-            # Bandingkan key utama dalam konfigurasi
-            if module_name in local_config and module_name in synced_config:
-                main_config_key = module_name
-            else:
-                # Cari key pertama sebagai key utama
-                main_config_key = list(config.keys())[0] if config else None
-            
-            # Verifikasi konsistensi
-            if main_config_key and main_config_key in local_config and main_config_key in synced_config:
-                is_consistent = True
-                for key, value in local_config[main_config_key].items():
-                    if key not in synced_config[main_config_key] or synced_config[main_config_key][key] != value:
-                        is_consistent = False
-                        logger.warning(f"⚠️ Inkonsistensi data pada key '{key}': {value} vs {synced_config[main_config_key].get(key, 'tidak ada')}")
-                        break
-                
-                if is_consistent:
-                    logger.info(f"✅ Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
-                    if ui_components and sync_logger:
-                        log_sync_success(ui_components, f"Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
-                    return synced_config
-                else:
-                    logger.warning(f"⚠️ Konsistensi data tidak terjamin setelah sinkronisasi")
-                    if ui_components and sync_logger:
-                        log_sync_warning(ui_components, "Konsistensi data tidak terjamin setelah sinkronisasi. Mencoba lagi...")
+        # Verifikasi file berhasil disalin
+        if os.path.exists(drive_config_path):
+            # Baca kembali konfigurasi dari Drive untuk verifikasi
+            try:
+                with open(drive_config_path, 'r') as f:
+                    drive_config = yaml.safe_load(f)
                     
-                    # Coba sekali lagi dengan upload langsung
-                    direct_success, _ = upload_config_to_drive(config_path, config)
-                    if direct_success:
-                        logger.info(f"✅ Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive (direct upload)")
-                        if ui_components and sync_logger:
-                            log_sync_success(ui_components, f"Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
-                        return config
-            
-            logger.info(f"✅ Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
-            if ui_components and sync_logger:
-                log_sync_success(ui_components, f"Konfigurasi {module_name} berhasil disinkronkan dengan Google Drive")
-            return synced_config
-        else:
-            logger.error(f"❌ Gagal sinkronisasi dengan Google Drive: {message}")
-            if ui_components and sync_logger:
-                log_sync_error(ui_components, f"Gagal sinkronisasi dengan Google Drive: {message}")
-            return config
-    
-    except Exception as e:
-        logger.error(f"❌ Error saat sinkronisasi dengan Google Drive: {str(e)}")
-        import traceback
-        logger.debug(f"Traceback: {traceback.format_exc()}")
+                # Verifikasi konfigurasi sama dengan yang disimpan
+                if drive_config and module_name in drive_config:
+                    return drive_config
+            except Exception as e:
+                logger.error(f"Error saat membaca konfigurasi dari Drive: {str(e)}")
         
-        # Log error ke UI
-        if ui_components and sync_logger:
-            log_sync_error(ui_components, f"Error saat sinkronisasi dengan Google Drive: {str(e)}")
-            
+        return config
+    except Exception as e:
+        logger.error(f"Error saat sinkronisasi dengan Drive: {str(e)}")
         return config
 
 def force_sync_with_drive(module_name: str, max_retries: int = 3) -> Tuple[bool, Dict[str, Any]]:

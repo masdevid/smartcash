@@ -130,21 +130,32 @@ def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_
     try:
         # Periksa apakah status_panel tersedia
         if 'status_panel' not in ui_components:
-            return
+            ui_components = add_sync_status_panel(ui_components)
             
-        # Dapatkan warna berdasarkan status_type
+        # Dapatkan warna berdasarkan status
         color_map = {
-            'info': 'blue',
-            'success': 'green',
-            'warning': 'orange',
-            'error': 'red'
+            'info': '#0dcaf0',    # Biru muda
+            'success': '#198754', # Hijau
+            'warning': '#ffc107', # Kuning
+            'error': '#dc3545'    # Merah
         }
-        color = color_map.get(status_type, 'black')
+        color = color_map.get(status_type, '#6c757d')  # Default: abu-abu
+        
+        # Dapatkan ikon berdasarkan status
+        icon_map = {
+            'info': '🔄',
+            'success': '✅',
+            'warning': '⚠️',
+            'error': '❌'
+        }
+        icon = icon_map.get(status_type, 'ℹ️')
         
         # Update panel status
-        ui_components['status_panel'].value = f'<span style="color: {color};">{message}</span>'
+        ui_components['status_panel'].value = f'<div style="padding: 5px; border-radius: 4px; background-color: #f8f9fa; margin-top: 5px;">Status: <span style="color: {color};">{icon} {message}</span></div>'
     except Exception as e:
-        print(f"❌ Error saat update status panel: {str(e)}")
+        # Fallback ke logger jika ada error
+        if 'logger' in ui_components:
+            ui_components['logger'].error(f"Error saat update status panel: {str(e)}")
 
 def create_sync_status_panel() -> widgets.HTML:
     """
@@ -168,36 +179,31 @@ def add_sync_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary komponen UI yang telah diupdate
     """
-    try:
-        # Buat panel status
-        status_panel = create_sync_status_panel()
-        
-        # Tambahkan ke komponen UI
+    # Buat panel status jika belum ada
+    if 'status_panel' not in ui_components:
+        status_panel = widgets.HTML(
+            value='<div style="padding: 5px; border-radius: 4px; background-color: #f8f9fa; margin-top: 5px;">Status: <span style="color: #6c757d;">Siap</span></div>',
+            layout=widgets.Layout(width='100%')
+        )
         ui_components['status_panel'] = status_panel
         
-        # Tambahkan ke layout jika ada
-        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
-            # Cari posisi yang tepat untuk menyisipkan status panel
-            children = list(ui_components['ui'].children)
-            
-            # Cari posisi tombol untuk memasukkan status panel setelahnya
-            button_pos = -1
-            for i, child in enumerate(children):
-                if isinstance(child, widgets.Button) or (hasattr(child, 'children') and 
-                                                       any(isinstance(c, widgets.Button) for c in child.children)):
-                    button_pos = i
+        # Tambahkan ke UI jika ada container
+        if 'footer_container' in ui_components:
+            ui_components['footer_container'].children = (*ui_components['footer_container'].children, status_panel)
+        elif 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+            # Cari container yang tepat untuk menambahkan status panel
+            found = False
+            for i, child in enumerate(ui_components['ui'].children):
+                if hasattr(child, 'description') and child.description == 'Tombol':
+                    # Tambahkan status panel setelah container tombol
+                    container = widgets.VBox([status_panel])
+                    ui_components['ui'].children = (*ui_components['ui'].children[:i+1], container, *ui_components['ui'].children[i+1:])
+                    found = True
                     break
             
-            # Sisipkan setelah posisi tombol atau di akhir jika tidak ditemukan
-            if button_pos >= 0:
-                children.insert(button_pos + 1, status_panel)
-            else:
-                children.append(status_panel)
-            
-            # Update children
-            ui_components['ui'].children = tuple(children)
-        
-        return ui_components
-    except Exception as e:
-        print(f"❌ Error saat menambahkan panel status: {str(e)}")
-        return ui_components 
+            # Jika tidak ada container tombol, tambahkan di akhir
+            if not found:
+                container = widgets.VBox([status_panel])
+                ui_components['ui'].children = (*ui_components['ui'].children, container)
+    
+    return ui_components 

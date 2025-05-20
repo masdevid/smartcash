@@ -40,10 +40,8 @@ def create_progress_tracking(
     
     # Progress bar untuk keseluruhan proses
     progress_bar = widgets.IntProgress(
-        value=0,
         min=0,
         max=100,
-        description=f"Progress: 0%",
         bar_style='info',
         orientation='horizontal',
         layout=widgets.Layout(
@@ -52,6 +50,14 @@ def create_progress_tracking(
             margin='5px 0'
         )
     )
+    
+    # Set nilai awal progress bar
+    try:
+        progress_bar.value = 0
+        progress_bar.description = "Progress: 0%"
+    except Exception:
+        # Jika gagal set nilai awal, abaikan
+        pass
     
     # Label untuk overall progress
     overall_label = widgets.HTML(
@@ -70,10 +76,8 @@ def create_progress_tracking(
     if show_step_progress:
         # Progress untuk step saat ini
         current_progress = widgets.IntProgress(
-            value=0,
             min=0,
             max=1,
-            description="Step 0/0",
             bar_style='info',
             orientation='horizontal',
             layout=widgets.Layout(
@@ -82,6 +86,14 @@ def create_progress_tracking(
                 margin='5px 0'
             )
         )
+        
+        # Set nilai awal step progress
+        try:
+            current_progress.value = 0
+            current_progress.description = "Step 0/0"
+        except Exception:
+            # Jika gagal set nilai awal, abaikan
+            pass
         
         # Label untuk step saat ini
         step_label = widgets.HTML(

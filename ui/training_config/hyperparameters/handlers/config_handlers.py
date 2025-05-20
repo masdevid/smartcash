@@ -10,14 +10,79 @@ from pathlib import Path
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.training_config.hyperparameters.hyperparameters_initializer import get_default_hyperparameters_config
+from smartcash.ui.training_config.hyperparameters.default_config import get_default_hyperparameters_config
 
 logger = get_logger(__name__)
 
 def get_default_base_dir():
+    """Dapatkan direktori base default."""
     if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
         return "/content"
     return str(Path.home() / "SmartCash")
+
+def merge_config(default_config: Dict[str, Any], user_config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Merge konfigurasi default dengan konfigurasi user.
+    
+    Args:
+        default_config: Konfigurasi default
+        user_config: Konfigurasi user
+        
+    Returns:
+        Dictionary hasil merge
+    """
+    merged = default_config.copy()
+    
+    def deep_merge(d1: Dict[str, Any], d2: Dict[str, Any]) -> None:
+        for key, value in d2.items():
+            if key in d1 and isinstance(d1[key], dict) and isinstance(value, dict):
+                deep_merge(d1[key], value)
+            else:
+                d1[key] = value
+    
+    deep_merge(merged, user_config)
+    return merged
+
+def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Dapatkan konfigurasi hyperparameters dari config manager.
+    
+    Args:
+        ui_components: Dictionary komponen UI (opsional)
+        
+    Returns:
+        Dictionary konfigurasi hyperparameters
+    """
+    try:
+        base_dir = get_default_base_dir()
+        config_manager = get_config_manager(base_dir=base_dir)
+        config = config_manager.get_module_config('hyperparameters', {})
+        
+        # Pastikan config memiliki struktur yang benar
+        if not config or 'hyperparameters' not in config:
+            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan konfigurasi default untuk hyperparameters")
+            default_config = get_default_hyperparameters_config()
+            # Simpan default config ke file
+            config_manager.save_module_config('hyperparameters', default_config)
+            return default_config
+            
+        # Validasi struktur konfigurasi
+        default_config = get_default_hyperparameters_config()
+        merged_config = merge_config(default_config, config)
+        
+        # Simpan config yang sudah di-merge
+        config_manager.save_module_config('hyperparameters', merged_config)
+        
+        return merged_config
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat mengambil konfigurasi hyperparameters: {str(e)}")
+        default_config = get_default_hyperparameters_config()
+        # Simpan default config ke file
+        try:
+            config_manager.save_module_config('hyperparameters', default_config)
+        except Exception as save_error:
+            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan default config: {str(save_error)}")
+        return default_config
 
 def get_default_hyperparameters_config() -> Dict[str, Any]:
     """
@@ -75,45 +140,6 @@ def get_default_hyperparameters_config() -> Dict[str, Any]:
             }
         }
     }
-
-def get_hyperparameters_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Dapatkan konfigurasi hyperparameters dari config manager.
-    
-    Args:
-        ui_components: Dictionary komponen UI (opsional)
-        
-    Returns:
-        Dictionary konfigurasi hyperparameters
-    """
-    try:
-        config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('hyperparameters', {})
-        
-        # Pastikan config memiliki struktur yang benar
-        if not config or 'hyperparameters' not in config:
-            logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan konfigurasi default untuk hyperparameters")
-            default_config = get_default_hyperparameters_config()
-            # Simpan default config ke file
-            config_manager.save_module_config('hyperparameters', default_config)
-            return default_config
-            
-        # Validasi struktur konfigurasi
-        default_config = get_default_hyperparameters_config()
-        for key in default_config['hyperparameters']:
-            if key not in config['hyperparameters']:
-                config['hyperparameters'][key] = default_config['hyperparameters'][key]
-        
-        return config
-    except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat mengambil konfigurasi hyperparameters: {str(e)}")
-        default_config = get_default_hyperparameters_config()
-        # Simpan default config ke file
-        try:
-            config_manager.save_module_config('hyperparameters', default_config)
-        except Exception as save_error:
-            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan default config: {str(save_error)}")
-        return default_config
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

@@ -15,6 +15,7 @@ from smartcash.ui.utils.header_utils import create_header
 from smartcash.common.logger import get_logger, LogLevel
 from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.training_config.hyperparameters.default_config import get_default_hyperparameters_config
 
 from smartcash.ui.training_config.hyperparameters.components import create_hyperparameters_ui_components
 from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import update_ui_from_config, update_config_from_ui
@@ -43,8 +44,11 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         Dict berisi komponen UI
     """
     try:
+        # Dapatkan base directory
+        base_dir = get_default_base_dir()
+        
         # Dapatkan config manager
-        config_manager = get_config_manager(base_dir=get_default_base_dir())
+        config_manager = get_config_manager(base_dir=base_dir)
         
         # Coba dapatkan UI components yang sudah teregistrasi
         ui_components = config_manager.get_ui_components('hyperparameters')
@@ -62,7 +66,7 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         else:
             # Jika tidak ada, inisialisasi UI baru
             # Dapatkan environment manager jika belum tersedia
-            env = env or get_environment_manager(base_dir=get_default_base_dir())
+            env = env or get_environment_manager(base_dir=base_dir)
             
             # Validasi config
             if config is None:

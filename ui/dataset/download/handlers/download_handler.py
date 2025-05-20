@@ -13,6 +13,16 @@ from smartcash.dataset.services.downloader.download_service import DownloadServi
 from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
 
+__all__ = [
+    'handle_download_button_click',
+    'execute_download',
+    '_reset_progress_bar',
+    '_show_progress',
+    '_update_progress',
+    '_reset_ui_after_download',
+    '_disable_buttons'
+]
+
 class DownloadHandler:
     """Handler untuk proses download dataset."""
     
@@ -58,63 +68,225 @@ class DownloadHandler:
             self.ui_components['download_running'] = False
             raise
 
-    def _reset_progress_bar(self):
-        """Reset progress bar ke kondisi awal"""
-        try:
-            # Reset progress bar
-            if hasattr(self, 'progress_bar') and self.progress_bar is not None:
-                self.progress_bar.value = 0
-                self.progress_bar.description = "Progress: 0%"
-                self.progress_bar.layout.visibility = 'hidden'
+def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
+    """
+    Reset progress bar ke kondisi awal.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    try:
+        # Reset progress bar
+        if 'progress_bar' in ui_components and ui_components['progress_bar'] is not None:
+            ui_components['progress_bar'].value = 0
+            ui_components['progress_bar'].description = "Progress: 0%"
+            ui_components['progress_bar'].layout.visibility = 'hidden'
+        
+        # Reset labels
+        if 'overall_label' in ui_components and ui_components['overall_label'] is not None:
+            ui_components['overall_label'].value = ""
+            ui_components['overall_label'].layout.visibility = 'hidden'
             
-            # Reset labels
-            if hasattr(self, 'overall_label') and self.overall_label is not None:
-                self.overall_label.value = ""
-                self.overall_label.layout.visibility = 'hidden'
-                
-            if hasattr(self, 'step_label') and self.step_label is not None:
-                self.step_label.value = ""
-                self.step_label.layout.visibility = 'hidden'
-                
-            if hasattr(self, 'current_progress') and self.current_progress is not None:
-                self.current_progress.value = 0
-                self.current_progress.description = "Step 0/0"
-                self.current_progress.layout.visibility = 'hidden'
-        except Exception as e:
-            print(f"Warning: Failed to reset progress bar: {str(e)}")
+        if 'step_label' in ui_components and ui_components['step_label'] is not None:
+            ui_components['step_label'].value = ""
+            ui_components['step_label'].layout.visibility = 'hidden'
+            
+        if 'current_progress' in ui_components and ui_components['current_progress'] is not None:
+            ui_components['current_progress'].value = 0
+            ui_components['current_progress'].description = "Step 0/0"
+            ui_components['current_progress'].layout.visibility = 'hidden'
+    except Exception as e:
+        print(f"Warning: Failed to reset progress bar: {str(e)}")
 
-    def handle_download_button_click(self, button):
-        """Handle click event pada tombol download"""
-        try:
-            # Disable tombol download
-            button.disabled = True
+def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> None:
+    """
+    Handler untuk tombol download pada UI download.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        button: Button widget
+    """
+    try:
+        # Disable tombol download
+        button.disabled = True
+        
+        # Log pesan persiapan
+        if 'log_output' in ui_components:
+            ui_components['log_output'].append_stdout("Memulai persiapan download dataset...")
+        
+        # Tampilkan konfirmasi download
+        from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
+        if confirm_download(ui_components):
+            # Reset progress bar setelah konfirmasi
+            _reset_progress_bar(ui_components)
             
-            # Log pesan persiapan
-            self.log_output.append_stdout("Memulai persiapan download dataset...")
+            # Ekstrak parameter dari UI
+            params = {
+                'workspace': ui_components['workspace'].value,
+                'project': ui_components['project'].value,
+                'version': ui_components['version'].value,
+                'api_key': ui_components['api_key'].value,
+                'output_dir': ui_components['output_dir'].value,
+                'validate_dataset': ui_components['validate_dataset'].value,
+                'backup_before_download': ui_components['backup_checkbox'].value,
+                'backup_dir': ui_components['backup_dir'].value
+            }
             
-            # Tampilkan konfirmasi download
-            if confirm_download(self.log_output):
-                # Reset progress bar setelah konfirmasi
-                self._reset_progress_bar()
-                
-                # Ekstrak parameter dari UI
-                params = self._extract_parameters()
-                
-                # Log parameter yang akan digunakan
-                self.log_output.append_stdout("Parameter download:")
+            # Log parameter yang akan digunakan
+            if 'log_output' in ui_components:
+                ui_components['log_output'].append_stdout("Parameter download:")
                 for key, value in params.items():
-                    self.log_output.append_stdout(f"- {key}: {value}")
+                    ui_components['log_output'].append_stdout(f"- {key}: {value}")
+            
+            # Jalankan download
+            execute_download(ui_components)
+        else:
+            if 'log_output' in ui_components:
+                ui_components['log_output'].append_stdout("Download dibatalkan")
                 
-                # Jalankan download
-                self.execute_download(params)
-            else:
-                self.log_output.append_stdout("Download dibatalkan")
-                
-        except Exception as e:
-            self.log_output.append_stderr(f"Error saat persiapan download: {str(e)}")
-        finally:
-            # Enable kembali tombol download
-            button.disabled = False
+    except Exception as e:
+        if 'log_output' in ui_components:
+            ui_components['log_output'].append_stderr(f"Error saat persiapan download: {str(e)}")
+    finally:
+        # Enable kembali tombol download
+        button.disabled = False
+
+def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
+    """
+    Tampilkan dan reset progress bar dengan layout yang konsisten.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan progress awal
+    """
+    # Set flag download_running ke True
+    ui_components['download_running'] = True
+
+    # Reset progress bar terlebih dahulu
+    _reset_progress_bar(ui_components)
+
+    # Pastikan progress container terlihat
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        ui_components['progress_container'].layout.display = 'block'
+        ui_components['progress_container'].layout.visibility = 'visible'
+
+    # Kirim notifikasi progress dimulai
+    notify_progress(
+        sender=ui_components,
+        event_type="start",
+        progress=0,
+        total=100,
+        message=message or "Memulai proses...",
+        step=1,
+        total_steps=5
+    )
+
+    # Pastikan log accordion terbuka
+    if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
+        ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
+
+def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
+    """
+    Update progress bar dengan layout yang konsisten.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        value: Nilai progress (0-100)
+        message: Pesan progress opsional
+    """
+    # Pastikan progress container terlihat
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        ui_components['progress_container'].layout.display = 'block'
+        ui_components['progress_container'].layout.visibility = 'visible'
+    
+    # Pastikan value adalah integer
+    try:
+        value = int(float(value))
+    except (ValueError, TypeError):
+        value = 0
+    
+    # Kirim notifikasi progress update
+    notify_progress(
+        sender=ui_components,
+        event_type="update",
+        progress=value,
+        total=100,
+        message=message or "",
+        step=min(5, max(1, int(value / 20))),  # Estimasi langkah berdasarkan persentase
+        total_steps=5
+    )
+
+def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
+    """
+    Nonaktifkan/aktifkan tombol-tombol UI.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        disabled: True untuk nonaktifkan, False untuk aktifkan
+    """
+    # Daftar tombol yang perlu dinonaktifkan
+    button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button']
+    
+    # Set status disabled untuk semua tombol
+    for key in button_keys:
+        if key in ui_components and hasattr(ui_components[key], 'disabled'):
+            ui_components[key].disabled = disabled
+            
+            # Atur visibilitas tombol jika disabled
+            if hasattr(ui_components[key], 'layout'):
+                if disabled:
+                    # Sembunyikan tombol reset dan cleanup saat proses berjalan
+                    if key in ['reset_button', 'cleanup_button']:
+                        ui_components[key].layout.display = 'none'
+                else:
+                    # Tampilkan kembali semua tombol dengan konsisten
+                    ui_components[key].layout.display = 'inline-block'
+
+def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
+    """Reset UI setelah proses download selesai."""
+    # Aktifkan kembali tombol (fungsi ini juga akan mengatur display='inline-block')
+    _disable_buttons(ui_components, False)
+    
+    # Reset progress bar
+    _reset_progress_bar(ui_components)
+    
+    # Sembunyikan progress container setelah beberapa detik
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        # Setelah proses selesai, biarkan progress bar terlihat sebentar
+        # kemudian sembunyikan setelah beberapa detik
+        import threading
+        def hide_progress_container():
+            import time
+            # Tunggu 3 detik sebelum menyembunyikan progress bar
+            time.sleep(3)
+            ui_components['progress_container'].layout.display = 'none'
+        
+        # Jalankan di thread terpisah agar tidak memblokir UI
+        threading.Thread(target=hide_progress_container).start()
+    
+    # Bersihkan area konfirmasi jika ada
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        ui_components['confirmation_area'].clear_output()
+    
+    # Update status panel jika tersedia
+    if 'status_panel' in ui_components:
+        from smartcash.ui.utils.alert_utils import update_status_panel
+        update_status_panel(ui_components['status_panel'], 'Download selesai', 'success')
+    elif 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+        ui_components['update_status_panel'](ui_components, 'info', 'Download selesai')
+    
+    # Pastikan log accordion tetap terbuka
+    if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
+        ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
+    
+    # Cleanup UI jika tersedia
+    if 'cleanup_ui' in ui_components and callable(ui_components['cleanup_ui']):
+        ui_components['cleanup_ui'](ui_components)
+    elif 'cleanup' in ui_components and callable(ui_components['cleanup']):
+        ui_components['cleanup']()
+        
+    # Set flag download_running ke False jika ada
+    ui_components['download_running'] = False
 
 def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') -> None:
     """
@@ -358,140 +530,3 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     
     # Reset UI setelah proses selesai
     _reset_ui_after_download(ui_components)
-
-def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
-    """Reset UI setelah proses download selesai."""
-    # Aktifkan kembali tombol (fungsi ini juga akan mengatur display='inline-block')
-    _disable_buttons(ui_components, False)
-    
-    # Reset progress bar
-    _reset_progress_bar(ui_components)
-    
-    # Sembunyikan progress container setelah beberapa detik
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-        # Setelah proses selesai, biarkan progress bar terlihat sebentar
-        # kemudian sembunyikan setelah beberapa detik
-        import threading
-        def hide_progress_container():
-            import time
-            # Tunggu 3 detik sebelum menyembunyikan progress bar
-            time.sleep(3)
-            ui_components['progress_container'].layout.display = 'none'
-        
-        # Jalankan di thread terpisah agar tidak memblokir UI
-        threading.Thread(target=hide_progress_container).start()
-    
-    # Bersihkan area konfirmasi jika ada
-    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        ui_components['confirmation_area'].clear_output()
-    
-    # Update status panel jika tersedia
-    if 'status_panel' in ui_components:
-        from smartcash.ui.utils.alert_utils import update_status_panel
-        update_status_panel(ui_components['status_panel'], 'Download selesai', 'success')
-    elif 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](ui_components, 'info', 'Download selesai')
-    
-    # Pastikan log accordion tetap terbuka
-    if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
-        ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
-    
-    # Cleanup UI jika tersedia
-    if 'cleanup_ui' in ui_components and callable(ui_components['cleanup_ui']):
-        ui_components['cleanup_ui'](ui_components)
-    elif 'cleanup' in ui_components and callable(ui_components['cleanup']):
-        ui_components['cleanup']()
-        
-    # Set flag download_running ke False jika ada
-    ui_components['download_running'] = False
-
-def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
-    """
-    Tampilkan dan reset progress bar dengan layout yang konsisten.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan progress awal
-    """
-    # Set flag download_running ke True
-    ui_components['download_running'] = True
-
-    # Reset progress bar terlebih dahulu
-    _reset_progress_bar(ui_components)
-
-    # Pastikan progress container terlihat
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-        ui_components['progress_container'].layout.display = 'block'
-        ui_components['progress_container'].layout.visibility = 'visible'
-
-    # Kirim notifikasi progress dimulai
-    notify_progress(
-        sender=ui_components,
-        event_type="start",
-        progress=0,
-        total=100,
-        message=message or "Memulai proses...",
-        step=1,
-        total_steps=5
-    )
-
-    # Pastikan log accordion terbuka
-    if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
-        ui_components['log_accordion'].selected_index = 0  # Buka accordion pertama
-
-def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
-    """
-    Update progress bar dengan layout yang konsisten.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        value: Nilai progress (0-100)
-        message: Pesan progress opsional
-    """
-    # Pastikan progress container terlihat
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-        ui_components['progress_container'].layout.display = 'block'
-        ui_components['progress_container'].layout.visibility = 'visible'
-    
-    # Pastikan value adalah integer
-    try:
-        value = int(float(value))
-    except (ValueError, TypeError):
-        value = 0
-    
-    # Kirim notifikasi progress update
-    notify_progress(
-        sender=ui_components,
-        event_type="update",
-        progress=value,
-        total=100,
-        message=message or "",
-        step=min(5, max(1, int(value / 20))),  # Estimasi langkah berdasarkan persentase
-        total_steps=5
-    )
-
-def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
-    """
-    Nonaktifkan/aktifkan tombol-tombol UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        disabled: True untuk nonaktifkan, False untuk aktifkan
-    """
-    # Daftar tombol yang perlu dinonaktifkan
-    button_keys = ['download_button', 'check_button', 'reset_button', 'cleanup_button']
-    
-    # Set status disabled untuk semua tombol
-    for key in button_keys:
-        if key in ui_components and hasattr(ui_components[key], 'disabled'):
-            ui_components[key].disabled = disabled
-            
-            # Atur visibilitas tombol jika disabled
-            if hasattr(ui_components[key], 'layout'):
-                if disabled:
-                    # Sembunyikan tombol reset dan cleanup saat proses berjalan
-                    if key in ['reset_button', 'cleanup_button']:
-                        ui_components[key].layout.display = 'none'
-                else:
-                    # Tampilkan kembali semua tombol dengan konsisten
-                    ui_components[key].layout.display = 'inline-block'

@@ -80,37 +80,52 @@ def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logge
     return logger
 
 
-def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", emoji: str = "") -> None:
+def log_to_ui(ui_components: Optional[Dict[str, Any]], message: str, level: str = 'info', emoji: str = None) -> None:
     """
-    Log pesan langsung ke UI widget menggunakan komponen terpadu.
+    Log pesan ke UI dengan level dan emoji yang sesuai.
     
     Args:
-        ui_components: Dictionary berisi komponen UI dengan kunci 'status'
+        ui_components: Dictionary komponen UI atau None
         message: Pesan yang akan ditampilkan
-        level: Level log (info, warning, error, debug, success)
-        emoji: Emoji untuk ditampilkan (akan ditambahkan ke pesan)
+        level: Level log (info, warning, error, success)
+        emoji: Emoji opsional untuk pesan
     """
-    # Skip debug messages untuk UI
-    if level == "debug":
+    # Jika ui_components None, gunakan print biasa
+    if ui_components is None:
+        print(f"{emoji or ''} {message}")
         return
         
-    if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
-        # Fallback sederhana: print pesan
-        print(f"{emoji} {message}")
+    # Pastikan ui_components adalah dictionary
+    if not isinstance(ui_components, dict):
+        print(f"{emoji or ''} {message}")
         return
     
-    with ui_components['status']:
-        try:
-            # Gunakan komponen alert_utils jika tersedia
-            from smartcash.ui.utils.alert_utils import create_status_indicator
-            # Tambahkan emoji ke pesan jika disediakan
-            full_message = f"{emoji} {message}" if emoji else message
-            display(create_status_indicator(level, full_message))
-        except ImportError:
-            # Fallback minimal tanpa alert_utils - reuse kode
-            emoji_map = {"info": "ℹ️", "success": "✅", "warning": "⚠️", "error": "❌", "debug": "🔍"}
-            icon = emoji or emoji_map.get(level, "ℹ️")
-            display(HTML(f"<div><span>{icon}</span> {message}</div>"))
+    # Set emoji berdasarkan level jika tidak disediakan
+    if emoji is None:
+        emoji = {
+            'info': 'ℹ️',
+            'warning': '⚠️',
+            'error': '❌',
+            'success': '✅'
+        }.get(level, '')
+    
+    # Coba log ke status output jika tersedia
+    if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
+        with ui_components['status']:
+            display(create_status_indicator(level, f"{emoji} {message}"))
+        return
+    
+    # Coba log ke log output jika tersedia
+    if 'log_output' in ui_components:
+        if hasattr(ui_components['log_output'], 'append_stdout'):
+            if level == 'error':
+                ui_components['log_output'].append_stderr(f"{emoji} {message}")
+            else:
+                ui_components['log_output'].append_stdout(f"{emoji} {message}")
+            return
+    
+    # Fallback: print pesan
+    print(f"{emoji} {message}")
 
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     """

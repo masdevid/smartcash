@@ -55,6 +55,9 @@ def get_default_training_strategy_config() -> Dict[str, Any]:
         }
     }
 
+# Alias for backward compatibility
+get_default_config = get_default_training_strategy_config
+
 def get_training_strategy_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Dapatkan konfigurasi training strategy dari config manager.

@@ -8,10 +8,12 @@ import os
 import yaml
 from pathlib import Path
 from smartcash.common.config import get_config_manager
-from smartcash.common.logger import get_logger
+from smartcash.common.logger import get_logger, LogLevel
 from smartcash.ui.utils.constants import ICONS
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.set_level(LogLevel.CRITICAL)
 
 def get_default_base_dir():
     if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
@@ -57,7 +59,7 @@ def get_backbone_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('model')
+        config = config_manager.get_module_config('backbone')
         if config and 'backbone' in config:
             return config
         logger.warning("⚠️ Konfigurasi backbone tidak ditemukan, menggunakan default")

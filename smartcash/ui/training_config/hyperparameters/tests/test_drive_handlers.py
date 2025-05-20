@@ -18,48 +18,50 @@ class TestDriveHandlers(unittest.TestCase):
     
     def setUp(self):
         """Setup untuk pengujian"""
-        # Mock config
+        # Mock config with nested structure
         self.mock_config = {
-            'batch_size': 16,
-            'image_size': 640,
-            'epochs': 100,
-            'augment': True,
-            'optimizer': 'SGD',
-            'learning_rate': 0.01,
-            'momentum': 0.937,
-            'weight_decay': 0.0005,
-            'scheduler': 'cosine',
-            'warmup_epochs': 3,
-            'warmup_momentum': 0.8,
-            'warmup_bias_lr': 0.1,
-            'early_stopping': {
+            'hyperparameters': {
                 'enabled': True,
-                'patience': 10,
-                'min_delta': 0.001
-            },
-            'save_best': {
-                'enabled': True,
-                'metric': 'mAP_0.5'
+                'optimizer': {
+                    'type': 'SGD',
+                    'learning_rate': 0.01,
+                    'momentum': 0.937,
+                    'weight_decay': 0.0005
+                },
+                'scheduler': {
+                    'enabled': True,
+                    'type': 'cosine',
+                    'warmup_epochs': 3,
+                    'warmup_momentum': 0.8,
+                    'warmup_bias_lr': 0.1
+                },
+                'early_stopping': {
+                    'enabled': True,
+                    'patience': 10,
+                    'min_delta': 0.001
+                },
+                'save_best': {
+                    'enabled': True,
+                    'metric': 'mAP_0.5'
+                }
             }
         }
         
         # Mock UI components
         self.mock_ui_components = {
-            'batch_size_slider': MagicMock(value=16),
-            'image_size_slider': MagicMock(value=640),
-            'epochs_slider': MagicMock(value=100),
-            'augment_checkbox': MagicMock(value=True),
+            'enabled_checkbox': MagicMock(value=True),
             'optimizer_dropdown': MagicMock(value='SGD'),
             'learning_rate_slider': MagicMock(value=0.01),
             'momentum_slider': MagicMock(value=0.937),
             'weight_decay_slider': MagicMock(value=0.0005),
+            'scheduler_checkbox': MagicMock(value=True),
             'scheduler_dropdown': MagicMock(value='cosine'),
             'warmup_epochs_slider': MagicMock(value=3),
             'warmup_momentum_slider': MagicMock(value=0.8),
             'warmup_bias_lr_slider': MagicMock(value=0.1),
-            'early_stopping_enabled_checkbox': MagicMock(value=True),
-            'early_stopping_patience_slider': MagicMock(value=10),
-            'early_stopping_min_delta_slider': MagicMock(value=0.001),
+            'early_stopping_checkbox': MagicMock(value=True),
+            'patience_slider': MagicMock(value=10),
+            'min_delta_slider': MagicMock(value=0.001),
             'save_best_checkbox': MagicMock(value=True),
             'checkpoint_metric_dropdown': MagicMock(value='mAP_0.5'),
             'status': MagicMock(),

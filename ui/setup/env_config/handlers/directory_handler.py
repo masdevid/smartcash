@@ -53,7 +53,7 @@ def on_directory_click(b: widgets.Button, ui_components: Dict[str, Any], colab_m
         for dir_path in base_dirs:
             path = Path(dir_path)
             path.mkdir(exist_ok=True)
-            state_manager.ui_components['log'].append_stdout(f"Created directory: {dir_path}\n")
+            state_manager.ui_components['log_output'].append_stdout(f"Created directory: {dir_path}\n")
         
         # Create symlinks to drive if connected
         if colab_manager.is_drive_connected():
@@ -78,7 +78,7 @@ def on_directory_click(b: widgets.Button, ui_components: Dict[str, Any], colab_m
                 
                 # Create new symlink
                 os.symlink(drive_path, local_path)
-                state_manager.ui_components['log'].append_stdout(f"Created symlink: {local_path} -> {drive_path}\n")
+                state_manager.ui_components['log_output'].append_stdout(f"Created symlink: {local_path} -> {drive_path}\n")
         
         # Update state
         state_manager.handle_directory_setup_success()

@@ -6,6 +6,7 @@ Deskripsi: Manager konfigurasi dengan dukungan YAML, environment variables, dan 
 import copy
 from pathlib import Path
 from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, List
+import logging
 
 from smartcash.common.config.singleton import Singleton
 from smartcash.common.config.base_manager import BaseConfigManager
@@ -35,13 +36,13 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
             
         # Initialize logger first
-        from smartcash.common.logger import get_logger
-        logger = get_logger("config_manager")
-        # Defensive: ensure logger is not a string
-        if isinstance(logger, str):
-            print(f"[WARNING] Logger should not be a string! Got: {logger}. Setting logger to None.")
-            logger = None
-        self._logger = logger
+        self._logger = logging.getLogger(__name__)
+        if not self._logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self._logger.addHandler(handler)
+            self._logger.setLevel(logging.INFO)
             
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)

@@ -5,7 +5,6 @@ Deskripsi: Handler untuk operasi directory
 
 import os
 import shutil
-import asyncio
 from pathlib import Path
 from typing import Dict, Any
 import ipywidgets as widgets
@@ -25,10 +24,10 @@ def setup_directory_handler(ui_components: Dict[str, Any], colab_manager: Any) -
     
     # Register event handler
     ui_components['directory_button'].on_click(
-        lambda b: asyncio.create_task(on_directory_click(b, ui_components, colab_manager, state_manager))
+        lambda b: on_directory_click(b, ui_components, colab_manager, state_manager)
     )
 
-async def on_directory_click(b: widgets.Button, ui_components: Dict[str, Any], colab_manager: Any, state_manager: EnvConfigStateManager) -> None:
+def on_directory_click(b: widgets.Button, ui_components: Dict[str, Any], colab_manager: Any, state_manager: EnvConfigStateManager) -> None:
     """
     Handler untuk tombol directory
     

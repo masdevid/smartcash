@@ -5,19 +5,15 @@ Deskripsi: Component untuk konfigurasi environment
 
 from typing import Dict, Any
 from IPython.display import display
-import asyncio
 from pathlib import Path
 from functools import reduce
-
-from smartcash.common.logger import get_logger
+import logging
 
 from smartcash.ui.setup.env_config.components.ui_creator import create_env_config_ui
 from smartcash.ui.setup.env_config.components.manager_setup import setup_managers
 from smartcash.ui.setup.env_config.components.progress_setup import setup_progress
 from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_config_handlers
 from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
-
-logger = get_logger(__name__)
 
 class EnvConfigComponent:
     """
@@ -28,7 +24,13 @@ class EnvConfigComponent:
         """
         Inisialisasi component
         """
-        self.logger = logger
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
         
         # Create UI first
         self.ui_components = create_env_config_ui()
@@ -44,7 +46,7 @@ class EnvConfigComponent:
         self.auto_check = AutoCheckHandler(self)
         
         # Run auto check without drive mounting
-        asyncio.create_task(self.auto_check.auto_check())
+        self.auto_check.auto_check()
     
     def _update_status(self, message: str, status_type: str = "info"):
         """

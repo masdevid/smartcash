@@ -37,6 +37,20 @@ def get_default_split_config() -> Dict[str, Any]:
         }
     }
 
+def is_colab_environment() -> bool:
+    """
+    Menentukan apakah kode dijalankan di Google Colab.
+    
+    Returns:
+        bool: True jika di Google Colab, False jika tidak
+    """
+    try:
+        from smartcash.common.config.force_sync import detect_colab_environment
+        return detect_colab_environment()
+    except ImportError:
+        # Fallback ke metode lama jika force_sync tidak tersedia
+        return "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ
+
 def load_config() -> Dict[str, Any]:
     """
     Load konfigurasi split dataset dari config manager.
@@ -62,18 +76,136 @@ def load_config() -> Dict[str, Any]:
         logger.error(f"{ICONS.get('error', '❌')} Error saat load konfigurasi split: {str(e)}")
         return get_default_split_config()
 
-def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> None:
+def sync_with_drive(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Simpan konfigurasi split dataset ke config manager.
+    Sinkronisasi konfigurasi dengan Google Drive.
+    
+    Args:
+        config: Konfigurasi yang akan disinkronkan
+        ui_components: Dictionary komponen UI (opsional)
+        
+    Returns:
+        Konfigurasi yang telah disinkronkan
+    """
+    try:
+        # Gunakan fungsi sync_with_drive dari force_sync jika tersedia
+        try:
+            from smartcash.common.config.force_sync import sync_with_drive as force_sync
+            return force_sync(config, 'split', ui_components)
+        except ImportError:
+            # Jika force_sync tidak tersedia, gunakan metode lama
+            pass
+        
+        if not is_colab_environment():
+            # Tidak perlu sinkronisasi jika bukan di Colab
+            if ui_components and 'logger' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_info
+                log_sync_info(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)")
+            return config
+            
+        # Dapatkan config manager
+        base_dir = get_default_base_dir()
+        config_manager = get_config_manager(base_dir=base_dir)
+        
+        # Log info
+        if ui_components and 'logger' in ui_components:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_info, update_sync_status_only
+            update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
+        
+        # Simpan konfigurasi terlebih dahulu
+        config_save_success = config_manager.save_module_config('split', config)
+        if not config_save_success:
+            # Log error jika gagal menyimpan
+            if ui_components and 'logger' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
+                log_sync_error(ui_components, "Gagal menyimpan konfigurasi lokal sebelum sinkronisasi")
+            return config
+        
+        # Sinkronisasi dengan Google Drive
+        success = config_manager.sync_to_drive('split')
+        
+        # Verifikasi sinkronisasi berhasil dengan membaca ulang konfigurasi
+        if success:
+            # Muat ulang konfigurasi untuk verifikasi
+            synced_config = config_manager.get_module_config('split', {})
+            
+            # Verifikasi konsistensi konfigurasi
+            if 'split' in synced_config and 'split' in config:
+                is_consistent = True
+                for key, value in config['split'].items():
+                    if key not in synced_config['split'] or synced_config['split'][key] != value:
+                        is_consistent = False
+                        logger.warning(f"⚠️ Inkonsistensi data pada key '{key}': {value} vs {synced_config['split'].get(key, 'tidak ada')}")
+                        break
+                
+                # Log hasil verifikasi
+                if is_consistent:
+                    # Berhasil dan konsisten
+                    if ui_components and 'logger' in ui_components:
+                        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success
+                        log_sync_success(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive")
+                    return synced_config
+                else:
+                    # Berhasil tapi tidak konsisten
+                    if ui_components and 'logger' in ui_components:
+                        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_warning
+                        log_sync_warning(ui_components, "Sinkronisasi berhasil tapi data tidak konsisten")
+                    # Kembalikan config asli untuk keamanan
+                    return config
+            
+            # Log hasil sinkronisasi jika tidak bisa memverifikasi konsistensi
+            if ui_components and 'logger' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success
+                log_sync_success(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive")
+            
+            return synced_config
+        else:
+            # Gagal sinkronisasi
+            if ui_components and 'logger' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
+                log_sync_error(ui_components, "Gagal menyinkronkan konfigurasi dengan Google Drive")
+            return config
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat sinkronisasi dengan Google Drive: {str(e)}")
+        
+        # Log error ke UI
+        if ui_components and 'logger' in ui_components:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
+            log_sync_error(ui_components, f"Error saat sinkronisasi dengan Google Drive: {str(e)}")
+            
+        return config
+
+def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    Simpan konfigurasi split dataset ke config manager dan sinkronkan dengan Google Drive.
     
     Args:
         config: Dictionary konfigurasi yang akan disimpan
         ui_components: Dictionary komponen UI (opsional)
+        
+    Returns:
+        Konfigurasi yang telah disimpan dan disinkronkan
     """
     try:
+        # Update status panel
+        if ui_components and 'status_panel' in ui_components:
+            from smartcash.ui.dataset.split.handlers.sync_logger import update_sync_status_only
+            update_sync_status_only(ui_components, "Menyimpan konfigurasi...", 'info')
+        
+        # Simpan konfigurasi asli untuk verifikasi
+        original_config = config.copy() if config else get_default_split_config()
+        
+        # Simpan konfigurasi
         base_dir = get_default_base_dir()
         config_manager = get_config_manager(base_dir=base_dir)
-        config_manager.save_module_config('split', config)
+        save_success = config_manager.save_module_config('split', config)
+        
+        if not save_success:
+            if ui_components and 'logger' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
+                log_sync_error(ui_components, "Gagal menyimpan konfigurasi split")
+            return config
         
         logger.info(f"{ICONS.get('success', '✅')} Konfigurasi split berhasil disimpan")
         
@@ -81,6 +213,64 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
         if ui_components and 'logger' in ui_components:
             from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success
             log_sync_success(ui_components, "Konfigurasi split berhasil disimpan")
+        
+        # Verifikasi konfigurasi tersimpan dengan benar
+        saved_config = config_manager.get_module_config('split', {})
+        
+        # Verifikasi konsistensi
+        if 'split' in saved_config and 'split' in original_config:
+            is_consistent = True
+            for key, value in original_config['split'].items():
+                if key not in saved_config['split'] or saved_config['split'][key] != value:
+                    is_consistent = False
+                    logger.warning(f"⚠️ Inkonsistensi data pada key '{key}': {value} vs {saved_config['split'].get(key, 'tidak ada')}")
+                    if ui_components and 'logger' in ui_components:
+                        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_warning
+                        log_sync_warning(ui_components, f"Inkonsistensi data pada key '{key}'")
+                    break
+            
+            if not is_consistent:
+                # Coba simpan ulang jika tidak konsisten
+                config_manager.save_module_config('split', original_config)
+                # Log warning
+                logger.warning(f"⚠️ Data tidak konsisten setelah penyimpanan, mencoba kembali")
+                if ui_components and 'logger' in ui_components:
+                    from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_warning
+                    log_sync_warning(ui_components, "Data tidak konsisten setelah penyimpanan, mencoba kembali")
+                
+                # Verifikasi ulang setelah simpan ulang
+                saved_config = config_manager.get_module_config('split', {})
+        
+        # Sinkronisasi dengan Google Drive jika di Colab
+        if is_colab_environment():
+            if ui_components and 'status_panel' in ui_components:
+                from smartcash.ui.dataset.split.handlers.sync_logger import update_sync_status_only
+                update_sync_status_only(ui_components, "Menyinkronkan dengan Google Drive...", 'info')
+            
+            # Pastikan nilai yang disinkronkan menggunakan nilai original_config
+            # untuk menghindari inkonsistensi
+            synced_config = sync_with_drive(original_config, ui_components)
+            
+            # Verifikasi konfigurasi yang disinkronkan dengan membandingkan dengan nilai asli
+            is_synced_consistent = True
+            if 'split' in synced_config and 'split' in original_config:
+                for key, value in original_config['split'].items():
+                    if key not in synced_config['split'] or synced_config['split'][key] != value:
+                        is_synced_consistent = False
+                        logger.warning(f"⚠️ Inkonsistensi data setelah sinkronisasi pada key '{key}': {value} vs {synced_config['split'].get(key, 'tidak ada')}")
+                        if ui_components and 'logger' in ui_components:
+                            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_warning
+                            log_sync_warning(ui_components, f"Inkonsistensi data setelah sinkronisasi pada key '{key}'")
+                        break
+            
+            if is_synced_consistent:
+                if ui_components and 'logger' in ui_components:
+                    from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success
+                    log_sync_success(ui_components, "Konfigurasi berhasil disimpan dan disinkronkan dengan Google Drive")
+            
+            return synced_config
+        
+        return saved_config
     except Exception as e:
         logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi split: {str(e)}")
         
@@ -88,6 +278,8 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
         if ui_components and 'logger' in ui_components:
             from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat menyimpan konfigurasi split: {str(e)}")
+        
+        return config
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
     """
@@ -99,7 +291,10 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
     """
     try:
         # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error
+        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error, update_sync_status_only
+        
+        # Update status panel
+        update_sync_status_only(ui_components, "Memperbarui UI dari konfigurasi...", 'info')
         
         # Get config if not provided
         if config is None:
@@ -137,6 +332,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
     except Exception as e:
         # Log error
         if 'logger' in ui_components:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat mengupdate UI dari konfigurasi: {str(e)}")
         logger.error(f"{ICONS.get('error', '❌')} Error saat mengupdate UI dari konfigurasi: {str(e)}")
         
@@ -156,7 +352,10 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error
+        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error, update_sync_status_only
+        
+        # Update status panel
+        update_sync_status_only(ui_components, "Memperbarui konfigurasi dari UI...", 'info')
         
         # Get current config
         config = load_config()
@@ -183,8 +382,8 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         if 'stratify_checkbox' in ui_components:
             config['split']['stratify'] = ui_components['stratify_checkbox'].value
         
-        # Save config
-        save_config(config, ui_components)
+        # Save config dan sinkronkan dengan Google Drive
+        saved_config = save_config(config, ui_components)
         
         # Verifikasi perubahan telah disimpan dengan benar dengan membaca ulang config
         post_update_config = load_config()
@@ -202,11 +401,12 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             log_sync_success(ui_components, "Konfigurasi berhasil diupdate dari UI")
             logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil diupdate dari UI")
         
-        return config
+        return saved_config
         
     except Exception as e:
         # Log error
         if 'logger' in ui_components:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat update config dari UI: {str(e)}")
         logger.error(f"{ICONS.get('error', '❌')} Error saat update config dari UI: {str(e)}")
         return load_config()

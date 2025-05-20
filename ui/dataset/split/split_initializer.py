@@ -31,13 +31,14 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
         # Import dependency
         from smartcash.common.environment import get_environment_manager
         from smartcash.common.config.manager import get_config_manager
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
+        from smartcash.ui.dataset.split.handlers.sync_logger import add_sync_status_panel
         
         # Dapatkan environment jika belum tersedia
         env = env or get_environment_manager()
         
         # Ensure base_dir is set
         if not getattr(env, 'base_dir', None):
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, "base_dir tidak ditemukan. Pastikan direktori base valid untuk konfigurasi.")
             raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
         
@@ -59,16 +60,33 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
             from smartcash.ui.dataset.split.components.split_components import create_split_ui
             ui_components.update(create_split_ui(config))
         except Exception as ui_error:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat membuat komponen UI: {str(ui_error)}")
             raise
+        
+        # Tambahkan panel status sinkronisasi
+        try:
+            ui_components = add_sync_status_panel(ui_components)
+        except Exception as panel_error:
+            logger.warning(f"⚠️ Error saat menambahkan panel status: {str(panel_error)}")
         
         # Setup button handlers
         try:
             from smartcash.ui.dataset.split.handlers.button_handlers import setup_button_handlers
             ui_components = setup_button_handlers(ui_components, config, env)
         except Exception as handler_error:
+            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat setup button handlers: {str(handler_error)}")
             raise
+        
+        # Deteksi apakah berjalan di Colab untuk keperluan debugging
+        try:
+            from smartcash.ui.dataset.split.handlers.config_handlers import is_colab_environment
+            is_colab = is_colab_environment()
+            if is_colab:
+                logger.info("🔍 Terdeteksi berjalan di lingkungan Google Colab")
+        except Exception as colab_error:
+            logger.warning(f"⚠️ Error saat mendeteksi lingkungan Colab: {str(colab_error)}")
         
         # Tampilkan UI
         display(ui_components['ui'])

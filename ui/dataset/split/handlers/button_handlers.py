@@ -9,8 +9,12 @@ from IPython.display import display
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert
-from smartcash.ui.dataset.split.handlers.config_handlers import load_config, save_config, update_ui_from_config
-from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error
+from smartcash.ui.dataset.split.handlers.config_handlers import (
+    load_config, save_config, update_ui_from_config, update_config_from_ui, is_colab_environment
+)
+from smartcash.ui.dataset.split.handlers.sync_logger import (
+    log_sync_success, log_sync_error, log_sync_warning, update_sync_status_only
+)
 
 logger = get_logger(__name__)
 
@@ -25,19 +29,50 @@ def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary komponen UI yang telah diupdate
     """
     try:
+        # Update status panel
+        update_sync_status_only(ui_components, "Memproses split dataset...", 'info')
+        
         # Get current config
         config = load_config()
+        
+        # Simpan nilai UI sebelum diupdate
+        if 'enabled_checkbox' in ui_components:
+            enabled_before = ui_components['enabled_checkbox'].value
+        if 'train_ratio_slider' in ui_components:
+            train_ratio_before = ui_components['train_ratio_slider'].value
+        if 'val_ratio_slider' in ui_components:
+            val_ratio_before = ui_components['val_ratio_slider'].value
+        if 'test_ratio_slider' in ui_components:
+            test_ratio_before = ui_components['test_ratio_slider'].value
         
         # Update UI from config
         update_ui_from_config(ui_components, config)
         
-        # Show success message
-        display(create_info_alert(
-            f"{ICONS.get('success', '✅')} Dataset berhasil di-split",
-            alert_type='success'
-        ))
+        # Verifikasi bahwa nilai UI setelah diupdate sesuai dengan nilai config
+        is_consistent = True
+        if 'enabled_checkbox' in ui_components and 'split' in config:
+            if ui_components['enabled_checkbox'].value != config['split']['enabled']:
+                is_consistent = False
+                log_sync_warning(ui_components, "Nilai enabled tidak konsisten setelah update")
+        if 'train_ratio_slider' in ui_components and 'split' in config:
+            if ui_components['train_ratio_slider'].value != config['split']['train_ratio']:
+                is_consistent = False
+                log_sync_warning(ui_components, "Nilai train_ratio tidak konsisten setelah update")
         
-        log_sync_success(ui_components, "Dataset berhasil di-split")
+        # Show success message if consistent
+        if is_consistent:
+            display(create_info_alert(
+                f"{ICONS.get('success', '✅')} Dataset berhasil di-split",
+                alert_type='success'
+            ))
+            log_sync_success(ui_components, "Dataset berhasil di-split")
+        else:
+            display(create_info_alert(
+                f"{ICONS.get('warning', '⚠️')} Dataset berhasil di-split, namun nilai UI tidak konsisten dengan config",
+                alert_type='warning'
+            ))
+            log_sync_warning(ui_components, "Dataset berhasil di-split, namun nilai UI tidak konsisten dengan config")
+        
         logger.info(f"{ICONS.get('success', '✅')} Split button berhasil dihandle")
         return ui_components
         
@@ -59,28 +94,68 @@ def handle_reset_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary komponen UI yang telah diupdate
     """
     try:
+        # Update status panel
+        update_sync_status_only(ui_components, "Mereset konfigurasi ke default...", 'info')
+        
         # Load default config
         config = load_config()
+        
+        # Simpan nilai sebelum reset untuk verifikasi
+        pre_reset_values = {}
+        if 'enabled_checkbox' in ui_components:
+            pre_reset_values['enabled'] = ui_components['enabled_checkbox'].value
+        if 'train_ratio_slider' in ui_components:
+            pre_reset_values['train_ratio'] = ui_components['train_ratio_slider'].value
+        if 'val_ratio_slider' in ui_components:
+            pre_reset_values['val_ratio'] = ui_components['val_ratio_slider'].value
+        if 'test_ratio_slider' in ui_components:
+            pre_reset_values['test_ratio'] = ui_components['test_ratio_slider'].value
+        if 'random_seed_input' in ui_components:
+            pre_reset_values['random_seed'] = ui_components['random_seed_input'].value
+        if 'stratify_checkbox' in ui_components:
+            pre_reset_values['stratify'] = ui_components['stratify_checkbox'].value
+        
         # Update UI
         update_ui_from_config(ui_components, config)
+        
         # Save config
-        save_config(config)
-        log_sync_success(ui_components, "Konfigurasi berhasil direset ke default (unit test)")
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil direset ke default (unit test)")
+        saved_config = save_config(config, ui_components)
+        
+        # Verifikasi nilai UI setelah reset
+        is_consistent = True
+        if 'enabled_checkbox' in ui_components and 'split' in saved_config:
+            if ui_components['enabled_checkbox'].value != saved_config['split']['enabled']:
+                is_consistent = False
+                logger.warning(f"⚠️ Nilai enabled tidak konsisten setelah reset: " 
+                             f"{ui_components['enabled_checkbox'].value} vs {saved_config['split']['enabled']}")
+        if 'train_ratio_slider' in ui_components and 'split' in saved_config:
+            if ui_components['train_ratio_slider'].value != saved_config['split']['train_ratio']:
+                is_consistent = False
+                logger.warning(f"⚠️ Nilai train_ratio tidak konsisten setelah reset: " 
+                             f"{ui_components['train_ratio_slider'].value} vs {saved_config['split']['train_ratio']}")
+        
+        # Log hasil verifikasi
+        if is_consistent:
+            log_sync_success(ui_components, "Konfigurasi berhasil direset ke default (unit test)")
+            logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil direset ke default (unit test)")
+        else:
+            log_sync_warning(ui_components, "Konfigurasi direset tapi nilai tidak konsisten (unit test)")
+            logger.warning(f"⚠️ Konfigurasi direset tapi nilai tidak konsisten (unit test)")
+        
         return ui_components
     except Exception as e:
         log_sync_error(ui_components, f"Error saat reset konfigurasi (unit test): {str(e)}")
         logger.error(f"{ICONS.get('error', '❌')} Error saat reset konfigurasi (unit test): {str(e)}")
         return ui_components
 
-def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] = None, env: Any = None) -> Dict[str, Any]:
     """
     Setup handler untuk button di split dataset.
     
     Args:
         ui_components: Dictionary komponen UI
-        env: Environment manager (opsional)
         config: Konfigurasi (opsional)
+        env: Environment manager (opsional)
         
     Returns:
         Dictionary komponen UI yang telah diupdate
@@ -94,6 +169,9 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
         if 'reset_button' in ui_components:
             def on_reset_clicked(b):
                 try:
+                    # Update status panel
+                    update_sync_status_only(ui_components, "Mereset konfigurasi ke default...", 'info')
+                    
                     # Load default config
                     config = load_config()
                     
@@ -104,7 +182,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
                     update_ui_from_config(ui_components, config)
                     
                     # Save config
-                    save_config(config)
+                    saved_config = save_config(config, ui_components)
                     
                     # Verifikasi reset berhasil dengan memuat ulang config
                     post_reset_config = load_config()
@@ -116,6 +194,7 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
                             # Skip perbandingan jika key tidak ada di salah satu config
                             if post_reset_config['split'][key] != pre_reset_config['split'][key]:
                                 is_consistent = False
+                                log_sync_warning(ui_components, f"Nilai {key} tidak konsisten setelah reset")
                                 break
                             
                     if is_consistent:
@@ -148,6 +227,9 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
         if 'save_button' in ui_components:
             def on_save_clicked(b):
                 try:
+                    # Update status panel
+                    update_sync_status_only(ui_components, "Menyimpan konfigurasi...", 'info')
+                    
                     # Get current config dan simpan nilai UI
                     ui_values = {
                         'enabled': ui_components['enabled_checkbox'].value if 'enabled_checkbox' in ui_components else True,
@@ -158,30 +240,13 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
                         'stratify': ui_components['stratify_checkbox'].value if 'stratify_checkbox' in ui_components else True
                     }
                     
-                    # Get current config
-                    config = load_config()
+                    # Tampilkan informasi sinkronisasi jika di Colab
+                    is_colab = is_colab_environment()
+                    if is_colab:
+                        update_sync_status_only(ui_components, "Menyimpan konfigurasi dan menyinkronkan dengan Google Drive...", 'info')
                     
-                    # Update config from UI
-                    if 'enabled_checkbox' in ui_components:
-                        config['split']['enabled'] = ui_components['enabled_checkbox'].value
-                        
-                    if 'train_ratio_slider' in ui_components:
-                        config['split']['train_ratio'] = ui_components['train_ratio_slider'].value
-                        
-                    if 'val_ratio_slider' in ui_components:
-                        config['split']['val_ratio'] = ui_components['val_ratio_slider'].value
-                        
-                    if 'test_ratio_slider' in ui_components:
-                        config['split']['test_ratio'] = ui_components['test_ratio_slider'].value
-                        
-                    if 'random_seed_input' in ui_components:
-                        config['split']['random_seed'] = ui_components['random_seed_input'].value
-                        
-                    if 'stratify_checkbox' in ui_components:
-                        config['split']['stratify'] = ui_components['stratify_checkbox'].value
-                    
-                    # Save config
-                    save_config(config)
+                    # Update dan simpan konfigurasi
+                    saved_config = update_config_from_ui(ui_components)
                     
                     # Verifikasi perubahan telah disimpan dengan benar
                     loaded_config = load_config()
@@ -197,20 +262,85 @@ def setup_button_handlers(ui_components: Dict[str, Any], env: Any = None, config
                     )
                     
                     if is_consistent:
+                        # Pesan sukses yang berbeda berdasarkan lingkungan
+                        if is_colab:
+                            success_message = "Konfigurasi berhasil disimpan dan disinkronkan dengan Google Drive"
+                        else:
+                            success_message = "Konfigurasi berhasil disimpan"
+                            
                         # Log sync status
-                        log_sync_success(ui_components, "Konfigurasi berhasil disimpan")
+                        log_sync_success(ui_components, success_message)
                         
-                        # Show success message
+                        # Tampilkan pesan sukses
                         display(create_info_alert(
-                            f"{ICONS.get('success', '✅')} Konfigurasi berhasil disimpan",
+                            f"{ICONS.get('success', '✅')} {success_message}",
                             alert_type='success'
                         ))
                     else:
-                        log_sync_error(ui_components, "Konfigurasi tidak disimpan dengan benar, ada perbedaan data")
+                        # Coba deteksi key mana yang tidak konsisten
+                        inconsistent_keys = []
+                        if ui_values['enabled'] != loaded_config['split']['enabled']:
+                            inconsistent_keys.append('enabled')
+                        if ui_values['train_ratio'] != loaded_config['split']['train_ratio']:
+                            inconsistent_keys.append('train_ratio')
+                        if ui_values['val_ratio'] != loaded_config['split']['val_ratio']:
+                            inconsistent_keys.append('val_ratio')
+                        if ui_values['test_ratio'] != loaded_config['split']['test_ratio']:
+                            inconsistent_keys.append('test_ratio')
+                        if ui_values['random_seed'] != loaded_config['split']['random_seed']:
+                            inconsistent_keys.append('random_seed')
+                        if ui_values['stratify'] != loaded_config['split']['stratify']:
+                            inconsistent_keys.append('stratify')
+                            
+                        log_sync_error(ui_components, f"Konfigurasi tidak disimpan dengan benar, ada perbedaan data pada: {', '.join(inconsistent_keys)}")
                         display(create_info_alert(
                             f"{ICONS.get('error', '❌')} Konfigurasi tidak disimpan dengan benar",
                             alert_type='error'
                         ))
+                        
+                        # Coba simpan ulang jika tidak konsisten
+                        try:
+                            # Buat config dari nilai UI
+                            retry_config = load_config()
+                            retry_config['split']['enabled'] = ui_values['enabled']
+                            retry_config['split']['train_ratio'] = ui_values['train_ratio']
+                            retry_config['split']['val_ratio'] = ui_values['val_ratio']
+                            retry_config['split']['test_ratio'] = ui_values['test_ratio']
+                            retry_config['split']['random_seed'] = ui_values['random_seed']
+                            retry_config['split']['stratify'] = ui_values['stratify']
+                            
+                            # Simpan ulang
+                            log_sync_warning(ui_components, "Mencoba menyimpan ulang konfigurasi...")
+                            retry_saved = save_config(retry_config, ui_components)
+                            
+                            # Verifikasi ulang
+                            retry_loaded = load_config()
+                            retry_is_consistent = (
+                                ui_values['enabled'] == retry_loaded['split']['enabled'] and
+                                ui_values['train_ratio'] == retry_loaded['split']['train_ratio'] and
+                                ui_values['val_ratio'] == retry_loaded['split']['val_ratio'] and
+                                ui_values['test_ratio'] == retry_loaded['split']['test_ratio'] and
+                                ui_values['random_seed'] == retry_loaded['split']['random_seed'] and
+                                ui_values['stratify'] == retry_loaded['split']['stratify']
+                            )
+                            
+                            if retry_is_consistent:
+                                # Pesan sukses yang berbeda berdasarkan lingkungan
+                                if is_colab:
+                                    success_message = "Konfigurasi berhasil disimpan ulang dan disinkronkan dengan Google Drive"
+                                else:
+                                    success_message = "Konfigurasi berhasil disimpan ulang"
+                                    
+                                log_sync_success(ui_components, success_message)
+                                display(create_info_alert(
+                                    f"{ICONS.get('success', '✅')} {success_message}",
+                                    alert_type='success'
+                                ))
+                            else:
+                                log_sync_error(ui_components, "Gagal menyimpan ulang konfigurasi")
+                                
+                        except Exception as retry_error:
+                            log_sync_error(ui_components, f"Error saat menyimpan ulang konfigurasi: {str(retry_error)}")
                         
                 except Exception as e:
                     log_sync_error(ui_components, f"Error saat menyimpan konfigurasi: {str(e)}")

@@ -1,9 +1,11 @@
 """
 File: smartcash/ui/dataset/split/handlers/sync_logger.py
-Deskripsi: Utility untuk logging proses sinkronisasi konfigurasi split dataset ke UI logger
+Deskripsi: Utilitas untuk mencatat status sinkronisasi konfigurasi di UI
 """
 
 from typing import Dict, Any, Optional
+import ipywidgets as widgets
+from IPython.display import display
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS, COLORS
 
@@ -116,14 +118,86 @@ def log_sync_info(ui_components: Dict[str, Any], message: str) -> None:
     """
     log_sync_status(ui_components, message, 'info')
 
-def update_sync_status_only(ui_components: Dict[str, Any], message: str, status: str = 'info') -> None:
+def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
     """
-    Update hanya panel status tanpa mencatat ke logger.
+    Update panel status sinkronisasi di UI tanpa menambahkan log baru.
     
     Args:
         ui_components: Dictionary komponen UI
         message: Pesan yang akan ditampilkan
-        status: Status pesan (success, error, info, warning)
+        status_type: Tipe status (info, success, warning, error)
     """
-    # Update panel status
-    update_status_panel(ui_components, message, status) 
+    try:
+        # Periksa apakah status_panel tersedia
+        if 'status_panel' not in ui_components:
+            return
+            
+        # Dapatkan warna berdasarkan status_type
+        color_map = {
+            'info': 'blue',
+            'success': 'green',
+            'warning': 'orange',
+            'error': 'red'
+        }
+        color = color_map.get(status_type, 'black')
+        
+        # Update panel status
+        ui_components['status_panel'].value = f'<span style="color: {color};">{message}</span>'
+    except Exception as e:
+        print(f"❌ Error saat update status panel: {str(e)}")
+
+def create_sync_status_panel() -> widgets.HTML:
+    """
+    Buat panel status untuk sinkronisasi.
+    
+    Returns:
+        widgets.HTML: Panel status
+    """
+    return widgets.HTML(
+        value='<span style="color: blue;">Status sinkronisasi akan ditampilkan di sini</span>',
+        layout=widgets.Layout(width='100%', padding='5px')
+    )
+
+def add_sync_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Tambahkan panel status sinkronisasi ke UI.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary komponen UI yang telah diupdate
+    """
+    try:
+        # Buat panel status
+        status_panel = create_sync_status_panel()
+        
+        # Tambahkan ke komponen UI
+        ui_components['status_panel'] = status_panel
+        
+        # Tambahkan ke layout jika ada
+        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+            # Cari posisi yang tepat untuk menyisipkan status panel
+            children = list(ui_components['ui'].children)
+            
+            # Cari posisi tombol untuk memasukkan status panel setelahnya
+            button_pos = -1
+            for i, child in enumerate(children):
+                if isinstance(child, widgets.Button) or (hasattr(child, 'children') and 
+                                                       any(isinstance(c, widgets.Button) for c in child.children)):
+                    button_pos = i
+                    break
+            
+            # Sisipkan setelah posisi tombol atau di akhir jika tidak ditemukan
+            if button_pos >= 0:
+                children.insert(button_pos + 1, status_panel)
+            else:
+                children.append(status_panel)
+            
+            # Update children
+            ui_components['ui'].children = tuple(children)
+        
+        return ui_components
+    except Exception as e:
+        print(f"❌ Error saat menambahkan panel status: {str(e)}")
+        return ui_components 

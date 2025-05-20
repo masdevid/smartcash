@@ -212,15 +212,17 @@ class TestDownloadHandler(unittest.TestCase):
         # Verify download was called
         mock_download.assert_called_once_with(self.ui_components)
     
-    def test_execute_download_invalid_endpoint(self):
+    @patch('smartcash.ui.dataset.download.handlers.download_handler.notify_log')
+    def test_execute_download_invalid_endpoint(self, mock_notify_log):
         """Test execute_download with invalid endpoint"""
         # Call function
         execute_download(self.ui_components, 'Invalid')
         
-        # Verify error is logged (stdout atau stderr)
-        self.assertTrue(
-            self.ui_components['log_output'].append_stdout.called or
-            self.ui_components['log_output'].append_stderr.called
+        # Verify notify_log was called with error level
+        mock_notify_log.assert_called_with(
+            sender=self.ui_components,
+            message="Endpoint 'Invalid' tidak didukung",
+            level="error"
         )
         
         # Verify UI is reset

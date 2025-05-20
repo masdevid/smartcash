@@ -9,6 +9,7 @@ import threading
 from typing import Dict, Any, Callable, Optional, List, Union
 from IPython.display import display, HTML, clear_output
 import ipywidgets as widgets
+from smartcash.ui.utils.alert_utils import create_status_indicator
 
 def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger"):
     """
@@ -70,7 +71,6 @@ def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logge
         # Hanya log error dan warning ke UI
         if level_name in ('error', 'critical', 'warning', 'warn'):
             with ui_components['status']:
-                from smartcash.ui.utils.alert_utils import create_status_indicator
                 # Map LogLevel ke status type
                 status_type = "warning" if level_name in ("warning", "warn") else "error"
                 display(create_status_indicator(status_type, message))
@@ -236,7 +236,6 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                             try:
                                 with self.ui_components['status']:
                                     try:
-                                        from smartcash.ui.utils.alert_utils import create_status_indicator
                                         display(create_status_indicator("info", line))
                                     except ImportError:
                                         display(HTML(f"<div>{line}</div>"))
@@ -252,7 +251,6 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     try:
                         with self.ui_components['status']:
                             try:
-                                from smartcash.ui.utils.alert_utils import create_status_indicator
                                 display(create_status_indicator("info", self.buffer))
                             except ImportError:
                                 display(HTML(f"<div>{self.buffer}</div>"))

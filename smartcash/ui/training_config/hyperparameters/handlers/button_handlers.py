@@ -21,6 +21,11 @@ from smartcash.ui.training_config.hyperparameters.handlers.config_handlers impor
 logger = get_logger(__name__)
 logger.set_level(LogLevel.CRITICAL)
 
+def get_default_base_dir():
+    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
+        return "/content"
+    return str(Path.home() / "SmartCash")
+
 def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
     Setup handler untuk tombol pada komponen UI hyperparameter.
@@ -35,10 +40,10 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
     """
     try:
         # Dapatkan environment manager jika belum tersedia
-        env = env or get_environment_manager()
+        env = env or get_environment_manager(base_dir=get_default_base_dir())
         
         # Dapatkan config manager singleton
-        config_manager = get_config_manager()
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
         
         # Validasi config
         if config is None:
@@ -88,12 +93,12 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 try:
                     if env.is_drive_mounted:
                         # Sinkronisasi ke Google Drive
-                        logger.critical(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        logger.info("Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
                         sync_to_drive(None, ui_components)
                 except Exception as e:
-                    logger.critical(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                    logger.warning(f"Gagal menyinkronkan ke Google Drive: {str(e)}")
                 
-                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil disimpan")
+                logger.info("Konfigurasi hyperparameter berhasil disimpan")
             except Exception as e:
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
                 with status_panel:
@@ -103,7 +108,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                         alert_type='error'
                     ))
                 
-                logger.critical(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
+                logger.error(f"Gagal menyimpan konfigurasi: {str(e)}")
         
         # Handler untuk tombol reset
         def on_reset_click(b):
@@ -149,12 +154,12 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                 try:
                     if env.is_drive_mounted:
                         # Sinkronisasi ke Google Drive
-                        logger.critical(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
+                        logger.info("Menyinkronkan konfigurasi hyperparameter ke Google Drive...")
                         sync_to_drive(None, ui_components)
                 except Exception as e:
-                    logger.critical(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
+                    logger.warning(f"Gagal menyinkronkan ke Google Drive: {str(e)}")
                 
-                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi hyperparameter berhasil direset ke default")
+                logger.info("Konfigurasi hyperparameter berhasil direset ke default")
             except Exception as e:
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
                 with status_panel:
@@ -164,7 +169,7 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
                         alert_type='error'
                     ))
                 
-                logger.critical(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
+                logger.error(f"Gagal mereset konfigurasi: {str(e)}")
         
         # Pasang handler ke tombol
         if 'save_button' in ui_components:
@@ -181,5 +186,5 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env=Non
         
         return ui_components
     except Exception as e:
-        logger.critical(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
+        logger.error(f"Error saat setup button handlers: {str(e)}")
         return ui_components

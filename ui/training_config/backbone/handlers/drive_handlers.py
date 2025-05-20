@@ -35,7 +35,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
     """
     status_panel = ui_components.get('status_panel')
     if not status_panel:
-        logger.error(f"{ICONS.get('error', '❌')} Status panel tidak ditemukan")
+        logger.error("Status panel tidak ditemukan")
         return
     
     with status_panel:
@@ -62,28 +62,24 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
             
             # Log pesan dari sync_to_drive
             if not success:
-                logger.critical(f"{ICONS.get('error', '❌')} {message}")
-            
-            if success:
-                # Tampilkan pesan sukses
+                logger.error(message)
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
-                        alert_type='success'
-                    ))
-                
-                logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive")
-            else:
-                # Tampilkan pesan error
-                with status_panel:
-                    clear_output(wait=True)
-                    display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive",
+                        f"{ICONS.get('error', '❌')} {message}",
                         alert_type='error'
                     ))
-                
-                logger.critical(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive")
+                return
+            
+            # Tampilkan pesan sukses
+            with status_panel:
+                clear_output(wait=True)
+                display(create_info_alert(
+                    f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
+                    alert_type='success'
+                ))
+            
+            logger.info("Konfigurasi backbone berhasil disinkronkan ke Google Drive")
         except Exception as e:
             # Tampilkan pesan error
             with status_panel:
@@ -93,7 +89,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                     alert_type='error'
                 ))
             
-            logger.critical(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
+            logger.error(f"Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
 
 def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -105,7 +101,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
     """
     status_panel = ui_components.get('status_panel')
     if not status_panel:
-        logger.error(f"{ICONS.get('error', '❌')} Status panel tidak ditemukan")
+        logger.error("Status panel tidak ditemukan")
         return
     
     with status_panel:
@@ -132,7 +128,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
             
             # Log pesan dari sync_with_drive
             if not success:
-                logger.critical(f"{ICONS.get('error', '❌')} {message}")
+                logger.error(message)
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
@@ -157,7 +153,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                             alert_type='success'
                         ))
                     
-                    logger.critical(f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan dari Google Drive")
+                    logger.info("Konfigurasi backbone berhasil disinkronkan dari Google Drive")
                 else:
                     # Tampilkan pesan error
                     with status_panel:
@@ -167,7 +163,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                             alert_type='error'
                         ))
                     
-                    logger.critical(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi backbone dari Google Drive")
+                    logger.error("Gagal menyimpan konfigurasi backbone dari Google Drive")
             else:
                 # Tampilkan pesan error
                 with status_panel:
@@ -177,7 +173,7 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                         alert_type='error'
                     ))
                 
-                logger.critical(f"{ICONS.get('error', '❌')} Gagal memuat konfigurasi backbone dari Google Drive")
+                logger.error("Gagal memuat konfigurasi backbone dari Google Drive")
         except Exception as e:
             # Tampilkan pesan error
             with status_panel:
@@ -187,4 +183,4 @@ def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> No
                     alert_type='error'
                 ))
             
-            logger.critical(f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}")
+            logger.error(f"Error saat menyinkronkan konfigurasi backbone dari Google Drive: {str(e)}")

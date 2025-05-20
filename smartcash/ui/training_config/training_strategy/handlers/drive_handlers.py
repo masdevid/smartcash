@@ -34,7 +34,7 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         ui_components: Dictionary komponen UI
     """
     if ui_components is None:
-        logger.error(f"{ICONS.get('error', '❌')} UI components tidak tersedia")
+        logger.error("UI components tidak tersedia")
         return
     
     # Dapatkan environment manager
@@ -79,7 +79,7 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
             save_yaml(config, drive_config_file)
             success = True
         except Exception as e:
-            logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan ke file: {str(e)}")
+            logger.error(f"Error saat menyimpan ke file: {str(e)}")
             success = False
         
         # Tampilkan status
@@ -96,7 +96,7 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
                     alert_type='warning'
                 ))
         
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil disinkronkan ke Google Drive")
+        logger.info("Konfigurasi strategi pelatihan berhasil disinkronkan ke Google Drive")
     except Exception as e:
         with ui_components['status']:
             clear_output(wait=True)
@@ -105,7 +105,7 @@ def sync_to_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
                 alert_type='error'
             ))
         
-        logger.error(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi ke Google Drive: {str(e)}")
+        logger.error(f"Gagal menyinkronkan konfigurasi ke Google Drive: {str(e)}")
 
 def sync_from_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
     """
@@ -116,7 +116,7 @@ def sync_from_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
         ui_components: Dictionary komponen UI
     """
     if ui_components is None:
-        logger.error(f"{ICONS.get('error', '❌')} UI components tidak tersedia")
+        logger.error("UI components tidak tersedia")
         return
     
     # Dapatkan environment manager
@@ -180,7 +180,7 @@ def sync_from_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
                     alert_type='warning'
                 ))
         
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil disinkronkan dari Google Drive")
+        logger.info("Konfigurasi strategi pelatihan berhasil disinkronkan dari Google Drive")
     except Exception as e:
         with ui_components['status']:
             clear_output(wait=True)
@@ -189,4 +189,4 @@ def sync_from_drive(b=None, ui_components: Dict[str, Any] = None) -> None:
                 alert_type='error'
             ))
         
-        logger.error(f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi dari Google Drive: {str(e)}")
+        logger.error(f"Gagal menyinkronkan konfigurasi dari Google Drive: {str(e)}")

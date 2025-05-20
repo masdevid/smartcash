@@ -12,7 +12,7 @@ import os
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.ui.utils.header_utils import create_header
-from smartcash.common.logger import get_logger
+from smartcash.common.logger import get_logger, LogLevel
 from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
 
@@ -21,20 +21,22 @@ from smartcash.ui.training_config.hyperparameters.handlers.config_handlers impor
 from smartcash.ui.training_config.hyperparameters.handlers.button_handlers import setup_hyperparameters_button_handlers
 from smartcash.ui.training_config.hyperparameters.handlers.form_handlers import setup_hyperparameters_form_handlers
 
+# Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
+logger.set_level(LogLevel.CRITICAL)
 
 def get_default_base_dir():
     if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
         return "/content"
     return str(Path.home() / "SmartCash")
 
-def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def initialize_hyperparameters_ui(env=None, config=None) -> Dict[str, Any]:
     """
-    Inisialisasi dan tampilkan komponen UI untuk konfigurasi hyperparameter.
+    Inisialisasi komponen UI untuk konfigurasi hyperparameter.
     
     Args:
-        env: Environment manager
-        config: Konfigurasi hyperparameter
+        env: Environment manager (opsional)
+        config: Konfigurasi model (opsional)
         
     Returns:
         Dict berisi komponen UI
@@ -43,58 +45,30 @@ def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None
         # Dapatkan environment manager jika belum tersedia
         env = env or get_environment_manager(base_dir=get_default_base_dir())
         
-        # Dapatkan config manager
+        # Dapatkan config manager singleton
         config_manager = get_config_manager(base_dir=get_default_base_dir())
         
-        # Dapatkan konfigurasi hyperparameter jika belum tersedia
+        # Validasi config
         if config is None:
             config = config_manager.get_module_config('hyperparameters', {})
         
         # Buat komponen UI
         ui_components = create_hyperparameters_ui_components()
         
-        # Tambahkan referensi ke config
-        ui_components['config'] = config
-        
-        # Setup handler untuk tombol
+        # Setup button handlers
         ui_components = setup_hyperparameters_button_handlers(ui_components, env, config)
         
-        # Setup handler untuk form
+        # Setup form handlers
         ui_components = setup_hyperparameters_form_handlers(ui_components, env, config)
         
-        # Update UI dari konfigurasi
+        # Update UI dari config
         update_ui_from_config(ui_components, config)
         
-        # Update info panel
-        if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
-            ui_components['update_hyperparameters_info'](ui_components)
-        
-        # Pastikan UI components teregistrasi untuk persistensi
-        try:
-            config_manager.register_ui_components('hyperparameters', ui_components)
-        except Exception as persist_error:
-            logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
-        
-        # Tampilkan UI secara otomatis
-        clear_output(wait=True)
-        if 'main_container' in ui_components:
-            display(ui_components['main_container'])
-        else:
-            display_hyperparameters_ui(ui_components)
-        
+        logger.info("UI hyperparameter berhasil diinisialisasi")
         return ui_components
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat inisialisasi UI hyperparameter: {str(e)}")
-        
-        # Buat UI minimal jika terjadi error
-        error_output = widgets.Output()
-        with error_output:
-            display(create_info_alert(
-                f"{ICONS.get('error', '❌')} Error saat inisialisasi UI hyperparameter: {str(e)}",
-                alert_type='error'
-            ))
-        
-        return {'main_layout': error_output, 'error': str(e)}
+        logger.error(f"Error saat inisialisasi UI hyperparameter: {str(e)}")
+        raise
 
 def display_hyperparameters_ui(ui_components: Dict[str, Any]) -> None:
     """

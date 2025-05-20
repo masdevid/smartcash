@@ -4,7 +4,7 @@ Deskripsi: Utilitas untuk menstandarisasi notifikasi observer dalam downloader s
 """
 
 from typing import Dict, Any, Optional
-# from smartcash.components.observer import notify, EventTopics  # <-- REMOVE THIS
+from smartcash.components.observer import notify, EventTopics
 
 def notify_event(
     sender: Any,
@@ -64,7 +64,6 @@ def notify_event(
             observer_manager.notify(event_type, sender, **params)
         else:
             # Langsung notifikasi via fungsi global
-            from smartcash.components.observer import notify
             notify(event_type, sender, **params)
     except Exception:
         # Jangan mengganggu proses jika notifikasi gagal
@@ -177,6 +176,8 @@ def notify_service_event(
         # Parameter khusus per tipe event
         if event_type.lower() == "start":
             event_params.setdefault("progress", 0)
+            event_params.setdefault("total_steps", 5)
+            event_params.setdefault("current_step", 1)
         elif event_type.lower() == "progress":
             # Hitung persentase jika ada progress dan total
             if "progress" in event_params and "total" in event_params:
@@ -184,6 +185,12 @@ def notify_service_event(
                 total = event_params["total"]
                 if total > 0:
                     event_params.setdefault("percentage", int((progress / total) * 100))
+            
+            # Tambahkan parameter untuk step progress
+            if "step" in event_params:
+                event_params.setdefault("step_message", f"Langkah {event_params['step']}: {event_params.get('message', '')}")
+                event_params.setdefault("step_progress", event_params.get('progress', 0))
+                event_params.setdefault("step_total", event_params.get('total', 100))
         
         # Panggil notify_event TANPA parameter duplikat status
         notify_event(sender, event_name, observer_manager, **event_params)

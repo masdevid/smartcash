@@ -20,6 +20,12 @@ class DownloadUIEvents:
     PROGRESS_UPDATE = "DOWNLOAD_PROGRESS_UPDATE"
     PROGRESS_COMPLETE = "DOWNLOAD_PROGRESS_COMPLETE"
     PROGRESS_ERROR = "DOWNLOAD_PROGRESS_ERROR"
+    
+    # Event untuk step progress
+    STEP_PROGRESS_START = "DOWNLOAD_STEP_PROGRESS_START"
+    STEP_PROGRESS_UPDATE = "DOWNLOAD_STEP_PROGRESS_UPDATE"
+    STEP_PROGRESS_COMPLETE = "DOWNLOAD_STEP_PROGRESS_COMPLETE"
+    STEP_PROGRESS_ERROR = "DOWNLOAD_STEP_PROGRESS_ERROR"
 
 def notify_log(
     sender: Any,
@@ -130,6 +136,31 @@ def notify_progress(
             params["percentage"] = percentage
         if message is not None:
             params["message"] = message
+        
+        # Tambahkan parameter untuk step progress jika ada
+        if "step" in kwargs:
+            step_event_mapping = {
+                "start": DownloadUIEvents.STEP_PROGRESS_START,
+                "update": DownloadUIEvents.STEP_PROGRESS_UPDATE,
+                "complete": DownloadUIEvents.STEP_PROGRESS_COMPLETE,
+                "error": DownloadUIEvents.STEP_PROGRESS_ERROR
+            }
+            step_event = step_event_mapping.get(event_type.lower(), DownloadUIEvents.STEP_PROGRESS_UPDATE)
+            
+            # Kirim notifikasi step progress
+            step_params = {
+                "step": kwargs["step"],
+                "step_message": kwargs.get("step_message", message or ""),
+                "step_progress": params.get("progress", 0),
+                "step_total": params.get("total", 100),
+                "total_steps": kwargs.get("total_steps", 5),
+                "current_step": kwargs.get("current_step", 1)
+            }
+            
+            if observer_manager is not None:
+                observer_manager.notify(step_event, sender, **step_params)
+            else:
+                notify(step_event, sender, **step_params)
         
         params.update(kwargs)
         

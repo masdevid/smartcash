@@ -42,16 +42,22 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
     try:
         # Ensure config is a dictionary
         config = config or {}
+        logger.info(f"Memulai inisialisasi UI dengan config: {config}")
         
         # Setup base directory for configuration
         base_dir = config.get('base_dir')
         if not base_dir:
-            raise ValueError("base_dir must be provided in config")
-            
+            # Fallback ke root project (5 tingkat di atas file ini)
+            base_dir = str(Path(__file__).resolve().parents[5])
+            logger.warning(f"base_dir tidak diberikan, fallback ke root project: {base_dir}")
+            config['base_dir'] = base_dir
+        
         config_file = config.get('config_file')
         if not config_file:
-            raise ValueError("config_file must be provided in config")
-            
+            config_file = str(Path(base_dir) / 'smartcash' / 'configs' / 'dataset_config.yaml')
+            logger.warning(f"config_file tidak diberikan, fallback ke: {config_file}")
+            config['config_file'] = config_file
+        
         # Get config manager and load config
         config_manager = get_config_manager(base_dir=base_dir, config_file=config_file)
         config_manager.load_config()
@@ -64,10 +70,10 @@ def initialize_dataset_download_ui(config: Optional[Dict[str, Any]] = None) -> w
         
         # Validasi UI components
         if not isinstance(ui_components, dict):
-            raise ValueError("UI components must be a dictionary")
+            raise ValueError("UI components harus berupa dictionary")
             
         if 'main_container' not in ui_components:
-            raise ValueError("UI components must contain 'main_container'")
+            raise ValueError("UI components harus mengandung 'main_container'")
         
         # Daftarkan observer
         register_ui_observers(ui_components, observer_manager)

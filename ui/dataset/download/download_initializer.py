@@ -11,7 +11,7 @@ from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download
 from smartcash.ui.dataset.download.components import create_download_ui
 from smartcash.ui.utils.ui_logger import log_to_ui
 
-def initialize_dataset_download_ui(env=None, config=None) -> Dict[str, Any]:
+def initialize_dataset_download_ui(env=None, config=None) -> Any:
     """
     Inisialisasi UI untuk dataset downloader.
     
@@ -20,7 +20,7 @@ def initialize_dataset_download_ui(env=None, config=None) -> Dict[str, Any]:
         config: Konfigurasi aplikasi
         
     Returns:
-        Dictionary berisi komponen UI
+        Widget UI utama yang bisa ditampilkan
     """
     try:
         # Get config manager dengan fallback otomatis
@@ -39,7 +39,8 @@ def initialize_dataset_download_ui(env=None, config=None) -> Dict[str, Any]:
         # Setup handlers
         ui_components = setup_download_handlers(ui_components, env, base_config)
         
-        return ui_components
+        # Return main UI widget
+        return ui_components['ui']
         
     except Exception as e:
         log_to_ui(None, f"❌ Error saat inisialisasi UI: {str(e)}", "error")

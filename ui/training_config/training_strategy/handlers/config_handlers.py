@@ -170,61 +170,34 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         # Get config if not provided
         if config is None:
             config = get_training_strategy_config(ui_components)
-            
+        # Helper untuk update value jika key ada
+        def safe_set(key, value):
+            if key in ui_components:
+                ui_components[key].value = value
+            else:
+                logger.warning(f"Key '{key}' tidak ditemukan di ui_components, skip update komponen.")
         # Update UI components
-        if 'enabled_checkbox' in ui_components:
-            ui_components['enabled_checkbox'].value = config['training_strategy']['enabled']
-            
-        if 'batch_size_slider' in ui_components:
-            ui_components['batch_size_slider'].value = config['training_strategy']['batch_size']
-            
-        if 'epochs_slider' in ui_components:
-            ui_components['epochs_slider'].value = config['training_strategy']['epochs']
-            
-        if 'learning_rate_slider' in ui_components:
-            ui_components['learning_rate_slider'].value = config['training_strategy']['learning_rate']
-            
-        if 'optimizer_dropdown' in ui_components:
-            ui_components['optimizer_dropdown'].value = config['training_strategy']['optimizer']['type']
-            
-        if 'weight_decay_slider' in ui_components:
-            ui_components['weight_decay_slider'].value = config['training_strategy']['optimizer']['weight_decay']
-            
-        if 'momentum_slider' in ui_components:
-            ui_components['momentum_slider'].value = config['training_strategy']['optimizer']['momentum']
-            
-        if 'scheduler_checkbox' in ui_components:
-            ui_components['scheduler_checkbox'].value = config['training_strategy']['scheduler']['enabled']
-            
-        if 'scheduler_dropdown' in ui_components:
-            ui_components['scheduler_dropdown'].value = config['training_strategy']['scheduler']['type']
-            
-        if 'warmup_epochs_slider' in ui_components:
-            ui_components['warmup_epochs_slider'].value = config['training_strategy']['scheduler']['warmup_epochs']
-            
-        if 'min_lr_slider' in ui_components:
-            ui_components['min_lr_slider'].value = config['training_strategy']['scheduler']['min_lr']
-            
-        if 'early_stopping_checkbox' in ui_components:
-            ui_components['early_stopping_checkbox'].value = config['training_strategy']['early_stopping']['enabled']
-            
-        if 'patience_slider' in ui_components:
-            ui_components['patience_slider'].value = config['training_strategy']['early_stopping']['patience']
-            
-        if 'min_delta_slider' in ui_components:
-            ui_components['min_delta_slider'].value = config['training_strategy']['early_stopping']['min_delta']
-            
-        if 'checkpoint_checkbox' in ui_components:
-            ui_components['checkpoint_checkbox'].value = config['training_strategy']['checkpoint']['enabled']
-            
-        if 'save_best_only_checkbox' in ui_components:
-            ui_components['save_best_only_checkbox'].value = config['training_strategy']['checkpoint']['save_best_only']
-            
-        if 'save_freq_slider' in ui_components:
-            ui_components['save_freq_slider'].value = config['training_strategy']['checkpoint']['save_freq']
-            
+        safe_set('enabled_checkbox', config['training_strategy']['enabled'])
+        safe_set('batch_size_slider', config['training_strategy']['batch_size'])
+        safe_set('epochs_slider', config['training_strategy']['epochs'])
+        safe_set('learning_rate_slider', config['training_strategy']['learning_rate'])
+        safe_set('optimizer_dropdown', config['training_strategy']['optimizer']['type'])
+        safe_set('weight_decay_slider', config['training_strategy']['optimizer']['weight_decay'])
+        safe_set('momentum_slider', config['training_strategy']['optimizer']['momentum'])
+        safe_set('scheduler_checkbox', config['training_strategy']['scheduler']['enabled'])
+        safe_set('scheduler_dropdown', config['training_strategy']['scheduler']['type'])
+        safe_set('warmup_epochs_slider', config['training_strategy']['scheduler']['warmup_epochs'])
+        safe_set('min_lr_slider', config['training_strategy']['scheduler']['min_lr'])
+        safe_set('early_stopping_checkbox', config['training_strategy']['early_stopping']['enabled'])
+        safe_set('patience_slider', config['training_strategy']['early_stopping']['patience'])
+        safe_set('min_delta_slider', config['training_strategy']['early_stopping']['min_delta'])
+        safe_set('checkpoint_checkbox', config['training_strategy']['checkpoint']['enabled'])
+        safe_set('save_best_only_checkbox', config['training_strategy']['checkpoint']['save_best_only'])
+        safe_set('save_freq_slider', config['training_strategy']['checkpoint']['save_freq'])
         logger.info("✅ UI berhasil diupdate dari konfigurasi training strategy")
         
+        # Update info panel
+        update_training_strategy_info(ui_components)
     except Exception as e:
         logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
 

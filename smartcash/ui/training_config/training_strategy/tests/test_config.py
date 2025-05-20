@@ -36,7 +36,25 @@ class TestTrainingStrategyConfig(unittest.TestCase):
             'multi_scale': MagicMock(value=False),
             'training_strategy_info': MagicMock(),
             'update_training_strategy_info': MagicMock(),
-            'status': MagicMock()
+            'status': MagicMock(),
+            # Tambahkan mock UI components yang diperlukan untuk update_ui_from_config
+            'enabled_checkbox': MagicMock(value=True),
+            'batch_size_slider': MagicMock(value=16),
+            'epochs_slider': MagicMock(value=100),
+            'learning_rate_slider': MagicMock(value=0.001),
+            'optimizer_dropdown': MagicMock(value='adam'),
+            'weight_decay_slider': MagicMock(value=0.0005),
+            'momentum_slider': MagicMock(value=0.9),
+            'scheduler_checkbox': MagicMock(value=True),
+            'scheduler_dropdown': MagicMock(value='cosine'),
+            'warmup_epochs_slider': MagicMock(value=5),
+            'min_lr_slider': MagicMock(value=0.00001),
+            'early_stopping_checkbox': MagicMock(value=True),
+            'patience_slider': MagicMock(value=10),
+            'min_delta_slider': MagicMock(value=0.001),
+            'checkpoint_checkbox': MagicMock(value=True),
+            'save_best_only_checkbox': MagicMock(value=True),
+            'save_freq_slider': MagicMock(value=1)
         }
         
         # Buat mock config manager

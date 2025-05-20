@@ -41,10 +41,7 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
     with status_panel:
         clear_output(wait=True)
         try:
-            # Dapatkan environment manager
             env_manager = get_environment_manager(base_dir=get_default_base_dir())
-            
-            # Cek apakah drive diaktifkan
             if not env_manager.is_drive_mounted:
                 with status_panel:
                     clear_output(wait=True)
@@ -53,42 +50,31 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
                         alert_type='error'
                     ))
                 return
-            
-            # Dapatkan ConfigManager singleton
             config_manager = get_config_manager(base_dir=get_default_base_dir())
-            
-            # Gunakan sync_to_drive dari ConfigManager yang baru
             success, message = config_manager.sync_to_drive('model')
-            
-            # Log pesan dari sync_to_drive
             if not success:
-                logger.error(message)
+                logger.error(f"Gagal sinkronisasi backbone ke drive: {message}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} {message}",
+                        f"{ICONS.get('error', '❌')} Gagal menyinkronkan konfigurasi backbone ke Google Drive",
                         alert_type='error'
                     ))
                 return
-            
-            # Tampilkan pesan sukses
             with status_panel:
                 clear_output(wait=True)
                 display(create_info_alert(
                     f"{ICONS.get('success', '✅')} Konfigurasi backbone berhasil disinkronkan ke Google Drive",
                     alert_type='success'
                 ))
-            
             logger.info("Konfigurasi backbone berhasil disinkronkan ke Google Drive")
         except Exception as e:
-            # Tampilkan pesan error
             with status_panel:
                 clear_output(wait=True)
                 display(create_info_alert(
                     f"{ICONS.get('error', '❌')} Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}",
                     alert_type='error'
                 ))
-            
             logger.error(f"Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}")
 
 def sync_from_drive(button: widgets.Button, ui_components: Dict[str, Any]) -> None:

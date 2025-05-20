@@ -29,11 +29,25 @@ def get_default_backbone_config() -> Dict[str, Any]:
     """
     return {
         'model': {
+            'enabled': True,
             'backbone': 'efficientnet_b4',
             'model_type': 'efficient_basic',
             'use_attention': True,
             'use_residual': True,
-            'use_ciou': False
+            'use_ciou': False,
+            'pretrained': True,
+            'freeze_backbone': False,
+            'freeze_bn': False,
+            'dropout': 0.2,
+            'activation': 'relu',
+            'normalization': {
+                'type': 'batch_norm',
+                'momentum': 0.1
+            },
+            'weights': {
+                'path': '',
+                'strict': True
+            }
         }
     }
 

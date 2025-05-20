@@ -20,8 +20,9 @@ def run_tests():
     # Buat test suite
     test_suite = unittest.TestSuite()
     
-    # Tambahkan test case ke test suite
-    test_suite.addTest(unittest.makeSuite(TestConfigSyncStandalone))
+    # Gunakan TestLoader daripada makeSuite (yang sudah deprecated)
+    loader = unittest.TestLoader()
+    test_suite.addTest(loader.loadTestsFromTestCase(TestConfigSyncStandalone))
     
     # Jalankan test
     runner = unittest.TextTestRunner(verbosity=2)

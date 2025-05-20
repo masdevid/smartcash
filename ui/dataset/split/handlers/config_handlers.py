@@ -99,10 +99,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
     """
     try:
         # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_info, log_sync_success, log_sync_error
-        
-        # Log sync start
-        log_sync_info(ui_components, "Memulai sinkronisasi UI dari konfigurasi...")
+        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error
         
         # Get config if not provided
         if config is None:
@@ -110,7 +107,6 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         # Pastikan config memiliki struktur yang benar
         if not config or 'split' not in config:
-            log_sync_info(ui_components, "Menggunakan konfigurasi default untuk split dataset")
             logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan konfigurasi default untuk split dataset")
             config = get_default_split_config()
             
@@ -160,13 +156,13 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         # Import sync logger
-        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_info, log_sync_success, log_sync_error
-        
-        # Log sync start
-        log_sync_info(ui_components, "Memulai sinkronisasi konfigurasi dari UI...")
+        from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_success, log_sync_error
         
         # Get current config
         config = load_config()
+        
+        # Simpan config sebelum diupdate untuk verifikasi nantinya
+        pre_update_config = config.copy() if config else get_default_split_config()
         
         # Update config from UI
         if 'enabled_checkbox' in ui_components:
@@ -190,14 +186,27 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Save config
         save_config(config, ui_components)
         
-        log_sync_success(ui_components, "Konfigurasi berhasil diupdate dari UI")
-        logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil diupdate dari UI")
+        # Verifikasi perubahan telah disimpan dengan benar dengan membaca ulang config
+        post_update_config = load_config()
+        
+        # Periksa apakah data yang disimpan sesuai
+        if (config['split']['train_ratio'] != post_update_config['split']['train_ratio'] or
+            config['split']['val_ratio'] != post_update_config['split']['val_ratio'] or
+            config['split']['test_ratio'] != post_update_config['split']['test_ratio'] or
+            config['split']['random_seed'] != post_update_config['split']['random_seed'] or
+            config['split']['stratify'] != post_update_config['split']['stratify'] or
+            config['split']['enabled'] != post_update_config['split']['enabled']):
+            log_sync_error(ui_components, "Konfigurasi tidak disimpan dengan benar, ada perbedaan data")
+            logger.error(f"{ICONS.get('error', '❌')} Konfigurasi tidak disimpan dengan benar, ada perbedaan data")
+        else:
+            log_sync_success(ui_components, "Konfigurasi berhasil diupdate dari UI")
+            logger.info(f"{ICONS.get('success', '✅')} Konfigurasi berhasil diupdate dari UI")
+        
         return config
         
     except Exception as e:
         # Log error
         if 'logger' in ui_components:
-            from smartcash.ui.dataset.split.handlers.sync_logger import log_sync_error
             log_sync_error(ui_components, f"Error saat update config dari UI: {str(e)}")
         logger.error(f"{ICONS.get('error', '❌')} Error saat update config dari UI: {str(e)}")
         return load_config()

@@ -34,6 +34,10 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         # Buat komponen UI
         ui_components = create_backbone_ui()
         
+        # Tambahkan status panel
+        from smartcash.ui.training_config.backbone.handlers.status_handlers import add_status_panel
+        ui_components = add_status_panel(ui_components)
+        
         # Tampilkan UI
         clear_output(wait=True)
         display(ui_components['main_container'])
@@ -119,6 +123,10 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
         # Register UI components untuk persistensi
         config_manager.register_ui_components('backbone', ui_components)
+        
+        # Update status panel dengan pesan selamat datang
+        from smartcash.ui.training_config.backbone.handlers.status_handlers import update_status_panel
+        update_status_panel(ui_components, "Konfigurasi backbone siap digunakan", 'info')
         
         return ui_components
         

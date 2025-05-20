@@ -123,7 +123,11 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             
         # Optimizer
         if 'optimizer_dropdown' in ui_components:
-            config['hyperparameters']['optimizer']['type'] = ui_components['optimizer_dropdown'].value
+            opt_val = ui_components['optimizer_dropdown'].value
+            if opt_val in config['hyperparameters']['optimizer']['type']:
+                config['hyperparameters']['optimizer']['type'] = opt_val
+            else:
+                config['hyperparameters']['optimizer']['type'] = config['hyperparameters']['optimizer']['type'][0]
             
         if 'learning_rate_slider' in ui_components:
             config['hyperparameters']['optimizer']['learning_rate'] = ui_components['learning_rate_slider'].value
@@ -148,7 +152,11 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             config['hyperparameters']['scheduler']['enabled'] = ui_components['scheduler_checkbox'].value
             
         if 'scheduler_dropdown' in ui_components:
-            config['hyperparameters']['scheduler']['type'] = ui_components['scheduler_dropdown'].value
+            sched_val = ui_components['scheduler_dropdown'].value
+            if sched_val in config['hyperparameters']['scheduler']['type']:
+                config['hyperparameters']['scheduler']['type'] = sched_val
+            else:
+                config['hyperparameters']['scheduler']['type'] = config['hyperparameters']['scheduler']['type'][0]
             
         if 'warmup_epochs_slider' in ui_components:
             config['hyperparameters']['scheduler']['warmup_epochs'] = ui_components['warmup_epochs_slider'].value
@@ -167,7 +175,11 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             
         # Loss
         if 'loss_dropdown' in ui_components:
-            config['hyperparameters']['loss']['type'] = ui_components['loss_dropdown'].value
+            loss_val = ui_components['loss_dropdown'].value
+            if loss_val in config['hyperparameters']['loss']['type']:
+                config['hyperparameters']['loss']['type'] = loss_val
+            else:
+                config['hyperparameters']['loss']['type'] = config['hyperparameters']['loss']['type'][0]
             
         if 'alpha_slider' in ui_components:
             config['hyperparameters']['loss']['alpha'] = ui_components['alpha_slider'].value
@@ -268,7 +280,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         # Optimizer
         if 'optimizer_dropdown' in ui_components:
-            ui_components['optimizer_dropdown'].value = config['hyperparameters']['optimizer']['type']
+            opt_val = config['hyperparameters']['optimizer']['type']
+            dropdown = ui_components['optimizer_dropdown']
+            if opt_val in dropdown.options:
+                dropdown.value = opt_val
+            else:
+                dropdown.value = dropdown.options[0]
             
         if 'learning_rate_slider' in ui_components:
             ui_components['learning_rate_slider'].value = config['hyperparameters']['optimizer']['learning_rate']
@@ -293,7 +310,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             ui_components['scheduler_checkbox'].value = config['hyperparameters']['scheduler']['enabled']
             
         if 'scheduler_dropdown' in ui_components:
-            ui_components['scheduler_dropdown'].value = config['hyperparameters']['scheduler']['type']
+            sched_val = config['hyperparameters']['scheduler']['type']
+            dropdown = ui_components['scheduler_dropdown']
+            if sched_val in dropdown.options:
+                dropdown.value = sched_val
+            else:
+                dropdown.value = dropdown.options[0]
             
         if 'warmup_epochs_slider' in ui_components:
             ui_components['warmup_epochs_slider'].value = config['hyperparameters']['scheduler']['warmup_epochs']
@@ -312,7 +334,12 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         # Loss
         if 'loss_dropdown' in ui_components:
-            ui_components['loss_dropdown'].value = config['hyperparameters']['loss']['type']
+            loss_val = config['hyperparameters']['loss']['type']
+            dropdown = ui_components['loss_dropdown']
+            if loss_val in dropdown.options:
+                dropdown.value = loss_val
+            else:
+                dropdown.value = dropdown.options[0]
             
         if 'alpha_slider' in ui_components:
             ui_components['alpha_slider'].value = config['hyperparameters']['loss']['alpha']

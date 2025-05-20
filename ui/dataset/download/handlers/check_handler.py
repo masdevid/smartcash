@@ -5,7 +5,6 @@ Deskripsi: Handler untuk pengecekan status dan validasi dataset
 
 from typing import Dict, Any, Tuple, Optional
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display
 
 def handle_check_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
@@ -32,13 +31,11 @@ def handle_check_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         # Tampilkan progress
         _show_progress(ui_components, "Memeriksa dataset...")
         
-        # Jalankan check dalam thread terpisah
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_check_dataset_status, ui_components, output_dir)
-            stats, message = future.result()
-            
-            # Tampilkan hasil dengan visualisasi
-            _display_check_results(ui_components, stats, message)
+        # Jalankan check langsung (tanpa threading untuk kompatibilitas Colab)
+        stats, message = _check_dataset_status(ui_components, output_dir)
+        
+        # Tampilkan hasil dengan visualisasi
+        _display_check_results(ui_components, stats, message)
     
     except Exception as e:
         # Tampilkan error

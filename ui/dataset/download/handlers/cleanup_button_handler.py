@@ -6,7 +6,6 @@ Deskripsi: Handler untuk tombol cleanup pada modul download dataset
 from typing import Dict, Any, Optional
 import os
 import shutil
-from concurrent.futures import ThreadPoolExecutor
 from tqdm.notebook import tqdm
 
 def handle_cleanup_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
@@ -28,9 +27,8 @@ def handle_cleanup_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
         ui_components['update_status_panel'](ui_components, 'info', '🧹 Membersihkan hasil download...')
     
-    # Jalankan proses cleanup di thread terpisah
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        executor.submit(_execute_cleanup, ui_components)
+    # Jalankan proses cleanup langsung (tanpa threading untuk kompatibilitas Colab)
+    _execute_cleanup(ui_components)
 
 def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
     """

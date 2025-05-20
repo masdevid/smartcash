@@ -7,7 +7,6 @@ import os
 import time
 from typing import Dict, Any, Optional
 from pathlib import Path
-import threading
 
 from smartcash.dataset.manager import DatasetManager
 from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
@@ -102,13 +101,8 @@ def confirm_cleanup(ui_components: Dict[str, Any], output_dir: str, button=None)
         # Bersihkan area konfirmasi
         ui_components['confirmation_area'].clear_output()
         
-        # Jalankan cleanup di thread terpisah
-        thread = threading.Thread(
-            target=execute_cleanup,
-            args=(ui_components, output_dir)
-        )
-        thread.daemon = True
-        thread.start()
+        # Jalankan cleanup langsung (tanpa threading untuk kompatibilitas dengan Colab)
+        execute_cleanup(ui_components, output_dir)
     
     # Fungsi untuk membatalkan cleanup
     def cancel_cleanup():

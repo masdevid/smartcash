@@ -3,15 +3,19 @@ File: smartcash/ui/dataset/download/handlers/download_handler.py
 Deskripsi: Handler untuk proses download dataset dengan dukungan observer dan delegasi ke service yang sesuai
 """
 
-from typing import Dict, Any, Optional, Tuple
-from concurrent.futures import ThreadPoolExecutor
 import os
 import time
+import datetime
+from typing import Dict, Any, Optional, List, Tuple, Callable
 from pathlib import Path
+from IPython.display import display
+
 from smartcash.dataset.manager import DatasetManager
 from smartcash.dataset.services.downloader.download_service import DownloadService
 from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
+from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
 
 __all__ = [
     'handle_download_button_click',
@@ -116,7 +120,6 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> 
             ui_components['log_output'].append_stdout("Memulai persiapan download dataset...")
         
         # Tampilkan konfirmasi download
-        from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
         if confirm_download(ui_components):
             # Reset progress bar setelah konfirmasi
             _reset_progress_bar(ui_components)
@@ -263,15 +266,8 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
     if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
         # Setelah proses selesai, biarkan progress bar terlihat sebentar
         # kemudian sembunyikan setelah beberapa detik
-        import threading
-        def hide_progress_container():
-            import time
-            # Tunggu 3 detik sebelum menyembunyikan progress bar
-            time.sleep(3)
-            ui_components['progress_container'].layout.display = 'none'
-        
-        # Jalankan di thread terpisah agar tidak memblokir UI
-        threading.Thread(target=hide_progress_container).start()
+        time.sleep(3)
+        ui_components['progress_container'].layout.display = 'none'
     
     # Bersihkan area konfirmasi jika ada
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
@@ -319,34 +315,14 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
             )
             
             # Pastikan observer terdaftar
-            from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
             observer_manager = register_ui_observers(ui_components)
             
-            # Jalankan download di thread terpisah agar UI tetap responsif
-            with ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(_download_from_roboflow, ui_components)
-                # Tunggu hasil agar thread tidak hilang
-                try:
-                    result = future.result()
-                    # Proses hasil jika ada
-                    if result:
-                        _process_download_result(ui_components, result)
-                except Exception as e:
-                    # Tangani error
-                    notify_log(
-                        sender=ui_components,
-                        message=f"Error saat proses download dataset: {str(e)}",
-                        level="error"
-                    )
-                    
-                    notify_progress(
-                        sender=ui_components,
-                        event_type="error",
-                        message=f"Error: {str(e)}"
-                    )
-                    
-                    # Reset UI
-                    _reset_ui_after_download(ui_components)
+            # Jalankan download
+            result = _download_from_roboflow(ui_components)
+            
+            # Proses hasil jika ada
+            if result:
+                _process_download_result(ui_components, result)
         else:
             # Endpoint tidak didukung
             notify_log(
@@ -504,7 +480,6 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         dataset_manager = DatasetManager()
         
         # Register observer jika ada
-        from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
         observer_manager = register_ui_observers(ui_components)
         
         # Coba dapatkan service downloader dan set observer

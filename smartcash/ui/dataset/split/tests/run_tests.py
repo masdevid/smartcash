@@ -18,6 +18,7 @@ from smartcash.ui.dataset.split.tests.test_config_handlers import TestSplitConfi
 from smartcash.ui.dataset.split.tests.test_button_handlers import TestSplitButtonHandlers
 from smartcash.ui.dataset.split.tests.test_drive_handlers import TestSplitDriveHandlers
 from smartcash.ui.dataset.split.tests.test_ui_handlers import TestSplitUIHandlers
+from smartcash.ui.dataset.split.tests.test_config_sync import TestConfigSync
 
 def run_tests():
     """Jalankan semua test untuk konfigurasi split dataset."""
@@ -29,6 +30,7 @@ def run_tests():
     test_suite.addTest(unittest.makeSuite(TestSplitButtonHandlers))
     test_suite.addTest(unittest.makeSuite(TestSplitDriveHandlers))
     test_suite.addTest(unittest.makeSuite(TestSplitUIHandlers))
+    test_suite.addTest(unittest.makeSuite(TestConfigSync))
     
     # Jalankan test
     runner = unittest.TextTestRunner(verbosity=2)

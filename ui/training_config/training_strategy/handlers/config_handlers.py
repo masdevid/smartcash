@@ -235,7 +235,7 @@ def update_training_strategy_info(ui_components: Optional[Dict[str, Any]] = None
     Args:
         ui_components: Komponen UI
     """
-    info_panel = ui_components.get('info_panel')
+    info_panel = ui_components.get('training_strategy_info')
     if not info_panel:
         logger.warning(f"{ICONS.get('warning', '⚠️')} Info panel tidak ditemukan")
         return
@@ -303,6 +303,15 @@ def update_training_strategy_info(ui_components: Optional[Dict[str, Any]] = None
             """
             
             display(widgets.HTML(html_content))
+            
+            # Sinkronkan dengan drive
+            try:
+                config_manager = get_config_manager(base_dir=get_default_base_dir())
+                config_manager.sync_config_with_drive('training_strategy')
+                logger.info("✅ Konfigurasi berhasil disinkronkan dengan drive")
+            except Exception as sync_error:
+                logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
+            
         except Exception as e:
             logger.error(f"{ICONS.get('error', '❌')} Error update info panel: {str(e)}")
             display(widgets.HTML(

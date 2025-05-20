@@ -75,6 +75,13 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 except Exception as persist_error:
                     logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
                 
+                # Sinkronkan dengan drive
+                try:
+                    config_manager.sync_config_with_drive('training_strategy')
+                    logger.info("✅ Konfigurasi berhasil disinkronkan dengan drive")
+                except Exception as sync_error:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
+                
                 # Tampilkan pesan sukses atau warning
                 status_panel = ui_components.get('status_panel', ui_components.get('status'))
                 with status_panel:
@@ -93,26 +100,14 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 # Update info panel jika ada
                 update_training_strategy_info(ui_components)
                 
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    if env.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi strategi pelatihan ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil disimpan")
             except Exception as e:
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}",
+                        f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}",
                         alert_type='error'
                     ))
-                
-                logger.error(f"{ICONS.get('error', '❌')} Gagal menyimpan konfigurasi: {str(e)}")
         
         # Handler untuk tombol reset
         def on_reset_click(b):
@@ -122,59 +117,39 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env=N
                 display(create_status_indicator('info', f"{ICONS.get('info', 'ℹ️')} Mereset konfigurasi strategi pelatihan..."))
             
             try:
-                # Dapatkan default config
+                # Reset ke konfigurasi default
                 default_config = get_default_config()
-                
-                # Update UI dari default config
                 update_ui_from_config(ui_components, default_config)
                 
-                # Simpan default config
+                # Simpan konfigurasi default
                 success = config_manager.save_module_config('training_strategy', default_config)
                 
-                # Pastikan UI components teregistrasi untuk persistensi
+                # Sinkronkan dengan drive
                 try:
-                    config_manager.register_ui_components('training_strategy', ui_components)
-                except Exception as persist_error:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memastikan persistensi UI: {persist_error}")
+                    config_manager.sync_config_with_drive('training_strategy')
+                    logger.info("✅ Konfigurasi default berhasil disinkronkan dengan drive")
+                except Exception as sync_error:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat sinkronisasi dengan drive: {str(sync_error)}")
                 
-                # Tampilkan pesan sukses atau warning
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                # Tampilkan pesan sukses
                 with status_panel:
                     clear_output(wait=True)
-                    if success:
-                        display(create_info_alert(
-                            f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil direset ke default",
-                            alert_type='success'
-                        ))
-                    else:
-                        display(create_info_alert(
-                            f"{ICONS.get('warning', '⚠️')} Konfigurasi strategi pelatihan direset di UI tetapi mungkin tidak tersimpan ke file",
-                            alert_type='warning'
-                        ))
+                    display(create_info_alert(
+                        f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil direset ke default",
+                        alert_type='success'
+                    ))
                 
                 # Update info panel jika ada
                 update_training_strategy_info(ui_components)
                 
-                # Sinkronisasi ke Google Drive jika diaktifkan
-                try:
-                    if env.is_drive_mounted:
-                        # Sinkronisasi ke Google Drive
-                        logger.info(f"{ICONS.get('info', 'ℹ️')} Menyinkronkan konfigurasi strategi pelatihan ke Google Drive...")
-                        sync_to_drive(None, ui_components)
-                except Exception as e:
-                    logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal menyinkronkan ke Google Drive: {str(e)}")
-                
-                logger.info(f"{ICONS.get('success', '✅')} Konfigurasi strategi pelatihan berhasil direset ke default")
             except Exception as e:
-                status_panel = ui_components.get('status_panel', ui_components.get('status'))
+                logger.error(f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi: {str(e)}")
                 with status_panel:
                     clear_output(wait=True)
                     display(create_info_alert(
-                        f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}",
+                        f"{ICONS.get('error', '❌')} Error saat mereset konfigurasi: {str(e)}",
                         alert_type='error'
                     ))
-                
-                logger.error(f"{ICONS.get('error', '❌')} Gagal mereset konfigurasi: {str(e)}")
         
         # Pasang handler ke tombol
         if 'save_button' in ui_components:

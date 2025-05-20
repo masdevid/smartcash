@@ -34,7 +34,7 @@ class PreprocessedCleaner:
             max_age_days: Usia maksimum data preprocessed (dalam hari)
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger or get_logger("preprocessed_cleaner")
+        self.logger = logger or get_logger()
         self.preprocessed_dir = Path(preprocessed_dir)
         self.max_age_days = max_age_days
         

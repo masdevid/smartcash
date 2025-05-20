@@ -26,7 +26,7 @@ class PostprocessingService:
         Args:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
-        self.logger = logger or get_logger("PostprocessingService")
+        self.logger = logger or get_logger()
         
         # Gunakan NMSProcessor dari domain model
         self.nms_processor = ModelNMSProcessor(logger=self.logger)

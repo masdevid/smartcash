@@ -38,7 +38,7 @@ class ExperimentAnalyzer:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
         self.base_dir = Path(base_dir)
-        self.logger = logger or get_logger("experiment_analyzer")
+        self.logger = logger or get_logger()
         
         self.logger.debug(f"🔍 ExperimentAnalyzer diinisialisasi")
     

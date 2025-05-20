@@ -38,7 +38,7 @@ class PreprocessedDatasetLoader:
             config: Konfigurasi tambahan
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger or get_logger("preprocessed_loader")
+        self.logger = logger or get_logger()
         self.preprocessed_dir = Path(preprocessed_dir)
         self.fallback_to_raw = fallback_to_raw
         self.auto_preprocess = auto_preprocess
@@ -324,7 +324,7 @@ class PreprocessedMultilayerDataset(torch.utils.data.Dataset):
         self.img_size = img_size
         self.require_all_layers = require_all_layers
         self.transform = transform
-        self.logger = logger or get_logger("preprocessed_dataset")
+        self.logger = logger or get_logger()
         
         # Verifikasi direktori
         self.images_dir = self.root_dir / 'images'

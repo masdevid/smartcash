@@ -278,3 +278,50 @@ def get_logger(name: Optional[str] = None,
         use_emojis=use_emojis,
         log_dir=log_dir
     )
+
+def fix_logger_usage():
+    """
+    Fungsi helper untuk memperbaiki penggunaan get_logger dengan string literal.
+    Fungsi ini akan mencari semua file yang menggunakan get_logger dengan string literal
+    dan menggantinya dengan get_logger() tanpa parameter.
+    """
+    import os
+    import re
+    from pathlib import Path
+    
+    # Pattern untuk mencari get_logger dengan string literal
+    pattern = r'get_logger\(["\']([^"\']+)["\']\)'
+    
+    # Direktori yang akan dicari
+    base_dir = Path(__file__).parent.parent
+    
+    # Ekstensi file yang akan diproses
+    extensions = {'.py'}
+    
+    # Counter untuk statistik
+    total_files = 0
+    modified_files = 0
+    
+    # Cari semua file Python
+    for root, _, files in os.walk(base_dir):
+        for file in files:
+            if file.endswith(extensions):
+                file_path = Path(root) / file
+                total_files += 1
+                
+                # Baca file
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Cari dan ganti
+                new_content = re.sub(pattern, 'get_logger()', content)
+                
+                # Jika ada perubahan, tulis kembali ke file
+                if new_content != content:
+                    with open(file_path, 'w', encoding='utf-8') as f:
+                        f.write(new_content)
+                    modified_files += 1
+                    print(f"Modified: {file_path}")
+    
+    print(f"\nTotal files processed: {total_files}")
+    print(f"Files modified: {modified_files}")

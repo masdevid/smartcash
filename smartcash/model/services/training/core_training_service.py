@@ -46,7 +46,7 @@ class TrainingService:
         """
         self.model = model
         self.config = config
-        self.logger = logger or get_logger("training_service")
+        self.logger = logger or get_logger()
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.experiment_name = experiment_name or f"exp_{int(time.time())}"
         

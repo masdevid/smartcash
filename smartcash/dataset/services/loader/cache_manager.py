@@ -42,7 +42,7 @@ class DatasetCacheManager:
             ttl_seconds: Waktu hidup cache dalam detik
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("dataset_cache")
+        self.logger = logger or get_logger()
         self.max_ram_usage_bytes = int(max_ram_usage_gb * 1024 * 1024 * 1024)
         self.max_disk_usage_bytes = int(max_disk_usage_gb * 1024 * 1024 * 1024)
         self.ttl_seconds = ttl_seconds

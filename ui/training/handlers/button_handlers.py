@@ -42,7 +42,7 @@ def on_start_training(b, ui_components: Dict[str, Any], env=None, config=None) -
         return
     
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('play', '▶️')} Memulai proses training...")
     
     # Update status
@@ -83,7 +83,7 @@ def on_stop_training(b, ui_components: Dict[str, Any], env=None, config=None) ->
         return
     
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('stop', '⏹️')} Menghentikan proses training...")
     
     # Set flag untuk menghentikan training
@@ -115,7 +115,7 @@ def on_reset_training(b, ui_components: Dict[str, Any], env=None, config=None) -
         return
     
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('reset', '🔄')} Reset konfigurasi training...")
     
     # Reset form ke nilai default
@@ -159,7 +159,7 @@ def on_cleanup_training(b, ui_components: Dict[str, Any], env=None, config=None)
         return
     
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('cleanup', '🧹')} Membersihkan output training...")
     
     # Reset chart dan metrik
@@ -194,7 +194,7 @@ def on_save_config(b, ui_components: Dict[str, Any], env=None, config=None) -> N
         config: Konfigurasi model
     """
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('save', '💾')} Menyimpan konfigurasi training...")
     
     try:
@@ -268,7 +268,7 @@ def on_reset_config(b, ui_components: Dict[str, Any], env=None, config=None) -> 
         config: Konfigurasi model
     """
     # Dapatkan logger
-    logger = ui_components.get('logger', None) or get_logger("training_ui")
+    logger = ui_components.get('logger', None) or get_logger()
     logger.info(f"{ICONS.get('reset', '🔄')} Reset konfigurasi training...")
     
     try:
@@ -338,7 +338,7 @@ def run_training(ui_components: Dict[str, Any], env=None, config=None) -> None:
     
     try:
         # Dapatkan logger
-        logger = ui_components.get('logger', None) or get_logger("training_ui")
+        logger = ui_components.get('logger', None) or get_logger()
         
         # Dapatkan konfigurasi dari form
         backbone = ui_components['backbone_dropdown'].value

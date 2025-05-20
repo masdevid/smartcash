@@ -36,7 +36,7 @@ class BatchHandler:
         self.detection_handler = detection_handler
         self.num_workers = num_workers
         self.batch_size = min(batch_size, max_batch_size)
-        self.logger = logger or get_logger("BatchHandler")
+        self.logger = logger or get_logger()
     
     def detect_directory(self, 
                         input_dir: str, 

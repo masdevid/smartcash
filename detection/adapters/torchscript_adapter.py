@@ -41,7 +41,7 @@ class TorchScriptAdapter:
         self.input_shape = input_shape
         self.class_map = class_map
         self.device_str = device
-        self.logger = logger or get_logger("TorchScriptAdapter")
+        self.logger = logger or get_logger()
         self.model = None
         self.device = None
         

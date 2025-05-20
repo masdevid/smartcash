@@ -25,7 +25,7 @@ class WeightCalculator:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("weight_calculator")
+        self.logger = logger or get_logger()
         
         # Setup parameter balancing
         self.balance_config = self.config.get('dataset', {}).get('balance', {})

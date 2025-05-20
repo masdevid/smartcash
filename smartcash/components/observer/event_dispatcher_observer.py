@@ -24,7 +24,7 @@ class EventDispatcher:
     """
     
     # Logger
-    _logger = get_logger("event_dispatcher")
+    _logger = get_logger()
     
     # Lock untuk thread-safety
     _lock = RLock()

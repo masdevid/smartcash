@@ -9,7 +9,7 @@ from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 
-logger = get_logger("preprocessing_service")
+logger = get_logger()
 
 def get_dataset_manager(ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None, custom_logger=None) -> Any:
     """
@@ -23,7 +23,7 @@ def get_dataset_manager(ui_components: Dict[str, Any], config: Optional[Dict[str
     Returns:
         Instance dataset manager atau None jika gagal
     """
-    logger = custom_logger or ui_components.get('logger', get_logger("preprocessing_service"))
+    logger = custom_logger or ui_components.get('logger', get_logger())
     
     try:
         # Import dataset manager

@@ -94,7 +94,7 @@ def setup_download_cleanup_handler(ui_components: Dict[str, Any], module_type: s
         Dictionary UI components yang telah diupdate
     """
     # Setup logger
-    logger = ui_components.get('logger', get_logger('download_cleanup'))
+    logger = ui_components.get('logger', get_logger())
     
     # Coba gunakan shared processing_cleanup_handler jika tersedia
     try:

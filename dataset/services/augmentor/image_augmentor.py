@@ -26,7 +26,7 @@ class ImageAugmentor:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("image_augmentor")
+        self.logger = logger or get_logger()
         
         # Setup parameter augmentasi
         aug_config = self.config.get('augmentation', {}).get('image', {})

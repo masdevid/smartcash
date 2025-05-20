@@ -37,7 +37,7 @@ class ONNXModelAdapter:
         self.onnx_path = onnx_path
         self.input_shape = input_shape
         self.class_map = class_map
-        self.logger = logger or get_logger("ONNXModelAdapter")
+        self.logger = logger or get_logger()
         self.session = None
         
         # Load class map dari layer config jika tidak disediakan

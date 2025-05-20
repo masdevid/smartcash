@@ -17,7 +17,7 @@ def validate_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any
     Returns:
         Dictionary hasil validasi dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     # Dapatkan konfigurasi dari UI
     from smartcash.ui.dataset.augmentation.handlers.config_handler import get_config_from_ui

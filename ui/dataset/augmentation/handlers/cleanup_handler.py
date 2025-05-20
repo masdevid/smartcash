@@ -23,7 +23,7 @@ def cleanup_augmentation_results(ui_components: Dict[str, Any]) -> Dict[str, Any
     Returns:
         Dictionary hasil pembersihan dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan path dari ui_components
@@ -174,7 +174,7 @@ def remove_augmented_files_from_preprocessed(ui_components: Dict[str, Any], pref
     Returns:
         Dictionary hasil penghapusan dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan path dari ui_components
@@ -275,7 +275,7 @@ def setup_cleanup_handler(ui_components: Dict[str, Any], env: Dict[str, Any] = N
     Returns:
         Dictionary komponen UI dengan handler terpasang
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     logger.info("🧹 Setup cleanup handler untuk augmentasi...")
     
     try:
@@ -298,7 +298,7 @@ def on_cleanup_augmentation(b, ui_components: Dict[str, Any]) -> None:
         b: Button widget
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     logger.info("🧹 Memulai pembersihan hasil augmentasi...")
     
     # Tampilkan status

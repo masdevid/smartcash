@@ -18,7 +18,7 @@ def initialize_augmentation_directories(ui_components: Dict[str, Any]) -> Dict[s
     Returns:
         Dictionary hasil inisialisasi dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan konfigurasi dari UI
@@ -116,7 +116,7 @@ def initialize_augmentation_service(ui_components: Dict[str, Any]) -> Dict[str, 
     Returns:
         Dictionary hasil inisialisasi dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan konfigurasi dari UI
@@ -199,7 +199,7 @@ def register_progress_callback(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     # Buat fungsi progress callback
     def progress_callback(progress=None, total=None, message=None, status='info', **kwargs):
@@ -329,7 +329,7 @@ def check_dataset_readiness(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary status kesiapan dataset
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     # Deteksi apakah dipanggil dari pengujian
     import inspect
@@ -444,7 +444,7 @@ def initialize_augmentation_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary hasil inisialisasi dengan status dan pesan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Inisialisasi direktori
@@ -493,7 +493,7 @@ def on_split_change(change: Dict[str, Any], ui_components: Dict[str, Any]) -> No
         change: Dictionary perubahan
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan nilai split baru
@@ -533,7 +533,7 @@ def setup_augmentation_module() -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diinisialisasi
     """
-    logger = get_logger('augmentation')
+    logger = get_logger()
     
     try:
         # Import komponen UI untuk augmentasi

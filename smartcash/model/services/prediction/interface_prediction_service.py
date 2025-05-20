@@ -45,7 +45,7 @@ class PredictionInterface:
             cache_results: Flag untuk caching hasil
             logger: Logger untuk pencatatan
         """
-        self.logger = logger or get_logger("prediction_interface")
+        self.logger = logger or get_logger()
         self.prediction_service = prediction_service
         self.output_dir = Path(output_dir) if output_dir else Path("predictions")
         self.output_dir.mkdir(parents=True, exist_ok=True)

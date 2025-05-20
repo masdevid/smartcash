@@ -30,7 +30,7 @@ class LabelProcessor:
         """
         self.config = config or {}
         self.data_dir = Path(data_dir or self.config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("label_processor")
+        self.logger = logger or get_logger()
         self.num_workers = num_workers
         
         # Setup utils

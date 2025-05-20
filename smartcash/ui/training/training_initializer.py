@@ -32,7 +32,7 @@ def initialize_training_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         config_manager = get_config_manager()
         
         # Dapatkan logger
-        logger = get_logger("training_ui")
+        logger = get_logger()
         
         # Import komponen UI baru
         from smartcash.ui.training.components.training_component import create_training_ui
@@ -69,7 +69,7 @@ def initialize_training_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
         
     except Exception as e:
         # Fallback jika terjadi error
-        logger = get_logger("training_ui")
+        logger = get_logger()
         logger.error(f"{ICONS.get('error', '❌')} Error saat inisialisasi UI training: {str(e)}")
         
         # Buat UI minimal jika terjadi error

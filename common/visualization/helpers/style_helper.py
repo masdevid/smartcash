@@ -22,7 +22,7 @@ class StyleHelper:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("style_helper")
+        self.logger = logger or get_logger()
         
         # Style presets untuk reusable styling
         self.style_presets = {

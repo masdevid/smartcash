@@ -99,7 +99,7 @@ def sync_config_with_drive(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("config_sync")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("config_sync")
@@ -252,7 +252,7 @@ def upload_config_to_drive(config_path: str, config: Dict[str, Any], logger = No
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("config_sync")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("config_sync")
@@ -329,7 +329,7 @@ def sync_all_configs(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("config_sync")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("config_sync")

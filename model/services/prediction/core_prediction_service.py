@@ -36,7 +36,7 @@ class PredictionService:
             config: Konfigurasi prediksi
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger or get_logger("prediction_service")
+        self.logger = logger or get_logger()
         self.model = model
         
         # Default config

@@ -44,7 +44,7 @@ class ExperimentRunner:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
         self.base_dir = Path(base_dir)
-        self.logger = logger or get_logger("experiment_runner")
+        self.logger = logger or get_logger()
         self.training_service = training_service
         self.evaluation_service = evaluation_service
         

@@ -12,7 +12,7 @@ from smartcash.components.observer.event_dispatcher_observer import EventDispatc
 
 
 # Global variables untuk tracking
-logger = get_logger("observer_cleanup")
+logger = get_logger()
 _registered_cleanups = []
 _registered_managers = weakref.WeakSet()
 

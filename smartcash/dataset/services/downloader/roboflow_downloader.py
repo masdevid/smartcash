@@ -35,7 +35,7 @@ class RoboflowDownloader:
             retry_limit: Batas retry pada kegagalan
             retry_delay: Delay antar retry dalam detik
         """
-        self.logger = logger or get_logger("roboflow_downloader")
+        self.logger = logger or get_logger()
         self.timeout = timeout
         self.chunk_size = chunk_size
         self.retry_limit = retry_limit

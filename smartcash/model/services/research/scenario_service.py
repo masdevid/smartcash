@@ -41,7 +41,7 @@ class ScenarioService:
             logger: Logger untuk mencatat aktivitas
         """
         # Setup logger dengan level CRITICAL untuk mengurangi log
-        self.logger = logger or get_logger("scenario_service")
+        self.logger = logger or get_logger()
         self.logger.setLevel("CRITICAL")
         self.config_manager = get_config_manager()
         self.base_dir = Path(base_dir)

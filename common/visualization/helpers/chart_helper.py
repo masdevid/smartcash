@@ -28,7 +28,7 @@ class ChartHelper(VisualizationBase):
             logger: Logger kustom (opsional)
         """
         self.style = style
-        self.logger = logger or get_logger("chart_helper")
+        self.logger = logger or get_logger()
         
         # Helper lain yang dibutuhkan
         self.color_helper = ColorHelper(logger)

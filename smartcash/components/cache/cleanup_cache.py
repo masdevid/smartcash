@@ -46,7 +46,7 @@ class CacheCleanup:
         self.ttl_seconds = ttl_seconds
         self.cleanup_interval = cleanup_interval
         self.cache_stats = cache_stats
-        self.logger = logger or get_logger("cache_cleanup")
+        self.logger = logger or get_logger()
         
         # Setup threading
         self._lock = threading.RLock()

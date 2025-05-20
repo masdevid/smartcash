@@ -46,7 +46,7 @@ class ExperimentService:
         self.experiment_dir = Path(experiment_dir)
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         
-        self.logger = logger or get_logger("experiment_service")
+        self.logger = logger or get_logger()
         self.training_service = training_service or TrainingService(logger=self.logger)
         self.evaluation_service = evaluation_service or EvaluationService(logger=self.logger)
         

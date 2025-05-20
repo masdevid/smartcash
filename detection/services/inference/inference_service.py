@@ -30,7 +30,7 @@ class InferenceService:
         self.prediction_service = prediction_service
         self.postprocessing_service = postprocessing_service
         self.accelerator = accelerator
-        self.logger = logger or get_logger("InferenceService")
+        self.logger = logger or get_logger()
         
         # Aktifkan akselerator jika tersedia
         if self.accelerator:

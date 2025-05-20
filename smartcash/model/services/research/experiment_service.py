@@ -49,7 +49,7 @@ class ExperimentService:
             config: Konfigurasi model dasar (opsional)
             logger: Logger untuk mencatat aktivitas (opsional)
         """
-        self.logger = logger or get_logger("experiment_service")
+        self.logger = logger or get_logger()
         
         # Persiapkan direktori
         self.base_dir = Path(base_dir)

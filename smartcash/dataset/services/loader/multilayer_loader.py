@@ -44,7 +44,7 @@ class MultilayerLoader:
         self.img_size = img_size
         self.cache_images = cache_images
         self.memory_efficient = memory_efficient
-        self.logger = logger or get_logger("multilayer_loader")
+        self.logger = logger or get_logger()
         
         # Setup layer config
         self.layer_config = get_layer_config()

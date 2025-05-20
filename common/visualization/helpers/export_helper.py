@@ -24,7 +24,7 @@ class ExportHelper:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("export_helper")
+        self.logger = logger or get_logger()
         self.logger.info("💾 ExportHelper diinisialisasi")
     
     def save_figure(

@@ -24,7 +24,7 @@ class ImageValidator:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("image_validator")
+        self.logger = logger or get_logger()
         
         # Setup parameter validasi
         validation_config = self.config.get('validation', {}).get('image', {})

@@ -26,7 +26,7 @@ class ExportFormatter:
             logger: Logger kustom (opsional)
         """
         self.output_dir = Path(output_dir) if output_dir else Path.cwd()
-        self.logger = logger or get_logger("export_formatter")
+        self.logger = logger or get_logger()
         
         # Buat direktori jika belum ada
         self.output_dir.mkdir(parents=True, exist_ok=True)

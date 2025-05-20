@@ -23,7 +23,7 @@ def get_augmentation_service(ui_components: Dict[str, Any], config: Dict[str, An
         Augmentation service instance
     """
     if logger is None:
-        logger = get_logger('augmentation')
+        logger = get_logger()
     
     # Cek apakah sudah ada di ui_components
     if 'augmentation_service' in ui_components and ui_components['augmentation_service']:
@@ -87,7 +87,7 @@ def execute_augmentation(ui_components: Dict[str, Any], params: Dict[str, Any]) 
     Returns:
         Dictionary hasil augmentasi
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan service
@@ -162,7 +162,7 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
         Dictionary hasil augmentasi
     """
     # Pastikan logger tersedia untuk debugging
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     logger.info("🔍 Memulai augmentasi dengan tracking detail")
     
     try:
@@ -310,7 +310,7 @@ def run_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary hasil augmentasi
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan konfigurasi dari UI
@@ -358,7 +358,7 @@ def initialize_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan service
@@ -389,7 +389,7 @@ def copy_augmented_to_preprocessed(ui_components: Dict[str, Any]) -> Dict[str, A
     Returns:
         Dictionary hasil penyalinan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan direktori data

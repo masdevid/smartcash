@@ -35,7 +35,7 @@ def run_augmentation(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     # Jalankan augmentasi di thread terpisah
     with ThreadPoolExecutor(max_workers=1) as executor:
@@ -50,7 +50,7 @@ def execute_augmentation(ui_components: Dict[str, Any], logger=None) -> None:
         logger: Logger untuk logging
     """
     if logger is None:
-        logger = get_logger('augmentation')
+        logger = get_logger()
     
     # Tandai augmentasi sedang berjalan
     ui_components['augmentation_running'] = True
@@ -232,7 +232,7 @@ def extract_augmentation_params(ui_components: Dict[str, Any]) -> Dict[str, Any]
     Returns:
         Dictionary parameter augmentasi
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     logger.info("🔍 Mengambil parameter augmentasi langsung dari UI")
     
     # Inisialisasi parameter dengan nilai default
@@ -413,7 +413,7 @@ def validate_prerequisites(params: Dict[str, Any], ui_components: Dict[str, Any]
         Boolean menunjukkan apakah prasyarat terpenuhi
     """
     if logger is None:
-        logger = get_logger('augmentation')
+        logger = get_logger()
     
     # Cek apakah augmentasi diaktifkan
     if not ui_components.get('augmentation_options'):

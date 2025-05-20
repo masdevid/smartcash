@@ -30,7 +30,7 @@ class VideoHandler:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
         self.detection_handler = detection_handler
-        self.logger = logger or get_logger("VideoHandler")
+        self.logger = logger or get_logger()
         self._stop_flag = False
     
     def detect_video(self, 

@@ -52,7 +52,7 @@ class ExperimentDataManager:
         self.shuffle = shuffle
         self.num_workers = num_workers
         
-        self.logger = logger or get_logger("experiment_data_manager")
+        self.logger = logger or get_logger()
         
         # Dataset dan DataLoader
         self.dataset = None

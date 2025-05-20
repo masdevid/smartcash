@@ -20,7 +20,7 @@ def create_augmentation_types_component(config: Dict[str, Any] = None) -> widget
     from smartcash.common.config.manager import get_config_manager
     from smartcash.common.logger import get_logger
     
-    logger = get_logger('augmentation')
+    logger = get_logger()
     
     try:
         # Dapatkan konfigurasi augmentasi

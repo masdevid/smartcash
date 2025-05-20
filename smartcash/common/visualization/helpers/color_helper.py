@@ -24,7 +24,7 @@ class ColorHelper(VisualizationBase):
             logger: Logger kustom (opsional)
         """
         super().__init__()
-        self.logger = logger or get_logger("color_helper")
+        self.logger = logger or get_logger()
         
         # Palet warna default untuk berbagai kasus penggunaan
         self.palettes = {

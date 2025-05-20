@@ -28,7 +28,7 @@ class ClassStatistics:
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("class_statistics")
+        self.logger = logger or get_logger()
         
         # Setup utils
         self.utils = DatasetUtils(config, data_dir, logger)

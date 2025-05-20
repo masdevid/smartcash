@@ -31,7 +31,7 @@ class VisualizationService:
         """
         self.config = config
         self.output_dir = Path(output_dir)
-        self.logger = logger or get_logger("visualization_service")
+        self.logger = logger or get_logger()
         
         # Buat direktori output jika belum ada
         self.output_dir.mkdir(parents=True, exist_ok=True)

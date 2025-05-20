@@ -56,7 +56,7 @@ class BatchGenerator:
         self.prefetch_factor = prefetch_factor
         self.timeout = timeout
         self.collate_fn = collate_fn
-        self.logger = logger or get_logger("batch_generator")
+        self.logger = logger or get_logger()
         
         # Buat dataloader
         self.dataloader = DataLoader(

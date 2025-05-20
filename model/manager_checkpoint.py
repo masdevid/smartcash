@@ -38,7 +38,7 @@ class ModelCheckpointManager(ICheckpointService):
             logger: Logger untuk mencatat aktivitas
         """
         self.model_manager = model_manager
-        self.logger = logger or get_logger("model_checkpoint_manager")
+        self.logger = logger or get_logger()
         
         # Inisialisasi checkpoint service
         self.checkpoint_service = CheckpointService(

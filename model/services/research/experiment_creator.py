@@ -40,7 +40,7 @@ class ExperimentCreator:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
-        self.logger = logger or get_logger("experiment_creator")
+        self.logger = logger or get_logger()
         self.base_config = base_config or ModelConfig()
         
         # Daftar eksperimen aktif

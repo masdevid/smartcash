@@ -24,7 +24,7 @@ class AnnotationHelper(VisualizationBase):
             logger: Logger kustom (opsional)
         """
         super().__init__()
-        self.logger = logger or get_logger("annotation_helper")
+        self.logger = logger or get_logger()
         self.logger.info("📝 AnnotationHelper diinisialisasi")
     
     def add_bar_annotations(

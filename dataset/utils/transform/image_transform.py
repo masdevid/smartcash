@@ -26,7 +26,7 @@ class ImageTransformer:
         """
         self.config = config
         self.img_size = img_size
-        self.logger = logger or get_logger("image_transformer")
+        self.logger = logger or get_logger()
         
         # Setup transformasi dasar
         self._setup_transformations()

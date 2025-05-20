@@ -26,7 +26,7 @@ class Undersampler:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("undersampler")
+        self.logger = logger or get_logger()
         
         self.logger.info(f"⬇️ Undersampler diinisialisasi untuk menyeimbangkan dataset")
     

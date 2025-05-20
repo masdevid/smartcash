@@ -26,7 +26,7 @@ class FormatConverter:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("format_converter")
+        self.logger = logger or get_logger()
         self.transformer = BBoxTransformer()
     
     def yolo_to_coco(

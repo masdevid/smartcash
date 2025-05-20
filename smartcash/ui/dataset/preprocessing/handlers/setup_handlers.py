@@ -19,7 +19,7 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env: Any = None,
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger('preprocessing'))
+    logger = ui_components.get('logger', get_logger())
     
     # Tambahkan logger ke ui_components jika belum ada
     if 'logger' not in ui_components:

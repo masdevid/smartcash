@@ -36,7 +36,7 @@ class MetricsComputation:
             logger: Logger instance
         """
         self.config = config
-        self.logger = logger or get_logger("model.metrics")
+        self.logger = logger or get_logger()
         
         # Dapatkan konfigurasi layer
         self.layer_config = get_layer_config()

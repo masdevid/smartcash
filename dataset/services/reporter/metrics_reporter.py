@@ -25,7 +25,7 @@ class MetricsReporter:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("metrics_reporter")
+        self.logger = logger or get_logger()
         
         # Setup layer config
         self.layer_config = get_layer_config()

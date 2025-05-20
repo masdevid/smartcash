@@ -30,7 +30,7 @@ class DataVisualizationHelper(VisualizationBase):
         """
         super().__init__()
         self.output_dir = Path(output_dir)
-        self.logger = logger or get_logger("DataVisualization")
+        self.logger = logger or get_logger()
         
         # Buat direktori output jika belum ada
         os.makedirs(self.output_dir, exist_ok=True)

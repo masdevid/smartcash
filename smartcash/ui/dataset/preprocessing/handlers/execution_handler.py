@@ -14,7 +14,7 @@ from smartcash.common.logger import get_logger
 # Import handler terpisah untuk SRP
 from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
 
-logger = get_logger("preprocessing_execution")
+logger = get_logger()
 
 def run_preprocessing(ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
@@ -28,7 +28,7 @@ def run_preprocessing(ui_components: Dict[str, Any], config: Optional[Dict[str, 
         Dictionary hasil preprocessing
     """
     # Dapatkan logger jika tersedia
-    logger = ui_components.get('logger', get_logger('preprocessing_execution'))
+    logger = ui_components.get('logger', get_logger())
     
     # Tandai waktu mulai untuk perhitungan durasi
     start_time = time.time()

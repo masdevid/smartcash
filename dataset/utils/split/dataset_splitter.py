@@ -28,7 +28,7 @@ class DatasetSplitter:
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("dataset_splitter")
+        self.logger = logger or get_logger()
         
         self.logger.info(f"✂️ DatasetSplitter diinisialisasi dengan data_dir: {self.data_dir}")
     

@@ -26,7 +26,7 @@ def on_start_click(b, ui_components: Dict[str, Any], logger=None):
         logger: Logger untuk mencatat aktivitas
     """
     # Dapatkan logger jika tidak disediakan
-    logger = logger or get_logger("training_ui")
+    logger = logger or get_logger()
     
     # Dapatkan status training
     training_status = get_training_status()
@@ -68,7 +68,7 @@ def on_stop_click(b, ui_components: Dict[str, Any], logger=None):
         logger: Logger untuk mencatat aktivitas
     """
     # Dapatkan logger jika tidak disediakan
-    logger = logger or get_logger("training_ui")
+    logger = logger or get_logger()
     
     # Dapatkan status training
     training_status = get_training_status()
@@ -101,7 +101,7 @@ def register_button_handlers(ui_components: Dict[str, Any], logger=None):
         Dict berisi komponen UI dengan handler terpasang
     """
     # Dapatkan logger jika tidak disediakan
-    logger = logger or get_logger("training_ui")
+    logger = logger or get_logger()
     
     try:
         # Pasang handler ke tombol start

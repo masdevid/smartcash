@@ -38,7 +38,7 @@ def notify_log(
         observer_manager: Observer manager opsional
         **kwargs: Parameter tambahan
     """
-    logger = get_logger("download")
+    logger = get_logger()
     
     # Map level ke event dan fungsi logger
     level_mapping = {
@@ -93,7 +93,7 @@ def notify_progress(
         observer_manager: Observer manager opsional
         **kwargs: Parameter tambahan
     """
-    logger = get_logger("download")
+    logger = get_logger()
     
     # Map event_type ke event
     event_mapping = {

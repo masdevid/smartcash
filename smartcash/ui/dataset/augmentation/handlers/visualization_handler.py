@@ -27,7 +27,7 @@ def visualize_augmented_images(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dict dengan status dan pesan hasil visualisasi
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Dapatkan direktori augmentasi

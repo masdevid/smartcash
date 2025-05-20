@@ -20,7 +20,7 @@ def create_combined_options(config: Dict[str, Any] = None) -> widgets.VBox:
     from smartcash.common.config.manager import get_config_manager
     from smartcash.common.logger import get_logger
     
-    logger = get_logger('augmentation')
+    logger = get_logger()
     
     try:
         # Dapatkan konfigurasi augmentasi
@@ -232,7 +232,7 @@ def create_basic_options(config: Dict[str, Any] = None) -> widgets.VBox:
     from smartcash.common.config.manager import get_config_manager
     from smartcash.common.logger import get_logger
     
-    logger = get_logger('augmentation')
+    logger = get_logger()
     
     try:
         # Dapatkan konfigurasi augmentasi
@@ -341,7 +341,7 @@ def create_augmentation_options(config: Dict[str, Any] = None) -> widgets.VBox:
     from smartcash.common.config.manager import get_config_manager
     from smartcash.common.logger import get_logger
     
-    logger = get_logger('augmentation')
+    logger = get_logger()
     logger.info(f"🔧 Membuat komponen opsi augmentasi")
     
     try:

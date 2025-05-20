@@ -52,7 +52,7 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi download
     """
-    logger = ui_components.get('logger', get_logger('download'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Get config manager
@@ -106,7 +106,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger('download'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Get config from UI
@@ -136,7 +136,7 @@ def get_download_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi download
     """
-    logger = ui_components.get('logger', get_logger('download'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Get config manager
@@ -166,7 +166,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
         ui_components: Dictionary komponen UI
         config_to_use: Konfigurasi yang akan digunakan
     """
-    logger = ui_components.get('logger', get_logger('download'))
+    logger = ui_components.get('logger', get_logger())
     
     try:
         # Get config

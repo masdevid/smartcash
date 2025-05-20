@@ -45,7 +45,7 @@ class BatchPredictionProcessor:
         
         self.num_workers = num_workers
         self.batch_size = batch_size
-        self.logger = logger or get_logger("batch_predictor")
+        self.logger = logger or get_logger()
         
         self.logger.info(
             f"🔄 Batch prediction processor diinisialisasi:\n"

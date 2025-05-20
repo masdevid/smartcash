@@ -31,7 +31,7 @@ class BalanceService:
         """
         self.config = config
         self.data_dir = Path(data_dir)
-        self.logger = logger or get_logger("balance_service")
+        self.logger = logger or get_logger()
         self.num_workers = num_workers
         
         # Setup utils

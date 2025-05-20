@@ -97,7 +97,7 @@ def ensure_ui_persistence(ui_components: Dict[str, Any], module_name: str = 'tra
         config_manager = get_config_manager()
         config_manager.register_ui_components(module_name, ui_components)
     except Exception as e:
-        logger = get_logger("training_ui")
+        logger = get_logger()
         logger.error(f"❌ Error saat memastikan persistensi UI: {str(e)}")
 
 def update_button_states(ui_components: Dict[str, Any], training_active: bool):

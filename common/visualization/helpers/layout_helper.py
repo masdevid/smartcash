@@ -24,7 +24,7 @@ class LayoutHelper:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("layout_helper")
+        self.logger = logger or get_logger()
         self.logger.info("📐 LayoutHelper diinisialisasi")
     
     def create_grid_layout(

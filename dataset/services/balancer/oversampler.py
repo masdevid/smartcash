@@ -26,7 +26,7 @@ class Oversampler:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("oversampler")
+        self.logger = logger or get_logger()
         
         self.logger.info(f"⬆️ Oversampler diinisialisasi untuk menyeimbangkan dataset")
     

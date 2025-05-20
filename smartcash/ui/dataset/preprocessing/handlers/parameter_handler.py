@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 
-logger = get_logger("preprocessing_params")
+logger = get_logger()
 
 def extract_preprocess_params(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

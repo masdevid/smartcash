@@ -42,7 +42,7 @@ class ExperimentMetricsTracker:
         self.metrics_dir = self.experiment_dir / "metrics"
         self.metrics_dir.mkdir(parents=True, exist_ok=True)
         
-        self.logger = logger or get_logger("experiment_metrics_tracker")
+        self.logger = logger or get_logger()
         
         # Default metrik yang dilacak
         self.metrics_to_track = metrics_to_track or [

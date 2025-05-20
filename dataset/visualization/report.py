@@ -29,7 +29,7 @@ class ReportVisualizer(VisualizationBase):
         """
         super().__init__()
         self.output_dir = Path(output_dir)
-        self.logger = logger or get_logger("report_visualizer")
+        self.logger = logger or get_logger()
         
         # Buat direktori output jika belum ada
         self.output_dir.mkdir(parents=True, exist_ok=True)

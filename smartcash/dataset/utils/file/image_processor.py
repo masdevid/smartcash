@@ -30,7 +30,7 @@ class ImageProcessor:
         """
         self.config = config or {}
         self.data_dir = Path(data_dir or self.config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("image_processor")
+        self.logger = logger or get_logger()
         self.num_workers = num_workers
         
         self.logger.info(f"🖼️ ImageProcessor diinisialisasi dengan data_dir: {self.data_dir}")

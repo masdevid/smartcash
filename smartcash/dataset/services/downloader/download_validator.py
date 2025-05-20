@@ -27,7 +27,7 @@ class DownloadValidator:
             logger: Logger kustom (opsional)
             num_workers: Jumlah worker untuk operasi paralel (opsional)
         """
-        self.logger = logger or get_logger("download_validator")
+        self.logger = logger or get_logger()
         # Optimasi: gunakan CPU count sebagai default tapi batasi maksimum
         self.num_workers = min(num_workers or (os.cpu_count() or 2), 8)
     

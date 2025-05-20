@@ -63,7 +63,7 @@ class EnvironmentManager:
             
             # Initialize logger properly
             if logger is None:
-                self.logger = get_logger("environment_manager")
+                self.logger = get_logger()
             else:
                 self.logger = logger
                 

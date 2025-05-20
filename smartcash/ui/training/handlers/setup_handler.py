@@ -27,7 +27,7 @@ def setup_training_handlers(ui_components: Dict[str, Any], env=None, config=None
     """
     try:
         # Dapatkan logger
-        logger = ui_components.get('logger', None) or get_logger("training_ui")
+        logger = ui_components.get('logger', None) or get_logger()
         
         # Dapatkan environment manager jika belum tersedia
         env = env or get_environment_manager()
@@ -52,7 +52,7 @@ def setup_training_handlers(ui_components: Dict[str, Any], env=None, config=None
     
     except Exception as e:
         # Fallback jika terjadi error
-        logger = get_logger("training_ui")
+        logger = get_logger()
         logger.error(f"{ICONS.get('error', '❌')} Error saat setup training handlers: {str(e)}")
         
         # Tampilkan pesan error
@@ -160,6 +160,6 @@ def update_training_info_from_config(ui_components: Dict[str, Any], config_manag
     
     except Exception as e:
         # Log error tapi jangan gagalkan inisialisasi UI
-        logger = get_logger("training_ui")
+        logger = get_logger()
         logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat update training info: {str(e)}")
 

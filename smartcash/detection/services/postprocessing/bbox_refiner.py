@@ -28,7 +28,7 @@ class BBoxRefiner:
         """
         self.clip_boxes = clip_boxes
         self.expand_factor = expand_factor
-        self.logger = logger or get_logger("BBoxRefiner")
+        self.logger = logger or get_logger()
     
     def process(self, 
                detections: List[Detection],

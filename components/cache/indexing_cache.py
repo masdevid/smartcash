@@ -24,7 +24,7 @@ class CacheIndex:
             logger: Logger kustom (opsional)
         """
         self.cache_dir = Path(cache_dir)
-        self.logger = logger or get_logger("cache_index")
+        self.logger = logger or get_logger()
         self.index_path = cache_dir / "cache_index.json"
         self._lock = threading.RLock()
         self.index = {}

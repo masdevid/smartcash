@@ -22,7 +22,7 @@ class DatasetManager:
             config: Konfigurasi dataset
             logger: Logger kustom
         """
-        self.logger = logger or get_logger("dataset_manager")
+        self.logger = logger or get_logger()
         
         # Default config
         self.config = self._initialize_config(config)

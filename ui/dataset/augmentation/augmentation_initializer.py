@@ -9,7 +9,7 @@ from smartcash.ui.dataset.augmentation.components.augmentation_component import 
 from smartcash.ui.dataset.augmentation.handlers.setup_handlers import setup_augmentation_handlers
 from smartcash.common.logger import get_logger
 
-logger = get_logger("augmentation_initializer")
+logger = get_logger()
 
 def initialize_augmentation_ui() -> Dict[str, Any]:
     """

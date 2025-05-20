@@ -46,7 +46,7 @@ class EvaluationService:
         """
         # Inisialisasi dasar
         self.config = config
-        self.logger = logger or get_logger("model.evaluation")
+        self.logger = logger or get_logger()
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Setup direktori output

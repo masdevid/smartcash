@@ -83,7 +83,7 @@ def sync_smartcash_configs():
     try:
         # Import logger
         from smartcash.common.logger import get_logger
-        logger = get_logger("config_sync")
+        logger = get_logger()
         
         # Dapatkan environment manager
         from smartcash.common.environment import get_environment_manager

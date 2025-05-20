@@ -30,7 +30,7 @@ class DetectionHandler:
         """
         self.inference_service = inference_service
         self.postprocessing_service = postprocessing_service
-        self.logger = logger or get_logger("DetectionHandler")
+        self.logger = logger or get_logger()
     
     def detect(self, 
                image: ImageType, 

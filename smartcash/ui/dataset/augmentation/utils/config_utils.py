@@ -11,7 +11,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 from smartcash.common.config.manager import get_config_manager
 
-logger = get_logger("augmentation_config")
+logger = get_logger()
 
 # Konstanta untuk konfigurasi default
 DEFAULT_CONFIG_PATH = "configs/augmentation_config.yaml"

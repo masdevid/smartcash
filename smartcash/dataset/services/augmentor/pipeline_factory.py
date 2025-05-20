@@ -23,7 +23,7 @@ class AugmentationPipelineFactory:
             logger: Logger kustom (opsional)
         """
         self.config = config or {}
-        self.logger = logger or get_logger("pipeline_factory")
+        self.logger = logger or get_logger()
         
         # Ekstrak parameter dari config
         self.aug_config = self.config.get('augmentation', {})

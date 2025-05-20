@@ -41,7 +41,7 @@ class CacheManager:
             cleanup_interval_mins: Interval pembersihan dalam menit
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("cache_manager")
+        self.logger = logger or get_logger()
         self.cache_dir = Path(cache_dir)
         self.max_size_bytes = int(max_size_gb * 1024 * 1024 * 1024)
         self.ttl_seconds = ttl_hours * 3600

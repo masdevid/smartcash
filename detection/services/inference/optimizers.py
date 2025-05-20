@@ -20,7 +20,7 @@ class ModelOptimizer:
         Args:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
-        self.logger = logger or get_logger("ModelOptimizer")
+        self.logger = logger or get_logger()
     
     def optimize_to_onnx(self, 
                         model, 

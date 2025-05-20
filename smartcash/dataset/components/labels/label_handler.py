@@ -24,7 +24,7 @@ class LabelHandler:
             logger: Logger kustom (opsional)
         """
         self.label_dir = Path(label_dir)
-        self.logger = logger or get_logger("label_handler")
+        self.logger = logger or get_logger()
         
         # Pastikan direktori label ada
         if not self.label_dir.exists():

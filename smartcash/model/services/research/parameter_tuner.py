@@ -40,7 +40,7 @@ class ParameterTuner:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
         self.base_dir = Path(base_dir)
-        self.logger = logger or get_logger("parameter_tuner")
+        self.logger = logger or get_logger()
         self.experiment_runner = experiment_runner
         self.experiment_creator = experiment_creator
         

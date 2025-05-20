@@ -21,7 +21,7 @@ def update_training_info(ui_components: Dict[str, Any], logger=None):
     """
     try:
         # Dapatkan logger jika tidak disediakan
-        logger = logger or get_logger("training_ui")
+        logger = logger or get_logger()
         
         # Dapatkan ConfigManager
         config_manager = get_config_manager()

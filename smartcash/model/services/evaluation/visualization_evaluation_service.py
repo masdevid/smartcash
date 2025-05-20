@@ -43,7 +43,7 @@ class EvaluationVisualizer:
             logger: Logger instance
         """
         self.config = config
-        self.logger = logger or get_logger("model.evaluation.viz")
+        self.logger = logger or get_logger()
         
         # Setup direktori output
         self.output_dir = Path(output_dir) if output_dir else Path("runs/evaluation/visualizations")

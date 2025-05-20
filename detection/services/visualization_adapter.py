@@ -30,7 +30,7 @@ class DetectionVisualizationAdapter(IDetectionVisualizer, IMetricsVisualizer):
             metrics_output_dir: Direktori output untuk visualisasi metrik
             logger: Logger untuk logging
         """
-        self.logger = logger or get_logger("detection_visualization_adapter")
+        self.logger = logger or get_logger()
         
         # Inisialisasi visualizer dari domain model
         self.detection_visualizer = DetectionVisualizer(detection_output_dir)

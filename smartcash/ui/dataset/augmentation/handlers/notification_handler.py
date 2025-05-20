@@ -17,7 +17,7 @@ def notify_process_start(ui_components: Dict[str, Any], process_name: str = "aug
         display_info: Informasi tambahan untuk ditampilkan
         split: Split dataset yang diproses (opsional)
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     if logger: logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
     
     # Panggil callback jika tersedia
@@ -46,7 +46,7 @@ def notify_process_stop(ui_components: Dict[str, Any], display_info: str = "") -
         ui_components: Dictionary komponen UI
         display_info: Informasi tambahan untuk ditampilkan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     if logger: logger.info(f"{ICONS['stop']} Augmentasi {display_info} dihentikan")
     
     # Panggil callback jika tersedia
@@ -74,7 +74,7 @@ def notify_process_complete(ui_components: Dict[str, Any], result: Optional[Dict
         result: Hasil augmentasi
         display_info: Informasi tambahan untuk ditampilkan
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     if logger: logger.info(f"{ICONS['success']} Augmentasi {display_info} selesai")
     
     # Panggil callback jika tersedia
@@ -100,7 +100,7 @@ def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> N
         ui_components: Dictionary komponen UI
         error_message: Pesan error yang terjadi
     """
-    logger = ui_components.get('logger', get_logger('augmentation'))
+    logger = ui_components.get('logger', get_logger())
     if logger: logger.error(f"{ICONS['error']} Error pada augmentasi: {error_message}")
     
     # Panggil callback jika tersedia

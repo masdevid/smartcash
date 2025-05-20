@@ -50,7 +50,7 @@ class ProgressTracker:
         if logger is None:
             try:
                 from smartcash.common.logger import get_logger
-                self.logger = get_logger("progress_tracker")
+                self.logger = get_logger()
             except ImportError:
                 import logging
                 self.logger = logging.getLogger("progress_tracker")

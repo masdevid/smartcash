@@ -40,7 +40,7 @@ class ObserverManager:
             max_workers: Jumlah maksimum worker thread (None untuk auto)
         """
         self.auto_register = auto_register
-        self.logger = logger or get_logger("observer_manager")
+        self.logger = logger or get_logger()
         self._observer_groups = {}  # Group -> set(observer_weakrefs)
         self._observers = weakref.WeakSet()  # Semua observer
         self._lock = RLock()

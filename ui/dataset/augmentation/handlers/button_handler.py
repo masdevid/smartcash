@@ -13,7 +13,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.augmentation.utils.notification_manager import get_notification_manager
 
-logger = get_logger("augmentation_button_handler")
+logger = get_logger()
 
 def notify_process_stop(ui_components: Dict[str, Any], display_info: str = "") -> None:
     """Notifikasi observer bahwa proses telah dihentikan oleh pengguna."""
@@ -228,7 +228,7 @@ def setup_augmentation_button_handlers(
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger('augmentation_button'))
+    logger = ui_components.get('logger', get_logger())
     
     # Handler tombol primary dengan dukungan progress tracking
     def on_primary_click(b):

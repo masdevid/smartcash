@@ -31,7 +31,7 @@ class DatasetValidatorService:
         """
         self.config = config
         self.data_dir = Path(data_dir)
-        self.logger = logger or get_logger("dataset_validator")
+        self.logger = logger or get_logger()
         self.num_workers = num_workers
         self.invalid_dir = self.data_dir / 'invalid'
         

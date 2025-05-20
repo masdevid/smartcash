@@ -27,7 +27,7 @@ class DatasetMerger:
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("dataset_merger")
+        self.logger = logger or get_logger()
         
         self.logger.info(f"🔄 DatasetMerger diinisialisasi dengan data_dir: {self.data_dir}")
     

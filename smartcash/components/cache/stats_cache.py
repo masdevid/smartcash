@@ -19,7 +19,7 @@ class CacheStats:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("cache_stats")
+        self.logger = logger or get_logger()
         self._lock = threading.RLock()
         self.reset()
     

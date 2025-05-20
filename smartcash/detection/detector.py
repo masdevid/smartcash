@@ -36,7 +36,7 @@ class Detector:
             visualization_adapter: Adapter visualisasi custom (opsional)
             logger: Logger untuk mencatat aktivitas (opsional)
         """
-        self.logger = logger or get_logger("Detector")
+        self.logger = logger or get_logger()
         
         # Setup inference service
         if inference_service is not None:

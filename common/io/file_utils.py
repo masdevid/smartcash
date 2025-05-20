@@ -87,7 +87,7 @@ def copy_files(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("file_utils")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("file_utils")
@@ -195,7 +195,7 @@ def move_files(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("file_utils")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("file_utils")
@@ -294,7 +294,7 @@ def backup_directory(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("file_utils")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("file_utils")
@@ -363,7 +363,7 @@ def extract_zip(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("file_utils")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("file_utils")
@@ -482,7 +482,7 @@ def find_corrupted_images(
     if logger is None:
         try:
             from smartcash.common.logger import get_logger
-            logger = get_logger("file_utils")
+            logger = get_logger()
         except ImportError:
             import logging
             logger = logging.getLogger("file_utils")

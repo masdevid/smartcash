@@ -26,7 +26,7 @@ class TrainingCallbacks:
         Args:
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger or get_logger("training_callbacks")
+        self.logger = logger or get_logger()
         self.callbacks = []
         
     def add_callback(self, callback: Callable) -> None:
@@ -81,7 +81,7 @@ class TrainingCallbacks:
         best_metric = float('inf') if mode == 'min' else float('-inf')
         
         # Set logger
-        local_logger = logger or get_logger("checkpoint_callback")
+        local_logger = logger or get_logger()
         
         # Callback function
         def checkpoint_callback(metrics: Dict[str, Any]) -> None:
@@ -140,7 +140,7 @@ class TrainingCallbacks:
             Fungsi callback
         """
         # Set logger
-        local_logger = logger or get_logger("progress_callback")
+        local_logger = logger or get_logger()
         
         # Simpan waktu mulai untuk perhitungan ETA
         start_time = time.time()
@@ -232,7 +232,7 @@ class TrainingCallbacks:
             Fungsi callback
         """
         # Set logger
-        local_logger = logger or get_logger("reduce_lr_callback")
+        local_logger = logger or get_logger()
         
         # State counter dan best metric
         counter = 0

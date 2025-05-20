@@ -27,7 +27,7 @@ class ConfidenceFilter:
         """
         self.default_threshold = default_threshold
         self.class_thresholds = class_thresholds or {}
-        self.logger = logger or get_logger("ConfidenceFilter")
+        self.logger = logger or get_logger()
     
     def process(self, 
                detections: List[Detection],

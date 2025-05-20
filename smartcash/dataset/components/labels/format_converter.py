@@ -23,7 +23,7 @@ class LabelFormatConverter:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("label_format_converter")
+        self.logger = logger or get_logger()
     
     def yolo_to_coco(self, yolo_dir: Union[str, Path], img_dir: Union[str, Path], 
                    class_names: List[str], output_file: Union[str, Path]) -> Dict:

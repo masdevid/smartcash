@@ -39,7 +39,7 @@ class CheckpointService(ICheckpointService):
         """
         self.checkpoint_dir = Path(checkpoint_dir)
         self.max_checkpoints = max_checkpoints
-        self.logger = logger or get_logger("checkpoint_service")
+        self.logger = logger or get_logger()
         
         # Buat direktori jika belum ada
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)

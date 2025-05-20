@@ -22,7 +22,7 @@ class ResultFormatter:
         Args:
             logger: Logger untuk mencatat aktivitas (opsional)
         """
-        self.logger = logger or get_logger("ResultFormatter")
+        self.logger = logger or get_logger()
     
     def to_json(self, 
                detections: List[Detection], 

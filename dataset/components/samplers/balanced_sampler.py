@@ -40,7 +40,7 @@ class BalancedBatchSampler(Sampler):
         self.batch_size = batch_size
         self.class_getter = class_getter
         self.drop_last = drop_last
-        self.logger = logger or get_logger("balanced_batch_sampler")
+        self.logger = logger or get_logger()
         
         # Map kelas ke indeks sampel
         self.class_indices = self._build_class_indices()

@@ -33,7 +33,7 @@ class DistributionAnalyzer:
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("distribution_analyzer")
+        self.logger = logger or get_logger()
         self.num_workers = num_workers
         
         # Setup utils

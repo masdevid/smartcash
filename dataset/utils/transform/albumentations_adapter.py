@@ -21,7 +21,7 @@ class AlbumentationsAdapter:
         Args:
             logger: Logger kustom (opsional)
         """
-        self.logger = logger or get_logger("albumentations_adapter")
+        self.logger = logger or get_logger()
     
     def get_basic_transforms(
         self, 

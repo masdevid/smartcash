@@ -28,7 +28,7 @@ class CacheStorage:
             logger: Logger kustom (opsional)
         """
         self.cache_dir = Path(cache_dir)
-        self.logger = logger or get_logger("cache_storage")
+        self.logger = logger or get_logger()
         self._thread_pool = ThreadPoolExecutor(max_workers=get_optimal_thread_count(), thread_name_prefix="CacheStorage")
     
     def create_cache_key(self, file_path: str, params: Dict) -> str:

@@ -9,7 +9,7 @@ from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 
-logger = get_logger("preprocessing_initialization")
+logger = get_logger()
 
 def initialize_preprocessing_directories(
     ui_components: Dict[str, Any], 

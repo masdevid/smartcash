@@ -28,7 +28,7 @@ class DatasetStratifier:
         """
         self.config = config
         self.data_dir = Path(data_dir or config.get('data_dir', 'data'))
-        self.logger = logger or get_logger("dataset_stratifier")
+        self.logger = logger or get_logger()
         
         # Setup layer config
         self.layer_config = get_layer_config()

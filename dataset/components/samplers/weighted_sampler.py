@@ -42,7 +42,7 @@ class WeightedSampler(Sampler):
         self.class_weights = class_weights or {}
         self.class_getter = class_getter
         self.replacement = replacement
-        self.logger = logger or get_logger("weighted_sampler")
+        self.logger = logger or get_logger()
         
         # Hitung bobot sampling untuk setiap sampel
         self.sample_weights = self._compute_sample_weights()
@@ -137,7 +137,7 @@ class WeightedSampler(Sampler):
         Returns:
             Instance WeightedSampler
         """
-        logger = kwargs.get('logger') or get_logger("weighted_sampler")
+        logger = kwargs.get('logger') or get_logger()
         
         # Hitung bobot berdasarkan hitungan kelas
         if not class_counts:

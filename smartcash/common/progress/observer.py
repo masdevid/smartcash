@@ -66,7 +66,7 @@ class ProgressObserver:
         if logger is None:
             try:
                 from smartcash.common.logger import get_logger
-                self.logger = get_logger("progress_observer")
+                self.logger = get_logger()
             except ImportError:
                 import logging
                 self.logger = logging.getLogger("progress_observer")
@@ -176,7 +176,7 @@ class ProgressEventEmitter:
         if logger is None:
             try:
                 from smartcash.common.logger import get_logger
-                self.logger = get_logger("progress_emitter")
+                self.logger = get_logger()
             except ImportError:
                 import logging
                 self.logger = logging.getLogger("progress_emitter")

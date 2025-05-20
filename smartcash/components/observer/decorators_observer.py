@@ -15,7 +15,7 @@ from smartcash.common.logger import get_logger
 import os
 
 # Logger
-_logger = get_logger("observer_decorators")
+_logger = get_logger()
 
 # Lock untuk thread-safety
 _lock = RLock()

@@ -28,7 +28,7 @@ class DatasetLoaderService:
         """
         self.config = config
         self.data_dir = Path(data_dir)
-        self.logger = logger or get_logger("dataset_loader")
+        self.logger = logger or get_logger()
         
         # Setup parameter default
         self.img_size = tuple(config.get('model', {}).get('input_size', DEFAULT_IMG_SIZE))

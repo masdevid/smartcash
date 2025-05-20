@@ -38,7 +38,7 @@ def create_training_ui(env=None, config=None) -> Dict[str, Any]:
     from smartcash.ui.info_boxes.training_info import get_training_info
     
     # Dapatkan logger
-    logger = get_logger("training_ui")
+    logger = get_logger()
     
     # Header
     header = create_header(

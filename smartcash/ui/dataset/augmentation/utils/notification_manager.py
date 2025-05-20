@@ -18,7 +18,7 @@ class NotificationManager:
             ui_components: Dictionary komponen UI
         """
         self.ui_components = ui_components
-        self.logger = ui_components.get('logger', get_logger('augmentation'))
+        self.logger = ui_components.get('logger', get_logger())
     
     def update_status(self, status_type: str, message: str) -> None:
         """

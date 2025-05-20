@@ -25,7 +25,7 @@ class MultilayerLabelHandler:
             config: Konfigurasi aplikasi (opsional)
         """
         self.label_dir = Path(label_dir)
-        self.logger = logger or get_logger("multilayer_label_handler")
+        self.logger = logger or get_logger()
         self.config = config or {}
         
         # Setup layer config

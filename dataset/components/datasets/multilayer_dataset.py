@@ -46,7 +46,7 @@ class MultilayerDataset(Dataset):
         self.transform = transform
         self.require_all_layers = require_all_layers
         self.config = config or {}
-        self.logger = logger or get_logger("multilayer_dataset")
+        self.logger = logger or get_logger()
         
         # Setup layer config
         self.layer_config_manager = get_layer_config()

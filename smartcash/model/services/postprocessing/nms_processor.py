@@ -24,7 +24,7 @@ class NMSProcessor:
         Args:
             logger: Logger untuk mencatat aktivitas
         """
-        self.logger = logger or get_logger("nms_processor")
+        self.logger = logger or get_logger()
     
     def process(
         self,

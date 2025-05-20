@@ -31,9 +31,9 @@ def get_default_base_dir():
         return "/content"
     return str(Path.home() / "SmartCash")
 
-def get_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
+def initialize_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Mendapatkan komponen UI untuk konfigurasi hyperparameter.
+    Inisialisasi dan tampilkan UI untuk konfigurasi hyperparameter.
     
     Args:
         env: Environment manager
@@ -59,47 +59,30 @@ def get_hyperparameters_ui(env: Any = None, config: Dict[str, Any] = None) -> Di
                 # Update info panel
                 if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
                     ui_components['update_hyperparameters_info'](ui_components)
+        else:
+            # Jika tidak ada, inisialisasi UI baru
+            # Dapatkan environment manager jika belum tersedia
+            env = env or get_environment_manager(base_dir=get_default_base_dir())
             
-            return ui_components
+            # Validasi config
+            if config is None:
+                config = config_manager.get_module_config('hyperparameters', {})
+            
+            # Buat komponen UI
+            ui_components = create_hyperparameters_ui_components()
+            
+            # Setup button handlers
+            ui_components = setup_hyperparameters_button_handlers(ui_components, env, config)
+            
+            # Setup form handlers
+            ui_components = setup_hyperparameters_form_handlers(ui_components, env, config)
+            
+            # Update UI dari config
+            update_ui_from_config(ui_components, config)
+            
+            # Simpan UI components ke config manager
+            config_manager.register_ui_components('hyperparameters', ui_components)
         
-        # Jika tidak ada, inisialisasi UI baru
-        # Dapatkan environment manager jika belum tersedia
-        env = env or get_environment_manager(base_dir=get_default_base_dir())
-        
-        # Validasi config
-        if config is None:
-            config = config_manager.get_module_config('hyperparameters', {})
-        
-        # Buat komponen UI
-        ui_components = create_hyperparameters_ui_components()
-        
-        # Setup button handlers
-        ui_components = setup_hyperparameters_button_handlers(ui_components, env, config)
-        
-        # Setup form handlers
-        ui_components = setup_hyperparameters_form_handlers(ui_components, env, config)
-        
-        # Update UI dari config
-        update_ui_from_config(ui_components, config)
-        
-        # Simpan UI components ke config manager
-        config_manager.register_ui_components('hyperparameters', ui_components)
-        
-        logger.info("UI hyperparameter berhasil diinisialisasi")
-        return ui_components
-        
-    except Exception as e:
-        logger.error(f"Error saat inisialisasi UI hyperparameter: {str(e)}")
-        raise
-
-def display_hyperparameters_ui(ui_components: Dict[str, Any]) -> None:
-    """
-    Menampilkan UI hyperparameter.
-    
-    Args:
-        ui_components: Komponen UI
-    """
-    try:
         # Tampilkan header
         display(create_header(
             title="Konfigurasi Hyperparameter",
@@ -115,9 +98,14 @@ def display_hyperparameters_ui(ui_components: Dict[str, Any]) -> None:
                 f"{ICONS.get('error', '❌')} Layout utama tidak ditemukan",
                 alert_type='error'
             ))
+        
+        logger.info("UI hyperparameter berhasil diinisialisasi")
+        return ui_components
+        
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat menampilkan UI hyperparameter: {str(e)}")
+        logger.error(f"Error saat inisialisasi UI hyperparameter: {str(e)}")
         display(create_info_alert(
-            f"{ICONS.get('error', '❌')} Error saat menampilkan UI hyperparameter: {str(e)}",
+            f"{ICONS.get('error', '❌')} Error saat inisialisasi UI hyperparameter: {str(e)}",
             alert_type='error'
         ))
+        raise

@@ -1,25 +1,21 @@
 """
 File: smartcash/ui/dataset/split/handlers/button_handlers.py
-Deskripsi: Handler untuk button events split dataset
+Deskripsi: Handler untuk button di split dataset
 """
 
 from typing import Dict, Any, Optional
+import ipywidgets as widgets
+from IPython.display import display
 from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.split.handlers.config_handlers import get_split_config, update_config_from_ui, update_ui_from_config
-from smartcash.common.config import get_config_manager
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.alert_utils import create_info_alert
+from smartcash.ui.dataset.split.handlers.config_handlers import load_config, save_config, update_ui_from_config
 
 logger = get_logger(__name__)
 
-def get_default_base_dir():
-    import os
-    from pathlib import Path
-    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
-        return "/content"
-    return str(Path.home() / "SmartCash")
-
-def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def setup_button_handlers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Handle click event untuk split button.
+    Setup handler untuk button di split dataset.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -28,45 +24,76 @@ def handle_split_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary komponen UI yang telah diupdate
     """
     try:
-        # Get config
-        config = get_split_config(ui_components)
-        
-        # Update config from UI
-        updated_config = update_config_from_ui(ui_components)
-        
-        # Update UI from config
-        update_ui_from_config(ui_components, updated_config)
-        
-        logger.info("✅ Split button berhasil dihandle")
-        
+        # Reset button handler
+        if 'reset_button' in ui_components:
+            def on_reset_clicked(b):
+                try:
+                    # Load default config
+                    config = load_config()
+                    # Update UI
+                    update_ui_from_config(ui_components, config)
+                    # Save config
+                    save_config(config)
+                    # Show success message
+                    display(create_info_alert(
+                        f"{ICONS.get('success', '✅')} Konfigurasi berhasil direset ke default",
+                        alert_type='success'
+                    ))
+                except Exception as e:
+                    logger.error(f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}")
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Error saat reset konfigurasi: {str(e)}",
+                        alert_type='error'
+                    ))
+            
+            ui_components['reset_button'].on_click(on_reset_clicked)
+            
+        # Save button handler
+        if 'save_button' in ui_components:
+            def on_save_clicked(b):
+                try:
+                    # Get current config
+                    config = load_config()
+                    
+                    # Update config from UI
+                    if 'enabled_checkbox' in ui_components:
+                        config['split']['enabled'] = ui_components['enabled_checkbox'].value
+                        
+                    if 'train_ratio_slider' in ui_components:
+                        config['split']['train_ratio'] = ui_components['train_ratio_slider'].value
+                        
+                    if 'val_ratio_slider' in ui_components:
+                        config['split']['val_ratio'] = ui_components['val_ratio_slider'].value
+                        
+                    if 'test_ratio_slider' in ui_components:
+                        config['split']['test_ratio'] = ui_components['test_ratio_slider'].value
+                        
+                    if 'random_seed_input' in ui_components:
+                        config['split']['random_seed'] = ui_components['random_seed_input'].value
+                        
+                    if 'stratify_checkbox' in ui_components:
+                        config['split']['stratify'] = ui_components['stratify_checkbox'].value
+                    
+                    # Save config
+                    save_config(config)
+                    
+                    # Show success message
+                    display(create_info_alert(
+                        f"{ICONS.get('success', '✅')} Konfigurasi berhasil disimpan",
+                        alert_type='success'
+                    ))
+                except Exception as e:
+                    logger.error(f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}")
+                    display(create_info_alert(
+                        f"{ICONS.get('error', '❌')} Error saat menyimpan konfigurasi: {str(e)}",
+                        alert_type='error'
+                    ))
+            
+            ui_components['save_button'].on_click(on_save_clicked)
+            
+        logger.info(f"{ICONS.get('success', '✅')} Button handlers berhasil disetup")
         return ui_components
         
     except Exception as e:
-        logger.error(f"❌ Error saat handle split button: {str(e)}")
-        return ui_components
-
-def handle_reset_button_click(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Handle click event untuk reset button.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Dictionary komponen UI yang telah diupdate
-    """
-    try:
-        # Get default config
-        from smartcash.ui.dataset.split.handlers.config_handlers import get_default_split_config
-        default_config = get_default_split_config()
-        
-        # Update UI from default config
-        update_ui_from_config(ui_components, default_config)
-        
-        logger.info("✅ Reset button berhasil dihandle")
-        
-        return ui_components
-        
-    except Exception as e:
-        logger.error(f"❌ Error saat handle reset button: {str(e)}")
+        logger.error(f"{ICONS.get('error', '❌')} Error saat setup button handlers: {str(e)}")
         return ui_components

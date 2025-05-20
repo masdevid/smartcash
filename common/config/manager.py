@@ -9,11 +9,13 @@ from typing import Dict, Any, Optional, Union, Type, TypeVar, Callable, Tuple, L
 import logging
 import yaml
 
+from smartcash.common.logger import get_logger
 from smartcash.common.config.singleton import Singleton
 from smartcash.common.config.base_manager import BaseConfigManager
 from smartcash.common.config.module_manager import ModuleConfigManager
 from smartcash.common.config.drive_manager import DriveConfigManager
 from smartcash.common.config.dependency_manager import DependencyManager
+from smartcash.ui.utils.ui_logger import log_to_ui
 
 # Type variable untuk dependency injection
 T = TypeVar('T')
@@ -37,14 +39,8 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             raise ValueError("base_dir must not be None. Please provide a valid base directory for configuration.")
             
         # Initialize logger first
-        self._logger = logging.getLogger(__name__)
-        if not self._logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self._logger.addHandler(handler)
-            self._logger.setLevel(logging.INFO)
-            
+        self._logger = get_logger(__name__)
+        
         # Inisialisasi DriveConfigManager
         DriveConfigManager.__init__(self, base_dir, config_file, env_prefix)
         
@@ -63,11 +59,10 @@ class ConfigManager(DriveConfigManager, DependencyManager):
             bool: True jika sinkronisasi berhasil, False jika gagal
         """
         success, message = self.sync_to_drive(module_name)
-        if self._logger:
-            if success:
-                self._logger.info(f"✅ Sinkronisasi konfigurasi '{module_name}' ke Google Drive berhasil: {message}")
-            else:
-                self._logger.warning(f"⚠️ Sinkronisasi konfigurasi '{module_name}' ke Google Drive gagal: {message}")
+        if success:
+            log_to_ui(None, f"✅ Sinkronisasi konfigurasi '{module_name}' ke Google Drive berhasil: {message}", "success")
+        else:
+            log_to_ui(None, f"⚠️ Sinkronisasi konfigurasi '{module_name}' ke Google Drive gagal: {message}", "error")
         return success
 
 # Singleton instance
@@ -145,14 +140,8 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
     """
     global _config_manager
     
-    # Initialize logger dengan level ERROR saja
-    logger = logging.getLogger(__name__)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.setLevel(logging.ERROR)  # Set ke ERROR level
+    # Initialize logger
+    logger = get_logger(__name__)
     
     try:
         # Cek apakah kita di Colab
@@ -189,10 +178,9 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
             try:
                 config_dir.mkdir(parents=True, exist_ok=True)
             except Exception as e:
-                logger.error(f"❌ Gagal membuat direktori configs: {str(e)}")
+                log_to_ui(None, f"❌ Gagal membuat direktori configs: {str(e)}", "error")
                 
         # Pastikan file config ada dan load API_KEY dari Colab secret jika di Colab
-        loaded_config = None
         if not Path(config_file).exists():
             default_config = get_default_config()
             
@@ -203,45 +191,37 @@ def get_config_manager(base_dir=None, config_file=None, env_prefix='SMARTCASH_')
                     if api_key:
                         default_config['data']['roboflow']['api_key'] = api_key
                 except Exception as e:
-                    logger.error(f"❌ Gagal mengambil API_KEY dari Colab secret: {str(e)}")
+                    log_to_ui(None, f"❌ Gagal mengambil API_KEY dari Colab secret: {str(e)}", "error")
             
             try:
                 # Simpan default config
                 with open(config_file, 'w') as f:
                     yaml.dump(default_config, f)
-                loaded_config = default_config
             except Exception as e:
-                logger.error(f"❌ Gagal menyimpan default config: {str(e)}")
+                log_to_ui(None, f"❌ Gagal menyimpan default config: {str(e)}", "error")
         else:
             # Jika file config sudah ada dan di Colab, update API_KEY dari secret
-            try:
-                with open(config_file, 'r') as f:
-                    loaded_config = yaml.safe_load(f)
-                
-                if is_colab:
-                    try:
-                        api_key = userdata.get('ROBOFLOW_API_KEY')
-                        if api_key:
-                            loaded_config['data']['roboflow']['api_key'] = api_key
-                            with open(config_file, 'w') as f:
-                                yaml.dump(loaded_config, f)
-                    except Exception as e:
-                        logger.error(f"❌ Gagal update API_KEY dari Colab secret: {str(e)}")
-            except Exception as e:
-                logger.error(f"❌ Gagal membaca config file: {str(e)}")
+            if is_colab:
+                try:
+                    with open(config_file, 'r') as f:
+                        config = yaml.safe_load(f)
+                    
+                    api_key = userdata.get('ROBOFLOW_API_KEY')
+                    if api_key:
+                        config['data']['roboflow']['api_key'] = api_key
+                        with open(config_file, 'w') as f:
+                            yaml.dump(config, f)
+                except Exception as e:
+                    log_to_ui(None, f"❌ Gagal update API_KEY dari Colab secret: {str(e)}", "error")
                 
         # Buat atau dapatkan instance ConfigManager
         if _config_manager is None:
             _config_manager = ConfigManager(base_dir, config_file, env_prefix)
             
-        # Set loaded config ke instance jika ada
-        if loaded_config:
-            _config_manager.config = loaded_config
-            
         return _config_manager
         
     except Exception as e:
-        logger.error(f"❌ Error saat membuat ConfigManager: {str(e)}")
+        log_to_ui(None, f"❌ Error saat membuat ConfigManager: {str(e)}", "error")
         raise
 
 # Tambahkan method get_instance sebagai staticmethod untuk kompatibilitas

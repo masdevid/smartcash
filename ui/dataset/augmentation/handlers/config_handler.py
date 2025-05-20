@@ -279,3 +279,32 @@ def save_augmentation_config(config: Dict[str, Any]) -> bool:
     except Exception as e:
         # Kembalikan False jika error
         return False
+
+def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get konfigurasi augmentation dataset dari UI.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi augmentation dataset
+    """
+    try:
+        # Get config manager
+        config_manager = get_config_manager()
+        
+        # Get config
+        config = config_manager.get_module_config('dataset')
+        
+        # Ensure config structure
+        if not config:
+            config = get_default_augmentation_config()
+        elif 'augmentation' not in config:
+            config['augmentation'] = get_default_augmentation_config()['augmentation']
+            
+        return config
+        
+    except Exception as e:
+        logger.error(f"❌ Error saat get augmentation config: {str(e)}")
+        return get_default_augmentation_config()

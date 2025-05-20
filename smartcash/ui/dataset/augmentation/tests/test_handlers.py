@@ -171,16 +171,15 @@ class TestPersistenceHandler(unittest.TestCase):
         """Test untuk fungsi ensure_ui_persistence."""
         from smartcash.ui.dataset.augmentation.handlers.persistence_handler import ensure_ui_persistence
         
-        # Setup config manager mock
-        mock_config_manager = MagicMock()
-        self.mock_config_manager.return_value = mock_config_manager
-        
-        # Panggil fungsi yang akan ditest
-        result = ensure_ui_persistence(self.mock_ui_components)
-        
-        # Verifikasi hasil
-        self.assertEqual(result, self.mock_ui_components)
-        mock_config_manager.register_ui_components.assert_called_once_with('augmentation', self.mock_ui_components)
+        # Patch get_config_manager pada path handler
+        with patch('smartcash.ui.dataset.augmentation.handlers.persistence_handler.get_config_manager') as mock_get_config_manager:
+            mock_config_manager = MagicMock()
+            mock_get_config_manager.return_value = mock_config_manager
+            # Panggil fungsi yang akan ditest
+            result = ensure_ui_persistence(self.mock_ui_components)
+            # Verifikasi hasil
+            self.assertEqual(result, self.mock_ui_components)
+            mock_config_manager.register_ui_components.assert_called_once_with('augmentation', self.mock_ui_components)
     
     def test_get_augmentation_config(self):
         """Test untuk fungsi get_augmentation_config."""
@@ -237,23 +236,18 @@ class TestPersistenceHandler(unittest.TestCase):
     def test_setup_persistence_handler(self):
         """Test untuk fungsi setup_persistence_handler."""
         from smartcash.ui.dataset.augmentation.handlers.persistence_handler import setup_persistence_handler
-        
-        # Mock untuk ensure_ui_persistence
-        with patch('smartcash.ui.dataset.augmentation.handlers.persistence_handler.ensure_ui_persistence') as mock_ensure:
-            mock_ensure.return_value = self.mock_ui_components
-            
-            # Panggil fungsi yang akan ditest
+        # Patch get_config_manager pada path handler
+        with patch('smartcash.ui.dataset.augmentation.handlers.persistence_handler.get_config_manager') as mock_get_config_manager:
+            mock_config_manager = MagicMock()
+            mock_get_config_manager.return_value = mock_config_manager
+            # Panggil fungsi yang akan ditest tanpa mock ensure_ui_persistence
             result = setup_persistence_handler(self.mock_ui_components)
-            
             # Verifikasi hasil
             self.assertEqual(result, self.mock_ui_components)
-            mock_ensure.assert_called_once()
-            
             # Verifikasi bahwa fungsi ditambahkan ke ui_components
             self.assertIn('get_augmentation_config', result)
             self.assertIn('sync_config_with_drive', result)
             self.assertIn('reset_config_to_default', result)
-            
             # Verifikasi bahwa on_click handler ditambahkan ke save_button
             self.assertTrue(hasattr(self.mock_ui_components['save_button'], '_click_handlers'))
 

@@ -57,7 +57,7 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         
         # Tampilkan pesan sukses
         update_status_panel(ui_components, "Konfigurasi backbone berhasil disimpan", 'success')
-        logger.info("Konfigurasi backbone berhasil disimpan")
+        logger.info("Konfigurasi backbone berhasil disimpan dan UI diperbarui")
     except Exception as e:
         # Tampilkan pesan error
         update_status_panel(ui_components, f"Gagal menyimpan konfigurasi: {str(e)}", 'error')
@@ -78,11 +78,11 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         # Reset konfigurasi ke default
         config = get_default_backbone_config()
         
+        # Update UI dari konfigurasi default terlebih dahulu
+        update_ui_from_config(ui_components, config)
+        
         # Simpan konfigurasi default dan sinkronisasi
         saved_config = save_config(config, ui_components)
-        
-        # Update UI dari konfigurasi default
-        update_ui_from_config(ui_components, saved_config)
         
         # Update info panel
         update_backbone_info(ui_components)

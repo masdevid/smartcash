@@ -10,6 +10,7 @@ from pathlib import Path
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger, LogLevel
 from smartcash.ui.utils.constants import ICONS
+from ipywidgets import widgets
 
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
@@ -86,6 +87,8 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
         config = config_manager.get_module_config('model') or get_default_backbone_config()
         
+        logger.info("Mengupdate konfigurasi dari UI components")
+        
         # Update config from UI
         if 'enabled_checkbox' in ui_components:
             config['model']['enabled'] = ui_components['enabled_checkbox'].value
@@ -120,15 +123,28 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         if 'strict_weights_checkbox' in ui_components:
             config['model']['weights']['strict'] = ui_components['strict_weights_checkbox'].value
             
+        # Update model-specific settings
+        if 'model_type_dropdown' in ui_components:
+            config['model']['model_type'] = ui_components['model_type_dropdown'].value
+            
+        if 'use_attention_checkbox' in ui_components:
+            config['model']['use_attention'] = ui_components['use_attention_checkbox'].value
+            
+        if 'use_residual_checkbox' in ui_components:
+            config['model']['use_residual'] = ui_components['use_residual_checkbox'].value
+            
+        if 'use_ciou_checkbox' in ui_components:
+            config['model']['use_ciou'] = ui_components['use_ciou_checkbox'].value
+            
         # Save config
         config_manager.save_module_config('model', config)
         
-        logger.info("✅ Konfigurasi backbone berhasil diupdate")
+        logger.info("✅ Konfigurasi backbone berhasil diupdate dari UI")
         
         return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat update konfigurasi backbone: {str(e)}")
+        logger.error(f"❌ Error saat update konfigurasi backbone dari UI: {str(e)}")
         return get_default_backbone_config()
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
@@ -142,11 +158,15 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
     try:
         # Get config if not provided
         if config is None:
+            logger.info("Mengambil konfigurasi backbone dari config manager")
             config = get_backbone_config(ui_components)
             
         # Ensure config has backbone key
         if 'model' not in config:
+            logger.info("Menambahkan key 'model' ke konfigurasi")
             config['model'] = get_default_backbone_config()['model']
+            
+        logger.info(f"Memperbarui UI dari konfigurasi backbone")
             
         # Update UI components
         if 'enabled_checkbox' in ui_components:
@@ -182,17 +202,42 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         if 'strict_weights_checkbox' in ui_components:
             ui_components['strict_weights_checkbox'].value = config['model']['weights']['strict']
             
+        # Update model-specific settings
+        if 'model_type_dropdown' in ui_components and 'model_type' in config['model']:
+            ui_components['model_type_dropdown'].value = config['model']['model_type']
+            
+        if 'use_attention_checkbox' in ui_components and 'use_attention' in config['model']:
+            ui_components['use_attention_checkbox'].value = config['model']['use_attention']
+            
+        if 'use_residual_checkbox' in ui_components and 'use_residual' in config['model']:
+            ui_components['use_residual_checkbox'].value = config['model']['use_residual']
+            
+        if 'use_ciou_checkbox' in ui_components and 'use_ciou' in config['model']:
+            ui_components['use_ciou_checkbox'].value = config['model']['use_ciou']
+            
+        # Force update UI by triggering change events for boolean widgets
+        for widget_name, widget in ui_components.items():
+            if isinstance(widget, widgets.Checkbox):
+                # Trigger a change event to update dependent widgets
+                old_value = widget.value
+                # Toggle boolean value to trigger change event
+                widget.value = not old_value
+                widget.value = old_value
+            
         logger.info("✅ UI berhasil diupdate dari konfigurasi backbone")
         
     except Exception as e:
         logger.error(f"❌ Error saat mengupdate UI dari konfigurasi: {str(e)}")
+        if 'info_panel' in ui_components:
+            ui_components['info_panel'].value = f"Error: {str(e)}"
 
-def update_backbone_info(ui_components: Dict[str, Any]) -> None:
+def update_backbone_info(ui_components: Dict[str, Any], message: str = None) -> None:
     """
     Update info panel dengan informasi backbone yang dipilih.
     
     Args:
         ui_components: Dictionary komponen UI
+        message: Pesan tambahan yang akan ditampilkan (opsional)
     """
     try:
         info_panel = ui_components.get('info_panel')
@@ -224,12 +269,19 @@ def update_backbone_info(ui_components: Dict[str, Any]) -> None:
         norm_type = normalization.get('type', default_config['normalization']['type'])
         norm_momentum = normalization.get('momentum', default_config['normalization']['momentum'])
         
+        # Get model-specific settings
+        model_type = model_config.get('model_type', default_config.get('model_type', 'YOLOv5'))
+        use_attention = model_config.get('use_attention', default_config.get('use_attention', False))
+        use_residual = model_config.get('use_residual', default_config.get('use_residual', True))
+        use_ciou = model_config.get('use_ciou', default_config.get('use_ciou', True))
+        
         # Update info panel dengan informasi backbone
         info_text = f"""
         <div style='font-family: monospace;'>
         <h4>Backbone Configuration:</h4>
         <ul>
             <li>Type: {backbone}</li>
+            <li>Model: {model_type}</li>
             <li>Pretrained: {pretrained}</li>
             <li>Freeze Backbone: {freeze_backbone}</li>
             <li>Freeze BatchNorm: {freeze_bn}</li>
@@ -237,11 +289,21 @@ def update_backbone_info(ui_components: Dict[str, Any]) -> None:
             <li>Activation: {activation}</li>
             <li>Normalization: {norm_type}</li>
             <li>BN Momentum: {norm_momentum}</li>
+            <li>Use Attention: {use_attention}</li>
+            <li>Use Residual: {use_residual}</li>
+            <li>Use CIoU: {use_ciou}</li>
         </ul>
-        </div>
         """
         
+        # Add message if provided
+        if message:
+            info_text += f"<p>{message}</p>"
+            
+        info_text += "</div>"
+        
         info_panel.value = info_text
+        
+        logger.info("✅ Info panel berhasil diupdate")
         
     except Exception as e:
         logger.error(f"{ICONS.get('error', '❌')} Error saat update info panel: {str(e)}")

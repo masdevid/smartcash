@@ -12,6 +12,7 @@ from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.training_config.backbone.handlers.config_handlers import get_default_backbone_config
 
 logger = get_logger(__name__)
 
@@ -30,19 +31,36 @@ def initialize_backbone_ui() -> Dict[str, Any]:
     try:
         # Import komponen UI
         from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
+        from smartcash.ui.training_config.backbone.handlers.config_handlers import (
+            update_ui_from_config,
+            update_backbone_info,
+            get_default_backbone_config
+        )
+        from smartcash.ui.training_config.backbone.handlers.status_handlers import add_status_panel, update_status_panel
+        
+        logger.info("Inisialisasi UI backbone")
         
         # Buat komponen UI
+        logger.info("Membuat komponen UI")
         ui_components = create_backbone_ui()
         
         # Tambahkan status panel
-        from smartcash.ui.training_config.backbone.handlers.status_handlers import add_status_panel
         ui_components = add_status_panel(ui_components)
         
-        # Tampilkan UI
-        clear_output(wait=True)
-        display(ui_components['main_container'])
+        # Dapatkan ConfigManager
+        config_manager = get_config_manager(base_dir=get_default_base_dir())
+        
+        # Dapatkan konfigurasi
+        logger.info("Mengambil konfigurasi backbone")
+        current_config = config_manager.get_module_config('model')
+        
+        # Jika tidak ada konfigurasi, gunakan default
+        if not current_config:
+            logger.info("Konfigurasi backbone tidak ditemukan, menggunakan default")
+            current_config = get_default_backbone_config()
         
         # Setup handler untuk form
+        logger.info("Setup form handlers")
         from smartcash.ui.training_config.backbone.handlers.form_handlers import (
             on_backbone_change,
             on_model_type_change,
@@ -78,12 +96,11 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         )
         
         # Setup handler untuk tombol
+        logger.info("Setup button handlers")
         from smartcash.ui.training_config.backbone.handlers.button_handlers import (
             on_save_click,
             on_reset_click
         )
-        
-        # Environment manager sudah diimpor di bagian atas file
         
         # Register handler untuk tombol
         ui_components['save_button'].on_click(
@@ -104,16 +121,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
             logger.warning(f"{ICONS.get('warning', '⚠️')} Gagal memeriksa status drive: {str(e)}")
         
         # Inisialisasi UI dari konfigurasi
-        from smartcash.ui.training_config.backbone.handlers.config_handlers import (
-            update_ui_from_config,
-            update_backbone_info
-        )
-        
-        # Dapatkan ConfigManager
-        config_manager = get_config_manager(base_dir=get_default_base_dir())
-        
-        # Dapatkan konfigurasi
-        current_config = config_manager.get_module_config('model')
+        logger.info("Memperbarui UI dari konfigurasi")
         
         # Update UI dari konfigurasi
         update_ui_from_config(ui_components, current_config)
@@ -121,13 +129,25 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         # Update info panel
         update_backbone_info(ui_components)
         
+        # Simpan referensi ke fungsi update_backbone_info
+        ui_components['update_backbone_info'] = update_backbone_info
+        
+        # Simpan konfigurasi saat ini ke ui_components
+        ui_components['config'] = current_config
+        
         # Register UI components untuk persistensi
+        logger.info("Mendaftarkan UI components ke config manager")
         config_manager.register_ui_components('backbone', ui_components)
         
+        # Tampilkan UI
+        logger.info("Menampilkan UI")
+        clear_output(wait=True)
+        display(ui_components['main_container'])
+        
         # Update status panel dengan pesan selamat datang
-        from smartcash.ui.training_config.backbone.handlers.status_handlers import update_status_panel
         update_status_panel(ui_components, "Konfigurasi backbone siap digunakan", 'info')
         
+        logger.info("UI backbone berhasil diinisialisasi")
         return ui_components
         
     except Exception as e:

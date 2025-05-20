@@ -55,6 +55,9 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
         # Update status
         update_status_panel(ui_components, "Konfigurasi hyperparameter berhasil disimpan", "success")
         
+        # Log untuk debugging
+        logger.info(f"Konfigurasi hyperparameter berhasil disimpan dan UI diperbarui")
+        
     except Exception as e:
         logger.error(f"Error saat menyimpan konfigurasi hyperparameters: {str(e)}")
         update_status_panel(ui_components, f"Error: {str(e)}", "error")
@@ -74,11 +77,11 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         # Dapatkan konfigurasi default
         default_config = get_default_hyperparameters_config()
         
+        # Update UI dari konfigurasi default terlebih dahulu
+        update_ui_from_config(ui_components, default_config)
+        
         # Simpan konfigurasi default
         saved_config = save_config(default_config, ui_components)
-        
-        # Update UI dari konfigurasi default
-        update_ui_from_config(ui_components, saved_config)
         
         # Update info panel
         update_hyperparameters_info(ui_components)

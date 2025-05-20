@@ -11,6 +11,7 @@ from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger, LogLevel
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.training_config.hyperparameters.default_config import get_default_hyperparameters_config
+from ipywidgets import widgets
 
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
@@ -59,6 +60,8 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Pastikan config memiliki struktur yang benar
         if 'hyperparameters' not in config:
             config = {'hyperparameters': config}
+        
+        logger.info("Mengupdate konfigurasi dari UI components")
         
         # Update optimizer settings
         if 'optimizer_type_dropdown' in ui_components:
@@ -171,13 +174,52 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             
         if 'mixup_prob_slider' in ui_components:
             config['hyperparameters']['augmentation']['mixup_prob'] = ui_components['mixup_prob_slider'].value
+            
+        # Update training parameters
+        if 'training' not in config['hyperparameters']:
+            config['hyperparameters']['training'] = {}
+            
+        if 'batch_size_slider' in ui_components:
+            config['hyperparameters']['training']['batch_size'] = ui_components['batch_size_slider'].value
+            
+        if 'image_size_slider' in ui_components:
+            config['hyperparameters']['training']['image_size'] = ui_components['image_size_slider'].value
+            
+        if 'epochs_slider' in ui_components:
+            config['hyperparameters']['training']['epochs'] = ui_components['epochs_slider'].value
+            
+        if 'dropout_slider' in ui_components:
+            config['hyperparameters']['training']['dropout'] = ui_components['dropout_slider'].value
+            
+        # Update early stopping settings
+        if 'early_stopping' not in config['hyperparameters']:
+            config['hyperparameters']['early_stopping'] = {}
+            
+        if 'early_stopping_checkbox' in ui_components:
+            config['hyperparameters']['early_stopping']['enabled'] = ui_components['early_stopping_checkbox'].value
+            
+        if 'patience_es_slider' in ui_components:
+            config['hyperparameters']['early_stopping']['patience'] = ui_components['patience_es_slider'].value
+            
+        if 'min_delta_slider' in ui_components:
+            config['hyperparameters']['early_stopping']['min_delta'] = ui_components['min_delta_slider'].value
+            
+        # Update checkpoint settings
+        if 'checkpoint' not in config['hyperparameters']:
+            config['hyperparameters']['checkpoint'] = {}
+            
+        if 'save_best_checkbox' in ui_components:
+            config['hyperparameters']['checkpoint']['save_best'] = ui_components['save_best_checkbox'].value
+            
+        if 'metric_dropdown' in ui_components:
+            config['hyperparameters']['checkpoint']['metric'] = ui_components['metric_dropdown'].value
         
-        logger.info("✅ Konfigurasi hyperparameters berhasil diupdate")
+        logger.info("✅ Konfigurasi hyperparameters berhasil diupdate dari UI")
         
         return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat update konfigurasi hyperparameters: {str(e)}")
+        logger.error(f"❌ Error saat update konfigurasi hyperparameters dari UI: {str(e)}")
         return get_default_hyperparameters_config()
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] = None) -> None:
@@ -191,18 +233,23 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
     try:
         # Get config if not provided
         if config is None:
+            logger.info("Mengambil konfigurasi hyperparameters dari config manager")
             config = get_hyperparameters_config(ui_components)
             
         # Ensure config has hyperparameters key
         if 'hyperparameters' not in config:
+            logger.info("Menambahkan key 'hyperparameters' ke konfigurasi")
             config = {'hyperparameters': config}
             
         # Get hyperparameters config with safe defaults
         hp_config = config['hyperparameters']
         default_config = get_default_hyperparameters_config()['hyperparameters']
         
+        logger.info(f"Memperbarui UI dari konfigurasi: {len(hp_config.keys())} kategori")
+        
         # Update optimizer UI components
         optimizer = hp_config.get('optimizer', default_config['optimizer'])
+        logger.info(f"Memperbarui komponen optimizer: {optimizer.get('type', 'unknown')}")
         
         if 'optimizer_type_dropdown' in ui_components:
             ui_components['optimizer_type_dropdown'].value = optimizer.get('type', default_config['optimizer']['type'])
@@ -227,6 +274,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
         # Update scheduler UI components
         scheduler = hp_config.get('scheduler', default_config['scheduler'])
+        logger.info(f"Memperbarui komponen scheduler: {scheduler.get('type', 'unknown')}, enabled: {scheduler.get('enabled', False)}")
         
         if 'scheduler_enabled_checkbox' in ui_components:
             ui_components['scheduler_enabled_checkbox'].value = scheduler.get('enabled', default_config['scheduler']['enabled'])
@@ -251,6 +299,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
         # Update loss UI components
         loss = hp_config.get('loss', default_config['loss'])
+        logger.info(f"Memperbarui komponen loss: {loss.get('type', 'unknown')}")
         
         if 'loss_type_dropdown' in ui_components:
             ui_components['loss_type_dropdown'].value = loss.get('type', default_config['loss']['type'])
@@ -275,6 +324,7 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
         
         # Update augmentation UI components
         augmentation = hp_config.get('augmentation', default_config['augmentation'])
+        logger.info(f"Memperbarui komponen augmentation: enabled: {augmentation.get('enabled', False)}")
         
         if 'augmentation_enabled_checkbox' in ui_components:
             ui_components['augmentation_enabled_checkbox'].value = augmentation.get('enabled', default_config['augmentation']['enabled'])
@@ -320,6 +370,32 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         if 'mixup_prob_slider' in ui_components:
             ui_components['mixup_prob_slider'].value = augmentation.get('mixup_prob', default_config['augmentation']['mixup_prob'])
+            
+        # Update training parameters
+        training = hp_config.get('training', default_config.get('training', {}))
+        logger.info(f"Memperbarui komponen training parameters")
+        
+        if 'batch_size_slider' in ui_components:
+            ui_components['batch_size_slider'].value = training.get('batch_size', 16)
+            
+        if 'image_size_slider' in ui_components:
+            ui_components['image_size_slider'].value = training.get('image_size', 640)
+            
+        if 'epochs_slider' in ui_components:
+            ui_components['epochs_slider'].value = training.get('epochs', 100)
+            
+        if 'dropout_slider' in ui_components:
+            ui_components['dropout_slider'].value = training.get('dropout', 0.0)
+            
+        # Force update UI
+        for widget_name, widget in ui_components.items():
+            if isinstance(widget, widgets.Widget) and hasattr(widget, 'value'):
+                # Trigger a change event to update dependent widgets
+                old_value = widget.value
+                if isinstance(old_value, bool):
+                    # Toggle boolean value to trigger change event
+                    widget.value = not old_value
+                    widget.value = old_value
             
         logger.info("✅ UI berhasil diupdate dari konfigurasi hyperparameters")
         

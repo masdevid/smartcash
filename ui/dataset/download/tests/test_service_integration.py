@@ -227,20 +227,38 @@ class TestServiceIntegration(unittest.TestCase):
         # Dapatkan signature dari method download_from_roboflow di DatasetManager
         dataset_manager = DatasetManager()
         
-        # Patch download_from_roboflow untuk menghindari eksekusi sebenarnya
-        with patch.object(dataset_manager, 'download_from_roboflow'):
-            # Dapatkan signature dari method download_from_roboflow
-            signature = inspect.signature(dataset_manager.download_from_roboflow)
-            service_params = list(signature.parameters.keys())
+        # Dapatkan parameter yang diterima oleh service
+        # Karena download_from_roboflow menggunakan **kwargs, kita perlu memeriksa implementasinya
+        # untuk mengetahui parameter yang didukung
+        
+        # Patch download_service untuk menangkap parameter yang diterima
+        with patch('smartcash.dataset.services.downloader.download_service.DownloadService.download_from_roboflow') as mock_download:
+            # Setup mock untuk mengembalikan hasil sukses
+            mock_download.return_value = {'status': 'success', 'message': 'Download berhasil'}
+            
+            # Panggil download_from_roboflow dengan parameter yang diharapkan
+            params = {
+                'api_key': 'test-api-key',
+                'workspace': 'test-workspace',
+                'project': 'test-project',
+                'version': '1',
+                'output_dir': '/tmp/test-output'
+            }
+            
+            # Jalankan download
+            dataset_manager.download_from_roboflow(**params)
+            
+            # Verifikasi parameter diteruskan ke service
+            args, kwargs = mock_download.call_args
             
             # Parameter yang diharapkan dari UI
             expected_ui_params = [
-                'api_key', 'workspace', 'project', 'version', 'output_dir'
+                'workspace', 'project', 'version', 'api_key', 'output_dir'
             ]
             
             # Verifikasi semua parameter yang diharapkan dari UI ada di service
             for param in expected_ui_params:
-                self.assertIn(param, service_params, f"Parameter '{param}' tidak ditemukan di service")
+                self.assertIn(param, kwargs, f"Parameter '{param}' tidak diteruskan ke service")
 
 if __name__ == '__main__':
     unittest.main() 

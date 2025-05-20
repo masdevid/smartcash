@@ -206,11 +206,15 @@ class TestDownloadHandler(unittest.TestCase):
     @patch('smartcash.ui.dataset.download.handlers.download_handler._download_from_roboflow')
     def test_execute_download_roboflow(self, mock_download):
         """Test execute_download with Roboflow endpoint"""
-        # Call function
-        execute_download(self.ui_components, 'Roboflow')
-        
-        # Verify download was called
-        mock_download.assert_called_once_with(self.ui_components)
+        # Mock untuk register_ui_observers
+        with patch('smartcash.ui.dataset.download.utils.ui_observers.register_ui_observers') as mock_register:
+            mock_register.return_value = MagicMock()
+            
+            # Call function
+            execute_download(self.ui_components, 'Roboflow')
+            
+            # Verify download was called
+            mock_download.assert_called_once()
     
     @patch('smartcash.ui.dataset.download.handlers.download_handler.notify_log')
     def test_execute_download_invalid_endpoint(self, mock_notify_log):

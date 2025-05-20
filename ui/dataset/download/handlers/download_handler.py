@@ -129,19 +129,25 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> 
                     'version': ui_components['version'].value,
                     'api_key': ui_components['api_key'].value,
                     'output_dir': ui_components['output_dir'].value,
-                    'validate_dataset': ui_components['validate_dataset'].value,
-                    'backup_before_download': ui_components['backup_checkbox'].value,
-                    'backup_dir': ui_components['backup_dir'].value
+                    'backup_before_download': ui_components['backup_checkbox'].value if 'backup_checkbox' in ui_components else False,
+                    'backup_dir': ui_components['backup_dir'].value if 'backup_dir' in ui_components else ''
                 }
                 
                 # Log parameter yang akan digunakan
                 if 'log_output' in ui_components:
                     ui_components['log_output'].append_stdout("Parameter download:")
                     for key, value in params.items():
-                        ui_components['log_output'].append_stdout(f"- {key}: {value}")
+                        if key == 'api_key':
+                            masked_key = value[:4] + "****" if value and len(value) > 4 else "****"
+                            ui_components['log_output'].append_stdout(f"- {key}: {masked_key}")
+                        else:
+                            ui_components['log_output'].append_stdout(f"- {key}: {value}")
             
-            # Jalankan download
-            execute_download(ui_components)
+            # Nonaktifkan tombol lain selama download
+            _disable_buttons(ui_components, True)
+            
+            # Jalankan download dengan endpoint Roboflow
+            execute_download(ui_components, 'Roboflow')
         else:
             if isinstance(ui_components, dict) and 'log_output' in ui_components:
                 ui_components['log_output'].append_stdout("Download dibatalkan")
@@ -312,9 +318,35 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
                 level="info"
             )
             
+            # Pastikan observer terdaftar
+            from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+            observer_manager = register_ui_observers(ui_components)
+            
             # Jalankan download di thread terpisah agar UI tetap responsif
             with ThreadPoolExecutor(max_workers=1) as executor:
-                executor.submit(_download_from_roboflow, ui_components)
+                future = executor.submit(_download_from_roboflow, ui_components)
+                # Tunggu hasil agar thread tidak hilang
+                try:
+                    result = future.result()
+                    # Proses hasil jika ada
+                    if result:
+                        _process_download_result(ui_components, result)
+                except Exception as e:
+                    # Tangani error
+                    notify_log(
+                        sender=ui_components,
+                        message=f"Error saat proses download dataset: {str(e)}",
+                        level="error"
+                    )
+                    
+                    notify_progress(
+                        sender=ui_components,
+                        event_type="error",
+                        message=f"Error: {str(e)}"
+                    )
+                    
+                    # Reset UI
+                    _reset_ui_after_download(ui_components)
         else:
             # Endpoint tidak didukung
             notify_log(
@@ -348,12 +380,15 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
         # Reset UI
         _reset_ui_after_download(ui_components)
 
-def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
+def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     Download dataset dari Roboflow menggunakan dataset manager.
     
     Args:
         ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dict[str, Any]: Hasil download
     """
     # Tampilkan progress container
     if 'progress_container' in ui_components:
@@ -363,6 +398,8 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
     notify_progress(
         sender=ui_components,
         event_type="start",
+        progress=0,
+        total=100,
         message="Mempersiapkan download dataset...",
         step=1,
         total_steps=5
@@ -374,11 +411,19 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         'project': ui_components['project'].value,
         'version': ui_components['version'].value,
         'api_key': ui_components['api_key'].value,
-        'output_dir': ui_components['output_dir'].value,
-        'validate_dataset': ui_components['validate_dataset'].value,
-        'backup_before_download': ui_components['backup_checkbox'].value,
-        'backup_dir': ui_components['backup_dir'].value
+        'output_dir': ui_components['output_dir'].value
     }
+    
+    # Parameter tambahan jika tersedia
+    if 'backup_checkbox' in ui_components and hasattr(ui_components['backup_checkbox'], 'value'):
+        backup_existing = ui_components['backup_checkbox'].value
+    else:
+        backup_existing = False
+    
+    if 'backup_dir' in ui_components and hasattr(ui_components['backup_dir'], 'value'):
+        backup_dir = ui_components['backup_dir'].value
+    else:
+        backup_dir = None
     
     # Validasi parameter
     if not params['api_key']:
@@ -393,7 +438,7 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
             message="API Key tidak ditemukan"
         )
         _reset_ui_after_download(ui_components)
-        return
+        return {"status": "error", "message": "API Key tidak ditemukan"}
     
     # Pastikan output_dir valid dan ada
     output_dir = params['output_dir']
@@ -441,15 +486,111 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
                 message="Error direktori output"
             )
             _reset_ui_after_download(ui_components)
-            return
+            return {"status": "error", "message": f"Gagal membuat direktori output: {str(e2)}"}
     
     # Jalankan download
     try:
-        dataset_manager = DatasetManager()
-        result = dataset_manager.download_from_roboflow(**params)
+        # Update progress
+        notify_progress(
+            sender=ui_components,
+            event_type="update",
+            progress=10,
+            total=100,
+            message="Memulai download dari Roboflow...",
+            step=2,
+            total_steps=5
+        )
         
-        # Proses hasil download
-        _process_download_result(ui_components, result)
+        dataset_manager = DatasetManager()
+        
+        # Register observer jika ada
+        from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+        observer_manager = register_ui_observers(ui_components)
+        
+        # Coba dapatkan service downloader dan set observer
+        try:
+            downloader_service = dataset_manager.get_service('downloader')
+            downloader_service.set_observer_manager(observer_manager)
+        except Exception as e:
+            notify_log(
+                sender=ui_components,
+                message=f"Warning: Gagal mengatur observer untuk downloader: {str(e)}",
+                level="warning"
+            )
+        
+        # Update progress lagi
+        notify_progress(
+            sender=ui_components,
+            event_type="update",
+            progress=20,
+            total=100,
+            message="Mendownload dataset dari Roboflow...",
+            step=3,
+            total_steps=5
+        )
+        
+        # Jalankan download dengan parameter yang sesuai
+        # Periksa signature method
+        import inspect
+        try:
+            signature = inspect.signature(dataset_manager.download_from_roboflow)
+            valid_params = {}
+            
+            # Tambahkan parameter yang valid
+            for param_name, param in signature.parameters.items():
+                if param_name in params:
+                    valid_params[param_name] = params[param_name]
+            
+            # Tambahkan parameter opsional jika didukung
+            if 'backup_existing' in signature.parameters:
+                valid_params['backup_existing'] = backup_existing
+            
+            if 'backup_dir' in signature.parameters and backup_dir:
+                valid_params['backup_dir'] = backup_dir
+                
+            # Tambahkan parameter show_progress jika didukung
+            if 'show_progress' in signature.parameters:
+                valid_params['show_progress'] = True
+                
+            # Tambahkan parameter verify_integrity jika didukung
+            if 'verify_integrity' in signature.parameters:
+                valid_params['verify_integrity'] = True
+                
+            notify_log(
+                sender=ui_components,
+                message=f"Mendownload dataset dengan parameter: {', '.join(valid_params.keys())}",
+                level="info"
+            )
+            
+            # Jalankan download
+            result = dataset_manager.download_from_roboflow(**valid_params)
+        except Exception as e:
+            # Fallback ke parameter minimal
+            notify_log(
+                sender=ui_components,
+                message=f"Mencoba download dengan parameter minimal: {str(e)}",
+                level="warning"
+            )
+            result = dataset_manager.download_from_roboflow(
+                api_key=params['api_key'],
+                workspace=params['workspace'],
+                project=params['project'],
+                version=params['version'],
+                output_dir=params['output_dir']
+            )
+        
+        # Update progress
+        notify_progress(
+            sender=ui_components,
+            event_type="update",
+            progress=90,
+            total=100,
+            message="Download selesai, memproses hasil...",
+            step=5,
+            total_steps=5
+        )
+        
+        return result
         
     except Exception as e:
         # Tangani error
@@ -468,6 +609,7 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> None:
         
         # Reset UI
         _reset_ui_after_download(ui_components)
+        return {"status": "error", "message": error_msg}
 
 def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
     """

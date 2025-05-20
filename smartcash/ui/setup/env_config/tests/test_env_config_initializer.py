@@ -1,64 +1,60 @@
 """
 File: smartcash/ui/setup/env_config/tests/test_env_config_initializer.py
-Deskripsi: Test untuk initializer konfigurasi environment
+Deskripsi: Test untuk inisialisasi environment config
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
-from smartcash.ui.setup.env_config.tests.test_helper import WarningTestCase, ignore_layout_warnings
+import os
+import tempfile
+from unittest.mock import MagicMock, patch, PropertyMock
+from pathlib import Path
+import ipywidgets as widgets
 
-class TestEnvConfigInitializer(WarningTestCase):
-    """Test case untuk env_config_initializer.py"""
-    
+from smartcash.ui.setup.env_config.env_config_initializer import initialize_env_config_ui
+from smartcash.ui.setup.env_config.components.env_config_component import EnvConfigComponent
+
+class TestEnvConfigInitializer(unittest.TestCase):
+    def setUp(self):
+        """Setup test environment"""
+        self.mock_component = MagicMock(spec=EnvConfigComponent)
+        self.mock_component.ui_components = {
+            'directory_button': widgets.Button(description='Select Directory'),
+            'drive_button': widgets.Button(description='Connect Drive'),
+            'status_output': widgets.Output(),
+            'progress_bar': widgets.FloatProgress()
+        }
+        # Create temporary directory for testing
+        self.temp_dir = tempfile.mkdtemp()
+        self.drive_dir = os.path.join(self.temp_dir, 'drive')
+        os.makedirs(os.path.join(self.temp_dir, 'SmartCash', 'configs'), exist_ok=True)
+        os.makedirs(os.path.join(self.drive_dir, 'SmartCash', 'configs'), exist_ok=True)
+        
+    def tearDown(self):
+        """Cleanup test environment"""
+        import shutil
+        shutil.rmtree(self.temp_dir)
+        
     def test_initializer_import(self):
-        """Test import initialize_env_config_ui berhasil"""
-        from smartcash.ui.setup.env_config.env_config_initializer import initialize_env_config_ui
-        self.assertTrue(callable(initialize_env_config_ui))
-    
-    def test_disable_ui_during_processing(self):
-        """Test fungsi untuk menonaktifkan UI selama processing"""
-        from smartcash.ui.setup.env_config.env_config_initializer import _disable_ui_during_processing
+        """Test import initializer"""
+        self.assertIsNotNone(initialize_env_config_ui)
         
-        # Buat mock UI components sederhana
-        ui_components = {
-            'drive_button': MagicMock(disabled=False),
-            'directory_button': MagicMock(disabled=False)
-        }
-        
-        # Test disable UI
-        _disable_ui_during_processing(ui_components, True)
-        
-        # Verifikasi komponen dinonaktifkan
-        self.assertTrue(ui_components['drive_button'].disabled)
-        self.assertTrue(ui_components['directory_button'].disabled)
-        
-        # Test enable UI
-        _disable_ui_during_processing(ui_components, False)
-        
-        # Verifikasi komponen diaktifkan kembali
-        self.assertFalse(ui_components['drive_button'].disabled)
-        self.assertFalse(ui_components['directory_button'].disabled)
-    
-    def test_cleanup_ui(self):
-        """Test fungsi untuk membersihkan UI"""
-        from smartcash.ui.setup.env_config.env_config_initializer import _cleanup_ui
-        
-        # Buat mock UI components sederhana
-        ui_components = {
-            'drive_button': MagicMock(disabled=True),
-            'progress_bar': MagicMock(layout=MagicMock(visibility='visible')),
-            'progress_message': MagicMock(layout=MagicMock(visibility='visible'))
-        }
-        
-        # Panggil fungsi cleanup
-        _cleanup_ui(ui_components)
-        
-        # Verifikasi tombol diaktifkan kembali
-        self.assertFalse(ui_components['drive_button'].disabled)
-        
-        # Verifikasi progress bar dan message disembunyikan
-        self.assertEqual(ui_components['progress_bar'].layout.visibility, 'hidden')
-        self.assertEqual(ui_components['progress_message'].layout.visibility, 'hidden')
+    def test_initializer_creation(self):
+        """Test pembuatan initializer"""
+        mock_colab_manager = MagicMock()
+        mock_colab_manager._local_base_path = Path('/tmp/SmartCash/configs')
+        mock_colab_manager._drive_base_path = Path('/tmp/drive/SmartCash/configs')
+        with patch('smartcash.ui.setup.env_config.components.manager_setup.ColabConfigManager', return_value=mock_colab_manager), \
+             patch('smartcash.ui.setup.env_config.components.manager_setup.setup_managers', return_value=(MagicMock(), mock_colab_manager, Path('/tmp/SmartCash'), Path('/tmp/SmartCash/configs'))), \
+             patch('asyncio.create_task', return_value=None):
+            component = initialize_env_config_ui()
+            self.assertIsInstance(component, EnvConfigComponent)
+            self.assertIsInstance(component.ui_components, dict)
+            self.assertIn('directory_button', component.ui_components)
+            self.assertIn('drive_button', component.ui_components)
+            self.assertIn('status_panel', component.ui_components)
+            self.assertIn('log_panel', component.ui_components)
+            self.assertIn('progress_bar', component.ui_components)
+            self.assertIn('ui_layout', component.ui_components)
 
 if __name__ == '__main__':
     unittest.main()

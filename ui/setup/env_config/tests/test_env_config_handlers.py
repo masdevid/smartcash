@@ -4,6 +4,7 @@ Deskripsi: Test untuk handlers environment config
 """
 
 import unittest
+import asyncio
 from unittest.mock import MagicMock, patch
 from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_config_handlers
 from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
@@ -41,13 +42,19 @@ class TestEnvConfigHandlers(unittest.TestCase):
             mock_drive.assert_called_once_with(self.ui_components, self.colab_manager)
             mock_dir.assert_called_once_with(self.ui_components, self.colab_manager)
             
+    async def _test_auto_check_handler_async(self):
+        """Async test helper for auto_check_handler"""
+        handler = AutoCheckHandler(self.mock_component)
+        await handler.auto_check()
+        
+        # Verify progress was updated
+        self.assertEqual(self.mock_component.ui_components['progress'].value, 1.0)
+        # Verify status was updated
+        self.mock_component._update_status.assert_called_once()
+        
     def test_auto_check_handler(self):
         """Test AutoCheckHandler lifecycle"""
-        handler = AutoCheckHandler(self.mock_component)
-        # Simulate async auto_check (just check it runs without error)
-        import asyncio
-        asyncio.run(handler.auto_check())
-        # No assertion, just ensure no exception
+        asyncio.run(self._test_auto_check_handler_async())
         
     def test_state_manager_initial_state(self):
         """Test EnvConfigStateManager initial state"""

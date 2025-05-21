@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 import ipywidgets as widgets
 from ipywidgets import HBox, VBox, Label, Button, Output, HTML, FloatProgress
 
-from smartcash.ui.utils.alert_utils import create_info_box, create_alert
+from smartcash.ui.utils.alert_utils import create_info_box, create_info_alert
 from smartcash.ui.utils.header_utils import create_header
 from smartcash.ui.utils.constants import COLORS, ICONS
 from smartcash.ui.components.status_panel import create_status_panel
@@ -118,7 +118,7 @@ class UIFactory:
         Returns:
             Alert widget
         """
-        return create_alert(f"{ICONS.get('error', '❌')} Error: {error_message}", "danger")
+        return create_info_alert(f"{ICONS.get('error', '❌')} Error: {error_message}", "error")
     
     @classmethod
     def create_ui_components(cls) -> Dict[str, Any]:

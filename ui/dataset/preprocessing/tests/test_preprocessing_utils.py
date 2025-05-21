@@ -5,6 +5,7 @@ Deskripsi: Unit test untuk utilitas preprocessing dataset
 
 import unittest
 from unittest.mock import patch, MagicMock, call
+import ipywidgets as widgets
 
 class TestPreprocessingUtils(unittest.TestCase):
     """Unit tests untuk utilitas preprocessing."""
@@ -16,7 +17,9 @@ class TestPreprocessingUtils(unittest.TestCase):
             'preprocessing_initialized': True,
             'preprocessing_running': False,
             'status_message': MagicMock(),
-            'status_icon': MagicMock()
+            'status_icon': MagicMock(),
+            'logger': MagicMock(),
+            'ui': widgets.VBox()
         }
     
     def test_is_preprocessing_running_true(self):
@@ -143,7 +146,6 @@ class TestPreprocessingUtils(unittest.TestCase):
         """Test log message."""
         # Arrange
         components = self.ui_components.copy()
-        components['logger'] = MagicMock()
         message = "Test log message"
         level = "info"
         icon = "🔍"
@@ -163,6 +165,44 @@ class TestPreprocessingUtils(unittest.TestCase):
             
             # Assert
             components['logger'].info.assert_called_once_with(f"{icon} {message}")
+    
+    @patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.create_preprocessing_ui')
+    @patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.setup_ui_logger')
+    @patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.get_config_manager')
+    @patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.get_logger')
+    def test_initialize_preprocessing_ui(self, mock_get_logger, mock_get_config_manager, 
+                                        mock_setup_ui_logger, mock_create_ui):
+        """Test inisialisasi UI preprocessing."""
+        # Arrange
+        mock_logger = MagicMock()
+        mock_get_logger.return_value = mock_logger
+        
+        mock_config_manager = MagicMock()
+        mock_config_manager.get_module_config.return_value = {"preprocessing": {"enabled": True}}
+        mock_get_config_manager.return_value = mock_config_manager
+        
+        mock_ui = widgets.VBox()
+        mock_components = {'ui': mock_ui}
+        mock_create_ui.return_value = mock_components
+        mock_setup_ui_logger.return_value = mock_components
+        
+        with patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer._setup_core_components',
+                  return_value=mock_components) as mock_setup_core:
+            with patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.setup_preprocessing_handlers',
+                      return_value=mock_components) as mock_setup_handlers:
+                with patch('smartcash.ui.dataset.preprocessing.preprocessing_initializer.update_status_panel',
+                          return_value=None) as mock_update_status:
+                    # Act
+                    from smartcash.ui.dataset.preprocessing.preprocessing_initializer import initialize_preprocessing_ui
+                    result = initialize_preprocessing_ui()
+                    
+                    # Assert
+                    self.assertEqual(result, mock_ui)
+                    mock_create_ui.assert_called_once()
+                    mock_setup_ui_logger.assert_called_once()
+                    mock_setup_core.assert_called_once()
+                    mock_setup_handlers.assert_called_once()
+                    mock_update_status.assert_called_once()
 
 
 if __name__ == '__main__':

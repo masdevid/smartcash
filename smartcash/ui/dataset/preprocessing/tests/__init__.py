@@ -5,12 +5,14 @@ Deskripsi: Package untuk tests preprocessing dataset
 
 # Export tests
 from smartcash.ui.dataset.preprocessing.tests.test_preprocessing_utils import TestPreprocessingUtils
+from smartcash.ui.dataset.preprocessing.tests.test_cell import TestPreprocessingCell
 
 # Export test runner
 from smartcash.ui.dataset.preprocessing.tests.run_tests import run_all_tests
 
 __all__ = [
     'TestPreprocessingUtils',
+    'TestPreprocessingCell',
     'run_all_tests'
 ]
 
@@ -26,6 +28,10 @@ Tests yang tersedia:
    * test_update_status_panel - Tes update panel status
    * test_get_widget_value - Tes mendapatkan nilai widget
    * test_log_message - Tes logging pesan
+   * test_initialize_preprocessing_ui - Tes inisialisasi UI preprocessing
+
+2. TestPreprocessingCell - Test untuk cell preprocessing
+   * test_cell_execution - Tes eksekusi cell preprocessing
 
 Untuk menjalankan semua test:
 python -m smartcash.ui.dataset.preprocessing.tests.run_tests

@@ -18,13 +18,15 @@ def run_all_tests():
     loader = unittest.TestLoader()
     suite = unittest.TestSuite()
     
-    # Import unittest untuk basic/unit tests
+    # Import tests
     try:
-        # Import hanya test utilitas sederhana untuk mengurangi error yang muncul 
+        # Import test utilitas preprocessing
         from smartcash.ui.dataset.preprocessing.tests.test_preprocessing_utils import TestPreprocessingUtils
+        from smartcash.ui.dataset.preprocessing.tests.test_cell import TestPreprocessingCell
         
-        # Tambahkan test cases sederhana ke suite
+        # Tambahkan test cases ke suite
         suite.addTests(loader.loadTestsFromTestCase(TestPreprocessingUtils))
+        suite.addTests(loader.loadTestsFromTestCase(TestPreprocessingCell))
         
         # Inisialisasi test runner dan jalankan tests
         runner = unittest.TextTestRunner(verbosity=2)

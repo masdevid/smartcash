@@ -6,17 +6,16 @@ Deskripsi: Handler untuk pengecekan status dan validasi dataset
 from typing import Dict, Any, Tuple, Optional
 from pathlib import Path
 from IPython.display import display
+from smartcash.ui.dataset.download.utils.logger_helper import log_message
 
-def handle_check_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
+def handle_check_button_click(ui_components: Dict[str, Any], b: Any = None) -> None:
     """
     Handler untuk tombol cek status dataset.
     
     Args:
-        b: Button widget
         ui_components: Dictionary komponen UI
+        b: Button widget (opsional)
     """
-    logger = ui_components.get('logger')
-    
     # Reset log output saat tombol diklik
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         ui_components['log_output'].clear_output(wait=True)
@@ -39,10 +38,8 @@ def handle_check_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     
     except Exception as e:
         # Tampilkan error
-        from smartcash.ui.utils.ui_logger import log_to_ui
         error_msg = f"Error saat memeriksa dataset: {str(e)}"
-        log_to_ui(ui_components, error_msg, "error", "❌")
-        if logger: logger.error(f"❌ {error_msg}")
+        log_message(ui_components, error_msg, "error", "❌")
     
     finally:
         # Aktifkan kembali tombol
@@ -59,8 +56,6 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
     Returns:
         Tuple (stats, message)
     """
-    logger = ui_components.get('logger')
-    
     # Stats untuk report
     stats = {
         'total_images': 0,
@@ -91,7 +86,7 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
         _update_progress(ui_components, progress, f"Memeriksa {subdir}...")
         
         if not full_path.exists():
-            if logger: logger.warning(f"⚠️ Direktori {subdir} tidak ditemukan")
+            log_message(ui_components, f"Direktori {subdir} tidak ditemukan", "warning", "⚠️")
             continue
         
         # Hitung file dalam direktori
@@ -112,9 +107,9 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
     
     # Format message berdasarkan hasil
     if stats['total_images'] == 0:
-        message = "⚠️ Dataset masih kosong, silahkan mulai download dataset terlebih dahulu"
+        message = "Dataset masih kosong, silahkan mulai download dataset terlebih dahulu"
     else:
-        message = f"✅ Dataset ditemukan: {stats['total_images']} gambar, {stats['total_labels']} label"
+        message = f"Dataset ditemukan: {stats['total_images']} gambar, {stats['total_labels']} label"
     
     return stats, message
 
@@ -163,11 +158,14 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
     """
     # Update status panel jika tersedia
     if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](ui_components, "info", message)
+        level = "warning" if stats['total_images'] == 0 else "success"
+        icon = "⚠️" if stats['total_images'] == 0 else "✅"
+        ui_components['update_status_panel'](ui_components, level, f"{icon} {message}")
     else:
-        # Fallback ke log_to_ui
-        from smartcash.ui.utils.ui_logger import log_to_ui
-        log_to_ui(ui_components, message, "info", "📊")
+        # Fallback ke log_message
+        level = "warning" if stats['total_images'] == 0 else "success"
+        icon = "⚠️" if stats['total_images'] == 0 else "✅"
+        log_message(ui_components, message, level, icon)
     
     # Update progress
     _update_progress(ui_components, 100, "Pengecekan selesai")
@@ -184,7 +182,7 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
     
     # Tampilkan statistik dalam output status jika summary container tidak tersedia
     status_output = ui_components.get('log_output') or ui_components.get('status')
-    if status_output:
+    if status_output and not ui_components.get('summary_container'):
         with status_output:
             try:
                 # Tampilkan statistik dengan tabel dan chart
@@ -194,6 +192,7 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
                 from IPython.display import HTML
                 display(HTML(f"<p style='color:red'>Error saat visualisasi: {str(e)}</p>"))
                 display(HTML(f"<pre>{stats}</pre>"))
+                log_message(ui_components, f"Error saat visualisasi statistik: {str(e)}", "error", "❌")
 
 def display_dataset_stats(stats: Dict[str, Any]) -> None:
     """
@@ -274,7 +273,10 @@ def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
             status_type='info'
         )
         return
-    except Exception:
+    except Exception as e:
+        # Log error dan fallback ke implementasi lama
+        log_message(ui_components, f"Error saat menampilkan progress: {str(e)}", "debug", "ℹ️")
+        
         # Fallback ke implementasi lama
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = 0
@@ -308,7 +310,10 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: Optiona
             message=message,
             status_type='info'
         )
-    except Exception:
+    except Exception as e:
+        # Log error dan fallback ke implementasi lama
+        log_message(ui_components, f"Error saat update progress: {str(e)}", "debug", "ℹ️")
+        
         # Fallback ke implementasi lama
         if 'progress_bar' in ui_components:
             ui_components['progress_bar'].value = value
@@ -341,3 +346,9 @@ def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     for key in button_keys:
         if key in ui_components:
             ui_components[key].disabled = disabled
+            
+    # Log status tombol jika diaktifkan
+    if not disabled:
+        log_message(ui_components, "Tombol UI diaktifkan kembali", "debug", "🔄")
+    else:
+        log_message(ui_components, "Tombol UI dinonaktifkan selama proses", "debug", "🔄")

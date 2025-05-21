@@ -5,6 +5,7 @@ Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan obse
 
 from typing import Dict, Any, Optional
 from smartcash.common.config import get_config_manager
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
 
 def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -18,6 +19,9 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     Returns:
         Dictionary UI components yang telah diupdate
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     # Setup observer untuk menerima event notifikasi
     _setup_observers(ui_components)
     
@@ -25,20 +29,21 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     try:
         from smartcash.ui.dataset.download.handlers.config_handler import update_ui_from_config
         config_manager = get_config_manager()
-        loaded_config = config_manager.config
+        
+        # Get dataset config
+        dataset_config = config_manager.get_module_config('dataset')
         
         # Pastikan config valid
-        if loaded_config and isinstance(loaded_config, dict):
+        if dataset_config and isinstance(dataset_config, dict):
             # Update UI dengan config yang valid
-            update_ui_from_config(ui_components, loaded_config)
+            update_ui_from_config(ui_components, dataset_config)
         else:
             # Gunakan config yang diberikan jika config manager tidak valid
             if config and isinstance(config, dict):
                 update_ui_from_config(ui_components, config)
     except Exception as e:
-        logger = ui_components.get('logger')
-        if logger:
-            logger.warning(f"⚠️ Gagal memuat konfigurasi: {str(e)}")
+        # Log error dengan logger helper
+        log_message(ui_components, f"Gagal memuat konfigurasi: {str(e)}", "warning", "⚠️")
     
     # Setup API key handler dan verifikasi (setelah config di-load)
     _setup_api_key_handler(ui_components)
@@ -59,9 +64,8 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     # Save config yang sudah ada ke UI components
     ui_components['config'] = config or {}
     
-    logger = ui_components.get('logger')
-    if logger:
-        logger.info("✅ Dataset downloader handlers berhasil diinisialisasi")
+    # Log info dengan logger helper
+    log_message(ui_components, "Dataset downloader handlers berhasil diinisialisasi", "success", "✅")
     
     return ui_components
 
@@ -79,15 +83,11 @@ def _setup_observers(ui_components: Dict[str, Any]) -> None:
         # Register UI observers untuk log dan progress
         register_ui_observers(ui_components)
         
-        # Log setup berhasil
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug("✅ Observer untuk sistem notifikasi berhasil disetup")
+        # Log setup berhasil dengan logger helper
+        log_message(ui_components, "Observer untuk sistem notifikasi berhasil disetup", "debug", "✅")
     except ImportError as e:
-        # Log gagal import jika logger tersedia
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug(f"ℹ️ Observer handler tidak tersedia: {str(e)}")
+        # Log gagal import dengan logger helper
+        log_message(ui_components, f"Observer handler tidak tersedia: {str(e)}", "debug", "ℹ️")
 
 def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
     """Setup API key handler untuk Roboflow."""
@@ -95,19 +95,16 @@ def _setup_api_key_handler(ui_components: Dict[str, Any]) -> None:
         from smartcash.ui.dataset.download.handlers.api_key_handler import setup_api_key_input
         setup_api_key_input(ui_components)
     except ImportError:
-        # Log gagal import jika logger tersedia
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug("ℹ️ API key handler tidak tersedia")
+        # Log gagal import dengan logger helper
+        log_message(ui_components, "API key handler tidak tersedia", "debug", "ℹ️")
 
 def _setup_endpoint_handlers(ui_components: Dict[str, Any]) -> None:
     """Setup handlers untuk endpoint Roboflow."""
     # Fungsi ini dipertahankan untuk kompatibilitas dengan kode lama
     # tetapi tidak lagi memerlukan handler untuk dropdown karena kita hanya menggunakan Roboflow
     
-    logger = ui_components.get('logger')
-    if logger:
-        logger.debug("ℹ️ Setup endpoint handler tidak diperlukan karena hanya menggunakan Roboflow")
+    # Log info dengan logger helper
+    log_message(ui_components, "Setup endpoint handler tidak diperlukan karena hanya menggunakan Roboflow", "debug", "ℹ️")
 
 def _setup_download_button_handler(ui_components: Dict[str, Any]) -> None:
     """Setup handler untuk tombol download."""
@@ -115,7 +112,7 @@ def _setup_download_button_handler(ui_components: Dict[str, Any]) -> None:
     
     if 'download_button' in ui_components:
         ui_components['download_button'].on_click(
-            lambda b: handle_download_button_click(b, ui_components)
+            lambda b: handle_download_button_click(ui_components, b)
         )
 
 def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
@@ -124,7 +121,7 @@ def _setup_check_button_handler(ui_components: Dict[str, Any]) -> None:
     
     if 'check_button' in ui_components:
         ui_components['check_button'].on_click(
-            lambda b: handle_check_button_click(b, ui_components)
+            lambda b: handle_check_button_click(ui_components, b)
         )
 
 def _setup_reset_button_handler(ui_components: Dict[str, Any]) -> None:
@@ -133,44 +130,17 @@ def _setup_reset_button_handler(ui_components: Dict[str, Any]) -> None:
     
     if 'reset_button' in ui_components:
         ui_components['reset_button'].on_click(
-            lambda b: handle_reset_button_click(b, ui_components)
+            lambda b: handle_reset_button_click(ui_components, b)
         )
 
 def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
-    """Setup handler untuk tombol save."""
-    # Gunakan config_manager langsung untuk menyimpan konfigurasi
-    from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui
-    
-    def handle_save_button_click(b, ui_components):
-        # Reset log output saat tombol diklik
-        if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-            ui_components['log_output'].clear_output(wait=True)
-        
-        logger = ui_components.get('logger')
-        
-        try:
-            # Simpan konfigurasi dengan config_manager
-            config_manager = get_config_manager()
-            config = update_config_from_ui(ui_components)
-            config_manager.update_config(config)
-            
-            # Update status panel jika tersedia
-            from smartcash.ui.utils.ui_logger import log_to_ui
-            success_msg = "Konfigurasi berhasil disimpan"
-            if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-                ui_components['update_status_panel'](ui_components, "success", success_msg)
-            else:
-                log_to_ui(ui_components, success_msg, "success", "💾")
-        except Exception as e:
-            # Tampilkan error
-            from smartcash.ui.utils.ui_logger import log_to_ui
-            error_msg = f"Error saat menyimpan konfigurasi: {str(e)}"
-            log_to_ui(ui_components, error_msg, "error", "❌")
-            if logger: logger.error(f"❌ {error_msg}")
+    """Setup handler untuk tombol save dengan SimpleConfigManager."""
+    # Gunakan save_handler yang baru
+    from smartcash.ui.dataset.download.handlers.save_handler import handle_save_config
     
     if 'save_button' in ui_components:
         ui_components['save_button'].on_click(
-            lambda b: handle_save_button_click(b, ui_components)
+            lambda b: handle_save_config(ui_components, b)
         )
 
 def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
@@ -189,15 +159,11 @@ def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
             step_label_key='step_label'
         )
         
-        # Log setup berhasil jika ada logger
-        logger = ui_components.get('logger')
-        if logger:
-            logger.debug("✅ Progress tracking berhasil disetup")
+        # Log setup berhasil dengan logger helper
+        log_message(ui_components, "Progress tracking berhasil disetup", "debug", "✅")
     except Exception as e:
-        # Log error jika ada logger
-        logger = ui_components.get('logger')
-        if logger:
-            logger.warning(f"⚠️ Error saat setup progress tracking: {str(e)}")
+        # Log error dengan logger helper
+        log_message(ui_components, f"Error saat setup progress tracking: {str(e)}", "warning", "⚠️")
 
 def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
     """Setup cleanup function."""
@@ -234,10 +200,9 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
             except ImportError:
                 pass
             
-            # Log cleanup
-            logger = ui_components.get('logger')
-            if logger:
-                logger.debug("🧹 Cleanup dataset_downloader berhasil")
+            # Log cleanup dengan logger helper
+            if 'log_message' in ui_components and callable(ui_components['log_message']):
+                ui_components['log_message']("Cleanup dataset_downloader berhasil", "debug", "🧹")
         except Exception as e:
             # Ignore exceptions during cleanup
             pass
@@ -248,11 +213,9 @@ def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
     # Register cleanup dengan IPython event
     try:
         from IPython import get_ipython
-        ipython = get_ipython()
-        if ipython:
-            # Hanya register cleanup saat cell pertama kali dieksekusi
-            if not hasattr(ipython, '_dataset_downloader_cleanup_registered'):
-                ipython.events.register('pre_run_cell', cleanup_resources)
-                ipython._dataset_downloader_cleanup_registered = True
+        ip = get_ipython()
+        if ip is not None:
+            ip.events.register('pre_run_cell', lambda: cleanup_resources())
     except (ImportError, AttributeError):
+        # Skip jika tidak di IPython environment
         pass

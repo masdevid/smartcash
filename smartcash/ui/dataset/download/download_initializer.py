@@ -16,6 +16,7 @@ from smartcash.ui.dataset.download.handlers.check_handler import handle_check_bu
 from smartcash.ui.dataset.download.handlers.reset_handler import handle_reset_button_click
 from smartcash.ui.dataset.download.handlers.cleanup_handler import handle_cleanup_button_click
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+from smartcash.ui.dataset.download.utils.logger_helper import setup_ui_logger
 
 def initialize_dataset_download_ui(env=None, config=None) -> Any:
     """
@@ -32,18 +33,21 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
         # Get config manager dengan fallback otomatis
         config_manager = get_config_manager()
         
-        # Get base config
-        base_config = config_manager.config
+        # Get dataset config dari SimpleConfigManager
+        dataset_config = config_manager.get_module_config('dataset')
         
         # Merge dengan config yang diberikan
         if config:
-            base_config.update(config)
+            dataset_config.update(config)
             
         # Create UI components
-        ui_components = create_download_ui(base_config)
+        ui_components = create_download_ui(dataset_config)
+        
+        # Setup logger
+        ui_components = setup_ui_logger(ui_components)
         
         # Setup handlers
-        ui_components = setup_download_handlers(ui_components, env, base_config)
+        ui_components = setup_download_handlers(ui_components, env, dataset_config)
         
         # Return main UI widget
         return ui_components['ui']
@@ -65,11 +69,22 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
     # Setup logger
     logger = get_logger()
     
+    try:
+        # Get config dari SimpleConfigManager jika config tidak diberikan
+        if config is None:
+            config_manager = get_config_manager()
+            config = config_manager.get_module_config('dataset')
+    except Exception as e:
+        logger.warning(f"⚠️ Gagal memuat konfigurasi dari SimpleConfigManager: {str(e)}")
+        # Gunakan config kosong sebagai fallback
+        config = {}
+    
     # Buat UI components
     ui_components = create_download_ui(config)
     
-    # Tambahkan logger ke UI components
+    # Tambahkan logger ke UI components dan setup UI logger
     ui_components['logger'] = logger
+    ui_components = setup_ui_logger(ui_components)
     
     # Tambahkan flag untuk tracking status
     ui_components['download_running'] = False

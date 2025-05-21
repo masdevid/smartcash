@@ -16,6 +16,7 @@ from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
 from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
+from smartcash.ui.utils.ui_logger import log_to_ui
 
 __all__ = [
     'handle_download_button_click',
@@ -102,13 +103,13 @@ def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     except Exception as e:
         print(f"Warning: Failed to reset progress bar: {str(e)}")
 
-def handle_download_button_click(ui_components: Dict[str, Any], button: Any) -> None:
+def handle_download_button_click(ui_components: Dict[str, Any], button: Any = None) -> None:
     """
     Handler untuk tombol download pada UI download.
     
     Args:
         ui_components: Dictionary komponen UI
-        button: Button widget
+        button: Button widget (opsional)
     """
     try:
         # Disable tombol download jika button adalah widget

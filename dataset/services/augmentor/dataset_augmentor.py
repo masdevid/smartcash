@@ -37,13 +37,19 @@ class DatasetAugmentor:
         self.pipeline_factory = AugmentationPipelineFactory()
         self.class_balancer = ClassBalancer(config)
         
-    def augment_dataset(self, dataset_path: str, output_dir: str) -> bool:
+    def augment_dataset(
+        self, 
+        dataset_path: str, 
+        output_dir: str,
+        create_symlinks: bool = False
+    ) -> bool:
         """
         Lakukan augmentasi pada dataset
         
         Args:
             dataset_path: Path ke dataset
             output_dir: Path untuk menyimpan hasil augmentasi
+            create_symlinks: Buat symlink ke folder preprocessing
             
         Returns:
             True jika berhasil, False jika gagal

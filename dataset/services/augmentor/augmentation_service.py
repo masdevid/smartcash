@@ -22,7 +22,7 @@ from smartcash.dataset.utils.dataset_constants import DEFAULT_AUGMENTED_DIR
 from smartcash.dataset.services.augmentor.helpers.path_helper import setup_paths
 from smartcash.dataset.services.augmentor.helpers.augmentation_executor import execute_augmentation_with_tracking
 from smartcash.dataset.services.augmentor.helpers.validation_helper import validate_input_files
-from smartcash.dataset.utils.move_utils import move_files_to_preprocessed
+from smartcash.dataset.utils.move_utils import create_symlinks_to_preprocessed
 
 class AugmentationService:
     """Layanan augmentasi dataset dengan integrasi observer pattern."""
@@ -144,7 +144,7 @@ class AugmentationService:
         process_bboxes: bool = True,
         target_balance: bool = True,
         num_workers: int = None,
-        move_to_preprocessed: bool = True,
+        create_symlinks: bool = True,
         target_count: int = 1000
     ) -> Dict[str, Any]:
         """
@@ -160,7 +160,7 @@ class AugmentationService:
             process_bboxes: Proses bounding box
             target_balance: Balance kelas target
             num_workers: Jumlah worker untuk parallel processing
-            move_to_preprocessed: Pindahkan hasil ke direktori preprocessed
+            create_symlinks: Buat symlink hasil ke direktori preprocessed
             target_count: Target jumlah gambar per kelas
             
         Returns:
@@ -187,7 +187,7 @@ class AugmentationService:
                 process_bboxes=process_bboxes,
                 target_balance=target_balance,
                 num_workers=num_workers,
-                move_to_preprocessed=move_to_preprocessed,
+                create_symlinks=create_symlinks,
                 target_count=target_count
             )
             

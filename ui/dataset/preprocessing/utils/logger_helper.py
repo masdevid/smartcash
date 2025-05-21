@@ -34,7 +34,7 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             ui_logger = create_ui_logger(
                 ui_components, 
                 PREPROCESSING_LOGGER_NAMESPACE,
-                display_name=PREPROCESSING_DISPLAY_NAME
+                redirect_stdout=False
             )
             ui_components['ui_logger'] = ui_logger
             

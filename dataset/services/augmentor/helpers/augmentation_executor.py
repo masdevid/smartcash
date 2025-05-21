@@ -4,6 +4,7 @@ Deskripsi: Helper untuk eksekusi augmentasi dengan tracking dinamis, prioritisas
 """
 
 import time
+import os
 from typing import Dict, List, Any, Set, Optional
 from collections import defaultdict
 
@@ -11,6 +12,7 @@ from collections import defaultdict
 from smartcash.dataset.services.augmentor.helpers.parallel_helper import process_files_with_executor
 from smartcash.dataset.services.augmentor.helpers.tracking_helper import track_class_progress
 from smartcash.dataset.utils.file_mapping_utils import select_prioritized_files_for_class
+from smartcash.dataset.utils.move_utils import create_symlinks_to_preprocessed
 
 def execute_prioritized_class_augmentation(
     service, 
@@ -260,7 +262,8 @@ def execute_augmentation_with_tracking(
     paths: Dict[str, str], 
     split: str, 
     target_count: int, 
-    start_time: float
+    start_time: float,
+    create_symlinks: bool = True  # Parameter baru untuk symlink
 ) -> Dict[str, Any]:
     """Eksekusi augmentasi dengan tracking dinamis kelas dan prioritisasi."""
     # Buat pipeline augmentasi
@@ -315,6 +318,19 @@ def execute_augmentation_with_tracking(
     
     # Durasi total dan hasil
     duration = time.time() - start_time
+    
+    # Jika diminta untuk membuat symlink ke direktori preprocessed, lakukan
+    preprocessed_dir = paths.get('preprocessed_dir')
+    if create_symlinks and preprocessed_dir:
+        service.logger.info(f"🔗 Membuat symlink hasil augmentasi ke {os.path.join(preprocessed_dir, split)}")
+        create_symlinks_to_preprocessed(
+            images_output_dir=paths['images_output_dir'],
+            labels_output_dir=paths['labels_output_dir'],
+            output_prefix=output_prefix,
+            final_output_dir=preprocessed_dir,
+            split=split,
+            logger=service.logger
+        )
     
     return {
         'original': sum(class_data.get('class_counts', {}).values()),

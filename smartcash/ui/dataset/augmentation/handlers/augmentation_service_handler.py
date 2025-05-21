@@ -109,7 +109,7 @@ def execute_augmentation(ui_components: Dict[str, Any], params: Dict[str, Any]) 
         process_bboxes = params.get('process_bboxes', True)
         target_balance = params.get('target_balance', True)
         num_workers = params.get('num_workers', 4)
-        move_to_preprocessed = params.get('move_to_preprocessed', True)
+        create_symlinks = params.get('create_symlinks', True)
         target_count = params.get('target_count', 1000)
         
         # Jalankan augmentasi
@@ -133,7 +133,7 @@ def execute_augmentation(ui_components: Dict[str, Any], params: Dict[str, Any]) 
             process_bboxes=process_bboxes,
             target_balance=target_balance,
             num_workers=num_workers,
-            move_to_preprocessed=move_to_preprocessed,
+            create_symlinks=create_symlinks,
             target_count=target_count
         )
         
@@ -185,7 +185,7 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
         process_bboxes = params.get('process_bboxes', True)
         target_balance = params.get('target_balance', True)
         num_workers = params.get('num_workers', 4)
-        move_to_preprocessed = params.get('move_to_preprocessed', True)
+        create_symlinks = params.get('create_symlinks', True)
         target_count = params.get('target_count', 1000)
         
         # Jalankan augmentasi
@@ -277,7 +277,7 @@ def execute_augmentation_with_tracking(ui_components: Dict[str, Any], params: Di
             process_bboxes=process_bboxes,
             target_balance=target_balance,
             num_workers=num_workers,
-            move_to_preprocessed=move_to_preprocessed,
+            create_symlinks=create_symlinks,
             target_count=target_count
         )
         
@@ -334,7 +334,7 @@ def run_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             'process_bboxes': True,
             'target_balance': augmentation_config.get('target_balance', True),
             'num_workers': augmentation_config.get('num_workers', 4),
-            'move_to_preprocessed': False,  # Akan dipindahkan secara manual nanti
+            'create_symlinks': True,  # Buat symlink ke preprocessing
             'target_count': augmentation_config.get('target_count', 1000)
         }
         

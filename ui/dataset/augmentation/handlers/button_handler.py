@@ -142,6 +142,13 @@ def execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: 
         # Log awal augmentasi
         if logger: logger.info(f"{ICONS['start']} Memulai augmentasi {split_info}")
         
+        # Jika opsi move to preprocessed diaktifkan, tambahkan ke params
+        move_option = ui_components.get('move_to_preprocessed_checkbox', None)
+        create_symlinks = False
+        
+        if move_option and hasattr(move_option, 'value'):
+            create_symlinks = move_option.value
+        
         # Jalankan augmentasi dengan parameter yang benar
         augment_result = augmentation_service.augment_dataset(
             split=split,
@@ -150,7 +157,7 @@ def execute_augmentation(ui_components: Dict[str, Any], split: str, split_info: 
             output_prefix=aug_prefix,
             target_balance=balance_classes,
             target_count=1000,  # Nilai default untuk target jumlah gambar
-            move_to_preprocessed=True,
+            create_symlinks=create_symlinks,
             validate_results=True
         )
         
@@ -395,3 +402,75 @@ def setup_augmentation_button_handlers(
     ui_components['augmentation_running'] = False
     
     return ui_components
+
+def copy_augmented_to_preprocessed(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Salin hasil augmentasi ke direktori preprocessed.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary hasil penyalinan
+    """
+    logger = ui_components.get('logger', get_logger())
+    
+    try:
+        # Dapatkan direktori data
+        data_dir = ui_components.get('data_dir', 'data')
+        
+        # Dapatkan split yang dipilih
+        split = ui_components.get('split_selector', {}).value if hasattr(ui_components.get('split_selector', {}), 'value') else 'train'
+        
+        # Dapatkan direktori sumber dan tujuan
+        source_dir = os.path.join(data_dir, 'augmented')
+        target_dir = os.path.join(data_dir, 'preprocessed', split)
+        
+        # Periksa apakah direktori sumber ada
+        if not os.path.exists(source_dir):
+            return {
+                'status': 'error',
+                'message': f'Direktori augmentasi tidak ditemukan: {source_dir}',
+                'error': 'DirectoryNotFound'
+            }
+        
+        # Periksa apakah direktori tujuan ada
+        if not os.path.exists(target_dir):
+            return {
+                'status': 'error',
+                'message': f'Dataset {split} tidak ditemukan di {target_dir}',
+                'error': 'DirectoryNotFound'
+            }
+        
+        # Buat symlink dari gambar dan label
+        from smartcash.dataset.utils.move_utils import create_symlinks_to_preprocessed
+        
+        # Coba membuat symlink ke direktori preprocessed
+        result = create_symlinks_to_preprocessed(
+            images_output_dir=os.path.join(source_dir, 'images'),
+            labels_output_dir=os.path.join(source_dir, 'labels'),
+            output_prefix='aug',
+            final_output_dir=os.path.join(data_dir, 'preprocessed'),
+            split=split,
+            logger=logger
+        )
+        
+        if result:
+            return {
+                'status': 'success',
+                'message': f'Berhasil membuat symlink hasil augmentasi ke {target_dir}'
+            }
+        else:
+            return {
+                'status': 'error',
+                'message': f'Gagal membuat symlink hasil augmentasi ke {target_dir}',
+                'error': 'SymlinkFailed'
+            }
+    except Exception as e:
+        logger.error(f"❌ Error saat membuat symlink: {str(e)}")
+        
+        return {
+            'status': 'error',
+            'message': f'Error saat membuat symlink: {str(e)}',
+            'error': str(e)
+        }

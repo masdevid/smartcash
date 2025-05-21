@@ -18,10 +18,14 @@ def setup_paths(config: Dict[str, Any], split: str) -> Dict[str, str]:
     Returns:
         Dictionary berisi path yang dibutuhkan
     """
+    # Pastikan kita punya direktori data dasar
+    data_dir = config.get('data', {}).get('dir', 'data')
+    
     # Base paths dengan one-liner
     paths = {
-        'preprocessed_dir': config.get('preprocessing', {}).get('preprocessed_dir', 'data/preprocessed'),
-        'augmented_dir': config.get('augmentation', {}).get('output_dir', 'data/augmented')
+        'data_dir': data_dir,
+        'preprocessed_dir': config.get('preprocessing', {}).get('output_dir', os.path.join(data_dir, 'preprocessed')),
+        'augmented_dir': config.get('augmentation', {}).get('output_dir', os.path.join(data_dir, 'augmented'))
     }
     
     # Pastikan direktori augmented tidak sama dengan preprocessed untuk menghindari konflik
@@ -34,8 +38,8 @@ def setup_paths(config: Dict[str, Any], split: str) -> Dict[str, str]:
         'images_input_dir': os.path.join(paths['preprocessed_dir'], split, 'images'),
         'labels_input_dir': os.path.join(paths['preprocessed_dir'], split, 'labels'),
         'output_dir': paths['augmented_dir'],
-        'images_output_dir': os.path.join(paths['augmented_dir'], split, 'images'),  # Tambahkan split ke path
-        'labels_output_dir': os.path.join(paths['augmented_dir'], split, 'labels'),  # Tambahkan split ke path
+        'images_output_dir': os.path.join(paths['augmented_dir'], 'images'),  # Gunakan direktori umum tanpa split
+        'labels_output_dir': os.path.join(paths['augmented_dir'], 'labels'),  # Gunakan direktori umum tanpa split
         'split': split,
         'final_output_dir': paths['preprocessed_dir']
     }}

@@ -92,6 +92,96 @@ def move_files_to_preprocessed(
             logger.error(f"❌ Error saat memindahkan file: {str(e)}")
         return False
 
+def create_symlinks_to_preprocessed(
+    images_output_dir: str, 
+    labels_output_dir: str, 
+    output_prefix: str, 
+    final_output_dir: str,
+    split: str, 
+    logger=None
+) -> bool:
+    """
+    Buat symlink dari file augmentasi ke direktori preprocessed.
+    
+    Args:
+        images_output_dir: Direktori output gambar
+        labels_output_dir: Direktori output label
+        output_prefix: Prefix output file
+        final_output_dir: Direktori tujuan akhir
+        split: Nama split dataset
+        logger: Logger untuk mencatat aktivitas
+        
+    Returns:
+        Boolean yang menunjukkan keberhasilan
+    """
+    try:
+        # Buat direktori target dan dapatkan file dengan one-liner
+        [os.makedirs(os.path.join(final_output_dir, split, subdir), exist_ok=True) 
+         for subdir in ['images', 'labels']]
+        
+        # Cari semua file augmentasi dengan pattern yang lebih fleksibel
+        augmented_files = []
+        for ext in IMG_EXTENSIONS:
+            pattern = os.path.join(images_output_dir, f"{output_prefix}_*{ext}")
+            augmented_files.extend(glob.glob(pattern))
+        
+        # Hanya log jumlah file yang ditemukan
+        if logger:
+            logger.info(f"🔗 Ditemukan {len(augmented_files)} file untuk dibuat symlink")
+        
+        # Jika tidak ada file yang ditemukan, coba cari semua file di direktori
+        if not augmented_files:
+            all_files = []
+            for ext in IMG_EXTENSIONS:
+                pattern = os.path.join(images_output_dir, f"*{ext}")
+                all_files.extend(glob.glob(pattern))
+            
+            if logger and all_files:
+                logger.info(f"🔎 Tidak ditemukan file dengan prefix {output_prefix}, menggunakan {len(all_files)} file yang tersedia")
+                augmented_files = all_files
+        
+        # Buat symlink untuk file yang ditemukan dengan progress bar
+        symlink_count = 0
+        total_files = len(augmented_files)
+        
+        # Buat progress bar dengan deskripsi yang jelas
+        with tqdm(total=total_files, desc=f"🔗 Membuat symlink ke {split}", unit="file", colour="blue") as pbar:
+            for img_file in augmented_files:
+                img_name = os.path.basename(img_file)
+                label_name = f"{os.path.splitext(img_name)[0]}.txt"
+                
+                # Define target paths
+                img_target = os.path.join(final_output_dir, split, 'images', img_name)
+                label_target = os.path.join(final_output_dir, split, 'labels', label_name)
+                label_file = os.path.join(labels_output_dir, label_name)
+                
+                # Buat symlink
+                for src, dst in [(img_file, img_target), (label_file, label_target)]:
+                    if os.path.exists(src):
+                        # Hapus file target jika sudah ada
+                        if os.path.exists(dst):
+                            if os.path.islink(dst):
+                                os.unlink(dst)
+                            else:
+                                os.remove(dst)
+                        
+                        # Gunakan path absolut untuk source dan target
+                        src_abs = os.path.abspath(src)
+                        os.symlink(src_abs, dst)
+                        symlink_count += 1
+                
+                # Update progress bar setiap gambar
+                pbar.update(1)
+        
+        if logger:
+            logger.info(f"✅ Berhasil membuat {symlink_count} symlink ke {os.path.join(final_output_dir, split)}")
+        
+        return symlink_count > 0
+    except Exception as e:
+        if logger: 
+            logger.error(f"❌ Error saat membuat symlink: {str(e)}")
+        return False
+
 def get_source_dir(split: str, config: Dict) -> str:
     """
     Dapatkan direktori sumber data split.

@@ -92,7 +92,7 @@ def create_basic_options_component(config: Dict[str, Any] = None) -> widgets.VBo
     # Pindahkan ke preprocessed (dipindahkan dari augmentation_types_component)
     move_to_preprocessed = widgets.Checkbox(
         value=aug_config.get('augmentation', {}).get('move_to_preprocessed', True),
-        description='Pindahkan ke Preprocessed',
+        description='Buat Symlink ke Preprocessed',
         indent=False,
         layout=widgets.Layout(width='auto')
     )

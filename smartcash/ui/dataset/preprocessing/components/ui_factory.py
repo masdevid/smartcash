@@ -58,15 +58,13 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     
     # Tombol aksi
     action_buttons = create_action_buttons(
-        "Preprocess Dataset",
-        "Berhenti",
-        "Hapus Data",
-        "Jalankan preprocessing dataset",
-        "Hentikan operasi yang berjalan",
-        "Hapus semua data preprocessing",
-        primary_button_style="success",
-        stop_button_style="warning",
-        cleanup_button_style="danger"
+        primary_label="Preprocess Dataset",
+        primary_icon="play",
+        secondary_buttons=[
+            ("Berhenti", "stop", "warning"),
+            ("Hapus Data", "trash", "danger")
+        ],
+        cleanup_enabled=True
     )
     
     # Tombol save & reset
@@ -92,9 +90,9 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
                 ),
                 widgets.HTML(f"<div style='margin: 8px 0;'><b>Target Split:</b> Pemilihan bagian dataset yang akan diproses</div>"),
                 create_split_selector(
-                    selected=config.get('split', 'all'),
+                    selected_value=config.get('split', 'All Splits'),
                     description="Split:",
-                    layout=widgets.Layout(width='95%', margin='5px 0')
+                    width='95%'
                 )
             ], layout=widgets.Layout(padding='10px 5px'))
         ],
@@ -116,9 +114,9 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     )
     
     target_split = create_split_selector(
-        selected=config.get('split', 'all'),
+        selected_value=config.get('split', 'All Splits'),
         description="Split:",
-        layout=widgets.Layout(width='95%', margin='5px 0')
+        width='95%'
     )
     
     # UI untuk menampilkan advanced options di kolom kedua

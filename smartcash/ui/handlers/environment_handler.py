@@ -12,6 +12,7 @@ from typing import List, Dict, Any, Tuple, Optional, Callable
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.utils.ui_logger import get_current_ui_logger, UILogger
 
 class EnvironmentHandler:
     """
@@ -25,17 +26,36 @@ class EnvironmentHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        self.logger = logging.getLogger(__name__)
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
+        # Gunakan UILogger jika tersedia, atau buat logger standar
+        self.ui_logger = get_current_ui_logger()
+        if not self.ui_logger:
+            self.logger = logging.getLogger(__name__)
+            if not self.logger.handlers:
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+                handler.setFormatter(formatter)
+                self.logger.addHandler(handler)
+                self.logger.setLevel(logging.INFO)
+        else:
+            self.logger = self.ui_logger
         
         # Initialize environment manager singleton first
         self.env_manager = get_environment_manager()
-        self.logger.info(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
+        
+        # Atur level logging untuk environment manager dan config manager
+        # Hanya tampilkan error logs
+        env_logger = logging.getLogger('smartcash.common.environment')
+        if env_logger:
+            env_logger.setLevel(logging.ERROR)
+            
+        config_logger = logging.getLogger('smartcash.common.config.manager')
+        if config_logger:
+            config_logger.setLevel(logging.ERROR)
+            
+        if isinstance(self.logger, UILogger):
+            self.logger.debug(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
+        else:
+            self.logger.info(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
         
         # Set callback functions
         self.ui_callback = ui_callback or {}
@@ -61,7 +81,11 @@ class EnvironmentHandler:
     
     def _log_message(self, message: str):
         """Log message to UI if callback exists"""
-        self.logger.info(message)
+        if isinstance(self.logger, UILogger):
+            self.logger.info(message)
+        else:
+            self.logger.info(message)
+            
         if 'log_message' in self.ui_callback:
             self.ui_callback['log_message'](message)
     
@@ -249,15 +273,22 @@ class EnvironmentHandler:
             # Step 4: Initialize config singleton (at the end)
             self._update_progress(0.8, "Menginisialisasi singleton config manager...")
             if not self.initialize_config_singleton():
-                self._update_status("Gagal menginisialisasi singleton config manager", "error")
+                self._update_status("Gagal menginisialisasi config manager", "error")
                 return False
             
-            # All done
+            # Complete
             self._update_progress(1.0, "Setup selesai")
-            self._update_status("Environment berhasil dikonfigurasi", "success")
+            self._update_status("Setup environment berhasil", "success")
+            self._log_message("✅ Setup environment berhasil diselesaikan")
+            
             return True
             
         except Exception as e:
-            self._update_status(f"Error: {str(e)}", "error")
-            self._log_message(f"Error: {str(e)}")
+            if isinstance(self.logger, UILogger):
+                self.logger.error(f"Error saat setup environment: {str(e)}")
+            else:
+                self.logger.error(f"Error during environment setup: {str(e)}")
+                
+            self._update_status(f"Error saat setup environment: {str(e)}", "error")
+            self._log_message(f"❌ Error saat setup environment: {str(e)}")
             return False 

@@ -4,11 +4,12 @@ Deskripsi: Initializer untuk UI download dataset
 """
 
 from typing import Dict, Any, Optional
+# Path tidak digunakan langsung tetapi mungkin dibutuhkan untuk type hints di komponen lain
 from pathlib import Path
 
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.ui_logger import log_to_ui, create_ui_logger
+from smartcash.ui.utils.ui_logger import create_ui_logger
 
 # Konstanta untuk namespace logger
 DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
@@ -20,8 +21,9 @@ from smartcash.ui.dataset.download.handlers.reset_handler import handle_reset_bu
 from smartcash.ui.dataset.download.handlers.cleanup_button_handler import handle_cleanup_button_click
 
 # Import utils yang dibutuhkan untuk inisialisasi
-from smartcash.ui.dataset.download.utils.logger_helper import setup_ui_logger, is_initialized
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, is_initialized
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
+# Fungsi-fungsi berikut tidak digunakan secara langsung tetapi tersedia untuk digunakan oleh handlers
 from smartcash.ui.dataset.download.utils.ui_state_manager import update_status_panel, reset_ui_after_download
 from smartcash.ui.dataset.download.utils.progress_manager import reset_progress_bar
 
@@ -69,8 +71,11 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
         # Create UI components
         ui_components = create_download_ui(dataset_config)
         
-        # Setup logger
-        ui_components = setup_ui_logger(ui_components)
+        # Setup logger dengan namespace spesifik
+        logger = create_ui_logger(ui_components, DOWNLOAD_LOGGER_NAMESPACE)
+        ui_components['logger'] = logger
+        ui_components['logger_namespace'] = DOWNLOAD_LOGGER_NAMESPACE
+        ui_components['download_initialized'] = True
         
         # Setup handlers
         ui_components = setup_download_handlers(ui_components, env, dataset_config)
@@ -82,7 +87,9 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
         logger.error(f"Error saat inisialisasi UI: {str(e)}")
         # Hanya tampilkan log di UI jika bukan saat dependency installer
         try:
-            log_to_ui(None, f"❌ Error saat inisialisasi UI: {str(e)}", "error")
+            # Buat temporary ui_components untuk log error
+            temp_ui_components = {'logger': logger, 'logger_namespace': DOWNLOAD_LOGGER_NAMESPACE}
+            log_message(temp_ui_components, f"Error saat inisialisasi UI: {str(e)}", "error")
         except:
             pass
         raise

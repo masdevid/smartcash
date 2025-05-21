@@ -6,7 +6,7 @@ Deskripsi: Utilitas untuk mengelola observer UI pada proses download dataset
 from typing import Dict, Any, Optional
 from smartcash.components.observer import ObserverManager, EventTopics
 from smartcash.ui.dataset.download.utils.notification_manager import DownloadUIEvents
-from smartcash.ui.dataset.download.utils.logger_helper import MODULE_LOGGER_NAME
+from smartcash.ui.dataset.download.download_initializer import DOWNLOAD_LOGGER_NAMESPACE
 
 def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     """
@@ -24,7 +24,7 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     def log_observer(event_type: str, sender: Any, **kwargs) -> None:
         # Periksa namespace untuk memastikan log hanya dari modul yang relevan
         namespace = kwargs.get('namespace', '')
-        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+        if namespace and namespace != DOWNLOAD_LOGGER_NAMESPACE and not namespace.startswith('smartcash.dataset.download'):
             return  # Skip log dari namespace lain
             
         if event_type in [DownloadUIEvents.LOG_INFO, DownloadUIEvents.LOG_WARNING, 
@@ -57,7 +57,7 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     def progress_observer(event_type: str, sender: Any, **kwargs) -> None:
         # Periksa namespace untuk memastikan progress hanya dari modul yang relevan
         namespace = kwargs.get('namespace', '')
-        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+        if namespace and namespace != DOWNLOAD_LOGGER_NAMESPACE and not namespace.startswith('smartcash.dataset.download'):
             return  # Skip progress dari namespace lain
             
         if not isinstance(ui_components, dict):
@@ -107,7 +107,7 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     def step_progress_observer(event_type: str, sender: Any, **kwargs) -> None:
         # Periksa namespace untuk memastikan step progress hanya dari modul yang relevan
         namespace = kwargs.get('namespace', '')
-        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+        if namespace and namespace != DOWNLOAD_LOGGER_NAMESPACE and not namespace.startswith('smartcash.dataset.download'):
             return  # Skip step progress dari namespace lain
             
         if not isinstance(ui_components, dict):

@@ -9,22 +9,25 @@ from typing import Optional, Union
 
 from smartcash.ui.utils.constants import ALERT_STYLES, COLORS
 
-def create_status_indicator(status: str, message: str) -> HTML:
+def create_status_indicator(status: str, message: str, icon: Optional[str] = None) -> HTML:
     """Create a styled status indicator.
 
     Args:
         status: Status type ('info', 'success', 'warning', 'error')
         message: Status message
+        icon: Optional custom emoji icon (defaults to type-specific icon)
 
     Returns:
         HTML widget with styled status indicator
     """
     style = ALERT_STYLES.get(status, ALERT_STYLES['info'])
+    icon_str = icon or style["icon"]
+    
     html_content = (
         f'<div style="margin: 5px 0; padding: 8px 12px; '
         f'border-radius: 4px; background-color: {COLORS["light"]};">'
         f'<span style="color: {style["text_color"]}; font-weight: bold;">'
-        f'{style["icon"]} {message}'
+        f'{icon_str} {message}'
         f'</span></div>'
     )
     return HTML(html_content)

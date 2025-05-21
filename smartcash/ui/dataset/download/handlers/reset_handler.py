@@ -1,166 +1,131 @@
 """
 File: smartcash/ui/dataset/download/handlers/reset_handler.py
-Deskripsi: Handler untuk reset UI dan state pada modul download
+Deskripsi: Handler untuk mereset UI download dataset ke nilai default
 """
 
 from typing import Dict, Any, Optional
+from IPython.display import display
 from smartcash.common.config import get_config_manager
-from smartcash.ui.utils.ui_logger import log_to_ui
-from smartcash.ui.dataset.download.utils.logger_helper import log_message
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
 
-def handle_reset_button_click(ui_components: Dict[str, Any], b: Any = None) -> None:
+def handle_reset_button_click(ui_components: Dict[str, Any], button=None) -> None:
     """
-    Handler untuk tombol reset pada UI download.
+    Handler untuk mereset UI download dataset ke nilai default.
     
     Args:
         ui_components: Dictionary komponen UI
-        b: Button widget (opsional)
+        button: Tombol yang diklik (opsional)
     """
-    # Reset log output saat tombol diklik
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-        ui_components['log_output'].clear_output(wait=True)
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
+    # Nonaktifkan tombol selama proses
+    if button and hasattr(button, 'disabled'):
+        button.disabled = True
     
     try:
-        # Reset UI components menggunakan konfigurasi default dari config manager
-        reset_download_ui(ui_components)
+        # Log info
+        log_message(ui_components, "Mereset konfigurasi dataset...", "info", "🔄")
         
-        # Log reset berhasil
-        log_message(ui_components, "UI download berhasil direset ke konfigurasi default", "info", "🔄")
+        # Reset UI ke nilai default
+        _reset_ui_to_defaults(ui_components)
         
         # Update status panel jika tersedia
-        if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-            ui_components['update_status_panel'](ui_components, "info", "Konfigurasi download dataset")
+        if 'status_panel' in ui_components:
+            from smartcash.ui.components.status_panel import update_status_panel
+            update_status_panel(
+                ui_components['status_panel'],
+                "Konfigurasi dataset berhasil direset",
+                "success"
+            )
         
+        # Log sukses
+        log_message(ui_components, "Konfigurasi dataset berhasil direset", "success", "✅")
     except Exception as e:
-        # Tampilkan error
-        error_msg = f"Error saat reset UI: {str(e)}"
-        log_message(ui_components, error_msg, "error", "❌")
+        # Log error
+        log_message(ui_components, f"Error saat mereset konfigurasi: {str(e)}", "error", "❌")
+    finally:
+        # Aktifkan kembali tombol
+        if button and hasattr(button, 'disabled'):
+            button.disabled = False
 
-def reset_download_ui(ui_components: Dict[str, Any]) -> None:
+def _reset_ui_to_defaults(ui_components: Dict[str, Any]) -> None:
     """
-    Reset semua komponen UI download ke nilai default dari SimpleConfigManager.
+    Reset UI ke nilai default.
     
     Args:
         ui_components: Dictionary komponen UI
     """
+    # Ambil default values dari SimpleConfigManager jika tersedia
     try:
-        # Ambil konfigurasi default dari config manager
         config_manager = get_config_manager()
-        default_config = config_manager.get_module_config('dataset')
+        default_config = config_manager.get_module_config('dataset_defaults')
         
-        # Default values jika config tidak ada
-        default_values = {
-            'url': '',
-            'type': 'currency',
-            'save_path': 'data/raw',
-            'auto_extract': True,
-            'validate': True
-        }
-        
-        # Gunakan nilai dari config jika tersedia, jika tidak gunakan default
-        download_config = default_config.get('download', {})
-        
-        # Reset input fields berdasarkan konfigurasi
-        if 'url_input' in ui_components:
-            ui_components['url_input'].value = download_config.get('url', default_values['url'])
-        
-        if 'dataset_type' in ui_components:
-            ui_components['dataset_type'].value = download_config.get('type', default_values['type'])
-        
-        if 'save_path' in ui_components:
-            ui_components['save_path'].value = download_config.get('save_path', default_values['save_path'])
-        
-        if 'auto_extract' in ui_components:
-            ui_components['auto_extract'].value = download_config.get('auto_extract', default_values['auto_extract'])
-        
-        if 'validate_dataset' in ui_components:
-            ui_components['validate_dataset'].value = download_config.get('validate', default_values['validate'])
-            
-        log_message(ui_components, f"Reset download UI dengan konfigurasi: {download_config}", "debug", "🔄")
-        
+        if default_config:
+            # Reset UI dengan default config
+            _update_ui_from_config(ui_components, default_config)
+            return
     except Exception as e:
-        log_message(ui_components, f"Tidak bisa memuat konfigurasi default: {str(e)}. Menggunakan fallback.", "warning", "⚠️")
-        # Fallback ke reset original
-        _reset_download_ui_fallback(ui_components)
+        log_message(ui_components, f"Tidak bisa memuat konfigurasi default: {str(e)}", "debug", "ℹ️")
     
-    # Reset progress tracking
-    if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-        ui_components['reset_progress_bar']()
-    else:
-        # Fallback ke reset progress bar manual
-        _reset_progress_bar(ui_components)
-    
-    # Reset summary container
-    if 'summary_container' in ui_components:
-        ui_components['summary_container'].clear_output()
-        ui_components['summary_container'].layout.display = 'none'
-    
-    # Aktifkan tombol-tombol
-    _enable_buttons(ui_components)
+    # Fallback ke defaults hardcoded jika tidak ada config
+    _set_hardcoded_defaults(ui_components)
 
-def _reset_download_ui_fallback(ui_components: Dict[str, Any]) -> None:
+def _update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
-    Metode fallback untuk reset UI jika SimpleConfigManager gagal.
+    Update UI dari konfigurasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi yang akan diterapkan
+    """
+    # Update widget UI berdasarkan config yang tersedia
+    for key, value in config.items():
+        # Cari komponen UI yang sesuai dengan key
+        if key in ui_components and hasattr(ui_components[key], 'value'):
+            try:
+                ui_components[key].value = value
+            except Exception as e:
+                log_message(ui_components, f"Tidak bisa mengatur nilai '{key}': {str(e)}", "debug", "⚠️")
+
+def _set_hardcoded_defaults(ui_components: Dict[str, Any]) -> None:
+    """
+    Set nilai default hardcoded ke UI components.
     
     Args:
         ui_components: Dictionary komponen UI
     """
-    # Reset input fields ke nilai default hard-coded
-    if 'url_input' in ui_components:
-        ui_components['url_input'].value = ''
+    # Default Roboflow
+    if 'workspace' in ui_components:
+        ui_components['workspace'].value = ""
     
-    if 'dataset_type' in ui_components:
-        ui_components['dataset_type'].value = 'currency'
+    if 'project' in ui_components:
+        ui_components['project'].value = ""
     
-    if 'save_path' in ui_components:
-        ui_components['save_path'].value = 'data/raw'
+    if 'version' in ui_components:
+        ui_components['version'].value = ""
     
-    if 'auto_extract' in ui_components:
-        ui_components['auto_extract'].value = True
+    # Masking API key jika ada
+    if 'api_key' in ui_components:
+        current_key = ui_components['api_key'].value
+        if current_key and len(current_key) > 4 and not current_key.startswith('*'):
+            # Mask existing API key
+            ui_components['api_key'].value = f"****{current_key[-4:]}"
+        else:
+            # Clear jika itu sudah masked
+            ui_components['api_key'].value = ""
     
+    # Default output path
+    if 'output_dir' in ui_components:
+        ui_components['output_dir'].value = "data"
+    
+    # Default backup path
+    if 'backup_dir' in ui_components:
+        ui_components['backup_dir'].value = "data_backup"
+    
+    # Default checkbox
     if 'validate_dataset' in ui_components:
         ui_components['validate_dataset'].value = True
-
-def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
-    """
-    Reset progress bar ke nilai awal.
     
-    Args:
-        ui_components: Dictionary komponen UI
-    """
-    # Reset progress bar
-    if 'progress_bar' in ui_components:
-        ui_components['progress_bar'].value = 0
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-    
-    # Reset labels
-    for label_key in ['overall_label', 'step_label']:
-        if label_key in ui_components:
-            ui_components[label_key].value = ""
-            ui_components[label_key].layout.visibility = 'hidden'
-    
-    # Reset current progress
-    if 'current_progress' in ui_components:
-        ui_components['current_progress'].value = 0
-        ui_components['current_progress'].layout.visibility = 'hidden'
-    
-    # Reset progress container
-    if 'progress_container' in ui_components:
-        ui_components['progress_container'].layout.visibility = 'hidden'
-
-def _enable_buttons(ui_components: Dict[str, Any]) -> None:
-    """
-    Aktifkan semua tombol UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-    """
-    # Daftar tombol yang perlu diaktifkan
-    button_keys = ['download_button', 'check_button', 'reset_button']
-    
-    # Set status enabled untuk semua tombol
-    for key in button_keys:
-        if key in ui_components:
-            ui_components[key].disabled = False
-            if hasattr(ui_components[key], 'layout'):
-                ui_components[key].layout.display = 'block'
+    if 'backup_checkbox' in ui_components:
+        ui_components['backup_checkbox'].value = True

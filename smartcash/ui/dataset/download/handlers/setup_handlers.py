@@ -54,6 +54,7 @@ def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None
     _setup_check_button_handler(ui_components)
     _setup_reset_button_handler(ui_components)
     _setup_save_button_handler(ui_components)
+    _setup_cleanup_button_handler(ui_components)
     
     # Setup multi-progress tracking untuk download
     _setup_progress_tracking(ui_components)
@@ -131,6 +132,15 @@ def _setup_reset_button_handler(ui_components: Dict[str, Any]) -> None:
     if 'reset_button' in ui_components:
         ui_components['reset_button'].on_click(
             lambda b: handle_reset_button_click(ui_components, b)
+        )
+
+def _setup_cleanup_button_handler(ui_components: Dict[str, Any]) -> None:
+    """Setup handler untuk tombol cleanup."""
+    from smartcash.ui.dataset.download.handlers.cleanup_button_handler import handle_cleanup_button_click
+    
+    if 'cleanup_button' in ui_components:
+        ui_components['cleanup_button'].on_click(
+            lambda b: handle_cleanup_button_click(b, ui_components)
         )
 
 def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:

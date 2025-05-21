@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional
 import os
 import shutil
 from tqdm.notebook import tqdm
+from IPython.display import display
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
 
 def handle_cleanup_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
     """
@@ -16,19 +18,130 @@ def handle_cleanup_button_click(b: Any, ui_components: Dict[str, Any]) -> None:
         b: Button widget
         ui_components: Dictionary komponen UI
     """
-    # Dapatkan logger jika tersedia
-    logger = ui_components.get('logger')
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
     
     # Nonaktifkan tombol selama proses
     if 'cleanup_button' in ui_components:
         ui_components['cleanup_button'].disabled = True
     
-    # Update status
-    if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](ui_components, 'info', '🧹 Membersihkan hasil download...')
+    try:
+        # Update status
+        if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+            ui_components['update_status_panel'](ui_components, 'info', '🧹 Mempersiapkan pembersihan dataset...')
+        
+        # Dapatkan direktori output dari UI
+        output_dir = None
+        if 'output_dir' in ui_components and hasattr(ui_components['output_dir'], 'value'):
+            output_dir = ui_components['output_dir'].value
+        elif 'config' in ui_components and isinstance(ui_components['config'], dict):
+            output_dir = ui_components['config'].get('data', {}).get('dir', 'data')
+        
+        if not output_dir:
+            output_dir = 'data'  # Default jika tidak ada
+            
+        # Log message
+        log_message(ui_components, f"Mempersiapkan pembersihan dataset di {output_dir}", "info", "🧹")
+        
+        # Cek apakah direktori ada
+        if not os.path.exists(output_dir):
+            log_message(ui_components, f"Direktori {output_dir} tidak ditemukan, tidak ada yang perlu dibersihkan", "warning", "⚠️")
+            _cleanup_complete(ui_components, success=True, message=f"Direktori {output_dir} tidak ditemukan")
+            return
+        
+        # Hitung jumlah file yang akan dihapus
+        total_files = sum([len(files) for _, _, files in os.walk(output_dir)])
+        
+        if total_files == 0:
+            log_message(ui_components, f"Tidak ada file di {output_dir}, tidak ada yang perlu dibersihkan", "info", "ℹ️")
+            _cleanup_complete(ui_components, success=True, message=f"Tidak ada file di {output_dir}")
+            return
+        
+        # Tampilkan konfirmasi untuk cleanup
+        _show_confirmation_dialog(ui_components, output_dir, total_files)
+            
+    except Exception as e:
+        # Tangani error
+        log_message(ui_components, f"Error saat persiapan cleanup: {str(e)}", "error", "❌")
+        _cleanup_complete(ui_components, success=False, message=f"Error: {str(e)}")
+
+def _show_confirmation_dialog(ui_components: Dict[str, Any], output_dir: str, total_files: int) -> None:
+    """
+    Tampilkan dialog konfirmasi untuk cleanup.
     
-    # Jalankan proses cleanup langsung (tanpa threading untuk kompatibilitas Colab)
-    _execute_cleanup(ui_components)
+    Args:
+        ui_components: Dictionary komponen UI
+        output_dir: Direktori yang akan dibersihkan
+        total_files: Jumlah file yang akan dihapus
+    """
+    from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
+    
+    # Buat pesan konfirmasi
+    message = f"Anda akan menghapus {total_files} file dari direktori {output_dir}.\n"
+    message += "Tindakan ini tidak dapat dibatalkan.\n"
+    message += "Apakah Anda yakin ingin melanjutkan?"
+    
+    # Fungsi untuk menjalankan cleanup setelah konfirmasi
+    def on_confirm():
+        # Bersihkan area konfirmasi
+        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+            ui_components['confirmation_area'].clear_output()
+        
+        # Log konfirmasi
+        log_message(ui_components, f"Konfirmasi diterima, menghapus {total_files} file dari {output_dir}", "info", "✅")
+        
+        # Jalankan proses cleanup
+        _execute_cleanup(ui_components)
+    
+    # Fungsi untuk membatalkan
+    def on_cancel():
+        # Bersihkan area konfirmasi
+        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+            ui_components['confirmation_area'].clear_output()
+        
+        # Log pembatalan
+        log_message(ui_components, "Pembersihan dibatalkan oleh pengguna", "info", "❌")
+        
+        # Reset status
+        if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+            ui_components['update_status_panel'](ui_components, 'info', '❌ Pembersihan dibatalkan')
+        
+        # Aktifkan kembali tombol
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].disabled = False
+    
+    # Pastikan area konfirmasi tersedia
+    if 'confirmation_area' not in ui_components:
+        from ipywidgets import Output
+        ui_components['confirmation_area'] = Output()
+        
+        # Tambahkan ke UI jika memungkinkan
+        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+            try:
+                children = list(ui_components['ui'].children)
+                children.append(ui_components['confirmation_area'])
+                ui_components['ui'].children = tuple(children)
+            except Exception as e:
+                log_message(ui_components, f"Tidak bisa menambahkan area konfirmasi ke UI: {str(e)}", "warning", "⚠️")
+    
+    # Tampilkan dialog konfirmasi
+    ui_components['confirmation_area'].clear_output()
+    with ui_components['confirmation_area']:
+        dialog = create_confirmation_dialog(
+            title="Konfirmasi Pembersihan Dataset", 
+            message=message,
+            on_confirm=on_confirm,
+            on_cancel=on_cancel
+        )
+        display(dialog)
+    
+    # Update status panel
+    if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
+        ui_components['update_status_panel'](
+            ui_components, 
+            'warning', 
+            '⚠️ Silakan konfirmasi untuk melanjutkan pembersihan'
+        )
 
 def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
     """
@@ -37,10 +150,8 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    logger = ui_components.get('logger')
-    
     try:
-        # Dapatkan direktori output dari UI atau config
+        # Dapatkan direktori output dari UI
         output_dir = None
         if 'output_dir' in ui_components and hasattr(ui_components['output_dir'], 'value'):
             output_dir = ui_components['output_dir'].value
@@ -52,8 +163,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
         
         # Cek apakah direktori ada
         if not os.path.exists(output_dir):
-            if logger:
-                logger.warning(f"⚠️ Direktori {output_dir} tidak ditemukan, tidak ada yang perlu dibersihkan")
+            log_message(ui_components, f"Direktori {output_dir} tidak ditemukan, tidak ada yang perlu dibersihkan", "warning", "⚠️")
             _cleanup_complete(ui_components, success=True, message=f"Direktori {output_dir} tidak ditemukan")
             return
         
@@ -61,8 +171,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
         total_files = sum([len(files) for _, _, files in os.walk(output_dir)])
         
         if total_files == 0:
-            if logger:
-                logger.info(f"ℹ️ Tidak ada file di {output_dir}, tidak ada yang perlu dibersihkan")
+            log_message(ui_components, f"Tidak ada file di {output_dir}, tidak ada yang perlu dibersihkan", "info", "ℹ️")
             _cleanup_complete(ui_components, success=True, message=f"Tidak ada file di {output_dir}")
             return
         
@@ -93,8 +202,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
                             os.remove(file_path)
                             progress_bar.update(1)
                         except Exception as e:
-                            if logger:
-                                logger.error(f"❌ Gagal menghapus {file_path}: {str(e)}")
+                            log_message(ui_components, f"Gagal menghapus {file_path}: {str(e)}", "error", "❌")
                     
                     # Hapus direktori kosong
                     for dir_name in dirs:
@@ -103,8 +211,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
                             if not os.listdir(dir_path):  # Cek apakah direktori kosong
                                 os.rmdir(dir_path)
                         except Exception as e:
-                            if logger:
-                                logger.error(f"❌ Gagal menghapus direktori {dir_path}: {str(e)}")
+                            log_message(ui_components, f"Gagal menghapus direktori {dir_path}: {str(e)}", "error", "❌")
                 
                 progress_bar.close()
         else:
@@ -115,8 +222,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
                     try:
                         os.remove(file_path)
                     except Exception as e:
-                        if logger:
-                            logger.error(f"❌ Gagal menghapus {file_path}: {str(e)}")
+                        log_message(ui_components, f"Gagal menghapus {file_path}: {str(e)}", "error", "❌")
                 
                 # Hapus direktori kosong
                 for dir_name in dirs:
@@ -125,8 +231,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
                         if not os.listdir(dir_path):  # Cek apakah direktori kosong
                             os.rmdir(dir_path)
                     except Exception as e:
-                        if logger:
-                            logger.error(f"❌ Gagal menghapus direktori {dir_path}: {str(e)}")
+                        log_message(ui_components, f"Gagal menghapus direktori {dir_path}: {str(e)}", "error", "❌")
         
         # Proses selesai
         _cleanup_complete(ui_components, success=True, message=f"Berhasil membersihkan {total_files} file dari {output_dir}")
@@ -134,8 +239,7 @@ def _execute_cleanup(ui_components: Dict[str, Any]) -> None:
     except Exception as e:
         # Tangani error
         error_msg = f"Error saat membersihkan hasil download: {str(e)}"
-        if logger:
-            logger.error(f"❌ {error_msg}")
+        log_message(ui_components, error_msg, "error", "❌")
         _cleanup_complete(ui_components, success=False, message=error_msg)
 
 def _cleanup_complete(ui_components: Dict[str, Any], success: bool, message: str) -> None:
@@ -159,7 +263,4 @@ def _cleanup_complete(ui_components: Dict[str, Any], success: bool, message: str
         ui_components['cleanup_button'].disabled = False
     
     # Log hasil
-    logger = ui_components.get('logger')
-    if logger:
-        log_func = logger.info if success else logger.error
-        log_func(f"{icon} {message}")
+    log_message(ui_components, message, status_type, icon)

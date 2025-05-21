@@ -14,7 +14,7 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.download.handlers.download_handler import handle_download_button_click
 from smartcash.ui.dataset.download.handlers.check_handler import handle_check_button_click
 from smartcash.ui.dataset.download.handlers.reset_handler import handle_reset_button_click
-from smartcash.ui.dataset.download.handlers.cleanup_handler import handle_cleanup_button_click
+from smartcash.ui.dataset.download.handlers.cleanup_button_handler import handle_cleanup_button_click
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
 from smartcash.ui.dataset.download.utils.logger_helper import setup_ui_logger
 
@@ -108,7 +108,7 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
     )
     
     ui_components['cleanup_button'].on_click(
-        lambda b: handle_cleanup_button_click(ui_components, b)
+        lambda b: handle_cleanup_button_click(b, ui_components)
     )
     
     logger.info("✅ UI download dataset berhasil diinisialisasi")

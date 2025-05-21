@@ -3,40 +3,30 @@ File: smartcash/ui/dataset/download/handlers/confirmation_handler.py
 Deskripsi: Handler konfirmasi untuk download dataset
 """
 
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List
 from IPython.display import display
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
 
-def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', download_button = None) -> bool:
+def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') -> bool:
     """
     Tampilkan dialog konfirmasi untuk download dataset dari Roboflow.
     
     Args:
         ui_components: Dictionary komponen UI
         endpoint: Endpoint download (default: 'Roboflow')
-        download_button: Tombol download yang diklik
         
     Returns:
-        bool: True jika konfirmasi berhasil ditampilkan, False jika terjadi error
+        bool: True jika pengguna mengkonfirmasi, False jika dibatalkan
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     # Import modul yang diperlukan
     from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
     from smartcash.ui.components.status_panel import update_status_panel
-    from smartcash.ui.dataset.download.handlers.download_handler import execute_download
     
-    # Buat context logger khusus untuk download
-    logger = ui_components.get('logger')
-    download_logger = logger
-    
-    # Coba gunakan bind jika tersedia, jika tidak gunakan logger biasa
-    try:
-        if logger and hasattr(logger, 'bind'):
-            download_logger = logger.bind(context="download_only")
-            ui_components['download_logger'] = download_logger
-    except Exception as e:
-        # Jika terjadi error saat bind, gunakan logger biasa
-        download_logger = logger
-        # Simpan logger ke ui_components untuk digunakan nanti
-        ui_components['download_logger'] = download_logger
+    # Log message sebelum konfirmasi
+    log_message(ui_components, "Menunggu konfirmasi download dataset", "info", "⏳")
     
     output_dir = ui_components['output_dir'].value
     
@@ -44,60 +34,70 @@ def confirm_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow', 
     message = f"Anda akan mengunduh dataset dalam format YOLO v5 ke direktori {output_dir}. "
     message += _get_endpoint_details(ui_components, endpoint)
     
-    # Ambil custom cancel callback jika tersedia
-    cancel_callback = ui_components.get('cancel_download_callback', 
-                                       lambda: cancel_download(ui_components, download_logger))
-    
-    # Fungsi untuk menjalankan download dan membersihkan dialog
-    def confirm_and_execute():
-        # Pastikan bahwa kita hanya mengeksekusi proses download dan tidak ada proses lain
-        try:
-            # Bersihkan area konfirmasi
-            ui_components['confirmation_area'].clear_output()
-            
-            # Log bahwa kita akan mengeksekusi download
-            if download_logger:
-                download_logger.debug(f"🔍 Mengeksekusi download dari {endpoint} ke {output_dir}")
-            
-            # Tambahkan flag untuk mencegah eksekusi proses augmentasi
-            ui_components['current_operation'] = 'download_only'
-            ui_components['prevent_augmentation'] = True
-            
-            # Eksekusi download dengan konteks yang jelas
-            execute_download(ui_components, endpoint)
-        except Exception as e:
-            if download_logger:
-                download_logger.error(f"❌ Error saat eksekusi download: {str(e)}")
-            # Reset UI jika terjadi error
-            cancel_download(ui_components, download_logger)
-    
     # Pastikan confirmation_area ada dan valid
     if 'confirmation_area' not in ui_components or not hasattr(ui_components['confirmation_area'], 'clear_output'):
-        if download_logger:
-            download_logger.error("❌ Area konfirmasi tidak tersedia")
+        log_message(ui_components, "Area konfirmasi tidak tersedia", "error", "❌")
         return False
     
-    # Tampilkan dialog konfirmasi
-    ui_components['confirmation_area'].clear_output()
-    with ui_components['confirmation_area']:
-        dialog = create_confirmation_dialog(
-            title="Konfirmasi Download Dataset", message=message,
-            on_confirm=confirm_and_execute,
-            on_cancel=cancel_callback
+    # Tampilkan dialog konfirmasi dengan Promise/Future untuk mengembalikan hasil
+    try:
+        from ipywidgets import Button, HBox, VBox, HTML
+        import threading
+        
+        result_event = threading.Event()
+        result_value = [False]  # Gunakan list untuk bisa diubah dari dalam fungsi
+        
+        def on_confirm(b):
+            result_value[0] = True
+            result_event.set()
+            if 'confirmation_area' in ui_components:
+                ui_components['confirmation_area'].clear_output()
+            log_message(ui_components, "Konfirmasi download diterima", "info", "✅")
+            
+        def on_cancel(b):
+            result_value[0] = False
+            result_event.set()
+            if 'confirmation_area' in ui_components:
+                ui_components['confirmation_area'].clear_output()
+            log_message(ui_components, "Download dibatalkan oleh pengguna", "info", "❌")
+            update_status_panel(
+                ui_components['status_panel'],
+                "Download dibatalkan",
+                "info"
+            )
+        
+        # Buat tombol konfirmasi dan pembatalan
+        confirm_button = Button(description="Ya, Lanjutkan", button_style="success")
+        confirm_button.on_click(on_confirm)
+        
+        cancel_button = Button(description="Batal", button_style="danger")
+        cancel_button.on_click(on_cancel)
+        
+        # Buat dialog konfirmasi
+        title = HTML(f"<h3>Konfirmasi Download Dataset</h3>")
+        message_html = HTML(f"<p>{message}</p>")
+        buttons = HBox([confirm_button, cancel_button])
+        dialog = VBox([title, message_html, buttons])
+        
+        # Tampilkan dialog
+        ui_components['confirmation_area'].clear_output()
+        with ui_components['confirmation_area']:
+            display(dialog)
+        
+        # Update status panel
+        update_status_panel(
+            ui_components['status_panel'],
+            "Silakan konfirmasi untuk melanjutkan download dataset",
+            "warning"
         )
-        display(dialog)
-    
-    # Update status panel menggunakan komponen reusable
-    update_status_panel(
-        ui_components['status_panel'],
-        "Silakan konfirmasi untuk melanjutkan download dataset",
-        "warning"
-    )
-    
-    if download_logger: download_logger.info(f"ℹ️ Menunggu konfirmasi download dataset dari {endpoint}")
-    
-    # Return True untuk menunjukkan bahwa dialog konfirmasi berhasil ditampilkan
-    return True
+        
+        # Tunggu hasil dari pengguna (ini akan mem-block)
+        result_event.wait(timeout=300)  # Timeout 5 menit
+        return result_value[0]
+        
+    except Exception as e:
+        log_message(ui_components, f"Error saat menampilkan konfirmasi: {str(e)}", "error", "❌")
+        return False
 
 def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
     """Dapatkan detail spesifik untuk Roboflow."""
@@ -105,67 +105,3 @@ def _get_endpoint_details(ui_components: Dict[str, Any], endpoint: str) -> str:
     project = ui_components['project'].value
     version = ui_components['version'].value
     return f"Dataset akan diunduh dari Roboflow (workspace: {workspace}, project: {project}, version: {version})."
-
-def cancel_download(ui_components: Dict[str, Any], logger=None) -> None:
-    """Cancel download dan reset UI."""
-    from smartcash.ui.components.status_panel import update_status_panel
-    
-    # Gunakan download_logger jika tersedia
-    download_logger = ui_components.get('download_logger') or logger
-    
-    # Clear konfirmasi area
-    ui_components['confirmation_area'].clear_output()
-    
-    # Reset UI dengan benar - pastikan tombol terlihat
-    _reset_download_ui(ui_components)
-    
-    # Hapus konteks operasi jika ada
-    if 'current_operation' in ui_components:
-        if download_logger:
-            download_logger.debug(f"🔧 Membersihkan operasi: {ui_components.get('current_operation')}")
-        ui_components.pop('current_operation', None)
-    
-    # Update status panel menggunakan komponen reusable
-    update_status_panel(
-        ui_components['status_panel'],
-        "Download dibatalkan",
-        "info"
-    )
-    
-    if download_logger: download_logger.info("ℹ️ Download dataset dibatalkan")
-    
-def _reset_download_ui(ui_components: Dict[str, Any]) -> None:
-    """Reset UI download ke kondisi awal."""
-    # Aktifkan kembali tombol
-    for button_key in ['download_button', 'check_button']:
-        if button_key in ui_components and hasattr(ui_components[button_key], 'disabled'):
-            ui_components[button_key].disabled = False
-        
-        # Pastikan tombol terlihat
-        if button_key in ui_components and hasattr(ui_components[button_key], 'layout'):
-            ui_components[button_key].layout.display = 'block'
-    
-    # Reset API key highlight jika ada
-    if 'api_key' in ui_components:
-        ui_components['api_key'].layout.border = ""
-    
-    # Reset progress bar
-    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-        ui_components['progress_bar'].value = 0
-    
-    # Reset progress message
-    if 'progress_message' in ui_components and hasattr(ui_components['progress_message'], 'layout'):
-        ui_components['progress_message'].layout.visibility = 'hidden'
-        ui_components['progress_message'].value = ""
-    
-    # Reset tracker jika ada
-    for tracker_key in ['download_tracker', 'download_step_tracker']:
-        if tracker_key in ui_components:
-            tracker = ui_components[tracker_key]
-            if hasattr(tracker, 'reset'):
-                tracker.reset()
-            if hasattr(tracker, 'current'):
-                tracker.current = 0
-            if hasattr(tracker, 'set_description'):
-                tracker.set_description("")

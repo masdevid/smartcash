@@ -16,7 +16,7 @@ from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.notification_manager import notify_log, notify_progress
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
 from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
-from smartcash.ui.utils.ui_logger import log_to_ui
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
 
 __all__ = [
     'handle_download_button_click',
@@ -59,10 +59,11 @@ class DownloadHandler:
             }
             
             # Notifikasi parameter yang diterima
-            notify_log(
-                sender=self.ui_components,
-                message=f"Menerima parameter download: workspace={params['workspace']}, project={params['project']}, version={params['version']}",
-                level="info"
+            log_message(
+                self.ui_components,
+                f"Menerima parameter download: workspace={params['workspace']}, project={params['project']}, version={params['version']}",
+                "info",
+                "ℹ️"
             )
             
             # Jalankan download dengan parameter
@@ -101,7 +102,7 @@ def _reset_progress_bar(ui_components: Dict[str, Any]) -> None:
             ui_components['current_progress'].description = "Step 0/0"
             ui_components['current_progress'].layout.visibility = 'hidden'
     except Exception as e:
-        print(f"Warning: Failed to reset progress bar: {str(e)}")
+        log_message(ui_components, f"Gagal mereset progress bar: {str(e)}", "warning", "⚠️")
 
 def handle_download_button_click(ui_components: Dict[str, Any], button: Any = None) -> None:
     """
@@ -112,40 +113,66 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any = No
         button: Button widget (opsional)
     """
     try:
+        # Setup logger jika belum
+        ui_components = setup_ui_logger(ui_components)
+        
         # Disable tombol download jika button adalah widget
         if hasattr(button, 'disabled'):
             button.disabled = True
         
-        # Log pesan persiapan jika ui_components adalah dict
-        if isinstance(ui_components, dict) and 'log_output' in ui_components:
-            ui_components['log_output'].append_stdout("Memulai persiapan download dataset...")
+        # Reset log output saat tombol diklik
+        if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+            ui_components['log_output'].clear_output(wait=True)
         
-        # Tampilkan konfirmasi download
-        if confirm_download(ui_components):
+        # Log pesan persiapan
+        log_message(ui_components, "Memulai persiapan download dataset...", "info", "🚀")
+        
+        # Pastikan kita memiliki UI area untuk konfirmasi
+        if 'confirmation_area' not in ui_components:
+            from ipywidgets import Output
+            ui_components['confirmation_area'] = Output()
+            log_message(ui_components, "Area konfirmasi dibuat otomatis", "info", "ℹ️")
+            
+            # Tambahkan ke UI jika ada area untuk itu
+            if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+                try:
+                    # Coba tambahkan ke UI container (bukan UI ideal, tapi berfungsi sebagai fallback)
+                    children = list(ui_components['ui'].children)
+                    children.append(ui_components['confirmation_area'])
+                    ui_components['ui'].children = tuple(children)
+                except Exception as e:
+                    log_message(ui_components, f"Tidak bisa menambahkan area konfirmasi ke UI: {str(e)}", "warning", "⚠️")
+        
+        # Import modul yang diperlukan
+        from smartcash.ui.dataset.download.handlers.confirmation_handler import confirm_download
+        
+        # Tampilkan konfirmasi download (menunggu konfirmasi dengan callback)
+        confirm_result = confirm_download(ui_components)
+        
+        # Jalankan proses hanya jika pengguna mengkonfirmasi
+        if confirm_result:
             # Reset progress bar setelah konfirmasi
             _reset_progress_bar(ui_components)
             
-            # Ekstrak parameter dari UI jika ui_components adalah dict
-            if isinstance(ui_components, dict):
-                params = {
-                    'workspace': ui_components['workspace'].value,
-                    'project': ui_components['project'].value,
-                    'version': ui_components['version'].value,
-                    'api_key': ui_components['api_key'].value,
-                    'output_dir': ui_components['output_dir'].value,
-                    'backup_before_download': ui_components['backup_checkbox'].value if 'backup_checkbox' in ui_components else False,
-                    'backup_dir': ui_components['backup_dir'].value if 'backup_dir' in ui_components else ''
-                }
-                
-                # Log parameter yang akan digunakan
-                if 'log_output' in ui_components:
-                    ui_components['log_output'].append_stdout("Parameter download:")
-                    for key, value in params.items():
-                        if key == 'api_key':
-                            masked_key = value[:4] + "****" if value and len(value) > 4 else "****"
-                            ui_components['log_output'].append_stdout(f"- {key}: {masked_key}")
-                        else:
-                            ui_components['log_output'].append_stdout(f"- {key}: {value}")
+            # Ekstrak parameter dari UI
+            params = {
+                'workspace': ui_components['workspace'].value,
+                'project': ui_components['project'].value,
+                'version': ui_components['version'].value,
+                'api_key': ui_components['api_key'].value,
+                'output_dir': ui_components['output_dir'].value,
+                'backup_before_download': ui_components.get('backup_checkbox', {}).value if 'backup_checkbox' in ui_components else False,
+                'backup_dir': ui_components.get('backup_dir', {}).value if 'backup_dir' in ui_components else ''
+            }
+            
+            # Log parameter yang akan digunakan
+            log_message(ui_components, "Parameter download:", "info", "ℹ️")
+            for key, value in params.items():
+                if key == 'api_key':
+                    masked_key = value[:4] + "****" if value and len(value) > 4 else "****"
+                    log_message(ui_components, f"- {key}: {masked_key}", "debug", "🔑")
+                else:
+                    log_message(ui_components, f"- {key}: {value}", "debug", "🔹")
             
             # Nonaktifkan tombol lain selama download
             _disable_buttons(ui_components, True)
@@ -153,15 +180,19 @@ def handle_download_button_click(ui_components: Dict[str, Any], button: Any = No
             # Jalankan download dengan endpoint Roboflow
             execute_download(ui_components, 'Roboflow')
         else:
-            if isinstance(ui_components, dict) and 'log_output' in ui_components:
-                ui_components['log_output'].append_stdout("Download dibatalkan")
-                
+            # Log pembatalan download
+            log_message(ui_components, "Download dibatalkan oleh pengguna", "info", "❌")
+            
+            # Aktifkan kembali tombol download
+            if hasattr(button, 'disabled'):
+                button.disabled = False
+            
     except Exception as e:
-        if isinstance(ui_components, dict) and 'log_output' in ui_components:
-            ui_components['log_output'].append_stderr(f"Error saat persiapan download: {str(e)}")
+        # Log error
+        log_message(ui_components, f"Error saat persiapan download: {str(e)}", "error", "❌")
     finally:
-        # Enable kembali tombol download jika button adalah widget
-        if hasattr(button, 'disabled'):
+        # Enable kembali tombol download jika button adalah widget dan belum diaktifkan
+        if hasattr(button, 'disabled') and button.disabled:
             button.disabled = False
 
 def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
@@ -193,6 +224,9 @@ def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
         step=1,
         total_steps=5
     )
+    
+    # Log message dengan logger helper
+    log_message(ui_components, message or "Memulai proses download...", "info", "🚀")
 
     # Pastikan log accordion terbuka
     if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
@@ -228,6 +262,10 @@ def _update_progress(ui_components: Dict[str, Any], value: int, message: Optiona
         step=min(5, max(1, int(value / 20))),  # Estimasi langkah berdasarkan persentase
         total_steps=5
     )
+    
+    # Log progress message jika ada pesan
+    if message:
+        log_message(ui_components, f"Progress {value}%: {message}", "debug", "⏳")
 
 def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
     """
@@ -279,7 +317,10 @@ def _reset_ui_after_download(ui_components: Dict[str, Any]) -> None:
         from smartcash.ui.utils.alert_utils import update_status_panel
         update_status_panel(ui_components['status_panel'], 'Download selesai', 'success')
     elif 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        ui_components['update_status_panel'](ui_components, 'info', 'Download selesai')
+        ui_components['update_status_panel'](ui_components, 'success', '✅ Download selesai')
+    
+    # Log message dengan logger helper
+    log_message(ui_components, "Proses download telah selesai", "info", "✅")
     
     # Pastikan log accordion tetap terbuka
     if 'log_accordion' in ui_components and hasattr(ui_components['log_accordion'], 'selected_index'):
@@ -303,17 +344,16 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
         endpoint: Parameter dipertahankan untuk kompatibilitas, selalu 'Roboflow'
     """
     try:
+        # Setup logger jika belum
+        ui_components = setup_ui_logger(ui_components)
+        
         # Jalankan download berdasarkan endpoint yang dipilih
         if endpoint.lower() == 'roboflow':
             # Tampilkan progress
             _show_progress(ui_components, "Memulai download dari Roboflow...")
             
-            # Kirim notifikasi log
-            notify_log(
-                sender=ui_components,
-                message=f"Memulai proses download dataset dari Roboflow",
-                level="info"
-            )
+            # Log message dengan logger helper
+            log_message(ui_components, "Memulai proses download dataset dari Roboflow", "info", "🚀")
             
             # Pastikan observer terdaftar
             observer_manager = register_ui_observers(ui_components)
@@ -326,33 +366,13 @@ def execute_download(ui_components: Dict[str, Any], endpoint: str = 'Roboflow') 
                 _process_download_result(ui_components, result)
         else:
             # Endpoint tidak didukung
-            notify_log(
-                sender=ui_components,
-                message=f"Endpoint '{endpoint}' tidak didukung",
-                level="error"
-            )
-            
-            notify_progress(
-                sender=ui_components,
-                event_type="error",
-                message=f"Endpoint tidak didukung: {endpoint}"
-            )
+            log_message(ui_components, f"Endpoint '{endpoint}' tidak didukung", "error", "❌")
             
             # Reset UI
             _reset_ui_after_download(ui_components)
     except Exception as e:
-        # Tampilkan error
-        notify_log(
-            sender=ui_components,
-            message=f"Error saat eksekusi download: {str(e)}",
-            level="error"
-        )
-        
-        notify_progress(
-            sender=ui_components,
-            event_type="error",
-            message=f"Error: {str(e)}"
-        )
+        # Tampilkan error dengan logger helper
+        log_message(ui_components, f"Error saat eksekusi download: {str(e)}", "error", "❌")
         
         # Reset UI
         _reset_ui_after_download(ui_components)
@@ -371,16 +391,9 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     if 'progress_container' in ui_components:
         ui_components['progress_container'].layout.display = 'block'
     
-    # Kirim notifikasi progress dimulai
-    notify_progress(
-        sender=ui_components,
-        event_type="start",
-        progress=0,
-        total=100,
-        message="Mempersiapkan download dataset...",
-        step=1,
-        total_steps=5
-    )
+    # Kirim notifikasi progress dimulai dan log message
+    _update_progress(ui_components, 0, "Mempersiapkan download dataset...")
+    log_message(ui_components, "Mempersiapkan download dataset...", "info", "🔄")
     
     # Ambil parameter dari UI
     params = {
@@ -404,16 +417,7 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     
     # Validasi parameter
     if not params['api_key']:
-        notify_log(
-            sender=ui_components,
-            message="API Key tidak ditemukan. Mohon masukkan API Key Roboflow.",
-            level="error"
-        )
-        notify_progress(
-            sender=ui_components,
-            event_type="error",
-            message="API Key tidak ditemukan"
-        )
+        log_message(ui_components, "API Key tidak ditemukan. Mohon masukkan API Key Roboflow.", "error", "❌")
         _reset_ui_after_download(ui_components)
         return {"status": "error", "message": "API Key tidak ditemukan"}
     
@@ -429,54 +433,26 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             f.write('test')
         os.remove(test_file)
         
-        notify_log(
-            sender=ui_components,
-            message=f"Direktori output dibuat/ditemukan: {output_dir}",
-            level="info"
-        )
+        log_message(ui_components, f"Direktori output dibuat/ditemukan: {output_dir}", "info", "📁")
     except Exception as e:
         error_msg = f"Gagal membuat direktori output: {str(e)}"
-        notify_log(
-            sender=ui_components,
-            message=error_msg,
-            level="error"
-        )
+        log_message(ui_components, error_msg, "error", "❌")
+        
         # Coba gunakan direktori alternatif
         alt_output_dir = os.path.join(os.path.expanduser('~'), 'smartcash_downloads')
         try:
             os.makedirs(alt_output_dir, exist_ok=True)
             params['output_dir'] = alt_output_dir
-            notify_log(
-                sender=ui_components,
-                message=f"Menggunakan direktori output alternatif: {alt_output_dir}",
-                level="warning"
-            )
+            log_message(ui_components, f"Menggunakan direktori output alternatif: {alt_output_dir}", "warning", "⚠️")
         except Exception as e2:
-            notify_log(
-                sender=ui_components,
-                message=f"Gagal membuat direktori alternatif: {str(e2)}",
-                level="error"
-            )
-            notify_progress(
-                sender=ui_components,
-                event_type="error",
-                message="Error direktori output"
-            )
+            log_message(ui_components, f"Gagal membuat direktori alternatif: {str(e2)}", "error", "❌")
             _reset_ui_after_download(ui_components)
             return {"status": "error", "message": f"Gagal membuat direktori output: {str(e2)}"}
     
     # Jalankan download
     try:
         # Update progress
-        notify_progress(
-            sender=ui_components,
-            event_type="update",
-            progress=10,
-            total=100,
-            message="Memulai download dari Roboflow...",
-            step=2,
-            total_steps=5
-        )
+        _update_progress(ui_components, 10, "Memulai download dari Roboflow...")
         
         dataset_manager = DatasetManager()
         
@@ -488,22 +464,10 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             downloader_service = dataset_manager.get_service('downloader')
             downloader_service.set_observer_manager(observer_manager)
         except Exception as e:
-            notify_log(
-                sender=ui_components,
-                message=f"Warning: Gagal mengatur observer untuk downloader: {str(e)}",
-                level="warning"
-            )
+            log_message(ui_components, f"Gagal mengatur observer untuk downloader: {str(e)}", "warning", "⚠️")
         
         # Update progress lagi
-        notify_progress(
-            sender=ui_components,
-            event_type="update",
-            progress=20,
-            total=100,
-            message="Mendownload dataset dari Roboflow...",
-            step=3,
-            total_steps=5
-        )
+        _update_progress(ui_components, 20, "Mendownload dataset dari Roboflow...")
         
         # Jalankan download dengan parameter yang sesuai
         # Periksa signature method
@@ -532,21 +496,13 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             if 'verify_integrity' in signature.parameters:
                 valid_params['verify_integrity'] = True
                 
-            notify_log(
-                sender=ui_components,
-                message=f"Mendownload dataset dengan parameter: {', '.join(valid_params.keys())}",
-                level="info"
-            )
+            log_message(ui_components, f"Mendownload dataset dengan parameter: {', '.join(valid_params.keys())}", "info", "📥")
             
             # Jalankan download
             result = dataset_manager.download_from_roboflow(**valid_params)
         except Exception as e:
             # Fallback ke parameter minimal
-            notify_log(
-                sender=ui_components,
-                message=f"Mencoba download dengan parameter minimal: {str(e)}",
-                level="warning"
-            )
+            log_message(ui_components, f"Mencoba download dengan parameter minimal: {str(e)}", "warning", "⚠️")
             result = dataset_manager.download_from_roboflow(
                 api_key=params['api_key'],
                 workspace=params['workspace'],
@@ -556,32 +512,14 @@ def _download_from_roboflow(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             )
         
         # Update progress
-        notify_progress(
-            sender=ui_components,
-            event_type="update",
-            progress=90,
-            total=100,
-            message="Download selesai, memproses hasil...",
-            step=5,
-            total_steps=5
-        )
+        _update_progress(ui_components, 90, "Download selesai, memproses hasil...")
         
         return result
         
     except Exception as e:
         # Tangani error
         error_msg = f"Error saat proses download dataset: {str(e)}"
-        notify_log(
-            sender=ui_components,
-            message=error_msg,
-            level="error"
-        )
-        
-        notify_progress(
-            sender=ui_components,
-            event_type="error",
-            message=f"Error: {str(e)}"
-        )
+        log_message(ui_components, error_msg, "error", "❌")
         
         # Reset UI
         _reset_ui_after_download(ui_components)
@@ -598,17 +536,7 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     # Cek apakah result adalah None atau tidak valid
     if result is None:
         error_msg = "Hasil download tidak valid (None)"
-        notify_log(
-            sender=ui_components,
-            message=error_msg,
-            level="error"
-        )
-        
-        notify_progress(
-            sender=ui_components,
-            event_type="error",
-            message=error_msg
-        )
+        log_message(ui_components, error_msg, "error", "❌")
         
         # Reset UI
         _reset_ui_after_download(ui_components)
@@ -620,34 +548,20 @@ def _process_download_result(ui_components: Dict[str, Any], result: Dict[str, An
     
     if success:
         # Download berhasil
-        notify_log(
-            sender=ui_components,
-            message=f"Download dataset berhasil: {message}",
-            level="success"
-        )
+        log_message(ui_components, f"Download dataset berhasil: {message}", "success", "✅")
         
-        notify_progress(
-            sender=ui_components,
-            event_type="complete",
-            message="Download selesai"
-        )
+        # Gunakan update_progress sebagai notifikasi
+        _update_progress(ui_components, 100, "Download selesai")
         
         # Simpan konfigurasi setelah download berhasil
-        from smartcash.ui.dataset.download.handlers.config_handler import update_config_from_ui
-        update_config_from_ui(ui_components)
+        try:
+            from smartcash.ui.dataset.download.handlers.save_handler import handle_save_config
+            handle_save_config(ui_components)
+        except Exception as e:
+            log_message(ui_components, f"Gagal menyimpan konfigurasi: {str(e)}", "warning", "⚠️")
     else:
         # Download gagal
-        notify_log(
-            sender=ui_components,
-            message=f"Download dataset gagal: {message}",
-            level="error"
-        )
-        
-        notify_progress(
-            sender=ui_components,
-            event_type="error",
-            message=f"Error: {message}"
-        )
+        log_message(ui_components, f"Download dataset gagal: {message}", "error", "❌")
     
     # Reset UI setelah proses selesai
     _reset_ui_after_download(ui_components)

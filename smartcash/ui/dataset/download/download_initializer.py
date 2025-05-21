@@ -8,7 +8,10 @@ from pathlib import Path
 
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.ui_logger import log_to_ui
+from smartcash.ui.utils.ui_logger import log_to_ui, create_ui_logger
+
+# Konstanta untuk namespace logger
+DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
 
 # Import handlers dengan nama yang lebih spesifik untuk menghindari konflik
 from smartcash.ui.dataset.download.handlers.download_handler import handle_download_button_click
@@ -43,7 +46,7 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
     global _DOWNLOAD_MODULE_INITIALIZED
     
     # Setup logger dengan nama modul spesifik
-    logger = get_logger('smartcash.dataset.download')
+    logger = get_logger(DOWNLOAD_LOGGER_NAMESPACE)
     
     # Hindari multiple inisialisasi yang tidak perlu
     if _DOWNLOAD_MODULE_INITIALIZED:
@@ -97,7 +100,7 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
     global _DOWNLOAD_MODULE_INITIALIZED
     
     # Setup logger dengan nama modul spesifik
-    logger = get_logger('smartcash.dataset.download')
+    logger = get_logger(DOWNLOAD_LOGGER_NAMESPACE)
     
     # Hindari multiple inisialisasi yang tidak perlu
     if _DOWNLOAD_MODULE_INITIALIZED:
@@ -119,9 +122,11 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
     # Buat UI components
     ui_components = create_download_ui(config)
     
-    # Tambahkan logger ke UI components dan setup UI logger
+    # Setup logger dengan namespace spesifik
+    logger = create_ui_logger(ui_components, DOWNLOAD_LOGGER_NAMESPACE)
     ui_components['logger'] = logger
-    ui_components = setup_ui_logger(ui_components)
+    ui_components['logger_namespace'] = DOWNLOAD_LOGGER_NAMESPACE
+    ui_components['download_initialized'] = True
     
     # Tambahkan flag untuk tracking status
     ui_components['download_running'] = False

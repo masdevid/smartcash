@@ -34,6 +34,7 @@ def on_install_click(b, ui_components: Dict[str, Any]) -> None:
     # Import utils
     from smartcash.ui.setup.dependency_installer.utils.package_utils import analyze_installed_packages
     from smartcash.ui.setup.dependency_installer.handlers.package_handler import get_all_missing_packages, run_batch_installation
+    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
     # Dapatkan packages yang perlu diinstall
     missing_packages = get_all_missing_packages(ui_components)
@@ -57,8 +58,8 @@ def on_install_click(b, ui_components: Dict[str, Any]) -> None:
     if tracker:
         tracker.reset()
     
-    # Display ringkasan
-    logger = ui_components.get('logger')
+    # Display ringkasan menggunakan logger helper
+    log_message(ui_components, f"Memulai instalasi {len(missing_packages)} package", "info")
     status_output = ui_components.get('status')
     
     if status_output:
@@ -72,6 +73,13 @@ def on_install_click(b, ui_components: Dict[str, Any]) -> None:
     
     # Jalankan instalasi
     success, stats = run_batch_installation(missing_packages, ui_components)
+    
+    # Log ringkasan dengan namespace khusus
+    log_message(
+        ui_components, 
+        f"Instalasi selesai: {stats['success']}/{stats['total']} berhasil, {stats['failed']} gagal ({stats['duration']:.1f} detik)",
+        "success" if success else "warning"
+    )
     
     # Tampilkan ringkasan hasil
     if status_output:
@@ -97,6 +105,10 @@ def on_install_click(b, ui_components: Dict[str, Any]) -> None:
                     'error',
                     '❌'
                 ))
+                
+                # Log error details
+                for pkg, err in stats['errors']:
+                    log_message(ui_components, f"Instalasi gagal untuk {pkg}: {err}", "error")
     
     # Update status panel
     completion_status = "success" if success else "warning"

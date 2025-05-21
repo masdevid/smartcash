@@ -21,6 +21,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     from smartcash.ui.setup.dependency_installer.handlers.install_handler import setup_install_handler
     from smartcash.ui.setup.dependency_installer.handlers.analyzer_handler import setup_analyzer_handler
     from smartcash.ui.setup.dependency_installer.utils.package_utils import analyze_installed_packages
+    from smartcash.ui.setup.dependency_installer.utils.logger_helper import log_message
     
     # Setup progress tracking
     from smartcash.ui.handlers.single_progress import setup_progress_tracking
@@ -47,7 +48,7 @@ def setup_dependency_installer_handlers(ui_components: Dict[str, Any], env=None,
     try:
         analyze_installed_packages(ui_components)
     except Exception as e:
-        if 'logger' in ui_components:
-            ui_components['logger'].warning(f"⚠️ Gagal mendeteksi packages otomatis: {str(e)}")
+        # Gunakan log_message untuk mencegah tercampur dengan logger lain
+        log_message(ui_components, f"Gagal mendeteksi packages otomatis: {str(e)}", "warning")
     
     return ui_components

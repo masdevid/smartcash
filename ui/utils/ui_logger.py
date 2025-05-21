@@ -13,6 +13,9 @@ from IPython.display import display, HTML
 import ipywidgets as widgets
 from datetime import datetime
 
+# Import namespace utility
+from smartcash.ui.utils.ui_logger_namespace import format_log_message
+
 # Ekspor fungsi-fungsi utama
 __all__ = [
     'UILogger', 
@@ -103,6 +106,10 @@ class UILogger:
         self._in_log_to_ui = True
         
         try:
+            # Format pesan dengan namespace jika tersedia
+            from smartcash.ui.utils.ui_logger_namespace import format_log_message
+            formatted_message = format_log_message(self.ui_components, message)
+            
             # Tambahkan timestamp
             timestamp = datetime.now().strftime('%H:%M:%S')
             
@@ -134,7 +141,7 @@ class UILogger:
             <div style="margin:2px 0;padding:3px;border-radius:3px;">
                 <span style="color:{COLORS.get('muted', '#6c757d')}">[{timestamp}]</span> 
                 <span>{emoji}</span> 
-                <span style="color:{color}">{message}</span>
+                <span style="color:{color}">{formatted_message}</span>
             </div>
             """
             
@@ -151,14 +158,14 @@ class UILogger:
                 with self.ui_components['status']:
                     try:
                         from smartcash.ui.utils.alert_utils import create_status_indicator
-                        display(create_status_indicator(level, message))
+                        display(create_status_indicator(level, formatted_message))
                     except ImportError:
                         # Fallback jika tidak ada alert_utils
                         display(HTML(formatted_html))
             else:
                 # Fallback ke sys.__stdout__ jika tidak ada UI components
                 # Menggunakan sys.__stdout__ untuk mencegah rekursi
-                formatted_text = f"[{timestamp}] {emoji} {message}"
+                formatted_text = f"[{timestamp}] {emoji} {formatted_message}"
                 sys.__stdout__.write(f"{formatted_text}\n")
                 sys.__stdout__.flush()
         finally:
@@ -374,6 +381,10 @@ def create_ui_logger(ui_components: Dict[str, Any],
     # Simpan referensi ke logger di ui_components
     ui_components['logger'] = logger
     
+    # Tambahkan namespace ke ui_components jika belum ada
+    if 'logger_namespace' not in ui_components:
+        ui_components['logger_namespace'] = name
+    
     # Register logger untuk digunakan secara global
     _register_current_ui_logger(logger)
     
@@ -476,6 +487,18 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                 # Filter berdasarkan prefiks
                 if any(prefix in msg_strip for prefix in self.ignore_prefixes):
                     return
+                
+                # Cek jika pesan ini dari module lain yang tidak terkait dengan current namespace
+                from smartcash.ui.utils.ui_logger_namespace import get_namespace_id, KNOWN_NAMESPACES
+                current_namespace_id = get_namespace_id(self.ui_components)
+                
+                # Filter pesan yang berasal dari namespace lain
+                # Contoh: Jika kita dalam dependency installer, filter pesan dari dataset download
+                if current_namespace_id:
+                    other_namespaces = [ns_id for ns_id in KNOWN_NAMESPACES.values() 
+                                        if ns_id != current_namespace_id]
+                    if any(f"[{ns_id}]" in msg_strip for ns_id in other_namespaces):
+                        return
                     
                 # Filter messages seperti inisialisasi, setup, dll
                 if ('inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or 
@@ -503,6 +526,10 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
         def _display_line(self, line):
             """Tampilkan baris ke widget UI."""
             try:
+                # Format line dengan namespace jika tersedia
+                from smartcash.ui.utils.ui_logger_namespace import format_log_message
+                formatted_line = format_log_message(self.ui_components, line)
+                
                 # Prioritaskan log_output jika ada
                 if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
                     with self.ui_components['log_output']:
@@ -511,19 +538,19 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                             from smartcash.ui.utils.constants import COLORS
                             formatted_html = f"""
                             <div style="margin:2px 0;padding:3px;border-radius:3px;">
-                                <span style="color:{COLORS.get('text', '#212529')}">{line}</span>
+                                <span style="color:{COLORS.get('text', '#212529')}">{formatted_line}</span>
                             </div>
                             """
                             display(HTML(formatted_html))
                         except ImportError:
-                            display(HTML(f"<div>{line}</div>"))
+                            display(HTML(f"<div>{formatted_line}</div>"))
                 else:
                     with self.ui_components['status']:
                         try:
                             from smartcash.ui.utils.alert_utils import create_status_indicator
-                            display(create_status_indicator("info", line))
+                            display(create_status_indicator("info", formatted_line))
                         except ImportError:
-                            display(HTML(f"<div>{line}</div>"))
+                            display(HTML(f"<div>{formatted_line}</div>"))
             except Exception as e:
                 # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
                 self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {line}\n")
@@ -580,143 +607,96 @@ def restore_stdout(ui_components: Dict[str, Any]) -> None:
 
 def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
     """
-    Log pesan ke UI components dengan icon opsional.
+    Log pesan ke komponen UI.
+    Fungsi independen untuk dipanggil dari luar UILogger.
     
     Args:
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary komponen UI
         message: Pesan yang akan di-log
         level: Level log (info, warning, error, success)
-        icon: Icon opsional untuk ditambahkan ke pesan
+        icon: Ikon opsional untuk ditampilkan di depan pesan
     """
-    # Jika pesan kosong, jangan log
+    if ui_components is None:
+        return
+        
+    # Skip pesan kosong
     if not message or not message.strip():
         return
         
-    # Jika ada logger di ui_components, gunakan itu
-    if 'logger' in ui_components:
-        logger = ui_components['logger']
-        
-        # Format pesan dengan icon jika ada
-        formatted_message = f"{icon} {message}" if icon else message
-        
-        # Log ke logger berdasarkan level
-        if level == "error":
-            logger.error(formatted_message)
-        elif level == "warning":
-            logger.warning(formatted_message)
-        elif level == "success":
-            logger.success(formatted_message)
-        elif level == "critical":
-            logger.critical(formatted_message)
-        else:  # info
-            logger.info(formatted_message)
-        return
+    # Dapatkan timestamp
+    timestamp = datetime.now().strftime('%H:%M:%S')
     
-    # Fallback jika tidak ada logger: gunakan status atau log_output widget
-    if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
-        from IPython.display import display, HTML
-        
-        # Tentukan warna berdasarkan level sesuai style dependency_installer
-        try:
-            from smartcash.ui.utils.constants import COLORS
-            color_map = {
-                "info": COLORS.get("primary", "#007bff"),
-                "success": COLORS.get("success", "#28a745"),
-                "warning": COLORS.get("warning", "#ffc107"),
-                "error": COLORS.get("danger", "#dc3545"),
-                "critical": COLORS.get("danger", "#dc3545")
-            }
-            color = color_map.get(level, COLORS.get("text", "#212529"))
-        except ImportError:
-            # Fallback colors jika constants tidak dapat diimpor
-            color = {
-                "info": "blue",
-                "success": "green",
-                "warning": "orange",
-                "error": "red",
-                "critical": "darkred"
-            }.get(level, "black")
-        
-        # Format pesan dengan icon jika ada
-        formatted_message = f"{icon} {message}" if icon else message
-        
-        # Tampilkan ke status widget
+    # Tambahkan emoji sesuai level jika tidak ada ikon yang diberikan
+    if icon is None:
+        emoji_map = {
+            "debug": "🔍",
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "critical": "🔥"
+        }
+        icon = emoji_map.get(level, "ℹ️")
+    
+    # Format pesan dengan namespace jika tersedia
+    formatted_message = format_log_message(ui_components, message)
+    
+    # Tentukan warna berdasarkan level
+    try:
+        from smartcash.ui.utils.constants import COLORS
+        color_map = {
+            "debug": COLORS.get("muted", "#6c757d"),
+            "info": COLORS.get("primary", "#007bff"),
+            "success": COLORS.get("success", "#28a745"),
+            "warning": COLORS.get("warning", "#ffc107"),
+            "error": COLORS.get("danger", "#dc3545"),
+            "critical": COLORS.get("danger", "#dc3545")
+        }
+        color = color_map.get(level, COLORS.get("text", "#212529"))
+    except ImportError:
+        # Fallback colors
+        color_map = {
+            "debug": "#6c757d",
+            "info": "#007bff",
+            "success": "#28a745",
+            "warning": "#ffc107",
+            "error": "#dc3545",
+            "critical": "#dc3545"
+        }
+        color = color_map.get(level, "#212529")
+    
+    # Format pesan dengan timestamp dan emoji
+    formatted_html = f"""
+    <div style="margin:2px 0;padding:3px;border-radius:3px;">
+        <span style="color:#6c757d">[{timestamp}]</span> 
+        <span>{icon}</span> 
+        <span style="color:{color}">{formatted_message}</span>
+    </div>
+    """
+    
+    # Prioritas output:
+    # 1. log_output (untuk log panel)
+    # 2. status untuk status singkat
+    # 3. output untuk output generik
+    # 4. fallback ke stdout
+    
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+        with ui_components['log_output']:
+            # Gunakan HTML untuk styling
+            display(HTML(formatted_html))
+    elif 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
         with ui_components['status']:
+            # Coba gunakan alert_utils jika tersedia
             try:
                 from smartcash.ui.utils.alert_utils import create_status_indicator
-                display(create_status_indicator(level, formatted_message))
+                display(create_status_indicator(level, formatted_message, icon))
             except ImportError:
-                timestamp = datetime.now().strftime('%H:%M:%S')
-                formatted_html = f"""
-                <div style="margin:2px 0;padding:3px;border-radius:3px;">
-                    <span style="color:gray">[{timestamp}]</span> 
-                    <span style="color:{color}">{formatted_message}</span>
-                </div>
-                """
+                # Fallback ke HTML biasa
                 display(HTML(formatted_html))
-    
-    # Jika ada log_output, gunakan itu juga
-    elif 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-        from IPython.display import display, HTML
-        from datetime import datetime
-        
-        # Format pesan dengan timestamp dan icon dengan style dependency_installer
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        emoji = {
-            "info": "ℹ️",
-            "success": "✅",
-            "warning": "⚠️",
-            "error": "❌",
-            "critical": "🔥"
-        }.get(level, "ℹ️")
-        icon_text = icon if icon else emoji
-        
-        try:
-            from smartcash.ui.utils.constants import COLORS
-            color_map = {
-                "info": COLORS.get("primary", "#007bff"),
-                "success": COLORS.get("success", "#28a745"),
-                "warning": COLORS.get("warning", "#ffc107"),
-                "error": COLORS.get("danger", "#dc3545"),
-                "critical": COLORS.get("danger", "#dc3545")
-            }
-            color = color_map.get(level, COLORS.get("text", "#212529"))
-            
-            formatted_html = f"""
-            <div style="margin:2px 0;padding:3px;border-radius:3px;">
-                <span style="color:{COLORS.get('muted', '#6c757d')}">[{timestamp}]</span> 
-                <span>{icon_text}</span> 
-                <span style="color:{color}">{message}</span>
-            </div>
-            """
-        except ImportError:
-            # Fallback style jika constants tidak dapat diimpor
-            color = {
-                "info": "blue",
-                "success": "green",
-                "warning": "orange",
-                "error": "red",
-                "critical": "darkred"
-            }.get(level, "black")
-            formatted_html = f"""<div style="color:{color}">[{timestamp}] {icon_text} {message}</div>"""
-        
-        # Tampilkan ke log_output widget
-        with ui_components['log_output']:
+    elif 'output' in ui_components and hasattr(ui_components['output'], 'clear_output'):
+        with ui_components['output']:
             display(HTML(formatted_html))
-    
-    # Fallback ke stdout jika tidak ada UI components
     else:
-        from datetime import datetime
-        timestamp = datetime.now().strftime('%H:%M:%S')
-        emoji = {
-            "info": "ℹ️",
-            "success": "✅",
-            "warning": "⚠️",
-            "error": "❌",
-            "critical": "🔥"
-        }.get(level, "ℹ️")
-        icon_text = icon if icon else emoji
-        formatted_message = f"[{timestamp}] {icon_text} {message}"
-        # Gunakan sys.__stdout__ untuk mencegah rekursi
-        sys.__stdout__.write(f"{formatted_message}\n")
-        sys.__stdout__.flush()
+        # Fallback ke stdout
+        formatted_text = f"[{timestamp}] {icon} {formatted_message}"
+        print(formatted_text)

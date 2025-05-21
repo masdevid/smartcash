@@ -12,6 +12,9 @@ from smartcash.common.environment import get_environment_manager
 from smartcash.common.config.manager import get_config_manager
 from smartcash.ui.utils.ui_logger import create_ui_logger
 
+# Konstanta untuk namespace logger
+DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer"
+
 def initialize_dependency_installer() -> Dict[str, Any]:
     """
     Inisialisasi UI dan handler untuk instalasi dependencies.
@@ -28,9 +31,11 @@ def initialize_dependency_installer() -> Dict[str, Any]:
     # Buat komponen UI
     ui_components = create_dependency_installer_ui(env_manager, config_manager)
     
-    # Setup logger
-    logger = create_ui_logger(ui_components, "dependency_installer")
+    # Setup logger dengan namespace spesifik
+    logger = create_ui_logger(ui_components, DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
     ui_components['logger'] = logger
+    ui_components['logger_namespace'] = DEPENDENCY_INSTALLER_LOGGER_NAMESPACE
+    ui_components['dependency_installer_initialized'] = True
     
     # Setup handlers
     setup_dependency_installer_handlers(ui_components, env_manager, config_manager)

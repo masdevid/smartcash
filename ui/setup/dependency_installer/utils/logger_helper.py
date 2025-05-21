@@ -1,6 +1,6 @@
 """
-File: smartcash/ui/dataset/download/utils/logger_helper.py
-Deskripsi: Helper untuk penggunaan UI logger yang konsisten di module download
+File: smartcash/ui/setup/dependency_installer/utils/logger_helper.py
+Deskripsi: Helper untuk penggunaan UI logger yang konsisten di module dependency installer
 """
 
 from typing import Dict, Any, Optional
@@ -8,11 +8,11 @@ from smartcash.ui.utils.ui_logger import log_to_ui as ui_log
 from smartcash.common.logger import get_logger
 
 # Import namespace konstanta
-from smartcash.ui.dataset.download.download_initializer import DOWNLOAD_LOGGER_NAMESPACE
+from smartcash.ui.setup.dependency_installer.dependency_installer_initializer import DEPENDENCY_INSTALLER_LOGGER_NAMESPACE
 
 def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: Optional[str] = None) -> None:
     """
-    Log pesan ke UI dan logger Python dengan namespace khusus dataset download.
+    Log pesan ke UI dan logger Python dengan namespace khusus dependency installer.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -20,13 +20,13 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         level: Level log (info, warning, error, success)
         icon: Ikon opsional untuk ditampilkan di depan pesan
     """
-    # Cek apakah ini adalah dataset download yang sudah diinisialisasi
+    # Cek apakah ini adalah dependency installer yang sudah diinisialisasi
     if not is_initialized(ui_components):
         # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di modul lain
         return
     
     # Pastikan menggunakan logger dengan namespace yang tepat
-    logger = ui_components.get('logger') or get_logger(DOWNLOAD_LOGGER_NAMESPACE)
+    logger = ui_components.get('logger') or get_logger(DEPENDENCY_INSTALLER_LOGGER_NAMESPACE)
     
     # Log ke UI hanya jika log_output atau output tersedia
     if 'log_output' in ui_components or 'output' in ui_components:
@@ -34,7 +34,7 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         ui_log(ui_components, message, level, icon)
     
     # Tambahkan prefix untuk memudahkan filtering
-    prefixed_message = f"[DATASET-DOWNLOAD] {message}"
+    prefixed_message = f"[DEP-INSTALLER] {message}"
     
     # Log ke Python logger
     if logger:
@@ -52,36 +52,9 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         elif level == "critical":
             logger.critical(prefixed_message)
 
-def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Setup UI logger untuk module download.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Dictionary UI components yang telah ditambahkan logger
-    """
-    # Setup logger jika belum ada
-    if 'logger' not in ui_components:
-        # Gunakan nama modul yang spesifik untuk menghindari conflict
-        ui_components['logger'] = get_logger(DOWNLOAD_LOGGER_NAMESPACE)
-    
-    # Tambahkan fungsi log_message ke UI components
-    ui_components['log_message'] = lambda msg, level="info", icon=None: log_message(ui_components, msg, level, icon)
-    
-    # Tambahkan flag download_initialized untuk menunjukkan modul telah di-initialize
-    # Flag ini digunakan untuk mencegah log ke installer dependency
-    ui_components['download_initialized'] = True
-    
-    # Tambahkan namespace ke ui_components untuk memudahkan tracing
-    ui_components['logger_namespace'] = DOWNLOAD_LOGGER_NAMESPACE
-    
-    return ui_components 
-
 def is_initialized(ui_components: Dict[str, Any]) -> bool:
     """
-    Cek apakah UI logger sudah diinisialisasi.
+    Cek apakah UI dependency installer sudah diinisialisasi.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -89,4 +62,4 @@ def is_initialized(ui_components: Dict[str, Any]) -> bool:
     Returns:
         bool: True jika sudah diinisialisasi, False jika belum
     """
-    return ui_components.get('download_initialized', False) 
+    return ui_components.get('dependency_installer_initialized', False) 

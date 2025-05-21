@@ -7,12 +7,12 @@ from typing import Dict, Any, Optional
 from smartcash.ui.utils.ui_logger import log_to_ui as ui_log
 from smartcash.common.logger import get_logger
 
-# Constant untuk nama modul logger
-MODULE_LOGGER_NAME = 'smartcash.dataset.download'
+# Import namespace konstanta
+from smartcash.ui.dataset.download.download_initializer import DOWNLOAD_LOGGER_NAMESPACE
 
 def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: Optional[str] = None) -> None:
     """
-    Log pesan ke UI dan logger Python dengan konsisten.
+    Log pesan ke UI dan logger Python dengan namespace khusus dataset download.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -20,16 +20,13 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         level: Level log (info, warning, error, success)
         icon: Ikon opsional untuk ditampilkan di depan pesan
     """
-    # Cek apakah ini adalah dependency installer
-    # Jika ui_components tidak memiliki flag download_initialized, 
-    # maka kemungkinan ini adalah dependency installer atau saat impor
+    # Cek apakah ini adalah dataset download yang sudah diinisialisasi
     if not is_initialized(ui_components):
-        # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di dependency installer
+        # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di modul lain
         return
     
     # Pastikan menggunakan logger dengan namespace yang tepat
-    # untuk memisahkan log download dari modul lain
-    logger = ui_components.get('logger') or get_logger(MODULE_LOGGER_NAME)
+    logger = ui_components.get('logger') or get_logger(DOWNLOAD_LOGGER_NAMESPACE)
     
     # Log ke UI hanya jika log_output atau output tersedia
     if 'log_output' in ui_components or 'output' in ui_components:
@@ -39,7 +36,7 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
     # Tambahkan prefix untuk memudahkan filtering
     prefixed_message = f"[DATASET-DOWNLOAD] {message}"
     
-    # Log ke Python logger jika tersedia
+    # Log ke Python logger
     if logger:
         if level == "info":
             logger.info(prefixed_message)
@@ -68,7 +65,7 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     # Setup logger jika belum ada
     if 'logger' not in ui_components:
         # Gunakan nama modul yang spesifik untuk menghindari conflict
-        ui_components['logger'] = get_logger(MODULE_LOGGER_NAME)
+        ui_components['logger'] = get_logger(DOWNLOAD_LOGGER_NAMESPACE)
     
     # Tambahkan fungsi log_message ke UI components
     ui_components['log_message'] = lambda msg, level="info", icon=None: log_message(ui_components, msg, level, icon)
@@ -78,7 +75,7 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     ui_components['download_initialized'] = True
     
     # Tambahkan namespace ke ui_components untuk memudahkan tracing
-    ui_components['logger_namespace'] = MODULE_LOGGER_NAME
+    ui_components['logger_namespace'] = DOWNLOAD_LOGGER_NAMESPACE
     
     return ui_components 
 

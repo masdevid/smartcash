@@ -8,25 +8,44 @@ from IPython.display import display, clear_output
 import os
 import traceback
 from pathlib import Path
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_status_indicator
-from smartcash.common.logger import get_logger
-from smartcash.ui.dataset.preprocessing.handlers.status_handler import update_status_panel
-from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
-    notify_process_start, 
-    notify_process_complete, 
-    notify_process_error, 
-    notify_process_stop,
-    disable_ui_during_processing
+
+# Import utils dari preprocessing module
+from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import (
+    update_status_panel,
+    update_ui_before_preprocessing,
+    reset_ui_after_preprocessing, 
+    toggle_input_controls
 )
+from smartcash.ui.dataset.preprocessing.utils.progress_manager import (
+    start_progress,
+    update_progress,
+    complete_progress,
+    reset_progress_bar
+)
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import (
+    PREPROCESSING_LOGGER_NAMESPACE,
+    notify_log,
+    notify_progress
+)
+from smartcash.ui.dataset.preprocessing.handlers.observer_handler import (
+    notify_process_start,
+    notify_process_complete,
+    notify_process_error,
+    notify_process_progress
+)
+from smartcash.ui.dataset.preprocessing.handlers.confirmation_handler import (
+    confirm_preprocessing
+)
+
+# Import common
+from smartcash.common.logger import get_logger
+
+# Setup logger
+logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
 
 def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str):
     """Eksekusi preprocessing dengan parameter dari UI."""
-    logger = ui_components.get('logger')
-    
-    # Dapatkan notification manager
-    from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
-    notification_manager = get_notification_manager(ui_components)
     
     # Dapatkan parameter dari UI
     try:
@@ -40,9 +59,10 @@ def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str)
             )
             ui_components['dataset_manager'] = dataset_manager
         
-        # Register progress callback jika tersedia
-        if 'update_progress' in ui_components and callable(ui_components['update_progress']):
-            dataset_manager.register_progress_callback(ui_components['update_progress'])
+        # Register progress callback ke dataset manager
+        dataset_manager.register_progress_callback(
+            lambda progress, total, message: notify_process_progress(ui_components, progress, total, message)
+        )
         
         # Dapatkan parameter preprocessing dari UI
         params = {}
@@ -93,10 +113,16 @@ def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str)
         config['preprocessing'].update(params)
         
         # Update status
-        notification_manager.update_status("info", f"{ICONS['processing']} Menjalankan preprocessing untuk {split_info}...")
+        update_status_panel(ui_components, "started", f"Menjalankan preprocessing untuk {split_info}...")
         
-        # Set flag running
-        ui_components['preprocessing_running'] = True
+        # Set UI untuk running
+        update_ui_before_preprocessing(ui_components)
+        
+        # Start progress tracking
+        start_progress(ui_components, f"Memulai preprocessing {split_info}...")
+        
+        # Notifikasi observer
+        notify_process_start(ui_components, "preprocessing", split_info, split)
         
         # Jalankan preprocessing
         result = dataset_manager.preprocess(
@@ -108,26 +134,22 @@ def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str)
         # Update UI setelah selesai
         if ui_components.get('preprocessing_running', True):
             # Preprocessing selesai dengan normal
-            notification_manager.update_status("success", f"{ICONS['success']} Preprocessing {split_info} selesai")
+            update_status_panel(ui_components, "completed", f"Preprocessing {split_info} selesai")
+            
+            # Complete progress tracking
+            complete_progress(ui_components, f"Preprocessing {split_info} selesai")
             
             # Notifikasi observer
             notify_process_complete(ui_components, result, split_info)
         else:
             # Preprocessing dihentikan oleh pengguna
-            notification_manager.update_status("warning", f"{ICONS['warning']} Preprocessing {split_info} dihentikan")
+            update_status_panel(ui_components, "warning", f"Preprocessing {split_info} dihentikan")
+            
+            # Reset progress tracking
+            reset_progress_bar(ui_components)
         
-        # Aktifkan kembali UI
-        disable_ui_during_processing(ui_components, False)
-        
-        # Tampilkan tombol primary dan sembunyikan tombol stop
-        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
-            ui_components['preprocess_button'].layout.display = 'block'
-        
-        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
-            ui_components['stop_button'].layout.display = 'none'
-        
-        # Reset flag
-        ui_components['preprocessing_running'] = False
+        # Reset UI setelah preprocessing
+        reset_ui_after_preprocessing(ui_components)
         
         return result
     
@@ -137,28 +159,19 @@ def execute_preprocessing(ui_components: Dict[str, Any], split, split_info: str)
         stack_trace = traceback.format_exc()
         
         # Log error
-        if logger:
-            logger.error(f"{ICONS['error']} Error saat preprocessing {split_info}: {error_msg}")
-            logger.debug(f"Stack trace: {stack_trace}")
+        log_message(ui_components, f"Error saat preprocessing {split_info}: {error_msg}", "error", "❌")
+        
+        # Untuk debugging, log stack trace 
+        logger.debug(f"Stack trace: {stack_trace}")
         
         # Update status
-        notification_manager.update_status("error", f"{ICONS['error']} Error: {error_msg}")
+        update_status_panel(ui_components, "failed", f"Error: {error_msg}")
         
         # Notifikasi observer
         notify_process_error(ui_components, error_msg)
         
-        # Aktifkan kembali UI
-        disable_ui_during_processing(ui_components, False)
-        
-        # Tampilkan tombol primary dan sembunyikan tombol stop
-        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
-            ui_components['preprocess_button'].layout.display = 'block'
-        
-        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
-            ui_components['stop_button'].layout.display = 'none'
-        
-        # Reset flag
-        ui_components['preprocessing_running'] = False
+        # Reset UI setelah preprocessing
+        reset_ui_after_preprocessing(ui_components)
 
 def setup_preprocessing_button_handlers(
     ui_components: Dict[str, Any], 
@@ -178,16 +191,10 @@ def setup_preprocessing_button_handlers(
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    logger = ui_components.get('logger', get_logger(module_type))
-    
-    # Dapatkan notification manager
-    from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
-    notification_manager = get_notification_manager(ui_components)
-    
     # Set flag running ke False
     ui_components['preprocessing_running'] = False
     
-    # Handler tombol primary dengan dukungan progress tracking
+    # Handler tombol primary dengan dukungan progress tracking dan konfirmasi
     def on_primary_click(b):
         # Dapatkan split yang dipilih
         split_selector = ui_components.get('split_selector')
@@ -202,108 +209,65 @@ def setup_preprocessing_button_handlers(
         }
         
         split = split_map.get(split_value, None)
-        split_info = split_value
         
-        # Set flag running
-        ui_components['preprocessing_running'] = True
+        # Disable inputs selama preprocessing
+        toggle_input_controls(ui_components, True)
         
-        # Disable UI selama proses
-        disable_ui_during_processing(ui_components, True)
-        
-        # Sembunyikan tombol primary dan tampilkan tombol stop
-        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
-            ui_components['preprocess_button'].layout.display = 'none'
-        
-        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
-            ui_components['stop_button'].layout.display = 'block'
-        
-        # Update status
-        notification_manager.update_status("info", f"{ICONS['processing']} Memulai preprocessing {split_info}...")
-        
-        # Notifikasi observer bahwa proses dimulai
-        notify_process_start(ui_components, "preprocessing", split_info, split)
-        
-        # Jalankan preprocessing dengan parameter dari UI
-        execute_preprocessing(ui_components, split, split_info)
+        # Tampilkan konfirmasi terlebih dahulu
+        confirm_preprocessing(ui_components, split)
     
-    # Handler untuk menghentikan proses
+    # Handler tombol stop
     def on_stop_click(b):
         # Set flag untuk menghentikan proses
         ui_components['preprocessing_running'] = False
         
         # Update status
-        notification_manager.update_status("warning", f"{ICONS['warning']} Menghentikan preprocessing...")
+        update_status_panel(ui_components, "warning", "Menghentikan preprocessing...")
         
-        # Notifikasi observer bahwa proses dihentikan
-        notify_process_stop(ui_components)
+        # Log ke console
+        log_message(ui_components, "Menghentikan preprocessing...", "warning", "⚠️")
     
-    # Reset UI dan konfigurasi ke default
+    # Handler tombol reset
     def on_reset_click(b):
-        # Konfirmasi reset
-        notification_manager.update_status("warning", f"{ICONS['warning']} Reset konfigurasi preprocessing...")
+        # Reset konfigurasi ke default
+        if 'reset_preprocessing_config' in ui_components and callable(ui_components['reset_preprocessing_config']):
+            ui_components['reset_preprocessing_config'](ui_components)
         
-        # Reset UI ke kondisi awal
+        # Reset UI
         _reset_ui(ui_components)
-        
-        # Update status
-        notification_manager.update_status("info", f"{ICONS['info']} Konfigurasi preprocessing direset ke default")
     
-    # Reset UI ke kondisi awal
     def _reset_ui(ui_components: Dict[str, Any]):
         # Reset flag
         ui_components['preprocessing_running'] = False
         
         # Reset progress bar
-        if 'reset_progress_bar' in ui_components and callable(ui_components['reset_progress_bar']):
-            ui_components['reset_progress_bar']()
+        reset_progress_bar(ui_components)
         
-        # Reset UI components ke default
-        # Dapatkan parameter dari preprocess_options
-        preproc_options = ui_components.get('preprocess_options')
-        if preproc_options and hasattr(preproc_options, 'children') and len(preproc_options.children) >= 5:
-            preproc_options.children[0].value = 640  # Image size
-            preproc_options.children[1].value = True  # Normalize
-            preproc_options.children[2].value = True  # Preserve Aspect Ratio
-            preproc_options.children[3].value = True  # Cache enabled
-            preproc_options.children[4].value = 4     # Workers
+        # Reset UI komponen
+        reset_ui_after_preprocessing(ui_components)
         
-        # Reset validation options
-        validation_options = ui_components.get('validation_options')
-        if validation_options and hasattr(validation_options, 'children') and len(validation_options.children) >= 4:
-            validation_options.children[0].value = True  # Enable validation
-            validation_options.children[1].value = True  # Fix issues
-            validation_options.children[2].value = True  # Move invalid
-            validation_options.children[3].value = 'data/invalid'  # Invalid dir
+        # Update status
+        update_status_panel(ui_components, "idle", "Preprocessing direset")
         
-        # Aktifkan kembali UI
-        disable_ui_during_processing(ui_components, False)
-        
-        # Tampilkan tombol primary dan sembunyikan tombol stop
-        if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'layout'):
-            ui_components['preprocess_button'].layout.display = 'block'
-        
-        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
-            ui_components['stop_button'].layout.display = 'none'
+        # Log ke console
+        log_message(ui_components, "Preprocessing direset", "info", "🔄")
     
-    # Register handler untuk tombol
-    if 'preprocess_button' in ui_components:
-        ui_components['preprocess_button'].on_click(on_primary_click)
+    # Attach event handlers ke tombol
+    buttons = {
+        'preprocess_button': on_primary_click,
+        'stop_button': on_stop_click,
+        'reset_button': on_reset_click
+    }
     
-    if 'stop_button' in ui_components:
-        ui_components['stop_button'].on_click(on_stop_click)
+    for button_key, handler in buttons.items():
+        if button_key in ui_components and hasattr(ui_components[button_key], 'on_click'):
+            ui_components[button_key].on_click(handler)
     
-    if 'reset_button' in ui_components:
-        ui_components['reset_button'].on_click(on_reset_click)
+    # Disable tombol stop awal
+    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'disabled'):
+        ui_components['stop_button'].disabled = True
     
-    # Tambahkan fungsi ke ui_components
-    ui_components.update({
-        'on_primary_click': on_primary_click,
-        'on_stop_click': on_stop_click,
-        'on_reset_click': on_reset_click,
-        'execute_preprocessing': execute_preprocessing
-    })
-    
-    # Set flag running ke False
-    ui_components['preprocessing_running'] = False
+    # Log setup berhasil
+    log_message(ui_components, "Button handlers berhasil disetup", "debug", "✅")
     
     return ui_components

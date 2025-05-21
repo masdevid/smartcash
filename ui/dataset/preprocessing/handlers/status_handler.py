@@ -6,23 +6,11 @@ Deskripsi: Handler untuk mengelola status panel pada UI preprocessing
 import ipywidgets as widgets
 from typing import Dict, Any
 
-# Import status handler utama untuk menjaga konsistensi
-from smartcash.ui.handlers.status_handler import update_status_panel as global_update_status_panel
-from smartcash.ui.handlers.status_handler import create_status_panel as global_create_status_panel
+# Import utils dari preprocessing module
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import notify_status
 from smartcash.ui.utils.constants import ALERT_STYLES, ICONS, COLORS
-from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
-
-def update_status_panel(ui_components: Dict[str, Any], status_type: str, message: str) -> None:
-    """
-    Update status panel UI dengan pesan dan tipe yang ditentukan.
-    
-    Args:
-        ui_components: Dictionary komponen UI dengan kunci 'status_panel'
-        status_type: Tipe pesan ('info', 'success', 'warning', 'error')
-        message: Pesan yang akan ditampilkan
-    """
-    # Delegasikan ke fungsi global untuk konsistensi
-    global_update_status_panel(ui_components, status_type, message)
 
 def create_status_panel(message: str = "", status_type: str = "info") -> widgets.HTML:
     """
@@ -35,8 +23,30 @@ def create_status_panel(message: str = "", status_type: str = "info") -> widgets
     Returns:
         Widget HTML berisi status panel
     """
-    # Delegasikan ke fungsi global untuk konsistensi
-    return global_create_status_panel(message, status_type)
+    # Pemetaan status ke icon dan warna
+    status_map = {
+        "info": ("ℹ️", "blue", "Info"),
+        "success": ("✅", "green", "Success"),
+        "warning": ("⚠️", "orange", "Warning"),
+        "error": ("❌", "red", "Error"),
+        "loading": ("⏳", "blue", "Loading"),
+        "idle": ("⏸️", "gray", "Idle"),
+        "started": ("🚀", "blue", "Started"),
+        "completed": ("✅", "green", "Completed"),
+        "failed": ("❌", "red", "Failed")
+    }
+    
+    emoji, color, default_text = status_map.get(status_type, ("ℹ️", "gray", "Info"))
+    
+    # Gunakan default message jika tidak ada pesan
+    display_message = message or default_text
+    
+    # Buat HTML widget dengan pesan dan style yang sesuai
+    html = widgets.HTML(
+        value=f"<span style='color: {color};'>{emoji} {display_message}</span>"
+    )
+    
+    return html
 
 def setup_status_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -50,13 +60,21 @@ def setup_status_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     # Pastikan status panel tersedia
     if 'status_panel' not in ui_components:
-        ui_components['status_panel'] = create_status_panel("Siap untuk preprocessing dataset", "info")
+        ui_components['status_panel'] = create_status_panel("Siap untuk preprocessing dataset", "idle")
     
-    # Inisialisasi notification manager
-    notification_manager = get_notification_manager(ui_components)
+    # Tambahkan fungsi ke ui_components jika belum ada
+    ui_components['update_status_panel'] = lambda status, message: update_status_panel(ui_components, status, message)
     
-    # Tambahkan fungsi ke ui_components
-    ui_components['update_status_panel'] = update_status_panel
+    # Tambahkan fungsi create panel
     ui_components['create_status_panel'] = create_status_panel
+    
+    # Set status awal
+    update_status_panel(ui_components, "idle", "Preprocessing siap dijalankan")
+    
+    # Notifikasi status awal
+    notify_status(ui_components, "idle", "Preprocessing siap dijalankan")
+    
+    # Log setup berhasil
+    log_message(ui_components, "Status handler berhasil disetup", "debug", "✅")
     
     return ui_components

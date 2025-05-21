@@ -12,9 +12,13 @@ from IPython.display import display
 from smartcash.dataset.utils.dataset_constants import DEFAULT_SPLITS, DEFAULT_PREPROCESSED_DIR, DEFAULT_INVALID_DIR, DEFAULT_IMG_SIZE
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.constants import ICONS
 
-logger = get_logger(__name__)
+# Import utils dari preprocessing module
+from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import notify_config, PREPROCESSING_LOGGER_NAMESPACE
+
+# Setup logger
+logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
 
 def get_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -39,10 +43,14 @@ def get_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         elif 'preprocessing' not in config:
             config['preprocessing'] = get_default_preprocessing_config()['preprocessing']
             
+        # Log berhasil get config
+        log_message(ui_components, "Konfigurasi preprocessing berhasil dimuat", "debug", "📄")
+            
         return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat get preprocessing config: {str(e)}")
+        # Log error
+        log_message(ui_components, f"Error saat get preprocessing config: {str(e)}", "error", "❌")
         return get_default_preprocessing_config()
 
 def get_default_preprocessing_config() -> Dict[str, Any]:
@@ -125,12 +133,17 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         config_manager = get_config_manager()
         config_manager.save_config(config, 'dataset')
         
-        logger.info("✅ Konfigurasi preprocessing berhasil diupdate dari UI")
+        # Log berhasil update config
+        log_message(ui_components, "Konfigurasi preprocessing berhasil diupdate dari UI", "success", "✅")
+        
+        # Notifikasi melalui observer
+        notify_config(ui_components, "updated", config)
         
         return config
         
     except Exception as e:
-        logger.error(f"❌ Error saat update config dari UI: {str(e)}")
+        # Log error
+        log_message(ui_components, f"Error saat update config dari UI: {str(e)}", "error", "❌")
         return get_preprocessing_config(ui_components)
 
 def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Dict[str, Any]:
@@ -190,10 +203,124 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any])
                         split_selector.value = key
                         break
             
-        logger.info("✅ UI preprocessing berhasil diupdate dari konfigurasi")
+        # Log berhasil update UI
+        log_message(ui_components, "UI preprocessing berhasil diupdate dari konfigurasi", "success", "✅")
+        
+        # Notifikasi melalui observer
+        notify_config(ui_components, "loaded", config)
         
         return ui_components
         
     except Exception as e:
-        logger.error(f"❌ Error saat update UI dari config: {str(e)}")
+        # Log error
+        log_message(ui_components, f"Error saat update UI dari config: {str(e)}", "error", "❌")
+        return ui_components
+
+def save_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Simpan konfigurasi preprocessing ke file.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi yang disimpan
+    """
+    try:
+        # Update config dari UI
+        config = update_config_from_ui(ui_components)
+        
+        # Save config
+        config_manager = get_config_manager()
+        config_manager.save_config(config, 'dataset')
+        
+        # Log berhasil save config
+        log_message(ui_components, "Konfigurasi preprocessing berhasil disimpan", "success", "💾")
+        
+        # Notifikasi melalui observer
+        notify_config(ui_components, "saved", config)
+        
+        return config
+        
+    except Exception as e:
+        # Log error
+        log_message(ui_components, f"Error saat simpan config: {str(e)}", "error", "❌")
+        return get_preprocessing_config(ui_components)
+
+def reset_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Reset konfigurasi preprocessing ke default.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary konfigurasi default
+    """
+    try:
+        # Get default config
+        config = get_default_preprocessing_config()
+        
+        # Update UI dari config
+        ui_components = update_ui_from_config(ui_components, config)
+        
+        # Save config
+        config_manager = get_config_manager()
+        config_manager.save_config(config, 'dataset')
+        
+        # Log berhasil reset config
+        log_message(ui_components, "Konfigurasi preprocessing berhasil direset ke default", "success", "🔄")
+        
+        # Notifikasi melalui observer
+        notify_config(ui_components, "reset", config)
+        
+        return config
+        
+    except Exception as e:
+        # Log error
+        log_message(ui_components, f"Error saat reset config: {str(e)}", "error", "❌")
+        return get_preprocessing_config(ui_components)
+
+def setup_preprocessing_config_handler(ui_components: Dict[str, Any], config: Optional[Dict[str, Any]] = None, env: Any = None) -> Dict[str, Any]:
+    """
+    Setup handler untuk konfigurasi preprocessing.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        config: Konfigurasi aplikasi (opsional)
+        env: Environment manager (opsional)
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    try:
+        # Load config jika tidak diberikan
+        if not config:
+            config = get_preprocessing_config(ui_components)
+        
+        # Update UI dari konfigurasi
+        ui_components = update_ui_from_config(ui_components, config)
+        
+        # Tambahkan fungsi ke ui_components
+        ui_components['get_preprocessing_config'] = get_preprocessing_config
+        ui_components['update_config_from_ui'] = update_config_from_ui
+        ui_components['update_ui_from_config'] = update_ui_from_config
+        ui_components['save_preprocessing_config'] = save_preprocessing_config
+        ui_components['reset_preprocessing_config'] = reset_preprocessing_config
+        
+        # Tambahkan event handler untuk button
+        if 'save_button' in ui_components and hasattr(ui_components['save_button'], 'on_click'):
+            ui_components['save_button'].on_click(lambda b: save_preprocessing_config(ui_components))
+        
+        if 'reset_button' in ui_components and hasattr(ui_components['reset_button'], 'on_click'):
+            ui_components['reset_button'].on_click(lambda b: reset_preprocessing_config(ui_components))
+        
+        # Log berhasil setup config handler
+        log_message(ui_components, "Config handler preprocessing berhasil disetup", "debug", "✅")
+        
+        return ui_components
+        
+    except Exception as e:
+        # Log error
+        log_message(ui_components, f"Error saat setup config handler: {str(e)}", "error", "❌")
         return ui_components

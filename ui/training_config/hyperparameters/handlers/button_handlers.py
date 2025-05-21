@@ -10,20 +10,25 @@ from IPython.display import display, clear_output
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.config import get_config_manager
-from smartcash.ui.training_config.hyperparameters.default_config import get_default_hyperparameters_config
-from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import (
-    update_ui_from_config,
-    update_config_from_ui,
-    save_config,
+from smartcash.ui.training_config.hyperparameters.handlers.default_config import get_default_hyperparameters_config
+from smartcash.ui.training_config.hyperparameters.handlers.config_reader import update_config_from_ui
+from smartcash.ui.training_config.hyperparameters.handlers.config_writer import update_ui_from_config
+from smartcash.ui.training_config.hyperparameters.handlers.config_manager import (
     get_hyperparameters_config,
-    update_hyperparameters_info
+    save_hyperparameters_config,
+    reset_hyperparameters_config,
+    get_default_base_dir
 )
 from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import (
     sync_to_drive,
     sync_from_drive
 )
 from smartcash.ui.training_config.hyperparameters.handlers.status_handlers import (
-    update_status_panel
+    update_status_panel,
+    show_success_status,
+    show_error_status,
+    show_info_status,
+    show_warning_status
 )
 
 logger = get_logger(__name__)
@@ -38,29 +43,35 @@ def on_save_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None
     """
     try:
         # Update status
-        update_status_panel(ui_components, "Menyimpan konfigurasi hyperparameter...", "info")
+        show_info_status(ui_components, "Menyimpan konfigurasi hyperparameter...")
         
         # Update config dari UI
         config = update_config_from_ui(ui_components)
         
         # Simpan config
-        saved_config = save_config(config, ui_components)
+        save_success = save_hyperparameters_config(config)
+        
+        if not save_success:
+            show_error_status(ui_components, "Gagal menyimpan konfigurasi hyperparameter")
+            return
         
         # Update UI dari config yang disimpan untuk memastikan konsistensi
+        saved_config = get_hyperparameters_config()
         update_ui_from_config(ui_components, saved_config)
         
-        # Update info panel
-        update_hyperparameters_info(ui_components)
+        # Update info panel jika ada
+        if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+            ui_components['update_hyperparameters_info'](ui_components)
         
         # Update status
-        update_status_panel(ui_components, "Konfigurasi hyperparameter berhasil disimpan", "success")
+        show_success_status(ui_components, "Konfigurasi hyperparameter berhasil disimpan")
         
         # Log untuk debugging
         logger.info(f"Konfigurasi hyperparameter berhasil disimpan dan UI diperbarui")
         
     except Exception as e:
         logger.error(f"Error saat menyimpan konfigurasi hyperparameters: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
+        show_error_status(ui_components, f"Error: {str(e)}")
 
 def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -72,7 +83,7 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
     """
     try:
         # Update status
-        update_status_panel(ui_components, "Mereset konfigurasi hyperparameter...", "info")
+        show_info_status(ui_components, "Mereset konfigurasi hyperparameter...")
         
         # Dapatkan konfigurasi default
         default_config = get_default_hyperparameters_config()
@@ -81,17 +92,22 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         update_ui_from_config(ui_components, default_config)
         
         # Simpan konfigurasi default
-        saved_config = save_config(default_config, ui_components)
+        save_success = save_hyperparameters_config(default_config)
         
-        # Update info panel
-        update_hyperparameters_info(ui_components)
+        if not save_success:
+            show_error_status(ui_components, "Gagal menyimpan konfigurasi default hyperparameter")
+            return
+        
+        # Update info panel jika ada
+        if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+            ui_components['update_hyperparameters_info'](ui_components)
         
         # Update status
-        update_status_panel(ui_components, "Konfigurasi hyperparameter berhasil direset ke default", "success")
+        show_success_status(ui_components, "Konfigurasi hyperparameter berhasil direset ke default")
         
     except Exception as e:
         logger.error(f"Error saat mereset konfigurasi hyperparameters: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
+        show_error_status(ui_components, f"Error: {str(e)}")
 
 def on_sync_to_drive_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -103,27 +119,31 @@ def on_sync_to_drive_click(button: widgets.Button, ui_components: Dict[str, Any]
     """
     try:
         # Update status
-        update_status_panel(ui_components, "Menyinkronkan konfigurasi hyperparameters ke Google Drive...", "info")
+        show_info_status(ui_components, "Menyinkronkan konfigurasi hyperparameters ke Google Drive...")
         
         # Update config dari UI
         config = update_config_from_ui(ui_components)
         
         # Simpan config
-        saved_config = save_config(config, ui_components)
+        save_success = save_hyperparameters_config(config)
+        
+        if not save_success:
+            show_error_status(ui_components, "Gagal menyimpan konfigurasi sebelum sinkronisasi")
+            return
         
         # Sinkronisasi ke Drive
         success, message = sync_to_drive(button, ui_components)
         
         if success:
             # Update status
-            update_status_panel(ui_components, message, "success")
+            show_success_status(ui_components, message)
         else:
             # Update status
-            update_status_panel(ui_components, message, "error")
+            show_error_status(ui_components, message)
         
     except Exception as e:
         logger.error(f"Error saat sinkronisasi ke Google Drive: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
+        show_error_status(ui_components, f"Error: {str(e)}")
 
 def on_sync_from_drive_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
     """
@@ -135,7 +155,7 @@ def on_sync_from_drive_click(button: widgets.Button, ui_components: Dict[str, An
     """
     try:
         # Update status
-        update_status_panel(ui_components, "Menyinkronkan konfigurasi hyperparameters dari Google Drive...", "info")
+        show_info_status(ui_components, "Menyinkronkan konfigurasi hyperparameters dari Google Drive...")
         
         # Sinkronisasi dari Drive
         success, message, drive_config = sync_from_drive(button, ui_components)
@@ -144,18 +164,19 @@ def on_sync_from_drive_click(button: widgets.Button, ui_components: Dict[str, An
             # Update UI dari konfigurasi yang disinkronkan
             update_ui_from_config(ui_components, drive_config)
             
-            # Update info panel
-            update_hyperparameters_info(ui_components)
+            # Update info panel jika ada
+            if 'update_hyperparameters_info' in ui_components and callable(ui_components['update_hyperparameters_info']):
+                ui_components['update_hyperparameters_info'](ui_components)
             
             # Update status
-            update_status_panel(ui_components, message, "success")
+            show_success_status(ui_components, message)
         else:
             # Update status
-            update_status_panel(ui_components, message, "error")
+            show_error_status(ui_components, message)
         
     except Exception as e:
         logger.error(f"Error saat sinkronisasi dari Google Drive: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
+        show_error_status(ui_components, f"Error: {str(e)}")
 
 def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
@@ -181,13 +202,13 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env: An
             lambda b: on_reset_click(b, ui_components)
         )
     
-    # Handler untuk tombol Sync to Drive
+    # Handler untuk tombol Sync to Drive (jika ada)
     if 'sync_to_drive_button' in ui_components:
         ui_components['sync_to_drive_button'].on_click(
             lambda b: on_sync_to_drive_click(b, ui_components)
         )
     
-    # Handler untuk tombol Sync from Drive
+    # Handler untuk tombol Sync from Drive (jika ada)
     if 'sync_from_drive_button' in ui_components:
         ui_components['sync_from_drive_button'].on_click(
             lambda b: on_sync_from_drive_click(b, ui_components)
@@ -199,4 +220,4 @@ def setup_hyperparameters_button_handlers(ui_components: Dict[str, Any], env: An
     ui_components['on_sync_to_drive_click'] = lambda b: on_sync_to_drive_click(b, ui_components)
     ui_components['on_sync_from_drive_click'] = lambda b: on_sync_from_drive_click(b, ui_components)
     
-    return ui_components 
+    return ui_components

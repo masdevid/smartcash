@@ -6,15 +6,14 @@ Deskripsi: Handler untuk sinkronisasi konfigurasi hyperparameters dengan Google 
 from typing import Dict, Any, Optional, Tuple
 import os
 import ipywidgets as widgets
-from IPython.display import clear_output, display
 from pathlib import Path
 
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger, LogLevel
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.training_config.hyperparameters.handlers.config_handlers import update_ui_from_config
+from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.training_config.hyperparameters.handlers.config_writer import update_ui_from_config
+from smartcash.ui.training_config.hyperparameters.handlers.config_manager import get_default_base_dir
 from smartcash.ui.training_config.hyperparameters.handlers.sync_logger import (
     update_sync_status_only,
     log_sync_success,
@@ -22,14 +21,9 @@ from smartcash.ui.training_config.hyperparameters.handlers.sync_logger import (
     log_sync_warning
 )
 
-# Setup logger dengan level CRITICAL untuk mengurangi log
+# Setup logger dengan level INFO
 logger = get_logger(__name__)
-logger.set_level(LogLevel.CRITICAL)
-
-def get_default_base_dir():
-    if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
-        return "/content"
-    return str(Path.home() / "SmartCash")
+logger.set_level(LogLevel.INFO)
 
 def is_colab_environment() -> bool:
     """
@@ -73,17 +67,14 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
         success, message = config_manager.sync_to_drive('hyperparameters')
         
         if not success:
-            logger.error(f"Gagal sinkronisasi hyperparameters ke drive: {message}")
-            update_sync_status_only(ui_components, f"Gagal menyinkronkan konfigurasi hyperparameters ke Google Drive: {message}", 'error')
+            log_sync_error(ui_components, f"Gagal sinkronisasi hyperparameters ke drive: {message}")
             return False, message
         
-        update_sync_status_only(ui_components, "Konfigurasi hyperparameters berhasil disinkronkan ke Google Drive", 'success')
-        logger.info("Konfigurasi hyperparameters berhasil disinkronkan ke Google Drive")
+        log_sync_success(ui_components, "Konfigurasi hyperparameters berhasil disinkronkan ke Google Drive")
         return True, "Konfigurasi hyperparameters berhasil disinkronkan ke Google Drive"
     except Exception as e:
         error_message = f"Error saat menyinkronkan konfigurasi hyperparameters ke Google Drive: {str(e)}"
-        update_sync_status_only(ui_components, error_message, 'error')
-        logger.error(error_message)
+        log_sync_error(ui_components, error_message)
         return False, error_message
 
 def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
@@ -120,8 +111,7 @@ def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, A
         
         # Log pesan dari sync_with_drive
         if not success:
-            logger.error(message)
-            update_sync_status_only(ui_components, message, 'error')
+            log_sync_error(ui_components, message)
             return False, message, None
         
         if drive_config:
@@ -133,98 +123,17 @@ def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, A
                 update_ui_from_config(ui_components, drive_config)
                 
                 # Tampilkan pesan sukses
-                update_sync_status_only(ui_components, "Konfigurasi hyperparameters berhasil disinkronkan dari Google Drive", 'success')
-                logger.info("Konfigurasi hyperparameters berhasil disinkronkan dari Google Drive")
+                log_sync_success(ui_components, "Konfigurasi hyperparameters berhasil disinkronkan dari Google Drive")
                 return True, "Konfigurasi hyperparameters berhasil disinkronkan dari Google Drive", drive_config
             else:
                 # Tampilkan pesan error
-                update_sync_status_only(ui_components, "Gagal menyimpan konfigurasi hyperparameters dari Google Drive", 'error')
-                logger.error("Gagal menyimpan konfigurasi hyperparameters dari Google Drive")
+                log_sync_error(ui_components, "Gagal menyimpan konfigurasi hyperparameters dari Google Drive")
                 return False, "Gagal menyimpan konfigurasi hyperparameters dari Google Drive", None
         else:
             # Tampilkan pesan error
-            update_sync_status_only(ui_components, "Gagal memuat konfigurasi hyperparameters dari Google Drive", 'error')
-            logger.error("Gagal memuat konfigurasi hyperparameters dari Google Drive")
+            log_sync_error(ui_components, "Gagal memuat konfigurasi hyperparameters dari Google Drive")
             return False, "Gagal memuat konfigurasi hyperparameters dari Google Drive", None
     except Exception as e:
         error_message = f"Error saat menyinkronkan konfigurasi hyperparameters dari Google Drive: {str(e)}"
-        update_sync_status_only(ui_components, error_message, 'error')
-        logger.error(error_message)
+        log_sync_error(ui_components, error_message)
         return False, error_message, None
-
-def sync_with_drive(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
-    """
-    Sinkronisasi konfigurasi dengan Google Drive.
-    
-    Args:
-        config: Konfigurasi yang akan disinkronkan
-        ui_components: Dictionary komponen UI (opsional)
-        
-    Returns:
-        Konfigurasi yang telah disinkronkan
-    """
-    try:
-        # Gunakan fungsi sync_with_drive dari force_sync jika tersedia
-        try:
-            from smartcash.common.config.force_sync import sync_with_drive as force_sync
-            if ui_components:
-                update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
-            
-            synced_config = force_sync(config, 'hyperparameters', ui_components)
-            
-            if ui_components:
-                update_sync_status_only(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive", 'success')
-            
-            return synced_config
-        except ImportError:
-            # Jika force_sync tidak tersedia, gunakan metode lama
-            pass
-        
-        if not is_colab_environment():
-            # Tidak perlu sinkronisasi jika bukan di Colab
-            if ui_components:
-                update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
-            return config
-            
-        # Dapatkan config manager
-        base_dir = get_default_base_dir()
-        config_manager = get_config_manager(base_dir=base_dir)
-        
-        # Log info
-        if ui_components:
-            update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
-        
-        # Pastikan konfigurasi memiliki struktur yang benar
-        if 'hyperparameters' not in config:
-            config = {'hyperparameters': config}
-        
-        # Simpan konfigurasi terlebih dahulu
-        config_save_success = config_manager.save_module_config('hyperparameters', config)
-        if not config_save_success:
-            # Log error jika gagal menyimpan
-            if ui_components:
-                update_sync_status_only(ui_components, "Gagal menyimpan konfigurasi lokal sebelum sinkronisasi", 'error')
-            return config
-        
-        # Sinkronisasi dengan Google Drive
-        success, message = config_manager.sync_to_drive('hyperparameters')
-        
-        if not success:
-            if ui_components:
-                update_sync_status_only(ui_components, f"Gagal sinkronisasi dengan Google Drive: {message}", 'error')
-            logger.error(f"Gagal sinkronisasi dengan Google Drive: {message}")
-            return config
-        
-        # Verifikasi konfigurasi yang disinkronkan dengan membandingkan dengan nilai asli
-        synced_config = config_manager.get_module_config('hyperparameters', {})
-        
-        if ui_components:
-            update_sync_status_only(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive", 'success')
-        
-        return synced_config
-    except Exception as e:
-        error_message = f"Error saat sinkronisasi dengan Google Drive: {str(e)}"
-        if ui_components:
-            update_sync_status_only(ui_components, error_message, 'error')
-        logger.error(error_message)
-        return config 

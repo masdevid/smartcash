@@ -8,100 +8,14 @@ import ipywidgets as widgets
 from IPython.display import display
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.constants import ICONS, COLORS
-from smartcash.ui.training_config.hyperparameters.handlers.status_handlers import update_status_panel as base_update_status_panel
+from smartcash.ui.utils.alert_utils import create_status_indicator
+from smartcash.ui.training_config.hyperparameters.handlers.status_handlers import update_status_panel
 
 logger = get_logger(__name__)
 
-def update_sync_status(ui_components: Dict[str, Any], message: str, status: str = 'info') -> None:
-    """
-    Update panel status sinkronisasi dengan pesan terbaru.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-        status: Status pesan (success, error, info, warning)
-    """
-    # Gunakan status_handlers yang sudah ada
-    base_update_status_panel(ui_components, message, status)
-
-def log_sync_status(ui_components: Dict[str, Any], message: str, status: str = 'info') -> None:
-    """
-    Log status sinkronisasi ke output UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-        status: Status pesan (success, error, info, warning)
-    """
-    if 'logger' not in ui_components:
-        return
-    
-    # Update status panel
-    update_sync_status(ui_components, message, status)
-    
-    # Log ke UI logger berdasarkan status (tanpa emoji karena sudah ditambahkan oleh UILogger)
-    if status == 'error':
-        ui_components['logger'].error(message)
-    elif status == 'warning':
-        ui_components['logger'].warning(message)
-    elif status == 'success':
-        ui_components['logger'].success(message)  # Gunakan success method yang sudah ada
-    else:
-        ui_components['logger'].info(message)
-    
-    # Log juga ke console logger untuk keperluan debug (tanpa emoji)
-    if status == 'error':
-        logger.error(message)
-    elif status == 'warning':
-        logger.warning(message)
-    elif status == 'success':
-        logger.info(f"SUCCESS: {message}")
-    else:
-        logger.info(message)
-
-def log_sync_success(ui_components: Dict[str, Any], message: str) -> None:
-    """
-    Log status sinkronisasi sukses ke output UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-    """
-    log_sync_status(ui_components, message, 'success')
-
-def log_sync_error(ui_components: Dict[str, Any], message: str) -> None:
-    """
-    Log status sinkronisasi error ke output UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-    """
-    log_sync_status(ui_components, message, 'error')
-
-def log_sync_warning(ui_components: Dict[str, Any], message: str) -> None:
-    """
-    Log status sinkronisasi warning ke output UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-    """
-    log_sync_status(ui_components, message, 'warning')
-
-def log_sync_info(ui_components: Dict[str, Any], message: str) -> None:
-    """
-    Log status sinkronisasi info ke output UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan yang akan ditampilkan
-    """
-    log_sync_status(ui_components, message, 'info')
-
 def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_type: str = 'info') -> None:
     """
-    Update panel status sinkronisasi di UI tanpa menambahkan log baru.
+    Update panel status sinkronisasi tanpa log tambahan.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -109,10 +23,54 @@ def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_
         status_type: Tipe status (info, success, warning, error)
     """
     try:
-        # Gunakan status_handlers yang sudah ada untuk update panel
-        base_update_status_panel(ui_components, message, status_type)
+        # Gunakan status_handlers untuk update panel
+        update_status_panel(ui_components, message, status_type)
     except Exception as e:
         # Fallback ke logger jika ada error
         if 'logger' in ui_components:
             ui_components['logger'].error(f"Error saat update status panel: {str(e)}")
-        logger.error(f"Error saat update status panel: {str(e)}") 
+        logger.error(f"Error saat update status panel: {str(e)}")
+
+def log_sync_success(ui_components: Dict[str, Any], message: str) -> None:
+    """
+    Log status sinkronisasi sukses.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan ditampilkan
+    """
+    update_sync_status_only(ui_components, f"{ICONS.get('success', '✅')} {message}", 'success')
+    logger.info(f"SYNC SUCCESS: {message}")
+
+def log_sync_error(ui_components: Dict[str, Any], message: str) -> None:
+    """
+    Log status sinkronisasi error.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan ditampilkan
+    """
+    update_sync_status_only(ui_components, f"{ICONS.get('error', '❌')} {message}", 'error')
+    logger.error(f"SYNC ERROR: {message}")
+
+def log_sync_warning(ui_components: Dict[str, Any], message: str) -> None:
+    """
+    Log status sinkronisasi warning.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan ditampilkan
+    """
+    update_sync_status_only(ui_components, f"{ICONS.get('warning', '⚠️')} {message}", 'warning')
+    logger.warning(f"SYNC WARNING: {message}")
+
+def log_sync_info(ui_components: Dict[str, Any], message: str) -> None:
+    """
+    Log status sinkronisasi info.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan ditampilkan
+    """
+    update_sync_status_only(ui_components, f"{ICONS.get('info', 'ℹ️')} {message}", 'info')
+    logger.info(f"SYNC INFO: {message}")

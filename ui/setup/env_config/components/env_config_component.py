@@ -105,7 +105,9 @@ class EnvConfigComponent:
             self._log_message("Environment sudah terkonfigurasi", "success", "✅")
             
             # Initialize config singleton if environment is already set up
-            self.env_handler.initialize_config_singleton()
+            config_manager = self.env_handler.initialize_config_singleton()
+            if config_manager:
+                self.ui_components['config_manager'] = config_manager
         else:
             self.ui_components['setup_button'].disabled = False
             self._update_status("Environment perlu dikonfigurasi", "info")

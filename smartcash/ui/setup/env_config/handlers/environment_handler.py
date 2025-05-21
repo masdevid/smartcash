@@ -13,6 +13,7 @@ from typing import List, Dict, Any, Tuple, Optional, Callable
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.common.environment import get_environment_manager
+from smartcash.common.config import get_config_manager, SimpleConfigManager
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger import get_current_ui_logger, create_ui_logger
 from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
@@ -216,27 +217,25 @@ class EnvironmentHandler:
             self._log_message(f"Error setting up config files: {str(e)}", "error", "❌")
             return False
     
-    def initialize_config_singleton(self) -> bool:
+    def initialize_config_singleton(self) -> SimpleConfigManager:
         """
         Initialize config manager singleton
         
         Returns:
-            bool: True if successful
+            SimpleConfigManager: Instance config manager atau None jika error
         """
         try:
-            from smartcash.common.config import get_config_manager
-            
             # Initialize config manager with proper base directory
             config_manager = get_config_manager(
                 base_dir=self.env_manager.base_dir,
                 config_file="configs/base_config.yaml"
             )
             
-            return True
+            return config_manager
         except Exception as e:
             self._update_status(f"Error initializing config: {str(e)}", "error")
             self._log_message(f"Error initializing config: {str(e)}", "error", "❌")
-            return False
+            return None
     
     def perform_setup(self) -> bool:
         """
@@ -274,8 +273,8 @@ class EnvironmentHandler:
         
         # Initialize config singleton
         self._update_progress(0.8, "Menginisialisasi konfigurasi...")
-        init_success = self.initialize_config_singleton()
-        if not init_success:
+        config_manager = self.initialize_config_singleton()
+        if config_manager is None:
             self._update_status("Error: Gagal inisialisasi konfigurasi", "error")
             self._log_message("Error: Gagal inisialisasi konfigurasi", "error", "❌")
             return False

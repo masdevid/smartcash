@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/executor.py
-Deskripsi: Executor untuk menjalankan proses preprocessing dataset
+Deskripsi: Executor untuk menjalankan proses preprocessing dataset dengan perbaikan tombol stop
 """
 
 from typing import Dict, Any
@@ -207,4 +207,4 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
             notification_manager.notify_process_error(error_message)
         except Exception:
             # Fallback jika notification manager tidak tersedia
-            update_ui_state(ui_components, "error", error_message) 
+            update_ui_state(ui_components, "error", error_message)

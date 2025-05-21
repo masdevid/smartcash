@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/notification_manager.py
-Deskripsi: Manager untuk notifikasi pada modul preprocessing dataset
+Deskripsi: Manager untuk notifikasi pada modul preprocessing dataset dengan perbaikan akses ke update_status_panel
 """
 
 from typing import Dict, Any, Optional
@@ -38,7 +38,6 @@ class NotificationManager:
             bool: True jika semua fungsi tersedia, False jika tidak
         """
         required_functions = [
-            'update_status_panel',
             'notify_process_start',
             'notify_process_complete',
             'notify_process_error'
@@ -60,10 +59,10 @@ class NotificationManager:
             status_type: Tipe pesan ('info', 'success', 'warning', 'error')
             message: Pesan yang akan ditampilkan
         """
-        # Import fungsi yang diperlukan
-        from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
-        
         try:
+            # Import fungsi yang diperlukan langsung di sini untuk menghindari circular import
+            from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
+            
             # Update status panel
             update_status_panel(self.ui_components, status_type, message)
             
@@ -169,6 +168,11 @@ class NotificationManager:
                 current_step=1,
                 split=split
             )
+            
+            # Tampilkan tombol stop
+            if 'stop_button' in self.ui_components and hasattr(self.ui_components['stop_button'], 'layout'):
+                self.ui_components['stop_button'].layout.display = 'inline-block'
+                
         except Exception as e:
             log_message(self.ui_components, f"Error saat notifikasi proses mulai: {str(e)}", "warning", "⚠️")
     
@@ -206,6 +210,10 @@ class NotificationManager:
             
             # Reset flag running
             self.ui_components['preprocessing_running'] = False
+            
+            # Sembunyikan tombol stop
+            if 'stop_button' in self.ui_components and hasattr(self.ui_components['stop_button'], 'layout'):
+                self.ui_components['stop_button'].layout.display = 'none'
             
             # Notify dengan format standar service
             self._notify_service_event(
@@ -246,6 +254,10 @@ class NotificationManager:
             # Reset flag running
             self.ui_components['preprocessing_running'] = False
             
+            # Sembunyikan tombol stop
+            if 'stop_button' in self.ui_components and hasattr(self.ui_components['stop_button'], 'layout'):
+                self.ui_components['stop_button'].layout.display = 'none'
+            
             # Notify dengan format standar service
             self._notify_service_event(
                 "preprocessing",
@@ -279,6 +291,10 @@ class NotificationManager:
             # Set flag stop_requested di UI components
             self.ui_components['stop_requested'] = True
             self.ui_components['preprocessing_running'] = False
+            
+            # Sembunyikan tombol stop
+            if 'stop_button' in self.ui_components and hasattr(self.ui_components['stop_button'], 'layout'):
+                self.ui_components['stop_button'].layout.display = 'none'
             
             # Notifikasi ke observer sistem
             observer_manager = self.ui_components.get('observer_manager')
@@ -402,4 +418,4 @@ def get_notification_manager(ui_components: Dict[str, Any]) -> NotificationManag
     # Simpan ke UI components untuk penggunaan berikutnya
     ui_components['notification_manager'] = notification_manager
     
-    return notification_manager 
+    return notification_manager

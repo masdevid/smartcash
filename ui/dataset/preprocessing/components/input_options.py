@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/input_options.py
-Deskripsi: Komponen opsi input untuk preprocessing dataset
+Deskripsi: Komponen opsi input untuk preprocessing dataset dengan perbaikan default resolusi
 """
 
 import ipywidgets as widgets
@@ -18,100 +18,100 @@ def create_preprocessing_options(config: Optional[Dict[str, Any]] = None) -> wid
         Widget VBox berisi opsi preprocessing
     """
     # Dapatkan nilai default dari config jika tersedia
-    img_size = DEFAULT_IMG_SIZE[0]  # Default 640
-    enable_normalization = True
-    preserve_aspect_ratio = True
-    enable_cache = True
-    num_workers = 4
+    if not config:
+        config = {}
     
-    if config and 'preprocessing' in config:
-        preproc_config = config['preprocessing']
-        # Ekstrak image size (array atau integer)
-        if 'img_size' in preproc_config:
-            img_size_val = preproc_config['img_size']
-            img_size = img_size_val[0] if isinstance(img_size_val, (list, tuple)) else img_size_val
-        
-        # Ekstrak opsi normalisasi
-        if 'normalization' in preproc_config:
-            norm_config = preproc_config['normalization']
-            enable_normalization = norm_config.get('enabled', True)
-            preserve_aspect_ratio = norm_config.get('preserve_aspect_ratio', True)
-        
-        # Ekstrak pengaturan cache dan workers
-        enable_cache = preproc_config.get('enabled', True)
-        num_workers = preproc_config.get('num_workers', 4)
+    preprocessing_config = config.get('preprocessing', {})
     
-    # Buat komponen-komponen UI
-    img_size_slider = widgets.IntSlider(
-        value=img_size,
-        min=320,
-        max=960,
-        step=32,
-        description='Image size:',
+    # Ekstrak image size (array atau integer)
+    # Default dari dataset_constants jika tidak ada
+    img_size = DEFAULT_IMG_SIZE  # Default (640, 640)
+    
+    if 'img_size' in preprocessing_config:
+        img_size_val = preprocessing_config['img_size']
+        if isinstance(img_size_val, (list, tuple)) and len(img_size_val) == 2:
+            img_size = img_size_val
+        elif isinstance(img_size_val, int):
+            img_size = (img_size_val, img_size_val)
+    
+    # Konversi tuple resolusi ke string format
+    resolution_str = f"{img_size[0]}x{img_size[1]}"
+    
+    # Ekstrak opsi normalisasi
+    normalization = preprocessing_config.get('normalization', 'minmax')
+    preserve_aspect_ratio = preprocessing_config.get('preserve_aspect_ratio', True)
+    augmentation = preprocessing_config.get('augmentation', False)
+    force_reprocess = preprocessing_config.get('force_reprocess', False)
+    
+    # Buat dropdown untuk resolusi - format harus str
+    resolution_options = ['320x320', '416x416', '512x512', '640x640', '768x768', '896x896', '1024x1024']
+    
+    # Pastikan resolusi yang digunakan adalah salah satu dari opsi yang ada
+    if resolution_str not in resolution_options:
+        resolution_str = '640x640'  # Fallback ke default jika tidak valid
+    
+    resolution_dropdown = widgets.Dropdown(
+        options=resolution_options,
+        value=resolution_str,
+        description='Resolusi:',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='95%')
     )
     
-    enable_norm_checkbox = widgets.Checkbox(
-        value=enable_normalization,
-        description='Enable normalization',
-        style={'description_width': 'initial'}
+    # Buat dropdown untuk normalisasi
+    normalization_options = ['none', 'minmax', 'standard', 'robust', 'yolo']
+    
+    # Pastikan normalisasi yang digunakan adalah salah satu dari opsi yang ada
+    if normalization not in normalization_options:
+        normalization = 'minmax'  # Fallback ke default jika tidak valid
+    
+    normalization_dropdown = widgets.Dropdown(
+        options=normalization_options,
+        value=normalization,
+        description='Normalisasi:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='95%')
     )
     
-    preserve_ratio_checkbox = widgets.Checkbox(
+    # Buat checkbox untuk preserve aspect ratio
+    preserve_aspect_ratio_checkbox = widgets.Checkbox(
         value=preserve_aspect_ratio,
-        description='Preserve aspect ratio',
-        style={'description_width': 'initial'}
-    )
-    
-    enable_cache_checkbox = widgets.Checkbox(
-        value=enable_cache,
-        description='Enable caching',
-        style={'description_width': 'initial'}
-    )
-    
-    num_workers_slider = widgets.IntSlider(
-        value=num_workers,
-        min=1,
-        max=16,
-        step=1,
-        description='Workers:',
+        description='Pertahankan aspect ratio',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='95%')
     )
     
-    # Split selector untuk kolom kedua
-    split_dropdown = widgets.Dropdown(
-        options=['Train', 'Validation', 'Test', 'All'],
-        value='Train',
-        description='Target Split:',
+    # Buat checkbox untuk augmentasi
+    augmentation_checkbox = widgets.Checkbox(
+        value=augmentation,
+        description='Aktifkan augmentasi',
         style={'description_width': 'initial'},
         layout=widgets.Layout(width='95%')
     )
     
-    # Buat layout 2 kolom untuk input options
-    left_column = widgets.VBox([
-        img_size_slider,
-        enable_norm_checkbox,
-        preserve_ratio_checkbox
-    ], layout=widgets.Layout(width='50%'))
+    # Buat checkbox untuk force reprocess
+    force_reprocess_checkbox = widgets.Checkbox(
+        value=force_reprocess,
+        description='Paksa reprocess semua',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='95%')
+    )
     
-    right_column = widgets.VBox([
-        num_workers_slider,
-        split_dropdown,
-        enable_cache_checkbox
-    ], layout=widgets.Layout(width='50%'))
+    # Container untuk opsi preprocessing utama
+    options_container = widgets.VBox([
+        widgets.HTML("<h5 style='margin-bottom: 10px;'>Opsi Preprocessing</h5>"),
+        resolution_dropdown,
+        normalization_dropdown,
+        preserve_aspect_ratio_checkbox,
+        augmentation_checkbox,
+        force_reprocess_checkbox
+    ], layout=widgets.Layout(padding='10px 5px', width='48%'))
     
-    # Gabungkan dalam container horizontal
-    options_container = widgets.HBox([left_column, right_column], 
-                                    layout=widgets.Layout(width='100%'))
-    
-    # Tambahkan atribut yang diperlukan untuk akses dari luar
-    options_container.resolution = img_size_slider
-    options_container.normalization = enable_norm_checkbox
-    options_container.preserve_aspect_ratio = preserve_ratio_checkbox
-    options_container.enable_cache = enable_cache_checkbox
-    options_container.num_workers = num_workers_slider
-    options_container.target_split = split_dropdown
+    # Tambahkan atribut yang mempermudah akses komponen dari luar
+    options_container.resolution_dropdown = resolution_dropdown
+    options_container.normalization_dropdown = normalization_dropdown
+    options_container.preserve_aspect_ratio_checkbox = preserve_aspect_ratio_checkbox
+    options_container.augmentation_checkbox = augmentation_checkbox
+    options_container.force_reprocess_checkbox = force_reprocess_checkbox
     
     return options_container

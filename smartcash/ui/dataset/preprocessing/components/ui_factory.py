@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/components/ui_factory.py
-Deskripsi: Factory untuk komponen UI preprocessing dataset
+Deskripsi: Factory untuk komponen UI preprocessing dataset dengan perbaikan duplikasi opsi dan tampilan tombol
 """
 
 import ipywidgets as widgets
@@ -32,9 +32,6 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     from smartcash.ui.components.save_reset_buttons import create_save_reset_buttons
     from smartcash.ui.components.sync_info_message import create_sync_info_message
     
-    # Import komponen preprocessing spesifik
-    from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
-    
     # Config default jika tidak ada
     if not config:
         config = {}
@@ -50,7 +47,8 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         "Konfigurasi preprocessing dataset", "info"
     )
     
-    # Dropdown untuk split dataset (ditampilkan di preprocessing_options)
+    # Create preprocessing options
+    from smartcash.ui.dataset.preprocessing.components.input_options import create_preprocessing_options
     preprocess_options = create_preprocessing_options(config)
     
     # Opsi validasi preprocessing
@@ -66,7 +64,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         cleanup_enabled=True
     )
     
-    # Default sembunyikan tombol stop dulu
+    # Default sembunyikan tombol stop
     if 'stop_button' in action_buttons and hasattr(action_buttons['stop_button'], 'layout'):
         action_buttons['stop_button'].layout.display = 'none'
     
@@ -76,7 +74,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     # Info sinkronisasi
     sync_info = create_sync_info_message()
     
-    # Tambahkan worker dan target split ke UI utama, bukan di dalam accordion
+    # Worker dan target split
     worker_slider = widgets.IntSlider(
         value=config.get('num_workers', 4),
         min=1,
@@ -87,7 +85,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         layout=widgets.Layout(width='95%', margin='5px 0')
     )
     
-    target_split = create_split_selector(
+    split_selector = create_split_selector(
         selected_value=config.get('split', 'All Splits'),
         description="Split:",
         width='95%'
@@ -99,7 +97,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         widgets.HTML(f"<div style='margin-bottom: 8px;'><b>Worker Thread:</b> Jumlah thread untuk preprocessing</div>"),
         worker_slider,
         widgets.HTML(f"<div style='margin: 8px 0;'><b>Target Split:</b> Bagian dataset yang akan diproses</div>"),
-        target_split
+        split_selector
     ], layout=widgets.Layout(padding='10px 5px', width='48%'))
     
     # Area konfirmasi dengan styling yang lebih baik - hidden by default
@@ -164,7 +162,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'status_panel': status_panel,
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
-        'split_selector': target_split,  # Gunakan split selector dari kolom kedua
+        'split_selector': split_selector,  # Gunakan split selector dari kolom kedua
         'worker_slider': worker_slider,  # Referensi langsung ke worker slider
         'preprocess_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
@@ -197,4 +195,4 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'log_accordion': log_components['log_accordion']
     })
     
-    return ui_components 
+    return ui_components

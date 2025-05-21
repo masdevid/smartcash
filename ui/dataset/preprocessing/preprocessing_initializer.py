@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/preprocessing_initializer.py
-Deskripsi: Initializer untuk UI preprocessing dataset
+Deskripsi: Initializer untuk UI preprocessing dataset dengan perbaikan tombol stop
 """
 
 from typing import Dict, Any, Optional
@@ -75,6 +75,10 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         ui_components['preprocessing_running'] = False
         ui_components['cleanup_running'] = False
         ui_components['stop_requested'] = False
+        
+        # Pastikan tombol stop tersembunyi di awal
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
         
         # Setup handlers
         ui_components = setup_preprocessing_handlers(ui_components, env, dataset_config)

@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/handlers/button_handler.py
-Deskripsi: Handler untuk interaksi tombol pada UI preprocessing dataset
+Deskripsi: Handler untuk interaksi tombol pada UI preprocessing dataset dengan perbaikan tombol stop
 """
 
 from typing import Dict, Any, Optional
@@ -28,7 +28,7 @@ def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]
         if is_preprocessing_running(ui_components):
             log_message(ui_components, "Preprocessing sudah berjalan", "warning", "⚠️")
             return
-            
+        
         # Get config dari UI
         config = get_preprocessing_config_from_ui(ui_components)
         
@@ -37,6 +37,10 @@ def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]
         
         # Update UI state
         update_status_panel(ui_components, "warning", "Konfirmasi preprocessing dataset...")
+        
+        # Pastikan tombol stop tersembunyi sampai preprocessing dimulai
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
         
         # Tampilkan dialog konfirmasi
         confirm_preprocessing(ui_components, config, button)
@@ -49,4 +53,4 @@ def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]
         
         # Re-enable tombol
         if button and hasattr(button, 'disabled'):
-            button.disabled = False 
+            button.disabled = False

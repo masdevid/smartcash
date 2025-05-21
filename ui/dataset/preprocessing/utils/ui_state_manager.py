@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/ui_state_manager.py
-Deskripsi: Utilitas untuk mengelola state UI preprocessing
+Deskripsi: Utilitas untuk mengelola state UI preprocessing dengan perbaikan tombol stop
 """
 
 from typing import Dict, Any, Optional, List, Callable
@@ -85,9 +85,11 @@ def reset_ui_after_preprocessing(ui_components: Dict[str, Any]) -> None:
     if 'preprocess_button' in ui_components:
         ui_components['preprocess_button'].disabled = False
     
-    # Disable stop button
+    # Sembunyikan dan disable tombol stop
     if 'stop_button' in ui_components:
         ui_components['stop_button'].disabled = True
+        if hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
     
     # Update status panel
     update_status_panel(ui_components, 'idle')
@@ -117,9 +119,11 @@ def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional
         if 'preprocess_button' in ui_components:
             ui_components['preprocess_button'].disabled = True
         
-        # Enable stop button
+        # Enable dan tampilkan tombol stop
         if 'stop_button' in ui_components:
             ui_components['stop_button'].disabled = False
+            if hasattr(ui_components['stop_button'], 'layout'):
+                ui_components['stop_button'].layout.display = 'inline-block'
             
         # Disable save button
         if 'save_button' in ui_components:
@@ -138,9 +142,11 @@ def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional
         if 'preprocess_button' in ui_components:
             ui_components['preprocess_button'].disabled = False
         
-        # Disable stop button
+        # Disable dan sembunyikan tombol stop
         if 'stop_button' in ui_components:
             ui_components['stop_button'].disabled = True
+            if hasattr(ui_components['stop_button'], 'layout'):
+                ui_components['stop_button'].layout.display = 'none'
             
         # Enable save button
         if 'save_button' in ui_components:
@@ -172,8 +178,11 @@ def update_ui_before_preprocessing(ui_components: Dict[str, Any]) -> None:
     if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'disabled'):
         ui_components['preprocess_button'].disabled = True
     
-    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'disabled'):
+    # Enable dan tampilkan tombol stop
+    if 'stop_button' in ui_components:
         ui_components['stop_button'].disabled = False
+        if hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'inline-block'
     
     if 'reset_button' in ui_components and hasattr(ui_components['reset_button'], 'disabled'):
         ui_components['reset_button'].disabled = True
@@ -334,6 +343,10 @@ def reset_after_operation(ui_components: Dict[str, Any], button: Any = None) -> 
     ui_components['cleanup_running'] = False
     ui_components['stop_requested'] = False
     
+    # Sembunyikan tombol stop
+    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+        ui_components['stop_button'].layout.display = 'none'
+    
     # Update status panel
     update_status_panel(ui_components, 'idle', "Siap untuk memulai preprocessing baru")
     
@@ -342,4 +355,4 @@ def reset_after_operation(ui_components: Dict[str, Any], button: Any = None) -> 
     
     # Bersihkan area konfirmasi
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        ui_components['confirmation_area'].clear_output() 
+        ui_components['confirmation_area'].clear_output()

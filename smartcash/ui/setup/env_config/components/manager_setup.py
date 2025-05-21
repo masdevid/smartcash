@@ -6,7 +6,7 @@ Deskripsi: Setup untuk manager environment config
 import os
 import shutil
 from pathlib import Path
-from typing import Tuple, Any
+from typing import Tuple, Any, Dict, Optional
 import yaml
 
 from smartcash.common.config.manager import SimpleConfigManager, get_config_manager
@@ -27,12 +27,19 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
         # Coba mendapatkan konfigurasi dari colab_config.yaml
         colab_config = {}
         repo_config_path = Path("/content/smartcash/configs/colab_config.yaml")
+        
+        # Dapatkan UI logger jika tersedia
+        ui_logger = _get_ui_logger()
+        
         if repo_config_path.exists():
             try:
                 with open(repo_config_path, 'r') as f:
                     colab_config = yaml.safe_load(f) or {}
             except Exception as e:
-                print(f"⚠️ Gagal memuat colab_config.yaml: {str(e)}")
+                if ui_logger:
+                    ui_logger.warning(f"Gagal memuat colab_config.yaml: {str(e)}")
+                else:
+                    print(f"⚠️ Gagal memuat colab_config.yaml: {str(e)}")
         
         # Dapatkan path Drive dari konfigurasi atau gunakan default
         drive_dir = 'SmartCash'
@@ -63,7 +70,11 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             # Copy file konfigurasi
             for config_file in repo_configs.glob("*.yaml"):
                 shutil.copy2(config_file, drive_config_dir / config_file.name)
-            print(f"📄 File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
+            
+            if ui_logger:
+                ui_logger.info(f"File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
+            else:
+                print(f"📄 File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
         
         # Gunakan symlinks jika dikonfigurasi
         if use_symlinks:
@@ -73,7 +84,10 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             
             if not config_dir.exists():
                 os.symlink(drive_config_dir, config_dir)
-                print(f"🔗 Symlink dibuat dari {drive_config_dir} ke {config_dir}")
+                if ui_logger:
+                    ui_logger.info(f"Symlink dibuat dari {drive_config_dir} ke {config_dir}")
+                else:
+                    print(f"🔗 Symlink dibuat dari {drive_config_dir} ke {config_dir}")
         else:
             # Jika tidak menggunakan symlink, copy file dari Drive ke local
             if not config_dir.exists():
@@ -82,7 +96,11 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             # Copy file dari Drive ke local
             for config_file in drive_config_dir.glob("*.yaml"):
                 shutil.copy2(config_file, config_dir / config_file.name)
-            print(f"📄 File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
+            
+            if ui_logger:
+                ui_logger.info(f"File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
+            else:
+                print(f"📄 File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
     else:
         # Gunakan project root sebagai base_dir
         base_dir = Path(__file__).resolve().parents[4]
@@ -95,3 +113,23 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
     config_manager = get_config_manager()
     
     return config_manager, base_dir, config_dir 
+
+def _get_ui_logger() -> Optional[Any]:
+    """
+    Mencoba mendapatkan UI logger jika tersedia.
+    
+    Returns:
+        UI logger atau None jika tidak tersedia
+    """
+    try:
+        # Coba dapatkan UI logger dari konteks global
+        import builtins
+        if hasattr(builtins, 'ui_components') and 'logger' in builtins.ui_components:
+            return builtins.ui_components['logger']
+        
+        # Coba dapatkan dari modul UI
+        from smartcash.ui.utils.ui_logger import get_current_ui_logger
+        return get_current_ui_logger()
+    except (ImportError, AttributeError):
+        # Fallback ke None jika tidak ada UI logger
+        return None 

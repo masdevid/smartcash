@@ -55,7 +55,7 @@ class SmartCashLogger:
             console_handler = logging.StreamHandler(sys.stdout)
             console_handler.setLevel(self.LEVEL_MAPPING[level])
             formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                '%(name)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S'
             )
             console_handler.setFormatter(formatter)

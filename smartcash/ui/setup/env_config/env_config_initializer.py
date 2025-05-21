@@ -88,7 +88,11 @@ def initialize_env_config_ui():
     
     # Tampilkan konfigurasi file yang tersedia
     try:
-        available_configs = config_manager.get_available_configs()
+        # Filter config yang tidak perlu dilaporkan jika tidak ada
+        ignored_configs = ['inference', 'export', 'environment']
+        
+        available_configs = config_manager.get_available_configs(ignored_configs)
+        
         print(f"\n📝 File Konfigurasi Tersedia:")
         for config in available_configs:
             print(f"   - {config}")

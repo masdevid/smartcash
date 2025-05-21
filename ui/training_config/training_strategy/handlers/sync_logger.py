@@ -101,18 +101,12 @@ def log_sync_status(message: str, status_type: str = 'info') -> None:
         message: Pesan yang akan di-log
         status_type: Tipe status (info, success, warning, error)
     """
-    icon = {
-        'info': ICONS.get('info', 'ℹ️'),
-        'success': ICONS.get('success', '✅'),
-        'warning': ICONS.get('warning', '⚠️'),
-        'error': ICONS.get('error', '❌')
-    }.get(status_type, ICONS.get('info', 'ℹ️'))
-    
+    # Log berdasarkan status tanpa menambahkan emoji (sudah ditangani oleh logger)
     log_methods = {
         'info': logger.info,
-        'success': logger.info,
+        'success': logger.info,  # Gunakan info untuk success jika tidak ada method success
         'warning': logger.warning,
         'error': logger.error
     }
     log_method = log_methods.get(status_type, logger.info)
-    log_method(f"{icon} {message}") 
+    log_method(message) 

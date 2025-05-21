@@ -36,34 +36,28 @@ def log_sync_status(ui_components: Dict[str, Any], message: str, status: str = '
     if 'logger' not in ui_components:
         return
     
-    # Dapatkan icon berdasarkan status
-    icon = ICONS.get(status, ICONS.get('info', 'ℹ️'))
-    
-    # Format pesan dengan icon
-    formatted_message = f"{icon} {message}"
-    
     # Update status panel
     update_sync_status(ui_components, message, status)
     
-    # Log ke UI logger berdasarkan status
+    # Log ke UI logger berdasarkan status (tanpa emoji karena sudah ditambahkan oleh UILogger)
     if status == 'error':
-        ui_components['logger'].error(formatted_message)
+        ui_components['logger'].error(message)
     elif status == 'warning':
-        ui_components['logger'].warning(formatted_message)
+        ui_components['logger'].warning(message)
     elif status == 'success':
-        ui_components['logger'].info(formatted_message)
+        ui_components['logger'].success(message)  # Gunakan success method yang sudah ada
     else:
-        ui_components['logger'].info(formatted_message)
+        ui_components['logger'].info(message)
     
-    # Log juga ke console logger untuk keperluan debug
+    # Log juga ke console logger untuk keperluan debug (tanpa emoji)
     if status == 'error':
-        logger.error(formatted_message)
+        logger.error(message)
     elif status == 'warning':
-        logger.warning(formatted_message)
+        logger.warning(message)
     elif status == 'success':
-        logger.info(formatted_message)
+        logger.info(f"SUCCESS: {message}")
     else:
-        logger.info(formatted_message)
+        logger.info(message)
 
 def log_sync_success(ui_components: Dict[str, Any], message: str) -> None:
     """

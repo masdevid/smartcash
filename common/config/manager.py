@@ -324,10 +324,13 @@ class SimpleConfigManager:
                 except Exception as e:
                     self._logger.error(f"Error saat memanggil observer: {str(e)}")
     
-    def get_available_configs(self) -> List[str]:
+    def get_available_configs(self, ignored_configs: List[str] = None) -> List[str]:
         """
         Dapatkan daftar konfigurasi yang tersedia
         
+        Args:
+            ignored_configs: List nama konfigurasi yang diabaikan (tidak perlu dilaporkan jika tidak ada)
+            
         Returns:
             List nama konfigurasi
         """
@@ -338,8 +341,19 @@ class SimpleConfigManager:
                 config_files.extend([f.name for f in self.config_dir.glob(f'*{ext}')])
         
         # Hilangkan ekstensi
-        return [f.replace('_config.yaml', '').replace('_config.yml', '').replace('.yaml', '').replace('.yml', '') 
+        configs = [f.replace('_config.yaml', '').replace('_config.yml', '').replace('.yaml', '').replace('.yml', '') 
                 for f in config_files]
+        
+        # Filter konfigurasi yang diabaikan
+        if ignored_configs:
+            # Jangan log error untuk konfigurasi yang diabaikan
+            for config in ignored_configs:
+                config_path = self.get_config_path(config)
+                if not config_path.exists():
+                    # Hapus log error untuk file yang memang tidak ada
+                    pass
+        
+        return configs
                 
     # Metode untuk kompatibilitas dengan kode lama
     def get_module_config(self, config_name: str = None, reload: bool = False) -> Dict[str, Any]:

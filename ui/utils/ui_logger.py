@@ -50,7 +50,7 @@ class UILogger:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(log_level)
         formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            '%(message)s',
             datefmt='%Y-%m-%d %H:%M:%S'
         )
         console_handler.setFormatter(formatter)
@@ -80,8 +80,32 @@ class UILogger:
             message: Pesan yang akan di-log
             level: Level log (info, warning, error, success)
         """
-        # Cek apakah ui_components memiliki status widget
-        if 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
+        # Tambahkan timestamp
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        
+        # Tambahkan emoji sesuai level
+        emoji_map = {
+            "debug": "🔍",
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "critical": "🔥"
+        }
+        emoji = emoji_map.get(level, "ℹ️")
+        
+        # Format pesan dengan timestamp dan emoji
+        formatted_message = f"[{timestamp}] {emoji} {message}"
+        
+        # Prioritas log output:
+        # 1. log_output widget jika ada
+        # 2. status widget jika ada
+        # 3. fallback ke stdout
+        
+        if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+            with self.ui_components['log_output']:
+                print(formatted_message)
+        elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
             with self.ui_components['status']:
                 try:
                     from smartcash.ui.utils.alert_utils import create_status_indicator
@@ -89,26 +113,24 @@ class UILogger:
                 except ImportError:
                     # Fallback jika tidak ada alert_utils
                     color = {
-                        'info': 'blue',
-                        'success': 'green',
-                        'warning': 'orange',
-                        'error': 'red',
-                    }.get(level, 'black')
-                    display(HTML(f"<div style='color:{color}'>{message}</div>"))
-        
-        # Jika ada log_output, gunakan itu juga
-        elif 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-            with self.ui_components['log_output']:
-                print(f"{message}")
-        
-        # Fallback ke stdout jika tidak ada UI components
+                        "debug": "gray",
+                        "info": "blue",
+                        "success": "green",
+                        "warning": "orange",
+                        "error": "red",
+                        "critical": "darkred"
+                    }.get(level, "black")
+                    display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
         else:
-            print(message)
+            # Fallback ke stdout jika tidak ada UI components
+            print(formatted_message)
     
     def debug(self, message: str) -> None:
         """Log debug message."""
         self.logger.debug(message)
-        # Debug messages tidak ditampilkan di UI secara default
+        # Debug messages hanya ditampilkan di UI jika level log DEBUG
+        if self.log_level <= logging.DEBUG:
+            self._log_to_ui(message, "debug")
     
     def info(self, message: str) -> None:
         """Log info message."""
@@ -166,6 +188,17 @@ class UILogger:
         self.logger.setLevel(level)
         for handler in self.logger.handlers:
             handler.setLevel(level)
+            
+        # Log informasi perubahan level
+        level_names = {
+            logging.DEBUG: "DEBUG",
+            logging.INFO: "INFO",
+            logging.WARNING: "WARNING",
+            logging.ERROR: "ERROR",
+            logging.CRITICAL: "CRITICAL"
+        }
+        level_name = level_names.get(level, str(level))
+        self.info(f"Log level diubah ke {level_name}")
 
 
 def create_ui_logger(ui_components: Dict[str, Any], 
@@ -241,8 +274,32 @@ def create_ui_logger(ui_components: Dict[str, Any],
     # Simpan referensi ke logger di ui_components
     ui_components['logger'] = logger
     
+    # Register logger untuk digunakan secara global
+    _register_current_ui_logger(logger)
+    
     return logger
 
+# Variabel global untuk menyimpan referensi ke logger UI saat ini
+_current_ui_logger = None
+
+def _register_current_ui_logger(logger: UILogger) -> None:
+    """
+    Register logger UI saat ini untuk digunakan secara global.
+    
+    Args:
+        logger: UILogger instance
+    """
+    global _current_ui_logger
+    _current_ui_logger = logger
+
+def get_current_ui_logger() -> Optional[UILogger]:
+    """
+    Dapatkan logger UI yang sedang aktif.
+    
+    Returns:
+        UILogger instance atau None jika tidak ada
+    """
+    return _current_ui_logger
 
 def _reset_logging_handlers():
     """Reset semua logging handlers untuk menghindari duplikasi."""
@@ -252,6 +309,17 @@ def _reset_logging_handlers():
     for handler in list(root_logger.handlers):
         if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
             root_logger.removeHandler(handler)
+            
+    # Reset level logging untuk root logger
+    root_logger.setLevel(logging.WARNING)
+    
+    # Tambahkan handler minimal untuk root logger
+    if not root_logger.handlers:
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setLevel(logging.WARNING)
+        formatter = logging.Formatter('%(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        root_logger.addHandler(handler)
 
 
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
@@ -283,7 +351,8 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                 'Using TensorFlow backend', 'Colab notebook',
                 'Your session crashed', 'Executing in eager mode',
                 'TensorFlow', 'NumExpr', 'Running on',
-                '/usr/local/lib', 'WARNING:', '[WARNING]'
+                '/usr/local/lib', 'WARNING:', '[WARNING]',
+                'Config file not found in repo'  # Filter pesan error konfigurasi yang tidak ada
             ]
             
         def write(self, message):
@@ -319,12 +388,17 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     for line in lines[:-1]:
                         if line.strip():  # Cek jika bukan baris kosong
                             try:
-                                with self.ui_components['status']:
-                                    try:
-                                        from smartcash.ui.utils.alert_utils import create_status_indicator
-                                        display(create_status_indicator("info", line))
-                                    except ImportError:
-                                        display(HTML(f"<div>{line}</div>"))
+                                # Prioritaskan log_output jika ada
+                                if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                                    with self.ui_components['log_output']:
+                                        print(line)
+                                else:
+                                    with self.ui_components['status']:
+                                        try:
+                                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                                            display(create_status_indicator("info", line))
+                                        except ImportError:
+                                            display(HTML(f"<div>{line}</div>"))
                             except Exception:
                                 # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
                                 self.terminal.write(f"[UI STDOUT ERROR] {line}\n")
@@ -335,12 +409,17 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
             with self.lock:
                 if self.buffer:
                     try:
-                        with self.ui_components['status']:
-                            try:
-                                from smartcash.ui.utils.alert_utils import create_status_indicator
-                                display(create_status_indicator("info", self.buffer))
-                            except ImportError:
-                                display(HTML(f"<div>{self.buffer}</div>"))
+                        # Prioritaskan log_output jika ada
+                        if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                            with self.ui_components['log_output']:
+                                print(self.buffer)
+                        else:
+                            with self.ui_components['status']:
+                                try:
+                                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                                    display(create_status_indicator("info", self.buffer))
+                                except ImportError:
+                                    display(HTML(f"<div>{self.buffer}</div>"))
                     except Exception:
                         # Fallback ke stdout asli
                         self.terminal.write(f"[UI STDOUT ERROR] {self.buffer}\n")

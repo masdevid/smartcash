@@ -3,7 +3,12 @@ File: smartcash/ui/setup/env_config/utils/__init__.py
 Deskripsi: Package untuk utilitas UI konfigurasi environment
 """
 
-# This package now uses utils from smartcash.ui.utils
-# See smartcash.ui.utils.env_ui_utils
+from smartcash.ui.setup.env_config.utils.env_utils import get_env_status, format_env_info
+from smartcash.ui.setup.env_config.utils.fallback_logger import get_fallback_logger, FallbackLogger
 
-__all__ = []
+__all__ = [
+    'get_env_status', 
+    'format_env_info', 
+    'get_fallback_logger',
+    'FallbackLogger'
+]

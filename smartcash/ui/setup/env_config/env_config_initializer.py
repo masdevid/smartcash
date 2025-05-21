@@ -7,53 +7,64 @@ from pathlib import Path
 from IPython.display import display, HTML
 import sys
 import os
+from typing import Dict, Any
 
 from smartcash.common.config import get_config_manager
 from smartcash.common.utils import is_colab
 from smartcash.ui.setup.env_config.components.manager_setup import setup_managers
+from smartcash.ui.utils.ui_logger import create_ui_logger
+from smartcash.ui.utils.widget_utils import create_output_area
+from smartcash.ui.utils.header_utils import create_header
 
-def initialize_env_config_ui():
+def initialize_env_config_ui() -> Dict[str, Any]:
     """
     Inisialisasi konfigurasi environment
     
     Returns:
-        ConfigManager instance
+        Dictionary UI components
     """
     try:
+        # Buat komponen UI dasar
+        ui_components = {}
+        ui_components['header'] = create_header("SmartCash Environment Configuration", 
+                                              "Konfigurasi lingkungan untuk SmartCash")
+        ui_components['log_output'] = create_output_area()
+        ui_components['ui'] = ui_components['log_output']
+        
+        # Setup logger
+        logger = create_ui_logger(ui_components, "env_config")
+        ui_components['logger'] = logger
+        
+        # Tampilkan UI
+        display(ui_components['header'])
+        display(ui_components['log_output'])
+        
         # Setup config managers dan direktori
-        config_manager, base_dir, config_dir = setup_managers()
+        config_manager, base_dir, config_dir = setup_managers(ui_components)
         
-        # Tampilkan header dengan styling
-        display(HTML("""
-        <div style="background-color: #f8f9fa; padding: 10px; border-left: 5px solid #28a745; margin-bottom: 10px;">
-            <h3 style="margin: 0; color: #28a745;">SmartCash Environment Configuration</h3>
-            <p style="margin: 5px 0 0 0; color: #666;">Environment setup completed successfully</p>
-        </div>
-        """))
-        
-        # Tampilkan informasi konfigurasi
-        print(f"✅ Environment berhasil dikonfigurasi:")
-        print(f"   📁 Base directory: {base_dir}")
-        print(f"   📁 Config directory: {config_dir}")
+        # Log informasi konfigurasi
+        logger.success("Environment berhasil dikonfigurasi")
+        logger.info(f"📁 Base directory: {base_dir}")
+        logger.info(f"📁 Config directory: {config_dir}")
         
         # Cek apakah config_dir adalah symlink
         if config_dir.is_symlink():
             target = Path(config_dir).resolve()
-            print(f"   🔗 Config directory adalah symlink ke: {target}")
+            logger.info(f"🔗 Config directory adalah symlink ke: {target}")
             
             # Verifikasi bahwa symlink berfungsi
             if not target.exists():
-                print(f"   ⚠️ Peringatan: Target symlink tidak ditemukan: {target}")
-                print(f"   🔄 Mencoba memperbaiki symlink...")
+                logger.warning(f"Target symlink tidak ditemukan: {target}")
+                logger.info("Mencoba memperbaiki symlink...")
                 # Perbaikan akan ditangani oleh setup_managers
         
         # Tampilkan informasi environment sistem
-        print(f"\n📊 Informasi Environment:")
-        print(f"   🐍 Python version: {sys.version.split()[0]}")
+        logger.info(f"📊 Informasi Environment:")
+        logger.info(f"🐍 Python version: {sys.version.split()[0]}")
         
         # Cek apakah sedang berjalan di Colab
         colab_status = "Ya" if is_colab() else "Tidak"
-        print(f"   💻 Running di Google Colab: {colab_status}")
+        logger.info(f"💻 Running di Google Colab: {colab_status}")
         
         # Jika di Colab, tampilkan informasi konfigurasi Colab
         if is_colab():
@@ -65,33 +76,33 @@ def initialize_env_config_ui():
                     # Tampilkan informasi drive
                     if 'drive' in colab_config:
                         drive_config = colab_config['drive']
-                        print(f"\n🗄️ Pengaturan Google Drive:")
-                        print(f"   - Sinkronisasi aktif: {drive_config.get('use_drive', False)}")
-                        print(f"   - Strategi sinkronisasi: {drive_config.get('sync_strategy', 'none')}")
-                        print(f"   - Gunakan symlinks: {drive_config.get('symlinks', False)}")
+                        logger.info(f"🗄️ Pengaturan Google Drive:")
+                        logger.info(f"- Sinkronisasi aktif: {drive_config.get('use_drive', False)}")
+                        logger.info(f"- Strategi sinkronisasi: {drive_config.get('sync_strategy', 'none')}")
+                        logger.info(f"- Gunakan symlinks: {drive_config.get('symlinks', False)}")
                         
                         # Tampilkan paths jika ada
                         if 'paths' in drive_config:
                             paths = drive_config['paths']
-                            print(f"   - SmartCash dir: {paths.get('smartcash_dir', 'SmartCash')}")
-                            print(f"   - Configs dir: {paths.get('configs_dir', 'configs')}")
+                            logger.info(f"- SmartCash dir: {paths.get('smartcash_dir', 'SmartCash')}")
+                            logger.info(f"- Configs dir: {paths.get('configs_dir', 'configs')}")
                     
                     # Tampilkan informasi model jika menggunakan GPU/TPU
                     if 'model' in colab_config:
                         model_config = colab_config['model']
-                        print(f"\n⚡ Pengaturan Hardware:")
-                        print(f"   - Gunakan GPU: {model_config.get('use_gpu', False)}")
-                        print(f"   - Gunakan TPU: {model_config.get('use_tpu', False)}")
-                        print(f"   - Precision: {model_config.get('precision', 'float32')}")
+                        logger.info(f"⚡ Pengaturan Hardware:")
+                        logger.info(f"- Gunakan GPU: {model_config.get('use_gpu', False)}")
+                        logger.info(f"- Gunakan TPU: {model_config.get('use_tpu', False)}")
+                        logger.info(f"- Precision: {model_config.get('precision', 'float32')}")
                     
                     # Informasi performa
                     if 'performance' in colab_config:
                         perf_config = colab_config['performance']
-                        print(f"\n🚀 Pengaturan Performa:")
-                        print(f"   - Auto garbage collect: {perf_config.get('auto_garbage_collect', False)}")
-                        print(f"   - Simpan checkpoint ke Drive: {perf_config.get('checkpoint_to_drive', False)}")
+                        logger.info(f"🚀 Pengaturan Performa:")
+                        logger.info(f"- Auto garbage collect: {perf_config.get('auto_garbage_collect', False)}")
+                        logger.info(f"- Simpan checkpoint ke Drive: {perf_config.get('checkpoint_to_drive', False)}")
             except Exception as e:
-                print(f"⚠️ Gagal memuat konfigurasi Colab: {str(e)}")
+                logger.warning(f"Gagal memuat konfigurasi Colab: {str(e)}")
         
         # Tampilkan konfigurasi file yang tersedia
         try:
@@ -101,29 +112,41 @@ def initialize_env_config_ui():
             available_configs = config_manager.get_available_configs(ignored_configs)
             
             if available_configs:
-                print(f"\n📝 File Konfigurasi Tersedia:")
+                logger.info(f"📝 File Konfigurasi Tersedia:")
                 for config in available_configs:
-                    print(f"   - {config}")
+                    logger.info(f"- {config}")
             else:
-                print(f"\n⚠️ Tidak ada file konfigurasi yang ditemukan.")
-                print(f"   💡 Tip: Pastikan direktori konfigurasi berisi file .yaml")
+                logger.warning("Tidak ada file konfigurasi yang ditemukan.")
+                logger.info("💡 Tip: Pastikan direktori konfigurasi berisi file .yaml")
         except Exception as e:
-            print(f"⚠️ Gagal mendapatkan daftar konfigurasi: {str(e)}")
+            logger.error(f"Gagal mendapatkan daftar konfigurasi: {str(e)}")
         
-        return config_manager
+        # Return UI components dan config manager
+        ui_components['config_manager'] = config_manager
+        return ui_components
+        
     except Exception as e:
-        # Tampilkan pesan error jika terjadi kesalahan
-        display(HTML(f"""
-        <div style="background-color: #f8d7da; padding: 10px; border-left: 5px solid #721c24; margin-bottom: 10px;">
-            <h3 style="margin: 0; color: #721c24;">Error saat inisialisasi environment</h3>
-            <p style="margin: 5px 0 0 0; color: #721c24;">{str(e)}</p>
-        </div>
-        """))
+        # Jika exception terjadi saat ui_components belum dibuat
+        if 'ui_components' not in locals() or not ui_components:
+            ui_components = {}
+            ui_components['header'] = create_header("SmartCash Environment Configuration", 
+                                                  "Error saat inisialisasi environment", 
+                                                  is_error=True)
+            ui_components['log_output'] = create_output_area()
+            display(ui_components['header'])
+            display(ui_components['log_output'])
+            
+            # Setup logger jika belum ada
+            logger = create_ui_logger(ui_components, "env_config")
         
-        print(f"❌ Error saat inisialisasi environment: {str(e)}")
+        # Log error
+        logger.error(f"Error saat inisialisasi environment: {str(e)}")
         
         # Coba dapatkan config manager sebagai fallback
         try:
-            return get_config_manager()
+            config_manager = get_config_manager()
+            ui_components['config_manager'] = config_manager
         except:
-            return None
+            pass
+        
+        return ui_components

@@ -5,8 +5,8 @@ Deskripsi: Logger khusus untuk UI yang dapat mengarahkan output ke widget UI dan
 
 import logging
 import sys
-import threading
 import os
+import subprocess
 from pathlib import Path
 from typing import Dict, Any, Callable, Optional, List, Union
 from IPython.display import display, HTML
@@ -117,18 +117,36 @@ class UILogger:
             }
             emoji = emoji_map.get(level, "ℹ️")
             
-            # Format pesan dengan timestamp dan emoji
-            formatted_message = f"[{timestamp}] {emoji} {message}"
+            # Tentukan warna berdasarkan level (konsisten dengan dependency_installer)
+            from smartcash.ui.utils.constants import COLORS
+            color_map = {
+                "debug": COLORS.get("muted", "#6c757d"),
+                "info": COLORS.get("primary", "#007bff"),
+                "success": COLORS.get("success", "#28a745"),
+                "warning": COLORS.get("warning", "#ffc107"),
+                "error": COLORS.get("danger", "#dc3545"),
+                "critical": COLORS.get("danger", "#dc3545")
+            }
+            color = color_map.get(level, COLORS.get("text", "#212529"))
+            
+            # Format pesan dengan timestamp dan emoji dalam style yang konsisten dengan dependency_installer
+            formatted_html = f"""
+            <div style="margin:2px 0;padding:3px;border-radius:3px;">
+                <span style="color:{COLORS.get('muted', '#6c757d')}">[{timestamp}]</span> 
+                <span>{emoji}</span> 
+                <span style="color:{color}">{message}</span>
+            </div>
+            """
             
             # Prioritas log output:
-            # 1. log_output widget jika ada
+            # 1. log_output widget (untuk log panel) jika ada
             # 2. status widget jika ada
             # 3. fallback ke sys.__stdout__ (bukan stdout yang sedang diintercept)
             
             if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
                 with self.ui_components['log_output']:
-                    # Hindari penggunaan print, gunakan display langsung
-                    display(HTML(f"<div>{formatted_message}</div>"))
+                    # Gunakan HTML untuk styling yang konsisten
+                    display(HTML(formatted_html))
             elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
                 with self.ui_components['status']:
                     try:
@@ -136,19 +154,12 @@ class UILogger:
                         display(create_status_indicator(level, message))
                     except ImportError:
                         # Fallback jika tidak ada alert_utils
-                        color = {
-                            "debug": "gray",
-                            "info": "blue",
-                            "success": "green",
-                            "warning": "orange",
-                            "error": "red",
-                            "critical": "darkred"
-                        }.get(level, "black")
-                        display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
+                        display(HTML(formatted_html))
             else:
                 # Fallback ke sys.__stdout__ jika tidak ada UI components
                 # Menggunakan sys.__stdout__ untuk mencegah rekursi
-                sys.__stdout__.write(f"{formatted_message}\n")
+                formatted_text = f"[{timestamp}] {emoji} {message}"
+                sys.__stdout__.write(f"{formatted_text}\n")
                 sys.__stdout__.flush()
         finally:
             self._in_log_to_ui = False
@@ -239,6 +250,53 @@ class UILogger:
         }
         level_name = level_names.get(level, str(level))
         self.info(f"Log level diubah ke {level_name}")
+    
+    def run_command(self, command: str, show_output: bool = True) -> subprocess.CompletedProcess:
+        """
+        Jalankan command shell dan log outputnya ke UI.
+        
+        Args:
+            command: Command yang akan dijalankan
+            show_output: Flag untuk menampilkan output ke logger
+            
+        Returns:
+            CompletedProcess instance
+        """
+        self.info(f"Menjalankan command: {command}")
+        
+        try:
+            # Gunakan subprocess.run untuk menjalankan command
+            result = subprocess.run(
+                command,
+                shell=True,
+                text=True,
+                capture_output=True,
+                check=False  # Don't raise exception on non-zero exit
+            )
+            
+            # Log output jika diperlukan
+            if show_output:
+                if result.stdout:
+                    for line in result.stdout.splitlines():
+                        if line.strip():
+                            self.info(line.strip())
+                
+                if result.stderr:
+                    for line in result.stderr.splitlines():
+                        if line.strip():
+                            self.warning(line.strip())
+            
+            # Log status
+            if result.returncode == 0:
+                self.success(f"Command selesai dengan exit code: {result.returncode}")
+            else:
+                self.error(f"Command gagal dengan exit code: {result.returncode}")
+            
+            return result
+            
+        except Exception as e:
+            self.error(f"Error saat menjalankan command: {str(e)}")
+            raise
 
 
 def create_ui_logger(ui_components: Dict[str, Any], 
@@ -379,14 +437,14 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
         return
     
-    # Buat stdout interceptor dengan thread-safety
+    # Buat stdout interceptor
     class UIStdoutInterceptor:
         def __init__(self, ui_components):
             self.ui_components = ui_components
             self.terminal = sys.__stdout__  # Gunakan sys.__stdout__ bukan sys.stdout
             self.buffer = ""
-            self.lock = threading.RLock()
-            self.buffer_limit = 1000  # Batasi buffer untuk mencegah memory leak
+            # Buffer limit untuk mencegah memory leak
+            self.buffer_limit = 1000
             # Prefiks untuk messages yang akan difilter
             self.ignore_prefixes = [
                 'DEBUG:', '[DEBUG]', 'INFO:', '[INFO]',
@@ -424,60 +482,58 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower()):
                     return
                     
-                # Buffer output sampai ada newline, dengan thread-safety
-                with self.lock:
-                    # Batasi ukuran buffer
-                    if len(self.buffer) > self.buffer_limit:
-                        self.buffer = self.buffer[-self.buffer_limit:]
+                # Batasi ukuran buffer
+                if len(self.buffer) > self.buffer_limit:
+                    self.buffer = self.buffer[-self.buffer_limit:]
+                
+                self.buffer += message
+                
+                # Proses pesan jika ada newline
+                if '\n' in self.buffer:
+                    lines = self.buffer.split('\n')
+                    self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
                     
-                    self.buffer += message
-                    if '\n' in self.buffer:
-                        lines = self.buffer.split('\n')
-                        self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
-                        
-                        # Tampilkan setiap baris lengkap yang tidak kosong
-                        for line in lines[:-1]:
-                            if line.strip():  # Cek jika bukan baris kosong
-                                try:
-                                    # Prioritaskan log_output jika ada
-                                    if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-                                        with self.ui_components['log_output']:
-                                            # Hindari penggunaan print, gunakan display langsung
-                                            display(HTML(f"<div>{line}</div>"))
-                                    else:
-                                        with self.ui_components['status']:
-                                            try:
-                                                from smartcash.ui.utils.alert_utils import create_status_indicator
-                                                display(create_status_indicator("info", line))
-                                            except ImportError:
-                                                display(HTML(f"<div>{line}</div>"))
-                                except Exception as e:
-                                    # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
-                                    self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {line}\n")
+                    # Tampilkan setiap baris lengkap yang tidak kosong
+                    for line in lines[:-1]:
+                        if line.strip():  # Cek jika bukan baris kosong
+                            self._display_line(line)
             finally:
                 self._in_write = False
+                
+        def _display_line(self, line):
+            """Tampilkan baris ke widget UI."""
+            try:
+                # Prioritaskan log_output jika ada
+                if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                    with self.ui_components['log_output']:
+                        # Gunakan styling dari dependency_installer
+                        try:
+                            from smartcash.ui.utils.constants import COLORS
+                            formatted_html = f"""
+                            <div style="margin:2px 0;padding:3px;border-radius:3px;">
+                                <span style="color:{COLORS.get('text', '#212529')}">{line}</span>
+                            </div>
+                            """
+                            display(HTML(formatted_html))
+                        except ImportError:
+                            display(HTML(f"<div>{line}</div>"))
+                else:
+                    with self.ui_components['status']:
+                        try:
+                            from smartcash.ui.utils.alert_utils import create_status_indicator
+                            display(create_status_indicator("info", line))
+                        except ImportError:
+                            display(HTML(f"<div>{line}</div>"))
+            except Exception as e:
+                # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
+                self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {line}\n")
         
         def flush(self):
             self.terminal.flush()
-            # Flush buffer jika perlu, dengan thread-safety
-            with self.lock:
-                if self.buffer and self.buffer.strip():  # Hanya flush jika buffer tidak kosong setelah strip
-                    try:
-                        # Prioritaskan log_output jika ada
-                        if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-                            with self.ui_components['log_output']:
-                                # Hindari penggunaan print, gunakan display langsung
-                                display(HTML(f"<div>{self.buffer}</div>"))
-                        else:
-                            with self.ui_components['status']:
-                                try:
-                                    from smartcash.ui.utils.alert_utils import create_status_indicator
-                                    display(create_status_indicator("info", self.buffer))
-                                except ImportError:
-                                    display(HTML(f"<div>{self.buffer}</div>"))
-                    except Exception as e:
-                        # Fallback ke stdout asli
-                        self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {self.buffer}\n")
+            
+            # Flush buffer jika tidak kosong
+            if self.buffer and self.buffer.strip():
+                self._display_line(self.buffer)
                 self.buffer = ""
         
         # Kebutuhan IOBase lainnya
@@ -560,14 +616,26 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
     if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
         from IPython.display import display, HTML
         
-        # Tentukan warna berdasarkan level
-        color = {
-            "info": "blue",
-            "success": "green",
-            "warning": "orange",
-            "error": "red",
-            "critical": "darkred"
-        }.get(level, "black")
+        # Tentukan warna berdasarkan level sesuai style dependency_installer
+        try:
+            from smartcash.ui.utils.constants import COLORS
+            color_map = {
+                "info": COLORS.get("primary", "#007bff"),
+                "success": COLORS.get("success", "#28a745"),
+                "warning": COLORS.get("warning", "#ffc107"),
+                "error": COLORS.get("danger", "#dc3545"),
+                "critical": COLORS.get("danger", "#dc3545")
+            }
+            color = color_map.get(level, COLORS.get("text", "#212529"))
+        except ImportError:
+            # Fallback colors jika constants tidak dapat diimpor
+            color = {
+                "info": "blue",
+                "success": "green",
+                "warning": "orange",
+                "error": "red",
+                "critical": "darkred"
+            }.get(level, "black")
         
         # Format pesan dengan icon jika ada
         formatted_message = f"{icon} {message}" if icon else message
@@ -578,27 +646,77 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
                 from smartcash.ui.utils.alert_utils import create_status_indicator
                 display(create_status_indicator(level, formatted_message))
             except ImportError:
-                display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
+                timestamp = datetime.now().strftime('%H:%M:%S')
+                formatted_html = f"""
+                <div style="margin:2px 0;padding:3px;border-radius:3px;">
+                    <span style="color:gray">[{timestamp}]</span> 
+                    <span style="color:{color}">{formatted_message}</span>
+                </div>
+                """
+                display(HTML(formatted_html))
     
     # Jika ada log_output, gunakan itu juga
     elif 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         from IPython.display import display, HTML
         from datetime import datetime
         
-        # Format pesan dengan timestamp dan icon
+        # Format pesan dengan timestamp dan icon dengan style dependency_installer
         timestamp = datetime.now().strftime('%H:%M:%S')
-        formatted_message = f"[{timestamp}] {icon + ' ' if icon else ''}{message}"
+        emoji = {
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "critical": "🔥"
+        }.get(level, "ℹ️")
+        icon_text = icon if icon else emoji
+        
+        try:
+            from smartcash.ui.utils.constants import COLORS
+            color_map = {
+                "info": COLORS.get("primary", "#007bff"),
+                "success": COLORS.get("success", "#28a745"),
+                "warning": COLORS.get("warning", "#ffc107"),
+                "error": COLORS.get("danger", "#dc3545"),
+                "critical": COLORS.get("danger", "#dc3545")
+            }
+            color = color_map.get(level, COLORS.get("text", "#212529"))
+            
+            formatted_html = f"""
+            <div style="margin:2px 0;padding:3px;border-radius:3px;">
+                <span style="color:{COLORS.get('muted', '#6c757d')}">[{timestamp}]</span> 
+                <span>{icon_text}</span> 
+                <span style="color:{color}">{message}</span>
+            </div>
+            """
+        except ImportError:
+            # Fallback style jika constants tidak dapat diimpor
+            color = {
+                "info": "blue",
+                "success": "green",
+                "warning": "orange",
+                "error": "red",
+                "critical": "darkred"
+            }.get(level, "black")
+            formatted_html = f"""<div style="color:{color}">[{timestamp}] {icon_text} {message}</div>"""
         
         # Tampilkan ke log_output widget
         with ui_components['log_output']:
-            # Hindari penggunaan print, gunakan display langsung
-            display(HTML(f"<div>{formatted_message}</div>"))
+            display(HTML(formatted_html))
     
     # Fallback ke stdout jika tidak ada UI components
     else:
         from datetime import datetime
         timestamp = datetime.now().strftime('%H:%M:%S')
-        formatted_message = f"[{timestamp}] {icon + ' ' if icon else ''}{message}"
+        emoji = {
+            "info": "ℹ️",
+            "success": "✅",
+            "warning": "⚠️",
+            "error": "❌",
+            "critical": "🔥"
+        }.get(level, "ℹ️")
+        icon_text = icon if icon else emoji
+        formatted_message = f"[{timestamp}] {icon_text} {message}"
         # Gunakan sys.__stdout__ untuk mencegah rekursi
         sys.__stdout__.write(f"{formatted_message}\n")
         sys.__stdout__.flush()

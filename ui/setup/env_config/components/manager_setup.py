@@ -11,14 +11,25 @@ import yaml
 
 from smartcash.common.config.manager import SimpleConfigManager, get_config_manager
 from smartcash.common.utils import is_colab
+from smartcash.ui.setup.env_config.utils.fallback_logger import get_fallback_logger
 
-def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
+def setup_managers(ui_components: Dict[str, Any]) -> Tuple[SimpleConfigManager, Path, Path]:
     """
     Setup configuration managers
     
+    Args:
+        ui_components: Dictionary berisi komponen UI, termasuk logger
+        
     Returns:
         Tuple of (config_manager, base_dir, config_dir)
     """
+    # Setup logger
+    logger = ui_components.get('logger', None)
+    
+    # Jika logger tidak tersedia, gunakan fallback
+    if not logger:
+        logger = get_fallback_logger("env_config_manager_setup")
+    
     # Determine base directory
     if is_colab():
         base_dir = Path("/content")
@@ -28,18 +39,13 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
         colab_config = {}
         repo_config_path = Path("/content/smartcash/configs/colab_config.yaml")
         
-        # Dapatkan UI logger jika tersedia
-        ui_logger = _get_ui_logger()
-        
         if repo_config_path.exists():
             try:
                 with open(repo_config_path, 'r') as f:
                     colab_config = yaml.safe_load(f) or {}
             except Exception as e:
-                if ui_logger:
-                    ui_logger.warning(f"Gagal memuat colab_config.yaml: {str(e)}")
-                else:
-                    print(f"⚠️ Gagal memuat colab_config.yaml: {str(e)}")
+                if logger:
+                    logger.warning(f"Gagal memuat colab_config.yaml: {str(e)}")
         
         # Dapatkan path Drive dari konfigurasi atau gunakan default
         drive_dir = 'SmartCash'
@@ -71,10 +77,8 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             for config_file in repo_configs.glob("*.yaml"):
                 shutil.copy2(config_file, drive_config_dir / config_file.name)
             
-            if ui_logger:
-                ui_logger.info(f"File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
-            else:
-                print(f"📄 File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
+            if logger:
+                logger.info(f"File konfigurasi disalin dari {repo_configs} ke {drive_config_dir}")
         
         # Gunakan symlinks jika dikonfigurasi
         if use_symlinks:
@@ -82,51 +86,39 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             if config_dir.exists() and not config_dir.is_symlink():
                 # Hapus direktori jika bukan symlink
                 shutil.rmtree(config_dir)
-                if ui_logger:
-                    ui_logger.warning(f"Direktori konfigurasi bukan symlink, akan dibuat ulang")
-                else:
-                    print(f"⚠️ Direktori konfigurasi bukan symlink, akan dibuat ulang")
+                if logger:
+                    logger.warning(f"Direktori konfigurasi bukan symlink, akan dibuat ulang")
             elif config_dir.is_symlink() and not config_dir.exists():
                 # Symlink rusak, hapus
                 os.unlink(config_dir)
-                if ui_logger:
-                    ui_logger.warning(f"Symlink konfigurasi rusak, akan dibuat ulang")
-                else:
-                    print(f"⚠️ Symlink konfigurasi rusak, akan dibuat ulang")
+                if logger:
+                    logger.warning(f"Symlink konfigurasi rusak, akan dibuat ulang")
             
             # Buat symlink baru jika belum ada atau rusak
             if not config_dir.exists():
                 # Pastikan direktori Drive ada sebelum membuat symlink
                 if not drive_config_dir.exists():
                     drive_config_dir.mkdir(parents=True, exist_ok=True)
-                    if ui_logger:
-                        ui_logger.info(f"Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
-                    else:
-                        print(f"📁 Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
+                    if logger:
+                        logger.info(f"Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
                 
                 # Buat symlink baru
                 os.symlink(drive_config_dir, config_dir)
-                if ui_logger:
-                    ui_logger.info(f"Symlink dibuat dari {drive_config_dir} ke {config_dir}")
-                else:
-                    print(f"🔗 Symlink dibuat dari {drive_config_dir} ke {config_dir}")
+                if logger:
+                    logger.info(f"Symlink dibuat dari {drive_config_dir} ke {config_dir}")
         else:
             # Jika tidak menggunakan symlink, copy file dari Drive ke local
             if not config_dir.exists():
                 config_dir.mkdir(parents=True, exist_ok=True)
-                if ui_logger:
-                    ui_logger.info(f"Direktori konfigurasi dibuat: {config_dir}")
-                else:
-                    print(f"📁 Direktori konfigurasi dibuat: {config_dir}")
+                if logger:
+                    logger.info(f"Direktori konfigurasi dibuat: {config_dir}")
             
             # Copy file dari Drive ke local
             for config_file in drive_config_dir.glob("*.yaml"):
                 shutil.copy2(config_file, config_dir / config_file.name)
             
-            if ui_logger:
-                ui_logger.info(f"File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
-            else:
-                print(f"📄 File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
+            if logger:
+                logger.info(f"File konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
     else:
         # Gunakan project root sebagai base_dir
         base_dir = Path(__file__).resolve().parents[4]
@@ -139,43 +131,10 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
     if not config_dir.exists():
         # Jika masih tidak ada, buat direktori kosong sebagai fallback
         config_dir.mkdir(parents=True, exist_ok=True)
-        ui_logger = _get_ui_logger()
-        if ui_logger:
-            ui_logger.error(f"Gagal membuat symlink atau direktori konfigurasi. Menggunakan direktori kosong sebagai fallback.")
-        else:
-            print(f"❌ Gagal membuat symlink atau direktori konfigurasi. Menggunakan direktori kosong sebagai fallback.")
+        if logger:
+            logger.error(f"Gagal membuat symlink atau direktori konfigurasi. Menggunakan direktori kosong sebagai fallback.")
     
     # Initialize config manager
     config_manager = get_config_manager()
     
     return config_manager, base_dir, config_dir 
-
-def _get_ui_logger() -> Optional[Any]:
-    """
-    Mencoba mendapatkan UI logger jika tersedia.
-    
-    Returns:
-        UI logger atau None jika tidak tersedia
-    """
-    try:
-        # Coba dapatkan UI logger dari konteks global
-        import builtins
-        if hasattr(builtins, 'ui_components') and 'logger' in builtins.ui_components:
-            logger = builtins.ui_components['logger']
-            # Set level ke ERROR untuk mengurangi log yang tidak perlu
-            if hasattr(logger, 'set_level'):
-                import logging
-                logger.set_level(logging.ERROR)
-            return logger
-        
-        # Coba dapatkan dari modul UI
-        from smartcash.ui.utils.ui_logger import get_current_ui_logger
-        logger = get_current_ui_logger()
-        if logger:
-            # Set level ke ERROR untuk mengurangi log yang tidak perlu
-            import logging
-            logger.set_level(logging.ERROR)
-        return logger
-    except Exception:
-        # Fallback ke None jika tidak ada UI logger atau terjadi error
-        return None 

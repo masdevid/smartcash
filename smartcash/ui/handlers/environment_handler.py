@@ -13,6 +13,8 @@ from typing import List, Dict, Any, Tuple, Optional, Callable
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.utils.ui_logger import get_current_ui_logger
+from smartcash.ui.setup.env_config.utils.fallback_logger import get_fallback_logger
 
 class EnvironmentHandler:
     """
@@ -26,15 +28,12 @@ class EnvironmentHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        # Setup logger tanpa menggunakan UILogger untuk menghindari circular dependency
-        self.logger = logging.getLogger(__name__)
-        if not self.logger.handlers:
-            # Gunakan sys.__stdout__ untuk menghindari rekursi
-            handler = logging.StreamHandler(sys.__stdout__)
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
+        # Coba mendapatkan UI logger yang ada
+        self.logger = get_current_ui_logger()
+        
+        # Jika tidak ada UI logger, gunakan fallback logger
+        if not self.logger:
+            self.logger = get_fallback_logger("environment_handler")
         
         # Initialize environment manager singleton first
         self.env_manager = get_environment_manager()

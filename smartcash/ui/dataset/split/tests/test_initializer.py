@@ -11,7 +11,7 @@ import ipywidgets as widgets
 class TestSplitInitializer(unittest.TestCase):
     """Test untuk initializer split dataset."""
     
-    @patch('smartcash.ui.utils.ui_logger.create_direct_ui_logger')
+    @patch('smartcash.ui.utils.ui_logger.create_ui_logger')
     @patch('smartcash.common.environment.get_environment_manager')
     @patch('smartcash.common.config.manager.get_config_manager')
     @patch('IPython.display.display')
@@ -69,7 +69,7 @@ class TestSplitInitializer(unittest.TestCase):
             from smartcash.ui.dataset.split.split_initializer import initialize_split_ui
             
             # Patch fungsi yang diperlukan
-            with patch('smartcash.ui.utils.ui_logger.create_direct_ui_logger') as mock_logger, \
+            with patch('smartcash.ui.utils.ui_logger.create_ui_logger') as mock_logger, \
                  patch('smartcash.common.environment.get_environment_manager') as mock_env_manager, \
                  patch('smartcash.ui.dataset.split.handlers.sync_logger.log_sync_error') as mock_log_error, \
                  patch('IPython.display.display') as mock_display:

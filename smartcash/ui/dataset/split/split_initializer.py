@@ -21,10 +21,10 @@ def initialize_split_ui(env: Any = None, config: Dict[str, Any] = None) -> Dict[
     ui_components = {'module_name': 'dataset_split'}
     
     # Setup UI logger
-    from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+    from smartcash.ui.utils.ui_logger import create_ui_logger
     output_widget = widgets.Output()
     ui_components['output_log'] = output_widget
-    logger = create_direct_ui_logger(ui_components, 'split_config')
+    logger = create_ui_logger(ui_components, 'split_config')
     ui_components['logger'] = logger
     
     try:

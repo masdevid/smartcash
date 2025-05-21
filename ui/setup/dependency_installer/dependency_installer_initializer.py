@@ -10,7 +10,7 @@ from smartcash.ui.setup.dependency_installer.components import create_dependency
 from smartcash.ui.setup.dependency_installer.handlers import setup_dependency_installer_handlers
 from smartcash.common.environment import get_environment_manager
 from smartcash.common.config.manager import get_config_manager
-from smartcash.ui.utils.ui_logger import create_direct_ui_logger
+from smartcash.ui.utils.ui_logger import create_ui_logger
 
 def initialize_dependency_installer() -> Dict[str, Any]:
     """
@@ -29,7 +29,7 @@ def initialize_dependency_installer() -> Dict[str, Any]:
     ui_components = create_dependency_installer_ui(env_manager, config_manager)
     
     # Setup logger
-    logger = create_direct_ui_logger(ui_components, "dependency_installer")
+    logger = create_ui_logger(ui_components, "dependency_installer")
     ui_components['logger'] = logger
     
     # Setup handlers

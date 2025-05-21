@@ -6,6 +6,7 @@ Deskripsi: Handler untuk menyimpan konfigurasi download dataset ke SimpleConfigM
 from typing import Dict, Any, Optional
 from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import update_status_panel
 
 def handle_save_config(ui_components: Dict[str, Any], button=None) -> None:
     """
@@ -38,19 +39,31 @@ def handle_save_config(ui_components: Dict[str, Any], button=None) -> None:
         if result:
             log_message(ui_components, "Konfigurasi dataset berhasil disimpan", "success", "✅")
             
-            # Update status panel jika tersedia
-            if 'status_panel' in ui_components:
-                from smartcash.ui.components.status_panel import update_status_panel
-                update_status_panel(
-                    ui_components['status_panel'],
-                    "Konfigurasi dataset berhasil disimpan",
-                    "success"
-                )
+            # Update status panel
+            update_status_panel(
+                ui_components,
+                "Konfigurasi dataset berhasil disimpan",
+                "success"
+            )
         else:
             log_message(ui_components, "Gagal menyimpan konfigurasi dataset", "error", "❌")
+            
+            # Update status panel dengan error
+            update_status_panel(
+                ui_components,
+                "Gagal menyimpan konfigurasi dataset",
+                "error"
+            )
     except Exception as e:
         # Log error
         log_message(ui_components, f"Error saat menyimpan konfigurasi: {str(e)}", "error", "❌")
+        
+        # Update status panel dengan error
+        update_status_panel(
+            ui_components,
+            f"Error saat menyimpan konfigurasi: {str(e)}",
+            "error"
+        )
     finally:
         # Aktifkan kembali tombol
         if button and hasattr(button, 'disabled'):

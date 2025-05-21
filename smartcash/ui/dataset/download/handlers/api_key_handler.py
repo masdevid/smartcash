@@ -6,6 +6,8 @@ Deskripsi: Handler untuk manajemen API key Roboflow
 import os
 from typing import Dict, Any, Optional, Tuple
 from IPython.display import display, clear_output
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import highlight_required_fields
 
 def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """
@@ -17,7 +19,8 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     Returns:
         Tuple (has_api_key, api_key)
     """
-    logger = ui_components.get('logger')
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
     
     # Check sources in priority order:
     # 1. UI input field
@@ -36,8 +39,7 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         if 'api_key' in ui_components:
             ui_components['api_key'].value = api_key
         
-        if logger:
-            logger.info("🔑 API key Roboflow berhasil diambil dari Google Colab secrets")
+        log_message(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "info", "🔑")
         return True, api_key
     
     # Check environment variable
@@ -47,13 +49,11 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
         if 'api_key' in ui_components:
             ui_components['api_key'].value = api_key
             
-        if logger:
-            logger.info("🔑 API key Roboflow berhasil diambil dari environment variable")
+        log_message(ui_components, "API key Roboflow berhasil diambil dari environment variable", "info", "🔑")
         return True, api_key
     
     # No API key found
-    if logger:
-        logger.warning("⚠️ API key Roboflow tidak ditemukan")
+    log_message(ui_components, "API key Roboflow tidak ditemukan", "warning", "⚠️")
     return False, None
 
 def get_api_key_from_secrets(secret_name: str) -> Optional[str]:
@@ -84,7 +84,8 @@ def request_api_key_input(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    from smartcash.ui.utils.ui_logger import log_to_ui
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
     
     # Tampilkan pesan pada status output
     api_key_msg = (
@@ -97,16 +98,10 @@ def request_api_key_input(ui_components: Dict[str, Any]) -> None:
         ui_components['roboflow_accordion'].selected_index = 0
     
     # Log ke UI
-    log_to_ui(ui_components, api_key_msg, "warning", "🔑")
+    log_message(ui_components, api_key_msg, "warning", "🔑")
     
-    # Log ke logger
-    logger = ui_components.get('logger')
-    if logger:
-        logger.warning(f"⚠️ {api_key_msg}")
-        
-    # Highlight input field jika ada
+    # Highlight input field untuk API key
     if 'api_key' in ui_components:
-        # Berikan outline merah untuk highlight
         ui_components['api_key'].layout.border = "1px solid red"
 
 def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
@@ -116,6 +111,9 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     # Hanya lakukan jika 'api_key' input ada di UI components
     if 'api_key' not in ui_components:
         return
@@ -135,9 +133,7 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
                     ui_components['api_key'].layout.border = ""
                     
                     # Log sukses
-                    logger = ui_components.get('logger')
-                    if logger:
-                        logger.info("✅ API key berhasil dimasukkan")
+                    log_message(ui_components, "API key berhasil dimasukkan", "success", "✅")
         
         # Register callback
         ui_components['api_key'].observe(on_api_key_change, names='value')
@@ -152,7 +148,8 @@ def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
     Args:
         ui_components: Dictionary komponen UI
     """
-    from smartcash.ui.utils.ui_logger import log_to_ui
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
     
     # Coba mendapatkan API key dari Colab secrets
     api_key = get_api_key_from_secrets('ROBOFLOW_API_KEY')
@@ -162,13 +159,8 @@ def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
         ui_components['api_key'].value = api_key
         
         # Log ke UI
-        log_to_ui(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "success", "🔑")
+        log_message(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "success", "🔑")
         
-        # Log ke logger
-        logger = ui_components.get('logger')
-        if logger:
-            logger.info("✅ API key Roboflow berhasil diambil dari Google Colab secrets")
-            
         # Reset style jika sebelumnya di-highlight
         ui_components['api_key'].layout.border = ""
     else:
@@ -179,7 +171,7 @@ def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
             ui_components['api_key'].value = api_key
             
             # Log ke UI
-            log_to_ui(ui_components, "API key Roboflow berhasil diambil dari environment variable", "success", "🔑")
+            log_message(ui_components, "API key Roboflow berhasil diambil dari environment variable", "success", "🔑")
             
             # Reset style
             ui_components['api_key'].layout.border = ""

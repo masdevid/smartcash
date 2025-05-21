@@ -6,6 +6,8 @@ Deskripsi: Setup handler untuk UI dataset download yang terintegrasi dengan obse
 from typing import Dict, Any, Optional
 from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.download.utils.progress_manager import setup_multi_progress, setup_progress_indicator
 
 def setup_download_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
     """
@@ -156,18 +158,11 @@ def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
 def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
     """Setup progress tracking untuk download."""
     try:
-        from smartcash.ui.handlers.multi_progress import setup_multi_progress_tracking
+        # Gunakan modul progress_manager untuk setup
+        setup_multi_progress(ui_components)
         
-        # Setup multi-progress tracking dengan tracker untuk keseluruhan dan step
-        setup_multi_progress_tracking(
-            ui_components=ui_components,
-            overall_tracker_name="download",
-            step_tracker_name="download_step",
-            overall_progress_key='progress_bar',
-            step_progress_key='progress_bar',
-            overall_label_key='overall_label',
-            step_label_key='step_label'
-        )
+        # Setup progress indicator jika diperlukan
+        setup_progress_indicator(ui_components)
         
         # Log setup berhasil dengan logger helper
         log_message(ui_components, "Progress tracking berhasil disetup", "debug", "✅")

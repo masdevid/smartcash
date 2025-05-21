@@ -4,7 +4,7 @@ Deskripsi: Utilitas untuk mengelola notifikasi UI pada proses download dataset
 """
 
 from typing import Dict, Any, Optional
-from smartcash.components.observer import notify, EventTopics
+from smartcash.components.observer import notify, EventTopics, ObserverManager
 from smartcash.common.logger import get_logger
 
 # Definisi topic event untuk UI
@@ -26,6 +26,24 @@ class DownloadUIEvents:
     STEP_PROGRESS_UPDATE = "DOWNLOAD_STEP_PROGRESS_UPDATE"
     STEP_PROGRESS_COMPLETE = "DOWNLOAD_STEP_PROGRESS_COMPLETE"
     STEP_PROGRESS_ERROR = "DOWNLOAD_STEP_PROGRESS_ERROR"
+
+# Singleton observer manager untuk digunakan oleh semua komponen
+_OBSERVER_MANAGER = None
+
+def get_observer_manager() -> ObserverManager:
+    """
+    Dapatkan instance ObserverManager yang digunakan untuk notifikasi download.
+    Ini menggunakan pola singleton untuk memastikan hanya satu instance yang digunakan.
+    
+    Returns:
+        ObserverManager: Instance observer manager
+    """
+    global _OBSERVER_MANAGER
+    
+    if _OBSERVER_MANAGER is None:
+        _OBSERVER_MANAGER = ObserverManager()
+    
+    return _OBSERVER_MANAGER
 
 def notify_log(
     sender: Any,

@@ -7,16 +7,27 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 
 from smartcash.common.config import get_config_manager
-from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download_handlers
-from smartcash.ui.dataset.download.components import create_download_ui
-from smartcash.ui.utils.ui_logger import log_to_ui
 from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger import log_to_ui
+
+# Import handlers dengan nama yang lebih spesifik untuk menghindari konflik
 from smartcash.ui.dataset.download.handlers.download_handler import handle_download_button_click
 from smartcash.ui.dataset.download.handlers.check_handler import handle_check_button_click
 from smartcash.ui.dataset.download.handlers.reset_handler import handle_reset_button_click
 from smartcash.ui.dataset.download.handlers.cleanup_button_handler import handle_cleanup_button_click
+
+# Import utils yang dibutuhkan untuk inisialisasi
+from smartcash.ui.dataset.download.utils.logger_helper import setup_ui_logger, is_initialized
 from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
-from smartcash.ui.dataset.download.utils.logger_helper import setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import update_status_panel, reset_ui_after_download
+from smartcash.ui.dataset.download.utils.progress_manager import reset_progress_bar
+
+# Import modul untuk setup
+from smartcash.ui.dataset.download.handlers.setup_handlers import setup_download_handlers
+from smartcash.ui.dataset.download.components import create_download_ui
+
+# Flag global untuk mencegah inisialisasi ulang
+_DOWNLOAD_MODULE_INITIALIZED = False
 
 def initialize_dataset_download_ui(env=None, config=None) -> Any:
     """
@@ -29,6 +40,18 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
     Returns:
         Widget UI utama yang bisa ditampilkan
     """
+    global _DOWNLOAD_MODULE_INITIALIZED
+    
+    # Setup logger dengan nama modul spesifik
+    logger = get_logger('smartcash.dataset.download')
+    
+    # Hindari multiple inisialisasi yang tidak perlu
+    if _DOWNLOAD_MODULE_INITIALIZED:
+        logger.debug("UI download dataset sudah diinisialisasi sebelumnya, menggunakan inisialisasi yang sudah ada")
+    else:
+        logger.info("Memulai inisialisasi UI download dataset")
+        _DOWNLOAD_MODULE_INITIALIZED = True
+    
     try:
         # Get config manager dengan fallback otomatis
         config_manager = get_config_manager()
@@ -53,7 +76,12 @@ def initialize_dataset_download_ui(env=None, config=None) -> Any:
         return ui_components['ui']
         
     except Exception as e:
-        log_to_ui(None, f"❌ Error saat inisialisasi UI: {str(e)}", "error")
+        logger.error(f"Error saat inisialisasi UI: {str(e)}")
+        # Hanya tampilkan log di UI jika bukan saat dependency installer
+        try:
+            log_to_ui(None, f"❌ Error saat inisialisasi UI: {str(e)}", "error")
+        except:
+            pass
         raise
 
 def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -66,8 +94,17 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
     Returns:
         Dictionary komponen UI
     """
-    # Setup logger
-    logger = get_logger()
+    global _DOWNLOAD_MODULE_INITIALIZED
+    
+    # Setup logger dengan nama modul spesifik
+    logger = get_logger('smartcash.dataset.download')
+    
+    # Hindari multiple inisialisasi yang tidak perlu
+    if _DOWNLOAD_MODULE_INITIALIZED:
+        logger.debug("UI download dataset sudah diinisialisasi sebelumnya")
+    else:
+        logger.info("Memulai inisialisasi UI download dataset (detail)")
+        _DOWNLOAD_MODULE_INITIALIZED = True
     
     try:
         # Get config dari SimpleConfigManager jika config tidak diberikan
@@ -75,7 +112,7 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
             config_manager = get_config_manager()
             config = config_manager.get_module_config('dataset')
     except Exception as e:
-        logger.warning(f"⚠️ Gagal memuat konfigurasi dari SimpleConfigManager: {str(e)}")
+        logger.warning(f"Gagal memuat konfigurasi dari SimpleConfigManager: {str(e)}")
         # Gunakan config kosong sebagai fallback
         config = {}
     
@@ -111,6 +148,6 @@ def initialize_download_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str,
         lambda b: handle_cleanup_button_click(b, ui_components)
     )
     
-    logger.info("✅ UI download dataset berhasil diinisialisasi")
+    logger.info("UI download dataset berhasil diinisialisasi")
     
     return ui_components

@@ -6,7 +6,9 @@ Deskripsi: Handler untuk pengecekan status dan validasi dataset
 from typing import Dict, Any, Tuple, Optional
 from pathlib import Path
 from IPython.display import display
-from smartcash.ui.dataset.download.utils.logger_helper import log_message
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import disable_buttons, update_status_panel
+from smartcash.ui.dataset.download.utils.progress_manager import show_progress, update_progress
 
 def handle_check_button_click(ui_components: Dict[str, Any], b: Any = None) -> None:
     """
@@ -16,19 +18,22 @@ def handle_check_button_click(ui_components: Dict[str, Any], b: Any = None) -> N
         ui_components: Dictionary komponen UI
         b: Button widget (opsional)
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+
     # Reset log output saat tombol diklik
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
         ui_components['log_output'].clear_output(wait=True)
     
     try:
         # Nonaktifkan tombol selama proses
-        _disable_buttons(ui_components, True)
+        disable_buttons(ui_components, True)
         
         # Dapatkan output directory dari UI
         output_dir = ui_components.get('output_dir', {}).value or 'data'
         
         # Tampilkan progress
-        _show_progress(ui_components, "Memeriksa dataset...")
+        show_progress(ui_components, "Memeriksa dataset...")
         
         # Jalankan check langsung (tanpa threading untuk kompatibilitas Colab)
         stats, message = _check_dataset_status(ui_components, output_dir)
@@ -43,7 +48,7 @@ def handle_check_button_click(ui_components: Dict[str, Any], b: Any = None) -> N
     
     finally:
         # Aktifkan kembali tombol
-        _disable_buttons(ui_components, False)
+        disable_buttons(ui_components, False)
 
 def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tuple[Dict[str, Any], str]:
     """
@@ -69,7 +74,7 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
     }
     
     # Update progress
-    _update_progress(ui_components, 10, "Memeriksa struktur direktori...")
+    update_progress(ui_components, 10, "Memeriksa struktur direktori...")
     
     # Cek apakah direktori ada
     base_dir = Path(output_dir)
@@ -83,7 +88,7 @@ def _check_dataset_status(ui_components: Dict[str, Any], output_dir: str) -> Tup
         
         # Update progress untuk setiap subdirektori
         progress = 10 + ((idx + 1) * 10)
-        _update_progress(ui_components, progress, f"Memeriksa {subdir}...")
+        update_progress(ui_components, progress, f"Memeriksa {subdir}...")
         
         if not full_path.exists():
             log_message(ui_components, f"Direktori {subdir} tidak ditemukan", "warning", "⚠️")
@@ -156,19 +161,13 @@ def _display_check_results(ui_components: Dict[str, Any], stats: Dict[str, Any],
         stats: Statistik dataset
         message: Pesan status
     """
-    # Update status panel jika tersedia
-    if 'update_status_panel' in ui_components and callable(ui_components['update_status_panel']):
-        level = "warning" if stats['total_images'] == 0 else "success"
-        icon = "⚠️" if stats['total_images'] == 0 else "✅"
-        ui_components['update_status_panel'](ui_components, level, f"{icon} {message}")
-    else:
-        # Fallback ke log_message
-        level = "warning" if stats['total_images'] == 0 else "success"
-        icon = "⚠️" if stats['total_images'] == 0 else "✅"
-        log_message(ui_components, message, level, icon)
+    # Update status panel
+    level = "warning" if stats['total_images'] == 0 else "success"
+    icon = "⚠️" if stats['total_images'] == 0 else "✅"
+    update_status_panel(ui_components, message, level)
     
     # Update progress
-    _update_progress(ui_components, 100, "Pengecekan selesai")
+    update_progress(ui_components, 100, "Pengecekan selesai")
     
     # Tampilkan statistik dalam summary container
     summary_container = ui_components.get('summary_container')
@@ -248,107 +247,4 @@ def display_dataset_stats(stats: Dict[str, Any]) -> None:
             plt.tight_layout()
             plt.show()
         except ImportError:
-            display(HTML("<p>Matplotlib tidak tersedia untuk visualisasi</p>"))
-
-def _show_progress(ui_components: Dict[str, Any], message: str = "") -> None:
-    """
-    Tampilkan dan reset progress bar.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        message: Pesan progress awal
-    """
-    # Gunakan update_progress dari shared component jika tersedia
-    from smartcash.ui.components.progress_tracking import update_progress
-    
-    try:
-        update_progress(
-            ui_components=ui_components,
-            progress=0,
-            total=100,
-            message=message,
-            step=0,
-            total_steps=1,
-            step_message=message,
-            status_type='info'
-        )
-        return
-    except Exception as e:
-        # Log error dan fallback ke implementasi lama
-        log_message(ui_components, f"Error saat menampilkan progress: {str(e)}", "debug", "ℹ️")
-        
-        # Fallback ke implementasi lama
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = 0
-            ui_components['progress_bar'].layout.visibility = 'visible'
-            
-        if 'overall_label' in ui_components:
-            ui_components['overall_label'].value = message
-            ui_components['overall_label'].layout.visibility = 'visible'
-            
-        if 'step_label' in ui_components:
-            ui_components['step_label'].value = message
-            ui_components['step_label'].layout.visibility = 'visible'
-
-def _update_progress(ui_components: Dict[str, Any], value: int, message: Optional[str] = None) -> None:
-    """
-    Update progress bar.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        value: Nilai progress (0-100)
-        message: Pesan progress opsional
-    """
-    # Gunakan update_progress dari shared component jika tersedia
-    from smartcash.ui.components.progress_tracking import update_progress
-    
-    try:
-        update_progress(
-            ui_components=ui_components,
-            progress=value,
-            total=100,
-            message=message,
-            status_type='info'
-        )
-    except Exception as e:
-        # Log error dan fallback ke implementasi lama
-        log_message(ui_components, f"Error saat update progress: {str(e)}", "debug", "ℹ️")
-        
-        # Fallback ke implementasi lama
-        if 'progress_bar' in ui_components:
-            ui_components['progress_bar'].value = value
-            
-        if message:
-            if 'overall_label' in ui_components:
-                ui_components['overall_label'].value = message
-            
-            if 'step_label' in ui_components:
-                ui_components['step_label'].value = message
-        
-    # Update progress tracker jika tersedia
-    tracker_key = 'download_tracker'
-    if tracker_key in ui_components:
-        tracker = ui_components[tracker_key]
-        tracker.update(value, message)
-
-def _disable_buttons(ui_components: Dict[str, Any], disabled: bool) -> None:
-    """
-    Nonaktifkan/aktifkan tombol-tombol UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        disabled: True untuk nonaktifkan, False untuk aktifkan
-    """
-    # Daftar tombol yang perlu dinonaktifkan
-    button_keys = ['download_button', 'check_button']
-    
-    # Set status disabled untuk semua tombol
-    for key in button_keys:
-        if key in ui_components:
-            ui_components[key].disabled = disabled
-            
-    # Log status tombol jika diaktifkan
-    if not disabled:
-        log_message(ui_components, "Tombol UI diaktifkan kembali", "debug", "🔄")
-    else:
-        log_message(ui_components, "Tombol UI dinonaktifkan selama proses", "debug", "🔄")
+            display(HTML("<p>Matplotlib tidak tersedia, visualisasi bar chart tidak dapat ditampilkan</p>"))

@@ -9,7 +9,8 @@ from pathlib import Path
 from smartcash.common.config import get_config_manager
 from smartcash.dataset.manager import DatasetManager
 from smartcash.dataset.services.downloader.download_service import DownloadService
-from smartcash.ui.utils.ui_logger import log_to_ui
+from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
+from smartcash.ui.dataset.download.utils.ui_state_manager import update_status_panel
 
 def map_config_to_form(config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -24,7 +25,7 @@ def map_config_to_form(config: Dict[str, Any]) -> Dict[str, Any]:
     form_config = {
         'download': {
             'source': config.get('data', {}).get('source', 'roboflow'),
-            'output_dir': 'data/downloads',  # Default value
+            'output_dir': config.get('data', {}).get('dir', 'data/downloads'),
             'backup_before_download': config.get('dataset', {}).get('backup', {}).get('enabled', True),
             'backup_dir': config.get('dataset', {}).get('backup', {}).get('dir', 'data/backup/dataset'),
             'roboflow': {
@@ -53,6 +54,7 @@ def map_form_to_config(form_config: Dict[str, Any]) -> Dict[str, Any]:
     config = {
         'data': {
             'source': download_config.get('source', 'roboflow'),
+            'dir': download_config.get('output_dir', 'data/downloads'),
             'roboflow': {
                 'workspace': roboflow_config.get('workspace', ''),
                 'project': roboflow_config.get('project', ''),
@@ -79,6 +81,9 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi download
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     try:
         # Get config manager (dengan fallback otomatis)
         config_manager = get_config_manager()
@@ -113,12 +118,12 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         if 'backup_dir' in ui_components:
             config['download']['backup_dir'] = ui_components['backup_dir'].value
             
-        log_to_ui(ui_components, "✅ Konfigurasi download berhasil diupdate dari UI", "success")
+        log_message(ui_components, "Konfigurasi download berhasil diupdate dari UI", "success", "✅")
         
         return config
         
     except Exception as e:
-        log_to_ui(ui_components, f"❌ Error saat mengambil konfigurasi dari UI: {str(e)}", "error")
+        log_message(ui_components, f"Error saat mengambil konfigurasi dari UI: {str(e)}", "error", "❌")
         raise
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,6 +136,9 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi yang telah diupdate
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     try:
         # Get config from UI
         form_config = get_config_from_ui(ui_components)
@@ -144,12 +152,14 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Update config in manager
         config_manager.update_config(config)
         
-        log_to_ui(ui_components, "✅ Konfigurasi download berhasil diupdate", "success")
+        log_message(ui_components, "Konfigurasi download berhasil diupdate", "success", "✅")
+        update_status_panel(ui_components, "Konfigurasi download berhasil diupdate", "success")
         
         return config
         
     except Exception as e:
-        log_to_ui(ui_components, f"❌ Error saat update konfigurasi: {str(e)}", "error")
+        log_message(ui_components, f"Error saat update konfigurasi: {str(e)}", "error", "❌")
+        update_status_panel(ui_components, f"Error saat update konfigurasi: {str(e)}", "error")
         raise
 
 def get_download_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
@@ -162,6 +172,9 @@ def get_download_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi download
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     try:
         # Get config manager (dengan fallback otomatis)
         config_manager = get_config_manager()
@@ -175,13 +188,13 @@ def get_download_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Get download config
         download_config = form_config.get('download', {})
         if not download_config:
-            log_to_ui(ui_components, "⚠️ Konfigurasi download tidak ditemukan", "warning")
+            log_message(ui_components, "Konfigurasi download tidak ditemukan", "warning", "⚠️")
             raise ValueError("Konfigurasi download tidak ditemukan")
             
         return download_config
         
     except Exception as e:
-        log_to_ui(ui_components, f"❌ Error saat mengambil konfigurasi download: {str(e)}", "error")
+        log_message(ui_components, f"Error saat mengambil konfigurasi download: {str(e)}", "error", "❌")
         raise
 
 def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str, Any] = None) -> None:
@@ -192,6 +205,9 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
         ui_components: Dictionary komponen UI
         config_to_use: Konfigurasi yang akan digunakan
     """
+    # Setup logger jika belum
+    ui_components = setup_ui_logger(ui_components)
+    
     try:
         # Get config
         if config_to_use:
@@ -224,10 +240,10 @@ def update_ui_from_config(ui_components: Dict[str, Any], config_to_use: Dict[str
         if 'backup_dir' in ui_components and 'backup_dir' in config:
             ui_components['backup_dir'].value = config['backup_dir']
             
-        log_to_ui(ui_components, "✅ UI berhasil diupdate dari konfigurasi", "success")
+        log_message(ui_components, "UI berhasil diupdate dari konfigurasi", "success", "✅")
         
     except Exception as e:
-        log_to_ui(ui_components, f"❌ Error saat update UI dari konfigurasi: {str(e)}", "error")
+        log_message(ui_components, f"Error saat update UI dari konfigurasi: {str(e)}", "error", "❌")
         raise
 
 def get_dataset_manager() -> DatasetManager:

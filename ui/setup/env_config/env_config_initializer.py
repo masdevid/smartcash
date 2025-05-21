@@ -13,8 +13,8 @@ from smartcash.common.config import get_config_manager
 from smartcash.common.utils import is_colab
 from smartcash.ui.setup.env_config.components.manager_setup import setup_managers
 from smartcash.ui.utils.ui_logger import create_ui_logger
-from smartcash.ui.utils.widget_utils import create_output_area
 from smartcash.ui.utils.header_utils import create_header
+from smartcash.ui.components.log_accordion import create_log_accordion
 
 def initialize_env_config_ui() -> Dict[str, Any]:
     """
@@ -28,8 +28,12 @@ def initialize_env_config_ui() -> Dict[str, Any]:
         ui_components = {}
         ui_components['header'] = create_header("SmartCash Environment Configuration", 
                                               "Konfigurasi lingkungan untuk SmartCash")
-        ui_components['log_output'] = create_output_area()
-        ui_components['ui'] = ui_components['log_output']
+        
+        # Gunakan komponen log_accordion standar yang sudah ada
+        log_panel = create_log_accordion("Log Konfigurasi Environment")
+        ui_components['log_accordion'] = log_panel['log_accordion']
+        ui_components['log_output'] = log_panel['log_output']
+        ui_components['ui'] = ui_components['log_accordion']
         
         # Setup logger
         logger = create_ui_logger(ui_components, "env_config")
@@ -37,7 +41,7 @@ def initialize_env_config_ui() -> Dict[str, Any]:
         
         # Tampilkan UI
         display(ui_components['header'])
-        display(ui_components['log_output'])
+        display(ui_components['log_accordion'])
         
         # Setup config managers dan direktori
         config_manager, base_dir, config_dir = setup_managers(ui_components)
@@ -132,9 +136,14 @@ def initialize_env_config_ui() -> Dict[str, Any]:
             ui_components['header'] = create_header("SmartCash Environment Configuration", 
                                                   "Error saat inisialisasi environment", 
                                                   is_error=True)
-            ui_components['log_output'] = create_output_area()
+            
+            # Gunakan komponen log_accordion standar yang sudah ada
+            log_panel = create_log_accordion("Log Error")
+            ui_components['log_accordion'] = log_panel['log_accordion']
+            ui_components['log_output'] = log_panel['log_output']
+            
             display(ui_components['header'])
-            display(ui_components['log_output'])
+            display(ui_components['log_accordion'])
             
             # Setup logger jika belum ada
             logger = create_ui_logger(ui_components, "env_config")

@@ -8,7 +8,7 @@ import ipywidgets as widgets
 from IPython.display import display, clear_output
 
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.constants import ICONS, COLORS
 
 logger = get_logger(__name__)
 
@@ -23,18 +23,37 @@ def add_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary komponen UI yang telah diupdate
     """
     if 'status_panel' not in ui_components:
+        logger.info(f"{ICONS.get('info', 'ℹ️')} Menambahkan status panel")
+        
         ui_components['status_panel'] = widgets.Output(
-            layout=widgets.Layout(width='100%', min_height='50px')
+            layout=widgets.Layout(
+                width='100%',
+                min_height='50px',
+                margin='10px 0'
+            )
         )
         
         # Tambahkan status panel ke main_container jika ada
         if 'main_container' in ui_components:
             if isinstance(ui_components['main_container'], widgets.VBox):
-                # Tambahkan status panel ke main_container
-                ui_components['main_container'].children = (*ui_components['main_container'].children, ui_components['status_panel'])
+                # Tambahkan status panel ke posisi sebelum footer (jika ada)
+                children = list(ui_components['main_container'].children)
+                if len(children) > 2:  # Hanya jika ada lebih dari 2 children (header, tabs, dan mungkin footer)
+                    # Tambahkan status panel sebelum elemen terakhir (footer)
+                    children.insert(len(children) - 1, ui_components['status_panel'])
+                    ui_components['main_container'].children = tuple(children)
+                else:
+                    # Tambahkan status panel ke akhir
+                    ui_components['main_container'].children = (*ui_components['main_container'].children, ui_components['status_panel'])
             elif isinstance(ui_components['main_container'], widgets.Box):
                 # Tambahkan status panel ke main_container
                 ui_components['main_container'].children = (*ui_components['main_container'].children, ui_components['status_panel'])
+                
+        logger.info(f"{ICONS.get('success', '✅')} Status panel berhasil ditambahkan")
+    
+    # Untuk kompatibilitas dengan kode lama
+    if 'status' not in ui_components:
+        ui_components['status'] = ui_components['status_panel']
     
     return ui_components
 
@@ -101,4 +120,26 @@ def update_status_panel(ui_components: Dict[str, Any], message: str, status_type
         log_method(f"{icon} {message}")
         
     except Exception as e:
-        logger.error(f"{ICONS.get('error', '❌')} Error saat update status panel: {str(e)}") 
+        logger.error(f"{ICONS.get('error', '❌')} Error saat update status panel: {str(e)}")
+        
+def clear_status_panel(ui_components: Dict[str, Any]) -> None:
+    """
+    Bersihkan status panel.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+    """
+    try:
+        status_panel = ui_components.get('status_panel')
+        if not status_panel:
+            logger.warning(f"{ICONS.get('warning', '⚠️')} Status panel tidak ditemukan")
+            return
+            
+        # Bersihkan status panel
+        with status_panel:
+            clear_output()
+            
+        logger.info(f"{ICONS.get('success', '✅')} Status panel berhasil dibersihkan")
+        
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat membersihkan status panel: {str(e)}")

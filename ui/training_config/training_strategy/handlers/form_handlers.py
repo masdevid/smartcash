@@ -13,6 +13,7 @@ from smartcash.ui.training_config.training_strategy.handlers.config_handlers imp
     update_config_from_ui,
     update_training_strategy_info
 )
+from smartcash.ui.training_config.training_strategy.handlers.status_handlers import update_status_panel
 
 logger = get_logger(__name__)
 
@@ -29,66 +30,91 @@ def setup_training_strategy_form_handlers(ui_components: Dict[str, Any], env=Non
         Dict berisi komponen UI dengan handler terpasang
     """
     try:
+        logger.info(f"{ICONS.get('info', 'ℹ️')} Setting up form handlers untuk strategi pelatihan")
+        
+        # List semua komponen yang perlu diobservasi
+        components_to_observe = [
+            # Parameter Utilitas Training
+            'experiment_name', 'checkpoint_dir', 'tensorboard', 
+            'log_metrics_every', 'visualize_batch_every', 'gradient_clipping', 
+            'mixed_precision', 'layer_mode',
+            
+            # Parameter utama
+            'enabled_checkbox', 'batch_size_slider', 'epochs_slider', 'learning_rate_slider',
+            
+            # Optimizer
+            'optimizer_dropdown', 'weight_decay_slider', 'momentum_slider',
+            
+            # Scheduler
+            'scheduler_checkbox', 'scheduler_dropdown', 'warmup_epochs_slider', 'min_lr_slider',
+            
+            # Early stopping
+            'early_stopping_checkbox', 'patience_slider', 'min_delta_slider',
+            
+            # Checkpoint
+            'checkpoint_checkbox', 'save_best_only_checkbox', 'save_freq_slider',
+            
+            # Validasi dan Evaluasi
+            'validation_frequency', 'iou_threshold', 'conf_threshold',
+            
+            # Multi-scale Training
+            'multi_scale'
+        ]
+        
+        # Daftar komponen yang berhasil diobservasi
+        observed_components = []
+        
         # Handler untuk perubahan komponen
         def on_component_change(change):
             if change['name'] == 'value':
-                # Update config dari UI
-                if 'update_config_from_ui' in ui_components and callable(ui_components['update_config_from_ui']):
-                    ui_components['update_config_from_ui'](ui_components)
-                
-                # Update info strategi pelatihan
-                update_training_strategy_info(ui_components)
+                try:
+                    # Update info strategi pelatihan
+                    update_training_strategy_info(ui_components)
+                    
+                    # Jika perubahan pada komponen utama, tampilkan pesan di status panel
+                    widget_name = None
+                    for name, widget in ui_components.items():
+                        if widget is change['owner']:
+                            widget_name = name
+                            break
+                    
+                    if widget_name:
+                        update_status_panel(
+                            ui_components, 
+                            f"Parameter '{widget_name}' diubah. Klik 'Simpan' untuk menyimpan perubahan.", 
+                            "info"
+                        )
+                except Exception as e:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Error saat memproses perubahan: {str(e)}")
         
-        # Register observers untuk semua komponen
-        # Tab 1: Parameter Utilitas Training
-        ui_components['experiment_name'].observe(on_component_change)
-        ui_components['checkpoint_dir'].observe(on_component_change)
-        ui_components['tensorboard'].observe(on_component_change)
-        ui_components['log_metrics_every'].observe(on_component_change)
-        ui_components['visualize_batch_every'].observe(on_component_change)
-        ui_components['gradient_clipping'].observe(on_component_change)
-        ui_components['mixed_precision'].observe(on_component_change)
-        ui_components['layer_mode'].observe(on_component_change)
+        # Register observers untuk semua komponen yang ada
+        for component_name in components_to_observe:
+            if component_name in ui_components and hasattr(ui_components[component_name], 'observe'):
+                try:
+                    ui_components[component_name].observe(on_component_change, names='value')
+                    observed_components.append(component_name)
+                except Exception as e:
+                    logger.warning(f"{ICONS.get('warning', '⚠️')} Tidak dapat register observer untuk '{component_name}': {str(e)}")
         
-        # Tab 2: Validasi dan Evaluasi
-        ui_components['validation_frequency'].observe(on_component_change)
-        ui_components['iou_threshold'].observe(on_component_change)
-        ui_components['conf_threshold'].observe(on_component_change)
+        logger.info(f"{ICONS.get('success', '✅')} Berhasil register observer untuk {len(observed_components)} komponen")
         
-        # Tab 3: Multi-scale Training
-        ui_components['multi_scale'].observe(on_component_change)
-        
-        # Cleanup function
+        # Cleanup function untuk unregister semua observer
         def cleanup():
             try:
-                # Hapus semua observer
-                # Tab 1: Parameter Utilitas Training
-                ui_components['experiment_name'].unobserve(on_component_change)
-                ui_components['checkpoint_dir'].unobserve(on_component_change)
-                ui_components['tensorboard'].unobserve(on_component_change)
-                ui_components['log_metrics_every'].unobserve(on_component_change)
-                ui_components['visualize_batch_every'].unobserve(on_component_change)
-                ui_components['gradient_clipping'].unobserve(on_component_change)
-                ui_components['mixed_precision'].unobserve(on_component_change)
-                ui_components['layer_mode'].unobserve(on_component_change)
-                
-                # Tab 2: Validasi dan Evaluasi
-                ui_components['validation_frequency'].unobserve(on_component_change)
-                ui_components['iou_threshold'].unobserve(on_component_change)
-                ui_components['conf_threshold'].unobserve(on_component_change)
-                
-                # Tab 3: Multi-scale Training
-                ui_components['multi_scale'].unobserve(on_component_change)
+                for component_name in observed_components:
+                    if component_name in ui_components and hasattr(ui_components[component_name], 'unobserve'):
+                        ui_components[component_name].unobserve(on_component_change, names='value')
                 
                 logger.info(f"{ICONS.get('success', '✅')} Training strategy form handlers cleaned up")
             except Exception as e:
                 logger.warning(f"{ICONS.get('warning', '⚠️')} Error cleanup: {e}")
         
         # Tambahkan cleanup function
-        ui_components['cleanup'] = cleanup
+        ui_components['cleanup_form_handlers'] = cleanup
         
-        # Tambahkan update_training_strategy_info ke ui_components
-        ui_components['update_training_strategy_info'] = lambda: update_training_strategy_info(ui_components)
+        # Tambahkan update_training_strategy_info ke ui_components jika belum ada
+        if 'update_training_strategy_info' not in ui_components:
+            ui_components['update_training_strategy_info'] = lambda: update_training_strategy_info(ui_components)
         
         return ui_components
     except Exception as e:

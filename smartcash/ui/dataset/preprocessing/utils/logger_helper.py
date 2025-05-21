@@ -8,24 +8,29 @@ from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger import create_ui_logger
 from smartcash.ui.dataset.preprocessing.utils.notification_manager import PREPROCESSING_LOGGER_NAMESPACE
 
-def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def setup_ui_logger(ui_components: Dict[str, Any], namespace: Optional[str] = None) -> Dict[str, Any]:
     """
     Setup logger untuk UI components.
     
     Args:
         ui_components: Dictionary komponen UI
+        namespace: Namespace logger (opsional, default: PREPROCESSING_LOGGER_NAMESPACE)
         
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Cek apakah logger sudah disetup
-    if 'logger' in ui_components and 'log_message' in ui_components:
+    # Gunakan namespace default jika tidak diberikan
+    if namespace is None:
+        namespace = PREPROCESSING_LOGGER_NAMESPACE
+    
+    # Cek apakah logger dengan namespace yang sama sudah disetup
+    if 'logger' in ui_components and 'logger_namespace' in ui_components and ui_components['logger_namespace'] == namespace:
         return ui_components
     
     # Setup logger dengan namespace spesifik
-    logger = create_ui_logger(ui_components, PREPROCESSING_LOGGER_NAMESPACE)
+    logger = create_ui_logger(ui_components, namespace)
     ui_components['logger'] = logger
-    ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
+    ui_components['logger_namespace'] = namespace
     
     # Tambahkan helper function untuk log message
     ui_components['log_message'] = lambda message, level="info", icon="ℹ️": log_message(ui_components, message, level, icon)

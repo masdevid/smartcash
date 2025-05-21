@@ -32,6 +32,28 @@ def create_status_indicator(status: str, message: str, icon: Optional[str] = Non
     )
     return HTML(html_content)
 
+def create_error_alert(message: str, title: str = "Error") -> widgets.HTML:
+    """Create a styled error alert.
+
+    Args:
+        message: Error message
+        title: Alert title
+
+    Returns:
+        HTML widget with styled error alert
+    """
+    style = ALERT_STYLES['error']
+    
+    html_content = (
+        f'<div style="padding: 10px; background-color: {style["bg_color"]}; '
+        f'color: {style["text_color"]}; border-left: 4px solid {style["border_color"]}; '
+        f'border-radius: 5px; margin: 10px 0;">'
+        f'<h4 style="margin-top: 0; color: inherit;">{style["icon"]} {title}</h4>'
+        f'<p>{message}</p>'
+        f'</div>'
+    )
+    return widgets.HTML(value=html_content)
+
 def create_info_alert(message: str, alert_type: str = 'info', icon: Optional[str] = None) -> widgets.HTML:
     """Create a styled alert box.
 

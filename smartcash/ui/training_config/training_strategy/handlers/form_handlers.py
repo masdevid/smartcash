@@ -9,10 +9,10 @@ from IPython.display import display
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.ui.training_config.training_strategy.handlers.config_handlers import (
-    update_config_from_ui,
-    update_training_strategy_info
-)
+
+# Import langsung dari modul terpisah
+from smartcash.ui.training_config.training_strategy.handlers.config_extractor import update_config_from_ui
+from smartcash.ui.training_config.training_strategy.handlers.info_updater import update_training_strategy_info
 from smartcash.ui.training_config.training_strategy.handlers.status_handlers import update_status_panel
 
 logger = get_logger(__name__)

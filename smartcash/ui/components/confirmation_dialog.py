@@ -65,11 +65,11 @@ def create_confirmation_dialog(
     
     def handle_cancel(b):
         if on_cancel:
-            on_cancel()
+            on_cancel(b)
         content.layout.display = 'none'
     
     def handle_confirm(b):
-        on_confirm()
+        on_confirm(b)
         content.layout.display = 'none'
     
     cancel_button.on_click(handle_cancel)

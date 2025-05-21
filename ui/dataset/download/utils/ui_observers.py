@@ -6,6 +6,7 @@ Deskripsi: Utilitas untuk mengelola observer UI pada proses download dataset
 from typing import Dict, Any, Optional
 from smartcash.components.observer import ObserverManager, EventTopics
 from smartcash.ui.dataset.download.utils.notification_manager import DownloadUIEvents
+from smartcash.ui.dataset.download.utils.logger_helper import MODULE_LOGGER_NAME
 
 def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     """
@@ -21,6 +22,11 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     
     # Observer untuk log output
     def log_observer(event_type: str, sender: Any, **kwargs) -> None:
+        # Periksa namespace untuk memastikan log hanya dari modul yang relevan
+        namespace = kwargs.get('namespace', '')
+        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+            return  # Skip log dari namespace lain
+            
         if event_type in [DownloadUIEvents.LOG_INFO, DownloadUIEvents.LOG_WARNING, 
                          DownloadUIEvents.LOG_ERROR, DownloadUIEvents.LOG_SUCCESS]:
             if isinstance(ui_components, dict) and 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_stdout'):
@@ -49,6 +55,11 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     
     # Observer untuk progress bar
     def progress_observer(event_type: str, sender: Any, **kwargs) -> None:
+        # Periksa namespace untuk memastikan progress hanya dari modul yang relevan
+        namespace = kwargs.get('namespace', '')
+        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+            return  # Skip progress dari namespace lain
+            
         if not isinstance(ui_components, dict):
             return
             
@@ -94,6 +105,11 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     
     # Observer untuk step progress
     def step_progress_observer(event_type: str, sender: Any, **kwargs) -> None:
+        # Periksa namespace untuk memastikan step progress hanya dari modul yang relevan
+        namespace = kwargs.get('namespace', '')
+        if namespace and namespace != MODULE_LOGGER_NAME and not namespace.startswith('smartcash.dataset.download'):
+            return  # Skip step progress dari namespace lain
+            
         if not isinstance(ui_components, dict):
             return
             
@@ -154,5 +170,8 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> ObserverManager:
     observer_manager.create_simple_observer(log_events, log_observer, name="log_observer")
     observer_manager.create_simple_observer(progress_events, progress_observer, name="progress_observer")
     observer_manager.create_simple_observer(step_progress_events, step_progress_observer, name="step_progress_observer")
+    
+    # Simpan observer_manager ke ui_components
+    ui_components['observer_manager'] = observer_manager
     
     return observer_manager

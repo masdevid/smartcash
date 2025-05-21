@@ -50,6 +50,7 @@ def notify_log(
     message: str,
     level: str = "info",
     observer_manager=None,
+    namespace: str = "dataset.download",
     **kwargs
 ) -> None:
     """
@@ -60,9 +61,10 @@ def notify_log(
         message: Pesan yang akan ditampilkan
         level: Level log (info, warning, error, success)
         observer_manager: Observer manager opsional
+        namespace: Namespace logger untuk memisahkan log dari modul lain
         **kwargs: Parameter tambahan
     """
-    logger = get_logger()
+    logger = get_logger(namespace)
     
     # Map level ke event dan fungsi logger
     level_mapping = {
@@ -86,7 +88,7 @@ def notify_log(
     
     # Kirim notifikasi ke UI
     try:
-        params = {"message": message, "level": level}
+        params = {"message": message, "level": level, "namespace": namespace}
         params.update(kwargs)
         
         if observer_manager is not None:
@@ -103,6 +105,7 @@ def notify_progress(
     total: Optional[float] = None,
     message: Optional[str] = None,
     observer_manager=None,
+    namespace: str = "dataset.download",
     **kwargs
 ) -> None:
     """
@@ -115,9 +118,10 @@ def notify_progress(
         total: Nilai total progress
         message: Pesan yang akan ditampilkan
         observer_manager: Observer manager opsional
+        namespace: Namespace logger untuk memisahkan log dari modul lain
         **kwargs: Parameter tambahan
     """
-    logger = get_logger()
+    logger = get_logger(namespace)
     
     # Map event_type ke event
     event_mapping = {
@@ -139,7 +143,7 @@ def notify_progress(
     
     # Kirim notifikasi ke UI
     try:
-        params = {}
+        params = {"namespace": namespace}
         if progress is not None:
             try:
                 params["progress"] = int(float(progress))
@@ -172,7 +176,8 @@ def notify_progress(
                 "step_progress": params.get("progress", 0),
                 "step_total": params.get("total", 100),
                 "total_steps": kwargs.get("total_steps", 5),
-                "current_step": kwargs.get("current_step", 1)
+                "current_step": kwargs.get("current_step", 1),
+                "namespace": namespace
             }
             
             if observer_manager is not None:

@@ -77,17 +77,32 @@ def _setup_observers(ui_components: Dict[str, Any]) -> None:
     try:
         # Import sistem notifikasi baru
         from smartcash.ui.dataset.download.utils.ui_observers import register_ui_observers
-        from smartcash.ui.dataset.download.utils.notification_manager import get_observer_manager
         
-        # Setup observer manager dan register UI observers
-        observer_manager = get_observer_manager()
-        ui_components['observer_manager'] = observer_manager
-        
-        # Register UI observers untuk log dan progress
-        register_ui_observers(ui_components)
-        
-        # Log setup berhasil dengan logger helper
-        log_message(ui_components, "Observer untuk sistem notifikasi berhasil disetup", "debug", "✅")
+        try:
+            # Coba import dan setup observer manager
+            from smartcash.ui.dataset.download.utils.notification_manager import get_observer_manager
+            
+            # Setup observer manager dan register UI observers
+            observer_manager = get_observer_manager()
+            ui_components['observer_manager'] = observer_manager
+            
+            # Register UI observers untuk log dan progress
+            register_ui_observers(ui_components)
+            
+            # Log setup berhasil dengan logger helper
+            log_message(ui_components, "Observer untuk sistem notifikasi berhasil disetup", "debug", "✅")
+        except (ImportError, AttributeError) as e:
+            # Log error jika get_observer_manager tidak tersedia
+            log_message(ui_components, f"Observer manager tidak tersedia: {str(e)}", "warning", "⚠️")
+            
+            # Gunakan observer lama jika ada
+            from smartcash.components.observer import ObserverManager
+            ui_components['observer_manager'] = ObserverManager()
+            
+            # Register UI observers
+            register_ui_observers(ui_components)
+            
+            log_message(ui_components, "Menggunakan observer manager fallback", "info", "ℹ️")
     except ImportError as e:
         # Log gagal import dengan logger helper
         log_message(ui_components, f"Observer handler tidak tersedia: {str(e)}", "debug", "ℹ️")

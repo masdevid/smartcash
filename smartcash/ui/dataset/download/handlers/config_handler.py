@@ -85,6 +85,13 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     ui_components = setup_ui_logger(ui_components)
     
     try:
+        # Update status panel saat memulai pengambilan konfigurasi
+        update_status_panel(
+            ui_components,
+            "Mempersiapkan konfigurasi download...",
+            "info"
+        )
+        
         # Get config manager (dengan fallback otomatis)
         config_manager = get_config_manager()
         
@@ -119,11 +126,21 @@ def get_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             config['download']['backup_dir'] = ui_components['backup_dir'].value
             
         log_message(ui_components, "Konfigurasi download berhasil diupdate dari UI", "success", "✅")
+        update_status_panel(
+            ui_components,
+            "Konfigurasi download berhasil dipersiapkan",
+            "success"
+        )
         
         return config
         
     except Exception as e:
         log_message(ui_components, f"Error saat mengambil konfigurasi dari UI: {str(e)}", "error", "❌")
+        update_status_panel(
+            ui_components,
+            f"Error saat mempersiapkan konfigurasi: {str(e)}",
+            "error"
+        )
         raise
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:

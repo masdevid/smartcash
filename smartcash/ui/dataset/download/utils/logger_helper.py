@@ -27,28 +27,33 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di dependency installer
         return
     
-    logger = ui_components.get('logger')
+    # Pastikan menggunakan logger dengan namespace yang tepat
+    # untuk memisahkan log download dari modul lain
+    logger = ui_components.get('logger') or get_logger(MODULE_LOGGER_NAME)
     
     # Log ke UI hanya jika log_output atau output tersedia
     if 'log_output' in ui_components or 'output' in ui_components:
         # Log ke UI dengan konsisten menggunakan UI logger
         ui_log(ui_components, message, level, icon)
     
+    # Tambahkan prefix untuk memudahkan filtering
+    prefixed_message = f"[DATASET-DOWNLOAD] {message}"
+    
     # Log ke Python logger jika tersedia
     if logger:
         if level == "info":
-            logger.info(message)
+            logger.info(prefixed_message)
         elif level == "warning" or level == "warn":
-            logger.warning(message)
+            logger.warning(prefixed_message)
         elif level == "error":
-            logger.error(message)
+            logger.error(prefixed_message)
         elif level == "debug":
-            logger.debug(message)
+            logger.debug(prefixed_message)
         elif level == "success":
             # Success level tidak ada di Python logger standard, gunakan info
-            logger.info(f"✅ {message}")
+            logger.info(f"✅ {prefixed_message}")
         elif level == "critical":
-            logger.critical(message)
+            logger.critical(prefixed_message)
 
 def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -71,6 +76,9 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     # Tambahkan flag download_initialized untuk menunjukkan modul telah di-initialize
     # Flag ini digunakan untuk mencegah log ke installer dependency
     ui_components['download_initialized'] = True
+    
+    # Tambahkan namespace ke ui_components untuk memudahkan tracing
+    ui_components['logger_namespace'] = MODULE_LOGGER_NAME
     
     return ui_components 
 

@@ -20,6 +20,13 @@ def handle_reset_button_click(ui_components: Dict[str, Any], button: Any = None)
         # Setup logger jika belum
         ui_components = setup_ui_logger(ui_components)
         
+        # Update status panel sebelum memulai reset
+        update_status_panel(
+            ui_components,
+            "Sedang mereset form...",
+            "warning"
+        )
+        
         # Log pesan reset
         log_message(ui_components, "Mereset form download dataset...", "info", "🔄")
         
@@ -38,15 +45,15 @@ def handle_reset_button_click(ui_components: Dict[str, Any], button: Any = None)
         if 'download_running' in ui_components:
             ui_components['download_running'] = False
         
-        # Update status panel
+        # Update status panel dengan notifikasi yang jelas
         update_status_panel(
             ui_components,
-            "Form telah direset",
+            "Konfigurasi telah direset ke nilai default",
             "success"
         )
         
         # Log pesan sukses
-        log_message(ui_components, "Form berhasil direset", "success", "✅")
+        log_message(ui_components, "Form berhasil direset ke nilai default", "success", "✅")
         
     except Exception as e:
         # Log error
@@ -55,7 +62,7 @@ def handle_reset_button_click(ui_components: Dict[str, Any], button: Any = None)
         # Update status panel dengan error
         update_status_panel(
             ui_components,
-            "Gagal mereset form",
+            f"Gagal mereset form: {str(e)}",
             "error"
         )
 

@@ -7,7 +7,7 @@ import os
 from typing import Dict, Any, Optional, Tuple
 from IPython.display import display, clear_output
 from smartcash.ui.dataset.download.utils.logger_helper import log_message, setup_ui_logger
-from smartcash.ui.dataset.download.utils.ui_state_manager import highlight_required_fields
+from smartcash.ui.dataset.download.utils.ui_state_manager import highlight_required_fields, update_status_panel
 
 def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
     """
@@ -40,6 +40,7 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
             ui_components['api_key'].value = api_key
         
         log_message(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "info", "🔑")
+        update_status_panel(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "success")
         return True, api_key
     
     # Check environment variable
@@ -50,10 +51,12 @@ def check_api_key(ui_components: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
             ui_components['api_key'].value = api_key
             
         log_message(ui_components, "API key Roboflow berhasil diambil dari environment variable", "info", "🔑")
+        update_status_panel(ui_components, "API key Roboflow berhasil diambil dari environment variable", "success")
         return True, api_key
     
     # No API key found
     log_message(ui_components, "API key Roboflow tidak ditemukan", "warning", "⚠️")
+    update_status_panel(ui_components, "API key Roboflow tidak ditemukan, silakan masukkan secara manual", "warning")
     return False, None
 
 def get_api_key_from_secrets(secret_name: str) -> Optional[str]:
@@ -91,6 +94,13 @@ def request_api_key_input(ui_components: Dict[str, Any]) -> None:
     api_key_msg = (
         "API key Roboflow tidak ditemukan. Silakan masukkan API key pada "
         "field 'API Key' di bagian konfigurasi Roboflow."
+    )
+    
+    # Update status panel
+    update_status_panel(
+        ui_components,
+        api_key_msg,
+        "warning"
     )
     
     # Jika RF accordion tertutup, buka
@@ -134,6 +144,13 @@ def setup_api_key_input(ui_components: Dict[str, Any]) -> None:
                     
                     # Log sukses
                     log_message(ui_components, "API key berhasil dimasukkan", "success", "✅")
+                    
+                    # Update status panel
+                    update_status_panel(
+                        ui_components,
+                        "API key berhasil dimasukkan",
+                        "success"
+                    )
         
         # Register callback
         ui_components['api_key'].observe(on_api_key_change, names='value')
@@ -161,6 +178,13 @@ def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
         # Log ke UI
         log_message(ui_components, "API key Roboflow berhasil diambil dari Google Colab secrets", "success", "🔑")
         
+        # Update status panel
+        update_status_panel(
+            ui_components,
+            "API key Roboflow berhasil diambil dari Google Colab secrets",
+            "success"
+        )
+        
         # Reset style jika sebelumnya di-highlight
         ui_components['api_key'].layout.border = ""
     else:
@@ -172,6 +196,13 @@ def check_colab_secrets(ui_components: Dict[str, Any]) -> None:
             
             # Log ke UI
             log_message(ui_components, "API key Roboflow berhasil diambil dari environment variable", "success", "🔑")
+            
+            # Update status panel
+            update_status_panel(
+                ui_components,
+                "API key Roboflow berhasil diambil dari environment variable",
+                "success"
+            )
             
             # Reset style
             ui_components['api_key'].layout.border = ""

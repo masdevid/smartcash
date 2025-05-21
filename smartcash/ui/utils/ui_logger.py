@@ -90,6 +90,10 @@ class UILogger:
             message: Pesan yang akan di-log
             level: Level log (info, warning, error, success)
         """
+        # Skip pesan kosong
+        if not message or not message.strip():
+            return
+            
         # Tambahkan timestamp
         timestamp = datetime.now().strftime('%H:%M:%S')
         
@@ -137,6 +141,8 @@ class UILogger:
     
     def debug(self, message: str) -> None:
         """Log debug message."""
+        if not message or not message.strip():
+            return
         self.logger.debug(message)
         # Debug messages hanya ditampilkan di UI jika level log DEBUG
         if self.log_level <= logging.DEBUG:
@@ -144,28 +150,38 @@ class UILogger:
     
     def info(self, message: str) -> None:
         """Log info message."""
+        if not message or not message.strip():
+            return
         self.logger.info(message)
         self._log_to_ui(message, "info")
     
     def success(self, message: str) -> None:
         """Log success message."""
+        if not message or not message.strip():
+            return
         self.logger.info(f"SUCCESS: {message}")
         self._log_to_ui(message, "success")
     
     def warning(self, message: str) -> None:
         """Log warning message."""
+        if not message or not message.strip():
+            return
         self.logger.warning(message)
         self._log_to_ui(message, "warning")
     
     def error(self, message: str) -> None:
         """Log error message."""
+        if not message or not message.strip():
+            return
         self.logger.error(message)
         self._log_to_ui(message, "error")
     
     def critical(self, message: str) -> None:
         """Log critical message."""
+        if not message or not message.strip():
+            return
         self.logger.critical(message)
-        self._log_to_ui(message, "error")
+        self._log_to_ui(message, "critical")
     
     def progress(self, iterable=None, desc="Processing", **kwargs):
         """
@@ -260,6 +276,8 @@ def create_ui_logger(ui_components: Dict[str, Any],
         
         # Callback untuk meneruskan log dari SmartCashLogger ke UI
         def ui_log_callback(level, message):
+            if not message or not message.strip():
+                return
             if level.name == 'DEBUG':
                 logger.debug(message)
             elif level.name == 'INFO':
@@ -505,6 +523,8 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
             logger.warning(formatted_message)
         elif level == "success":
             logger.success(formatted_message)
+        elif level == "critical":
+            logger.critical(formatted_message)
         else:  # info
             logger.info(formatted_message)
         return

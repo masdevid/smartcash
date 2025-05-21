@@ -10,6 +10,7 @@ from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message, 
 from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel, toggle_input_controls
 from smartcash.ui.dataset.preprocessing.utils.progress_manager import reset_progress_bar
 from smartcash.ui.dataset.preprocessing.utils.notification_manager import notify_status, PREPROCESSING_LOGGER_NAMESPACE
+from smartcash.ui.dataset.preprocessing.utils.ui_helpers import ensure_output_area
 
 def confirm_preprocessing(ui_components: Dict[str, Any], split: Optional[str] = None) -> None:
     """
@@ -50,12 +51,8 @@ def confirm_preprocessing(ui_components: Dict[str, Any], split: Optional[str] = 
             invalid_dir = config.get('validate', {}).get('invalid_dir', "invalid")
             message += f"File tidak valid akan dipindahkan ke direktori '{invalid_dir}'. "
     
-    # Pastikan confirmation_area ada dan valid
-    if 'confirmation_area' not in ui_components:
-        # Buat area konfirmasi jika belum ada
-        ui_components['confirmation_area'] = widgets.Output()
-        if 'main_output' in ui_components:
-            ui_components['main_output'].children = list(ui_components['main_output'].children) + [ui_components['confirmation_area']]
+    # Pastikan area konfirmasi tersedia
+    ui_components = ensure_output_area(ui_components, 'confirmation_area', 'main_output')
     
     # Reset status konfirmasi
     ui_components['confirmation_result'] = False
@@ -175,11 +172,7 @@ def setup_confirmation_handler(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         Dictionary UI components yang telah diupdate
     """
     # Pastikan area konfirmasi tersedia
-    if 'confirmation_area' not in ui_components:
-        ui_components['confirmation_area'] = widgets.Output()
-        if 'main_output' in ui_components:
-            if hasattr(ui_components['main_output'], 'children'):
-                ui_components['main_output'].children = list(ui_components['main_output'].children) + [ui_components['confirmation_area']]
+    ui_components = ensure_output_area(ui_components, 'confirmation_area', 'main_output')
     
     # Tambahkan fungsi ke ui_components
     ui_components['confirm_preprocessing'] = confirm_preprocessing

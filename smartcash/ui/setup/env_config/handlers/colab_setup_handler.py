@@ -9,10 +9,10 @@ from pathlib import Path
 from typing import Tuple, Any, Dict, Optional, Callable
 import yaml
 
-from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
+from smartcash.ui.setup.env_config.handlers.base_handler import BaseHandler
 
-class ColabSetupHandler:
+class ColabSetupHandler(BaseHandler):
     """
     Handler untuk operasi setup di lingkungan Google Colab
     """
@@ -24,29 +24,7 @@ class ColabSetupHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        self.ui_callback = ui_callback or {}
-        self.logger = get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
-        
-    def _log_message(self, message: str, level: str = "info", icon: str = None):
-        """Log message to UI if callback exists"""
-        # Log ke logger object
-        if level == "error":
-            self.logger.error(message)
-        elif level == "warning":
-            self.logger.warning(message)
-        elif level == "success":
-            self.logger.info(f"✅ {message}")
-        else:
-            self.logger.info(message)
-            
-        # Gunakan callback jika ada
-        if 'log_message' in self.ui_callback:
-            self.ui_callback['log_message'](message, level, icon)
-            
-    def _update_status(self, message: str, status_type: str = "info"):
-        """Update status in UI if callback exists"""
-        if 'update_status' in self.ui_callback:
-            self.ui_callback['update_status'](message, status_type)
+        super().__init__(ui_callback, ENV_CONFIG_LOGGER_NAMESPACE)
             
     def load_colab_config(self) -> Dict[str, Any]:
         """
@@ -198,38 +176,52 @@ class ColabSetupHandler:
         base_dir = Path("/content")
         config_dir = base_dir / "configs"
         
+        # Mount Google Drive jika belum dimount
         try:
-            # Coba mendapatkan konfigurasi dari colab_config.yaml
-            colab_config = self.load_colab_config()
-            
-            # Dapatkan informasi konfigurasi drive
-            drive_dir, configs_dir = self.get_drive_paths(colab_config)
-            drive_config_dir = Path(f"/content/drive/MyDrive/{drive_dir}/{configs_dir}")
-            drive_config_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Dapatkan strategi sinkronisasi
-            sync_strategy, use_symlinks = self.get_sync_strategy(colab_config)
-            
-            # Sinkronisasi dengan repo jika perlu
-            repo_configs = Path("/content/smartcash/configs")
-            if repo_configs.exists() and (not any(drive_config_dir.glob("*.yaml")) or sync_strategy == 'repo_priority'):
-                self.sync_configs(repo_configs, drive_config_dir)
-            
-            # Konfigurasi direktori berdasarkan strategi
-            if use_symlinks:
-                config_dir = self.setup_symlinks(config_dir, drive_config_dir)
-            else:
-                config_dir = self.setup_direct_copy(config_dir, drive_config_dir)
-                
-            self._log_message(f"Setup environment Colab selesai. Base: {base_dir}, Config: {config_dir}", "success", "✅")
-            
+            from google.colab import drive
+            drive.mount('/content/drive')
+            self._log_message("Google Drive berhasil dimount", "success", "✅")
         except Exception as e:
-            self._log_message(f"Error saat setup Colab environment: {str(e)}", "error", "❌")
-            self._update_status(f"Error saat setup environment: {str(e)}", "error")
-            
-            # Fallback - buat direktori config kosong jika terjadi error
-            if not config_dir.exists():
-                config_dir.mkdir(parents=True, exist_ok=True)
-                self._log_message(f"Direktori konfigurasi fallback dibuat: {config_dir}", "warning", "⚠️")
+            self._log_message(f"Error mounting Google Drive: {str(e)}", "warning", "⚠️")
+            # Jika tidak bisa mount, gunakan direktori lokal saja
+            config_dir.mkdir(parents=True, exist_ok=True)
+            self._log_message(f"Menggunakan direktori konfigurasi lokal: {config_dir}", "info", "ℹ️")
+            return base_dir, config_dir
+        
+        # Load konfigurasi Colab
+        colab_config = self.load_colab_config()
+        
+        # Dapatkan path Drive
+        drive_dir, configs_dir = self.get_drive_paths(colab_config)
+        
+        # Atur path direktori Drive
+        drive_path = Path("/content/drive/MyDrive") / drive_dir
+        drive_config_dir = drive_path / configs_dir
+        
+        # Pastikan direktori Drive ada
+        drive_path.mkdir(parents=True, exist_ok=True)
+        drive_config_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Dapatkan strategi sinkronisasi
+        sync_strategy, use_symlinks = self.get_sync_strategy(colab_config)
+        
+        # Sinkronisasi konfigurasi berdasarkan strategi
+        if sync_strategy == 'colab_priority':
+            # Copy dari Colab ke Drive
+            repo_config_dir = Path("/content/smartcash/configs")
+            if repo_config_dir.exists():
+                self.sync_configs(repo_config_dir, drive_config_dir)
+        elif sync_strategy == 'drive_priority':
+            # Copy dari Drive ke Colab
+            self.sync_configs(drive_config_dir, config_dir)
+        
+        # Setup symlinks atau direct copy
+        if use_symlinks:
+            config_dir = self.setup_symlinks(config_dir, drive_config_dir)
+        else:
+            config_dir = self.setup_direct_copy(config_dir, drive_config_dir)
+        
+        # Log success
+        self._log_message(f"Setup Colab environment berhasil: base_dir={base_dir}, config_dir={config_dir}", "success", "✅")
         
         return base_dir, config_dir 

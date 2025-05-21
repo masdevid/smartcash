@@ -6,10 +6,10 @@ Deskripsi: Handler untuk setup environment di lingkungan lokal (non-Colab)
 from pathlib import Path
 from typing import Tuple, Any, Optional, Dict, Callable
 
-from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
+from smartcash.ui.setup.env_config.handlers.base_handler import BaseHandler
 
-class LocalSetupHandler:
+class LocalSetupHandler(BaseHandler):
     """
     Handler untuk operasi setup di lingkungan lokal
     """
@@ -21,24 +21,7 @@ class LocalSetupHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        self.ui_callback = ui_callback or {}
-        self.logger = get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
-    
-    def _log_message(self, message: str, level: str = "info", icon: str = None):
-        """Log message to UI if callback exists"""
-        # Log ke logger object
-        if level == "error":
-            self.logger.error(message)
-        elif level == "warning":
-            self.logger.warning(message)
-        elif level == "success":
-            self.logger.info(f"✅ {message}")
-        else:
-            self.logger.info(message)
-            
-        # Gunakan callback jika ada
-        if 'log_message' in self.ui_callback:
-            self.ui_callback['log_message'](message, level, icon)
+        super().__init__(ui_callback, ENV_CONFIG_LOGGER_NAMESPACE)
     
     def setup_local_environment(self) -> Tuple[Path, Path]:
         """

@@ -6,27 +6,21 @@ Deskripsi: Handler untuk sinkronisasi konfigurasi backbone dengan Google Drive
 from typing import Dict, Any, Optional, Tuple
 import os
 import ipywidgets as widgets
-from IPython.display import clear_output, display
 from pathlib import Path
 
-from smartcash.ui.utils.constants import ICONS
-from smartcash.ui.utils.alert_utils import create_info_alert, create_status_indicator
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger, LogLevel
 from smartcash.common.environment import get_environment_manager
+from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.training_config.backbone.handlers.config_handlers import update_ui_from_config
-from smartcash.ui.training_config.backbone.handlers.sync_logger import (
-    update_sync_status_only,
-    log_sync_success,
-    log_sync_error,
-    log_sync_warning
-)
+from smartcash.ui.training_config.backbone.handlers.sync_logger import update_sync_status_only
 
 # Setup logger dengan level CRITICAL untuk mengurangi log
 logger = get_logger(__name__)
 logger.set_level(LogLevel.CRITICAL)
 
 def get_default_base_dir():
+    """Mendapatkan direktori default berdasarkan environment"""
     if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
         return "/content"
     return str(Path.home() / "SmartCash")
@@ -40,30 +34,46 @@ def is_colab_environment() -> bool:
     """
     return "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ
 
-def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> Tuple[bool, str]:
+def is_drive_mounted() -> bool:
+    """
+    Periksa apakah Google Drive diaktifkan/di-mount.
+    
+    Returns:
+        Boolean yang menunjukkan apakah Google Drive di-mount
+    """
+    try:
+        env_manager = get_environment_manager(base_dir=get_default_base_dir())
+        return env_manager.is_drive_mounted
+    except Exception as e:
+        logger.error(f"{ICONS.get('error', '❌')} Error saat memeriksa status Drive: {str(e)}")
+        return False
+
+def sync_to_drive(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Tuple[bool, str]:
     """
     Sinkronisasi konfigurasi backbone ke Google Drive.
     
     Args:
-        button: Tombol yang diklik
-        ui_components: Dictionary berisi komponen UI
+        config: Konfigurasi yang akan disinkronkan
+        ui_components: Dictionary komponen UI (opsional)
         
     Returns:
         Tuple berisi status sukses dan pesan
     """
     try:
         # Update status
-        update_sync_status_only(ui_components, "Menyinkronkan konfigurasi ke Google Drive...", 'info')
+        if ui_components:
+            update_sync_status_only(ui_components, "Menyinkronkan konfigurasi ke Google Drive...", 'info')
         
-        # Periksa apakah di lingkungan Colab
+        # Jika bukan di Colab, tidak perlu sinkronisasi
         if not is_colab_environment():
-            update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
+            if ui_components:
+                update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
             return True, "Tidak perlu sinkronisasi (bukan di Google Colab)"
         
         # Periksa apakah Google Drive diaktifkan
-        env_manager = get_environment_manager(base_dir=get_default_base_dir())
-        if not env_manager.is_drive_mounted:
-            update_sync_status_only(ui_components, "Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.", 'error')
+        if not is_drive_mounted():
+            if ui_components:
+                update_sync_status_only(ui_components, "Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.", 'error')
             return False, "Google Drive tidak diaktifkan"
         
         # Dapatkan ConfigManager
@@ -74,25 +84,27 @@ def sync_to_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any
         
         if not success:
             logger.error(f"Gagal sinkronisasi backbone ke drive: {message}")
-            update_sync_status_only(ui_components, f"Gagal menyinkronkan konfigurasi backbone ke Google Drive: {message}", 'error')
+            if ui_components:
+                update_sync_status_only(ui_components, f"Gagal menyinkronkan konfigurasi backbone ke Google Drive: {message}", 'error')
             return False, message
         
-        update_sync_status_only(ui_components, "Konfigurasi backbone berhasil disinkronkan ke Google Drive", 'success')
+        if ui_components:
+            update_sync_status_only(ui_components, "Konfigurasi backbone berhasil disinkronkan ke Google Drive", 'success')
         logger.info("Konfigurasi backbone berhasil disinkronkan ke Google Drive")
         return True, "Konfigurasi backbone berhasil disinkronkan ke Google Drive"
     except Exception as e:
         error_message = f"Error saat menyinkronkan konfigurasi backbone ke Google Drive: {str(e)}"
-        update_sync_status_only(ui_components, error_message, 'error')
+        if ui_components:
+            update_sync_status_only(ui_components, error_message, 'error')
         logger.error(error_message)
         return False, error_message
 
-def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
+def sync_from_drive(ui_components: Dict[str, Any]) -> Tuple[bool, str, Optional[Dict[str, Any]]]:
     """
     Sinkronisasi konfigurasi backbone dari Google Drive.
     
     Args:
-        button: Tombol yang diklik
-        ui_components: Dictionary berisi komponen UI
+        ui_components: Dictionary komponen UI
         
     Returns:
         Tuple berisi status sukses, pesan, dan konfigurasi yang disinkronkan
@@ -101,14 +113,13 @@ def sync_from_drive(button: Optional[widgets.Button], ui_components: Dict[str, A
         # Update status
         update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dari Google Drive...", 'info')
         
-        # Periksa apakah di lingkungan Colab
+        # Jika bukan di Colab, tidak perlu sinkronisasi
         if not is_colab_environment():
             update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
             return True, "Tidak perlu sinkronisasi (bukan di Google Colab)", None
         
         # Periksa apakah Google Drive diaktifkan
-        env_manager = get_environment_manager(base_dir=get_default_base_dir())
-        if not env_manager.is_drive_mounted:
+        if not is_drive_mounted():
             update_sync_status_only(ui_components, "Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.", 'error')
             return False, "Google Drive tidak diaktifkan", None
         
@@ -163,68 +174,25 @@ def sync_with_drive(config: Dict[str, Any], ui_components: Dict[str, Any] = None
     Returns:
         Konfigurasi yang telah disinkronkan
     """
-    try:
-        # Gunakan fungsi sync_with_drive dari force_sync jika tersedia
-        try:
-            from smartcash.common.config.force_sync import sync_with_drive as force_sync
-            if ui_components:
-                update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
-            
-            synced_config = force_sync(config, 'model', ui_components)
-            
-            if ui_components:
-                update_sync_status_only(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive", 'success')
-            
-            return synced_config
-        except ImportError:
-            # Jika force_sync tidak tersedia, gunakan metode lama
-            pass
-        
-        if not is_colab_environment():
-            # Tidak perlu sinkronisasi jika bukan di Colab
-            if ui_components:
-                update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
-            return config
-            
-        # Dapatkan config manager
-        base_dir = get_default_base_dir()
-        config_manager = get_config_manager(base_dir=base_dir)
-        
-        # Log info
+    # Jika bukan di lingkungan Colab, tidak perlu sinkronisasi
+    if not is_colab_environment():
         if ui_components:
-            update_sync_status_only(ui_components, "Menyinkronkan konfigurasi dengan Google Drive...", 'info')
-        
-        # Pastikan konfigurasi memiliki struktur yang benar
-        if 'model' not in config:
-            config = {'model': config}
-        
-        # Simpan konfigurasi terlebih dahulu
-        config_save_success = config_manager.save_module_config('model', config)
-        if not config_save_success:
-            # Log error jika gagal menyimpan
-            if ui_components:
-                update_sync_status_only(ui_components, "Gagal menyimpan konfigurasi lokal sebelum sinkronisasi", 'error')
-            return config
-        
-        # Sinkronisasi dengan Google Drive
-        success, message = config_manager.sync_to_drive('model')
-        
-        if not success:
-            if ui_components:
-                update_sync_status_only(ui_components, f"Gagal sinkronisasi dengan Google Drive: {message}", 'error')
-            logger.error(f"Gagal sinkronisasi dengan Google Drive: {message}")
-            return config
-        
-        # Verifikasi konfigurasi yang disinkronkan dengan membandingkan dengan nilai asli
-        synced_config = config_manager.get_module_config('model', {})
-        
-        if ui_components:
-            update_sync_status_only(ui_components, "Konfigurasi berhasil disinkronkan dengan Google Drive", 'success')
-        
-        return synced_config
-    except Exception as e:
-        error_message = f"Error saat sinkronisasi dengan Google Drive: {str(e)}"
-        if ui_components:
-            update_sync_status_only(ui_components, error_message, 'error')
-        logger.error(error_message)
+            update_sync_status_only(ui_components, "Tidak perlu sinkronisasi (bukan di Google Colab)", 'info')
         return config
+        
+    # Jika Google Drive tidak diaktifkan, tidak perlu sinkronisasi
+    if not is_drive_mounted():
+        if ui_components:
+            update_sync_status_only(ui_components, "Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi.", 'warning')
+        return config
+        
+    # Coba sinkronisasi ke Google Drive
+    success, message = sync_to_drive(config, ui_components)
+    
+    # Kembalikan konfigurasi asli jika gagal
+    if not success:
+        return config
+        
+    # Kembalikan konfigurasi yang disinkronkan
+    config_manager = get_config_manager(base_dir=get_default_base_dir())
+    return config_manager.get_config('model', reload=True)

@@ -3,7 +3,7 @@ File: smartcash/ui/training_config/backbone/handlers/sync_logger.py
 Deskripsi: Utilitas untuk mencatat status sinkronisasi konfigurasi backbone di UI
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import ipywidgets as widgets
 from IPython.display import display
 from smartcash.common.logger import get_logger
@@ -115,4 +115,4 @@ def update_sync_status_only(ui_components: Dict[str, Any], message: str, status_
         # Fallback ke logger jika ada error
         if 'logger' in ui_components:
             ui_components['logger'].error(f"Error saat update status panel: {str(e)}")
-        logger.error(f"Error saat update status panel: {str(e)}") 
+        logger.error(f"Error saat update status panel: {str(e)}")

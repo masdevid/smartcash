@@ -3,11 +3,10 @@ File: smartcash/ui/training_config/backbone/handlers/status_handlers.py
 Deskripsi: Handler untuk status panel di backbone configuration
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import ipywidgets as widgets
 from IPython.display import clear_output, display
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.alert_utils import update_status_panel as utils_update_status_panel
 from smartcash.ui.utils.alert_utils import create_info_alert
 from smartcash.ui.utils.constants import ALERT_STYLES, COLORS, ICONS
 
@@ -65,4 +64,4 @@ def add_status_panel(ui_components: Dict[str, Any]) -> Dict[str, Any]:
                 children.append(status_panel)
                 ui_components['main_container'].children = tuple(children)
     
-    return ui_components 
+    return ui_components

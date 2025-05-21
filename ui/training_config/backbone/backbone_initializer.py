@@ -5,18 +5,18 @@ Deskripsi: Inisialisasi UI dan logika bisnis untuk pemilihan backbone model Smar
 
 from typing import Dict, Any
 from IPython.display import display, clear_output
-from pathlib import Path
 import os
+from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
 from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.training_config.backbone.handlers.config_handlers import get_default_backbone_config
 
 logger = get_logger(__name__)
 
 def get_default_base_dir():
+    """Mendapatkan direktori default berdasarkan environment"""
     if "COLAB_GPU" in os.environ or "COLAB_TPU_ADDR" in os.environ:
         return "/content"
     return str(Path.home() / "SmartCash")
@@ -31,11 +31,16 @@ def initialize_backbone_ui() -> Dict[str, Any]:
     try:
         # Import komponen UI
         from smartcash.ui.training_config.backbone.components.backbone_components import create_backbone_ui
+        
+        # Import handler untuk konfigurasi
         from smartcash.ui.training_config.backbone.handlers.config_handlers import (
             update_ui_from_config,
             update_backbone_info,
-            get_default_backbone_config
+            get_backbone_config
         )
+        from smartcash.ui.training_config.backbone.handlers.default_config import get_default_backbone_config
+        
+        # Import handler untuk status
         from smartcash.ui.training_config.backbone.handlers.status_handlers import add_status_panel, update_status_panel
         
         logger.info("Inisialisasi UI backbone")
@@ -52,12 +57,7 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
         # Dapatkan konfigurasi
         logger.info("Mengambil konfigurasi backbone")
-        current_config = config_manager.get_module_config('model')
-        
-        # Jika tidak ada konfigurasi, gunakan default
-        if not current_config:
-            logger.info("Konfigurasi backbone tidak ditemukan, menggunakan default")
-            current_config = get_default_backbone_config()
+        current_config = get_backbone_config()
         
         # Setup handler untuk form
         logger.info("Setup form handlers")
@@ -113,8 +113,8 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
         # Perbarui informasi sinkronisasi berdasarkan status drive
         try:
-            env_manager = get_environment_manager(base_dir=get_default_base_dir())
-            if not env_manager.is_drive_mounted:
+            from smartcash.ui.training_config.backbone.handlers.drive_handlers import is_drive_mounted
+            if not is_drive_mounted():
                 # Jika drive tidak diaktifkan, perbarui pesan
                 ui_components['sync_info'].value = f"<div style='margin-top: 5px; font-style: italic; color: #666;'>{ICONS.get('warning', '⚠️')} Google Drive tidak diaktifkan. Aktifkan terlebih dahulu untuk sinkronisasi otomatis.</div>"
         except Exception as e:
@@ -129,15 +129,8 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         # Update info panel
         update_backbone_info(ui_components)
         
-        # Simpan referensi ke fungsi update_backbone_info
-        ui_components['update_backbone_info'] = update_backbone_info
-        
         # Simpan konfigurasi saat ini ke ui_components
         ui_components['config'] = current_config
-        
-        # Register UI components untuk persistensi
-        logger.info("Mendaftarkan UI components ke config manager")
-        config_manager.register_ui_components('backbone', ui_components)
         
         # Tampilkan UI
         logger.info("Menampilkan UI")
@@ -152,16 +145,3 @@ def initialize_backbone_ui() -> Dict[str, Any]:
         
     except Exception as e:
         logger.error(f"{ICONS.get('error', '❌')} Error saat inisialisasi UI backbone: {str(e)}")
-        
-        # Import widgets jika belum diimpor
-        import ipywidgets as widgets
-        
-        # Buat container minimal untuk menampilkan error
-        error_container = widgets.VBox([
-            widgets.HTML(f"<h3>{ICONS.get('error', '❌')} Error saat inisialisasi UI backbone</h3>"),
-            widgets.HTML(f"<p>{str(e)}</p>")
-        ])
-        
-        display(error_container)
-        
-        return {'main_container': error_container}

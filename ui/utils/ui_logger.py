@@ -13,6 +13,16 @@ from IPython.display import display, HTML
 import ipywidgets as widgets
 from datetime import datetime
 
+# Ekspor fungsi-fungsi utama
+__all__ = [
+    'UILogger', 
+    'create_ui_logger', 
+    'get_current_ui_logger',
+    'log_to_ui',
+    'intercept_stdout_to_ui',
+    'restore_stdout'
+]
+
 class UILogger:
     """
     Logger khusus untuk UI yang dapat mengarahkan output ke widget UI dan file.
@@ -466,3 +476,75 @@ def restore_stdout(ui_components: Dict[str, Any]) -> None:
                 custom_stdout.flush()
             except:
                 pass
+
+def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = None) -> None:
+    """
+    Log pesan ke UI components dengan icon opsional.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+        message: Pesan yang akan di-log
+        level: Level log (info, warning, error, success)
+        icon: Icon opsional untuk ditambahkan ke pesan
+    """
+    # Jika ada logger di ui_components, gunakan itu
+    if 'logger' in ui_components:
+        logger = ui_components['logger']
+        
+        # Format pesan dengan icon jika ada
+        formatted_message = f"{icon} {message}" if icon else message
+        
+        # Log ke logger berdasarkan level
+        if level == "error":
+            logger.error(formatted_message)
+        elif level == "warning":
+            logger.warning(formatted_message)
+        elif level == "success":
+            logger.success(formatted_message)
+        else:  # info
+            logger.info(formatted_message)
+        return
+    
+    # Fallback jika tidak ada logger: gunakan status atau log_output widget
+    if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
+        from IPython.display import display, HTML
+        
+        # Tentukan warna berdasarkan level
+        color = {
+            "info": "blue",
+            "success": "green",
+            "warning": "orange",
+            "error": "red",
+            "critical": "darkred"
+        }.get(level, "black")
+        
+        # Format pesan dengan icon jika ada
+        formatted_message = f"{icon} {message}" if icon else message
+        
+        # Tampilkan ke status widget
+        with ui_components['status']:
+            try:
+                from smartcash.ui.utils.alert_utils import create_status_indicator
+                display(create_status_indicator(level, formatted_message))
+            except ImportError:
+                display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
+    
+    # Jika ada log_output, gunakan itu juga
+    elif 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
+        from IPython.display import display
+        from datetime import datetime
+        
+        # Format pesan dengan timestamp dan icon
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        formatted_message = f"[{timestamp}] {icon + ' ' if icon else ''}{message}"
+        
+        # Tampilkan ke log_output widget
+        with ui_components['log_output']:
+            print(formatted_message)
+    
+    # Fallback ke stdout jika tidak ada UI components
+    else:
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%H:%M:%S')
+        formatted_message = f"[{timestamp}] {icon + ' ' if icon else ''}{message}"
+        print(formatted_message)

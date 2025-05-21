@@ -149,6 +149,7 @@ ICONS = {
     'chart': '📊',
     'link': '🔗',
     'compare': '🔄',
+    'idle': '🕓',
     
     # Domain-specific icons
     'settings': '🔧',

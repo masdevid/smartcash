@@ -6,12 +6,10 @@ Deskripsi: Utilitas untuk membantu logging di UI preprocessing
 from typing import Dict, Any, Optional, Callable
 import logging
 from smartcash.common.logger import get_logger
-from smartcash.ui.utils.ui_logger import create_ui_logger
+from smartcash.ui.utils.ui_logger import create_ui_logger, log_to_ui as ui_log
 
-# Konstanta untuk namespace logger
-PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
-# Konstanta untuk display name logger di UI
-PREPROCESSING_DISPLAY_NAME = "PREPROCESSING"
+# Import namespace konstanta
+from smartcash.ui.dataset.preprocessing.preprocessing_initializer import PREPROCESSING_LOGGER_NAMESPACE, MODULE_LOGGER_NAME
 
 def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -28,7 +26,7 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
         ui_components['logger'] = logger
         ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
-        
+    
         # Setup UI logger dengan namespace dan display name spesifik
         if 'log_output' in ui_components:
             ui_logger = create_ui_logger(
@@ -41,53 +39,55 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Setup log_message function
         ui_components['log_message'] = lambda msg, level='info', icon='': log_message(ui_components, msg, level, icon)
         
+        # Tandai modul sudah diinisialisasi
+        ui_components['preprocessing_initialized'] = True
+    
     return ui_components
 
 def log_message(ui_components: Dict[str, Any], message: str, level: str = 'info', icon: str = '') -> None:
     """
-    Log pesan dengan level yang diberikan.
+    Log pesan ke UI dan logger Python dengan namespace khusus preprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
-        message: Pesan yang akan dilog
+        message: Pesan yang akan di-log
         level: Level log (debug, info, warning, error, critical)
         icon: Ikon untuk pesan (emoji)
     """
-    logger = ui_components.get('logger')
-    if not logger:
-        # Fallback ke logger baru
-        logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
-        ui_components['logger'] = logger
-        ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
+    # Cek apakah ini adalah preprocessing yang sudah diinisialisasi
+    if not is_initialized(ui_components):
+        # Skip UI logging jika belum diinisialisasi untuk mencegah log muncul di modul lain
+        return
     
-    # Format pesan dengan icon dan namespace
+    # Pastikan menggunakan logger dengan namespace yang tepat
+    logger = ui_components.get('logger') or get_logger(PREPROCESSING_LOGGER_NAMESPACE)
+    
+    # Format pesan dengan icon jika ada
     formatted_message = f"{icon} {message}" if icon else message
-    prefixed_message = f"[{PREPROCESSING_DISPLAY_NAME}] {formatted_message}"
     
-    # Log ke logger
-    if level == 'debug':
-        logger.debug(formatted_message)
-    elif level == 'info':
-        logger.info(formatted_message)
-    elif level == 'warning':
-        logger.warning(formatted_message)
-    elif level == 'error':
-        logger.error(formatted_message)
-    elif level == 'critical':
-        logger.critical(formatted_message)
-    else:
-        logger.info(formatted_message)
+    # Log ke UI hanya jika log_output atau output tersedia
+    if 'log_output' in ui_components or 'output' in ui_components:
+        # Log ke UI dengan konsisten menggunakan UI logger
+        ui_log(ui_components, message, level, icon)
     
-    # Log ke UI widget jika ada
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_log'):
-        # Pastikan namespace terlihat di UI log
-        module_name = ui_components.get('module_name', 'preprocessing')
-        ui_components['log_output'].append_log(
-            message=formatted_message, 
-            level=level, 
-            namespace=PREPROCESSING_LOGGER_NAMESPACE,
-            module=module_name
-        )
+    # Tambahkan prefix untuk memudahkan filtering
+    prefixed_message = f"[{MODULE_LOGGER_NAME}] {formatted_message}"
+    
+    # Log ke Python logger
+    if logger:
+        if level == 'debug':
+            logger.debug(prefixed_message)
+        elif level == 'info':
+            logger.info(prefixed_message)
+        elif level == 'warning' or level == 'warn':
+            logger.warning(prefixed_message)
+        elif level == 'error':
+            logger.error(prefixed_message)
+        elif level == 'success':
+            # Success level tidak ada di Python logger standard, gunakan info
+            logger.info(f"✅ {prefixed_message}")
+        elif level == 'critical':
+            logger.critical(prefixed_message)
 
 def is_initialized(ui_components: Dict[str, Any]) -> bool:
     """

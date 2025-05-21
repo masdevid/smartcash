@@ -47,9 +47,9 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
     
     # Hindari multiple inisialisasi yang tidak perlu
     if _PREPROCESSING_MODULE_INITIALIZED:
-        logger.debug("UI preprocessing dataset sudah diinisialisasi sebelumnya, menggunakan inisialisasi yang sudah ada")
+        logger.debug(f"[{MODULE_LOGGER_NAME}] UI preprocessing dataset sudah diinisialisasi sebelumnya, menggunakan inisialisasi yang sudah ada")
     else:
-        logger.info("Memulai inisialisasi UI preprocessing dataset")
+        logger.info(f"[{MODULE_LOGGER_NAME}] Memulai inisialisasi UI preprocessing dataset")
         _PREPROCESSING_MODULE_INITIALIZED = True
     
     try:
@@ -87,7 +87,7 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         return ui_components['ui']
         
     except Exception as e:
-        logger.error(f"Error saat inisialisasi UI preprocessing: {str(e)}")
+        logger.error(f"[{MODULE_LOGGER_NAME}] Error saat inisialisasi UI preprocessing: {str(e)}")
         # Tampilkan error UI sederhana
         import ipywidgets as widgets
         from smartcash.ui.utils.constants import ICONS, COLORS

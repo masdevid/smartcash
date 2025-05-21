@@ -6,8 +6,6 @@ Deskripsi: Handler untuk operasi preprocessing dataset
 from typing import Dict, Any, Optional, List, Union
 import ipywidgets as widgets
 import os
-import threading
-from concurrent.futures import ThreadPoolExecutor
 from IPython.display import display
 from pathlib import Path
 
@@ -34,7 +32,7 @@ def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]
     if button and hasattr(button, 'disabled'):
         button.disabled = True
     
-    # Tambahkan stop button di sebelah preprocessing button
+    # Tampilkan stop button
     if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
         ui_components['stop_button'].layout.display = 'inline-block'
     
@@ -64,9 +62,7 @@ def handle_preprocessing_button_click(button: Any, ui_components: Dict[str, Any]
             "ℹ️"
         )
         
-        # Jalankan preprocessing dalam thread terpisah untuk menghindari UI freeze
-        # Gunakan event loop yang sudah ada, bukan menciptakan thread baru
-        # Jalankan preprocessing
+        # Jalankan preprocessing langsung - jangan gunakan thread terpisah agar berfungsi di Colab
         execute_preprocessing(ui_components, config)
         
     except Exception as e:

@@ -4,6 +4,7 @@ Deskripsi: Executor untuk menjalankan proses preprocessing dataset
 """
 
 from typing import Dict, Any
+import time
 
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
 from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import (
@@ -35,6 +36,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
         from smartcash.common.config import get_config_manager
         from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
         from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+        from smartcash.ui.utils.constants import ICONS
         
         # Get config manager
         config_manager = get_config_manager()
@@ -68,7 +70,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
                 'normalize': normalization != 'none',
                 'normalization': normalization,
                 'augmentation': augmentation,
-                'num_workers': num_workers,
+                'num_workers': num_workers, # Untuk Google Colab sebaiknya gunakan 1 worker karena tidak multi-threading
                 'output_dir': config.get('preprocessed_dir', 'data/preprocessed')
             },
             'data': {
@@ -79,16 +81,37 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Log parameters
         log_message(ui_components, f"Preprocessing dataset dengan resolusi {img_size}, normalisasi {normalization}, augmentasi {augmentation}, split {split}, workers {num_workers}", "info", "🔄")
         
+        # Tampilkan confirmation area jika tersedia
+        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'layout'):
+            ui_components['confirmation_area'].layout.display = 'block'
+            ui_components['confirmation_area'].clear_output(wait=True)
+            with ui_components['confirmation_area']:
+                from IPython.display import display, HTML
+                display(HTML(f"""
+                <div style='padding: 10px; background-color: #f8f9fa; border-left: 4px solid #17a2b8;'>
+                    <h3 style='margin-top: 0;'>{ICONS.get('info', 'ℹ️')} Preprocessing sedang berjalan</h3>
+                    <p>Memproses dataset dengan konfigurasi:</p>
+                    <ul>
+                        <li><b>Resolusi:</b> {img_size[0]}x{img_size[1]}</li>
+                        <li><b>Normalisasi:</b> {normalization}</li>
+                        <li><b>Split:</b> {split}</li>
+                        <li><b>Workers:</b> {num_workers}</li>
+                        <li><b>Output:</b> {config.get('preprocessed_dir', 'data/preprocessed')}</li>
+                    </ul>
+                    <p>Perkiraan waktu: <i>Tergantung ukuran dataset</i></p>
+                </div>
+                """))
+        
         # Notify process start menggunakan notification manager
         notification_manager.notify_process_start("preprocessing", f"split: {split}", split)
         
         # Update progress
         update_progress(ui_components, 10, 100, "Memulai preprocessing dataset...", f"Menganalisis dataset untuk split: {split}")
         
-        # Buat observer manager jika belum ada di ui_components
+        # Setup observer manager jika belum ada di ui_components
         if 'observer_manager' not in ui_components:
-            from smartcash.ui.dataset.preprocessing.utils.ui_observers import MockObserverManager
-            ui_components['observer_manager'] = MockObserverManager()
+            from smartcash.ui.dataset.preprocessing.utils.ui_observers import create_observer_manager
+            ui_components['observer_manager'] = create_observer_manager(ui_components)
             ui_components['observer_manager'].notification_manager = notification_manager
         
         # Buat preprocessing service dengan observer_manager dari UI
@@ -106,8 +129,15 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
             # Gunakan notification manager untuk menangani progress
             try:
                 notification_manager.notify_progress(**kwargs)
+                
+                # Cek jika stop_requested
+                if ui_components.get('stop_requested', False):
+                    return False  # Mengirim signal stop ke processor
+                    
+                return True  # Lanjutkan processing
             except Exception as e:
                 log_message(ui_components, f"Error saat update progress: {str(e)}", "error", "❌")
+                return True  # Default tetap lanjutkan
         
         # Register progress callback ke preprocessor
         try:
@@ -130,7 +160,26 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
             total_processed = result.get('processed', 0)
             total_skipped = result.get('skipped', 0)
             total_failed = result.get('failed', 0)
-            log_message(ui_components, f"Preprocessing selesai: {total_processed} gambar diproses, {total_skipped} dilewati, {total_failed} gagal", "success", "✅")
+            success_message = f"Preprocessing selesai: {total_processed} gambar diproses, {total_skipped} dilewati, {total_failed} gagal"
+            log_message(ui_components, success_message, "success", "✅")
+            
+            # Update confirmation area dengan hasil
+            if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+                ui_components['confirmation_area'].clear_output(wait=True)
+                with ui_components['confirmation_area']:
+                    from IPython.display import display, HTML
+                    display(HTML(f"""
+                    <div style='padding: 10px; background-color: #f0fff0; border-left: 4px solid #28a745;'>
+                        <h3 style='margin-top: 0;'>{ICONS.get('success', '✅')} Preprocessing Selesai</h3>
+                        <p>Hasil preprocessing:</p>
+                        <ul>
+                            <li><b>Diproses:</b> {total_processed} gambar</li>
+                            <li><b>Dilewati:</b> {total_skipped} gambar</li>
+                            <li><b>Gagal:</b> {total_failed} gambar</li>
+                        </ul>
+                        <p><b>Output:</b> {config.get('preprocessed_dir', 'data/preprocessed')}</p>
+                    </div>
+                    """))
             
             # Notifikasi selesai
             notification_manager.notify_process_complete(result, f"split {split}")

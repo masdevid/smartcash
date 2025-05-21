@@ -27,6 +27,7 @@ class MockObserverManager:
         """Inisialisasi mock observer manager."""
         self.observers = {}
         self.flags = {}
+        self.notification_manager = None
     
     def register(self, event_type: str, callback: Callable, group: str = None) -> None:
         """
@@ -110,15 +111,15 @@ class MockObserverManager:
         """
         self.set_flag('stop_requested', True)
 
-def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+def create_observer_manager(ui_components: Dict[str, Any]) -> Any:
     """
-    Register observer untuk UI preprocessing.
+    Membuat instance observer manager yang sesuai untuk UI.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        Dictionary UI components yang telah diupdate
+        Instance observer manager yang sesuai
     """
     # Coba import observer dari common
     try:
@@ -134,26 +135,39 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             log_message(ui_components, "Observer manager tidak tersedia. Menggunakan mock observer.", "warning", "⚠️")
             observer_manager_class = MockObserverManager
     
-    # Cek apakah observer manager sudah ada
-    if 'observer_manager' not in ui_components:
-        ui_components['observer_manager'] = observer_manager_class()
+    # Buat instance observer manager
+    observer_manager = observer_manager_class()
     
-    # Get observer manager
-    observer_manager = ui_components['observer_manager']
-    
+    # Register handler-handler yang diperlukan
     try:
         # Register event handlers
         register_progress_handlers(ui_components, observer_manager)
         register_status_handlers(ui_components, observer_manager)
         register_message_handlers(ui_components, observer_manager)
         register_completion_handlers(ui_components, observer_manager)
-        
-        # Setup observer group untuk UI
-        ui_components['observer_group'] = "preprocessing_ui"
     except Exception as e:
         # Log warning jika terjadi error saat registrasi observer
         from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
         log_message(ui_components, f"Error saat registrasi observer: {str(e)}", "warning", "⚠️")
+    
+    return observer_manager
+
+def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Register observer untuk UI preprocessing.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Cek apakah observer manager sudah ada
+    if 'observer_manager' not in ui_components:
+        ui_components['observer_manager'] = create_observer_manager(ui_components)
+    
+    # Setup observer group untuk UI
+    ui_components['observer_group'] = "preprocessing_ui"
     
     return ui_components
 

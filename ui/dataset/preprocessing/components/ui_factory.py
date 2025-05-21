@@ -61,46 +61,20 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         primary_label="Preprocess Dataset",
         primary_icon="play",
         secondary_buttons=[
-            ("Berhenti", "stop", "warning"),
-            ("Hapus Data", "trash", "danger")
+            ("Berhenti", "stop", "warning")
         ],
         cleanup_enabled=True
     )
+    
+    # Default sembunyikan tombol stop dulu
+    if 'stop_button' in action_buttons and hasattr(action_buttons['stop_button'], 'layout'):
+        action_buttons['stop_button'].layout.display = 'none'
     
     # Tombol save & reset
     save_reset_buttons = create_save_reset_buttons()
     
     # Info sinkronisasi
     sync_info = create_sync_info_message()
-    
-    # Advanced options accordion
-    advanced_accordion = widgets.Accordion(
-        children=[
-            widgets.VBox([
-                widgets.HTML(f"<h5 style='margin-bottom: 10px; color: {COLORS['dark']};'>{ICONS['config']} Opsi Lanjutan</h5>"),
-                widgets.HTML(f"<div style='margin-bottom: 8px;'><b>Worker Thread:</b> Jumlah thread yang digunakan untuk preprocessing</div>"),
-                widgets.IntSlider(
-                    value=config.get('num_workers', 4),
-                    min=1,
-                    max=8,
-                    step=1,
-                    description='Workers:',
-                    style={'description_width': '80px'},
-                    layout=widgets.Layout(width='95%', margin='5px 0')
-                ),
-                widgets.HTML(f"<div style='margin: 8px 0;'><b>Target Split:</b> Pemilihan bagian dataset yang akan diproses</div>"),
-                create_split_selector(
-                    selected_value=config.get('split', 'All Splits'),
-                    description="Split:",
-                    width='95%'
-                )
-            ], layout=widgets.Layout(padding='10px 5px'))
-        ],
-        layout=widgets.Layout(width='100%', margin='10px 0')
-    )
-    
-    # Set judul accordion
-    advanced_accordion.set_title(0, f"{ICONS['settings']} Opsi Lanjutan Preprocessing")
     
     # Tambahkan worker dan target split ke UI utama, bukan di dalam accordion
     worker_slider = widgets.IntSlider(
@@ -128,17 +102,16 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         target_split
     ], layout=widgets.Layout(padding='10px 5px', width='48%'))
     
-    # Area konfirmasi dengan styling yang lebih baik
+    # Area konfirmasi dengan styling yang lebih baik - hidden by default
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
             width='100%', 
             margin='15px 0',
-            min_height='150px',
-            height='auto',
+            min_height='30px',
             border='1px solid #ddd',
             padding='10px',
-            visibility='visible',  # Visible by default
-            display='block'  # Display block by default
+            display='none',  # Hidden by default
+            border_radius='5px'
         )
     )
     
@@ -178,7 +151,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
-        confirmation_area,  # Area konfirmasi di bawah tombol aksi
+        confirmation_area,  # Area konfirmasi di bawah tombol aksi (tersembunyi)
         progress_components['progress_container'],
         log_components['log_accordion'],
         help_panel
@@ -192,7 +165,6 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
         'split_selector': target_split,  # Gunakan split selector dari kolom kedua
-        'advanced_accordion': advanced_accordion,
         'worker_slider': worker_slider,  # Referensi langsung ke worker slider
         'preprocess_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
@@ -201,6 +173,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'reset_button': save_reset_buttons['reset_button'],
         'save_reset_buttons': save_reset_buttons,
         'sync_info': sync_info,
+        'action_buttons': action_buttons,  # Menyimpan semua action buttons
         'button_container': action_buttons['container'],
         'confirmation_area': confirmation_area,
         'module_name': 'preprocessing',

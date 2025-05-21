@@ -24,6 +24,9 @@ def handle_stop_button_click(button: Any, ui_components: Dict[str, Any]) -> None
         button.disabled = True
     
     try:
+        # Set flag stop_requested di UI components
+        ui_components['stop_requested'] = True
+        
         # Set flag observer untuk memberi sinyal stop
         observer_manager = ui_components.get('observer_manager')
         if observer_manager and hasattr(observer_manager, 'set_flag'):
@@ -39,6 +42,10 @@ def handle_stop_button_click(button: Any, ui_components: Dict[str, Any]) -> None
         # Notify process stop menggunakan notification manager
         notification_manager.notify_process_stop("Stop oleh pengguna")
         
+        # Sembunyikan tombol stop
+        if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'layout'):
+            ui_components['stop_button'].layout.display = 'none'
+            
         # Reset state preprocessing
         stop_preprocessing(ui_components)
         
@@ -63,6 +70,9 @@ def stop_preprocessing(ui_components: Dict[str, Any]) -> None:
     # Log menghentikan preprocessing
     log_message(ui_components, "Preprocessing dihentikan oleh pengguna", "warning", "⏹️")
     
+    # Set flag preprocessing_running ke False
+    ui_components['preprocessing_running'] = False
+    
     # Reset state preprocessing
     set_preprocessing_state(ui_components, False)
     
@@ -74,6 +84,13 @@ def stop_preprocessing(ui_components: Dict[str, Any]) -> None:
     except Exception:
         # Fallback ke update_ui_state jika notification manager tidak tersedia
         update_ui_state(ui_components, "warning", "Preprocessing dihentikan oleh pengguna")
+    
+    # Update confirmation area jika tersedia
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        # Bersihkan dan sembunyikan confirmation area
+        ui_components['confirmation_area'].clear_output(wait=True)
+        if hasattr(ui_components['confirmation_area'], 'layout'):
+            ui_components['confirmation_area'].layout.display = 'none'
     
     # Reset UI setelah operasi
     reset_after_operation(ui_components)

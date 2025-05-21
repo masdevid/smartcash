@@ -394,7 +394,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     lines = self.buffer.split('\n')
                     self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
                     
-                    # Tampilkan setiap baris lengkap
+                    # Tampilkan setiap baris lengkap yang tidak kosong
                     for line in lines[:-1]:
                         if line.strip():  # Cek jika bukan baris kosong
                             try:
@@ -417,7 +417,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
             self.terminal.flush()
             # Flush buffer jika perlu, dengan thread-safety
             with self.lock:
-                if self.buffer:
+                if self.buffer and self.buffer.strip():  # Hanya flush jika buffer tidak kosong setelah strip
                     try:
                         # Prioritaskan log_output jika ada
                         if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
@@ -433,7 +433,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     except Exception:
                         # Fallback ke stdout asli
                         self.terminal.write(f"[UI STDOUT ERROR] {self.buffer}\n")
-                    self.buffer = ""
+                self.buffer = ""
         
         # Kebutuhan IOBase lainnya
         def isatty(self):
@@ -487,6 +487,10 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
         level: Level log (info, warning, error, success)
         icon: Icon opsional untuk ditambahkan ke pesan
     """
+    # Jika pesan kosong, jangan log
+    if not message or not message.strip():
+        return
+        
     # Jika ada logger di ui_components, gunakan itu
     if 'logger' in ui_components:
         logger = ui_components['logger']

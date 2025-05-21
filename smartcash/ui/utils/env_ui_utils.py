@@ -45,6 +45,10 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         message: Message to log
         level: Log level (info, error)
     """
+    # Jika pesan kosong, jangan log
+    if not message or not message.strip():
+        return
+        
     from IPython.display import display
     timestamp = datetime.now().strftime('%H:%M:%S')
     log_widget = ui_components.get('log_output')  # Use Output widget for logging
@@ -70,5 +74,5 @@ def update_progress(ui_components: Dict[str, Any], value: float, message: str = 
     if 'progress_bar' in ui_components:
         ui_components['progress_bar'].value = value
     
-    if 'progress_message' in ui_components:
+    if 'progress_message' in ui_components and message:  # Hanya update jika message tidak kosong
         ui_components['progress_message'].value = message 

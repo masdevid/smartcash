@@ -132,9 +132,6 @@ class EnvironmentManager:
                     os.makedirs(self._drive_path, exist_ok=True)
                     if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
                 
-                # Sinkronisasi otomatis file **_config.yaml saat drive terhubung
-                self._sync_config_files_on_drive_connect()
-                
                 return True
         except ImportError:
             # Fallback jika drive_utils tidak tersedia
@@ -147,9 +144,6 @@ class EnvironmentManager:
                 self._drive_path = drive_path
                 os.makedirs(self._drive_path, exist_ok=True)
                 if self.logger: self.logger.debug(f"✅ Google Drive terdeteksi pada: {self._drive_path}")
-                
-                # Sinkronisasi otomatis file **_config.yaml saat drive terhubung
-                self._sync_config_files_on_drive_connect()
                 
                 return True
         return False
@@ -248,269 +242,235 @@ class EnvironmentManager:
                     self.logger.warning(f"⚠️ Error pembuatan direktori: {path} - {str(e)}")
                 raise e
         
-        # Buat direktori
-        for idx, dir_path in enumerate(directories):
-            if progress_callback: 
-                progress_callback(idx + 1, total_dirs, f"Membuat direktori: {dir_path}")
-                
-            full_path = base / dir_path
+        # Iterasi dan buat setiap direktori
+        for i, dir_path in enumerate(directories):
             try:
-                # Khusus untuk direktori configs, pastikan file konfigurasi yang sudah ada tidak terhapus
-                if dir_path == "configs" and full_path.exists():
-                    # Hitung jumlah file konfigurasi yang dipertahankan
-                    config_files = list(full_path.glob("*_config.yaml"))
-                    stats['preserved'] += len(config_files)
-                    
-                    if self.logger and config_files:
-                        self.logger.info(f"💾 Mempertahankan {len(config_files)} file konfigurasi yang sudah ada")
-                        
-                    # Pastikan direktori configs tetap ada
-                    stats['existing'] += 1
-                    continue
+                # Report progress
+                if progress_callback:
+                    progress_callback(i, total_dirs, f"Creating directory: {dir_path}")
                 
-                # Untuk direktori lain, buat seperti biasa
-                if not full_path.exists():
-                    ensure_dir(full_path)
-                    stats['created'] += 1
+                # Buat direktori
+                path = base / dir_path
+                if path.exists():
+                    stats['existing'] += 1
                 else:
-                    stats['existing'] += 1
-            except Exception:
+                    ensure_dir(path)
+                    stats['created'] += 1
+            except Exception as e:
                 stats['error'] += 1
-        
-        # Sinkronisasi konfigurasi jika drive terhubung dan belum dalam proses sinkronisasi
-        if use_drive and self._drive_mounted and stats['preserved'] > 0 and not self._is_syncing:
-            # Set flag sinkronisasi untuk mencegah rekursi
-            self._is_syncing = True
-            
-            try:
-                # Import fungsi sinkronisasi dari smartcash.common.config.sync
-                from smartcash.common.config.sync import sync_all_configs
-                
-                    # Sinkronisasi semua file konfigurasi tanpa log berlebihan
-                results = sync_all_configs(
-                    sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
-                    config_dir='configs',   # Direktori konfigurasi
-                    create_backup=True,     # Buat backup sebelum sinkronisasi
-                    logger=None            # Tidak perlu log detail proses
-                )
-                
-                # Log hanya jika ada file yang berhasil disinkronkan
-                counts = {k: len(v) for k, v in results.items()}
-                
-                if self.logger and counts['success'] > 0:
-                    # Tampilkan ringkasan hanya untuk file yang berhasil
-                    success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
-                    if success_files:
-                        self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
-                        
-                # Log error jika ada
-                if self.logger and counts['failure'] > 0:
-                    self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
-            except Exception as sync_error:
                 if self.logger:
-                    self.logger.warning(f"⚠️ Error saat sinkronisasi setelah setup direktori: {str(sync_error)}")
-            finally:
-                # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
-                self._is_syncing = False
+                    self.logger.error(f"❌ Error saat membuat direktori {dir_path}: {str(e)}")
         
-        if self.logger:
-            # Log hasil setup direktori
-            self.logger.info(
-                f"📁 Setup direktori: {stats['created']} dibuat, {stats['existing']} sudah ada, "
-                f"{stats['preserved']} file konfigurasi dipertahankan"
-            )
+        # Report final progress
+        if progress_callback:
+            progress_callback(total_dirs, total_dirs, "Struktur direktori selesai dibuat")
         
         return stats
     
     def create_symlinks(self, progress_callback: Optional[Callable[[int, int, str], None]] = None) -> Dict[str, int]:
         """
-        Buat symlink dari direktori lokal ke direktori Google Drive.
+        Buat symlinks dari Drive ke direktori lokal di Colab.
         
         Args:
-            progress_callback: Callback untuk menampilkan progres (current, total, message)
+            progress_callback: Callback untuk menampilkan progres
             
         Returns:
             Statistik pembuatan symlink
         """
-        if not self._drive_mounted:
-            msg = "⚠️ Google Drive tidak ter-mount, tidak dapat membuat symlink"
-            if self.logger: self.logger.warning(msg)
+        if not self._in_colab or not self._drive_mounted:
             return {'created': 0, 'existing': 0, 'error': 0}
         
-        # Mapping symlink (koreksi: gunakan path /content, bukan /content/SmartCash)
-        symlinks = {
-            'data': self._drive_path / 'data',
-            'configs': self._drive_path / 'configs', 
-            'runs': self._drive_path / 'runs',
-            'logs': self._drive_path / 'logs',
-            'checkpoints': self._drive_path / 'checkpoints'
-        }
-        
+        # Direktori yang akan di-symlink
+        dirs_to_link = ['data', 'models', 'logs', 'exports', 'configs']
         stats = {'created': 0, 'existing': 0, 'error': 0}
-        total_symlinks = len(symlinks)
         
-        import shutil, os
-        
-        for idx, (local_name, target_path) in enumerate(symlinks.items()):
-            if progress_callback: progress_callback(idx + 1, total_symlinks, f"Membuat symlink: {local_name} -> {target_path}")
-                
+        for i, dirname in enumerate(dirs_to_link):
             try:
-                # Pastikan direktori target ada
-                os.makedirs(target_path, exist_ok=True)
+                # Report progress
+                if progress_callback:
+                    progress_callback(i, len(dirs_to_link), f"Creating symlink for: {dirname}")
                 
-                # Gunakan path /content, bukan /content/SmartCash
-                local_path = Path('/content') / local_name
+                # Path sumber dan target
+                src_path = self._drive_path / dirname
+                target_path = self._base_dir / dirname
                 
-                # Cek jika path lokal ada dan bukan symlink
-                if local_path.exists() and not local_path.is_symlink():
-                    backup_path = local_path.with_name(f"{local_name}_backup")
+                # Pastikan direktori sumber ada
+                if not src_path.exists():
+                    src_path.mkdir(parents=True, exist_ok=True)
+                
+                # Jika target sudah ada dan bukan symlink, backup dan hapus
+                if target_path.exists() and not target_path.is_symlink():
+                    backup_path = self._base_dir / f"{dirname}_backup"
+                    if backup_path.exists():
+                        import shutil
+                        shutil.rmtree(backup_path)
+                    target_path.rename(backup_path)
                     if self.logger:
-                        self.logger.debug(f"🔄 Memindahkan direktori lokal ke backup: {local_path} -> {backup_path}")
-                    
-                    # Hapus backup yang sudah ada
-                    if backup_path.exists(): shutil.rmtree(backup_path)
-                    
-                    # Pindahkan direktori lokal ke backup
-                    local_path.rename(backup_path)
+                        self.logger.info(f"🔄 Direktori {dirname} di-backup ke {dirname}_backup")
                 
                 # Buat symlink jika belum ada
-                if not local_path.exists():
-                    local_path.symlink_to(target_path)
+                if not target_path.exists():
+                    target_path.symlink_to(src_path, target_is_directory=True)
                     stats['created'] += 1
-                    if self.logger: self.logger.debug(f"🔗 Symlink berhasil dibuat: {local_name} -> {target_path}")
+                    if self.logger:
+                        self.logger.info(f"🔗 Symlink dibuat: {target_path} -> {src_path}")
                 else:
                     stats['existing'] += 1
             except Exception as e:
                 stats['error'] += 1
-                if self.logger: self.logger.warning(f"⚠️ Error pembuatan symlink: {local_name} - {str(e)}")
+                if self.logger:
+                    self.logger.error(f"❌ Error saat membuat symlink {dirname}: {str(e)}")
+        
+        # Report final progress
+        if progress_callback:
+            progress_callback(len(dirs_to_link), len(dirs_to_link), "Symlinks selesai dibuat")
         
         return stats
     
     def get_directory_tree(self, root_dir: Optional[Union[str, Path]] = None, max_depth: int = 3, 
                          indent: int = 0, _current_depth: int = 0) -> str:
         """
-        Dapatkan struktur direktori dalam format HTML.
+        Dapatkan representasi tree dari direktori.
         
         Args:
-            root_dir: Direktori awal untuk ditampilkan (default: base_dir)
-            max_depth: Kedalaman maksimum direktori yang ditampilkan
-            indent: Indentasi awal (untuk rekursi)
-            _current_depth: Kedalaman saat ini (untuk rekursi)
+            root_dir: Direktori root (default: base_dir)
+            max_depth: Kedalaman maksimum tree
+            indent: Indentasi awal
+            _current_depth: Kedalaman saat ini (untuk rekursi internal)
             
         Returns:
-            String HTML yang menampilkan struktur direktori
+            String representasi tree
         """
-        # Implementasi default jika komponen tidak tersedia
-        root_dir = Path(root_dir or self._base_dir)
-        
-        if not root_dir.exists(): return f"<span style='color:red'>❌ Direktori tidak ditemukan: {root_dir}</span>"
-        if _current_depth > max_depth: return "<span style='color:gray'>...</span>"
-        
-        result = "<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n" if indent == 0 else ""
-        
-        if indent == 0: result += f"<span style='color:#0366d6; font-weight:bold;'>{root_dir.name}/</span>\n"
-        
-        spaces = "│  " * indent
+        if root_dir is None:
+            root_dir = self._base_dir
+        else:
+            root_dir = Path(root_dir)
+            
+        if not root_dir.exists():
+            return f"Directory not found: {root_dir}"
+            
+        if _current_depth > max_depth:
+            return "..."
+            
+        result = []
         
         try:
-            items = sorted(root_dir.iterdir(), key=lambda x: (not x.is_dir(), x.name))
-        except PermissionError:
-            return f"{spaces}<span style='color:red'>❌ Akses ditolak: {root_dir}</span>\n"
-        
-        for i, item in enumerate(items):
-            is_last = i == len(items) - 1
-            prefix = "└─ " if is_last else "├─ "
+            # Get all entries in the directory
+            entries = list(root_dir.iterdir())
+            entries.sort(key=lambda x: (not x.is_dir(), x.name.lower()))
             
-            if item.is_dir():
-                result += f"{spaces}{prefix}<span style='color:#0366d6; font-weight:bold;'>{item.name}/</span>\n"
+            for i, entry in enumerate(entries):
+                is_last = i == len(entries) - 1
+                prefix = "└── " if is_last else "├── "
+                full_prefix = "    " * indent + prefix
                 
-                next_spaces = spaces + ("   " if is_last else "│  ")
-                if _current_depth < max_depth:
-                    subdirs = self.get_directory_tree(item, max_depth, indent + 1, _current_depth + 1)
-                    subdirs = subdirs.replace("<pre style='margin:0; padding:5px; background:#f8f9fa; font-family:monospace; color:#333;'>\n", "")
-                    subdirs = subdirs.replace("</pre>", "")
-                    result += subdirs
-            else:
-                ext = item.suffix.lower()
-                color = self._get_color_for_extension(ext)
-                result += f"{spaces}{prefix}<span style='color:{color};'>{item.name}</span>\n"
-        
-        if indent == 0: result += "</pre>"
-        return result
+                # Add color based on file type
+                if entry.is_dir():
+                    color = self._get_color_for_extension("dir")
+                    entry_str = f"{full_prefix}<span style='color:{color}'>{entry.name}/</span>"
+                else:
+                    ext = entry.suffix.lower()
+                    color = self._get_color_for_extension(ext)
+                    entry_str = f"{full_prefix}<span style='color:{color}'>{entry.name}</span>"
+                
+                result.append(entry_str)
+                
+                if entry.is_dir():
+                    next_indent = indent + 1
+                    next_prefix = "    " if is_last else "│   "
+                    subtree = self.get_directory_tree(
+                        entry, max_depth, next_indent, _current_depth + 1
+                    )
+                    if subtree != "...":
+                        result.append(subtree)
+                        
+            return "\n".join(result)
+        except Exception as e:
+            return f"Error reading directory: {str(e)}"
     
     def _get_color_for_extension(self, ext: str) -> str:
-        """Mendapatkan warna berdasarkan ekstensi file."""
-        if ext in ['.py']: return "#3572A5"  # Python files
-        elif ext in ['.md', '.txt']: return "#6A737D"  # Documentation files
-        elif ext in ['.jpg', '.jpeg', '.png', '.bmp']: return "#E34F26"  # Image files
-        elif ext in ['.json', '.yaml', '.yml']: return "#F1E05A"  # Config files
-        elif ext in ['.pt', '.pth']: return "#9B4DCA"  # PyTorch model files
-        return "#333"  # Default color
+        """Get color for file extension."""
+        colors = {
+            "dir": "#4285F4",  # Blue for directories
+            ".py": "#0F9D58",  # Green for Python
+            ".ipynb": "#F4B400",  # Yellow for notebooks
+            ".md": "#DB4437",  # Red for markdown
+            ".txt": "#4285F4",  # Blue for text
+            ".yaml": "#AA46BB",  # Purple for yaml
+            ".yml": "#AA46BB",  # Purple for yml
+            ".json": "#F26522",  # Orange for json
+        }
+        return colors.get(ext, "#000000")  # Default black
     
     def sync_config(self) -> Tuple[bool, str]:
         """
-        Sinkronisasi konfigurasi antara lokal dan Google Drive.
+        Sinkronisasi konfigurasi antara lokal dan drive.
         
         Returns:
-            Tuple (sukses, pesan)
+            Tuple dari (sukses, pesan)
         """
+        # Cek apakah di Colab dan drive terhubung
+        if not self._in_colab or not self._drive_mounted:
+            return False, "Sinkronisasi hanya tersedia di Google Colab dengan Drive terhubung"
+        
         try:
-            # Import config manager
-            from smartcash.common.config import get_config_manager
-            config_manager = get_config_manager()
+            # Import komponen UI jika tersedia
+            try:
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                from IPython.display import display
+                
+                # Tampilkan pesan informasi sinkronisasi
+                display(create_info_alert(
+                    "Sinkronisasi Config",
+                    "info",
+                    "🔄"
+                ))
+            except ImportError:
+                pass
+                
+            # Dapatkan direktori konfigurasi
+            local_config_dir = self._base_dir / "configs"
+            drive_config_dir = self._drive_path / "configs"
             
-            # Sinkronisasi konfigurasi
-            if self._drive_mounted:
-                # Cek apakah ada konfigurasi di Drive
-                drive_config_path = self._drive_path / 'configs'
-                local_config_path = self._base_dir / 'configs'
-                
-                # Pastikan direktori configs ada di kedua lokasi
-                os.makedirs(drive_config_path, exist_ok=True)
-                os.makedirs(local_config_path, exist_ok=True)
-                
-                # Sinkronisasi file konfigurasi dari Drive ke lokal
-                synced_files = 0
-                for config_file in drive_config_path.glob('*.yaml'):
-                    target_file = local_config_path / config_file.name
-                    if not target_file.exists() or os.path.getmtime(config_file) > os.path.getmtime(target_file):
+            # Pastikan kedua direktori ada
+            os.makedirs(local_config_dir, exist_ok=True)
+            os.makedirs(drive_config_dir, exist_ok=True)
+            
+            # Buat symlink jika belum ada
+            if not local_config_dir.is_symlink():
+                # Backup direktori lokal jika ada
+                if local_config_dir.exists():
+                    backup_dir = self._base_dir / "configs_backup"
+                    if backup_dir.exists():
                         import shutil
-                        shutil.copy2(config_file, target_file)
-                        synced_files += 1
-                        if self.logger:
-                            self.logger.debug(f"🔄 Sinkronisasi konfigurasi: {config_file.name} (Drive → Lokal)")
-                
-                # Sinkronisasi file konfigurasi dari lokal ke Drive
-                for config_file in local_config_path.glob('*.yaml'):
-                    target_file = drive_config_path / config_file.name
-                    if not target_file.exists() or os.path.getmtime(config_file) > os.path.getmtime(target_file):
-                        import shutil
-                        shutil.copy2(config_file, target_file)
-                        synced_files += 1
-                        if self.logger:
-                            self.logger.debug(f"🔄 Sinkronisasi konfigurasi: {config_file.name} (Lokal → Drive)")
-                
-                # Memuat ulang konfigurasi setelah sinkronisasi
-                try:
-                    # Dapatkan daftar modul yang tersedia
-                    module_configs = getattr(config_manager, 'module_configs', {})
-                    
-                    # Untuk setiap modul, load ulang konfigurasinya
-                    for module_name in module_configs.keys():
-                        # Dapatkan konfigurasi modul saat ini (ini akan memuat ulang dari file)
-                        config_manager.get_module_config(module_name, {})
-                except Exception as reload_error:
+                        shutil.rmtree(backup_dir)
+                    import shutil
+                    shutil.move(local_config_dir, backup_dir)
                     if self.logger:
-                        self.logger.debug(f"ℹ️ Tidak dapat memuat ulang konfigurasi: {str(reload_error)}")
+                        self.logger.info(f"🔄 Direktori konfigurasi di-backup ke configs_backup")
                 
-                if self.logger and synced_files > 0:
-                    self.logger.info(f"✅ Sinkronisasi konfigurasi selesai: {synced_files} file disinkronkan")
-                
-                return True, f"Sinkronisasi konfigurasi berhasil: {synced_files} file disinkronkan"
-            else:
+                # Buat symlink
+                os.symlink(drive_config_dir, local_config_dir)
                 if self.logger:
-                    self.logger.debug("ℹ️ Google Drive tidak terhubung, sinkronisasi konfigurasi dilewati")
-                return True, "Google Drive tidak terhubung, sinkronisasi konfigurasi dilewati"
+                    self.logger.info(f"🔗 Symlink konfigurasi dibuat: {local_config_dir} -> {drive_config_dir}")
+            
+            # Tampilkan ringkasan
+            try:
+                from smartcash.ui.utils.metric_utils import create_metric_display
+                from IPython.display import display
+                
+                # Hitung jumlah file
+                local_files = list(local_config_dir.glob("*.yaml"))
+                drive_files = list(drive_config_dir.glob("*.yaml"))
+                
+                # Tampilkan metrik
+                display(create_metric_display("Config files", len(local_files)))
+                display(create_metric_display("Status", "Synced", is_good=True))
+            except ImportError:
+                pass
+                
+            return True, "Konfigurasi berhasil disinkronkan"
+            
         except Exception as e:
             if self.logger:
                 self.logger.error(f"❌ Error saat sinkronisasi konfigurasi: {str(e)}")
@@ -521,26 +481,17 @@ class EnvironmentManager:
         Simpan konfigurasi environment ke file.
         
         Returns:
-            Tuple (sukses, pesan)
+            Tuple dari (sukses, pesan)
         """
         try:
-            # Import config manager
+            # Dapatkan config manager
             from smartcash.common.config import get_config_manager
             config_manager = get_config_manager()
             
-            # Dapatkan informasi environment
+            # Dapatkan informasi sistem
             env_info = self.get_system_info()
             
-            # Simpan informasi environment ke konfigurasi
-            config_manager.set('environment', env_info)
-            
-            # Simpan path penting
-            config_manager.set('base_dir', str(self._base_dir))
-            config_manager.set('dataset_path', str(self._base_dir / 'data'))
-            config_manager.set('model_path', str(self._base_dir / 'models'))
-            config_manager.set('config_path', str(self._base_dir / 'configs'))
-            
-            # Simpan status drive
+            # Tambahkan informasi drive
             if self._drive_mounted:
                 config_manager.set('drive_mounted', True)
                 config_manager.set('drive_path', str(self._drive_path))
@@ -561,41 +512,28 @@ class EnvironmentManager:
                 if self.logger:
                     self.logger.warning(f"⚠️ Error saat menyimpan konfigurasi modul: {str(save_error)}")
             
-            # Sinkronisasi semua file konfigurasi jika Drive terhubung dan belum dalam proses sinkronisasi
-            if self._drive_mounted and not self._is_syncing:
-                # Set flag sinkronisasi untuk mencegah rekursi
-                self._is_syncing = True
+            # Tampilkan ringkasan dengan format yang sama dengan dependency installer
+            try:
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                from smartcash.ui.utils.metric_utils import create_metric_display
+                from IPython.display import display
                 
-                try:
-                    # Import fungsi sinkronisasi dari smartcash.common.config.sync
-                    from smartcash.common.config.sync import sync_all_configs
-                    
-                    # Sinkronisasi semua file konfigurasi tanpa log berlebihan
-                    results = sync_all_configs(
-                        sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
-                        config_dir='configs',   # Direktori konfigurasi
-                        create_backup=True,     # Buat backup sebelum sinkronisasi
-                        logger=None            # Tidak perlu log detail proses
-                    )
-                    
-                    # Log hanya jika ada file yang berhasil disinkronkan
-                    counts = {k: len(v) for k, v in results.items()}
-                    
-                    if self.logger and counts['success'] > 0:
-                        # Tampilkan ringkasan hanya untuk file yang berhasil
-                        success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
-                        if success_files:
-                            self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
-                            
-                    # Log error jika ada
-                    if self.logger and counts['failure'] > 0:
-                        self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
-                except Exception as sync_error:
-                    if self.logger:
-                        self.logger.warning(f"⚠️ Error saat sinkronisasi konfigurasi: {str(sync_error)}")
-                finally:
-                    # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
-                    self._is_syncing = False
+                # Header ringkasan
+                display(create_info_alert(
+                    "Konfigurasi Environment",
+                    "success",
+                    "✅"
+                ))
+                
+                # Metrik
+                display(create_metric_display("Environment", "Google Colab" if self._in_colab else "Local"))
+                display(create_metric_display("Base Directory", str(self._base_dir)))
+                display(create_metric_display("Drive Mounted", "Yes" if self._drive_mounted else "No", is_good=self._drive_mounted))
+                if self._drive_mounted:
+                    display(create_metric_display("Drive Path", str(self._drive_path)))
+            except ImportError:
+                # Fallback jika komponen UI tidak tersedia
+                pass
             
             if self.logger:
                 self.logger.info("✅ Konfigurasi environment berhasil disimpan")
@@ -671,45 +609,35 @@ class EnvironmentManager:
     def _sync_config_files_on_drive_connect(self) -> None:
         """
         Sinkronisasi otomatis file **_config.yaml saat drive terhubung.
-        Menggunakan flag sinkronisasi untuk mencegah rekursi.
         """
-        # Cek apakah drive terhubung dan sinkronisasi belum berjalan
-        if not self._drive_mounted or self._is_syncing:
+        # Cek apakah drive terhubung
+        if not self._drive_mounted:
             return
             
-        # Set flag sinkronisasi untuk mencegah rekursi
-        self._is_syncing = True
-        
         try:
-            # Import fungsi sinkronisasi dari smartcash.common.config.sync
-            from smartcash.common.config.sync import sync_all_configs
+            # Tampilkan informasi sinkronisasi dengan format yang sama dengan dependency installer
+            try:
+                from smartcash.ui.utils.alert_utils import create_info_alert
+                from IPython.display import display
+                
+                # Tampilkan pesan informasi sinkronisasi
+                display(create_info_alert(
+                    "Sinkronisasi Config",
+                    "info",
+                    "🔄"
+                ))
+            except ImportError:
+                pass
             
-            # Sinkronisasi semua file konfigurasi
-            results = sync_all_configs(
-                sync_strategy='merge',  # Gabungkan konfigurasi lokal dan drive
-                config_dir='configs',   # Direktori konfigurasi
-                create_backup=True,     # Buat backup sebelum sinkronisasi
-                logger=None            # Tidak perlu log detail proses
-            )
+            # Lakukan sinkronisasi sederhana dengan symlink
+            self.sync_config()
             
-            # Log hanya jika ada file yang berhasil disinkronkan
-            counts = {k: len(v) for k, v in results.items()}
-            
-            if self.logger and counts['success'] > 0:
-                # Tampilkan ringkasan hanya untuk file yang berhasil
-                success_files = [item['file'] for item in results['success'] if '_config.yaml' in item['file']]
-                if success_files:
-                    self.logger.info(f"✅ {len(success_files)} file konfigurasi berhasil disinkronkan: {', '.join(success_files)}")
-                    
-            # Log error jika ada
-            if self.logger and counts['failure'] > 0:
-                self.logger.warning(f"⚠️ {counts['failure']} file gagal disinkronkan")
+            if self.logger:
+                self.logger.info("✅ Sinkronisasi config berhasil")
+                
         except Exception as sync_error:
             if self.logger:
                 self.logger.warning(f"⚠️ Error saat sinkronisasi otomatis: {str(sync_error)}")
-        finally:
-            # Reset flag sinkronisasi setelah selesai (bahkan jika terjadi error)
-            self._is_syncing = False
     
     def _detect_notebook(self) -> bool:
         """

@@ -161,11 +161,21 @@ def _get_ui_logger() -> Optional[Any]:
         # Coba dapatkan UI logger dari konteks global
         import builtins
         if hasattr(builtins, 'ui_components') and 'logger' in builtins.ui_components:
-            return builtins.ui_components['logger']
+            logger = builtins.ui_components['logger']
+            # Set level ke ERROR untuk mengurangi log yang tidak perlu
+            if hasattr(logger, 'set_level'):
+                import logging
+                logger.set_level(logging.ERROR)
+            return logger
         
         # Coba dapatkan dari modul UI
         from smartcash.ui.utils.ui_logger import get_current_ui_logger
-        return get_current_ui_logger()
-    except (ImportError, AttributeError):
-        # Fallback ke None jika tidak ada UI logger
+        logger = get_current_ui_logger()
+        if logger:
+            # Set level ke ERROR untuk mengurangi log yang tidak perlu
+            import logging
+            logger.set_level(logging.ERROR)
+        return logger
+    except Exception:
+        # Fallback ke None jika tidak ada UI logger atau terjadi error
         return None 

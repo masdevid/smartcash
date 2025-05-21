@@ -12,26 +12,29 @@ from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handler import (
 
 from smartcash.ui.dataset.preprocessing.handlers.stop_handler import (
     handle_stop_button_click,
-    execute_stop
+    stop_preprocessing
 )
 
 from smartcash.ui.dataset.preprocessing.handlers.reset_handler import (
     handle_reset_button_click,
-    execute_reset,
-    reset_ui_values
+    reset_preprocessing_config
 )
 
 from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import (
     handle_cleanup_button_click,
     execute_cleanup,
-    cleanup_preprocessed_files
+    cleanup_preprocessed_files,
+    start_progress,
+    reset_ui_after_cleanup
 )
 
 from smartcash.ui.dataset.preprocessing.handlers.save_handler import (
     handle_save_button_click,
-    execute_save,
-    save_preprocessing_config,
-    prepare_config_for_serialization
+    save_preprocessing_config
+)
+
+from smartcash.ui.dataset.preprocessing.handlers.config_handler import (
+    update_ui_from_config
 )
 
 from smartcash.ui.dataset.preprocessing.handlers.setup_handlers import (
@@ -47,23 +50,25 @@ __all__ = [
     
     # stop_handler exports
     'handle_stop_button_click',
-    'execute_stop',
+    'stop_preprocessing',
     
     # reset_handler exports
     'handle_reset_button_click',
-    'execute_reset',
-    'reset_ui_values',
+    'reset_preprocessing_config',
     
     # cleanup_handler exports
     'handle_cleanup_button_click',
     'execute_cleanup',
     'cleanup_preprocessed_files',
+    'start_progress',
+    'reset_ui_after_cleanup',
     
     # save_handler exports
     'handle_save_button_click',
-    'execute_save',
     'save_preprocessing_config',
-    'prepare_config_for_serialization',
+    
+    # config_handler exports
+    'update_ui_from_config',
     
     # setup_handlers exports
     'setup_preprocessing_handlers'

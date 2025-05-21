@@ -1,16 +1,32 @@
 """
 File: smartcash/ui/setup/env_config/utils/fallback_logger.py
 Deskripsi: Logger fallback sederhana untuk environment config
+
+DEPRECATED: Gunakan create_ui_logger dengan ENV_CONFIG_LOGGER_NAMESPACE dari smartcash.ui.utils.ui_logger_namespace sebagai gantinya.
 """
 
 import logging
 import sys
+import warnings
 from typing import Optional, Any
+
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
+
+# Tampilkan warning tentang deprecation
+warnings.warn(
+    "FallbackLogger sudah deprecated. Gunakan create_ui_logger dengan ENV_CONFIG_LOGGER_NAMESPACE "
+    "dari smartcash.ui.utils.ui_logger_namespace sebagai gantinya.",
+    DeprecationWarning,
+    stacklevel=2
+)
 
 class FallbackLogger:
     """
     Logger sederhana yang menyediakan antarmuka mirip dengan UILogger
     untuk memastikan kompatibilitas ketika UILogger tidak tersedia.
+    
+    DEPRECATED: Gunakan create_ui_logger dengan ENV_CONFIG_LOGGER_NAMESPACE sebagai gantinya.
     """
     
     def __init__(self, name: str = "env_config", level: int = logging.INFO):
@@ -21,18 +37,15 @@ class FallbackLogger:
             name: Nama logger
             level: Level logging
         """
-        self.logger = logging.getLogger(name)
+        warnings.warn(
+            "FallbackLogger sudah deprecated. Gunakan create_ui_logger dengan ENV_CONFIG_LOGGER_NAMESPACE sebagai gantinya.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        
+        # Gunakan logger dengan namespace dari ui_logger_namespace sebagai gantinya
+        self.logger = get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
         self.logger.setLevel(level)
-        
-        # Hapus handler yang sudah ada untuk mencegah duplikasi
-        for handler in self.logger.handlers[:]:
-            self.logger.removeHandler(handler)
-        
-        # Tambahkan console handler ke sys.__stdout__ untuk menghindari rekursi
-        handler = logging.StreamHandler(sys.__stdout__)
-        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        handler.setFormatter(formatter)
-        self.logger.addHandler(handler)
     
     def debug(self, message: str) -> None:
         """Log debug message."""
@@ -66,10 +79,17 @@ def get_fallback_logger(name: str = "env_config") -> FallbackLogger:
     """
     Dapatkan instance fallback logger
     
+    DEPRECATED: Gunakan get_logger(ENV_CONFIG_LOGGER_NAMESPACE) sebagai gantinya.
+    
     Args:
         name: Nama logger
         
     Returns:
         Instance FallbackLogger
     """
+    warnings.warn(
+        "get_fallback_logger sudah deprecated. Gunakan get_logger dengan ENV_CONFIG_LOGGER_NAMESPACE sebagai gantinya.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     return FallbackLogger(name) 

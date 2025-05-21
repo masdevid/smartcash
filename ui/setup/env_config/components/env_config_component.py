@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/components/env_config_component.py
+File: smartcash/ui/setup/env_config/components/env_config_component.py
 Deskripsi: Component UI untuk konfigurasi environment
 """
 
@@ -7,12 +7,14 @@ from typing import Dict, Any
 from IPython.display import display
 from pathlib import Path
 import os
-import logging
 
-from smartcash.ui.handlers.environment_handler import EnvironmentHandler
-from smartcash.ui.handlers.auto_check_handler import AutoCheckHandler
-from smartcash.ui.setup.env_config.components.ui_creator import create_env_config_ui
-from smartcash.ui.utils.env_ui_utils import update_status, update_progress, log_message
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger import create_ui_logger
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
+from smartcash.ui.setup.env_config.handlers.environment_handler import EnvironmentHandler
+from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
+from smartcash.ui.setup.env_config.components.ui_factory import UIFactory
+from smartcash.ui.utils.env_ui_utils import update_status, update_progress, log_message, MODULE_LOGGER_NAME
 from smartcash.common.utils import is_colab
 
 class EnvConfigComponent:
@@ -24,16 +26,15 @@ class EnvConfigComponent:
         """
         Inisialisasi component
         """
-        self.logger = logging.getLogger(__name__)
-        if not self.logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-            self.logger.addHandler(handler)
-            self.logger.setLevel(logging.INFO)
         
         # Create UI components first
-        self.ui_components = create_env_config_ui()
+        self.ui_components = UIFactory.create_ui_components()
+        
+        # Setup logger dengan namespace khusus environment config
+        logger = create_ui_logger(self.ui_components, ENV_CONFIG_LOGGER_NAMESPACE)
+        self.ui_components['logger'] = logger
+        self.ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
+        self.ui_components['env_config_initialized'] = True
         
         # Setup UI callbacks for handlers
         ui_callbacks = {
@@ -64,11 +65,11 @@ class EnvConfigComponent:
         """
         update_progress(self.ui_components, value, message)
 
-    def _log_message(self, message: str):
+    def _log_message(self, message: str, level: str = "info", icon: str = None):
         """
         Log a message to the output panel
         """
-        log_message(self.ui_components, message)
+        log_message(self.ui_components, message, level, icon)
 
     def _handle_setup_click(self, button):
         """
@@ -88,7 +89,7 @@ class EnvConfigComponent:
                 
         except Exception as e:
             self._update_status(f"Error: {str(e)}", "error")
-            self._log_message(f"Error: {str(e)}")
+            self._log_message(f"Error: {str(e)}", "error", "❌")
             button.disabled = False
 
     def display(self):
@@ -101,12 +102,14 @@ class EnvConfigComponent:
         if all_dirs_exist:
             self.ui_components['setup_button'].disabled = True
             self._update_status("Environment sudah terkonfigurasi", "success")
+            self._log_message("Environment sudah terkonfigurasi", "success", "✅")
             
             # Initialize config singleton if environment is already set up
             self.env_handler.initialize_config_singleton()
         else:
             self.ui_components['setup_button'].disabled = False
             self._update_status("Environment perlu dikonfigurasi", "info")
+            self._log_message("Environment perlu dikonfigurasi", "info", "ℹ️")
 
         # Display the UI components
         display(self.ui_components['ui_layout'])

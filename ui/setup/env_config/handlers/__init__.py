@@ -8,6 +8,8 @@ from smartcash.ui.setup.env_config.handlers.environment_setup_handler import Env
 from smartcash.ui.setup.env_config.handlers.local_setup_handler import LocalSetupHandler
 from smartcash.ui.setup.env_config.handlers.colab_setup_handler import ColabSetupHandler
 from smartcash.ui.setup.env_config.handlers.setup_handler import SetupHandler
+from smartcash.ui.setup.env_config.handlers.environment_handler import EnvironmentHandler
+from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
 
 # Import fungsi-fungsi untuk kompatibilitas mundur
 from smartcash.ui.setup.env_config.handlers.config_info_handler import display_config_info
@@ -20,6 +22,8 @@ __all__ = [
     'LocalSetupHandler',
     'ColabSetupHandler',
     'SetupHandler',
+    'EnvironmentHandler',
+    'AutoCheckHandler',
     
     # Fungsi-fungsi untuk kompatibilitas mundur
     'display_config_info',

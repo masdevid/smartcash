@@ -12,14 +12,16 @@ from smartcash.ui.setup.env_config.handlers import (
     perform_setup,
     handle_setup_error,
     setup_environment,
-    display_config_info
+    display_config_info,
+    EnvironmentHandler,
+    AutoCheckHandler
 )
 
 # Import components
 from smartcash.ui.setup.env_config.components import (
     UIFactory,
     create_ui_components,
-    create_env_config_ui
+    EnvConfigComponent
 )
 
 # Import env_config_initializer
@@ -31,6 +33,8 @@ __all__ = [
     'LocalSetupHandler',
     'ColabSetupHandler',
     'SetupHandler',
+    'EnvironmentHandler',
+    'AutoCheckHandler',
     'perform_setup',
     'handle_setup_error',
     'setup_environment',
@@ -39,7 +43,7 @@ __all__ = [
     # Components
     'UIFactory',
     'create_ui_components',
-    'create_env_config_ui',
+    'EnvConfigComponent',
     
     # Initializer
     'initialize_env_config_ui'

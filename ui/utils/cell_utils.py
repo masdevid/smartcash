@@ -53,7 +53,10 @@ def setup_notebook_environment(cell_name: str) -> Tuple[Any, Dict[str, Any]]:
             # Coba load konfigurasi spesifik cell jika ada
             cell_config_file = f"configs/{cell_name.lower()}_config.yaml"
             if Path(cell_config_file).exists():
-                config = config_manager.merge_config(cell_config_file)
+                # Use merge_configs from serialization
+                from smartcash.common.io.serialization import merge_configs
+                cell_config = config_manager.load_config(cell_config_file)
+                config = merge_configs(config, cell_config)
         except Exception as e:
             print(f"⚠️ Error saat load konfigurasi: {str(e)}")
             

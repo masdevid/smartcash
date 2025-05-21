@@ -158,7 +158,7 @@ class UILogger:
                 with self.ui_components['status']:
                     try:
                         from smartcash.ui.utils.alert_utils import create_status_indicator
-                        display(create_status_indicator(level, formatted_message))
+                        display(create_status_indicator(level, formatted_message, emoji))
                     except ImportError:
                         # Fallback jika tidak ada alert_utils
                         display(HTML(formatted_html))

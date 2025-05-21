@@ -3,11 +3,18 @@ File: smartcash/ui/utils/env_ui_utils.py
 Deskripsi: Utilitas UI untuk environment config
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 import ipywidgets as widgets
 import sys
 from datetime import datetime
 from IPython.display import display, HTML
+
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger import log_to_ui
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
+
+# Konstanta untuk ID namespace di UI
+MODULE_LOGGER_NAME = "ENV-CONFIG"
 
 def update_status(ui_components: Dict[str, Any], message: str, style: str = "info") -> None:
     """
@@ -38,36 +45,52 @@ def set_button_state(button: widgets.Button, disabled: bool, style: str = None) 
     if style:
         button.button_style = style
 
-def log_message(ui_components: Dict[str, Any], message: str, level: str = "info") -> None:
+def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: Optional[str] = None) -> None:
     """
-    Log message to output
+    Log message ke UI dan logger Python dengan namespace environment config.
     
     Args:
-        ui_components: Dictionary UI components
-        message: Message to log
-        level: Log level (info, error)
+        ui_components: Dictionary komponen UI
+        message: Pesan yang akan di-log
+        level: Level log (info, warning, error, success)
+        icon: Ikon opsional untuk ditampilkan di depan pesan
     """
     # Jika pesan kosong, jangan log
     if not message or not message.strip():
         return
         
-    timestamp = datetime.now().strftime('%H:%M:%S')
-    log_widget = ui_components.get('log_output')  # Use Output widget for logging
+    # Pastikan komponen UI memiliki namespace yang tepat
+    if 'logger_namespace' not in ui_components:
+        ui_components['logger_namespace'] = ENV_CONFIG_LOGGER_NAMESPACE
     
-    # Tentukan warna dan icon berdasarkan level
-    color = "red" if level == "error" else "black"
-    icon = "❌" if level == "error" else "ℹ️"
+    # Tandai sebagai modul environment config
+    if 'env_config_initialized' not in ui_components:
+        ui_components['env_config_initialized'] = True
     
-    formatted_message = f"[{timestamp}] {icon} {message}"
+    # Gunakan logger dengan namespace yang tepat
+    logger = ui_components.get('logger') or get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
     
-    if log_widget is not None:
-        with log_widget:
-            # Gunakan display(HTML) sebagai pengganti print untuk menghindari rekursi
-            display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
-    else:
-        # Fallback ke sys.__stdout__ untuk menghindari rekursi
-        sys.__stdout__.write(f"{formatted_message}\n")
-        sys.__stdout__.flush()
+    # Log ke UI dengan log_to_ui untuk format yang konsisten
+    log_to_ui(ui_components, message, level, icon)
+    
+    # Tambahkan prefix untuk memudahkan filtering di logger Python
+    prefixed_message = f"[{MODULE_LOGGER_NAME}] {message}"
+    
+    # Log ke Python logger juga
+    if logger:
+        if level == "info":
+            logger.info(prefixed_message)
+        elif level == "warning" or level == "warn":
+            logger.warning(prefixed_message)
+        elif level == "error":
+            logger.error(prefixed_message)
+        elif level == "debug":
+            logger.debug(prefixed_message)
+        elif level == "success":
+            # Success level tidak ada di Python logger standard, gunakan info
+            logger.info(f"✅ {prefixed_message}")
+        elif level == "critical":
+            logger.critical(prefixed_message)
 
 def update_progress(ui_components: Dict[str, Any], value: float, message: str = "") -> None:
     """
@@ -82,4 +105,8 @@ def update_progress(ui_components: Dict[str, Any], value: float, message: str = 
         ui_components['progress_bar'].value = value
     
     if 'progress_message' in ui_components and message:  # Hanya update jika message tidak kosong
-        ui_components['progress_message'].value = message 
+        ui_components['progress_message'].value = message
+        
+    # Log progress message jika ada
+    if message:
+        log_message(ui_components, message, "info") 

@@ -7,8 +7,10 @@ import os
 import shutil
 from pathlib import Path
 from typing import Tuple, Any, Dict, Optional, Callable
-import logging
 import yaml
+
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 
 class ColabSetupHandler:
     """
@@ -23,13 +25,23 @@ class ColabSetupHandler:
             ui_callback: Dictionary callback untuk update UI
         """
         self.ui_callback = ui_callback or {}
-        self.logger = logging.getLogger(__name__)
+        self.logger = get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
         
-    def _log_message(self, message: str):
+    def _log_message(self, message: str, level: str = "info", icon: str = None):
         """Log message to UI if callback exists"""
-        self.logger.info(message)
+        # Log ke logger object
+        if level == "error":
+            self.logger.error(message)
+        elif level == "warning":
+            self.logger.warning(message)
+        elif level == "success":
+            self.logger.info(f"✅ {message}")
+        else:
+            self.logger.info(message)
+            
+        # Gunakan callback jika ada
         if 'log_message' in self.ui_callback:
-            self.ui_callback['log_message'](message)
+            self.ui_callback['log_message'](message, level, icon)
             
     def _update_status(self, message: str, status_type: str = "info"):
         """Update status in UI if callback exists"""
@@ -50,11 +62,11 @@ class ColabSetupHandler:
             try:
                 with open(repo_config_path, 'r') as f:
                     colab_config = yaml.safe_load(f) or {}
-                self._log_message(f"✅ Konfigurasi Colab dimuat dari {repo_config_path}")
+                self._log_message(f"Konfigurasi Colab dimuat dari {repo_config_path}", "success", "✅")
             except Exception as e:
-                self._log_message(f"⚠️ Gagal memuat colab_config.yaml: {str(e)}")
+                self._log_message(f"Gagal memuat colab_config.yaml: {str(e)}", "warning", "⚠️")
         else:
-            self._log_message(f"ℹ️ File konfigurasi Colab tidak ditemukan di {repo_config_path}")
+            self._log_message(f"File konfigurasi Colab tidak ditemukan di {repo_config_path}", "info", "ℹ️")
         
         return colab_config
     
@@ -114,7 +126,7 @@ class ColabSetupHandler:
             shutil.copy2(config_file, target_dir / config_file.name)
             count += 1
         
-        self._log_message(f"✅ {count} file konfigurasi disalin dari {source_dir} ke {target_dir}")
+        self._log_message(f"{count} file konfigurasi disalin dari {source_dir} ke {target_dir}", "success", "✅")
     
     def setup_symlinks(self, config_dir: Path, drive_config_dir: Path) -> Path:
         """
@@ -131,22 +143,22 @@ class ColabSetupHandler:
         if config_dir.exists() and not config_dir.is_symlink():
             # Hapus direktori jika bukan symlink
             shutil.rmtree(config_dir)
-            self._log_message(f"⚠️ Direktori konfigurasi bukan symlink, akan dibuat ulang")
+            self._log_message(f"Direktori konfigurasi bukan symlink, akan dibuat ulang", "warning", "⚠️")
         elif config_dir.is_symlink() and not os.path.exists(config_dir):
             # Symlink rusak, hapus
             os.unlink(config_dir)
-            self._log_message(f"⚠️ Symlink konfigurasi rusak, akan dibuat ulang")
+            self._log_message(f"Symlink konfigurasi rusak, akan dibuat ulang", "warning", "⚠️")
         
         # Buat symlink baru jika belum ada atau rusak
         if not config_dir.exists():
             # Pastikan direktori Drive ada sebelum membuat symlink
             if not drive_config_dir.exists():
                 drive_config_dir.mkdir(parents=True, exist_ok=True)
-                self._log_message(f"✅ Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
+                self._log_message(f"Direktori konfigurasi di Drive dibuat: {drive_config_dir}", "success", "✅")
             
             # Buat symlink baru
             os.symlink(drive_config_dir, config_dir)
-            self._log_message(f"✅ Symlink dibuat dari {drive_config_dir} ke {config_dir}")
+            self._log_message(f"Symlink dibuat dari {drive_config_dir} ke {config_dir}", "success", "✅")
         
         return config_dir
     
@@ -164,7 +176,7 @@ class ColabSetupHandler:
         # Jika tidak menggunakan symlink, copy file dari Drive ke local
         if not config_dir.exists():
             config_dir.mkdir(parents=True, exist_ok=True)
-            self._log_message(f"✅ Direktori konfigurasi dibuat: {config_dir}")
+            self._log_message(f"Direktori konfigurasi dibuat: {config_dir}", "success", "✅")
         
         # Copy file dari Drive ke local
         count = 0
@@ -172,7 +184,7 @@ class ColabSetupHandler:
             shutil.copy2(config_file, config_dir / config_file.name)
             count += 1
         
-        self._log_message(f"✅ {count} file konfigurasi disalin dari {drive_config_dir} ke {config_dir}")
+        self._log_message(f"{count} file konfigurasi disalin dari {drive_config_dir} ke {config_dir}", "success", "✅")
         
         return config_dir
     
@@ -209,15 +221,15 @@ class ColabSetupHandler:
             else:
                 config_dir = self.setup_direct_copy(config_dir, drive_config_dir)
                 
-            self._log_message(f"✅ Setup environment Colab selesai. Base: {base_dir}, Config: {config_dir}")
+            self._log_message(f"Setup environment Colab selesai. Base: {base_dir}, Config: {config_dir}", "success", "✅")
             
         except Exception as e:
-            self._log_message(f"❌ Error saat setup Colab environment: {str(e)}")
+            self._log_message(f"Error saat setup Colab environment: {str(e)}", "error", "❌")
             self._update_status(f"Error saat setup environment: {str(e)}", "error")
             
             # Fallback - buat direktori config kosong jika terjadi error
             if not config_dir.exists():
                 config_dir.mkdir(parents=True, exist_ok=True)
-                self._log_message(f"✅ Direktori konfigurasi fallback dibuat: {config_dir}")
+                self._log_message(f"Direktori konfigurasi fallback dibuat: {config_dir}", "warning", "⚠️")
         
         return base_dir, config_dir 

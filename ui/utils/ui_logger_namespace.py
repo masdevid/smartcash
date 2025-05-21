@@ -9,8 +9,14 @@ from typing import Dict, Any, Optional
 KNOWN_NAMESPACES = {
     "smartcash.setup.dependency_installer": "DEP-INSTALLER",
     "smartcash.dataset.download": "DATASET-DOWNLOAD",
+    "smartcash.ui.env_config": "ENV-CONFIG",
     # Tambahkan namespace-namespace lain di sini jika diperlukan
 }
+
+# Export konstanta
+DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer" 
+DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
+ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
 
 def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     """
@@ -35,6 +41,9 @@ def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     
     if ui_components.get('download_initialized', False):
         return KNOWN_NAMESPACES.get("smartcash.dataset.download")
+    
+    if ui_components.get('env_config_initialized', False):
+        return KNOWN_NAMESPACES.get("smartcash.ui.env_config")
     
     # Default: tidak ada namespace yang dikenali
     return None

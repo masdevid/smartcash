@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/handlers/environment_handler.py
+File: smartcash/ui/setup/env_config/handlers/environment_handler.py
 Deskripsi: Handler untuk operasi terkait environment
 """
 
@@ -13,8 +13,9 @@ from typing import List, Dict, Any, Tuple, Optional, Callable
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.utils.ui_logger import get_current_ui_logger
-from smartcash.ui.setup.env_config.utils.fallback_logger import get_fallback_logger
+from smartcash.common.logger import get_logger
+from smartcash.ui.utils.ui_logger import get_current_ui_logger, create_ui_logger
+from smartcash.ui.utils.ui_logger_namespace import ENV_CONFIG_LOGGER_NAMESPACE
 
 class EnvironmentHandler:
     """
@@ -31,9 +32,9 @@ class EnvironmentHandler:
         # Coba mendapatkan UI logger yang ada
         self.logger = get_current_ui_logger()
         
-        # Jika tidak ada UI logger, gunakan fallback logger
+        # Jika tidak ada UI logger, gunakan logger dengan namespace env_config
         if not self.logger:
-            self.logger = get_fallback_logger("environment_handler")
+            self.logger = get_logger(ENV_CONFIG_LOGGER_NAMESPACE)
         
         # Initialize environment manager singleton first
         self.env_manager = get_environment_manager()
@@ -72,12 +73,21 @@ class EnvironmentHandler:
             'colab_config.yaml'
         ]
     
-    def _log_message(self, message: str):
+    def _log_message(self, message: str, level: str = "info", icon: str = None):
         """Log message to UI if callback exists"""
-        self.logger.info(message)
+        # Log ke logger object
+        if level == "error":
+            self.logger.error(message)
+        elif level == "warning":
+            self.logger.warning(message)
+        elif level == "success":
+            self.logger.info(f"✅ {message}")
+        else:
+            self.logger.info(message)
             
+        # Gunakan callback jika ada
         if 'log_message' in self.ui_callback:
-            self.ui_callback['log_message'](message)
+            self.ui_callback['log_message'](message, level, icon)
     
     def _update_status(self, message: str, status_type: str = "info"):
         """Update status in UI if callback exists"""
@@ -118,14 +128,14 @@ class EnvironmentHandler:
             if not self.env_manager.is_drive_mounted:
                 success, message = self.env_manager.mount_drive()
                 self._update_status(message, "success" if success else "error")
-                self._log_message(message)
+                self._log_message(message, "success" if success else "error", "✅" if success else "❌")
                 return success
             else:
-                self._log_message("✅ Google Drive sudah terhubung")
+                self._log_message("Google Drive sudah terhubung", "success", "✅")
                 return True
         except Exception as e:
             self._update_status(f"Error connecting to Drive: {str(e)}", "error")
-            self._log_message(f"Error connecting to Drive: {str(e)}")
+            self._log_message(f"Error connecting to Drive: {str(e)}", "error", "❌")
             return False
     
     def setup_directories(self) -> bool:
@@ -145,7 +155,7 @@ class EnvironmentHandler:
                 dir_path = Path(drive_path) / dir_name
                 if not dir_path.exists():
                     os.makedirs(dir_path, exist_ok=True)
-                    self._log_message(f"✅ Created directory in Drive: {dir_name}")
+                    self._log_message(f"Created directory in Drive: {dir_name}", "success", "✅")
             
             # Create symlinks in Colab
             for dir_name in drive_dirs:
@@ -158,17 +168,17 @@ class EnvironmentHandler:
                     if backup_path.exists():
                         shutil.rmtree(backup_path)
                     shutil.move(colab_path, backup_path)
-                    self._log_message(f"🔄 Backed up existing directory: {dir_name} to {dir_name}_backup")
+                    self._log_message(f"Backed up existing directory: {dir_name} to {dir_name}_backup", "info", "🔄")
                 
                 # Create symlink if it doesn't exist
                 if not colab_path.exists():
                     colab_path.symlink_to(drive_dir_path)
-                    self._log_message(f"🔗 Created symlink: {dir_name} -> {drive_dir_path}")
+                    self._log_message(f"Created symlink: {dir_name} -> {drive_dir_path}", "info", "🔗")
             
             return True
         except Exception as e:
             self._update_status(f"Error setting up directories: {str(e)}", "error")
-            self._log_message(f"Error setting up directories: {str(e)}")
+            self._log_message(f"Error setting up directories: {str(e)}", "error", "❌")
             return False
     
     def setup_config_files(self) -> bool:
@@ -198,34 +208,34 @@ class EnvironmentHandler:
                         src_file = repo_configs_dir / config_file
                         if src_file.exists():
                             shutil.copy2(src_file, configs_dir / config_file)
-                            self._log_message(f"📄 Copied config file: {config_file}")
-                        else:
-                            self._log_message(f"⚠️ Config file not found in repo: {config_file}")
-                else:
-                    self._log_message("⚠️ Repository config directory not found")
+                            self._log_message(f"Copied config file: {config_file}", "success", "✅")
             
             return True
         except Exception as e:
             self._update_status(f"Error setting up config files: {str(e)}", "error")
-            self._log_message(f"Error setting up config files: {str(e)}")
+            self._log_message(f"Error setting up config files: {str(e)}", "error", "❌")
             return False
     
     def initialize_config_singleton(self) -> bool:
         """
-        Initialize singleton config manager
+        Initialize config manager singleton
         
         Returns:
             bool: True if successful
         """
         try:
-            # Initialize config manager at the end of setup process
-            from smartcash.common.config.manager import get_config_manager
-            config_manager = get_config_manager()
-            self._log_message("✅ Initialized config manager singleton")
+            from smartcash.common.config import get_config_manager
+            
+            # Initialize config manager with proper base directory
+            config_manager = get_config_manager(
+                base_dir=self.env_manager.base_dir,
+                config_file="configs/base_config.yaml"
+            )
+            
             return True
         except Exception as e:
-            self._update_status(f"Error initializing config singleton: {str(e)}", "error")
-            self._log_message(f"Error initializing config singleton: {str(e)}")
+            self._update_status(f"Error initializing config: {str(e)}", "error")
+            self._log_message(f"Error initializing config: {str(e)}", "error", "❌")
             return False
     
     def perform_setup(self) -> bool:
@@ -233,49 +243,46 @@ class EnvironmentHandler:
         Perform complete environment setup
         
         Returns:
-            bool: True if successful
+            bool: True if all steps successful
         """
-        try:
-            self._update_status("Memulai setup environment...", "info")
-            self._update_progress(0.1, "Memeriksa status environment...")
-            
-            # Step 1: Connect to Drive if not connected
-            if not self.env_manager.is_drive_mounted:
-                self._update_progress(0.2, "Menghubungkan ke Google Drive...")
-                if not self.connect_drive():
-                    self._update_status("Gagal menghubungkan ke Google Drive", "error")
-                    return False
-            else:
-                self._log_message("✅ Google Drive sudah terhubung")
-            
-            # Step 2: Setup directories and symlinks
-            self._update_progress(0.4, "Menyiapkan direktori dan symlink...")
-            if not self.setup_directories():
-                self._update_status("Gagal menyiapkan direktori", "error")
-                return False
-            
-            # Step 3: Setup config files
-            self._update_progress(0.6, "Menyiapkan file konfigurasi...")
-            if not self.setup_config_files():
-                self._update_status("Gagal menyiapkan file konfigurasi", "error")
-                return False
-            
-            # Step 4: Initialize config singleton (at the end)
-            self._update_progress(0.8, "Menginisialisasi singleton config manager...")
-            if not self.initialize_config_singleton():
-                self._update_status("Gagal menginisialisasi config manager", "error")
-                return False
-            
-            # Complete
-            self._update_progress(1.0, "Setup selesai")
-            self._update_status("Setup environment berhasil", "success")
-            self._log_message("✅ Setup environment berhasil diselesaikan")
-            
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Error saat setup environment: {str(e)}")
-                
-            self._update_status(f"Error saat setup environment: {str(e)}", "error")
-            self._log_message(f"❌ Error saat setup environment: {str(e)}")
-            return False 
+        self._update_status("Memulai setup environment...", "info")
+        self._log_message("Memulai setup environment...", "info", "🚀")
+        
+        # Connect to drive (if not already connected)
+        self._update_progress(0.1, "Menghubungkan ke Google Drive...")
+        drive_success = self.connect_drive()
+        if not drive_success:
+            self._update_status("Error: Gagal menghubungkan ke Google Drive", "error")
+            self._log_message("Error: Gagal menghubungkan ke Google Drive", "error", "❌")
+            return False
+        
+        # Setup directories
+        self._update_progress(0.3, "Membuat direktori dan symlinks...")
+        dirs_success = self.setup_directories()
+        if not dirs_success:
+            self._update_status("Error: Gagal setup direktori", "error")
+            self._log_message("Error: Gagal setup direktori", "error", "❌")
+            return False
+        
+        # Setup config files
+        self._update_progress(0.6, "Menyiapkan file konfigurasi...")
+        config_success = self.setup_config_files()
+        if not config_success:
+            self._update_status("Error: Gagal setup file konfigurasi", "error")
+            self._log_message("Error: Gagal setup file konfigurasi", "error", "❌")
+            return False
+        
+        # Initialize config singleton
+        self._update_progress(0.8, "Menginisialisasi konfigurasi...")
+        init_success = self.initialize_config_singleton()
+        if not init_success:
+            self._update_status("Error: Gagal inisialisasi konfigurasi", "error")
+            self._log_message("Error: Gagal inisialisasi konfigurasi", "error", "❌")
+            return False
+        
+        # Everything succeeded
+        self._update_progress(1.0, "Setup selesai")
+        self._update_status("Setup environment berhasil", "success")
+        self._log_message("Setup environment berhasil", "success", "✅")
+        
+        return True 

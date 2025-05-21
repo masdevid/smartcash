@@ -8,7 +8,7 @@ from smartcash.ui.utils.ui_logger import log_to_ui as ui_log
 from smartcash.common.logger import get_logger
 
 # Import namespace konstanta
-from smartcash.ui.dataset.download.download_initializer import DOWNLOAD_LOGGER_NAMESPACE
+from smartcash.ui.dataset.download.download_initializer import DOWNLOAD_LOGGER_NAMESPACE, MODULE_LOGGER_NAME
 
 def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: Optional[str] = None) -> None:
     """
@@ -34,7 +34,7 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         ui_log(ui_components, message, level, icon)
     
     # Tambahkan prefix untuk memudahkan filtering
-    prefixed_message = f"[DATASET-DOWNLOAD] {message}"
+    prefixed_message = f"[{MODULE_LOGGER_NAME}] {message}"
     
     # Log ke Python logger
     if logger:

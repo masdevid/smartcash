@@ -103,7 +103,7 @@ def update_config_from_ui(ui_components: Dict[str, Any], config: Dict[str, Any] 
 
 def save_preprocessing_config(config: Dict[str, Any], config_path: str = "configs/preprocessing_config.yaml") -> bool:
     """
-    Simpan konfigurasi preprocessing dengan penanganan persistensi yang lebih baik.
+    Simpan konfigurasi preprocessing dengan SimpleConfigManager.
     
     Args:
         config: Konfigurasi aplikasi
@@ -113,32 +113,50 @@ def save_preprocessing_config(config: Dict[str, Any], config_path: str = "config
         Boolean status keberhasilan
     """
     try:
-        # Pastikan direktori ada
-        config_dir = os.path.dirname(config_path)
-        if config_dir and not os.path.exists(config_dir):
-            os.makedirs(config_dir, exist_ok=True)
+        # Dapatkan config manager
+        config_manager = get_config_manager()
         
-        # Simpan ke file
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+        # Simpan ke SimpleConfigManager menggunakan metode save_module_config
+        success = config_manager.save_module_config('preprocessing', config)
         
-        # Coba simpan juga ke ConfigManager
-        try:
-            config_manager = get_config_manager()
-            config_manager.save_module_config('preprocessing', config)
-        except Exception as e:
-            # Gagal menyimpan ke ConfigManager, tapi masih berhasil menyimpan ke file
-            # Jadi kita anggap sukses
-            pass
-        
-        return True
+        if success:
+            # Coba simpan juga ke file untuk kompatibilitas
+            try:
+                # Pastikan direktori ada
+                config_dir = os.path.dirname(config_path)
+                if config_dir and not os.path.exists(config_dir):
+                    os.makedirs(config_dir, exist_ok=True)
+                
+                # Simpan ke file
+                with open(config_path, 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+            except Exception as e:
+                # Gagal menyimpan ke file, tapi berhasil menyimpan ke ConfigManager
+                # Jadi kita anggap sukses
+                pass
+                
+            return True
+        else:
+            # Jika gagal menyimpan ke ConfigManager, coba fallback ke file
+            try:
+                # Pastikan direktori ada
+                config_dir = os.path.dirname(config_path)
+                if config_dir and not os.path.exists(config_dir):
+                    os.makedirs(config_dir, exist_ok=True)
+                
+                # Simpan ke file
+                with open(config_path, 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                return True
+            except Exception:
+                return False
     except Exception as e:
         # Log error tapi jangan raise exception
         return False
 
 def load_preprocessing_config(config_path: str = "configs/preprocessing_config.yaml", ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Load konfigurasi preprocessing dengan persistensi yang disempurnakan.
+    Load konfigurasi preprocessing dengan SimpleConfigManager.
     
     Args:
         config_path: Path file konfigurasi
@@ -149,42 +167,20 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
     """
     logger = ui_components.get('logger') if ui_components else None
     
-    # Coba load dari ConfigManager terlebih dahulu
     try:
+        # Dapatkan config manager dan load dari module config
         config_manager = get_config_manager()
         config = config_manager.get_module_config('preprocessing')
+        
         if config:
             if logger: 
-                logger.debug(f"{ICONS['info']} Konfigurasi berhasil diload dari ConfigManager")
+                logger.debug(f"{ICONS['info']} Konfigurasi berhasil diload dari SimpleConfigManager")
             return config
     except Exception as e:
         if logger: 
-            logger.debug(f"{ICONS['info']} Tidak dapat load dari ConfigManager: {str(e)}")
+            logger.debug(f"{ICONS['info']} Tidak dapat load dari SimpleConfigManager: {str(e)}")
     
-    # Fallback ke load dari file
-    try:
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-            
-            if config:
-                if logger: 
-                    logger.debug(f"{ICONS['info']} Konfigurasi berhasil diload dari file: {config_path}")
-                
-                # Coba simpan ke ConfigManager untuk sinkronisasi
-                try:
-                    config_manager = get_config_manager()
-                    config_manager.save_module_config('preprocessing', config)
-                except Exception as e:
-                    if logger: 
-                        logger.debug(f"{ICONS['info']} Tidak dapat menyimpan ke ConfigManager: {str(e)}")
-                
-                return config
-    except Exception as e:
-        if logger: 
-            logger.debug(f"{ICONS['warning']} Error saat loading konfigurasi dari file: {str(e)}")
-    
-    # Jika tidak berhasil load, buat default config
+    # Default config yang akan digunakan jika tidak ada konfigurasi
     default_config = {
         'data': {
             'dir': 'data'
@@ -208,13 +204,31 @@ def load_preprocessing_config(config_path: str = "configs/preprocessing_config.y
         }
     }
     
-    # Coba simpan default ke ConfigManager
+    # Coba simpan default ke SimpleConfigManager
     try:
         config_manager = get_config_manager()
         config_manager.save_module_config('preprocessing', default_config)
+        if logger: 
+            logger.debug(f"{ICONS['info']} Default konfigurasi berhasil disimpan ke SimpleConfigManager")
     except Exception as e:
         if logger: 
-            logger.debug(f"{ICONS['info']} Tidak dapat menyimpan default ke ConfigManager: {str(e)}")
+            logger.debug(f"{ICONS['info']} Tidak dapat menyimpan default ke SimpleConfigManager: {str(e)}")
+        
+        # Fallback: Coba simpan ke file
+        try:
+            # Pastikan direktori ada
+            config_dir = os.path.dirname(config_path)
+            if config_dir and not os.path.exists(config_dir):
+                os.makedirs(config_dir, exist_ok=True)
+            
+            # Simpan ke file
+            with open(config_path, 'w') as f:
+                yaml.dump(default_config, f, default_flow_style=False)
+            if logger: 
+                logger.debug(f"{ICONS['info']} Default konfigurasi berhasil disimpan ke file {config_path}")
+        except Exception as file_e:
+            if logger: 
+                logger.debug(f"{ICONS['warning']} Gagal menyimpan default ke file: {str(file_e)}")
     
     # Simpan default config ke ui_components jika tersedia
     if ui_components: 

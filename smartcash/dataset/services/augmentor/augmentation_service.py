@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.common.exceptions import DatasetError
-from smartcash.common.config import ConfigManager, get_config_manager
+from smartcash.common.config import SimpleConfigManager, get_config_manager
 from smartcash.dataset.services.augmentor.pipeline_factory import AugmentationPipelineFactory
 from smartcash.dataset.services.augmentor.bbox_augmentor import BBoxAugmentor
 from smartcash.dataset.services.augmentor.class_balancer import ClassBalancer

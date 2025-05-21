@@ -1,8 +1,8 @@
 """
-File: smartcash/config/__init__.py
-Deskripsi: Package initialization untuk konfigurasi SmartCash
+File: smartcash/configs/__init__.py
+Deskripsi: Package konfigurasi untuk SmartCash
 """
 
-from smartcash.common.config import ConfigManager, get_config_manager
+from smartcash.common.config import SimpleConfigManager, get_config_manager
 
-__all__ = ['ConfigManager', 'get_config_manager']
+__all__ = ['SimpleConfigManager', 'get_config_manager']

@@ -64,7 +64,7 @@ def get_backbone_config(ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('model')
+        config = config_manager.get_config('model')
         if config and 'model' in config:
             return config
         logger.warning("⚠️ Konfigurasi backbone tidak ditemukan, menggunakan default")
@@ -85,7 +85,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('model') or get_default_backbone_config()
+        config = config_manager.get_config('model') or get_default_backbone_config()
         
         logger.info("Mengupdate konfigurasi dari UI components")
         
@@ -137,7 +137,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             config['model']['use_ciou'] = ui_components['use_ciou_checkbox'].value
             
         # Save config
-        config_manager.save_module_config('model', config)
+        config_manager.save_config(config, 'model')
         
         logger.info("✅ Konfigurasi backbone berhasil diupdate dari UI")
         
@@ -312,14 +312,14 @@ def update_backbone_info(ui_components: Dict[str, Any], message: str = None) -> 
 
 def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Simpan konfigurasi backbone ke config manager dan sinkronkan dengan Google Drive.
+    Simpan konfigurasi backbone ke config manager.
     
     Args:
         config: Dictionary konfigurasi yang akan disimpan
         ui_components: Dictionary komponen UI (opsional)
         
     Returns:
-        Konfigurasi yang telah disimpan dan disinkronkan
+        Konfigurasi yang telah disimpan
     """
     try:
         # Update status panel
@@ -337,7 +337,7 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
         # Simpan konfigurasi
         base_dir = get_default_base_dir()
         config_manager = get_config_manager(base_dir=base_dir)
-        save_success = config_manager.save_module_config('model', original_config)
+        save_success = config_manager.save_config(original_config, 'model')
         
         if not save_success:
             if ui_components:
@@ -353,7 +353,7 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
             update_sync_status_only(ui_components, "Konfigurasi backbone berhasil disimpan", 'success')
         
         # Verifikasi konfigurasi tersimpan dengan benar
-        saved_config = config_manager.get_module_config('model', {})
+        saved_config = config_manager.get_config('model', {})
         
         # Verifikasi konsistensi
         if 'model' in saved_config and 'model' in original_config:
@@ -369,7 +369,7 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
             
             if not is_consistent:
                 # Coba simpan ulang jika tidak konsisten
-                config_manager.save_module_config('model', original_config)
+                config_manager.save_config(original_config, 'model')
                 # Log warning
                 logger.warning(f"⚠️ Data tidak konsisten setelah penyimpanan, mencoba kembali")
                 if ui_components:
@@ -377,37 +377,7 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
                     update_sync_status_only(ui_components, "Data tidak konsisten, mencoba kembali", 'warning')
                 
                 # Verifikasi ulang setelah simpan ulang
-                saved_config = config_manager.get_module_config('model', {})
-        
-        # Sinkronisasi dengan Google Drive jika di Colab
-        from smartcash.ui.training_config.backbone.handlers.drive_handlers import is_colab_environment, sync_with_drive
-        if is_colab_environment():
-            if ui_components:
-                from smartcash.ui.training_config.backbone.handlers.sync_logger import update_sync_status_only
-                update_sync_status_only(ui_components, "Menyinkronkan dengan Google Drive...", 'info')
-            
-            # Pastikan nilai yang disinkronkan menggunakan nilai original_config
-            # untuk menghindari inkonsistensi
-            synced_config = sync_with_drive(original_config, ui_components)
-            
-            # Verifikasi konfigurasi yang disinkronkan dengan membandingkan dengan nilai asli
-            is_synced_consistent = True
-            if 'model' in synced_config and 'model' in original_config:
-                for key, value in original_config['model'].items():
-                    if key not in synced_config['model'] or synced_config['model'][key] != value:
-                        is_synced_consistent = False
-                        logger.warning(f"⚠️ Inkonsistensi data setelah sinkronisasi pada key '{key}': {value} vs {synced_config['model'].get(key, 'tidak ada')}")
-                        if ui_components:
-                            from smartcash.ui.training_config.backbone.handlers.sync_logger import update_sync_status_only
-                            update_sync_status_only(ui_components, f"Inkonsistensi data setelah sinkronisasi", 'warning')
-                        break
-            
-            if is_synced_consistent:
-                if ui_components:
-                    from smartcash.ui.training_config.backbone.handlers.sync_logger import update_sync_status_only
-                    update_sync_status_only(ui_components, "Konfigurasi berhasil disimpan dan disinkronkan", 'success')
-            
-            return synced_config
+                saved_config = config_manager.get_config('model', {})
         
         return saved_config
     except Exception as e:
@@ -429,7 +399,7 @@ def load_config() -> Dict[str, Any]:
     """
     try:
         config_manager = get_config_manager(base_dir=get_default_base_dir())
-        config = config_manager.get_module_config('model')
+        config = config_manager.get_config('model')
         if config and 'model' in config:
             return config
         logger.warning("⚠️ Konfigurasi backbone tidak ditemukan, menggunakan default")

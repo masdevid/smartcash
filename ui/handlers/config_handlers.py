@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/handlers/config_handlers.py
-Deskripsi: Handler umum untuk konfigurasi model dan komponen UI
+Deskripsi: Handler untuk konfigurasi umum
 """
 
 from typing import Dict, Any, Optional, Callable
@@ -9,17 +9,18 @@ from IPython.display import display, HTML
 import yaml
 import os
 from pathlib import Path
+from smartcash.common.config import get_config_manager
 
 def save_config(ui_components: Dict[str, Any], config: Dict[str, Any], 
                config_path: str, update_func: Callable = None, 
                component_name: str = "Konfigurasi") -> None:
     """
-    Simpan konfigurasi ke file.
+    Simpan konfigurasi.
     
     Args:
         ui_components: Komponen UI
         config: Konfigurasi yang akan disimpan
-        config_path: Path file konfigurasi
+        config_path: Path atau nama module konfigurasi
         update_func: Fungsi untuk update konfigurasi dari UI
         component_name: Nama komponen untuk pesan status
     """
@@ -30,30 +31,37 @@ def save_config(ui_components: Dict[str, Any], config: Dict[str, Any],
         # Update config dari UI jika ada fungsi update
         if update_func:
             config = update_func(config)
+            
+        # Dapatkan config manager
+        config_manager = get_config_manager()
         
-        # Buat direktori jika belum ada
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
-        
-        # Simpan ke file
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+        # Ekstrak nama modul jika config_path adalah path file
+        if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+            module_name = config_path.split('/')[-1].split('_')[0]
+            if module_name.endswith('.yaml') or module_name.endswith('.yml'):
+                module_name = module_name.rsplit('.', 1)[0]
+        else:
+            module_name = config_path
+            
+        # Simpan ke module config
+        success = config_manager.save_module_config(module_name, config)
         
         # Tampilkan pesan sukses
         if 'status' in ui_components:
             with ui_components['status']:
-                display(HTML(f"<p style='color:green'>✅ {component_name} berhasil disimpan ke {config_path}</p>"))
+                display(HTML(f"<p style='color:green'>✅ {component_name} berhasil disimpan</p>"))
         
         if logger:
-            logger.info(f"✅ {component_name} berhasil disimpan ke {config_path}")
+            logger.info(f"✅ {component_name} berhasil disimpan menggunakan SimpleConfigManager")
             
     except Exception as e:
         # Tampilkan pesan error
         if 'status' in ui_components:
             with ui_components['status']:
-                display(HTML(f"<p style='color:red'>❌ Error menyimpan {component_name}: {str(e)}</p>"))
+                display(HTML(f"<p style='color:red'>❌ Error saat menyimpan {component_name}: {str(e)}</p>"))
         
         if logger:
-            logger.error(f"❌ Error menyimpan {component_name}: {str(e)}")
+            logger.error(f"❌ Error saat menyimpan {component_name}: {str(e)}")
 
 def reset_config(ui_components: Dict[str, Any], config: Dict[str, Any], 
                 default_config: Dict[str, Any], update_ui_func: Callable = None, 

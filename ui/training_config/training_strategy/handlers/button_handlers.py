@@ -1,18 +1,18 @@
 """
 File: smartcash/ui/training_config/training_strategy/handlers/button_handlers.py
-Deskripsi: Handler untuk tombol pada komponen UI strategi pelatihan
+Deskripsi: Handler untuk tombol-tombol di UI konfigurasi training strategy
 """
 
-from typing import Dict, Any, Optional, Callable
 import os
-import ipywidgets as widgets
 from pathlib import Path
+from typing import Dict, Any, Optional
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.config import get_config_manager
 from smartcash.common.logger import get_logger
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.training_config.training_strategy.handlers.drive_handlers import sync_to_drive, sync_from_drive
 from smartcash.ui.training_config.training_strategy.handlers.config_handlers import (
     update_config_from_ui,
     update_ui_from_config,
@@ -98,71 +98,6 @@ def on_reset_click(button: widgets.Button, ui_components: Dict[str, Any]) -> Non
         logger.error(f"Error saat mereset konfigurasi strategi pelatihan: {str(e)}")
         update_status_panel(ui_components, f"Error: {str(e)}", "error")
 
-def on_sync_to_drive_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk klik tombol Sync to Drive.
-    
-    Args:
-        button: Tombol yang diklik
-        ui_components: Dictionary komponen UI
-    """
-    try:
-        # Update status
-        update_status_panel(ui_components, "Menyinkronkan konfigurasi strategi pelatihan ke Google Drive...", "info")
-        
-        # Update config dari UI
-        config = update_config_from_ui(ui_components)
-        
-        # Simpan config
-        config_manager = get_config_manager(base_dir=get_default_base_dir())
-        saved_config = config_manager.save_module_config('training_strategy', config)
-        
-        # Sinkronisasi ke Drive
-        success, message = sync_to_drive(button, ui_components)
-        
-        if success:
-            # Update status
-            update_status_panel(ui_components, message, "success")
-        else:
-            # Update status
-            update_status_panel(ui_components, message, "error")
-        
-    except Exception as e:
-        logger.error(f"Error saat sinkronisasi ke Google Drive: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
-
-def on_sync_from_drive_click(button: widgets.Button, ui_components: Dict[str, Any]) -> None:
-    """
-    Handler untuk klik tombol Sync from Drive.
-    
-    Args:
-        button: Tombol yang diklik
-        ui_components: Dictionary komponen UI
-    """
-    try:
-        # Update status
-        update_status_panel(ui_components, "Menyinkronkan konfigurasi strategi pelatihan dari Google Drive...", "info")
-        
-        # Sinkronisasi dari Drive
-        success, message, drive_config = sync_from_drive(button, ui_components)
-        
-        if success and drive_config:
-            # Update UI dari konfigurasi yang disinkronkan
-            update_ui_from_config(ui_components, drive_config)
-            
-            # Update info panel
-            update_training_strategy_info(ui_components)
-            
-            # Update status
-            update_status_panel(ui_components, message, "success")
-        else:
-            # Update status
-            update_status_panel(ui_components, message, "error")
-        
-    except Exception as e:
-        logger.error(f"Error saat sinkronisasi dari Google Drive: {str(e)}")
-        update_status_panel(ui_components, f"Error: {str(e)}", "error")
-
 def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env: Any = None, config: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Setup handler untuk tombol-tombol di UI konfigurasi strategi pelatihan.
@@ -187,22 +122,8 @@ def setup_training_strategy_button_handlers(ui_components: Dict[str, Any], env: 
             lambda b: on_reset_click(b, ui_components)
         )
     
-    # Handler untuk tombol Sync to Drive
-    if 'sync_to_drive_button' in ui_components:
-        ui_components['sync_to_drive_button'].on_click(
-            lambda b: on_sync_to_drive_click(b, ui_components)
-        )
-    
-    # Handler untuk tombol Sync from Drive
-    if 'sync_from_drive_button' in ui_components:
-        ui_components['sync_from_drive_button'].on_click(
-            lambda b: on_sync_from_drive_click(b, ui_components)
-        )
-    
     # Add handler functions to ui_components for testing
     ui_components['on_save_click'] = lambda b: on_save_click(b, ui_components)
     ui_components['on_reset_click'] = lambda b: on_reset_click(b, ui_components)
-    ui_components['on_sync_to_drive_click'] = lambda b: on_sync_to_drive_click(b, ui_components)
-    ui_components['on_sync_from_drive_click'] = lambda b: on_sync_from_drive_click(b, ui_components)
     
     return ui_components

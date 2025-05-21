@@ -1,5 +1,5 @@
 """
-File: smartcash/ui/setup/env_config/utils/ui_utils.py
+File: smartcash/ui/utils/env_ui_utils.py
 Deskripsi: Utilitas UI untuk environment config
 """
 
@@ -46,7 +46,6 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         level: Log level (info, error)
     """
     from IPython.display import display
-    from datetime import datetime
     timestamp = datetime.now().strftime('%H:%M:%S')
     log_widget = ui_components.get('log_output')  # Use Output widget for logging
     if log_widget is not None:
@@ -59,14 +58,17 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
         # Fallback to print if log_output is missing
         print(f"[{timestamp}] {message}")
 
-def update_progress(tracker: Any, value: float, message: str) -> None:
+def update_progress(ui_components: Dict[str, Any], value: float, message: str = "") -> None:
     """
-    Update progress tracker
+    Update progress bar and message
     
     Args:
-        tracker: Progress tracker
+        ui_components: Dictionary UI components
         value: Progress value (0-1)
         message: Progress message
     """
-    if tracker:
-        tracker.update(value, message) 
+    if 'progress_bar' in ui_components:
+        ui_components['progress_bar'].value = value
+    
+    if 'progress_message' in ui_components:
+        ui_components['progress_message'].value = message 

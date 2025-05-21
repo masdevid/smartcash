@@ -3,10 +3,7 @@ File: smartcash/ui/setup/env_config/handlers/__init__.py
 Deskripsi: Package untuk handlers environment config
 """
 
-from smartcash.ui.setup.env_config.handlers.setup_handlers import setup_env_config_handlers
-from smartcash.ui.setup.env_config.handlers.auto_check_handler import AutoCheckHandler
+# This package now uses handlers from smartcash.ui.handlers
+# See smartcash.ui.handlers.environment_handler and smartcash.ui.handlers.auto_check_handler
 
-__all__ = [
-    'setup_env_config_handlers',
-    'AutoCheckHandler'
-]
+__all__ = []

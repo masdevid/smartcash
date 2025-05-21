@@ -31,10 +31,14 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Header
     header = create_header("Konfigurasi Environment", "Atur dan konfigurasi environment untuk SmartCash")
 
-    # Buttons
-    drive_button = Button(description="Hubungkan ke Google Drive", button_style="primary")
-    directory_button = Button(description="Atur Direktori", button_style="primary")
-    button_layout = HBox([drive_button, directory_button], layout=STANDARD_LAYOUTS['hbox'])
+    # Single setup button
+    setup_button = Button(
+        description="Konfigurasi Environment", 
+        button_style="primary",
+        icon="cog"
+    )
+    setup_button.layout.width = '100%'
+    button_layout = VBox([setup_button], layout=STANDARD_LAYOUTS['vbox'])
 
     # Status Panel
     status_panel = create_status_panel("Siap untuk mengkonfigurasi environment", "info")
@@ -51,8 +55,7 @@ def create_env_config_ui() -> Dict[str, Any]:
     # Assemble UI components
     ui_components = {
         'header': header,
-        'drive_button': drive_button,
-        'directory_button': directory_button,
+        'setup_button': setup_button,
         'status_panel': status_panel,
         'log_panel': log_accordion,   # For display
         'log_output': log_output,     # For logging

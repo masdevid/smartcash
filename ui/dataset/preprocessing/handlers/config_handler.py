@@ -31,7 +31,7 @@ def get_preprocessing_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         config_manager = get_config_manager()
         
         # Get config
-        config = config_manager.get_module_config('dataset')
+        config = config_manager.get_config('dataset')
         
         # Ensure config structure
         if not config:
@@ -123,7 +123,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             
         # Save config
         config_manager = get_config_manager()
-        config_manager.set_module_config('dataset', config)
+        config_manager.save_config(config, 'dataset')
         
         logger.info("✅ Konfigurasi preprocessing berhasil diupdate dari UI")
         

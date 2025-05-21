@@ -12,7 +12,7 @@ from pathlib import Path
 
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.config import get_config_manager
 from smartcash.common.environment import get_default_base_dir
 from smartcash.dataset.services.service_factory import get_dataset_service
 from smartcash.ui.dataset.visualization.components.dashboard_cards import (
@@ -131,8 +131,17 @@ def find_valid_dataset_path() -> str:
     # Coba dapatkan dari config manager
     try:
         config_manager = get_config_manager()
-        dataset_config = config_manager.get_module_config('dataset_config')
-        config_path = dataset_config.get('dataset_path', None)
+        
+        # Coba dari dataset_config terlebih dahulu
+        dataset_config = config_manager.get_config('dataset')
+        config_path = dataset_config.get('dataset_path')
+        
+        # Jika tidak ada, cek di base_config
+        if not config_path:
+            base_config = config_manager.get_config('base')
+            if 'dataset' in base_config:
+                config_path = base_config.get('dataset', {}).get('dataset_path')
+        
         if config_path and os.path.exists(config_path):
             logger.info(f"{ICONS.get('info', 'ℹ️')} Menggunakan path dataset dari konfigurasi: {config_path}")
             return config_path

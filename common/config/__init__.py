@@ -1,35 +1,21 @@
 """
 File: smartcash/common/config/__init__.py
-Deskripsi: Package untuk manajemen konfigurasi dengan dependency injection dan sync
+Deskripsi: Package untuk manajemen konfigurasi yang disederhanakan
 """
 
 # Import langsung dari modul manager untuk singleton pattern
-from smartcash.common.config.manager import ConfigManager, get_config_manager
+from smartcash.common.config.manager import SimpleConfigManager, get_config_manager
 
-from smartcash.common.config.singleton import Singleton
-from smartcash.common.config.base_manager import BaseConfigManager
-from smartcash.common.config.module_manager import ModuleConfigManager
-from smartcash.common.config.drive_manager import DriveConfigManager
-from smartcash.common.config.dependency_manager import DependencyManager
+# Alias SimpleConfigManager sebagai ConfigManager untuk kompatibilitas
+ConfigManager = SimpleConfigManager
 
-from smartcash.common.config.sync import (
-    sync_config_with_drive,
-    sync_all_configs,
-    merge_configs_smart,
-    are_configs_identical
-)
-
-# Re-export fungsi utama
+# Re-export fungsi utama dan alias
 __all__ = [
-    'ConfigManager',
-    'get_config_manager',
-    'Singleton',
-    'BaseConfigManager',
-    'ModuleConfigManager',
-    'DriveConfigManager',
-    'DependencyManager',
-    'sync_config_with_drive',
-    'sync_all_configs',
-    'merge_configs_smart',
-    'are_configs_identical'
+    'SimpleConfigManager',
+    'ConfigManager',  # Alias untuk kompatibilitas
+    'get_config_manager'
 ]
+
+# Import dan expose fungsi kompatibilitas
+from smartcash.common.config.compat import get_module_config
+__all__.append('get_module_config')

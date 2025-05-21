@@ -9,7 +9,8 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 from smartcash.ui.utils.constants import ICONS
 from smartcash.common.logger import get_logger
-from smartcash.common.config.manager import get_config_manager
+from smartcash.common.config import get_config_manager
+from smartcash.common.environment import get_default_base_dir
 
 logger = get_logger()
 
@@ -19,7 +20,7 @@ DEFAULT_AUGMENTATION_DIR = "data/augmented"
 
 def get_module_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Dapatkan konfigurasi augmentasi dari ConfigManager atau file.
+    Dapatkan konfigurasi augmentasi dari SimpleConfigManager atau file.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -27,33 +28,43 @@ def get_module_config(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary konfigurasi augmentasi
     """
-    # Coba dapatkan dari ConfigManager terlebih dahulu
+    # Dapatkan config manager
     try:
         config_manager = get_config_manager()
+        
+        # Coba dapatkan konfigurasi dengan metode get_module_config
         config = config_manager.get_module_config('augmentation')
-        if config and isinstance(config, dict) and 'augmentation' in config:
+        if config and isinstance(config, dict):
+            logger.debug("✅ Konfigurasi augmentasi berhasil dimuat dari SimpleConfigManager")
             return config
     except Exception as e:
-        logger.debug(f"Tidak dapat memuat dari ConfigManager: {str(e)}")
+        logger.debug(f"Tidak dapat memuat dari SimpleConfigManager: {str(e)}")
     
-    # Jika tidak ada di ConfigManager, coba load dari file
+    # Jika tidak dapat memuat dari ConfigManager, buat default dan simpan ke ConfigManager
+    default_config = create_default_config()
+    
+    # Coba simpan default config ke ConfigManager
     try:
-        config_path = DEFAULT_CONFIG_PATH
-        if os.path.exists(config_path):
-            with open(config_path, 'r') as f:
-                config = yaml.safe_load(f)
-                if config and isinstance(config, dict):
-                    logger.info(f"✅ Konfigurasi augmentasi berhasil dimuat dari {config_path}")
-                    return config
+        config_manager = get_config_manager()
+        config_manager.save_module_config('augmentation', default_config)
+        logger.debug("✅ Default konfigurasi augmentasi berhasil disimpan ke SimpleConfigManager")
     except Exception as e:
-        logger.warning(f"⚠️ Gagal memuat konfigurasi dari file: {str(e)}")
+        logger.debug(f"Tidak dapat menyimpan default config ke SimpleConfigManager: {str(e)}")
+        
+        # Fallback: Simpan ke file
+        try:
+            os.makedirs(os.path.dirname(DEFAULT_CONFIG_PATH), exist_ok=True)
+            with open(DEFAULT_CONFIG_PATH, 'w') as f:
+                yaml.dump(default_config, f, default_flow_style=False)
+            logger.debug(f"✅ Default konfigurasi augmentasi berhasil disimpan ke {DEFAULT_CONFIG_PATH}")
+        except Exception as file_e:
+            logger.warning(f"⚠️ Gagal menyimpan default config ke file: {str(file_e)}")
     
-    # Jika tidak ada konfigurasi, buat default
-    return create_default_config()
+    return default_config
 
 def save_module_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> bool:
     """
-    Simpan konfigurasi augmentasi ke ConfigManager dan file.
+    Simpan konfigurasi augmentasi ke SimpleConfigManager dan file.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -63,21 +74,42 @@ def save_module_config(ui_components: Dict[str, Any], config: Dict[str, Any]) ->
         Boolean status keberhasilan
     """
     try:
-        # Simpan ke ConfigManager
+        # Dapatkan config manager
         config_manager = get_config_manager()
-        config_manager.save_module_config('augmentation', config)
         
-        # Simpan ke file
-        config_path = DEFAULT_CONFIG_PATH
-        os.makedirs(os.path.dirname(config_path), exist_ok=True)
-        with open(config_path, 'w') as f:
-            yaml.dump(config, f, default_flow_style=False)
+        # Simpan ke SimpleConfigManager menggunakan metode save_module_config
+        success = config_manager.save_module_config('augmentation', config)
         
-        logger.info(f"✅ Konfigurasi augmentasi berhasil disimpan ke {config_path}")
-        return True
+        if success:
+            logger.info("✅ Konfigurasi augmentasi berhasil disimpan ke SimpleConfigManager")
+            
+            # Simpan juga ke file untuk kompatibilitas
+            try:
+                os.makedirs(os.path.dirname(DEFAULT_CONFIG_PATH), exist_ok=True)
+                with open(DEFAULT_CONFIG_PATH, 'w') as f:
+                    yaml.dump(config, f, default_flow_style=False)
+                logger.debug(f"✅ Konfigurasi augmentasi berhasil disimpan ke {DEFAULT_CONFIG_PATH}")
+            except Exception as file_e:
+                logger.debug(f"⚠️ Gagal menyimpan config ke file: {str(file_e)}")
+                # Tidak menganggap ini sebagai kegagalan karena sudah berhasil disimpan ke ConfigManager
+            
+            return True
+        else:
+            logger.error("❌ SimpleConfigManager gagal menyimpan konfigurasi")
+            return False
+            
     except Exception as e:
         logger.error(f"❌ Error saat menyimpan konfigurasi: {str(e)}")
-        return False
+        
+        # Fallback: Coba simpan ke file sebagai alternatif
+        try:
+            os.makedirs(os.path.dirname(DEFAULT_CONFIG_PATH), exist_ok=True)
+            with open(DEFAULT_CONFIG_PATH, 'w') as f:
+                yaml.dump(config, f, default_flow_style=False)
+            logger.info(f"✅ Konfigurasi berhasil disimpan ke file: {DEFAULT_CONFIG_PATH}")
+            return True
+        except Exception:
+            return False
 
 def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

@@ -139,38 +139,52 @@ def update_status_panel(ui_components: Dict[str, Any], message: str, status_type
 
 def load_config_safely(config_path: str, logger=None) -> Dict[str, Any]:
     """
-    Load config dengan fallback jika gagal.
+    Load config dengan SimpleConfigManager atau fallback jika gagal.
     
     Args:
-        config_path: Path ke file konfigurasi
+        config_path: Path ke file konfigurasi atau nama modul konfigurasi
         logger: Logger untuk mencatat error
         
     Returns:
         Dictionary berisi konfigurasi atau dict kosong jika gagal
     """
     try:
-        # Coba gunakan ConfigManager jika tersedia
-        config_manager = import_with_fallback('smartcash.common.config.get_config_manager')
-        if config_manager:
-            manager = config_manager()
-            return manager.load_config(config_path)
-    except Exception as e:
-        if logger:
-            logger.warning(f"⚠️ Gagal load config dengan ConfigManager: {e}")
-    
-    # Fallback ke load YAML langsung
-    try:
-        import yaml
-        from pathlib import Path
+        # Gunakan SimpleConfigManager
+        from smartcash.common.config import get_config_manager
+        config_manager = get_config_manager()
         
-        config_file = Path(config_path)
-        if config_file.exists():
-            with open(config_file, 'r') as f:
-                return yaml.safe_load(f)
-                
+        # Jika config_path berisi nama file, ekstrak nama modul
+        if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+            module_name = config_path.split('/')[-1].split('_')[0]
+            if module_name.endswith('.yaml') or module_name.endswith('.yml'):
+                module_name = module_name.rsplit('.', 1)[0]
+        else:
+            module_name = config_path
+            
+        # Coba dapatkan konfigurasi
+        config = config_manager.get_module_config(module_name)
+        if config:
+            if logger:
+                logger.info(f"✅ Konfigurasi berhasil dimuat dari SimpleConfigManager untuk modul {module_name}")
+            return config
+        
+        # Fallback ke load dari config file
+        config = config_manager.load_config(config_path)
+        if config:
+            if logger:
+                logger.info(f"✅ Konfigurasi berhasil dimuat dari file {config_path}")
+            
+            # Simpan ke module config juga
+            try:
+                config_manager.save_module_config(module_name, config)
+            except Exception as e:
+                if logger:
+                    logger.debug(f"⚠️ Gagal menyimpan ke module config: {str(e)}")
+                    
+            return config
     except Exception as e:
         if logger:
-            logger.warning(f"⚠️ Gagal load config dari file: {e}")
+            logger.warning(f"⚠️ Gagal load config: {str(e)}")
     
     # Return empty dict sebagai fallback terakhir
     return {}

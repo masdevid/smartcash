@@ -119,7 +119,7 @@ def update_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             
         # Save config
         config_manager = get_config_manager()
-        config_manager.set_module_config('dataset', config)
+        config_manager.save_module_config('dataset', config)
         
         logger.info("✅ Konfigurasi augmentation berhasil diupdate dari UI")
         

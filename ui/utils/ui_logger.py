@@ -1,136 +1,262 @@
 """
 File: smartcash/ui/utils/ui_logger.py
-Deskripsi: Utility untuk mengarahkan output logger ke UI widget dengan integrasi standar dan tanpa duplikasi
+Deskripsi: Logger khusus untuk UI yang dapat mengarahkan output ke widget UI dan file
 """
 
 import logging
 import sys
 import threading
+import os
+from pathlib import Path
 from typing import Dict, Any, Callable, Optional, List, Union
-from IPython.display import display, HTML, clear_output
+from IPython.display import display, HTML
 import ipywidgets as widgets
-from smartcash.ui.utils.alert_utils import create_status_indicator
+from datetime import datetime
 
-def create_direct_ui_logger(ui_components: Dict[str, Any], name: str = "ui_logger"):
+class UILogger:
     """
-    Buat logger yang langsung menampilkan output ke UI tanpa addHandler.
+    Logger khusus untuk UI yang dapat mengarahkan output ke widget UI dan file.
+    """
+    
+    def __init__(self, 
+                ui_components: Dict[str, Any], 
+                name: str = "ui_logger",
+                log_to_file: bool = False,
+                log_dir: str = "logs",
+                log_level: int = logging.INFO):
+        """
+        Inisialisasi UILogger.
+        
+        Args:
+            ui_components: Dictionary berisi komponen UI
+            name: Nama logger
+            log_to_file: Flag untuk mengaktifkan logging ke file
+            log_dir: Direktori untuk menyimpan file log
+            log_level: Level logging (default: INFO)
+        """
+        self.ui_components = ui_components
+        self.name = name
+        self.log_level = log_level
+        
+        # Setup Python logger
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(log_level)
+        
+        # Hapus handler yang sudah ada untuk mencegah duplikasi
+        for handler in self.logger.handlers[:]:
+            self.logger.removeHandler(handler)
+        
+        # Tambahkan console handler untuk output standar
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setLevel(log_level)
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            datefmt='%Y-%m-%d %H:%M:%S'
+        )
+        console_handler.setFormatter(formatter)
+        self.logger.addHandler(console_handler)
+        
+        # Tambahkan file handler jika diperlukan
+        if log_to_file:
+            log_path = Path(log_dir)
+            log_path.mkdir(parents=True, exist_ok=True)
+            
+            log_file = log_path / f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+            file_handler = logging.FileHandler(log_file, encoding='utf-8')
+            file_handler.setLevel(log_level)
+            file_handler.setFormatter(formatter)
+            self.logger.addHandler(file_handler)
+            
+            # Simpan path log file untuk referensi
+            self.log_file_path = log_file
+        else:
+            self.log_file_path = None
+    
+    def _log_to_ui(self, message: str, level: str = "info") -> None:
+        """
+        Log pesan ke UI components.
+        
+        Args:
+            message: Pesan yang akan di-log
+            level: Level log (info, warning, error, success)
+        """
+        # Cek apakah ui_components memiliki status widget
+        if 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
+            with self.ui_components['status']:
+                try:
+                    from smartcash.ui.utils.alert_utils import create_status_indicator
+                    display(create_status_indicator(level, message))
+                except ImportError:
+                    # Fallback jika tidak ada alert_utils
+                    color = {
+                        'info': 'blue',
+                        'success': 'green',
+                        'warning': 'orange',
+                        'error': 'red',
+                    }.get(level, 'black')
+                    display(HTML(f"<div style='color:{color}'>{message}</div>"))
+        
+        # Jika ada log_output, gunakan itu juga
+        elif 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+            with self.ui_components['log_output']:
+                print(f"{message}")
+        
+        # Fallback ke stdout jika tidak ada UI components
+        else:
+            print(message)
+    
+    def debug(self, message: str) -> None:
+        """Log debug message."""
+        self.logger.debug(message)
+        # Debug messages tidak ditampilkan di UI secara default
+    
+    def info(self, message: str) -> None:
+        """Log info message."""
+        self.logger.info(message)
+        self._log_to_ui(message, "info")
+    
+    def success(self, message: str) -> None:
+        """Log success message."""
+        self.logger.info(f"SUCCESS: {message}")
+        self._log_to_ui(message, "success")
+    
+    def warning(self, message: str) -> None:
+        """Log warning message."""
+        self.logger.warning(message)
+        self._log_to_ui(message, "warning")
+    
+    def error(self, message: str) -> None:
+        """Log error message."""
+        self.logger.error(message)
+        self._log_to_ui(message, "error")
+    
+    def critical(self, message: str) -> None:
+        """Log critical message."""
+        self.logger.critical(message)
+        self._log_to_ui(message, "error")
+    
+    def progress(self, iterable=None, desc="Processing", **kwargs):
+        """
+        Buat progress bar dan log progress.
+        
+        Args:
+            iterable: Iterable untuk diiterasi
+            desc: Deskripsi progress
+            **kwargs: Arguments tambahan untuk tqdm
+            
+        Returns:
+            tqdm progress bar atau iterable asli jika tqdm tidak ada
+        """
+        try:
+            from tqdm.auto import tqdm
+            progress_bar = tqdm(iterable, desc=desc, **kwargs)
+            return progress_bar
+        except ImportError:
+            self.warning("tqdm tidak ditemukan, progress tracking tidak aktif")
+            return iterable
+
+    def set_level(self, level: int) -> None:
+        """
+        Atur level logging untuk logger dan semua handlers.
+        
+        Args:
+            level: Level logging untuk diatur
+        """
+        self.log_level = level
+        self.logger.setLevel(level)
+        for handler in self.logger.handlers:
+            handler.setLevel(level)
+
+
+def create_ui_logger(ui_components: Dict[str, Any], 
+                    name: str = "ui_logger",
+                    log_to_file: bool = False,
+                    redirect_stdout: bool = True,
+                    log_dir: str = "logs",
+                    log_level: int = logging.INFO) -> UILogger:
+    """
+    Buat UILogger dan setup integrasi dengan UI components.
     
     Args:
-        ui_components: Dictionary berisi komponen UI dengan kunci 'status'
+        ui_components: Dictionary berisi komponen UI
         name: Nama logger
+        log_to_file: Flag untuk mengaktifkan logging ke file
+        redirect_stdout: Flag untuk mengalihkan stdout ke UI
+        log_dir: Direktori untuk menyimpan file log
+        log_level: Level logging (default: INFO)
         
     Returns:
-        Logger yang dikonfigurasi
+        UILogger instance
     """
-    # Import komponen secara strategis untuk menghindari circular imports
-    from smartcash.common.logger import get_logger, SmartCashLogger, LogLevel
+    # Buat logger
+    logger = UILogger(ui_components, name, log_to_file, log_dir, log_level)
     
-    # Sebelum membuat logger kustom, pastikan ada widget output
-    if 'status' not in ui_components or not hasattr(ui_components['status'], 'clear_output'):
-        # Fallback ke logger standar tanpa UI
-        return get_logger(name)
+    # Redirect stdout ke UI jika diperlukan
+    if redirect_stdout and 'status' in ui_components:
+        intercept_stdout_to_ui(ui_components)
     
-    # Setup LogLevel ke INFO untuk mengurangi debug log
-    logger = get_logger(name, LogLevel.INFO)
+    # Reset logging untuk menghindari duplikasi
+    _reset_logging_handlers()
     
-    # Simpan referensi ke fungsi log asli
-    original_log = logger.log
-    
-    # Dapatkan referensi ke logger Python standar tapi skip semua log non-critical
-    python_logger = None
-    if hasattr(logger, 'logger'):
-        python_logger = logger.logger
+    # Integrasikan logger dengan SmartCashLogger jika ada
+    try:
+        from smartcash.common.logger import get_logger, LogLevel
         
-        # Hapus semua handlers dari logger untuk menghilangkan semua log
-        for handler in list(python_logger.handlers):
-            python_logger.removeHandler(handler)
+        # Mapping level log antara UILogger dan SmartCashLogger
+        level_mapping = {
+            logging.DEBUG: LogLevel.DEBUG,
+            logging.INFO: LogLevel.INFO,
+            logging.WARNING: LogLevel.WARNING,
+            logging.ERROR: LogLevel.ERROR,
+            logging.CRITICAL: LogLevel.CRITICAL
+        }
+        
+        # Gunakan level yang sesuai dengan UILogger
+        sc_level = level_mapping.get(log_level, LogLevel.INFO)
+        std_logger = get_logger(name, level=sc_level)
+        
+        # Callback untuk meneruskan log dari SmartCashLogger ke UI
+        def ui_log_callback(level, message):
+            if level.name == 'DEBUG':
+                logger.debug(message)
+            elif level.name == 'INFO':
+                logger.info(message)
+            elif level.name == 'SUCCESS':
+                logger.success(message)
+            elif level.name == 'WARNING':
+                logger.warning(message)
+            elif level.name in ('ERROR', 'CRITICAL'):
+                logger.error(message)
+        
+        # Tambahkan callback ke std_logger
+        std_logger.add_callback(ui_log_callback)
+        
+        # Simpan referensi ke smartcash_logger di ui_components
+        ui_components['smartcash_logger'] = std_logger
+        
+    except ImportError:
+        # Tidak ada SmartCashLogger, hanya gunakan UILogger
+        pass
     
-    def ui_log(level, message):
-        # Jangan log debug message ke UI untuk mengurangi noise
-        level_name = level.name.lower() if hasattr(level, 'name') else 'info'
-        
-        # Filter semua log inisialisasi dan non-critical
-        if ('inisialisasi' in message.lower() or 'setup' in message.lower() or 
-            'handler' in message.lower() or 'initializing' in message.lower() or 
-            'module' in message.lower() or 'preprocessing' in message.lower()):
-            return
-            
-        # Konversi ke level logging standar
-        std_level = logger.LEVEL_MAPPING[level] if hasattr(logger, 'LEVEL_MAPPING') else logging.INFO
-        
-        # Format pesan untuk file
-        if hasattr(logger, '_format_message'):
-            _, file_msg = logger._format_message(level, message)
-        else:
-            file_msg = message
-        
-        # Skip UI display untuk debug messages dan info yang tidak penting
-        if level_name == 'debug' or level_name == 'info':
-            return
-            
-        # Hanya log error dan warning ke UI
-        if level_name in ('error', 'critical', 'warning', 'warn'):
-            with ui_components['status']:
-                # Map LogLevel ke status type
-                status_type = "warning" if level_name in ("warning", "warn") else "error"
-                display(create_status_indicator(status_type, message))
+    # Simpan referensi ke logger di ui_components
+    ui_components['logger'] = logger
     
-    # Ganti implementasi log dengan versi kustom
-    logger.log = ui_log
     return logger
 
 
-def log_to_ui(ui_components: Optional[Dict[str, Any]], message: str, level: str = 'info', emoji: str = None) -> None:
-    """
-    Log pesan ke UI dengan level dan emoji yang sesuai.
+def _reset_logging_handlers():
+    """Reset semua logging handlers untuk menghindari duplikasi."""
+    root_logger = logging.getLogger()
     
-    Args:
-        ui_components: Dictionary komponen UI atau None
-        message: Pesan yang akan ditampilkan
-        level: Level log (info, warning, error, success)
-        emoji: Emoji opsional untuk pesan
-    """
-    # Jika ui_components None, gunakan print biasa
-    if ui_components is None:
-        print(f"{emoji or ''} {message}")
-        return
-        
-    # Pastikan ui_components adalah dictionary
-    if not isinstance(ui_components, dict):
-        print(f"{emoji or ''} {message}")
-        return
-    
-    # Set emoji berdasarkan level jika tidak disediakan
-    if emoji is None:
-        emoji = {
-            'info': 'ℹ️',
-            'warning': '⚠️',
-            'error': '❌',
-            'success': '✅'
-        }.get(level, '')
-    
-    # Coba log ke status output jika tersedia
-    if 'status' in ui_components and hasattr(ui_components['status'], 'clear_output'):
-        with ui_components['status']:
-            display(create_status_indicator(level, f"{emoji} {message}"))
-        return
-    
-    # Coba log ke log output jika tersedia
-    if 'log_output' in ui_components:
-        if hasattr(ui_components['log_output'], 'append_stdout'):
-            if level == 'error':
-                ui_components['log_output'].append_stderr(f"{emoji} {message}")
-            else:
-                ui_components['log_output'].append_stdout(f"{emoji} {message}")
-            return
-    
-    # Fallback: print pesan
-    print(f"{emoji} {message}")
+    # Hapus semua StreamHandler untuk stdout/stderr
+    for handler in list(root_logger.handlers):
+        if isinstance(handler, logging.StreamHandler) and handler.stream in (sys.stdout, sys.stderr):
+            root_logger.removeHandler(handler)
+
 
 def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     """
     Intercept stdout dan arahkan ke UI widget.
-    Metode yang lebih clean dengan satu implementasi dan thread lock.
     
     Args:
         ui_components: Dictionary berisi komponen UI dengan kunci 'status'
@@ -142,31 +268,6 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     # Pastikan tidak terjadi multiple intercepts
     if 'custom_stdout' in ui_components and ui_components.get('custom_stdout') == sys.stdout:
         return
-        
-    # Hapus handler logging lain untuk mencegah duplikasi output
-    try:
-        import logging
-        root_logger = logging.getLogger()
-        
-        # Hapus semua stream handlers untuk mencegah output ke console
-        for handler in root_logger.handlers[:]:
-            if isinstance(handler, logging.StreamHandler):
-                root_logger.removeHandler(handler)
-                
-        # Tambahkan file handler jika diperlukan untuk tetap menyimpan log
-        has_file_handler = any(isinstance(h, logging.FileHandler) for h in root_logger.handlers)
-        if not has_file_handler:
-            try:
-                from pathlib import Path
-                log_dir = Path('logs')
-                log_dir.mkdir(exist_ok=True)
-                file_handler = logging.FileHandler(log_dir / 'colab.log')
-                file_handler.setLevel(logging.INFO)
-                root_logger.addHandler(file_handler)
-            except Exception:
-                pass
-    except Exception:
-        pass
     
     # Buat stdout interceptor dengan thread-safety
     class UIStdoutInterceptor:
@@ -176,47 +277,31 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
             self.buffer = ""
             self.lock = threading.RLock()
             self.buffer_limit = 1000  # Batasi buffer untuk mencegah memory leak
-            # Tambahkan lebih banyak prefiks untuk difilter
-            self.ignore_debug_prefix = [
-                '[DEBUG]', 'DEBUG:', 'INFO:', '[INFO]',
+            # Prefiks untuk messages yang akan difilter
+            self.ignore_prefixes = [
+                'DEBUG:', '[DEBUG]', 'INFO:', '[INFO]',
                 'Using TensorFlow backend', 'Colab notebook',
                 'Your session crashed', 'Executing in eager mode',
                 'TensorFlow', 'NumExpr', 'Running on',
-                '/usr/local/lib', 'WARNING:', '[WARNING]',
-                'This TensorFlow binary', 'For more info',
-                'Welcome to', 'This notebook', 'The Jupyter',
-                'IPython', 'torch._C', 'matplotlib', 'numpy',
-                'Requirement already satisfied', 'Downloading',
-                'Collecting', 'Building wheel', 'Installing',
-                'Successfully installed', 'Preparing metadata',
-                'Extracting', 'Processing', 'Looking in',
-                'Copying', 'Cloning', 'Pulling', 'Pushing',
-                'Fetching', 'Checking out', 'HEAD is now at',
-                'Already up to date', 'Your branch is',
-                'Mounted at', 'Drive already mounted',
-                'FutureWarning', 'DeprecationWarning',
-                'UserWarning', 'RuntimeWarning',
-
-            ]  # Prefiks untuk mengidentifikasi pesan yang tidak perlu ditampilkan di UI
+                '/usr/local/lib', 'WARNING:', '[WARNING]'
+            ]
             
         def write(self, message):
             # Write ke terminal asli
             self.terminal.write(message)
             
-            # Skip semua pesan yang tidak kritis untuk cell_1_x, cell_2_1, dan cell_2_2
+            # Skip semua pesan yang tidak penting
             msg_strip = message.strip()
             if not msg_strip or len(msg_strip) < 2:  # Skip pesan kosong atau terlalu pendek
                 return
                 
-            # Filter semua log inisialisasi handler dan log non-critical
-            if any(prefix in msg_strip for prefix in self.ignore_debug_prefix) or \
-               'inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or \
-               'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower() or \
-               'module' in msg_strip.lower() or 'preprocessing' in msg_strip.lower():
+            # Filter berdasarkan prefiks
+            if any(prefix in msg_strip for prefix in self.ignore_prefixes):
                 return
                 
-            # Filter tambahan untuk pesan pertama kali cell dijalankan
-            if 'Executing:' in msg_strip or 'In [' in msg_strip:
+            # Filter messages seperti inisialisasi, setup, dll
+            if ('inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or 
+                'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower()):
                 return
                 
             # Buffer output sampai ada newline, dengan thread-safety
@@ -236,6 +321,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                             try:
                                 with self.ui_components['status']:
                                     try:
+                                        from smartcash.ui.utils.alert_utils import create_status_indicator
                                         display(create_status_indicator("info", line))
                                     except ImportError:
                                         display(HTML(f"<div>{line}</div>"))
@@ -251,6 +337,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                     try:
                         with self.ui_components['status']:
                             try:
+                                from smartcash.ui.utils.alert_utils import create_status_indicator
                                 display(create_status_indicator("info", self.buffer))
                             except ImportError:
                                 display(HTML(f"<div>{self.buffer}</div>"))
@@ -274,3 +361,29 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     interceptor = UIStdoutInterceptor(ui_components)
     sys.stdout = interceptor
     ui_components['custom_stdout'] = interceptor
+
+
+def restore_stdout(ui_components: Dict[str, Any]) -> None:
+    """
+    Kembalikan stdout ke aslinya.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+    """
+    if 'original_stdout' in ui_components:
+        # Simpan custom stdout untuk dibersihkan
+        custom_stdout = ui_components.get('custom_stdout')
+        
+        # Kembalikan ke aslinya
+        sys.stdout = ui_components['original_stdout']
+        
+        # Hapus referensi di ui_components
+        ui_components.pop('original_stdout', None)
+        ui_components.pop('custom_stdout', None)
+        
+        # Flush buffer stdout custom untuk memastikan tidak ada pesan yang tertinggal
+        if custom_stdout and hasattr(custom_stdout, 'flush'):
+            try:
+                custom_stdout.flush()
+            except:
+                pass

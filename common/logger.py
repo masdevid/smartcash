@@ -1,18 +1,15 @@
 """
 File: smartcash/common/logger.py
-Deskripsi: Sistem logging terpusat dengan dukungan emoji, warna, dan callback
+Deskripsi: Sistem logging sederhana dengan dukungan callback untuk integrasi UI
 """
 
 import logging
 import sys
-import os
-import time
-from pathlib import Path
-from typing import Dict, Optional, Union, Callable, List
 from enum import Enum, auto
+from typing import Dict, Optional, Union, Callable, List
 
 class LogLevel(Enum):
-    """Level log dengan emoji."""
+    """Level log."""
     DEBUG = auto()
     INFO = auto()
     SUCCESS = auto()
@@ -22,35 +19,8 @@ class LogLevel(Enum):
 
 class SmartCashLogger:
     """
-    Logger untuk SmartCash dengan fitur:
-    - Emoji untuk level log
-    - Format teks berwarna
-    - Output ke file dan console
-    - Support callback untuk UI
+    Logger sederhana untuk SmartCash dengan dukungan callback untuk UI
     """
-    
-    # Emoji untuk log level
-    EMOJIS = {
-        LogLevel.DEBUG: '🐞',
-        LogLevel.INFO: 'ℹ️',
-        LogLevel.SUCCESS: '✅',
-        LogLevel.WARNING: '⚠️',
-        LogLevel.ERROR: '❌',
-        LogLevel.CRITICAL: '🔥'
-    }
-    
-    # Colors (ANSI color codes)
-    COLORS = {
-        LogLevel.DEBUG: '\033[90m',  # Gray
-        LogLevel.INFO: '\033[0m',    # Default
-        LogLevel.SUCCESS: '\033[92m', # Green
-        LogLevel.WARNING: '\033[93m', # Yellow
-        LogLevel.ERROR: '\033[91m',   # Red
-        LogLevel.CRITICAL: '\033[91;1m' # Bold Red
-    }
-    
-    # Reset ANSI color
-    RESET_COLOR = '\033[0m'
     
     # Mapping ke logging level standar
     LEVEL_MAPPING = {
@@ -64,80 +34,32 @@ class SmartCashLogger:
     
     def __init__(self, 
                 name: str, 
-                level: LogLevel = LogLevel.INFO,
-                log_file: Optional[str] = None,
-                use_colors: bool = True,
-                use_emojis: bool = True,
-                log_dir: str = 'logs'):
+                level: LogLevel = LogLevel.INFO):
         """
         Inisialisasi SmartCashLogger.
         
         Args:
             name: Nama logger
             level: Level minimum log
-            log_file: Path file log (auto-generated jika None)
-            use_colors: Flag untuk menggunakan warna
-            use_emojis: Flag untuk menggunakan emoji
-            log_dir: Direktori untuk file log
         """
         self.name = name
         self.level = level
-        self.use_colors = use_colors
-        self.use_emojis = use_emojis
         self._callbacks = []
         
         # Setup Python logger
         self.logger = logging.getLogger(name)
         self.logger.setLevel(self.LEVEL_MAPPING[level])
         
-        # Hapus handler yang sudah ada
-        for handler in self.logger.handlers[:]:
-            self.logger.removeHandler(handler)
-        
-        # Tambahkan console handler
-        console_handler = logging.StreamHandler(sys.stdout)
-        console_handler.setLevel(self.LEVEL_MAPPING[level])
-        self.logger.addHandler(console_handler)
-        
-        # Tambahkan file handler jika diperlukan
-        if log_file or log_dir:
-            self.log_dir = Path(log_dir)
-            self.log_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Otomatis generate nama file jika tidak ada
-            if not log_file:
-                log_file = f"{self.log_dir}/{name}_{time.strftime('%Y%m%d')}.log"
-                
-            file_handler = logging.FileHandler(log_file, encoding='utf-8')
-            file_handler.setLevel(self.LEVEL_MAPPING[level])
-            
-            # Format sederhana untuk file
-            file_formatter = logging.Formatter(
+        # Jika tidak ada handler, tambahkan console handler default
+        if not self.logger.handlers:
+            console_handler = logging.StreamHandler(sys.stdout)
+            console_handler.setLevel(self.LEVEL_MAPPING[level])
+            formatter = logging.Formatter(
                 '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S'
             )
-            file_handler.setFormatter(file_formatter)
-            self.logger.addHandler(file_handler)
-    
-    def _format_message(self, level: LogLevel, message: str) -> str:
-        """Format pesan log dengan emoji dan warna."""
-        formatted = ""
-        
-        # Tambahkan emoji jika diperlukan
-        if self.use_emojis and level in self.EMOJIS:
-            formatted += f"{self.EMOJIS[level]} "
-            
-        # Tambahkan pesan
-        formatted += message
-        
-        # Tambahkan warna jika di console dan diizinkan
-        if self.use_colors and level in self.COLORS:
-            colored = f"{self.COLORS[level]}{formatted}{self.RESET_COLOR}"
-            # Return versi berwarna untuk console, plain untuk file
-            return colored, formatted
-            
-        # Tidak ada warna
-        return formatted, formatted
+            console_handler.setFormatter(formatter)
+            self.logger.addHandler(console_handler)
     
     def log(self, level: LogLevel, message: str) -> None:
         """
@@ -147,14 +69,11 @@ class SmartCashLogger:
             level: Level log
             message: Pesan yang akan di-log
         """
-        # Format pesan
-        console_msg, file_msg = self._format_message(level, message)
-        
         # Map ke level logging standar
         std_level = self.LEVEL_MAPPING[level]
         
         # Log via Python logger
-        self.logger.log(std_level, file_msg)
+        self.logger.log(std_level, message)
         
         # Panggil callbacks jika ada
         for callback in self._callbacks:
@@ -225,9 +144,10 @@ class SmartCashLogger:
 
     def set_level(self, level: LogLevel) -> None:
         """
-        Set the logging level for the logger and all handlers.
+        Atur level logging untuk logger dan semua handlers.
+        
         Args:
-            level: LogLevel to set
+            level: LogLevel untuk diatur
         """
         self.level = level
         std_level = self.LEVEL_MAPPING[level]
@@ -237,21 +157,13 @@ class SmartCashLogger:
 
 # Fungsi helper untuk mendapatkan logger
 def get_logger(name: Optional[str] = None, 
-              level: LogLevel = LogLevel.INFO, 
-              log_file: Optional[str] = None,
-              use_colors: bool = True,
-              use_emojis: bool = True,
-              log_dir: str = 'logs') -> SmartCashLogger:
+              level: LogLevel = LogLevel.INFO) -> SmartCashLogger:
     """
     Dapatkan instance SmartCashLogger.
     
     Args:
         name: Nama logger (default: __name__ dari modul pemanggil)
         level: Level minimum log
-        log_file: Path file log (auto-generated jika None)
-        use_colors: Flag untuk menggunakan warna
-        use_emojis: Flag untuk menggunakan emoji
-        log_dir: Direktori untuk file log
         
     Returns:
         Instance SmartCashLogger
@@ -272,56 +184,5 @@ def get_logger(name: Optional[str] = None,
     
     return SmartCashLogger(
         name=name,
-        level=level,
-        log_file=log_file,
-        use_colors=use_colors,
-        use_emojis=use_emojis,
-        log_dir=log_dir
+        level=level
     )
-
-def fix_logger_usage():
-    """
-    Fungsi helper untuk memperbaiki penggunaan get_logger dengan string literal.
-    Fungsi ini akan mencari semua file yang menggunakan get_logger dengan string literal
-    dan menggantinya dengan get_logger() tanpa parameter.
-    """
-    import os
-    import re
-    from pathlib import Path
-    
-    # Pattern untuk mencari get_logger dengan string literal
-    pattern = r'get_logger\(["\']([^"\']+)["\']\)'
-    
-    # Direktori yang akan dicari
-    base_dir = Path(__file__).parent.parent
-    
-    # Ekstensi file yang akan diproses
-    extensions = {'.py'}
-    
-    # Counter untuk statistik
-    total_files = 0
-    modified_files = 0
-    
-    # Cari semua file Python
-    for root, _, files in os.walk(base_dir):
-        for file in files:
-            if file.endswith(extensions):
-                file_path = Path(root) / file
-                total_files += 1
-                
-                # Baca file
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                
-                # Cari dan ganti
-                new_content = re.sub(pattern, 'get_logger()', content)
-                
-                # Jika ada perubahan, tulis kembali ke file
-                if new_content != content:
-                    with open(file_path, 'w', encoding='utf-8') as f:
-                        f.write(new_content)
-                    modified_files += 1
-                    print(f"Modified: {file_path}")
-    
-    print(f"\nTotal files processed: {total_files}")
-    print(f"Files modified: {modified_files}")

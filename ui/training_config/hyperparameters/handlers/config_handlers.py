@@ -406,14 +406,14 @@ def update_ui_from_config(ui_components: Dict[str, Any], config: Dict[str, Any] 
 
 def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    Simpan konfigurasi hyperparameters ke config manager dan sinkronkan dengan Google Drive.
+    Simpan konfigurasi hyperparameters ke config manager.
     
     Args:
         config: Dictionary konfigurasi yang akan disimpan
         ui_components: Dictionary komponen UI (opsional)
         
     Returns:
-        Konfigurasi yang telah disimpan dan disinkronkan
+        Konfigurasi yang telah disimpan
     """
     try:
         # Update status panel
@@ -472,36 +472,6 @@ def save_config(config: Dict[str, Any], ui_components: Dict[str, Any] = None) ->
                 
                 # Verifikasi ulang setelah simpan ulang
                 saved_config = config_manager.get_module_config('hyperparameters', {})
-        
-        # Sinkronisasi dengan Google Drive jika di Colab
-        from smartcash.ui.training_config.hyperparameters.handlers.drive_handlers import is_colab_environment, sync_with_drive
-        if is_colab_environment():
-            if ui_components:
-                from smartcash.ui.training_config.hyperparameters.handlers.sync_logger import update_sync_status_only
-                update_sync_status_only(ui_components, "Menyinkronkan dengan Google Drive...", 'info')
-            
-            # Pastikan nilai yang disinkronkan menggunakan nilai original_config
-            # untuk menghindari inkonsistensi
-            synced_config = sync_with_drive(original_config, ui_components)
-            
-            # Verifikasi konfigurasi yang disinkronkan dengan membandingkan dengan nilai asli
-            is_synced_consistent = True
-            if 'hyperparameters' in synced_config and 'hyperparameters' in original_config:
-                for key, value in original_config['hyperparameters'].items():
-                    if key not in synced_config['hyperparameters'] or synced_config['hyperparameters'][key] != value:
-                        is_synced_consistent = False
-                        logger.warning(f"⚠️ Inkonsistensi data setelah sinkronisasi pada key '{key}': {value} vs {synced_config['hyperparameters'].get(key, 'tidak ada')}")
-                        if ui_components:
-                            from smartcash.ui.training_config.hyperparameters.handlers.sync_logger import update_sync_status_only
-                            update_sync_status_only(ui_components, f"Inkonsistensi data setelah sinkronisasi", 'warning')
-                        break
-            
-            if is_synced_consistent:
-                if ui_components:
-                    from smartcash.ui.training_config.hyperparameters.handlers.sync_logger import update_sync_status_only
-                    update_sync_status_only(ui_components, "Konfigurasi berhasil disimpan dan disinkronkan", 'success')
-            
-            return synced_config
         
         return saved_config
     except Exception as e:

@@ -11,7 +11,7 @@ from smartcash.common.constants.log_messages import OPERATION_FAILED
 from smartcash.ui.utils.constants import ICONS
 from smartcash.ui.utils.alert_utils import create_info_alert
 from smartcash.ui.dataset.split.handlers.config_handlers import (
-    load_config, save_config, update_ui_from_config, update_config_from_ui, is_colab_environment
+    load_config, save_config, update_ui_from_config, update_config_from_ui
 )
 from smartcash.ui.dataset.split.handlers.sync_logger import (
     log_sync_success, log_sync_error, log_sync_warning, update_sync_status_only, add_sync_status_panel
@@ -168,13 +168,6 @@ def setup_button_handlers(ui_components: Dict[str, Any], config: Dict[str, Any] 
             
         if 'save_button' in ui_components:
             ui_components['save_button'].on_click(save_handler)
-        
-        # Tampilkan informasi lingkungan
-        is_colab = is_colab_environment()
-        if is_colab:
-            logger.info("🔄 Sinkronisasi dengan Google Drive aktif")
-        else:
-            logger.info("ℹ️ Berjalan di lingkungan lokal (tanpa sinkronisasi Drive)")
         
         return ui_components
     except Exception as e:

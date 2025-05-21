@@ -6,11 +6,7 @@ Deskripsi: Inisialisasi dan ekspor modul-modul umum untuk SmartCash dengan penge
 # ===== Konfigurasi =====
 from smartcash.common.config import (
     get_config_manager, 
-    ConfigManager,
-    sync_config_with_drive,
-    sync_all_configs,
-    merge_configs_smart,
-    are_configs_identical
+    SimpleConfigManager
 )
 
 from smartcash.common.default_config import (
@@ -202,12 +198,10 @@ from smartcash.common.constants.paths import (
 # Daftar ekspor lengkap
 __all__ = [
     # Konfigurasi
-    'get_config_manager', 'ConfigManager',
+    'get_config_manager', 'SimpleConfigManager',
     'generate_default_config', 
     'ensure_base_config_exists', 
     'ensure_colab_config_exists',
-    'sync_config_with_drive', 'sync_all_configs',
-    'merge_configs_smart', 'are_configs_identical',
     
     # Lingkungan
     'get_environment_manager', 'EnvironmentManager',

@@ -6,7 +6,8 @@ Deskripsi: Handler untuk tombol reset konfigurasi preprocessing dataset
 from typing import Dict, Any, Optional
 
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
-from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel, update_ui_state, reset_after_operation
+from smartcash.ui.dataset.preprocessing.utils.progress_manager import reset_progress_bar
 
 def handle_reset_button_click(button: Any, ui_components: Dict[str, Any]) -> None:
     """
@@ -34,18 +35,22 @@ def handle_reset_button_click(button: Any, ui_components: Dict[str, Any]) -> Non
         log_message(ui_components, "Konfigurasi preprocessing berhasil direset ke default", "success", "✅")
         
         # Update UI state
-        update_status_panel(ui_components, "success", "Konfigurasi direset ke default")
+        update_ui_state(ui_components, "success", "Konfigurasi direset ke default")
+        
+        # Reset progress bar dan konfirmasi
+        reset_progress_bar(ui_components)
+        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+            ui_components['confirmation_area'].clear_output()
         
     except Exception as e:
         # Log error
         error_message = str(e)
-        update_status_panel(ui_components, "error", f"Error saat reset konfigurasi: {error_message}")
+        update_ui_state(ui_components, "error", f"Error saat reset konfigurasi: {error_message}")
         log_message(ui_components, f"Error saat reset konfigurasi preprocessing: {error_message}", "error", "❌")
     
     finally:
-        # Re-enable tombol setelah operasi selesai
-        if button and hasattr(button, 'disabled'):
-            button.disabled = False
+        # Reset UI setelah operasi
+        reset_after_operation(ui_components, button)
 
 def reset_preprocessing_config(ui_components: Dict[str, Any]) -> None:
     """

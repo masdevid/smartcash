@@ -6,7 +6,7 @@ Deskripsi: Handler untuk tombol save konfigurasi preprocessing dataset
 from typing import Dict, Any, Optional
 
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
-from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel, update_ui_state, reset_after_operation
 from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handler import get_preprocessing_config_from_ui
 
 def handle_save_button_click(button: Any, ui_components: Dict[str, Any]) -> None:
@@ -35,18 +35,21 @@ def handle_save_button_click(button: Any, ui_components: Dict[str, Any]) -> None
         log_message(ui_components, "Konfigurasi preprocessing berhasil disimpan", "success", "✅")
         
         # Update UI state
-        update_status_panel(ui_components, "success", "Konfigurasi berhasil disimpan")
+        update_ui_state(ui_components, "success", "Konfigurasi berhasil disimpan")
+        
+        # Bersihkan area konfirmasi jika ada
+        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+            ui_components['confirmation_area'].clear_output()
         
     except Exception as e:
         # Log error
         error_message = str(e)
-        update_status_panel(ui_components, "error", f"Error saat simpan konfigurasi: {error_message}")
+        update_ui_state(ui_components, "error", f"Error saat simpan konfigurasi: {error_message}")
         log_message(ui_components, f"Error saat simpan konfigurasi preprocessing: {error_message}", "error", "❌")
     
     finally:
-        # Re-enable tombol setelah operasi selesai
-        if button and hasattr(button, 'disabled'):
-            button.disabled = False
+        # Reset UI setelah operasi
+        reset_after_operation(ui_components, button)
 
 def save_preprocessing_config(ui_components: Dict[str, Any]) -> None:
     """

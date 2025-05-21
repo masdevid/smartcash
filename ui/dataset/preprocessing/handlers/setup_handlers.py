@@ -6,7 +6,7 @@ Deskripsi: Setup handler untuk UI preprocessing dataset yang terintegrasi dengan
 from typing import Dict, Any, Optional
 from smartcash.common.config import get_config_manager
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message, setup_ui_logger
-from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_status_panel, ensure_confirmation_area
 from smartcash.ui.dataset.preprocessing.utils.progress_manager import setup_multi_progress, setup_progress_indicator
 
 def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
@@ -28,7 +28,7 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     _setup_observers(ui_components)
     
     # Pastikan area konfirmasi tersedia
-    _setup_confirmation_area(ui_components)
+    ui_components = ensure_confirmation_area(ui_components)
     
     # Load konfigurasi dan update UI
     try:
@@ -74,6 +74,12 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     # Save config yang sudah ada ke UI components
     ui_components['config'] = config or {}
     
+    # Tambahkan direktori default jika belum ada
+    if 'data_dir' not in ui_components:
+        ui_components['data_dir'] = 'data'
+    if 'preprocessed_dir' not in ui_components:
+        ui_components['preprocessed_dir'] = 'data/preprocessed'
+    
     # Log info dengan logger helper
     log_message(ui_components, "Preprocessing handlers berhasil diinisialisasi", "success", "✅")
     
@@ -83,60 +89,41 @@ def _setup_observers(ui_components: Dict[str, Any]) -> None:
     """Setup observer handlers untuk sistem notifikasi."""
     try:
         # Import sistem notifikasi 
-        from smartcash.ui.dataset.preprocessing.utils.ui_observers import register_ui_observers
+        from smartcash.ui.dataset.preprocessing.utils.ui_observers import register_ui_observers, MockObserverManager
         
         try:
-            # Setup observer manager dan register UI observers
-            from smartcash.common.observer import ObserverManager
+            # Coba import observer dari modul yang berbeda-beda
+            try:
+                from smartcash.components.observer import ObserverManager
+                observer_class = ObserverManager
+            except ImportError:
+                try:
+                    from smartcash.common.observer import ObserverManager
+                    observer_class = ObserverManager
+                except ImportError:
+                    # Gunakan mock observer jika tidak ada modul observer
+                    observer_class = MockObserverManager
+                    log_message(ui_components, "Menggunakan mock observer karena modul observer tidak tersedia", "info", "ℹ️")
             
             # Setup observer manager jika belum ada
             if 'observer_manager' not in ui_components:
-                ui_components['observer_manager'] = ObserverManager()
+                ui_components['observer_manager'] = observer_class()
             
             # Register UI observers untuk log dan progress
             register_ui_observers(ui_components)
             
             # Log setup berhasil
             log_message(ui_components, "Observer untuk sistem notifikasi berhasil disetup", "debug", "✅")
-        except (ImportError, AttributeError) as e:
-            # Log error jika ObserverManager tidak tersedia
-            log_message(ui_components, f"Observer manager tidak tersedia: {str(e)}", "warning", "⚠️")
+        except Exception as e:
+            # Log error jika gagal setup observer
+            log_message(ui_components, f"Error saat setup observer: {str(e)}", "warning", "⚠️")
+            
+            # Gunakan mock observer sebagai fallback
+            ui_components['observer_manager'] = MockObserverManager()
+            log_message(ui_components, "Menggunakan mock observer sebagai fallback", "info", "ℹ️")
     except ImportError as e:
         # Log gagal import
         log_message(ui_components, f"Observer handler tidak tersedia: {str(e)}", "debug", "ℹ️")
-
-def _setup_confirmation_area(ui_components: Dict[str, Any]) -> None:
-    """Setup area konfirmasi untuk dialog konfirmasi."""
-    if 'confirmation_area' not in ui_components:
-        from IPython.display import display
-        import ipywidgets as widgets
-        
-        # Buat output widget untuk area konfirmasi
-        ui_components['confirmation_area'] = widgets.Output()
-        
-        # Tambahkan ke UI jika ui adalah VBox
-        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
-            try:
-                # Cari posisi yang tepat (setelah tombol action atau progress container)
-                children = list(ui_components['ui'].children)
-                insert_pos = -1
-                
-                # Cari posisi setelah button container
-                for i, child in enumerate(children):
-                    if child == ui_components.get('button_container') or child == ui_components.get('progress_container'):
-                        insert_pos = i + 1
-                        break
-                
-                # Jika tidak ditemukan, tambahkan di akhir
-                if insert_pos == -1:
-                    insert_pos = len(children)
-                
-                # Sisipkan confirmation area
-                children.insert(insert_pos, ui_components['confirmation_area'])
-                ui_components['ui'].children = children
-            except Exception as e:
-                # Log error jika gagal menambahkan area konfirmasi
-                log_message(ui_components, f"Gagal menambahkan area konfirmasi: {str(e)}", "warning", "⚠️")
 
 def _setup_progress_tracking(ui_components: Dict[str, Any]) -> None:
     """Setup progress tracking untuk preprocessing."""
@@ -199,52 +186,16 @@ def _setup_save_button_handler(ui_components: Dict[str, Any]) -> None:
         )
 
 def _setup_cleanup(ui_components: Dict[str, Any]) -> None:
-    """Setup cleanup function."""
-    def cleanup_resources():
-        """Fungsi untuk membersihkan resources."""
-        try:
-            # Reset progress
-            if 'progress_bar' in ui_components:
-                if hasattr(ui_components['progress_bar'], 'layout'):
-                    ui_components['progress_bar'].layout.visibility = 'hidden'
-                ui_components['progress_bar'].value = 0
+    """Setup fungsi cleanup untuk membersihkan resources saat selesai."""
+    if 'cleanup_ui' not in ui_components:
+        def cleanup_resources():
+            # Reset semua flag
+            ui_components['preprocessing_running'] = False
+            ui_components['cleanup_running'] = False
+            ui_components['stop_requested'] = False
             
-            # Reset progress labels
-            for label_key in ['overall_label', 'step_label', 'current_progress']:
-                if label_key in ui_components and hasattr(ui_components[label_key], 'layout'):
-                    ui_components[label_key].layout.visibility = 'hidden'
-                    ui_components[label_key].value = ""
-            
-            # Unregister observer group jika ada
-            if 'observer_manager' in ui_components and 'observer_group' in ui_components:
-                try:
-                    ui_components['observer_manager'].unregister_group(ui_components['observer_group'])
-                except Exception:
-                    pass
-            
-            # Reset logging
-            try:
-                from smartcash.ui.utils.logging_utils import reset_logging
-                reset_logging()
-            except ImportError:
-                pass
-            
-            # Log cleanup berhasil
-            if 'log_message' in ui_components and callable(ui_components['log_message']):
-                ui_components['log_message']("Cleanup preprocessing berhasil", "debug", "🧹")
-        except Exception as e:
-            # Ignore exceptions during cleanup
-            pass
-    
-    # Tetapkan fungsi cleanup ke ui_components
-    ui_components['cleanup'] = cleanup_resources
-    
-    # Register cleanup dengan IPython event
-    try:
-        from IPython import get_ipython
-        ip = get_ipython()
-        if ip is not None:
-            ip.events.register('pre_run_cell', lambda: cleanup_resources())
-    except (ImportError, AttributeError):
-        # Skip jika tidak di IPython environment
-        pass
+            # Bersihkan observer manager
+            if 'observer_manager' in ui_components and hasattr(ui_components['observer_manager'], 'cleanup'):
+                ui_components['observer_manager'].cleanup()
+        
+        ui_components['cleanup_ui'] = cleanup_resources

@@ -3,8 +3,87 @@ File: smartcash/ui/dataset/preprocessing/utils/ui_observers.py
 Deskripsi: Utilitas untuk observer UI pada modul preprocessing dataset
 """
 
-from typing import Dict, Any, Callable, Optional
+from typing import Dict, Any, Callable, Optional, List
 from smartcash.ui.utils.constants import ICONS
+from enum import Enum, auto
+
+# Event types untuk preprocessing
+class PreprocessingEvents:
+    """Event types untuk modul preprocessing."""
+    PROGRESS_UPDATE = "preprocessing.progress_update"
+    STATUS_UPDATE = "preprocessing.status_update"
+    LOG_MESSAGE = "preprocessing.log_message"
+    TASK_COMPLETED = "preprocessing.task_completed"
+    PROCESS_START = "preprocessing.process_start"
+    PROCESS_COMPLETE = "preprocessing.process_complete"
+    PROCESS_ERROR = "preprocessing.process_error"
+    PROCESS_STOP = "preprocessing.process_stop"
+
+# Fallback ObserverManager untuk Colab environment
+class MockObserverManager:
+    """Mock Observer Manager untuk environment tanpa modul observer."""
+    
+    def __init__(self):
+        """Inisialisasi mock observer manager."""
+        self.observers = {}
+        self.flags = {}
+    
+    def register(self, event_type: str, callback: Callable, group: str = None) -> None:
+        """
+        Register observer untuk event type.
+        
+        Args:
+            event_type: Tipe event yang akan diobservasi
+            callback: Fungsi callback untuk event
+            group: Grup observer (opsional)
+        """
+        if event_type not in self.observers:
+            self.observers[event_type] = []
+        
+        self.observers[event_type].append({
+            'callback': callback,
+            'group': group
+        })
+    
+    def notify(self, event_type: str, data: Dict[str, Any] = None) -> None:
+        """
+        Notifikasi semua observer untuk event type.
+        
+        Args:
+            event_type: Tipe event yang dinotifikasi
+            data: Data untuk dikirim ke observer
+        """
+        if event_type not in self.observers:
+            return
+        
+        for observer in self.observers[event_type]:
+            try:
+                observer['callback'](data or {})
+            except Exception as e:
+                print(f"Error pada observer: {str(e)}")
+    
+    def set_flag(self, flag_name: str, value: Any) -> None:
+        """
+        Set flag value.
+        
+        Args:
+            flag_name: Nama flag
+            value: Nilai flag
+        """
+        self.flags[flag_name] = value
+    
+    def get_flag(self, flag_name: str, default: Any = None) -> Any:
+        """
+        Get flag value.
+        
+        Args:
+            flag_name: Nama flag
+            default: Nilai default jika flag tidak ada
+            
+        Returns:
+            Nilai flag
+        """
+        return self.flags.get(flag_name, default)
 
 def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -16,17 +95,28 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Import observer
+    # Coba import observer dari common
     try:
-        from smartcash.common.observer import ObserverManager, EventType
-        
-        # Cek apakah observer manager sudah ada
-        if 'observer_manager' not in ui_components:
-            ui_components['observer_manager'] = ObserverManager()
-        
-        # Get observer manager
-        observer_manager = ui_components['observer_manager']
-        
+        from smartcash.components.observer import ObserverManager, EventTopics
+        observer_manager_class = ObserverManager
+    except ImportError:
+        try:
+            from smartcash.common.observer import ObserverManager, EventType
+            observer_manager_class = ObserverManager
+        except ImportError:
+            # Fallback ke mock observer manager
+            from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+            log_message(ui_components, "Observer manager tidak tersedia. Menggunakan mock observer.", "warning", "⚠️")
+            observer_manager_class = MockObserverManager
+    
+    # Cek apakah observer manager sudah ada
+    if 'observer_manager' not in ui_components:
+        ui_components['observer_manager'] = observer_manager_class()
+    
+    # Get observer manager
+    observer_manager = ui_components['observer_manager']
+    
+    try:
         # Register event handlers
         register_progress_handlers(ui_components, observer_manager)
         register_status_handlers(ui_components, observer_manager)
@@ -35,11 +125,10 @@ def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         
         # Setup observer group untuk UI
         ui_components['observer_group'] = "preprocessing_ui"
-        
-    except ImportError:
-        # Log warning jika observer tidak tersedia
-        if 'log_message' in ui_components and callable(ui_components['log_message']):
-            ui_components['log_message']("ObserverManager tidak tersedia. Fitur notifikasi dibatasi.", "warning", "⚠️")
+    except Exception as e:
+        # Log warning jika terjadi error saat registrasi observer
+        from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+        log_message(ui_components, f"Error saat registrasi observer: {str(e)}", "warning", "⚠️")
     
     return ui_components
 
@@ -51,8 +140,6 @@ def register_progress_handlers(ui_components: Dict[str, Any], observer_manager: 
         ui_components: Dictionary komponen UI
         observer_manager: Observer manager
     """
-    from smartcash.common.observer import EventType
-    
     # Handler untuk progress update
     def handle_progress_update(data: Dict[str, Any]) -> None:
         # Pastikan data valid
@@ -69,11 +156,24 @@ def register_progress_handlers(ui_components: Dict[str, Any], observer_manager: 
         update_progress(ui_components, value, max_value, message)
     
     # Register observer untuk progress update
-    observer_manager.register(
-        event_type=EventType.PROGRESS_UPDATE,
-        callback=handle_progress_update,
-        group="preprocessing_ui"
-    )
+    try:
+        try:
+            from smartcash.components.observer import EventTopics
+            event_type = EventTopics.PROGRESS_UPDATE
+        except ImportError:
+            try:
+                from smartcash.common.observer import EventType
+                event_type = EventType.PROGRESS_UPDATE
+            except ImportError:
+                event_type = PreprocessingEvents.PROGRESS_UPDATE
+        
+        observer_manager.register(
+            event_type=event_type,
+            callback=handle_progress_update,
+            group="preprocessing_ui"
+        )
+    except Exception:
+        pass
 
 def register_status_handlers(ui_components: Dict[str, Any], observer_manager: Any) -> None:
     """
@@ -83,8 +183,6 @@ def register_status_handlers(ui_components: Dict[str, Any], observer_manager: An
         ui_components: Dictionary komponen UI
         observer_manager: Observer manager
     """
-    from smartcash.common.observer import EventType
-    
     # Handler untuk status update
     def handle_status_update(data: Dict[str, Any]) -> None:
         # Pastikan data valid
@@ -100,11 +198,24 @@ def register_status_handlers(ui_components: Dict[str, Any], observer_manager: An
         update_status_panel(ui_components, status, message)
     
     # Register observer untuk status update
-    observer_manager.register(
-        event_type=EventType.STATUS_UPDATE,
-        callback=handle_status_update,
-        group="preprocessing_ui"
-    )
+    try:
+        try:
+            from smartcash.components.observer import EventTopics
+            event_type = EventTopics.STATUS_UPDATE
+        except ImportError:
+            try:
+                from smartcash.common.observer import EventType
+                event_type = EventType.STATUS_UPDATE
+            except ImportError:
+                event_type = PreprocessingEvents.STATUS_UPDATE
+        
+        observer_manager.register(
+            event_type=event_type,
+            callback=handle_status_update,
+            group="preprocessing_ui"
+        )
+    except Exception:
+        pass
 
 def register_message_handlers(ui_components: Dict[str, Any], observer_manager: Any) -> None:
     """
@@ -114,8 +225,6 @@ def register_message_handlers(ui_components: Dict[str, Any], observer_manager: A
         ui_components: Dictionary komponen UI
         observer_manager: Observer manager
     """
-    from smartcash.common.observer import EventType
-    
     # Handler untuk log message
     def handle_log_message(data: Dict[str, Any]) -> None:
         # Pastikan data valid
@@ -132,11 +241,24 @@ def register_message_handlers(ui_components: Dict[str, Any], observer_manager: A
         log_message(ui_components, message, level, icon)
     
     # Register observer untuk log message
-    observer_manager.register(
-        event_type=EventType.LOG_MESSAGE,
-        callback=handle_log_message,
-        group="preprocessing_ui"
-    )
+    try:
+        try:
+            from smartcash.components.observer import EventTopics
+            event_type = EventTopics.LOG_MESSAGE
+        except ImportError:
+            try:
+                from smartcash.common.observer import EventType
+                event_type = EventType.LOG_MESSAGE
+            except ImportError:
+                event_type = PreprocessingEvents.LOG_MESSAGE
+        
+        observer_manager.register(
+            event_type=event_type,
+            callback=handle_log_message,
+            group="preprocessing_ui"
+        )
+    except Exception:
+        pass
 
 def register_completion_handlers(ui_components: Dict[str, Any], observer_manager: Any) -> None:
     """
@@ -146,8 +268,6 @@ def register_completion_handlers(ui_components: Dict[str, Any], observer_manager
         ui_components: Dictionary komponen UI
         observer_manager: Observer manager
     """
-    from smartcash.common.observer import EventType
-    
     # Handler untuk completion
     def handle_completion(data: Dict[str, Any]) -> None:
         # Pastikan data valid
@@ -170,11 +290,24 @@ def register_completion_handlers(ui_components: Dict[str, Any], observer_manager
         reset_ui_after_preprocessing(ui_components)
     
     # Register observer untuk completion
-    observer_manager.register(
-        event_type=EventType.TASK_COMPLETED,
-        callback=handle_completion,
-        group="preprocessing_ui"
-    )
+    try:
+        try:
+            from smartcash.components.observer import EventTopics
+            event_type = EventTopics.TASK_COMPLETED
+        except ImportError:
+            try:
+                from smartcash.common.observer import EventType
+                event_type = EventType.TASK_COMPLETED
+            except ImportError:
+                event_type = PreprocessingEvents.TASK_COMPLETED
+        
+        observer_manager.register(
+            event_type=event_type,
+            callback=handle_completion,
+            group="preprocessing_ui"
+        )
+    except Exception:
+        pass
 
 def notify_process_start(ui_components: Dict[str, Any], process_name: str, display_info: str, split: Optional[str] = None) -> None:
     """
@@ -186,9 +319,31 @@ def notify_process_start(ui_components: Dict[str, Any], process_name: str, displ
         display_info: Informasi tambahan untuk ditampilkan
         split: Split dataset yang diproses (opsional)
     """
-    logger = ui_components.get('logger')
-    if logger: 
-        logger.info(f"{ICONS['start']} Memulai {process_name} {display_info}")
+    # Log informasi
+    from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+    log_message(ui_components, f"Memulai {process_name} {display_info}", "info", ICONS['start'])
+    
+    # Notifikasi observer jika tersedia
+    observer_manager = ui_components.get('observer_manager')
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            try:
+                from smartcash.components.observer import EventTopics
+                event_type = EventTopics.PROCESS_START
+            except ImportError:
+                try:
+                    from smartcash.common.observer import EventType
+                    event_type = EventType.PROCESS_START
+                except ImportError:
+                    event_type = PreprocessingEvents.PROCESS_START
+            
+            observer_manager.notify(event_type, {
+                'process_name': process_name,
+                'display_info': display_info,
+                'split': split
+            })
+        except Exception:
+            pass
     
     # Panggil callback jika tersedia
     if 'on_process_start' in ui_components and callable(ui_components['on_process_start']):
@@ -206,9 +361,31 @@ def notify_process_complete(ui_components: Dict[str, Any], result: Dict[str, Any
         result: Hasil dari proses
         display_info: Informasi tambahan untuk ditampilkan
     """
-    logger = ui_components.get('logger')
-    if logger: 
-        logger.info(f"{ICONS['success']} Preprocessing {display_info} selesai")
+    # Log informasi
+    from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+    log_message(ui_components, f"Preprocessing {display_info} selesai", "success", ICONS['success'])
+    
+    # Notifikasi observer jika tersedia
+    observer_manager = ui_components.get('observer_manager')
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            try:
+                from smartcash.components.observer import EventTopics
+                event_type = EventTopics.PROCESS_COMPLETE
+            except ImportError:
+                try:
+                    from smartcash.common.observer import EventType
+                    event_type = EventType.PROCESS_COMPLETE
+                except ImportError:
+                    event_type = PreprocessingEvents.PROCESS_COMPLETE
+            
+            observer_manager.notify(event_type, {
+                'success': True,
+                'result': result,
+                'display_info': display_info
+            })
+        except Exception:
+            pass
     
     # Panggil callback jika tersedia
     if 'on_process_complete' in ui_components and callable(ui_components['on_process_complete']):
@@ -222,9 +399,30 @@ def notify_process_error(ui_components: Dict[str, Any], error_message: str) -> N
         ui_components: Dictionary komponen UI
         error_message: Pesan error
     """
-    logger = ui_components.get('logger')
-    if logger: 
-        logger.error(f"{ICONS['error']} Error pada preprocessing: {error_message}")
+    # Log informasi
+    from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+    log_message(ui_components, f"Error pada preprocessing: {error_message}", "error", ICONS['error'])
+    
+    # Notifikasi observer jika tersedia
+    observer_manager = ui_components.get('observer_manager')
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            try:
+                from smartcash.components.observer import EventTopics
+                event_type = EventTopics.PROCESS_ERROR
+            except ImportError:
+                try:
+                    from smartcash.common.observer import EventType
+                    event_type = EventType.PROCESS_ERROR
+                except ImportError:
+                    event_type = PreprocessingEvents.PROCESS_ERROR
+            
+            observer_manager.notify(event_type, {
+                'success': False,
+                'error': error_message
+            })
+        except Exception:
+            pass
     
     # Panggil callback jika tersedia
     if 'on_process_error' in ui_components and callable(ui_components['on_process_error']):
@@ -238,9 +436,29 @@ def notify_process_stop(ui_components: Dict[str, Any], display_info: str = "") -
         ui_components: Dictionary komponen UI
         display_info: Informasi tambahan untuk ditampilkan
     """
-    logger = ui_components.get('logger')
-    if logger: 
-        logger.warning(f"{ICONS['stop']} Proses preprocessing dihentikan oleh pengguna")
+    # Log informasi
+    from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+    log_message(ui_components, f"Proses preprocessing dihentikan oleh pengguna", "warning", ICONS['stop'])
+    
+    # Notifikasi observer jika tersedia
+    observer_manager = ui_components.get('observer_manager')
+    if observer_manager and hasattr(observer_manager, 'notify'):
+        try:
+            try:
+                from smartcash.components.observer import EventTopics
+                event_type = EventTopics.PROCESS_STOP
+            except ImportError:
+                try:
+                    from smartcash.common.observer import EventType
+                    event_type = EventType.PROCESS_STOP
+                except ImportError:
+                    event_type = PreprocessingEvents.PROCESS_STOP
+            
+            observer_manager.notify(event_type, {
+                'display_info': display_info
+            })
+        except Exception:
+            pass
     
     # Panggil callback jika tersedia
     if 'on_process_stop' in ui_components and callable(ui_components['on_process_stop']):

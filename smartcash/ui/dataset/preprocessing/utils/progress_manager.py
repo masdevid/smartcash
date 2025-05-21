@@ -3,7 +3,7 @@ File: smartcash/ui/dataset/preprocessing/utils/progress_manager.py
 Deskripsi: Utilitas untuk mengelola progress bar dan tracking dalam UI preprocessing
 """
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Callable
 import ipywidgets as widgets
 from smartcash.ui.utils.constants import COLORS
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
@@ -52,11 +52,24 @@ def setup_multi_progress(ui_components: Dict[str, Any]) -> Dict[str, Any]:
             layout=widgets.Layout(margin='0 0 5px 0', visibility='hidden')
         )
     
+    # Setup current progress bar untuk step progress
+    if 'current_progress' not in ui_components:
+        ui_components['current_progress'] = widgets.FloatProgress(
+            value=0,
+            min=0,
+            max=100,
+            description='',
+            bar_style='info',
+            orientation='horizontal',
+            layout=widgets.Layout(width='100%', visibility='hidden')
+        )
+    
     # Update progress container dengan komponen yang telah dibuat
     ui_components['progress_container'].children = [
         ui_components['overall_label'],
         ui_components['step_label'],
-        ui_components['progress_bar']
+        ui_components['progress_bar'],
+        ui_components['current_progress']
     ]
     
     return ui_components
@@ -100,7 +113,8 @@ def update_progress(ui_components: Dict[str, Any],
                     value: float, 
                     max_value: float = 100,
                     overall_message: Optional[str] = None,
-                    step_message: Optional[str] = None) -> None:
+                    step_message: Optional[str] = None,
+                    **kwargs) -> None:
     """
     Update nilai progress bar dan pesan progress.
     
@@ -110,6 +124,7 @@ def update_progress(ui_components: Dict[str, Any],
         max_value: Nilai progress maksimum
         overall_message: Pesan untuk overall progress
         step_message: Pesan untuk step progress
+        **kwargs: Parameter tambahan untuk progress tracking
     """
     # Pastikan progress bar tersedia
     if 'progress_bar' not in ui_components:
@@ -152,6 +167,32 @@ def update_progress(ui_components: Dict[str, Any],
         if hasattr(step_label, 'layout') and step_label.layout.visibility == 'hidden':
             step_label.layout.visibility = 'visible'
     
+    # Check for current_step progress
+    current_progress = kwargs.get('current_progress')
+    current_total = kwargs.get('current_total')
+    
+    if current_progress is not None and current_total is not None and current_total > 0 and 'current_progress' in ui_components:
+        # Normalisasi nilai untuk step progress
+        step_value = min(100, (current_progress / current_total) * 100)
+        
+        # Update step progress bar
+        step_progress_bar = ui_components['current_progress']
+        step_progress_bar.value = step_value
+        
+        # Tampilkan step progress bar
+        if hasattr(step_progress_bar, 'layout') and step_progress_bar.layout.visibility == 'hidden':
+            step_progress_bar.layout.visibility = 'visible'
+        
+        # Update step description
+        step = kwargs.get('step', 0)
+        total_steps = kwargs.get('total_steps', 3)
+        split = kwargs.get('split', '')
+        
+        if split:
+            step_progress_bar.description = f"Split {split}"
+        else:
+            step_progress_bar.description = f"Step {step+1}/{total_steps}"
+    
     # Log progress jika > 10% perubahan dari terakhir kali
     if 'last_logged_progress' not in ui_components:
         ui_components['last_logged_progress'] = 0
@@ -188,6 +229,12 @@ def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
         ui_components['step_label'].value = ""
         if hasattr(ui_components['step_label'], 'layout'):
             ui_components['step_label'].layout.visibility = 'hidden'
+    
+    # Reset current progress
+    if 'current_progress' in ui_components:
+        ui_components['current_progress'].value = 0
+        if hasattr(ui_components['current_progress'], 'layout'):
+            ui_components['current_progress'].layout.visibility = 'hidden'
     
     # Reset value tracking
     ui_components['last_logged_progress'] = 0
@@ -228,4 +275,68 @@ def complete_progress(ui_components: Dict[str, Any], message: str = "Preprocessi
         return
     
     # Update progress ke 100%
-    update_progress(ui_components, 100, 100, message) 
+    update_progress(ui_components, 100, 100, message)
+
+def create_progress_callback(ui_components: Dict[str, Any]) -> Callable:
+    """
+    Membuat callback function untuk progress tracking yang kompatibel dengan DatasetPreprocessor.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Fungsi callback yang bisa digunakan oleh DatasetPreprocessor
+    """
+    def progress_callback(**kwargs):
+        # Extract parameters
+        progress = kwargs.get('progress', 0)
+        total = kwargs.get('total_files_all', 100)
+        message = kwargs.get('message', '')
+        status = kwargs.get('status', 'info')
+        
+        # Extract parameters untuk step progress
+        step = kwargs.get('step', 0)
+        split = kwargs.get('split', '')
+        split_step = kwargs.get('split_step', '')
+        current_progress = kwargs.get('current_progress', 0)
+        current_total = kwargs.get('current_total', 0)
+        
+        # Format step message
+        step_message = split_step
+        if not step_message and split:
+            step_message = f"Split: {split}"
+        
+        # Update progress dengan parameter yang diekstrak
+        update_progress(
+            ui_components, 
+            progress, 
+            total, 
+            overall_message=message,
+            step_message=step_message,
+            step=step,
+            total_steps=3,  # Default steps: persiapan, proses, finalisasi
+            split=split,
+            current_progress=current_progress,
+            current_total=current_total
+        )
+        
+        # Log message jika diperlukan
+        if message and message != ui_components.get('last_progress_message', ''):
+            icon_map = {
+                'info': "ℹ️",
+                'success': "✅",
+                'warning': "⚠️",
+                'error': "❌"
+            }
+            icon = icon_map.get(status, "ℹ️")
+            
+            # Log message dengan level yang sesuai
+            log_message(ui_components, message, status, icon)
+            
+            # Update last message
+            ui_components['last_progress_message'] = message
+        
+        # Return True untuk menunjukkan progress berhasil diupdate
+        return True
+    
+    return progress_callback 

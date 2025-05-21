@@ -3,9 +3,11 @@ File: smartcash/ui/dataset/preprocessing/utils/ui_state_manager.py
 Deskripsi: Utilitas untuk mengelola state UI preprocessing
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Callable
+import time
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
 from smartcash.ui.utils.constants import ICONS, COLORS
+from IPython.display import display
 
 def update_status_panel(ui_components: Dict[str, Any], status: str, message: str = None) -> None:
     """
@@ -13,7 +15,7 @@ def update_status_panel(ui_components: Dict[str, Any], status: str, message: str
     
     Args:
         ui_components: Dictionary komponen UI
-        status: Status preprocessing (idle, running, success, error)
+        status: Status preprocessing (idle, running, success, error, warning)
         message: Pesan status opsional
     """
     if 'status_panel' not in ui_components:
@@ -24,14 +26,15 @@ def update_status_panel(ui_components: Dict[str, Any], status: str, message: str
     # Map status ke warna dan icon
     status_map = {
         'idle': {'color': 'info', 'icon': ICONS['idle']},
+        'info': {'color': 'info', 'icon': ICONS['info']},
         'running': {'color': 'primary', 'icon': ICONS['running']},
         'success': {'color': 'success', 'icon': ICONS['success']},
         'error': {'color': 'danger', 'icon': ICONS['error']},
         'warning': {'color': 'warning', 'icon': ICONS['warning']},
     }
     
-    # Default ke idle jika status tidak valid
-    status_info = status_map.get(status, status_map['idle'])
+    # Default ke info jika status tidak valid
+    status_info = status_map.get(status, status_map['info'])
     
     # Format pesan
     if message:
@@ -39,6 +42,7 @@ def update_status_panel(ui_components: Dict[str, Any], status: str, message: str
     else:
         default_messages = {
             'idle': "Preprocessing siap dijalankan",
+            'info': "Informasi preprocessing",
             'running': "Preprocessing sedang berjalan...",
             'success': "Preprocessing berhasil diselesaikan",
             'error': "Terjadi kesalahan saat preprocessing",
@@ -88,9 +92,12 @@ def reset_ui_after_preprocessing(ui_components: Dict[str, Any]) -> None:
     # Update status panel
     update_status_panel(ui_components, 'idle')
     
+    # Bersihkan area konfirmasi
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        ui_components['confirmation_area'].clear_output()
+    
     # Log reset
-    if 'log_message' in ui_components and callable(ui_components['log_message']):
-        ui_components['log_message']("UI telah direset ke state awal", "info", "🔄")
+    log_message(ui_components, "UI telah direset ke state awal", "info", "🔄")
 
 def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional[str] = None) -> None:
     """
@@ -98,7 +105,7 @@ def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional
     
     Args:
         ui_components: Dictionary komponen UI
-        state: State baru (idle, running, success, error)
+        state: State baru (idle, running, success, error, warning, info)
         message: Pesan opsional untuk ditampilkan
     """
     # Update status panel
@@ -122,7 +129,11 @@ def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional
         if 'reset_button' in ui_components:
             ui_components['reset_button'].disabled = True
             
-    elif state in ['idle', 'success', 'error']:
+        # Disable cleanup button
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].disabled = True
+            
+    elif state in ['idle', 'success', 'error', 'warning', 'info']:
         # Enable preprocessing button
         if 'preprocess_button' in ui_components:
             ui_components['preprocess_button'].disabled = False
@@ -138,13 +149,13 @@ def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional
         # Enable reset button
         if 'reset_button' in ui_components:
             ui_components['reset_button'].disabled = False
+            
+        # Enable cleanup button
+        if 'cleanup_button' in ui_components:
+            ui_components['cleanup_button'].disabled = False
     
     # Log state change
-    if 'log_message' in ui_components and callable(ui_components['log_message']):
-        log_message = f"UI state diubah ke {state}"
-        if message:
-            log_message += f": {message}"
-        ui_components['log_message'](log_message, "debug", "🔄")
+    log_message(ui_components, f"UI state diubah ke {state}{': ' + message if message else ''}", "debug", "🔄")
 
 def update_ui_before_preprocessing(ui_components: Dict[str, Any]) -> None:
     """
@@ -177,7 +188,7 @@ def update_ui_before_preprocessing(ui_components: Dict[str, Any]) -> None:
     ui_components['preprocessing_running'] = True
     
     # Update status
-    update_status_panel(ui_components, "started", "Preprocessing sedang berjalan...")
+    update_status_panel(ui_components, "running", "Preprocessing sedang berjalan...")
     
     # Log update berhasil
     log_message(ui_components, "UI dipersiapkan untuk preprocessing", "debug", "🔄")
@@ -239,4 +250,88 @@ def toggle_input_controls(ui_components: Dict[str, Any], disabled: bool) -> None
     
     # Toggle disabled state untuk semua controls
     for control in input_controls:
-        control.disabled = disabled 
+        control.disabled = disabled
+
+def ensure_confirmation_area(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Pastikan UI memiliki area konfirmasi yang valid.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary UI components yang telah ditambahkan area konfirmasi
+    """
+    # Pastikan kita memiliki UI area untuk konfirmasi
+    if 'confirmation_area' not in ui_components:
+        from ipywidgets import Output
+        ui_components['confirmation_area'] = Output()
+        log_message(ui_components, "Area konfirmasi dibuat otomatis", "info", "ℹ️")
+        
+        # Tambahkan ke UI jika ada area untuk itu
+        if 'ui' in ui_components and hasattr(ui_components['ui'], 'children'):
+            try:
+                # Coba tambahkan ke UI container (bukan UI ideal, tapi berfungsi sebagai fallback)
+                children = list(ui_components['ui'].children)
+                children.append(ui_components['confirmation_area'])
+                ui_components['ui'].children = tuple(children)
+            except Exception as e:
+                log_message(ui_components, f"Tidak bisa menambahkan area konfirmasi ke UI: {str(e)}", "warning", "⚠️")
+    
+    return ui_components
+
+def show_confirmation(ui_components: Dict[str, Any], title: str, message: str, 
+                     on_confirm: Callable, on_cancel: Callable) -> None:
+    """
+    Tampilkan dialog konfirmasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        title: Judul konfirmasi
+        message: Pesan konfirmasi
+        on_confirm: Fungsi yang dipanggil saat konfirmasi
+        on_cancel: Fungsi yang dipanggil saat pembatalan
+    """
+    # Pastikan ada area konfirmasi
+    ui_components = ensure_confirmation_area(ui_components)
+    
+    # Import dialog komponen
+    from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
+    
+    # Bersihkan area konfirmasi
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        ui_components['confirmation_area'].clear_output()
+    
+    # Tampilkan dialog konfirmasi
+    with ui_components['confirmation_area']:
+        dialog = create_confirmation_dialog(
+            title=title, 
+            message=message,
+            on_confirm=on_confirm,
+            on_cancel=on_cancel
+        )
+        display(dialog)
+
+def reset_after_operation(ui_components: Dict[str, Any], button: Any = None) -> None:
+    """
+    Reset UI setelah operasi selesai dan re-enable tombol.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        button: Tombol yang akan diaktifkan kembali
+    """
+    # Re-enable tombol
+    if button and hasattr(button, 'disabled'):
+        button.disabled = False
+    
+    # Reset UI untuk operasi flags
+    ui_components['preprocessing_running'] = False
+    ui_components['cleanup_running'] = False
+    ui_components['stop_requested'] = False
+    
+    # Update status panel
+    update_status_panel(ui_components, 'idle', "Siap untuk memulai preprocessing baru")
+    
+    # Bersihkan area konfirmasi
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
+        ui_components['confirmation_area'].clear_output() 

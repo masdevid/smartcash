@@ -5,7 +5,8 @@ Deskripsi: Ekspor utilitas dan fungsi preprocessing dataset
 
 # Ekspor fungsi inisialisasi
 from smartcash.ui.dataset.preprocessing.preprocessing_initializer import (
-    initialize_dataset_preprocessing_ui
+    initialize_dataset_preprocessing_ui,
+    initialize_preprocessing_ui
 )
 
 # Ekspor utilitas logging dan UI state
@@ -22,7 +23,10 @@ from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import (
     reset_ui_after_preprocessing,
     update_ui_before_preprocessing,
     is_preprocessing_running,
-    set_preprocessing_state
+    set_preprocessing_state,
+    show_confirmation,
+    ensure_confirmation_area,
+    reset_after_operation
 )
 
 # Ekspor utilitas progress manager
@@ -30,7 +34,8 @@ from smartcash.ui.dataset.preprocessing.utils.progress_manager import (
     update_progress,
     reset_progress_bar,
     start_progress,
-    complete_progress
+    complete_progress,
+    create_progress_callback
 )
 
 # Ekspor utilitas observer
@@ -39,7 +44,8 @@ from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
     notify_process_start,
     notify_process_complete,
     notify_process_error,
-    notify_process_stop
+    notify_process_stop,
+    MockObserverManager
 )
 
 # Ekspor handler utama
@@ -63,7 +69,9 @@ from smartcash.ui.dataset.preprocessing.handlers.reset_handler import (
 from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import (
     handle_cleanup_button_click,
     execute_cleanup,
-    cleanup_preprocessed_files
+    cleanup_preprocessed_files,
+    start_progress,
+    reset_ui_after_cleanup
 )
 
 from smartcash.ui.dataset.preprocessing.handlers.save_handler import (
@@ -82,6 +90,7 @@ from smartcash.ui.dataset.preprocessing.handlers.setup_handlers import (
 __all__ = [
     # Inisialisasi
     'initialize_dataset_preprocessing_ui',
+    'initialize_preprocessing_ui',
     
     # Logging dan UI State
     'log_message',
@@ -93,12 +102,16 @@ __all__ = [
     'update_ui_before_preprocessing',
     'is_preprocessing_running',
     'set_preprocessing_state',
+    'show_confirmation',
+    'ensure_confirmation_area',
+    'reset_after_operation',
     
     # Progress
     'update_progress',
     'reset_progress_bar',
     'start_progress',
     'complete_progress',
+    'create_progress_callback',
     
     # Observer
     'register_ui_observers',
@@ -106,6 +119,7 @@ __all__ = [
     'notify_process_complete',
     'notify_process_error',
     'notify_process_stop',
+    'MockObserverManager',
     
     # Handlers - Preprocessing
     'handle_preprocessing_button_click',
@@ -125,6 +139,7 @@ __all__ = [
     'handle_cleanup_button_click',
     'execute_cleanup',
     'cleanup_preprocessed_files',
+    'reset_ui_after_cleanup',
     
     # Handlers - Save
     'handle_save_button_click',

@@ -11,10 +11,10 @@ from IPython.display import display
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
 from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import (
     update_ui_state, update_status_panel, update_ui_before_preprocessing, 
-    is_preprocessing_running, set_preprocessing_state
+    is_preprocessing_running, set_preprocessing_state, show_confirmation
 )
 from smartcash.ui.dataset.preprocessing.utils.progress_manager import (
-    update_progress, reset_progress_bar, start_progress, complete_progress
+    update_progress, reset_progress_bar, start_progress, complete_progress, create_progress_callback
 )
 from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
     notify_process_start, notify_process_complete, notify_process_error
@@ -161,18 +161,11 @@ def confirm_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any],
     
     # Fungsi untuk menjalankan preprocessing dan membersihkan dialog
     def confirm_and_execute():
-        # Bersihkan area konfirmasi
-        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-            ui_components['confirmation_area'].clear_output()
-        
-        # Jalankan preprocessing langsung (tanpa threading untuk kompatibilitas dengan Colab)
+        # Jalankan preprocessing
         execute_preprocessing(ui_components, config)
     
     # Fungsi untuk membatalkan preprocessing
     def cancel_preprocessing():
-        if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-            ui_components['confirmation_area'].clear_output()
-        
         log_message(ui_components, "Preprocessing dibatalkan", "info", "ℹ️")
         update_status_panel(ui_components, "info", "Preprocessing dibatalkan")
         
@@ -180,21 +173,14 @@ def confirm_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any],
         if button and hasattr(button, 'disabled'):
             button.disabled = False
     
-    # Tampilkan dialog konfirmasi
-    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        ui_components['confirmation_area'].clear_output()
-        with ui_components['confirmation_area']:
-            dialog = create_confirmation_dialog(
-                title="Konfirmasi Preprocessing Dataset", 
-                message=message,
-                on_confirm=confirm_and_execute,
-                on_cancel=cancel_preprocessing
-            )
-            display(dialog)
-    else:
-        # Jika tidak ada area konfirmasi, langsung jalankan preprocessing
-        log_message(ui_components, "Area konfirmasi tidak tersedia, melanjutkan preprocessing...", "warning", "⚠️")
-        execute_preprocessing(ui_components, config)
+    # Gunakan fungsi konfirmasi dari ui_state_manager
+    show_confirmation(
+        ui_components=ui_components,
+        title="Konfirmasi Preprocessing Dataset",
+        message=message,
+        on_confirm=confirm_and_execute,
+        on_cancel=cancel_preprocessing
+    )
 
 def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any]) -> None:
     """
@@ -216,7 +202,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
     try:
         # Import komponen yang dibutuhkan
         from smartcash.common.config import get_config_manager
-        from smartcash.dataset.services.preprocessor.dataset_preprocessor import DatasetPreprocessor
+        from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
         
         # Get config manager
         config_manager = get_config_manager()
@@ -262,31 +248,24 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
         # Update progress
         update_progress(ui_components, 10, 100, "Memulai preprocessing dataset...", f"Menganalisis dataset untuk split: {split}")
         
-        # Buat preprocessor dengan observer
-        preprocessor = DatasetPreprocessor(
+        # Buat preprocessing service dengan observer_manager dari UI
+        preprocessing_service = PreprocessingService(
             config=preprocessor_config,
-            logger=ui_components.get('logger')
+            logger=ui_components.get('logger'),
+            observer_manager=ui_components.get('observer_manager')
         )
         
-        # Register progress callback jika observer manager tersedia
-        if 'observer_manager' in ui_components:
-            def progress_callback(**kwargs):
-                message = kwargs.get('message', '')
-                progress = kwargs.get('progress', 0)
-                total = kwargs.get('total', 100)
-                step_message = kwargs.get('step_message', '')
-                
-                # Update progress
-                update_progress(ui_components, progress, total, message, step_message)
-                
-            # Register callback
-            preprocessor.register_progress_callback(progress_callback)
+        # Dapatkan preprocessor dan register progress callback
+        preprocessor = preprocessing_service.preprocessor
+        
+        # Buat dan register progress callback
+        progress_callback = create_progress_callback(ui_components)
+        preprocessor.register_progress_callback(progress_callback)
         
         # Jalankan preprocessing
-        result = preprocessor.preprocess_dataset(
+        result = preprocessing_service.preprocess_dataset(
             split=split,
-            force_reprocess=False,
-            show_progress=True
+            force_reprocess=config.get('force_reprocess', False)
         )
         
         # Update progress

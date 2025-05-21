@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional
 from IPython.display import display
 
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
-from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_ui_state, update_status_panel
+from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import update_ui_state, update_status_panel, show_confirmation, reset_after_operation
 from smartcash.ui.dataset.preprocessing.utils.progress_manager import update_progress, reset_progress_bar
 from smartcash.ui.components.confirmation_dialog import create_confirmation_dialog
 
@@ -97,21 +97,14 @@ def confirm_cleanup(ui_components: Dict[str, Any], dir_path: str, button: Any = 
         if button and hasattr(button, 'disabled'):
             button.disabled = False
     
-    # Tampilkan dialog konfirmasi
-    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        ui_components['confirmation_area'].clear_output()
-        with ui_components['confirmation_area']:
-            dialog = create_confirmation_dialog(
-                title="Konfirmasi Hapus Data Preprocessing", 
-                message=message,
-                on_confirm=confirm_and_execute,
-                on_cancel=cancel_cleanup
-            )
-            display(dialog)
-    else:
-        # Jika tidak ada area konfirmasi, langsung jalankan cleanup
-        log_message(ui_components, "Area konfirmasi tidak tersedia, melanjutkan pembersihan...", "warning", "⚠️")
-        execute_cleanup(ui_components, dir_path)
+    # Gunakan fungsi konfirmasi dari ui_state_manager
+    show_confirmation(
+        ui_components=ui_components,
+        title="Konfirmasi Hapus Data Preprocessing",
+        message=message,
+        on_confirm=confirm_and_execute,
+        on_cancel=cancel_cleanup
+    )
 
 def execute_cleanup(ui_components: Dict[str, Any], dir_path: str) -> None:
     """
@@ -249,80 +242,60 @@ def reset_ui_after_cleanup(ui_components: Dict[str, Any]) -> None:
     # Reset flag
     ui_components['cleanup_running'] = False
     
-    # Bersihkan area konfirmasi
-    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
-        ui_components['confirmation_area'].clear_output()
+    # Update status
+    update_status_panel(ui_components, "success", "Pembersihan selesai")
 
 def cleanup_preprocessed_files(dir_path: str) -> Dict[str, Any]:
     """
-    Membersihkan file preprocessing dari direktori yang diberikan.
+    Bersihkan file preprocessing di direktori.
     
     Args:
         dir_path: Path direktori yang akan dibersihkan
         
     Returns:
-        Dictionary dengan informasi hasil pembersihan
+        Dictionary hasil cleanup
     """
-    # Convert to Path object
-    path = Path(dir_path)
-    
-    # Cek apakah direktori ada
-    if not path.exists() or not path.is_dir():
-        return {
-            'success': False,
-            'error': f"Direktori {dir_path} tidak ada"
-        }
-    
-    # Inisialisasi counter
-    files_removed = 0
-    dirs_removed = 0
-    space_freed = 0
-    
     try:
-        # Ambil ukuran awal direktori
-        initial_size = get_dir_size(path)
+        # Pastikan path valid
+        path = Path(dir_path)
+        if not path.exists():
+            return {"success": False, "error": f"Direktori {dir_path} tidak ada"}
         
-        # Hapus semua file dan direktori di dalam direktori preprocessed
-        for item in path.glob('*'):
+        # Cari semua file dan direktori
+        files_removed = 0
+        dirs_removed = 0
+        
+        # Hitung ukuran direktori sebelum dihapus
+        total_size = get_dir_size(path)
+        
+        # Hapus semua subdirektori dan file
+        for item in path.glob("**/*"):
             if item.is_file():
-                # Tambahkan ukuran file ke space_freed
-                space_freed += item.stat().st_size
-                
-                # Hapus file
                 item.unlink()
                 files_removed += 1
-            elif item.is_dir():
-                # Tambahkan ukuran direktori ke space_freed
-                dir_size = get_dir_size(item)
-                space_freed += dir_size
-                
-                # Hapus direktori
-                shutil.rmtree(item)
-                dirs_removed += 1
+            elif item.is_dir() and item != path:
+                if not any(item.iterdir()):  # Hapus hanya direktori kosong
+                    item.rmdir()
+                    dirs_removed += 1
         
-        # Final size check
-        final_size = get_dir_size(path)
-        space_freed = initial_size - final_size
+        # Hapus direktori utama jika kosong
+        if path.exists() and not any(path.iterdir()):
+            path.rmdir()
+            dirs_removed += 1
         
         return {
-            'success': True,
-            'files_removed': files_removed,
-            'dirs_removed': dirs_removed,
-            'space_freed': space_freed
+            "success": True,
+            "files_removed": files_removed,
+            "dirs_removed": dirs_removed,
+            "space_freed": total_size
         }
     
     except Exception as e:
-        return {
-            'success': False,
-            'error': str(e),
-            'files_removed': files_removed,
-            'dirs_removed': dirs_removed,
-            'space_freed': space_freed
-        }
+        return {"success": False, "error": str(e)}
 
 def get_dir_size(path: Path) -> int:
     """
-    Menghitung total ukuran direktori termasuk semua subdirektori.
+    Dapatkan ukuran direktori dalam bytes.
     
     Args:
         path: Path direktori
@@ -331,8 +304,10 @@ def get_dir_size(path: Path) -> int:
         Ukuran direktori dalam bytes
     """
     total_size = 0
-    if path.exists():
-        for item in path.glob('**/*'):
-            if item.is_file():
-                total_size += item.stat().st_size
+    
+    # Iterasi semua file dalam direktori
+    for item in path.glob("**/*"):
+        if item.is_file():
+            total_size += item.stat().st_size
+    
     return total_size

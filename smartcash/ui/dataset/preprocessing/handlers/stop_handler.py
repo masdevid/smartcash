@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
 from smartcash.ui.dataset.preprocessing.utils.ui_state_manager import (
-    update_ui_state, update_status_panel, set_preprocessing_state
+    update_ui_state, update_status_panel, set_preprocessing_state, reset_after_operation
 )
 from smartcash.ui.dataset.preprocessing.utils.ui_observers import notify_process_stop
 
@@ -26,7 +26,7 @@ def handle_stop_button_click(button: Any, ui_components: Dict[str, Any]) -> None
     try:
         # Set flag observer untuk memberi sinyal stop
         observer_manager = ui_components.get('observer_manager')
-        if observer_manager:
+        if observer_manager and hasattr(observer_manager, 'set_flag'):
             observer_manager.set_flag('stop_requested', True)
         
         # Log stop preprocessing
@@ -70,6 +70,9 @@ def stop_preprocessing(ui_components: Dict[str, Any]) -> None:
     
     # Update UI state
     update_ui_state(ui_components, "warning", "Preprocessing dihentikan oleh pengguna")
+    
+    # Reset UI setelah operasi
+    reset_after_operation(ui_components)
     
     # Hilangkan flag stop request
     ui_components['stop_requested'] = False 

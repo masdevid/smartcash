@@ -79,8 +79,9 @@ class SimpleConfigManager:
         """
         Setup direktori konfigurasi dengan symlink ke Google Drive jika di Colab
         """
-        # Pastikan direktori config lokal ada
-        self.config_dir.mkdir(parents=True, exist_ok=True)
+        # Pastikan direktori config lokal ada jika bukan symlink
+        if not self.config_dir.is_symlink() and not self.config_dir.exists():
+            self.config_dir.mkdir(parents=True, exist_ok=True)
         
         try:
             # Cek apakah kita di Colab
@@ -107,17 +108,37 @@ class SimpleConfigManager:
                     self._copy_config_files(repo_config_dir, self.drive_config_dir)
                     self._logger.info(f"File konfigurasi disalin dari {repo_config_dir} ke {self.drive_config_dir}")
                 
-                # Jika config directory bukan symlink, buat symlink ke drive
-                if not self.config_dir.is_symlink():
-                    # Hapus direktori lokal jika sudah ada
-                    if self.config_dir.exists():
+                # Cek apakah symlink rusak atau hilang
+                if self.config_dir.is_symlink() and not self.config_dir.exists():
+                    # Symlink rusak, hapus
+                    os.unlink(self.config_dir)
+                    self._logger.warning(f"Symlink konfigurasi rusak, akan dibuat ulang")
+                
+                # Jika config directory bukan symlink atau tidak ada, buat symlink ke drive
+                if not self.config_dir.exists() or not self.config_dir.is_symlink():
+                    # Hapus direktori lokal jika sudah ada dan bukan symlink
+                    if self.config_dir.exists() and not self.config_dir.is_symlink():
                         shutil.rmtree(self.config_dir)
+                        self._logger.warning(f"Direktori konfigurasi bukan symlink, akan dibuat ulang")
                     
                     # Buat symlink dari Drive ke local
                     os.symlink(self.drive_config_dir, self.config_dir)
                     self._logger.info(f"Symlink dibuat dari {self.drive_config_dir} ke {self.config_dir}")
+                
+                # Verifikasi bahwa symlink berfungsi dengan benar
+                if self.config_dir.is_symlink():
+                    target = self.config_dir.resolve()
+                    if not target.exists():
+                        self._logger.warning(f"Target symlink tidak ditemukan: {target}")
+                        # Coba buat direktori target jika tidak ada
+                        target.mkdir(parents=True, exist_ok=True)
+                        self._logger.info(f"Direktori target dibuat: {target}")
             except Exception as e:
                 self._logger.warning(f"Gagal setup Google Drive symlink: {str(e)}")
+                # Pastikan direktori config lokal ada sebagai fallback
+                if not self.config_dir.exists():
+                    self.config_dir.mkdir(parents=True, exist_ok=True)
+                    self._logger.info(f"Menggunakan direktori lokal sebagai fallback: {self.config_dir}")
     
     def _copy_config_files(self, src_path: Path, dst_path: Path) -> None:
         """
@@ -336,9 +357,45 @@ class SimpleConfigManager:
         """
         # Dapatkan semua file .yaml dan .yml di direktori konfigurasi
         config_files = []
-        if self.config_dir.exists():
+        
+        # Pastikan direktori konfigurasi ada
+        if not self.config_dir.exists():
+            self._logger.warning(f"Direktori konfigurasi tidak ditemukan: {self.config_dir}")
+            try:
+                # Coba buat direktori jika tidak ada
+                self.config_dir.mkdir(parents=True, exist_ok=True)
+                self._logger.info(f"Direktori konfigurasi dibuat: {self.config_dir}")
+            except Exception as e:
+                self._logger.error(f"Gagal membuat direktori konfigurasi: {str(e)}")
+                return []
+        
+        # Cek apakah direktori dapat diakses
+        try:
             for ext in ['.yaml', '.yml']:
                 config_files.extend([f.name for f in self.config_dir.glob(f'*{ext}')])
+        except Exception as e:
+            self._logger.error(f"Gagal mengakses direktori konfigurasi: {str(e)}")
+            return []
+        
+        # Jika tidak ada file konfigurasi, coba salin dari repo jika di Colab
+        if not config_files:
+            try:
+                # Cek apakah kita di Colab
+                import google.colab
+                is_colab = True
+            except ImportError:
+                is_colab = False
+            
+            if is_colab:
+                # Coba salin dari repo
+                repo_config_dir = Path('/content/smartcash/configs')
+                if repo_config_dir.exists():
+                    self._copy_config_files(repo_config_dir, self.config_dir)
+                    self._logger.info(f"File konfigurasi disalin dari {repo_config_dir} ke {self.config_dir}")
+                    
+                    # Coba lagi mendapatkan daftar file
+                    for ext in ['.yaml', '.yml']:
+                        config_files.extend([f.name for f in self.config_dir.glob(f'*{ext}')])
         
         # Hilangkan ekstensi
         configs = [f.replace('_config.yaml', '').replace('_config.yml', '').replace('.yaml', '').replace('.yml', '') 

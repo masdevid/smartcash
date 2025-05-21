@@ -78,11 +78,33 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
         
         # Gunakan symlinks jika dikonfigurasi
         if use_symlinks:
-            # Buat symlink dari Drive ke config_dir jika belum ada
+            # Cek apakah symlink rusak atau hilang
             if config_dir.exists() and not config_dir.is_symlink():
+                # Hapus direktori jika bukan symlink
                 shutil.rmtree(config_dir)
+                if ui_logger:
+                    ui_logger.warning(f"Direktori konfigurasi bukan symlink, akan dibuat ulang")
+                else:
+                    print(f"⚠️ Direktori konfigurasi bukan symlink, akan dibuat ulang")
+            elif config_dir.is_symlink() and not config_dir.exists():
+                # Symlink rusak, hapus
+                os.unlink(config_dir)
+                if ui_logger:
+                    ui_logger.warning(f"Symlink konfigurasi rusak, akan dibuat ulang")
+                else:
+                    print(f"⚠️ Symlink konfigurasi rusak, akan dibuat ulang")
             
+            # Buat symlink baru jika belum ada atau rusak
             if not config_dir.exists():
+                # Pastikan direktori Drive ada sebelum membuat symlink
+                if not drive_config_dir.exists():
+                    drive_config_dir.mkdir(parents=True, exist_ok=True)
+                    if ui_logger:
+                        ui_logger.info(f"Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
+                    else:
+                        print(f"📁 Direktori konfigurasi di Drive dibuat: {drive_config_dir}")
+                
+                # Buat symlink baru
                 os.symlink(drive_config_dir, config_dir)
                 if ui_logger:
                     ui_logger.info(f"Symlink dibuat dari {drive_config_dir} ke {config_dir}")
@@ -92,6 +114,10 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
             # Jika tidak menggunakan symlink, copy file dari Drive ke local
             if not config_dir.exists():
                 config_dir.mkdir(parents=True, exist_ok=True)
+                if ui_logger:
+                    ui_logger.info(f"Direktori konfigurasi dibuat: {config_dir}")
+                else:
+                    print(f"📁 Direktori konfigurasi dibuat: {config_dir}")
             
             # Copy file dari Drive ke local
             for config_file in drive_config_dir.glob("*.yaml"):
@@ -108,6 +134,16 @@ def setup_managers() -> Tuple[SimpleConfigManager, Path, Path]:
         
         # Pastikan direktori config ada
         config_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Verifikasi bahwa direktori konfigurasi ada dan dapat diakses
+    if not config_dir.exists():
+        # Jika masih tidak ada, buat direktori kosong sebagai fallback
+        config_dir.mkdir(parents=True, exist_ok=True)
+        ui_logger = _get_ui_logger()
+        if ui_logger:
+            ui_logger.error(f"Gagal membuat symlink atau direktori konfigurasi. Menggunakan direktori kosong sebagai fallback.")
+        else:
+            print(f"❌ Gagal membuat symlink atau direktori konfigurasi. Menggunakan direktori kosong sebagai fallback.")
     
     # Initialize config manager
     config_manager = get_config_manager()

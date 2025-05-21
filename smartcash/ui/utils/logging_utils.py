@@ -13,7 +13,8 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
                          module_name: Optional[str] = None, 
                          log_to_file: bool = False,
                          log_dir: str = "logs",
-                         log_level: int = logging.INFO) -> Any:
+                         log_level: int = logging.INFO,
+                         redirect_all_logs: bool = False) -> Any:
     """
     Setup logger untuk IPython notebook dengan output ke UI widget.
     
@@ -23,6 +24,7 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
         log_to_file: Flag untuk mengaktifkan logging ke file
         log_dir: Direktori untuk menyimpan file log
         log_level: Level logging (default: INFO)
+        redirect_all_logs: Flag untuk mengalihkan semua console log ke output log UI
         
     Returns:
         Logger yang dikonfigurasi atau None jika gagal
@@ -56,6 +58,10 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
         # Register cleanup function
         register_cleanup_on_cell_execution(ui_components)
         
+        # Redirect semua log ke UI jika diminta
+        if redirect_all_logs:
+            redirect_all_logs_to_ui(ui_components)
+        
         return logger
         
     except Exception as e:
@@ -70,6 +76,125 @@ def setup_ipython_logging(ui_components: Dict[str, Any],
         
         # Return standard logger
         return logging.getLogger(module_name or 'ipython')
+
+def redirect_all_logs_to_ui(ui_components: Dict[str, Any]) -> None:
+    """
+    Alihkan semua console log ke output log UI.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+    """
+    if 'logger' not in ui_components:
+        print("⚠️ Tidak dapat mengalihkan log: logger tidak ditemukan di ui_components")
+        return
+    
+    # Dapatkan UI logger
+    ui_logger = ui_components['logger']
+    
+    # Redirect stdout/stderr ke UI
+    from smartcash.ui.utils.ui_logger import intercept_stdout_to_ui
+    intercept_stdout_to_ui(ui_components)
+    
+    # Redirect semua logger ke UI logger
+    redirect_all_loggers_to_ui_logger(ui_logger)
+    
+    # Simpan flag bahwa semua log telah dialihkan
+    ui_components['all_logs_redirected'] = True
+    
+    print("✅ Semua console log berhasil dialihkan ke output log UI")
+
+def redirect_all_loggers_to_ui_logger(ui_logger) -> None:
+    """
+    Alihkan semua logger ke UI logger.
+    
+    Args:
+        ui_logger: Instance UILogger
+    """
+    # Dapatkan root logger
+    root_logger = logging.getLogger()
+    
+    # Hapus semua handler yang ada
+    for handler in list(root_logger.handlers):
+        root_logger.removeHandler(handler)
+    
+    # Buat custom handler yang mengalihkan ke UI logger
+    class UILogHandler(logging.Handler):
+        def __init__(self, ui_logger):
+            super().__init__()
+            self.ui_logger = ui_logger
+        
+        def emit(self, record):
+            try:
+                # Format pesan
+                msg = self.format(record)
+                
+                # Log ke UI logger berdasarkan level
+                if record.levelno >= logging.CRITICAL:
+                    self.ui_logger.critical(msg)
+                elif record.levelno >= logging.ERROR:
+                    self.ui_logger.error(msg)
+                elif record.levelno >= logging.WARNING:
+                    self.ui_logger.warning(msg)
+                else:
+                    self.ui_logger.info(msg)
+            except Exception:
+                self.handleError(record)
+    
+    # Buat dan tambahkan handler ke root logger
+    handler = UILogHandler(ui_logger)
+    formatter = logging.Formatter('%(name)s - %(message)s')
+    handler.setFormatter(formatter)
+    root_logger.addHandler(handler)
+    
+    # Set level ke DEBUG agar semua log ditangkap
+    root_logger.setLevel(logging.DEBUG)
+    
+    # Alihkan juga SmartCashLogger jika ada
+    try:
+        from smartcash.common.logger import get_logger, LogLevel
+        
+        # Dapatkan instance SmartCashLogger
+        sc_logger = get_logger()
+        
+        # Tambahkan callback untuk mengalihkan log ke UI logger
+        def ui_log_callback(level, message):
+            if level.name == 'DEBUG':
+                ui_logger.debug(message)
+            elif level.name == 'INFO':
+                ui_logger.info(message)
+            elif level.name == 'SUCCESS':
+                ui_logger.success(message)
+            elif level.name == 'WARNING':
+                ui_logger.warning(message)
+            elif level.name in ('ERROR', 'CRITICAL'):
+                ui_logger.error(message)
+        
+        # Tambahkan callback ke SmartCashLogger
+        sc_logger.add_callback(ui_log_callback)
+    except ImportError:
+        # Tidak ada SmartCashLogger, lewati
+        pass
+
+def restore_console_logs(ui_components: Dict[str, Any]) -> None:
+    """
+    Kembalikan console log ke aslinya.
+    
+    Args:
+        ui_components: Dictionary berisi komponen UI
+    """
+    # Kembalikan stdout/stderr ke aslinya
+    from smartcash.ui.utils.ui_logger import restore_stdout
+    restore_stdout(ui_components)
+    
+    # Reset semua logging handler
+    from smartcash.ui.utils.ui_logger import _reset_logging_handlers
+    _reset_logging_handlers()
+    
+    # Hapus flag
+    if 'all_logs_redirected' in ui_components:
+        del ui_components['all_logs_redirected']
+    
+    print("✅ Console log dikembalikan ke aslinya")
 
 def _setup_observer_integration_minimal(ui_components: Dict[str, Any]) -> None:
     """
@@ -117,6 +242,15 @@ def create_cleanup_function(ui_components: Dict[str, Any]) -> callable:
             if 'original_stdout' in ui_components:
                 sys.stdout = ui_components['original_stdout']
                 ui_components.pop('original_stdout', None)
+        
+        # Reset semua logging handler jika semua log telah dialihkan
+        if 'all_logs_redirected' in ui_components:
+            try:
+                from smartcash.ui.utils.ui_logger import _reset_logging_handlers
+                _reset_logging_handlers()
+                ui_components.pop('all_logs_redirected', None)
+            except ImportError:
+                pass
         
         # Unregister observer jika ada
         if 'observer_manager' in ui_components and 'observer_group' in ui_components:

@@ -290,12 +290,16 @@ def create_progress_callback(ui_components: Dict[str, Any]) -> Callable:
     def progress_callback(**kwargs):
         # Extract parameters
         progress = kwargs.get('progress', 0)
-        total = kwargs.get('total_files_all', 100)
+        total = kwargs.get('total', 100)
+        if 'total_files_all' in kwargs:
+            total = kwargs.get('total_files_all', 100)
+            
         message = kwargs.get('message', '')
         status = kwargs.get('status', 'info')
         
         # Extract parameters untuk step progress
         step = kwargs.get('step', 0)
+        total_steps = kwargs.get('total_steps', 3)
         split = kwargs.get('split', '')
         split_step = kwargs.get('split_step', '')
         current_progress = kwargs.get('current_progress', 0)
@@ -314,7 +318,7 @@ def create_progress_callback(ui_components: Dict[str, Any]) -> Callable:
             overall_message=message,
             step_message=step_message,
             step=step,
-            total_steps=3,  # Default steps: persiapan, proses, finalisasi
+            total_steps=total_steps,
             split=split,
             current_progress=current_progress,
             current_total=current_total

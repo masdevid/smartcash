@@ -53,14 +53,6 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     # Opsi preprocessing (resolusi, normalisasi, dll)
     preprocess_options = create_preprocessing_options(config)
     
-    # Selector split data
-    split_selector = create_split_selector(
-        selected_value='Train Only',
-        description="Target Split:",
-        width='100%',
-        icon='split'
-    )
-    
     # Opsi validasi
     validation_options = create_validation_options(
         title="Opsi Validasi",
@@ -112,6 +104,17 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         cleanup_enabled=True
     )
     
+    # Area konfirmasi
+    confirmation_area = widgets.Output(
+        layout=widgets.Layout(
+            width='100%', 
+            margin='10px 0',
+            border='1px solid #ddd',
+            padding='10px',
+            display='none'  # Hidden by default
+        )
+    )
+    
     # Progress tracking
     progress_components = create_progress_tracking(
         module_name='preprocessing',
@@ -136,7 +139,6 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
         preprocess_options,
-        split_selector,
         advanced_accordion,
         widgets.VBox([
             save_reset_buttons['container'],
@@ -144,6 +146,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
+        confirmation_area,  # Area konfirmasi di bawah tombol
         progress_components['progress_container'],
         log_components['log_accordion'],
         help_panel
@@ -156,7 +159,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'status_panel': status_panel,
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
-        'split_selector': split_selector,
+        'split_selector': preprocess_options.target_split,
         'advanced_accordion': advanced_accordion,
         'preprocess_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
@@ -166,6 +169,7 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'save_reset_buttons': save_reset_buttons,
         'sync_info': sync_info,
         'button_container': action_buttons['container'],
+        'confirmation_area': confirmation_area,
         'module_name': 'preprocessing',
         'data_dir': 'data',
         'preprocessed_dir': 'data/preprocessed'

@@ -92,14 +92,25 @@ def get_preprocessing_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str,
         
         # Normalization
         if hasattr(options, 'normalization') and hasattr(options.normalization, 'value'):
-            config['normalization'] = options.normalization.value
+            config['normalization'] = 'minmax' if options.normalization.value else 'none'
         
-        # Augmentation
-        if hasattr(options, 'augmentation') and hasattr(options.augmentation, 'value'):
-            config['augmentation'] = options.augmentation.value
+        # Workers
+        if hasattr(options, 'num_workers') and hasattr(options.num_workers, 'value'):
+            config['num_workers'] = options.num_workers.value
+            
+        # Target Split
+        if hasattr(options, 'target_split') and hasattr(options.target_split, 'value'):
+            split_value = options.target_split.value
+            split_map = {
+                'Train': 'train',
+                'Validation': 'val',
+                'Test': 'test',
+                'All': 'all'
+            }
+            config['split'] = split_map.get(split_value, 'all')
     
-    # Get split
-    if 'split_selector' in ui_components and hasattr(ui_components['split_selector'], 'value'):
+    # Compatibility fallback untuk split dari widget split_selector
+    if 'split' not in config and 'split_selector' in ui_components and hasattr(ui_components['split_selector'], 'value'):
         split_value = ui_components['split_selector'].value
         split_map = {
             'Train Only': 'train',
@@ -165,7 +176,7 @@ def confirm_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any],
         execute_preprocessing(ui_components, config)
     
     # Fungsi untuk membatalkan preprocessing
-    def cancel_preprocessing():
+    def cancel_preprocessing(_=None):
         log_message(ui_components, "Preprocessing dibatalkan", "info", "ℹ️")
         update_status_panel(ui_components, "info", "Preprocessing dibatalkan")
         
@@ -211,6 +222,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
         split = config.get('split', 'all')
         normalization = config.get('normalization', 'minmax')
         augmentation = config.get('augmentation', False)
+        num_workers = config.get('num_workers', 4)
         
         # Dapatkan resolusi
         resolution = config.get('resolution')
@@ -232,6 +244,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
                 'normalize': normalization != 'none',
                 'normalization': normalization,
                 'augmentation': augmentation,
+                'num_workers': num_workers,
                 'output_dir': config.get('preprocessed_dir', 'data/preprocessed')
             },
             'data': {
@@ -240,7 +253,7 @@ def execute_preprocessing(ui_components: Dict[str, Any], config: Dict[str, Any])
         }
         
         # Log parameters
-        log_message(ui_components, f"Preprocessing dataset dengan resolusi {img_size}, normalisasi {normalization}, augmentasi {augmentation}, split {split}", "info", "🔄")
+        log_message(ui_components, f"Preprocessing dataset dengan resolusi {img_size}, normalisasi {normalization}, augmentasi {augmentation}, split {split}, workers {num_workers}", "info", "🔄")
         
         # Notify process start
         notify_process_start(ui_components, "preprocessing", f"split: {split}")

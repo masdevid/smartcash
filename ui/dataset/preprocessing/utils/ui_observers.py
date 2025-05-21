@@ -84,6 +84,31 @@ class MockObserverManager:
             Nilai flag
         """
         return self.flags.get(flag_name, default)
+        
+    def cleanup(self) -> None:
+        """
+        Cleanup resources.
+        """
+        self.observers.clear()
+        self.flags.clear()
+        
+    def is_running(self, process_name: str) -> bool:
+        """
+        Cek apakah proses sedang berjalan.
+        
+        Args:
+            process_name: Nama proses
+            
+        Returns:
+            True jika proses sedang berjalan, False jika tidak
+        """
+        return self.flags.get(f"{process_name}_running", False)
+        
+    def stop_all(self) -> None:
+        """
+        Stop semua proses.
+        """
+        self.set_flag('stop_requested', True)
 
 def register_ui_observers(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """

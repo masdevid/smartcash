@@ -86,7 +86,7 @@ def confirm_cleanup(ui_components: Dict[str, Any], dir_path: str, button: Any = 
         execute_cleanup(ui_components, dir_path)
     
     # Fungsi untuk membatalkan cleanup
-    def cancel_cleanup():
+    def cancel_cleanup(_=None):
         if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
             ui_components['confirmation_area'].clear_output()
         

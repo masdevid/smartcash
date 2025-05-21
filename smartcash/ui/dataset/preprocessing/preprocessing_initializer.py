@@ -96,3 +96,6 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         ])
         
         return error_ui
+
+# Alias untuk kompatibilitas
+initialize_preprocessing_ui = initialize_dataset_preprocessing_ui

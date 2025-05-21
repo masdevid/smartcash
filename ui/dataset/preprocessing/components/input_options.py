@@ -49,7 +49,7 @@ def create_preprocessing_options(config: Optional[Dict[str, Any]] = None) -> wid
         step=32,
         description='Image size:',
         style={'description_width': 'initial'},
-        layout=widgets.Layout(width='70%')
+        layout=widgets.Layout(width='95%')
     )
     
     enable_norm_checkbox = widgets.Checkbox(
@@ -77,14 +77,41 @@ def create_preprocessing_options(config: Optional[Dict[str, Any]] = None) -> wid
         step=1,
         description='Workers:',
         style={'description_width': 'initial'},
-        layout=widgets.Layout(width='50%')
+        layout=widgets.Layout(width='95%')
     )
     
-    # Gabungkan dalam container
-    return widgets.VBox([
+    # Split selector untuk kolom kedua
+    split_dropdown = widgets.Dropdown(
+        options=['Train', 'Validation', 'Test', 'All'],
+        value='Train',
+        description='Target Split:',
+        style={'description_width': 'initial'},
+        layout=widgets.Layout(width='95%')
+    )
+    
+    # Buat layout 2 kolom untuk input options
+    left_column = widgets.VBox([
         img_size_slider,
         enable_norm_checkbox,
-        preserve_ratio_checkbox,
-        enable_cache_checkbox,
-        num_workers_slider
-    ])
+        preserve_ratio_checkbox
+    ], layout=widgets.Layout(width='50%'))
+    
+    right_column = widgets.VBox([
+        num_workers_slider,
+        split_dropdown,
+        enable_cache_checkbox
+    ], layout=widgets.Layout(width='50%'))
+    
+    # Gabungkan dalam container horizontal
+    options_container = widgets.HBox([left_column, right_column], 
+                                    layout=widgets.Layout(width='100%'))
+    
+    # Tambahkan atribut yang diperlukan untuk akses dari luar
+    options_container.resolution = img_size_slider
+    options_container.normalization = enable_norm_checkbox
+    options_container.preserve_aspect_ratio = preserve_ratio_checkbox
+    options_container.enable_cache = enable_cache_checkbox
+    options_container.num_workers = num_workers_slider
+    options_container.target_split = split_dropdown
+    
+    return options_container

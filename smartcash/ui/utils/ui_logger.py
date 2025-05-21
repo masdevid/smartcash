@@ -47,6 +47,7 @@ class UILogger:
         self.ui_components = ui_components
         self.name = name
         self.log_level = log_level
+        self._in_log_to_ui = False  # Flag untuk mencegah rekursi
         
         # Setup Python logger
         self.logger = logging.getLogger(name)
@@ -57,7 +58,8 @@ class UILogger:
             self.logger.removeHandler(handler)
         
         # Tambahkan console handler untuk output standar
-        console_handler = logging.StreamHandler(sys.stdout)
+        # Gunakan sys.__stdout__ untuk mencegah rekursi dengan stdout interceptor
+        console_handler = logging.StreamHandler(sys.__stdout__)
         console_handler.setLevel(log_level)
         formatter = logging.Formatter(
             '%(message)s',
@@ -94,50 +96,62 @@ class UILogger:
         if not message or not message.strip():
             return
             
-        # Tambahkan timestamp
-        timestamp = datetime.now().strftime('%H:%M:%S')
+        # Mencegah rekursi
+        if self._in_log_to_ui:
+            return
         
-        # Tambahkan emoji sesuai level
-        emoji_map = {
-            "debug": "🔍",
-            "info": "ℹ️",
-            "success": "✅",
-            "warning": "⚠️",
-            "error": "❌",
-            "critical": "🔥"
-        }
-        emoji = emoji_map.get(level, "ℹ️")
+        self._in_log_to_ui = True
         
-        # Format pesan dengan timestamp dan emoji
-        formatted_message = f"[{timestamp}] {emoji} {message}"
-        
-        # Prioritas log output:
-        # 1. log_output widget jika ada
-        # 2. status widget jika ada
-        # 3. fallback ke stdout
-        
-        if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-            with self.ui_components['log_output']:
-                print(formatted_message)
-        elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
-            with self.ui_components['status']:
-                try:
-                    from smartcash.ui.utils.alert_utils import create_status_indicator
-                    display(create_status_indicator(level, message))
-                except ImportError:
-                    # Fallback jika tidak ada alert_utils
-                    color = {
-                        "debug": "gray",
-                        "info": "blue",
-                        "success": "green",
-                        "warning": "orange",
-                        "error": "red",
-                        "critical": "darkred"
-                    }.get(level, "black")
-                    display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
-        else:
-            # Fallback ke stdout jika tidak ada UI components
-            print(formatted_message)
+        try:
+            # Tambahkan timestamp
+            timestamp = datetime.now().strftime('%H:%M:%S')
+            
+            # Tambahkan emoji sesuai level
+            emoji_map = {
+                "debug": "🔍",
+                "info": "ℹ️",
+                "success": "✅",
+                "warning": "⚠️",
+                "error": "❌",
+                "critical": "🔥"
+            }
+            emoji = emoji_map.get(level, "ℹ️")
+            
+            # Format pesan dengan timestamp dan emoji
+            formatted_message = f"[{timestamp}] {emoji} {message}"
+            
+            # Prioritas log output:
+            # 1. log_output widget jika ada
+            # 2. status widget jika ada
+            # 3. fallback ke sys.__stdout__ (bukan stdout yang sedang diintercept)
+            
+            if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                with self.ui_components['log_output']:
+                    # Hindari penggunaan print, gunakan display langsung
+                    display(HTML(f"<div>{formatted_message}</div>"))
+            elif 'status' in self.ui_components and hasattr(self.ui_components['status'], 'clear_output'):
+                with self.ui_components['status']:
+                    try:
+                        from smartcash.ui.utils.alert_utils import create_status_indicator
+                        display(create_status_indicator(level, message))
+                    except ImportError:
+                        # Fallback jika tidak ada alert_utils
+                        color = {
+                            "debug": "gray",
+                            "info": "blue",
+                            "success": "green",
+                            "warning": "orange",
+                            "error": "red",
+                            "critical": "darkred"
+                        }.get(level, "black")
+                        display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
+            else:
+                # Fallback ke sys.__stdout__ jika tidak ada UI components
+                # Menggunakan sys.__stdout__ untuk mencegah rekursi
+                sys.__stdout__.write(f"{formatted_message}\n")
+                sys.__stdout__.flush()
+        finally:
+            self._in_log_to_ui = False
     
     def debug(self, message: str) -> None:
         """Log debug message."""
@@ -343,7 +357,7 @@ def _reset_logging_handlers():
     
     # Tambahkan handler minimal untuk root logger
     if not root_logger.handlers:
-        handler = logging.StreamHandler(sys.stderr)
+        handler = logging.StreamHandler(sys.__stderr__)  # Gunakan sys.__stderr__ untuk mencegah rekursi
         handler.setLevel(logging.WARNING)
         formatter = logging.Formatter('%(levelname)s - %(message)s')
         handler.setFormatter(formatter)
@@ -369,7 +383,7 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
     class UIStdoutInterceptor:
         def __init__(self, ui_components):
             self.ui_components = ui_components
-            self.terminal = sys.stdout
+            self.terminal = sys.__stdout__  # Gunakan sys.__stdout__ bukan sys.stdout
             self.buffer = ""
             self.lock = threading.RLock()
             self.buffer_limit = 1000  # Batasi buffer untuk mencegah memory leak
@@ -382,54 +396,66 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                 '/usr/local/lib', 'WARNING:', '[WARNING]',
                 'Config file not found in repo'  # Filter pesan error konfigurasi yang tidak ada
             ]
+            # Flag untuk mencegah rekursi
+            self._in_write = False
             
         def write(self, message):
-            # Write ke terminal asli
-            self.terminal.write(message)
+            # Mencegah rekursi
+            if self._in_write:
+                return
             
-            # Skip semua pesan yang tidak penting
-            msg_strip = message.strip()
-            if not msg_strip or len(msg_strip) < 2:  # Skip pesan kosong atau terlalu pendek
-                return
+            self._in_write = True
+            
+            try:
+                # Write ke terminal asli
+                self.terminal.write(message)
                 
-            # Filter berdasarkan prefiks
-            if any(prefix in msg_strip for prefix in self.ignore_prefixes):
-                return
-                
-            # Filter messages seperti inisialisasi, setup, dll
-            if ('inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or 
-                'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower()):
-                return
-                
-            # Buffer output sampai ada newline, dengan thread-safety
-            with self.lock:
-                # Batasi ukuran buffer
-                if len(self.buffer) > self.buffer_limit:
-                    self.buffer = self.buffer[-self.buffer_limit:]
-                
-                self.buffer += message
-                if '\n' in self.buffer:
-                    lines = self.buffer.split('\n')
-                    self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
+                # Skip semua pesan yang tidak penting
+                msg_strip = message.strip()
+                if not msg_strip or len(msg_strip) < 2:  # Skip pesan kosong atau terlalu pendek
+                    return
                     
-                    # Tampilkan setiap baris lengkap yang tidak kosong
-                    for line in lines[:-1]:
-                        if line.strip():  # Cek jika bukan baris kosong
-                            try:
-                                # Prioritaskan log_output jika ada
-                                if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
-                                    with self.ui_components['log_output']:
-                                        print(line)
-                                else:
-                                    with self.ui_components['status']:
-                                        try:
-                                            from smartcash.ui.utils.alert_utils import create_status_indicator
-                                            display(create_status_indicator("info", line))
-                                        except ImportError:
+                # Filter berdasarkan prefiks
+                if any(prefix in msg_strip for prefix in self.ignore_prefixes):
+                    return
+                    
+                # Filter messages seperti inisialisasi, setup, dll
+                if ('inisialisasi' in msg_strip.lower() or 'setup' in msg_strip.lower() or 
+                    'handler' in msg_strip.lower() or 'initializing' in msg_strip.lower()):
+                    return
+                    
+                # Buffer output sampai ada newline, dengan thread-safety
+                with self.lock:
+                    # Batasi ukuran buffer
+                    if len(self.buffer) > self.buffer_limit:
+                        self.buffer = self.buffer[-self.buffer_limit:]
+                    
+                    self.buffer += message
+                    if '\n' in self.buffer:
+                        lines = self.buffer.split('\n')
+                        self.buffer = lines[-1]  # Simpan baris terakhir yang belum lengkap
+                        
+                        # Tampilkan setiap baris lengkap yang tidak kosong
+                        for line in lines[:-1]:
+                            if line.strip():  # Cek jika bukan baris kosong
+                                try:
+                                    # Prioritaskan log_output jika ada
+                                    if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
+                                        with self.ui_components['log_output']:
+                                            # Hindari penggunaan print, gunakan display langsung
                                             display(HTML(f"<div>{line}</div>"))
-                            except Exception:
-                                # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
-                                self.terminal.write(f"[UI STDOUT ERROR] {line}\n")
+                                    else:
+                                        with self.ui_components['status']:
+                                            try:
+                                                from smartcash.ui.utils.alert_utils import create_status_indicator
+                                                display(create_status_indicator("info", line))
+                                            except ImportError:
+                                                display(HTML(f"<div>{line}</div>"))
+                                except Exception as e:
+                                    # Jika ada error saat menampilkan ke UI, kirim ke stdout asli
+                                    self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {line}\n")
+            finally:
+                self._in_write = False
         
         def flush(self):
             self.terminal.flush()
@@ -440,7 +466,8 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                         # Prioritaskan log_output jika ada
                         if 'log_output' in self.ui_components and hasattr(self.ui_components['log_output'], 'clear_output'):
                             with self.ui_components['log_output']:
-                                print(self.buffer)
+                                # Hindari penggunaan print, gunakan display langsung
+                                display(HTML(f"<div>{self.buffer}</div>"))
                         else:
                             with self.ui_components['status']:
                                 try:
@@ -448,9 +475,9 @@ def intercept_stdout_to_ui(ui_components: Dict[str, Any]) -> None:
                                     display(create_status_indicator("info", self.buffer))
                                 except ImportError:
                                     display(HTML(f"<div>{self.buffer}</div>"))
-                    except Exception:
+                    except Exception as e:
                         # Fallback ke stdout asli
-                        self.terminal.write(f"[UI STDOUT ERROR] {self.buffer}\n")
+                        self.terminal.write(f"[UI STDOUT ERROR: {str(e)}] {self.buffer}\n")
                 self.buffer = ""
         
         # Kebutuhan IOBase lainnya
@@ -555,7 +582,7 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
     
     # Jika ada log_output, gunakan itu juga
     elif 'log_output' in ui_components and hasattr(ui_components['log_output'], 'clear_output'):
-        from IPython.display import display
+        from IPython.display import display, HTML
         from datetime import datetime
         
         # Format pesan dengan timestamp dan icon
@@ -564,11 +591,14 @@ def log_to_ui(ui_components: Dict[str, Any], message: str, level: str = "info", 
         
         # Tampilkan ke log_output widget
         with ui_components['log_output']:
-            print(formatted_message)
+            # Hindari penggunaan print, gunakan display langsung
+            display(HTML(f"<div>{formatted_message}</div>"))
     
     # Fallback ke stdout jika tidak ada UI components
     else:
         from datetime import datetime
         timestamp = datetime.now().strftime('%H:%M:%S')
         formatted_message = f"[{timestamp}] {icon + ' ' if icon else ''}{message}"
-        print(formatted_message)
+        # Gunakan sys.__stdout__ untuk mencegah rekursi
+        sys.__stdout__.write(f"{formatted_message}\n")
+        sys.__stdout__.flush()

@@ -6,13 +6,13 @@ Deskripsi: Handler untuk operasi terkait environment
 import os
 import shutil
 import logging
+import sys
 from pathlib import Path
 from typing import List, Dict, Any, Tuple, Optional, Callable
 
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.common.environment import get_environment_manager
-from smartcash.ui.utils.ui_logger import get_current_ui_logger, UILogger
 
 class EnvironmentHandler:
     """
@@ -26,18 +26,15 @@ class EnvironmentHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        # Gunakan UILogger jika tersedia, atau buat logger standar
-        self.ui_logger = get_current_ui_logger()
-        if not self.ui_logger:
-            self.logger = logging.getLogger(__name__)
-            if not self.logger.handlers:
-                handler = logging.StreamHandler()
-                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                handler.setFormatter(formatter)
-                self.logger.addHandler(handler)
-                self.logger.setLevel(logging.INFO)
-        else:
-            self.logger = self.ui_logger
+        # Setup logger tanpa menggunakan UILogger untuk menghindari circular dependency
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            # Gunakan sys.__stdout__ untuk menghindari rekursi
+            handler = logging.StreamHandler(sys.__stdout__)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
         
         # Initialize environment manager singleton first
         self.env_manager = get_environment_manager()
@@ -52,10 +49,7 @@ class EnvironmentHandler:
         if config_logger:
             config_logger.setLevel(logging.ERROR)
             
-        if isinstance(self.logger, UILogger):
-            self.logger.debug(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
-        else:
-            self.logger.info(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
+        self.logger.info(f"Environment manager initialized. Is Colab: {self.env_manager.is_colab}")
         
         # Set callback functions
         self.ui_callback = ui_callback or {}
@@ -74,17 +68,14 @@ class EnvironmentHandler:
             'augmentation_config.yaml',
             'evaluation_config.yaml',
             'preprocessing_config.yaml',
-            'inference_config.yaml',
-            'export_config.yaml',
-            'environment_config.yaml'
+            'hyperparameters_config.yaml',
+            'base_config.yaml',
+            'colab_config.yaml'
         ]
     
     def _log_message(self, message: str):
         """Log message to UI if callback exists"""
-        if isinstance(self.logger, UILogger):
-            self.logger.info(message)
-        else:
-            self.logger.info(message)
+        self.logger.info(message)
             
         if 'log_message' in self.ui_callback:
             self.ui_callback['log_message'](message)
@@ -284,10 +275,7 @@ class EnvironmentHandler:
             return True
             
         except Exception as e:
-            if isinstance(self.logger, UILogger):
-                self.logger.error(f"Error saat setup environment: {str(e)}")
-            else:
-                self.logger.error(f"Error during environment setup: {str(e)}")
+            self.logger.error(f"Error saat setup environment: {str(e)}")
                 
             self._update_status(f"Error saat setup environment: {str(e)}", "error")
             self._log_message(f"❌ Error saat setup environment: {str(e)}")

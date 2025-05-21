@@ -5,13 +5,13 @@ Deskripsi: Handler untuk auto check environment
 
 from datetime import datetime
 import logging
+import sys
 from pathlib import Path
 from typing import Dict, Any, Optional, Callable, List
 
 from smartcash.common.utils import is_colab
 from smartcash.common.constants.paths import COLAB_PATH
 from smartcash.ui.handlers.environment_handler import EnvironmentHandler
-from smartcash.ui.utils.ui_logger import get_current_ui_logger, UILogger
 
 class AutoCheckHandler:
     """
@@ -25,18 +25,15 @@ class AutoCheckHandler:
         Args:
             ui_callback: Dictionary callback untuk update UI
         """
-        # Gunakan UILogger jika tersedia, atau buat logger standar
-        self.ui_logger = get_current_ui_logger()
-        if not self.ui_logger:
-            self.logger = logging.getLogger(__name__)
-            if not self.logger.handlers:
-                handler = logging.StreamHandler()
-                formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-                handler.setFormatter(formatter)
-                self.logger.addHandler(handler)
-                self.logger.setLevel(logging.INFO)
-        else:
-            self.logger = self.ui_logger
+        # Setup logger tanpa menggunakan UILogger untuk menghindari circular dependency
+        self.logger = logging.getLogger(__name__)
+        if not self.logger.handlers:
+            # Gunakan sys.__stdout__ untuk mencegah rekursi
+            handler = logging.StreamHandler(sys.__stdout__)
+            formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+            self.logger.setLevel(logging.INFO)
             
         # Set callback functions
         self.ui_callback = ui_callback or {}
@@ -56,10 +53,7 @@ class AutoCheckHandler:
     
     def _log_message(self, message: str):
         """Log message to UI if callback exists"""
-        if isinstance(self.logger, UILogger):
-            self.logger.info(message)
-        else:
-            self.logger.info(message)
+        self.logger.info(message)
             
         if 'log_message' in self.ui_callback:
             self.ui_callback['log_message'](message)
@@ -138,10 +132,7 @@ class AutoCheckHandler:
             return env_info
             
         except Exception as e:
-            if isinstance(self.logger, UILogger):
-                self.logger.error(f"Error saat pemeriksaan environment: {str(e)}")
-            else:
-                self.logger.error(f"Error during environment check: {str(e)}")
+            self.logger.error(f"Error saat pemeriksaan environment: {str(e)}")
                 
             self._log_message(f"[{datetime.now().strftime('%H:%M:%S')}] Error saat pemeriksaan environment: {str(e)}")
             self._update_status(f"Error saat pemeriksaan environment: {str(e)}", "error")

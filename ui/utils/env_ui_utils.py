@@ -5,7 +5,9 @@ Deskripsi: Utilitas UI untuk environment config
 
 from typing import Dict, Any
 import ipywidgets as widgets
+import sys
 from datetime import datetime
+from IPython.display import display, HTML
 
 def update_status(ui_components: Dict[str, Any], message: str, style: str = "info") -> None:
     """
@@ -49,18 +51,23 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = "info"
     if not message or not message.strip():
         return
         
-    from IPython.display import display
     timestamp = datetime.now().strftime('%H:%M:%S')
     log_widget = ui_components.get('log_output')  # Use Output widget for logging
+    
+    # Tentukan warna dan icon berdasarkan level
+    color = "red" if level == "error" else "black"
+    icon = "❌" if level == "error" else "ℹ️"
+    
+    formatted_message = f"[{timestamp}] {icon} {message}"
+    
     if log_widget is not None:
         with log_widget:
-            if level == "error":
-                print(f"[{timestamp}] ❌ {message}")
-            else:
-                print(f"[{timestamp}] ℹ️ {message}")
+            # Gunakan display(HTML) sebagai pengganti print untuk menghindari rekursi
+            display(HTML(f"<div style='color:{color}'>{formatted_message}</div>"))
     else:
-        # Fallback to print if log_output is missing
-        print(f"[{timestamp}] {message}")
+        # Fallback ke sys.__stdout__ untuk menghindari rekursi
+        sys.__stdout__.write(f"{formatted_message}\n")
+        sys.__stdout__.flush()
 
 def update_progress(ui_components: Dict[str, Any], value: float, message: str = "") -> None:
     """

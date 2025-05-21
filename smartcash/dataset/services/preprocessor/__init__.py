@@ -7,5 +7,12 @@ from smartcash.dataset.services.preprocessor.dataset_preprocessor import Dataset
 from smartcash.dataset.services.preprocessor.storage import PreprocessedStorage
 from smartcash.dataset.services.preprocessor.pipeline import PreprocessingPipeline
 from smartcash.dataset.services.preprocessor.cleaner import PreprocessedCleaner
+from smartcash.dataset.services.preprocessor.preprocessing_service import PreprocessingService
 
-__all__ = ['DatasetPreprocessor', 'PreprocessedStorage', 'PreprocessingPipeline', 'PreprocessedCleaner']
+__all__ = [
+    'DatasetPreprocessor', 
+    'PreprocessedStorage', 
+    'PreprocessingPipeline', 
+    'PreprocessedCleaner',
+    'PreprocessingService'
+]

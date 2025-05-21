@@ -1,102 +1,86 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/logger_helper.py
-Deskripsi: Helper untuk logging di preprocessing dataset
+Deskripsi: Utilitas untuk membantu logging di UI preprocessing
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
+import logging
 from smartcash.common.logger import get_logger
 from smartcash.ui.utils.ui_logger import create_ui_logger
-from smartcash.ui.dataset.preprocessing.utils.notification_manager import PREPROCESSING_LOGGER_NAMESPACE
 
-def setup_ui_logger(ui_components: Dict[str, Any], namespace: Optional[str] = None) -> Dict[str, Any]:
+# Konstanta untuk namespace logger
+PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
+
+def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Setup logger untuk UI components.
+    Setup logger untuk UI preprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
-        namespace: Namespace logger (opsional, default: PREPROCESSING_LOGGER_NAMESPACE)
         
     Returns:
-        Dictionary UI components yang telah diupdate
+        Dictionary komponen UI yang telah diupdate
     """
-    # Gunakan namespace default jika tidak diberikan
-    if namespace is None:
-        namespace = PREPROCESSING_LOGGER_NAMESPACE
-    
-    # Cek apakah logger dengan namespace yang sama sudah disetup
-    if 'logger' in ui_components and 'logger_namespace' in ui_components and ui_components['logger_namespace'] == namespace:
-        return ui_components
-    
-    # Setup logger dengan namespace spesifik
-    logger = create_ui_logger(ui_components, namespace)
-    ui_components['logger'] = logger
-    ui_components['logger_namespace'] = namespace
-    
-    # Tambahkan helper function untuk log message
-    ui_components['log_message'] = lambda message, level="info", icon="ℹ️": log_message(ui_components, message, level, icon)
-    
+    if not ui_components.get('logger'):
+        # Setup logger dengan namespace yang sudah didefine
+        logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
+        ui_components['logger'] = logger
+        
+        # Setup UI logger
+        if 'log_output' in ui_components:
+            ui_logger = create_ui_logger(ui_components, PREPROCESSING_LOGGER_NAMESPACE)
+            ui_components['ui_logger'] = ui_logger
+            
+        # Setup log_message function
+        ui_components['log_message'] = lambda msg, level='info', icon='': log_message(ui_components, msg, level, icon)
+        
     return ui_components
 
-def log_message(ui_components: Dict[str, Any], message: str, level: str = "info", icon: str = "ℹ️") -> None:
+def log_message(ui_components: Dict[str, Any], message: str, level: str = 'info', icon: str = '') -> None:
     """
-    Log message ke UI dan logger.
+    Log pesan dengan level yang diberikan.
     
     Args:
         ui_components: Dictionary komponen UI
         message: Pesan yang akan dilog
-        level: Level log (info, warning, error, success)
-        icon: Icon untuk pesan log
+        level: Level log (debug, info, warning, error, critical)
+        icon: Ikon untuk pesan (emoji)
     """
-    # Skip jika ui_components tidak valid
-    if not isinstance(ui_components, dict):
-        return
+    logger = ui_components.get('logger')
+    if not logger:
+        # Fallback ke logger baru
+        logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
+        ui_components['logger'] = logger
     
-    # Setup default logger jika tidak ada
-    if 'logger' not in ui_components:
-        ui_components['logger'] = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
+    # Format pesan dengan icon
+    formatted_message = f"{icon} {message}" if icon else message
     
     # Log ke logger
-    logger = ui_components['logger']
-    if hasattr(logger, level):
-        log_func = getattr(logger, level)
-        log_func(message)
+    if level == 'debug':
+        logger.debug(formatted_message)
+    elif level == 'info':
+        logger.info(formatted_message)
+    elif level == 'warning':
+        logger.warning(formatted_message)
+    elif level == 'error':
+        logger.error(formatted_message)
+    elif level == 'critical':
+        logger.critical(formatted_message)
     else:
-        logger.info(message)
+        logger.info(formatted_message)
     
-    # Tampilkan di UI jika log_output tersedia
-    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_stdout'):
-        formatted_message = f"{icon} {message}"
-        
-        # Gunakan stderr untuk level error
-        if level.lower() == 'error':
-            ui_components['log_output'].append_stderr(formatted_message)
-        else:
-            ui_components['log_output'].append_stdout(formatted_message)
-    
-    # Notifikasi melalui observer jika tersedia
-    try:
-        from smartcash.ui.dataset.preprocessing.utils.notification_manager import notify_log
-        notify_log(ui_components, message, level, icon)
-    except (ImportError, AttributeError):
-        pass
+    # Log ke UI widget jika ada
+    if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_log'):
+        ui_components['log_output'].append_log(formatted_message, level)
 
 def is_initialized(ui_components: Dict[str, Any]) -> bool:
     """
-    Cek apakah UI sudah diinisialisasi.
+    Cek apakah UI preprocessing sudah diinisialisasi.
     
     Args:
         ui_components: Dictionary komponen UI
         
     Returns:
-        bool: True jika UI sudah diinisialisasi, False jika belum
+        Boolean menunjukkan apakah UI sudah diinisialisasi
     """
-    # Periksa apakah memiliki flag initialized
-    if 'preprocessing_initialized' in ui_components:
-        return ui_components['preprocessing_initialized']
-    
-    # Periksa apakah memiliki logger dan UI components utama
-    has_logger = 'logger' in ui_components
-    has_ui = 'ui' in ui_components
-    has_progress = 'progress_bar' in ui_components
-    
-    return has_logger and has_ui and has_progress 
+    return ui_components.get('preprocessing_initialized', False) 

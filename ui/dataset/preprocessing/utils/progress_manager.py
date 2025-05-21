@@ -1,19 +1,16 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/progress_manager.py
-Deskripsi: Manager untuk progress tracking pada preprocessing dataset
+Deskripsi: Utilitas untuk mengelola progress bar dan tracking dalam UI preprocessing
 """
 
-from typing import Dict, Any, Optional, Callable
+from typing import Dict, Any, Optional, Tuple
+import ipywidgets as widgets
+from smartcash.ui.utils.constants import COLORS
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
-from smartcash.ui.dataset.preprocessing.utils.notification_manager import (
-    PreprocessingUIEvents, 
-    notify_progress, 
-    notify_step_progress
-)
 
 def setup_multi_progress(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Setup multi-progress tracking untuk preprocessing.
+    Setup progress tracking dengan dukungan multi-level.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -21,54 +18,52 @@ def setup_multi_progress(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Key untuk progress tracking
-    progress_keys = {
-        'progress_bar': 'progress_bar',
-        'overall_label': 'overall_label',
-        'current_progress': 'current_progress',
-        'step_label': 'step_label'
-    }
+    # Jika komponen progress sudah disetup, tidak perlu setup ulang
+    if all(k in ui_components for k in ['progress_bar', 'overall_label', 'step_label']):
+        return ui_components
     
-    # Cek apakah semua komponen progress tracking tersedia
-    has_progress_components = all(key in ui_components for key in progress_keys.values())
+    # Pastikan progress_container telah dibuat
+    if 'progress_container' not in ui_components:
+        ui_components['progress_container'] = widgets.VBox([])
     
-    if not has_progress_components:
-        # Log jika komponen tidak lengkap
-        log_message(ui_components, "Beberapa komponen progress tracking tidak tersedia", "warning", "⚠️")
+    # Setup progress bar jika belum ada
+    if 'progress_bar' not in ui_components:
+        ui_components['progress_bar'] = widgets.FloatProgress(
+            value=0,
+            min=0,
+            max=100,
+            description='',
+            bar_style='info',
+            orientation='horizontal',
+            layout=widgets.Layout(width='100%', visibility='hidden')
+        )
     
-    # Setup progress bar
-    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'layout'):
-        ui_components['progress_bar'].layout.visibility = 'hidden'
-        ui_components['progress_bar'].value = 0
+    # Setup label untuk overall progress
+    if 'overall_label' not in ui_components:
+        ui_components['overall_label'] = widgets.HTML(
+            value="",
+            layout=widgets.Layout(margin='5px 0', visibility='hidden')
+        )
     
-    # Setup current progress
-    if 'current_progress' in ui_components and hasattr(ui_components['current_progress'], 'layout'):
-        ui_components['current_progress'].layout.visibility = 'hidden'
-        ui_components['current_progress'].value = 0
+    # Setup label untuk step progress
+    if 'step_label' not in ui_components:
+        ui_components['step_label'] = widgets.HTML(
+            value="",
+            layout=widgets.Layout(margin='0 0 5px 0', visibility='hidden')
+        )
     
-    # Setup overall label
-    if 'overall_label' in ui_components and hasattr(ui_components['overall_label'], 'layout'):
-        ui_components['overall_label'].layout.visibility = 'hidden'
-        ui_components['overall_label'].value = ""
-    
-    # Setup step label
-    if 'step_label' in ui_components and hasattr(ui_components['step_label'], 'layout'):
-        ui_components['step_label'].layout.visibility = 'hidden'
-        ui_components['step_label'].value = ""
-    
-    # Setup helper functions untuk update progress
-    ui_components['update_progress'] = lambda progress, total=100, message="": update_progress(ui_components, progress, total, message)
-    ui_components['update_step_progress'] = lambda step_progress, step_total=100, step_message="", current_step=1, total_steps=1: update_step_progress(ui_components, step_progress, step_total, step_message, current_step, total_steps)
-    ui_components['reset_progress'] = lambda: reset_progress_bar(ui_components)
-    
-    # Log setup berhasil
-    log_message(ui_components, "Progress tracking berhasil disetup", "debug", "✅")
+    # Update progress container dengan komponen yang telah dibuat
+    ui_components['progress_container'].children = [
+        ui_components['overall_label'],
+        ui_components['step_label'],
+        ui_components['progress_bar']
+    ]
     
     return ui_components
 
 def setup_progress_indicator(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Setup indikator progress untuk preprocessing.
+    Setup indikator progress yang lebih simpel (tidak multi-level).
     
     Args:
         ui_components: Dictionary komponen UI
@@ -76,157 +71,126 @@ def setup_progress_indicator(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Dictionary UI components yang telah diupdate
     """
-    # Setup progress container jika tersedia
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-        ui_components['progress_container'].layout.display = 'none'
-        ui_components['progress_container'].layout.visibility = 'hidden'
+    # Jika sudah ada progress bar, gunakan yang sudah ada
+    if 'progress_bar' in ui_components:
+        return ui_components
+    
+    # Setup progress bar baru
+    ui_components['progress_bar'] = widgets.FloatProgress(
+        value=0,
+        min=0,
+        max=100,
+        description='',
+        bar_style='info',
+        orientation='horizontal',
+        layout=widgets.Layout(width='100%', visibility='hidden')
+    )
+    
+    # Tambahkan ke container jika belum ada
+    if 'progress_container' not in ui_components:
+        ui_components['progress_container'] = widgets.VBox([ui_components['progress_bar']])
+    else:
+        current_children = list(ui_components['progress_container'].children)
+        if ui_components['progress_bar'] not in current_children:
+            ui_components['progress_container'].children = current_children + [ui_components['progress_bar']]
     
     return ui_components
 
-def update_progress(ui_components: Dict[str, Any], progress: int, total: int = 100, message: str = "") -> None:
+def update_progress(ui_components: Dict[str, Any], 
+                    value: float, 
+                    max_value: float = 100,
+                    overall_message: Optional[str] = None,
+                    step_message: Optional[str] = None) -> None:
     """
-    Update progress bar dan label.
+    Update nilai progress bar dan pesan progress.
     
     Args:
         ui_components: Dictionary komponen UI
-        progress: Nilai progress saat ini
-        total: Total nilai progress
-        message: Pesan progress
+        value: Nilai progress saat ini
+        max_value: Nilai progress maksimum
+        overall_message: Pesan untuk overall progress
+        step_message: Pesan untuk step progress
     """
-    # Skip jika progress tidak valid
-    if not isinstance(ui_components, dict):
+    # Pastikan progress bar tersedia
+    if 'progress_bar' not in ui_components:
         return
     
-    # Pastikan progress adalah integer
-    try:
-        progress = int(float(progress))
-    except (ValueError, TypeError):
-        progress = 0
-    
-    # Pastikan progress berada dalam range valid
-    progress = max(0, min(progress, 100))
+    # Normalisasi nilai untuk progress bar
+    normalized_value = min(100, (value / max_value) * 100) if max_value > 0 else 0
     
     # Update progress bar
-    if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'value'):
-        # Show progress bar jika tersembunyi
-        if hasattr(ui_components['progress_bar'], 'layout'):
-            ui_components['progress_bar'].layout.visibility = 'visible'
+    progress_bar = ui_components['progress_bar']
+    progress_bar.value = normalized_value
+    
+    # Tampilkan progress bar jika tersembunyi
+    if hasattr(progress_bar, 'layout') and progress_bar.layout.visibility == 'hidden':
+        progress_bar.layout.visibility = 'visible'
+    
+    # Update warna progress bar berdasarkan nilai
+    if normalized_value < 30:
+        progress_bar.bar_style = 'info'
+    elif normalized_value < 70:
+        progress_bar.bar_style = 'warning'
+    else:
+        progress_bar.bar_style = 'success'
+    
+    # Update overall message
+    if overall_message and 'overall_label' in ui_components:
+        overall_label = ui_components['overall_label']
+        overall_label.value = f"<div>{overall_message}</div>"
         
-        # Update nilai progress bar
-        ui_components['progress_bar'].value = progress
-        ui_components['progress_bar'].description = f"Progress: {progress}%"
+        # Tampilkan overall label jika tersembunyi
+        if hasattr(overall_label, 'layout') and overall_label.layout.visibility == 'hidden':
+            overall_label.layout.visibility = 'visible'
     
-    # Update label jika ada pesan
-    if message and 'overall_label' in ui_components and hasattr(ui_components['overall_label'], 'value'):
-        # Show label jika tersembunyi
-        if hasattr(ui_components['overall_label'], 'layout'):
-            ui_components['overall_label'].layout.visibility = 'visible'
+    # Update step message
+    if step_message and 'step_label' in ui_components:
+        step_label = ui_components['step_label']
+        step_label.value = f"<div style='color:{COLORS['secondary']};font-size:0.9em;'>{step_message}</div>"
         
-        # Update nilai label
-        ui_components['overall_label'].value = message
+        # Tampilkan step label jika tersembunyi
+        if hasattr(step_label, 'layout') and step_label.layout.visibility == 'hidden':
+            step_label.layout.visibility = 'visible'
     
-    # Notifikasi progress melalui observer
-    notify_progress(ui_components, progress, total, message)
-
-def update_step_progress(ui_components: Dict[str, Any], step_progress: int, step_total: int = 100, 
-                        step_message: str = "", current_step: int = 1, total_steps: int = 1) -> None:
-    """
-    Update step progress bar dan label.
+    # Log progress jika > 10% perubahan dari terakhir kali
+    if 'last_logged_progress' not in ui_components:
+        ui_components['last_logged_progress'] = 0
     
-    Args:
-        ui_components: Dictionary komponen UI
-        step_progress: Nilai progress step saat ini
-        step_total: Total nilai progress step
-        step_message: Pesan step progress
-        current_step: Langkah saat ini
-        total_steps: Total langkah
-    """
-    # Skip jika progress tidak valid
-    if not isinstance(ui_components, dict):
-        return
-    
-    # Pastikan step_progress adalah integer
-    try:
-        step_progress = int(float(step_progress))
-    except (ValueError, TypeError):
-        step_progress = 0
-    
-    # Pastikan step_progress berada dalam range valid
-    step_progress = max(0, min(step_progress, 100))
-    
-    # Update step progress bar
-    if 'current_progress' in ui_components and hasattr(ui_components['current_progress'], 'value'):
-        # Show progress bar jika tersembunyi
-        if hasattr(ui_components['current_progress'], 'layout'):
-            ui_components['current_progress'].layout.visibility = 'visible'
-        
-        # Update nilai progress bar
-        ui_components['current_progress'].value = step_progress
-        ui_components['current_progress'].description = f"Step {current_step}/{total_steps}"
-    
-    # Update label jika ada pesan
-    if step_message and 'step_label' in ui_components and hasattr(ui_components['step_label'], 'value'):
-        # Show label jika tersembunyi
-        if hasattr(ui_components['step_label'], 'layout'):
-            ui_components['step_label'].layout.visibility = 'visible'
-        
-        # Update nilai label
-        ui_components['step_label'].value = step_message
-    
-    # Notifikasi step progress melalui observer
-    notify_step_progress(ui_components, step_progress, step_total, step_message, current_step, total_steps)
+    if abs(normalized_value - ui_components['last_logged_progress']) >= 10 or normalized_value >= 100:
+        if overall_message:
+            log_message(ui_components, f"Progress: {normalized_value:.1f}% - {overall_message}", "debug", "📊")
+        else:
+            log_message(ui_components, f"Progress: {normalized_value:.1f}%", "debug", "📊")
+            
+        ui_components['last_logged_progress'] = normalized_value
 
 def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """
-    Reset progress bar dan label.
+    Reset progress bar dan semua label progress.
     
     Args:
         ui_components: Dictionary komponen UI
     """
-    # Skip jika progress tidak valid
-    if not isinstance(ui_components, dict):
-        return
-    
     # Reset progress bar
     if 'progress_bar' in ui_components:
-        # Hide progress bar
+        ui_components['progress_bar'].value = 0
         if hasattr(ui_components['progress_bar'], 'layout'):
             ui_components['progress_bar'].layout.visibility = 'hidden'
-        
-        # Reset nilai progress bar
-        ui_components['progress_bar'].value = 0
     
     # Reset overall label
     if 'overall_label' in ui_components:
-        # Hide label
+        ui_components['overall_label'].value = ""
         if hasattr(ui_components['overall_label'], 'layout'):
             ui_components['overall_label'].layout.visibility = 'hidden'
-        
-        # Reset nilai label
-        ui_components['overall_label'].value = ""
-    
-    # Reset current progress
-    if 'current_progress' in ui_components:
-        # Hide progress bar
-        if hasattr(ui_components['current_progress'], 'layout'):
-            ui_components['current_progress'].layout.visibility = 'hidden'
-        
-        # Reset nilai progress bar
-        ui_components['current_progress'].value = 0
     
     # Reset step label
     if 'step_label' in ui_components:
-        # Hide label
+        ui_components['step_label'].value = ""
         if hasattr(ui_components['step_label'], 'layout'):
             ui_components['step_label'].layout.visibility = 'hidden'
-        
-        # Reset nilai label
-        ui_components['step_label'].value = ""
     
-    # Reset progress container
-    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
-        ui_components['progress_container'].layout.visibility = 'hidden'
-        ui_components['progress_container'].layout.display = 'none'
+    # Reset value tracking
+    ui_components['last_logged_progress'] = 0
 
 def start_progress(ui_components: Dict[str, Any], message: str = "Memulai preprocessing...") -> None:
     """
@@ -250,16 +214,6 @@ def start_progress(ui_components: Dict[str, Any], message: str = "Memulai prepro
     
     # Update progress awal
     update_progress(ui_components, 0, 100, message)
-    
-    # Notifikasi start melalui observer
-    if 'observer_manager' in ui_components:
-        ui_components['observer_manager'].notify(
-            PreprocessingUIEvents.PROGRESS_START,
-            ui_components,
-            progress=0,
-            total=100,
-            message=message
-        )
 
 def complete_progress(ui_components: Dict[str, Any], message: str = "Preprocessing selesai") -> None:
     """
@@ -274,14 +228,4 @@ def complete_progress(ui_components: Dict[str, Any], message: str = "Preprocessi
         return
     
     # Update progress ke 100%
-    update_progress(ui_components, 100, 100, message)
-    
-    # Notifikasi complete melalui observer
-    if 'observer_manager' in ui_components:
-        ui_components['observer_manager'].notify(
-            PreprocessingUIEvents.PROGRESS_COMPLETE,
-            ui_components,
-            progress=100,
-            total=100,
-            message=message
-        ) 
+    update_progress(ui_components, 100, 100, message) 

@@ -1,92 +1,150 @@
 """
 File: smartcash/ui/dataset/preprocessing/utils/ui_state_manager.py
-Deskripsi: Utilitas untuk mengelola state UI pada proses preprocessing dataset
+Deskripsi: Utilitas untuk mengelola state UI preprocessing
 """
 
 from typing import Dict, Any, Optional, List
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
-from smartcash.ui.dataset.preprocessing.utils.notification_manager import notify_status
+from smartcash.ui.utils.constants import ICONS, COLORS
 
-def update_status_panel(ui_components: Dict[str, Any], status: str, message: str = "") -> None:
+def update_status_panel(ui_components: Dict[str, Any], status: str, message: str = None) -> None:
     """
-    Update status panel dengan status dan pesan.
+    Update status panel UI dengan status dan pesan.
     
     Args:
         ui_components: Dictionary komponen UI
-        status: Status baru (started, completed, failed, paused, resumed)
-        message: Pesan status tambahan
+        status: Status preprocessing (idle, running, success, error)
+        message: Pesan status opsional
     """
-    # Skip jika ui_components tidak valid
-    if not isinstance(ui_components, dict):
-        return
-    
-    # Pastikan status panel tersedia
     if 'status_panel' not in ui_components:
-        log_message(ui_components, "Status panel tidak tersedia", "debug", "ℹ️")
         return
     
-    # Map status ke emoji dan warna
+    status_panel = ui_components['status_panel']
+    
+    # Map status ke warna dan icon
     status_map = {
-        "started": ("🔄", "blue", "Running", "info"),
-        "running": ("🔄", "blue", "Running", "info"),
-        "completed": ("✅", "green", "Completed", "success"),
-        "success": ("✅", "green", "Sukses", "success"),
-        "failed": ("❌", "red", "Failed", "error"),
-        "error": ("❌", "red", "Error", "error"),
-        "paused": ("⏸️", "orange", "Paused", "warning"),
-        "warning": ("⚠️", "orange", "Warning", "warning"),
-        "reset": ("🔄", "gray", "Reset", "info"),
-        "idle": ("ℹ️", "gray", "Idle", "info"),
-        "loading": ("⏳", "blue", "Loading", "info")
+        'idle': {'color': 'info', 'icon': ICONS['idle']},
+        'running': {'color': 'primary', 'icon': ICONS['running']},
+        'success': {'color': 'success', 'icon': ICONS['success']},
+        'error': {'color': 'danger', 'icon': ICONS['error']},
+        'warning': {'color': 'warning', 'icon': ICONS['warning']},
     }
     
-    # Get emoji, warna, dan default message berdasarkan status
-    emoji, color, default_text, log_level = status_map.get(status.lower(), ("ℹ️", "gray", "Unknown", "info"))
+    # Default ke idle jika status tidak valid
+    status_info = status_map.get(status, status_map['idle'])
     
-    # Gunakan default message jika tidak ada pesan
-    display_message = message or default_text
+    # Format pesan
+    if message:
+        formatted_message = f"{status_info['icon']} {message}"
+    else:
+        default_messages = {
+            'idle': "Preprocessing siap dijalankan",
+            'running': "Preprocessing sedang berjalan...",
+            'success': "Preprocessing berhasil diselesaikan",
+            'error': "Terjadi kesalahan saat preprocessing",
+            'warning': "Perhatian diperlukan",
+        }
+        formatted_message = f"{status_info['icon']} {default_messages.get(status, 'Status tidak diketahui')}"
     
-    # Update status panel dengan HTML
-    ui_components['status_panel'].value = f"<span style='color: {color};'>{emoji} {display_message}</span>"
-    
-    # Log status update
-    log_message(ui_components, f"Status: {display_message}", log_level, emoji)
-    
-    # Notifikasi status melalui observer
-    notify_status(ui_components, status, message)
+    # Update panel
+    if hasattr(status_panel, 'type') and hasattr(status_panel, 'message'):
+        status_panel.type = status_info['color']
+        status_panel.message = formatted_message
+    else:
+        # Alternatif jika status_panel tidak memiliki atribut yang diharapkan
+        from ipywidgets import HTML
+        if isinstance(status_panel, HTML):
+            color = COLORS.get(status_info['color'], COLORS['dark'])
+            status_panel.value = f"<div style='color: {color};'>{formatted_message}</div>"
 
 def reset_ui_after_preprocessing(ui_components: Dict[str, Any]) -> None:
     """
-    Reset UI components setelah preprocessing selesai.
+    Reset UI ke state awal setelah preprocessing.
     
     Args:
         ui_components: Dictionary komponen UI
     """
-    # Skip jika ui_components tidak valid
-    if not isinstance(ui_components, dict):
-        return
+    # Reset progress bar
+    if 'progress_bar' in ui_components:
+        ui_components['progress_bar'].value = 0
+        if hasattr(ui_components['progress_bar'], 'layout'):
+            ui_components['progress_bar'].layout.visibility = 'hidden'
     
-    # Reset button states
-    if 'preprocess_button' in ui_components and hasattr(ui_components['preprocess_button'], 'disabled'):
+    # Reset progress labels
+    for label_key in ['overall_label', 'step_label', 'current_progress']:
+        if label_key in ui_components and hasattr(ui_components[label_key], 'value'):
+            ui_components[label_key].value = ""
+            if hasattr(ui_components[label_key], 'layout'):
+                ui_components[label_key].layout.visibility = 'hidden'
+    
+    # Enable preprocessing button
+    if 'preprocess_button' in ui_components:
         ui_components['preprocess_button'].disabled = False
     
-    if 'stop_button' in ui_components and hasattr(ui_components['stop_button'], 'disabled'):
+    # Disable stop button
+    if 'stop_button' in ui_components:
         ui_components['stop_button'].disabled = True
     
-    if 'reset_button' in ui_components and hasattr(ui_components['reset_button'], 'disabled'):
-        ui_components['reset_button'].disabled = False
+    # Update status panel
+    update_status_panel(ui_components, 'idle')
     
-    if 'cleanup_button' in ui_components and hasattr(ui_components['cleanup_button'], 'disabled'):
-        ui_components['cleanup_button'].disabled = False
+    # Log reset
+    if 'log_message' in ui_components and callable(ui_components['log_message']):
+        ui_components['log_message']("UI telah direset ke state awal", "info", "🔄")
+
+def update_ui_state(ui_components: Dict[str, Any], state: str, message: Optional[str] = None) -> None:
+    """
+    Update seluruh UI berdasarkan state.
     
-    if 'save_button' in ui_components and hasattr(ui_components['save_button'], 'disabled'):
-        ui_components['save_button'].disabled = False
+    Args:
+        ui_components: Dictionary komponen UI
+        state: State baru (idle, running, success, error)
+        message: Pesan opsional untuk ditampilkan
+    """
+    # Update status panel
+    update_status_panel(ui_components, state, message)
     
-    # Reset flags
-    ui_components['preprocessing_running'] = False
+    # Handle button states
+    if state == 'running':
+        # Disable preprocessing button
+        if 'preprocess_button' in ui_components:
+            ui_components['preprocess_button'].disabled = True
+        
+        # Enable stop button
+        if 'stop_button' in ui_components:
+            ui_components['stop_button'].disabled = False
+            
+        # Disable save button
+        if 'save_button' in ui_components:
+            ui_components['save_button'].disabled = True
+            
+        # Disable reset button
+        if 'reset_button' in ui_components:
+            ui_components['reset_button'].disabled = True
+            
+    elif state in ['idle', 'success', 'error']:
+        # Enable preprocessing button
+        if 'preprocess_button' in ui_components:
+            ui_components['preprocess_button'].disabled = False
+        
+        # Disable stop button
+        if 'stop_button' in ui_components:
+            ui_components['stop_button'].disabled = True
+            
+        # Enable save button
+        if 'save_button' in ui_components:
+            ui_components['save_button'].disabled = False
+            
+        # Enable reset button
+        if 'reset_button' in ui_components:
+            ui_components['reset_button'].disabled = False
     
-    # Log reset berhasil
-    log_message(ui_components, "UI reset setelah preprocessing", "debug", "🔄")
+    # Log state change
+    if 'log_message' in ui_components and callable(ui_components['log_message']):
+        log_message = f"UI state diubah ke {state}"
+        if message:
+            log_message += f": {message}"
+        ui_components['log_message'](log_message, "debug", "🔄")
 
 def update_ui_before_preprocessing(ui_components: Dict[str, Any]) -> None:
     """

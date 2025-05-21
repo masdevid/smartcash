@@ -37,6 +37,12 @@ from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
     disable_ui_during_processing
 )
 
+# Import NotificationManager
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import (
+    NotificationManager,
+    get_notification_manager
+)
+
 __all__ = [
     # Logger helper
     'log_message',
@@ -66,5 +72,9 @@ __all__ = [
     'notify_process_complete',
     'notify_process_error',
     'notify_process_stop',
-    'disable_ui_during_processing'
+    'disable_ui_during_processing',
+    
+    # Notification manager
+    'NotificationManager',
+    'get_notification_manager'
 ]

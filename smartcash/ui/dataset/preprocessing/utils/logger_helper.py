@@ -10,6 +10,8 @@ from smartcash.ui.utils.ui_logger import create_ui_logger
 
 # Konstanta untuk namespace logger
 PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
+# Konstanta untuk display name logger di UI
+PREPROCESSING_DISPLAY_NAME = "PREPROCESSING"
 
 def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -25,10 +27,15 @@ def setup_ui_logger(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         # Setup logger dengan namespace yang sudah didefine
         logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
         ui_components['logger'] = logger
+        ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
         
-        # Setup UI logger
+        # Setup UI logger dengan namespace dan display name spesifik
         if 'log_output' in ui_components:
-            ui_logger = create_ui_logger(ui_components, PREPROCESSING_LOGGER_NAMESPACE)
+            ui_logger = create_ui_logger(
+                ui_components, 
+                PREPROCESSING_LOGGER_NAMESPACE,
+                display_name=PREPROCESSING_DISPLAY_NAME
+            )
             ui_components['ui_logger'] = ui_logger
             
         # Setup log_message function
@@ -51,9 +58,11 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = 'info'
         # Fallback ke logger baru
         logger = get_logger(PREPROCESSING_LOGGER_NAMESPACE)
         ui_components['logger'] = logger
+        ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
     
-    # Format pesan dengan icon
+    # Format pesan dengan icon dan namespace
     formatted_message = f"{icon} {message}" if icon else message
+    prefixed_message = f"[{PREPROCESSING_DISPLAY_NAME}] {formatted_message}"
     
     # Log ke logger
     if level == 'debug':
@@ -71,7 +80,14 @@ def log_message(ui_components: Dict[str, Any], message: str, level: str = 'info'
     
     # Log ke UI widget jika ada
     if 'log_output' in ui_components and hasattr(ui_components['log_output'], 'append_log'):
-        ui_components['log_output'].append_log(formatted_message, level)
+        # Pastikan namespace terlihat di UI log
+        module_name = ui_components.get('module_name', 'preprocessing')
+        ui_components['log_output'].append_log(
+            message=formatted_message, 
+            level=level, 
+            namespace=PREPROCESSING_LOGGER_NAMESPACE,
+            module=module_name
+        )
 
 def is_initialized(ui_components: Dict[str, Any]) -> bool:
     """

@@ -14,7 +14,7 @@ from smartcash.ui.utils.ui_logger import create_ui_logger
 # Konstanta untuk namespace logger
 PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
 # Konstanta untuk ID namespace di UI
-MODULE_LOGGER_NAME = "DATASET-PREPROCESSING"
+MODULE_LOGGER_NAME = "PREPROCESSING"
 
 # Import utils yang dibutuhkan untuk inisialisasi
 from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message, is_initialized
@@ -67,9 +67,8 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         ui_components = create_preprocessing_ui_components(dataset_config)
         
         # Setup logger dengan namespace spesifik
-        logger = create_ui_logger(ui_components, PREPROCESSING_LOGGER_NAMESPACE)
-        ui_components['logger'] = logger
-        ui_components['logger_namespace'] = PREPROCESSING_LOGGER_NAMESPACE
+        from smartcash.ui.dataset.preprocessing.utils.logger_helper import setup_ui_logger
+        ui_components = setup_ui_logger(ui_components)
         ui_components['preprocessing_initialized'] = True
         
         # Tambahkan flag untuk tracking status
@@ -79,6 +78,10 @@ def initialize_dataset_preprocessing_ui(env=None, config=None) -> Any:
         
         # Setup handlers
         ui_components = setup_preprocessing_handlers(ui_components, env, dataset_config)
+        
+        # Log bahwa inisialisasi berhasil
+        from smartcash.ui.dataset.preprocessing.utils.logger_helper import log_message
+        log_message(ui_components, "UI preprocessing dataset berhasil diinisialisasi", "info", "✅")
         
         # Return main UI widget
         return ui_components['ui']

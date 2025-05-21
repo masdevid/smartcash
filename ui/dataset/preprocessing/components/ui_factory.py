@@ -50,68 +50,97 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         "Konfigurasi preprocessing dataset", "info"
     )
     
-    # Opsi preprocessing (resolusi, normalisasi, dll)
+    # Dropdown untuk split dataset (ditampilkan di preprocessing_options)
     preprocess_options = create_preprocessing_options(config)
     
-    # Opsi validasi
-    validation_options = create_validation_options(
-        title="Opsi Validasi",
-        description="Pilih opsi validasi yang akan dijalankan selama preprocessing",
-        options=[
-            ("Validasi format gambar", "validate_image_format", True),
-            ("Validasi label format", "validate_label_format", True),
-            ("Validasi dimensi gambar", "validate_image_dimensions", True),
-            ("Validasi bounding box", "validate_bounding_box", True)
-        ],
-        width="100%",
-        icon="validation"
-    )
+    # Opsi validasi preprocessing
+    validation_options = create_validation_options(config)
     
-    # Accordion untuk opsi validasi (selalu tertutup di awal)
-    advanced_accordion = widgets.Accordion(
-        children=[validation_options['container']], 
-        selected_index=None
-    )
-    advanced_accordion.set_title(0, f"{ICONS['search']} Validation Options")
-    
-    # Tombol save dan reset
-    save_reset_buttons = create_save_reset_buttons(
-        save_label="Simpan",
-        reset_label="Reset",
-        save_tooltip="Simpan konfigurasi preprocessing dan sinkronkan ke Google Drive",
-        reset_tooltip="Reset konfigurasi preprocessing ke default",
-        save_icon="save",
-        reset_icon="reset",
-        with_sync_info=False,
-        button_width="100px",
-        container_width="100%"
-    )
-    
-    # Pesan sinkronisasi
-    sync_info = create_sync_info_message(
-        message="Konfigurasi akan otomatis disinkronkan dengan Google Drive saat disimpan.",
-        icon="info",
-        color="#666",
-        font_style="italic",
-        margin_top="5px",
-        width="100%"
-    )
-    
-    # Tombol aksi (run, stop, cleanup)
+    # Tombol aksi
     action_buttons = create_action_buttons(
-        primary_label="Run Preprocessing",
-        primary_icon="cog",
-        cleanup_enabled=True
+        "Preprocess Dataset",
+        "Berhenti",
+        "Hapus Data",
+        "Jalankan preprocessing dataset",
+        "Hentikan operasi yang berjalan",
+        "Hapus semua data preprocessing",
+        primary_button_style="success",
+        stop_button_style="warning",
+        cleanup_button_style="danger"
     )
     
-    # Area konfirmasi
+    # Tombol save & reset
+    save_reset_buttons = create_save_reset_buttons()
+    
+    # Info sinkronisasi
+    sync_info = create_sync_info_message()
+    
+    # Advanced options accordion
+    advanced_accordion = widgets.Accordion(
+        children=[
+            widgets.VBox([
+                widgets.HTML(f"<h5 style='margin-bottom: 10px; color: {COLORS['dark']};'>{ICONS['config']} Opsi Lanjutan</h5>"),
+                widgets.HTML(f"<div style='margin-bottom: 8px;'><b>Worker Thread:</b> Jumlah thread yang digunakan untuk preprocessing</div>"),
+                widgets.IntSlider(
+                    value=config.get('num_workers', 4),
+                    min=1,
+                    max=8,
+                    step=1,
+                    description='Workers:',
+                    style={'description_width': '80px'},
+                    layout=widgets.Layout(width='95%', margin='5px 0')
+                ),
+                widgets.HTML(f"<div style='margin: 8px 0;'><b>Target Split:</b> Pemilihan bagian dataset yang akan diproses</div>"),
+                create_split_selector(
+                    selected=config.get('split', 'all'),
+                    description="Split:",
+                    layout=widgets.Layout(width='95%', margin='5px 0')
+                )
+            ], layout=widgets.Layout(padding='10px 5px'))
+        ],
+        layout=widgets.Layout(width='100%', margin='10px 0')
+    )
+    
+    # Set judul accordion
+    advanced_accordion.set_title(0, f"{ICONS['settings']} Opsi Lanjutan Preprocessing")
+    
+    # Tambahkan worker dan target split ke UI utama, bukan di dalam accordion
+    worker_slider = widgets.IntSlider(
+        value=config.get('num_workers', 4),
+        min=1,
+        max=8,
+        step=1,
+        description='Workers:',
+        style={'description_width': '80px'},
+        layout=widgets.Layout(width='95%', margin='5px 0')
+    )
+    
+    target_split = create_split_selector(
+        selected=config.get('split', 'all'),
+        description="Split:",
+        layout=widgets.Layout(width='95%', margin='5px 0')
+    )
+    
+    # UI untuk menampilkan advanced options di kolom kedua
+    advanced_options_column = widgets.VBox([
+        widgets.HTML(f"<h5 style='margin-bottom: 10px; color: {COLORS['dark']};'>{ICONS['config']} Opsi Preprocessing</h5>"),
+        widgets.HTML(f"<div style='margin-bottom: 8px;'><b>Worker Thread:</b> Jumlah thread untuk preprocessing</div>"),
+        worker_slider,
+        widgets.HTML(f"<div style='margin: 8px 0;'><b>Target Split:</b> Bagian dataset yang akan diproses</div>"),
+        target_split
+    ], layout=widgets.Layout(padding='10px 5px', width='48%'))
+    
+    # Area konfirmasi dengan styling yang lebih baik
     confirmation_area = widgets.Output(
         layout=widgets.Layout(
             width='100%', 
-            margin='10px 0',
+            margin='15px 0',
+            min_height='150px',
+            height='auto',
             border='1px solid #ddd',
             padding='10px',
-            display='none'  # Hidden by default
+            visibility='visible',  # Visible by default
+            display='block'  # Display block by default
         )
     )
     
@@ -133,20 +162,25 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
     # Help panel
     help_panel = get_preprocessing_info()
     
+    # Layout 2 kolom untuk input options
+    options_container = widgets.HBox([
+        preprocess_options,
+        advanced_options_column
+    ], layout=widgets.Layout(width='100%', margin='10px 0'))
+    
     # Rakit komponen UI utama
     ui = widgets.VBox([
         header,
         status_panel,
         widgets.HTML(f"<h4 style='color: {COLORS['dark']}; margin-top: 15px; margin-bottom: 10px;'>{ICONS['settings']} Preprocessing Settings</h4>"),
-        preprocess_options,
-        advanced_accordion,
+        options_container,  # 2 kolom untuk options
         widgets.VBox([
             save_reset_buttons['container'],
             sync_info['container']
         ], layout=widgets.Layout(align_items='flex-end', width='100%')),
         create_divider(),
         action_buttons['container'],
-        confirmation_area,  # Area konfirmasi di bawah tombol
+        confirmation_area,  # Area konfirmasi di bawah tombol aksi
         progress_components['progress_container'],
         log_components['log_accordion'],
         help_panel
@@ -159,8 +193,9 @@ def create_preprocessing_ui_components(config: Optional[Dict[str, Any]] = None) 
         'status_panel': status_panel,
         'preprocess_options': preprocess_options,
         'validation_options': validation_options,
-        'split_selector': preprocess_options.target_split,
+        'split_selector': target_split,  # Gunakan split selector dari kolom kedua
         'advanced_accordion': advanced_accordion,
+        'worker_slider': worker_slider,  # Referensi langsung ke worker slider
         'preprocess_button': action_buttons['primary_button'],
         'stop_button': action_buttons['stop_button'],
         'cleanup_button': action_buttons['cleanup_button'],

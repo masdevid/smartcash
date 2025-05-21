@@ -14,7 +14,7 @@ from smartcash.ui.utils.ui_logger import create_ui_logger
 # Konstanta untuk namespace logger
 DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
 # Konstanta untuk ID namespace di UI
-MODULE_LOGGER_NAME = "DATASET-DOWNLOAD"
+MODULE_LOGGER_NAME = "DATASET"
 
 # Import handlers dengan nama yang lebih spesifik untuk menghindari konflik
 from smartcash.ui.dataset.download.handlers.download_handler import handle_download_button_click

@@ -48,54 +48,62 @@ from smartcash.ui.dataset.preprocessing.utils.ui_observers import (
     MockObserverManager
 )
 
-# Ekspor handler utama
-from smartcash.ui.dataset.preprocessing.handlers.preprocessing_handler import (
+# Ekspor notification manager
+from smartcash.ui.dataset.preprocessing.utils.notification_manager import (
+    NotificationManager,
+    get_notification_manager
+)
+
+# Ekspor handler yang dipecah menjadi modul-modul yang lebih kecil
+from smartcash.ui.dataset.preprocessing.handlers import (
+    # Button handlers
     handle_preprocessing_button_click,
-    execute_preprocessing,
+    
+    # Config handlers
     get_preprocessing_config_from_ui,
-    confirm_preprocessing
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.stop_handler import (
+    update_ui_from_config,
+    
+    # Confirmation handlers
+    confirm_preprocessing,
+    
+    # Execution handlers
+    execute_preprocessing,
+    
+    # Stop handlers
     handle_stop_button_click,
-    stop_preprocessing
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.reset_handler import (
+    stop_preprocessing,
+    
+    # Reset handlers
     handle_reset_button_click,
-    reset_preprocessing_config
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import (
+    reset_preprocessing_config,
+    
+    # Cleanup handlers
     handle_cleanup_button_click,
     execute_cleanup,
     cleanup_preprocessed_files,
-    start_progress,
-    reset_ui_after_cleanup
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.save_handler import (
+    
+    # Save handlers
     handle_save_button_click,
-    save_preprocessing_config
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.config_handler import (
-    update_ui_from_config
-)
-
-from smartcash.ui.dataset.preprocessing.handlers.setup_handlers import (
+    save_preprocessing_config,
+    
+    # Setup handlers
     setup_preprocessing_handlers
 )
 
+# Ekspor dari utils atau handlers yang dibutuhkan
+from smartcash.ui.dataset.preprocessing.handlers.cleanup_handler import reset_ui_after_cleanup
+
 __all__ = [
-    # Inisialisasi
+    # Fungsi inisialisasi
     'initialize_dataset_preprocessing_ui',
     'initialize_preprocessing_ui',
     
-    # Logging dan UI State
+    # Utilitas logging
     'log_message',
     'is_initialized',
     'setup_ui_logger',
+    
+    # Utilitas UI state
     'update_status_panel',
     'update_ui_state',
     'reset_ui_after_preprocessing',
@@ -106,14 +114,14 @@ __all__ = [
     'ensure_confirmation_area',
     'reset_after_operation',
     
-    # Progress
+    # Utilitas progress
     'update_progress',
     'reset_progress_bar',
     'start_progress',
     'complete_progress',
     'create_progress_callback',
     
-    # Observer
+    # Utilitas observer
     'register_ui_observers',
     'notify_process_start',
     'notify_process_complete',
@@ -121,33 +129,41 @@ __all__ = [
     'notify_process_stop',
     'MockObserverManager',
     
-    # Handlers - Preprocessing
+    # Notification manager
+    'NotificationManager',
+    'get_notification_manager',
+    
+    # Button handlers
     'handle_preprocessing_button_click',
-    'execute_preprocessing',
+    
+    # Config handlers
     'get_preprocessing_config_from_ui',
+    'update_ui_from_config',
+    
+    # Confirmation handlers
     'confirm_preprocessing',
     
-    # Handlers - Stop
+    # Execution handlers
+    'execute_preprocessing',
+    
+    # Stop handlers
     'handle_stop_button_click',
     'stop_preprocessing',
     
-    # Handlers - Reset
+    # Reset handlers
     'handle_reset_button_click',
     'reset_preprocessing_config',
     
-    # Handlers - Cleanup
+    # Cleanup handlers
     'handle_cleanup_button_click',
     'execute_cleanup',
     'cleanup_preprocessed_files',
     'reset_ui_after_cleanup',
     
-    # Handlers - Save
+    # Save handlers
     'handle_save_button_click',
     'save_preprocessing_config',
     
-    # Handlers - Config
-    'update_ui_from_config',
-    
-    # Handlers - Setup
+    # Setup handlers
     'setup_preprocessing_handlers'
 ]

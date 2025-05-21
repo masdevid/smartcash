@@ -6,7 +6,8 @@ Deskripsi: Komponen log accordion yang dapat digunakan kembali
 import ipywidgets as widgets
 from typing import Dict, Any, Optional
 from IPython.display import display
-from smartcash.ui.utils.constants import ICONS
+from smartcash.ui.utils.constants import ICONS, COLORS
+import datetime
 
 def create_log_accordion(
     module_name: str = 'process',
@@ -36,6 +37,51 @@ def create_log_accordion(
                 padding='10px'
             )
         )
+    
+    # Tambahkan metode append_log sebagai custom method ke output_widget
+    def append_log(message: str, level: str = 'info', namespace: str = None, module: str = None) -> None:
+        """
+        Menambahkan log dengan format yang rapi.
+        
+        Args:
+            message: Pesan yang akan ditampilkan
+            level: Level log (debug, info, warning, error, critical)
+            namespace: Namespace logger (opsional)
+            module: Nama modul (opsional)
+        """
+        # Map level ke warna
+        level_to_color = {
+            'debug': '#6c757d',   # Abu-abu
+            'info': '#007bff',    # Biru
+            'success': '#28a745', # Hijau
+            'warning': '#ffc107', # Kuning
+            'error': '#dc3545',   # Merah
+            'critical': '#dc3545' # Merah
+        }
+        
+        # Waktu saat ini
+        now = datetime.datetime.now().strftime("%H:%M:%S")
+        
+        # Format namespace atau module
+        prefix = ""
+        if namespace:
+            prefix = f"<span style='color: #6610f2;'>[{namespace.split('.')[-1]}]</span> "
+        elif module:
+            prefix = f"<span style='color: #6610f2;'>[{module}]</span> "
+        
+        # Format level
+        level_color = level_to_color.get(level, '#007bff')
+        level_display = f"<span style='color: {level_color};'>{level.upper()}</span>"
+        
+        # Format pesan lengkap
+        formatted_message = f"<span style='color: #666;'>{now}</span> {level_display} {prefix}{message}"
+        
+        # Tambahkan ke output
+        with output_widget:
+            display(widgets.HTML(formatted_message))
+    
+    # Tambahkan metode append_log ke output_widget
+    output_widget.append_log = append_log
     
     # Buat accordion untuk log
     log_accordion = widgets.Accordion(

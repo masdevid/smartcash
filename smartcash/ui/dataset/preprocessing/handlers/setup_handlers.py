@@ -24,6 +24,12 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     # Setup logger jika belum
     ui_components = setup_ui_logger(ui_components)
     
+    # Log awal inisialisasi
+    log_message(ui_components, "Memulai setup handlers untuk preprocessing", "debug", "��")
+    
+    # Setup notification manager
+    _setup_notification_manager(ui_components)
+    
     # Setup observer untuk menerima event notifikasi
     _setup_observers(ui_components)
     
@@ -84,6 +90,23 @@ def setup_preprocessing_handlers(ui_components: Dict[str, Any], env=None, config
     log_message(ui_components, "Preprocessing handlers berhasil diinisialisasi", "success", "✅")
     
     return ui_components
+
+def _setup_notification_manager(ui_components: Dict[str, Any]) -> None:
+    """
+    Setup notification manager untuk UI preprocessing.
+    """
+    try:
+        # Import notification manager
+        from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+        
+        # Inisialisasi notification manager
+        notification_manager = get_notification_manager(ui_components)
+        
+        # Log setup berhasil
+        log_message(ui_components, "NotificationManager berhasil diinisialisasi", "debug", "✅")
+    except Exception as e:
+        # Log error jika gagal setup notification manager
+        log_message(ui_components, f"Error saat setup NotificationManager: {str(e)}", "warning", "⚠️")
 
 def _setup_observers(ui_components: Dict[str, Any]) -> None:
     """Setup observer handlers untuk sistem notifikasi."""

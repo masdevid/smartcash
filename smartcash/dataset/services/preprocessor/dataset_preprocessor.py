@@ -344,3 +344,32 @@ class DatasetPreprocessor:
         """Cek apakah split sudah dipreprocess."""
         split_path = self.storage.get_split_path(split)
         return split_path.exists() and len(list(split_path.glob('**/*.jpg'))) > 0
+
+    def _notify_progress(self, progress: float, total: float, message: str, **kwargs) -> None:
+        """
+        Notifikasi progress melalui callback.
+        
+        Args:
+            progress: Progress saat ini
+            total: Total progress
+            message: Pesan progress
+            **kwargs: Parameter tambahan
+        """
+        if self._progress_callback and callable(self._progress_callback):
+            try:
+                # Set parameter status jika tidak ada
+                params = {
+                    'progress': progress,
+                    'total': total,
+                    'message': message,
+                    'status': kwargs.get('status', 'info'),
+                    'step': kwargs.get('step', 'progress'),
+                }
+                
+                # Tambahkan parameter untuk service notification system
+                params.update(kwargs)
+                
+                # Jalankan callback
+                self._progress_callback(**params)
+            except Exception as e:
+                self.logger.warning(f"Error pada progress callback: {str(e)}")

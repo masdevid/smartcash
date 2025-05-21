@@ -32,14 +32,12 @@ def handle_stop_button_click(button: Any, ui_components: Dict[str, Any]) -> None
         # Log stop preprocessing
         log_message(ui_components, "Menghentikan preprocessing dataset...", "warning", "⏹️")
         
-        # Update UI state
-        update_status_panel(ui_components, "warning", "Menghentikan preprocessing...")
+        # Get notification manager
+        from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+        notification_manager = get_notification_manager(ui_components)
         
-        # Tambah flag stop request
-        ui_components['stop_requested'] = True
-        
-        # Notify process stop
-        notify_process_stop(ui_components, "Stop oleh pengguna")
+        # Notify process stop menggunakan notification manager
+        notification_manager.notify_process_stop("Stop oleh pengguna")
         
         # Reset state preprocessing
         stop_preprocessing(ui_components)
@@ -68,8 +66,14 @@ def stop_preprocessing(ui_components: Dict[str, Any]) -> None:
     # Reset state preprocessing
     set_preprocessing_state(ui_components, False)
     
-    # Update UI state
-    update_ui_state(ui_components, "warning", "Preprocessing dihentikan oleh pengguna")
+    # Update UI state menggunakan notification manager
+    try:
+        from smartcash.ui.dataset.preprocessing.utils.notification_manager import get_notification_manager
+        notification_manager = get_notification_manager(ui_components)
+        notification_manager.update_status("warning", "Preprocessing dihentikan oleh pengguna")
+    except Exception:
+        # Fallback ke update_ui_state jika notification manager tidak tersedia
+        update_ui_state(ui_components, "warning", "Preprocessing dihentikan oleh pengguna")
     
     # Reset UI setelah operasi
     reset_after_operation(ui_components)

@@ -302,6 +302,11 @@ def show_confirmation(ui_components: Dict[str, Any], title: str, message: str,
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):
         ui_components['confirmation_area'].clear_output()
     
+    # Pastikan area konfirmasi visible
+    if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'layout'):
+        ui_components['confirmation_area'].layout.display = 'block'
+        ui_components['confirmation_area'].layout.visibility = 'visible'
+    
     # Tampilkan dialog konfirmasi
     with ui_components['confirmation_area']:
         dialog = create_confirmation_dialog(
@@ -331,6 +336,9 @@ def reset_after_operation(ui_components: Dict[str, Any], button: Any = None) -> 
     
     # Update status panel
     update_status_panel(ui_components, 'idle', "Siap untuk memulai preprocessing baru")
+    
+    # Log reset completion
+    log_message(ui_components, "UI telah direset, siap untuk operasi baru", "info", "🔄")
     
     # Bersihkan area konfirmasi
     if 'confirmation_area' in ui_components and hasattr(ui_components['confirmation_area'], 'clear_output'):

@@ -102,3 +102,78 @@ def disable_ui_during_processing(ui_components: Dict[str, Any], disable: bool = 
     # Tampilkan tombol augment jika proses tidak sedang berjalan, sembunyikan jika sedang berjalan
     if 'augment_button' in ui_components and hasattr(ui_components['augment_button'], 'layout'):
         ui_components['augment_button'].layout.display = 'none' if disable else 'block'
+
+def register_ui_observers(ui_components: Dict[str, Any]) -> Any:
+    """
+    Register UI observers untuk notifikasi proses augmentasi.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Observer manager instance
+    """
+    try:
+        # Coba import observer manager
+        from smartcash.components.observer import ObserverManager
+        
+        # Buat observer manager jika belum ada
+        if 'observer_manager' not in ui_components:
+            observer_manager = ObserverManager()
+            ui_components['observer_manager'] = observer_manager
+        else:
+            observer_manager = ui_components['observer_manager']
+        
+        # Setup observer group untuk augmentasi
+        observer_group = 'augmentation_observers'
+        ui_components['observer_group'] = observer_group
+        
+        # Register observer callbacks
+        def on_process_start(event_type: str, data: Dict[str, Any]):
+            notify_process_start(ui_components, event_type, data.get('display_info', ''), data.get('split'))
+        
+        def on_process_complete(event_type: str, data: Dict[str, Any]):
+            notify_process_complete(ui_components, data, data.get('display_info', ''))
+        
+        def on_process_error(event_type: str, data: str):
+            notify_process_error(ui_components, data)
+        
+        def on_process_stop(event_type: str, data: Any = None):
+            notify_process_stop(ui_components)
+        
+        # Register callbacks ke observer manager
+        observer_manager.register(observer_group, 'process_start', on_process_start)
+        observer_manager.register(observer_group, 'process_complete', on_process_complete)
+        observer_manager.register(observer_group, 'process_error', on_process_error)
+        observer_manager.register(observer_group, 'process_stop', on_process_stop)
+        
+        return observer_manager
+        
+    except ImportError:
+        # Fallback jika observer manager tidak tersedia
+        from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+        log_message(ui_components, "Observer manager tidak tersedia, menggunakan fallback", "warning", "⚠️")
+        
+        # Buat mock observer manager
+        class MockObserverManager:
+            def register(self, group: str, event: str, callback): pass
+            def notify(self, event: str, data: Any = None): pass
+            def unregister_group(self, group: str): pass
+        
+        ui_components['observer_manager'] = MockObserverManager()
+        return ui_components['observer_manager']
+
+class MockObserverManager:
+    """Mock observer manager untuk fallback."""
+    
+    def register(self, group: str, event: str, callback):
+        """Mock register method."""
+        pass
+    
+    def notify(self, event: str, data: Any = None):
+        """Mock notify method."""
+        pass
+    
+    def unregister_group(self, group: str):
+        """Mock unregister method."""
+        pass

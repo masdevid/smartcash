@@ -1,6 +1,6 @@
 """
 File: smartcash/ui/dataset/augmentation/augmentation_initializer.py
-Deskripsi: Initializer untuk UI augmentasi dataset yang mengikuti pola dataset download
+Deskripsi: Initializer untuk UI augmentasi dataset dengan imports yang diperbaiki
 """
 
 from typing import Dict, Any, Optional
@@ -24,9 +24,8 @@ from smartcash.ui.dataset.augmentation.utils.ui_observers import register_ui_obs
 from smartcash.ui.dataset.augmentation.utils.ui_state_manager import update_status_panel, reset_ui_after_augmentation
 from smartcash.ui.dataset.augmentation.utils.progress_manager import reset_progress_bar
 
-# Import modul untuk setup
-from smartcash.ui.dataset.augmentation.handlers.setup_handlers import setup_augmentation_handlers
-from smartcash.ui.dataset.augmentation.components import create_augmentation_ui
+# Import komponen UI
+from smartcash.ui.dataset.augmentation.components.augmentation_component import create_augmentation_ui
 
 # Flag global untuk mencegah inisialisasi ulang
 _AUGMENTATION_MODULE_INITIALIZED = False
@@ -49,7 +48,7 @@ def initialize_dataset_augmentation_ui(env=None, config=None) -> Any:
     
     # Hindari multiple inisialisasi yang tidak perlu
     if _AUGMENTATION_MODULE_INITIALIZED:
-        logger.debug("UI augmentasi dataset sudah diinisialisasi sebelumnya, menggunakan inisialisasi yang sudah ada")
+        logger.debug("UI augmentasi dataset sudah diinisialisasi sebelumnya")
     else:
         logger.info("Memulai inisialisasi UI augmentasi dataset")
         _AUGMENTATION_MODULE_INITIALIZED = True
@@ -59,18 +58,25 @@ def initialize_dataset_augmentation_ui(env=None, config=None) -> Any:
         config_manager = get_config_manager()
         
         # Get augmentation config dari SimpleConfigManager
-        augmentation_config = config_manager.get_module_config('augmentation')
+        try:
+            augmentation_config = config_manager.get_module_config('augmentation')
+        except Exception as e:
+            logger.warning(f"Gagal memuat konfigurasi augmentasi: {str(e)}")
+            augmentation_config = {}
         
         # Merge dengan config yang diberikan
         if config:
-            augmentation_config.update(config)
+            if isinstance(augmentation_config, dict):
+                augmentation_config.update(config)
+            else:
+                augmentation_config = config
             
         # Create UI components
-        ui_components = create_augmentation_ui(augmentation_config)
+        ui_components = create_augmentation_ui(env, augmentation_config)
         
         # Setup logger dengan namespace spesifik
-        logger = create_ui_logger(ui_components, AUGMENTATION_LOGGER_NAMESPACE)
-        ui_components['logger'] = logger
+        ui_logger = create_ui_logger(ui_components, AUGMENTATION_LOGGER_NAMESPACE)
+        ui_components['logger'] = ui_logger
         ui_components['logger_namespace'] = AUGMENTATION_LOGGER_NAMESPACE
         ui_components['augmentation_initialized'] = True
         
@@ -82,18 +88,11 @@ def initialize_dataset_augmentation_ui(env=None, config=None) -> Any:
         
     except Exception as e:
         logger.error(f"Error saat inisialisasi UI: {str(e)}")
-        # Hanya tampilkan log di UI jika bukan saat dependency installer
-        try:
-            # Buat temporary ui_components untuk log error
-            temp_ui_components = {'logger': logger, 'logger_namespace': AUGMENTATION_LOGGER_NAMESPACE}
-            log_message(temp_ui_components, f"Error saat inisialisasi UI: {str(e)}", "error")
-        except:
-            pass
         raise
 
 def initialize_augmentation_ui(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    Inisialisasi UI augmentasi dataset.
+    Inisialisasi UI augmentasi dataset dengan handlers lengkap.
     
     Args:
         config: Konfigurasi UI (opsional)
@@ -117,49 +116,116 @@ def initialize_augmentation_ui(config: Optional[Dict[str, Any]] = None) -> Dict[
         # Get config dari SimpleConfigManager jika config tidak diberikan
         if config is None:
             config_manager = get_config_manager()
-            config = config_manager.get_module_config('augmentation')
+            try:
+                config = config_manager.get_module_config('augmentation')
+            except Exception as e:
+                logger.warning(f"Gagal memuat konfigurasi dari SimpleConfigManager: {str(e)}")
+                config = {}
     except Exception as e:
-        logger.warning(f"Gagal memuat konfigurasi dari SimpleConfigManager: {str(e)}")
-        # Gunakan config kosong sebagai fallback
+        logger.warning(f"Error config manager: {str(e)}")
         config = {}
     
     # Buat UI components
-    ui_components = create_augmentation_ui(config)
+    ui_components = create_augmentation_ui(None, config)
     
     # Setup logger dengan namespace spesifik
-    logger = create_ui_logger(ui_components, AUGMENTATION_LOGGER_NAMESPACE)
-    ui_components['logger'] = logger
+    ui_logger = create_ui_logger(ui_components, AUGMENTATION_LOGGER_NAMESPACE)
+    ui_components['logger'] = ui_logger
     ui_components['logger_namespace'] = AUGMENTATION_LOGGER_NAMESPACE
     ui_components['augmentation_initialized'] = True
     
     # Tambahkan flag untuk tracking status
     ui_components['augmentation_running'] = False
     ui_components['cleanup_running'] = False
+    ui_components['stop_requested'] = False
     
     # Register observer untuk notifikasi
-    observer_manager = register_ui_observers(ui_components)
-    ui_components['observer_manager'] = observer_manager
+    try:
+        observer_manager = register_ui_observers(ui_components)
+        ui_components['observer_manager'] = observer_manager
+    except Exception as e:
+        logger.warning(f"Gagal setup observer: {str(e)}")
     
-    # Tambahkan handler untuk tombol
-    ui_components['augment_button'].on_click(
-        lambda b: handle_augmentation_button_click(ui_components, b)
-    )
+    # Setup handlers untuk tombol
+    _setup_button_handlers(ui_components)
     
+    logger.info("UI augmentasi dataset berhasil diinisialisasi")
+    
+    return ui_components
+
+def setup_augmentation_handlers(ui_components: Dict[str, Any], env=None, config=None) -> Dict[str, Any]:
+    """
+    Setup handler untuk komponen UI augmentasi dataset.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        env: Environment manager
+        config: Konfigurasi aplikasi
+        
+    Returns:
+        Dictionary UI components yang telah diupdate
+    """
+    # Setup logger jika belum
+    if 'logger' not in ui_components:
+        ui_components['logger'] = get_logger(AUGMENTATION_LOGGER_NAMESPACE)
+        ui_components['logger_namespace'] = AUGMENTATION_LOGGER_NAMESPACE
+        ui_components['augmentation_initialized'] = True
+    
+    # Setup observer untuk notifikasi
+    try:
+        observer_manager = register_ui_observers(ui_components)
+        ui_components['observer_manager'] = observer_manager
+    except Exception as e:
+        ui_components['logger'].warning(f"Gagal setup observer: {str(e)}")
+    
+    # Setup handlers untuk UI events
+    _setup_button_handlers(ui_components)
+    
+    # Setup progress tracking
+    from smartcash.ui.dataset.augmentation.utils.progress_manager import setup_multi_progress
+    try:
+        setup_multi_progress(ui_components)
+    except Exception as e:
+        ui_components['logger'].warning(f"Error setup progress: {str(e)}")
+    
+    # Save config ke UI components
+    ui_components['config'] = config or {}
+    
+    # Load konfigurasi dan update UI jika ada
+    try:
+        if config and isinstance(config, dict):
+            from smartcash.ui.dataset.augmentation.handlers.config_handler import update_ui_from_config
+            update_ui_from_config(ui_components, config)
+    except Exception as e:
+        ui_components['logger'].warning(f"Gagal update UI dari config: {str(e)}")
+    
+    log_message(ui_components, "Augmentasi dataset handlers berhasil diinisialisasi", "success", "✅")
+    
+    return ui_components
+
+def _setup_button_handlers(ui_components: Dict[str, Any]) -> None:
+    """Setup handlers untuk tombol UI."""
+    
+    # Setup augmentation button
+    if 'augment_button' in ui_components:
+        ui_components['augment_button'].on_click(
+            lambda b: handle_augmentation_button_click(ui_components, b)
+        )
+    
+    # Setup cleanup button
     if 'cleanup_button' in ui_components:
         ui_components['cleanup_button'].on_click(
             lambda b: handle_cleanup_button_click(ui_components, b)
         )
     
+    # Setup reset button
     if 'reset_button' in ui_components:
         ui_components['reset_button'].on_click(
             lambda b: handle_reset_button_click(ui_components, b)
         )
     
+    # Setup save button
     if 'save_button' in ui_components:
         ui_components['save_button'].on_click(
             lambda b: handle_save_button_click(ui_components, b)
         )
-    
-    logger.info("UI augmentasi dataset berhasil diinisialisasi")
-    
-    return ui_components

@@ -1,11 +1,64 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/progress_manager.py
-Deskripsi: Manager progress bar untuk augmentasi dataset
+Deskripsi: Manager progress bar untuk augmentasi dataset (lengkap)
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
-from smartcash.ui.dataset.augmentation.utils.notification_manager import notify_progress
+
+def start_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Start progress tracking dengan pesan awal."""
+    # Reset progress bar terlebih dahulu
+    reset_progress_bar(ui_components)
+    
+    # Tampilkan progress container
+    show_progress(ui_components, message)
+    
+    # Set progress awal
+    update_progress(ui_components, 0, message)
+    
+    log_message(ui_components, f"📊 Progress dimulai: {message}", "info")
+
+def complete_progress(ui_components: Dict[str, Any], message: str) -> None:
+    """Complete progress dengan pesan akhir."""
+    # Set progress ke 100%
+    update_progress(ui_components, 100, message)
+    
+    # Log completion
+    log_message(ui_components, f"✅ Progress selesai: {message}", "success")
+    
+    # Sembunyikan progress setelah delay singkat
+    import time
+    time.sleep(1)
+    if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
+        ui_components['progress_container'].layout.display = 'none'
+
+def create_progress_callback(ui_components: Dict[str, Any]) -> Callable[[int, int, str], bool]:
+    """
+    Buat progress callback function.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Callback function yang mengembalikan True untuk continue, False untuk stop
+    """
+    def progress_callback(current: int, total: int, message: str = "") -> bool:
+        # Cek stop request
+        if ui_components.get('stop_requested', False):
+            log_message(ui_components, "⏹️ Stop request detected dalam progress callback", "warning")
+            return False
+        
+        # Hitung persentase
+        percentage = int((current / total) * 100) if total > 0 else 0
+        
+        # Update progress
+        progress_message = f"{message} ({current}/{total})" if message else f"Progress: {current}/{total}"
+        update_progress(ui_components, percentage, progress_message)
+        
+        return True
+    
+    return progress_callback
 
 def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
     """Reset progress bar ke kondisi awal."""
@@ -13,17 +66,21 @@ def reset_progress_bar(ui_components: Dict[str, Any]) -> None:
         if 'progress_bar' in ui_components and ui_components['progress_bar'] is not None:
             ui_components['progress_bar'].value = 0
             ui_components['progress_bar'].description = "Progress: 0%"
-            ui_components['progress_bar'].layout.visibility = 'hidden'
+            if hasattr(ui_components['progress_bar'], 'layout'):
+                ui_components['progress_bar'].layout.visibility = 'hidden'
         
-        for label_key in ['overall_label', 'step_label']:
+        for label_key in ['overall_label', 'step_label', 'progress_message']:
             if label_key in ui_components and ui_components[label_key] is not None:
                 ui_components[label_key].value = ""
-                ui_components[label_key].layout.visibility = 'hidden'
+                if hasattr(ui_components[label_key], 'layout'):
+                    ui_components[label_key].layout.visibility = 'hidden'
                 
         if 'current_progress' in ui_components and ui_components['current_progress'] is not None:
             ui_components['current_progress'].value = 0
             ui_components['current_progress'].description = "Step 0/0"
-            ui_components['current_progress'].layout.visibility = 'hidden'
+            if hasattr(ui_components['current_progress'], 'layout'):
+                ui_components['current_progress'].layout.visibility = 'hidden'
+                
     except Exception as e:
         log_message(ui_components, f"Gagal mereset progress bar: {str(e)}", "warning", "⚠️")
 
@@ -34,6 +91,7 @@ def show_progress(ui_components: Dict[str, Any], message: str) -> None:
     
     if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'value'):
         ui_components['progress_bar'].value = 0
+        ui_components['progress_bar'].description = "Progress: 0%"
         if hasattr(ui_components['progress_bar'], 'layout'):
             ui_components['progress_bar'].layout.visibility = 'visible'
     
@@ -49,12 +107,14 @@ def update_progress(ui_components: Dict[str, Any], value: int, message: Optional
     
     if 'progress_bar' in ui_components and hasattr(ui_components['progress_bar'], 'value'):
         ui_components['progress_bar'].value = value
+        ui_components['progress_bar'].description = f"Progress: {value}%"
     
     if message:
         for label_key in ['progress_message', 'step_label', 'overall_label']:
             if label_key in ui_components and hasattr(ui_components[label_key], 'value'):
                 ui_components[label_key].value = message
     
+    # Notify observer jika ada
     observer_manager = ui_components.get('observer_manager')
     if observer_manager:
         try:
@@ -76,6 +136,7 @@ def setup_multi_progress(ui_components: Dict[str, Any], tracking_keys: Optional[
     if 'progress_container' in ui_components and hasattr(ui_components['progress_container'], 'layout'):
         ui_components['progress_container'].layout.display = 'block'
     
+    # Add utility functions ke ui_components
     if not callable(ui_components.get('update_progress')):
         ui_components['update_progress'] = lambda value, message=None: update_progress(ui_components, value, message)
     
@@ -84,6 +145,12 @@ def setup_multi_progress(ui_components: Dict[str, Any], tracking_keys: Optional[
     
     if not callable(ui_components.get('show_progress')):
         ui_components['show_progress'] = lambda message: show_progress(ui_components, message)
+    
+    if not callable(ui_components.get('start_progress')):
+        ui_components['start_progress'] = lambda message: start_progress(ui_components, message)
+        
+    if not callable(ui_components.get('complete_progress')):
+        ui_components['complete_progress'] = lambda message: complete_progress(ui_components, message)
     
     return ui_components
 

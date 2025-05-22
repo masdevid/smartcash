@@ -1,19 +1,15 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_handler.py
-Deskripsi: Handler utama untuk proses augmentasi dataset dengan validasi dan koordinasi
+Deskripsi: Handler utama untuk proses augmentasi dataset tanpa threading (Colab compatible)
 """
 
-import threading
 from typing import Dict, Any, Optional
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from tqdm.auto import tqdm
-
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
 from smartcash.ui.dataset.augmentation.utils.validation_utils import validate_augmentation_parameters
 from smartcash.ui.dataset.augmentation.utils.ui_state_manager import (
     update_ui_before_augmentation, reset_ui_after_augmentation, 
-    is_augmentation_running, set_augmentation_state
+    is_augmentation_running, set_augmentation_state, show_confirmation
 )
 from smartcash.ui.dataset.augmentation.utils.progress_manager import (
     start_progress, update_progress, complete_progress
@@ -37,26 +33,35 @@ def handle_augmentation_button_click(ui_components: Dict[str, Any], button: Any 
         log_message(ui_components, "⚠️ Augmentasi sedang berjalan", "warning")
         return
     
-    # Set state running
-    set_augmentation_state(ui_components, True)
-    
-    # Update UI sebelum augmentasi
-    update_ui_before_augmentation(ui_components)
-    
     # Validasi parameter
     validation_result = validate_augmentation_parameters(ui_components)
     if not validation_result['valid']:
         log_message(ui_components, f"❌ {validation_result['message']}", "error")
-        reset_ui_after_augmentation(ui_components)
         return
     
     # Tampilkan konfirmasi
-    from smartcash.ui.dataset.augmentation.handlers.confirmation_handler import show_augmentation_confirmation
     show_augmentation_confirmation(ui_components, validation_result['params'])
+
+def show_augmentation_confirmation(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
+    """Tampilkan konfirmasi augmentasi."""
+    aug_types = params.get('types', ['combined'])
+    split = params.get('split_target', 'train')
+    
+    message = f"Anda akan menjalankan augmentasi {', '.join(aug_types)} pada dataset {split}. "
+    message += f"Akan menghasilkan {params.get('num_variations', 2)} variasi per gambar. Lanjutkan?"
+    
+    def on_confirm():
+        log_message(ui_components, "✅ Konfirmasi augmentasi diterima", "info")
+        execute_augmentation_process(ui_components, params)
+    
+    def on_cancel():
+        log_message(ui_components, "❌ Augmentasi dibatalkan", "info")
+    
+    show_confirmation(ui_components, "Konfirmasi Augmentasi Dataset", message, on_confirm, on_cancel)
 
 def execute_augmentation_process(ui_components: Dict[str, Any], params: Dict[str, Any]) -> None:
     """
-    Eksekusi proses augmentasi dengan progress tracking.
+    Eksekusi proses augmentasi secara synchronous (tanpa threading).
     
     Args:
         ui_components: Dictionary komponen UI
@@ -64,36 +69,33 @@ def execute_augmentation_process(ui_components: Dict[str, Any], params: Dict[str
     """
     logger = ui_components.get('logger', get_logger(AUGMENTATION_LOGGER_NAMESPACE))
     
+    # Set state running
+    set_augmentation_state(ui_components, True)
+    update_ui_before_augmentation(ui_components)
+    
     try:
         # Start progress tracking
         start_progress(ui_components, "🔄 Memulai augmentasi dataset...")
         
-        # Jalankan di thread terpisah
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(_run_augmentation_with_progress, ui_components, params)
-            
-            # Monitor progress
-            while not future.done():
-                if ui_components.get('stop_requested', False):
-                    log_message(ui_components, "⏹️ Augmentasi dihentikan oleh pengguna", "warning")
-                    future.cancel()
-                    break
-                threading.Event().wait(0.1)  # Check setiap 100ms
-            
-            # Dapatkan hasil
-            if not future.cancelled():
-                result = future.result()
-                _handle_augmentation_result(ui_components, result)
-    
+        # Jalankan augmentasi secara synchronous
+        result = _run_augmentation_sync(ui_components, params)
+        
+        # Handle hasil
+        _handle_augmentation_result(ui_components, result)
+        
     except Exception as e:
         log_message(ui_components, f"❌ Error augmentasi: {str(e)}", "error")
         logger.error(f"🔥 Error augmentasi: {str(e)}")
-    finally:
+        
+        # Reset UI pada error
         reset_ui_after_augmentation(ui_components)
+    finally:
+        # Pastikan state direset
+        set_augmentation_state(ui_components, False)
 
-def _run_augmentation_with_progress(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
+def _run_augmentation_sync(ui_components: Dict[str, Any], params: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Jalankan augmentasi dengan progress tracking detail.
+    Jalankan augmentasi secara synchronous dengan progress tracking.
     
     Args:
         ui_components: Dictionary komponen UI
@@ -102,22 +104,49 @@ def _run_augmentation_with_progress(ui_components: Dict[str, Any], params: Dict[
     Returns:
         Dictionary hasil augmentasi
     """
-    from smartcash.ui.dataset.augmentation.handlers.augmentation_executor import AugmentationExecutor
+    # Import augmentation service
+    from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
     
-    # Buat executor dengan progress callback
-    executor = AugmentationExecutor(ui_components)
+    # Buat service instance
+    service = AugmentationService()
     
-    # Register progress callback
+    # Setup progress callback
     def progress_callback(current: int, total: int, message: str = ""):
         if ui_components.get('stop_requested', False):
             return False  # Signal untuk stop
-        update_progress(ui_components, current, total, message)
+        
+        # Update progress UI
+        progress_percentage = int((current / total) * 100) if total > 0 else 0
+        update_progress(ui_components, progress_percentage, message)
+        
         return True
     
-    executor.set_progress_callback(progress_callback)
-    
-    # Jalankan augmentasi
-    return executor.execute(params)
+    # Jalankan augmentasi dengan progress callback
+    try:
+        log_message(ui_components, f"🚀 Memulai augmentasi dengan parameter: {params}", "info")
+        
+        # Panggil service augmentasi
+        result = service.augment_dataset(
+            data_dir=params.get('data_dir', 'data'),
+            split=params.get('split_target', 'train'),
+            types=params.get('types', ['combined']),
+            num_variations=params.get('num_variations', 2),
+            target_count=params.get('target_count', 1000),
+            output_prefix=params.get('output_prefix', 'aug'),
+            balance_classes=params.get('balance_classes', False),
+            validate_results=params.get('validate_results', True),
+            progress_callback=progress_callback,
+            create_symlinks=True  # Selalu buat symlinks
+        )
+        
+        return result
+        
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': f'Error saat augmentasi: {str(e)}',
+            'generated_images': 0
+        }
 
 def _handle_augmentation_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
     """
@@ -132,8 +161,9 @@ def _handle_augmentation_result(ui_components: Dict[str, Any], result: Dict[str,
         complete_progress(ui_components, f"✅ Augmentasi selesai: {generated_count} gambar dihasilkan")
         log_message(ui_components, f"🎉 Augmentasi berhasil! {generated_count} gambar baru dibuat", "success")
         
-        # Tampilkan opsi cleanup
-        ui_components.get('cleanup_button', {}).layout.display = 'block'
+        # Tampilkan tombol cleanup
+        if 'cleanup_button' in ui_components and hasattr(ui_components['cleanup_button'], 'layout'):
+            ui_components['cleanup_button'].layout.display = 'block'
         
     elif result.get('status') == 'cancelled':
         log_message(ui_components, "⏹️ Augmentasi dibatalkan", "warning")
@@ -141,6 +171,9 @@ def _handle_augmentation_result(ui_components: Dict[str, Any], result: Dict[str,
     else:
         error_msg = result.get('message', 'Augmentasi gagal')
         log_message(ui_components, f"❌ {error_msg}", "error")
+    
+    # Reset UI setelah selesai
+    reset_ui_after_augmentation(ui_components)
 
 def get_augmentation_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -164,7 +197,7 @@ def get_augmentation_config_from_ui(ui_components: Dict[str, Any]) -> Dict[str, 
         config['types'] = list(ui_components['augmentation_types'].value)
     
     # Extract boolean options
-    for bool_field in ['balance_classes', 'move_to_preprocessed', 'validate_results']:
+    for bool_field in ['balance_classes', 'validate_results']:
         if bool_field in ui_components and hasattr(ui_components[bool_field], 'value'):
             config[bool_field] = ui_components[bool_field].value
     

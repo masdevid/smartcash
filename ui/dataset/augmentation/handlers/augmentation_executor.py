@@ -1,19 +1,18 @@
 """
 File: smartcash/ui/dataset/augmentation/handlers/augmentation_executor.py
-Deskripsi: Executor untuk menjalankan proses augmentasi dengan progress tracking dan tqdm
+Deskripsi: Executor untuk menjalankan proses augmentasi tanpa threading (Colab compatible)
 """
 
 import os
 import time
 from typing import Dict, Any, Callable, Optional, List
-from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from tqdm.auto import tqdm
 
 from smartcash.common.logger import get_logger
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
 
 class AugmentationExecutor:
-    """Executor untuk proses augmentasi dengan progress tracking."""
+    """Executor untuk proses augmentasi tanpa threading (Colab compatible)."""
     
     def __init__(self, ui_components: Dict[str, Any]):
         """
@@ -128,7 +127,7 @@ class AugmentationExecutor:
     
     def _run_augmentation(self, params: Dict[str, Any], dataset_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Jalankan proses augmentasi dengan tqdm dan multiprocessing.
+        Jalankan proses augmentasi secara sequential dengan tqdm (tanpa multiprocessing).
         
         Args:
             params: Parameter augmentasi
@@ -150,31 +149,18 @@ class AugmentationExecutor:
         # Gunakan tqdm untuk progress bar
         with tqdm(total=total_tasks, desc="🔄 Augmentasi", unit="gambar", colour="green") as pbar:
             
-            # Gunakan ProcessPoolExecutor untuk CPU-intensive augmentation
-            max_workers = min(params.get('num_workers', 4), os.cpu_count())
-            
-            with ProcessPoolExecutor(max_workers=max_workers) as executor:
-                
-                # Submit semua tasks
-                future_to_file = {}
-                for file_info in files:
-                    for variation in range(num_variations):
-                        if self.ui_components.get('stop_requested', False):
-                            break
-                        
-                        future = executor.submit(
-                            self._augment_single_image,
-                            file_info, params, variation
-                        )
-                        future_to_file[future] = (file_info, variation)
-                
-                # Process hasil
-                for future in as_completed(future_to_file):
+            # Process secara sequential (tanpa multiprocessing untuk Colab)
+            for file_info in files:
+                for variation in range(num_variations):
+                    
+                    # Cek stop request
                     if self.ui_components.get('stop_requested', False):
                         break
                     
                     try:
-                        result = future.result()
+                        # Augmentasi single image
+                        result = self._augment_single_image(file_info, params, variation)
+                        
                         if result['success']:
                             generated_count += 1
                         
@@ -194,6 +180,10 @@ class AugmentationExecutor:
                         self.logger.error(f"🔥 Error task: {str(e)}")
                         pbar.update(1)
                         processed_count += 1
+                
+                # Break outer loop jika stop requested
+                if self.ui_components.get('stop_requested', False):
+                    break
         
         # Hasil akhir
         if self.ui_components.get('stop_requested', False):
@@ -231,7 +221,7 @@ class AugmentationExecutor:
             # Import augmentation service
             from smartcash.dataset.services.augmentor.augmentation_service import AugmentationService
             
-            # Buat service instance (per-process)
+            # Buat service instance
             service = AugmentationService()
             
             # Generate augmented image
@@ -258,3 +248,38 @@ class AugmentationExecutor:
         self.stop_requested = True
         self.ui_components['stop_requested'] = True
         log_message(self.ui_components, "⏹️ Permintaan stop diterima", "warning")
+
+# Fungsi utility untuk compatibility dengan handler lama
+def run_augmentation(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Jalankan augmentasi dengan executor.
+    Compatibility function untuk handler yang sudah ada.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dictionary hasil augmentasi
+    """
+    from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import get_augmentation_config_from_ui
+    
+    # Dapatkan konfigurasi dari UI
+    config = get_augmentation_config_from_ui(ui_components)
+    
+    # Buat executor
+    executor = AugmentationExecutor(ui_components)
+    
+    # Jalankan augmentasi
+    return executor.execute(config)
+
+def process_augmentation_result(ui_components: Dict[str, Any], result: Dict[str, Any]) -> None:
+    """
+    Process hasil augmentasi dan update UI.
+    Compatibility function untuk handler yang sudah ada.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        result: Hasil augmentasi
+    """
+    from smartcash.ui.dataset.augmentation.handlers.augmentation_handler import _handle_augmentation_result
+    _handle_augmentation_result(ui_components, result)

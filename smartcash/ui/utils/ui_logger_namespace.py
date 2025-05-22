@@ -10,6 +10,8 @@ KNOWN_NAMESPACES = {
     "smartcash.setup.dependency_installer": "DEP-INSTALLER",
     "smartcash.dataset.download": "DATASET-DOWNLOAD",
     "smartcash.ui.env_config": "ENV-CONFIG",
+    "smartcash.dataset.preprocessing": "PREPROCESSING",
+    "smartcash.dataset.augmentation": "AUGMENTATION"
     # Tambahkan namespace-namespace lain di sini jika diperlukan
 }
 
@@ -17,6 +19,8 @@ KNOWN_NAMESPACES = {
 DEPENDENCY_INSTALLER_LOGGER_NAMESPACE = "smartcash.setup.dependency_installer" 
 DOWNLOAD_LOGGER_NAMESPACE = "smartcash.dataset.download"
 ENV_CONFIG_LOGGER_NAMESPACE = "smartcash.ui.env_config"
+PREPROCESSING_LOGGER_NAMESPACE = "smartcash.dataset.preprocessing"
+AUGMENTATION_LOGGER_NAMESPACE = "smartcash.dataset.augmentation"
 
 def get_namespace_id(ui_components: Dict[str, Any]) -> Optional[str]:
     """

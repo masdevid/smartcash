@@ -1,11 +1,106 @@
 """
 File: smartcash/ui/dataset/augmentation/utils/validation_utils.py
-Deskripsi: Utilitas validasi untuk augmentasi dataset
+Deskripsi: Utilitas validasi untuk augmentasi dataset (lengkap dengan function yang hilang)
 """
 
 import os
 from typing import Dict, Any, List, Tuple, Optional
 from smartcash.ui.dataset.augmentation.utils.logger_helper import log_message
+
+def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validasi parameter augmentasi dari UI dan return dict dengan params yang valid.
+    
+    Args:
+        ui_components: Dictionary komponen UI
+        
+    Returns:
+        Dict dengan 'valid' (bool), 'message' (str), dan 'params' (dict) jika valid
+    """
+    try:
+        # Extract parameters dari UI
+        params = {}
+        
+        # Validasi jenis augmentasi
+        if 'augmentation_types' in ui_components:
+            aug_types = getattr(ui_components['augmentation_types'], 'value', [])
+            if not aug_types:
+                return {'valid': False, 'message': 'Jenis augmentasi tidak dipilih'}
+            params['types'] = list(aug_types)
+        else:
+            params['types'] = ['combined']  # default
+        
+        # Validasi num_variations
+        if 'num_variations' in ui_components:
+            num_variations = getattr(ui_components['num_variations'], 'value', 2)
+            if num_variations <= 0:
+                return {'valid': False, 'message': 'Jumlah variasi harus lebih dari 0'}
+            params['num_variations'] = num_variations
+        else:
+            params['num_variations'] = 2  # default
+        
+        # Validasi target_count
+        if 'target_count' in ui_components:
+            target_count = getattr(ui_components['target_count'], 'value', 1000)
+            if target_count <= 0:
+                return {'valid': False, 'message': 'Target count harus lebih dari 0'}
+            params['target_count'] = target_count
+        else:
+            params['target_count'] = 1000  # default
+        
+        # Validasi output_prefix
+        if 'output_prefix' in ui_components:
+            output_prefix = getattr(ui_components['output_prefix'], 'value', 'aug')
+            if not output_prefix or not output_prefix.strip():
+                return {'valid': False, 'message': 'Output prefix tidak boleh kosong'}
+            params['output_prefix'] = output_prefix.strip()
+        else:
+            params['output_prefix'] = 'aug'  # default
+        
+        # Validasi split target
+        if 'split_target' in ui_components:
+            split_target = getattr(ui_components['split_target'], 'value', 'train')
+        elif 'target_split' in ui_components:
+            split_target = getattr(ui_components['target_split'], 'value', 'train')
+        else:
+            split_target = 'train'  # default
+        
+        if split_target not in ['train', 'valid', 'test']:
+            return {'valid': False, 'message': f'Split target tidak valid: {split_target}'}
+        params['split_target'] = split_target
+        
+        # Validasi boolean options
+        params['balance_classes'] = getattr(ui_components.get('balance_classes', {}), 'value', False)
+        params['validate_results'] = getattr(ui_components.get('validate_results', {}), 'value', True)
+        params['process_bboxes'] = True  # Always true untuk augmentasi
+        
+        # Validasi dataset availability
+        data_dir = ui_components.get('data_dir', 'data')
+        dataset_valid, dataset_msg = validate_dataset_availability(ui_components, split_target, data_dir)
+        if not dataset_valid:
+            return {'valid': False, 'message': dataset_msg}
+        
+        # Validasi disk space
+        output_dir = ui_components.get('augmented_dir', 'data/augmented')
+        disk_valid, disk_msg = validate_disk_space(ui_components, output_dir, 1000)
+        if not disk_valid:
+            log_message(ui_components, f"⚠️ {disk_msg}", "warning")
+        
+        # Set additional params
+        params['output_dir'] = output_dir
+        params['data_dir'] = data_dir
+        params['num_workers'] = 4  # Default workers
+        
+        return {
+            'valid': True,
+            'message': f'Parameter valid untuk augmentasi {split_target}',
+            'params': params
+        }
+        
+    except Exception as e:
+        error_msg = f"Error validasi parameter: {str(e)}"
+        log_message(ui_components, error_msg, "error", "❌")
+        return {'valid': False, 'message': error_msg}
 
 def validate_augmentation_config(ui_components: Dict[str, Any], config: Dict[str, Any]) -> Tuple[bool, str]:
     """
@@ -176,49 +271,6 @@ def validate_ui_components(ui_components: Dict[str, Any]) -> Tuple[bool, List[st
     
     return len(missing_components) == 0, missing_components
 
-def validate_augmentation_parameters(ui_components: Dict[str, Any]) -> Tuple[bool, str]:
-    """
-    Validasi semua parameter augmentasi dari UI.
-    
-    Args:
-        ui_components: Dictionary komponen UI
-        
-    Returns:
-        Tuple (is_valid, error_message)
-    """
-    # Validasi split
-    split = getattr(ui_components.get('split_selector', {}), 'value', None)
-    if not split:
-        return False, "Split dataset tidak dipilih"
-    
-    # Validasi jenis augmentasi
-    aug_types = getattr(ui_components.get('augmentation_types', {}), 'value', None)
-    if not aug_types:
-        return False, "Jenis augmentasi tidak dipilih"
-    
-    # Validasi num_variations
-    num_variations = getattr(ui_components.get('num_variations', {}), 'value', 0)
-    if num_variations <= 0:
-        return False, "Jumlah variasi harus lebih dari 0"
-    
-    # Validasi target_count
-    target_count = getattr(ui_components.get('target_count', {}), 'value', 0)
-    if target_count <= 0:
-        return False, "Target count harus lebih dari 0"
-    
-    # Validasi output_prefix
-    output_prefix = getattr(ui_components.get('output_prefix', {}), 'value', '')
-    if not output_prefix:
-        return False, "Output prefix tidak boleh kosong"
-    
-    # Validasi dataset
-    data_dir = ui_components.get('data_dir', 'data')
-    is_available, error_msg = validate_dataset_availability(ui_components, split, data_dir)
-    if not is_available:
-        return False, error_msg
-    
-    return True, "Semua parameter valid"
-
 def get_validation_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     """
     Dapatkan ringkasan validasi lengkap.
@@ -237,10 +289,10 @@ def get_validation_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
     }
     
     # Validasi parameter
-    param_valid, param_error = validate_augmentation_parameters(ui_components)
-    if not param_valid:
+    param_result = validate_augmentation_parameters(ui_components)
+    if not param_result['valid']:
         summary['is_valid'] = False
-        summary['errors'].append(f"Parameter: {param_error}")
+        summary['errors'].append(f"Parameter: {param_result['message']}")
     
     # Validasi komponen UI
     ui_valid, missing_components = validate_ui_components(ui_components)
@@ -248,7 +300,7 @@ def get_validation_summary(ui_components: Dict[str, Any]) -> Dict[str, Any]:
         summary['warnings'].append(f"Komponen UI hilang: {', '.join(missing_components)}")
     
     # Validasi ruang disk
-    output_dir = getattr(ui_components.get('output_dir', {}), 'value', 'data/augmented')
+    output_dir = ui_components.get('augmented_dir', 'data/augmented')
     disk_valid, disk_msg = validate_disk_space(ui_components, output_dir)
     if not disk_valid:
         summary['warnings'].append(f"Ruang disk: {disk_msg}")
